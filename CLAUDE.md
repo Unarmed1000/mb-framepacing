@@ -38,9 +38,8 @@ dotnet run --project dotnet/app/FramePacing/FramePacing.csproj -- selftest --fps
 - CI: `.github/workflows/ci.yml` builds and tests C++ and .NET on Windows, Ubuntu and macOS and checks formatting.
 - If you change the marker payload or geometry, regenerate the golden set with
   `cpp/build/<preset>/Release/marker-render --golden test-data/markers` (Windows: `...\Release\marker-render.exe`) and run the C# tests.
-- This machine has a `Platform=x64` environment variable: building a single project writes to `bin/x64/...`, while building
-  the `.slnx` writes to `bin/...`. `dotnet run --no-build` after a solution build can therefore run a stale binary. Build the
-  project you run.
+- Every .NET project is pinned to AnyCPU in `Directory.Build.props`, because some machines set a `Platform=x64` environment
+  variable. Keep that pin: without it, single-project builds go to `bin/x64` and cause MSB3270 warnings.
 - Verify the GUI without touching the desktop: `mb-framepacing-gui --demo --output-root <dir>` captures and analyses the synthetic
   game and writes the reports to disk (demo and `--output-root` runs never save settings). Do not take screenshots.
 
