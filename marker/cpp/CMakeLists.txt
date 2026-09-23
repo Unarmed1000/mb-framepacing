@@ -13,6 +13,9 @@ endif()
 # Edit marker/VERSION to bump the marker libraries, or override with -DMB_FRAMEMARKER_VERSION=x.y.z.
 file(STRINGS "${MB_FRAMEMARKER_META_DIR}/VERSION" MB_FRAMEMARKER_VERSION_FILE LIMIT_COUNT 1)
 set(MB_FRAMEMARKER_VERSION "${MB_FRAMEMARKER_VERSION_FILE}" CACHE STRING "mb_framemarker version (defaults to marker/VERSION)")
+if(NOT MB_FRAMEMARKER_VERSION MATCHES "^[0-9]+\.[0-9]+\.[0-9]+$")
+  message(FATAL_ERROR "MB_FRAMEMARKER_VERSION '${MB_FRAMEMARKER_VERSION}' is not MAJOR.MINOR.PATCH (a parent project may have set a variable of that name)")
+endif()
 
 project(mb_framemarker VERSION ${MB_FRAMEMARKER_VERSION} DESCRIPTION "Pixel aligned QR frame marker geometry" LANGUAGES C CXX)
 
@@ -33,6 +36,8 @@ configure_file(cmake/Version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/mb/frame
 
 add_library(mb_framemarker STATIC)
 add_library(mb::framemarker ALIAS mb_framemarker)
+# Installed copies export the same name as the alias: find_package(mb_framemarker) gives mb::framemarker too
+set_target_properties(mb_framemarker PROPERTIES EXPORT_NAME framemarker)
 target_sources(mb_framemarker
   PRIVATE
     src/FrameMarker.cpp
