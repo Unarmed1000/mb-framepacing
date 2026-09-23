@@ -3,7 +3,7 @@
   "printWidth": 130,
   "tabWidth": 2,
   "useTabs": false,
-  "endOfLine": "lf",
+  "endOfLine": "auto",
   "proseWrap": "preserve",
   "overrides": [
     {
