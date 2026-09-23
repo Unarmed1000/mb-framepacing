@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+             xmlns:scottplot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+             x:Class="MB.FramePacing.Gui.Views.AnalysisView"
+             x:DataType="vm:AnalysisViewModel">
+  <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+    <!-- Which capture -->
+    <Border Classes="card" Padding="12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+        <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains frames.mbfc)" />
+        <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
+        <ComboBox Grid.Column="2" ItemsSource="{Binding TimeSources}" SelectedItem="{Binding SelectedTimeSource}"
+                  ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available." />
+        <Button Grid.Column="3" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
+        <Button Grid.Column="4" Content="Open reports" Command="{Binding OpenReportsCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Status, warnings -->
+    <StackPanel Grid.Row="1" Spacing="4">
+      <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" IsVisible="{Binding IsBusy}" />
+      <TextBlock Classes="subtle" Text="{Binding SummaryText}" TextWrapping="Wrap" />
+      <TextBlock Classes="error" Text="{Binding ErrorText}" />
+      <ItemsControl ItemsSource="{Binding Warnings}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Classes="warning" Text="{Binding StringFormat='⚠ {0}'}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- Headline numbers for the selected run -->
+    <StackPanel Grid.Row="2" Spacing="10" IsVisible="{Binding HasRun}">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <ComboBox ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="260" />
+        <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding SelectedRun.StartText, FallbackValue=''}" />
+      </Grid>
+      <WrapPanel ItemSpacing="10" LineSpacing="10">
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Presented frames" />
+            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.PresentedFramesText, FallbackValue='-'}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile" ToolTip.Tip="Frames whose animation time is off by more than one capture period (the measurement resolution)">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Frames visibly off" />
+            <TextBlock Classes="tileValue" Classes.warning="{Binding SelectedRun.HasErrorFrames, FallbackValue=False}"
+                       Text="{Binding SelectedRun.ErrorFramesTile, FallbackValue='-'}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile" ToolTip.Tip="95% of the frames have an animation error below this">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Typical error (p95)" />
+            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.TypicalErrorText, FallbackValue='-'}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Worst error" />
+            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.WorstErrorText, FallbackValue='-'}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile" ToolTip.Tip="One capture period: times are only known to this precision">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Resolution" />
+            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.ResolutionText, FallbackValue='-'}" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+      <TextBlock Classes="caption" Text="{Binding SelectedRun.CountsText, FallbackValue=''}" TextWrapping="Wrap" />
+      <ItemsControl ItemsSource="{Binding SelectedRun.Warnings, FallbackValue={x:Null}}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Classes="warning" Text="{Binding StringFormat='⚠ {0}'}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Expander Header="Detailed statistics (ms)" HorizontalAlignment="Stretch">
+        <StackPanel>
+          <Grid ColumnDefinitions="170,80,80,80,80,80,80,80">
+            <TextBlock Grid.Column="1" Classes="caption" Text="min" TextAlignment="Right" />
+            <TextBlock Grid.Column="2" Classes="caption" Text="mean" TextAlignment="Right" />
+            <TextBlock Grid.Column="3" Classes="caption" Text="p50" TextAlignment="Right" />
+            <TextBlock Grid.Column="4" Classes="caption" Text="p95" TextAlignment="Right" />
+            <TextBlock Grid.Column="5" Classes="caption" Text="p99" TextAlignment="Right" />
+            <TextBlock Grid.Column="6" Classes="caption" Text="max" TextAlignment="Right" />
+            <TextBlock Grid.Column="7" Classes="caption" Text="stddev" TextAlignment="Right" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding SelectedRun.Statistics, FallbackValue={x:Null}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StatisticsRow">
+                <Grid ColumnDefinitions="170,80,80,80,80,80,80,80">
+                  <TextBlock Grid.Column="0" Text="{Binding Name}" />
+                  <TextBlock Grid.Column="1" Classes="value" Text="{Binding Min}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="2" Classes="value" Text="{Binding Mean}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="3" Classes="value" Text="{Binding P50}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="4" Classes="value" Text="{Binding P95}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="5" Classes="value" Text="{Binding P99}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="6" Classes="value" Text="{Binding Max}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="7" Classes="value" Text="{Binding StdDev}" TextAlignment="Right" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Expander>
+    </StackPanel>
+
+    <!-- Charts -->
+    <Border Grid.Row="3" Classes="card" Padding="4" IsVisible="{Binding HasRun}">
+      <TabControl>
+        <TabItem Header="Animation error">
+          <scottplot:AvaPlot x:Name="ErrorPlot" />
+        </TabItem>
+        <TabItem Header="Error histogram">
+          <scottplot:AvaPlot x:Name="ErrorHistogramPlot" />
+        </TabItem>
+        <TabItem Header="Error percentiles">
+          <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
+        </TabItem>
+        <TabItem Header="Frame times">
+          <scottplot:AvaPlot x:Name="FrameTimePlot" />
+        </TabItem>
+        <TabItem Header="Frame time histogram">
+          <scottplot:AvaPlot x:Name="FrameTimeHistogramPlot" />
+        </TabItem>
+        <TabItem Header="Drift">
+          <scottplot:AvaPlot x:Name="DriftPlot" />
+        </TabItem>
+      </TabControl>
+    </Border>
+  </Grid>
+</UserControl>

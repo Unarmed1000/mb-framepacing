@@ -1,0 +1,22 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Folder Name="/app/">
+    <Project Path="app/FramePacing/FramePacing.csproj" />
+    <Project Path="app/FramePacing.Gui/FramePacing.Gui.csproj" />
+  </Folder>
+  <Folder Name="/libs/">
+    <Project Path="libs/MB.FramePacing.Analysis/MB.FramePacing.Analysis.csproj" />
+    <Project Path="libs/MB.FramePacing.Capture/MB.FramePacing.Capture.csproj" />
+    <Project Path="libs/MB.FramePacing.Marker/MB.FramePacing.Marker.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/DocImages/DocImages.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="libs/MB.FramePacing.Analysis/UnitTest/MB.FramePacing.Analysis.UnitTest.csproj" />
+    <Project Path="libs/MB.FramePacing.Capture/UnitTest/MB.FramePacing.Capture.UnitTest.csproj" />
+    <Project Path="libs/MB.FramePacing.Marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+# Generated, vendored or third-party content: never reformat
+node_modules/
+**/bin/
+**/obj/
+**/build/
+**/publish/
+**/TestResults/
+cpp/third_party/
+test-data/
+licenses/*.txt
+package-lock.json
+doc/images/
+
+# clang tool configs (clang-tidy accepts YAML that Prettier rejects)
+cpp/.clang-format
+cpp/.clang-tidy

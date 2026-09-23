@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Developer tool: renders the images used by README.md / doc (GUI screenshots rendered offscreen, marker examples). Not shipped. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DocImages</AssemblyName>
+    <RootNamespace>MB.FramePacing.DocImages</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\app\FramePacing.Gui\FramePacing.Gui.csproj" />
+  </ItemGroup>
+</Project>

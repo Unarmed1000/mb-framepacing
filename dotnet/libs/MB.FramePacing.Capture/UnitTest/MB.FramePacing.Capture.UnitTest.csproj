@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\UnitTest.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Capture.csproj" />
+  </ItemGroup>
+</Project>

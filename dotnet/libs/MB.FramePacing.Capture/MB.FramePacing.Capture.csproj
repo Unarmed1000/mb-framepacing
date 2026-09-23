@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.Capture.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NLog" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Marker\MB.FramePacing.Marker.csproj" />
+  </ItemGroup>
+</Project>

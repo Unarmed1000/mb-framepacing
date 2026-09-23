@@ -1,0 +1,19 @@
+<Project>
+  <!-- Shared settings for every project in the solution.
+       The version comes from the repository's VERSION file, shared with the C++ library (cpp/CMakeLists.txt).
+       Edit VERSION to bump everything; override a single build with -p:VersionPrefix=x.y.z or add -p:VersionSuffix=beta1. -->
+  <PropertyGroup>
+    <VersionPrefix>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../VERSION').Trim())</VersionPrefix>
+    <Company>Mana Battery ApS</Company>
+    <Copyright>Copyright (c) 2026, Mana Battery ApS</Copyright>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- Each library keeps its tests in a UnitTest sub folder; never compile them into the library itself -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);UnitTest\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

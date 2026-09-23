@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/mb_framemarkerTargets.cmake")
+check_required_components(mb_framemarker)

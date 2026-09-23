@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.Analysis.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Capture\MB.FramePacing.Capture.csproj" />
+  </ItemGroup>
+</Project>

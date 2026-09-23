@@ -1,0 +1,13 @@
+{
+  "name": "mb-framepacing-tooling",
+  "private": true,
+  "description": "Formatting for the Markdown, JSON and YAML files of mb-framepacing (the code has CSharpier and clang-format).",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "3.9.9"
+  }
+}
