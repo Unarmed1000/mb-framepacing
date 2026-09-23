@@ -1,0 +1,171 @@
+# Release the marker libraries (C++, C# and the Unity package): push a tag marker-v<version> that matches marker/VERSION.
+#   1. verify   the tag is semantic versioning and matches marker/VERSION
+#   2. test     C++ and C# libraries on Windows, Ubuntu and macOS, and the documented CMake consumer setups
+#   3. package  the C++ source archives (tar.gz, zip) and SHA256SUMS; the extracted archive must build, pass its tests and work through
+#               FetchContent (URL + URL_HASH) before anything is published
+#   4. release  a GitHub Release with the archives and the snippets to use them
+#   5. upm      the Unity package on the orphan branch upm, tagged upm/v<version> (install from git URL ...#upm/v<version>)
+# See doc/releasing.md. Everything uses the default GITHUB_TOKEN; GitHub-hosted runners are free for public repositories.
+name: release-marker
+
+on:
+  push:
+    tags: ["marker-v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        name: Tag is marker-v<semver> and matches marker/VERSION
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#marker-v}"
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::$GITHUB_REF_NAME is not marker-v<major>.<minor>.<patch>"; exit 1
+          fi
+          expected="$(tr -d '[:space:]' < marker/VERSION)"
+          if [ "$version" != "$expected" ]; then
+            echo "::error::the tag says $version, marker/VERSION says $expected"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: test ${{ matrix.os }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: CMake 4
+        uses: lukka/get-cmake@latest
+      - name: C++ library
+        shell: bash
+        run: |
+          cmake -S marker/cpp -B marker/cpp/build/release -DCMAKE_BUILD_TYPE=Release
+          cmake --build marker/cpp/build/release --config Release --parallel
+          ctest --test-dir marker/cpp/build/release -C Release --output-on-failure
+      - name: C# library
+        run: dotnet test marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj -c Release
+      - name: CMake consumers (FetchContent, add_subdirectory, find_package)
+        shell: bash
+        run: |
+          # Windows runners have 'python', Linux and macOS 'python3'
+          "$(command -v python3 || command -v python)" marker/cpp/tests/consumer/check_consumers.py
+
+  package:
+    name: package C++ archives
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4
+        uses: lukka/get-cmake@latest
+      - name: Create and verify the archives
+        run: python3 marker/cpp/package_release.py --output dist --verify
+      - uses: actions/upload-artifact@v7
+        with:
+          name: marker-release
+          path: dist/
+          retention-days: 7
+
+  release:
+    name: GitHub Release
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: marker-release
+          path: dist
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          sha256="$(grep "mb-framemarker-cpp-$VERSION.tar.gz" dist/SHA256SUMS | cut -d' ' -f1)"
+          major_minor="${VERSION%.*}"
+          cat > notes.md <<EOF
+          ## C++ (CMake 4.0+, C++20)
+
+          \`\`\`cmake
+          include(FetchContent)
+          FetchContent_Declare(mb_framemarker
+            URL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/mb-framemarker-cpp-${VERSION}.tar.gz
+            URL_HASH SHA256=${sha256}
+            FIND_PACKAGE_ARGS ${major_minor} CONFIG)
+          FetchContent_MakeAvailable(mb_framemarker)
+          target_link_libraries(my_game PRIVATE mb::framemarker)
+          \`\`\`
+
+          ## Unity (2021.3+)
+
+          Package Manager, Add package from git URL:
+          \`\`\`text
+          https://github.com/${GITHUB_REPOSITORY}.git#upm/v${VERSION}
+          \`\`\`
+
+          ## C# (.NET Standard 2.0)
+
+          The general library is \`marker/csharp\` at this tag.
+          EOF
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Marker libraries $VERSION" --notes-file notes.md --generate-notes
+
+  upm:
+    name: Unity package (upm branch)
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Assemble the package
+        run: python3 marker/unity/build_upm.py --output "$RUNNER_TEMP/package" --check
+      - name: Commit it to the upm branch and tag it
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="$RUNNER_TEMP/upm-branch"
+          if git ls-remote --exit-code --heads origin upm > /dev/null; then
+            git fetch origin upm
+            git worktree add "$branch" -B upm origin/upm
+          else
+            git worktree add --orphan -b upm "$branch"
+          fi
+          find "$branch" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R "$RUNNER_TEMP/package/." "$branch/"
+          cd "$branch"
+          git add -A
+          git commit -m "com.manabattery.framemarker $VERSION (from $GITHUB_REF_NAME, ${GITHUB_SHA::7})"
+          git tag "upm/v$VERSION"
+          git push origin upm "upm/v$VERSION"

@@ -18,8 +18,8 @@ error**.
 > unmodified game or app that you cannot rebuild.
 
 **Get started:** install on [Windows](doc/install/windows.md) · [Ubuntu](doc/install/ubuntu.md) ·
-[macOS (Homebrew)](doc/install/macos.md), add the marker with [Integrating the marker](doc/integrating.md), then measure with
-[Using mb-framepacing](doc/usage.md).
+[macOS (Homebrew)](doc/install/macos.md), add the marker with [Integrating the marker](doc/integrating.md) (C++ or C#) or the
+[Unity package](doc/unity.md), then measure with [Using mb-framepacing](doc/usage.md).
 
 ## Why this exists
 
@@ -90,20 +90,24 @@ flowchart LR
 
 ### 1. Once: build the marker into your application
 
-Link the library and draw the marker as the very last thing in every frame, after post effects and UI, in pure black and white:
+Link the library and draw the marker as the very last thing in every frame, after post effects and UI, in pure black and white.
+It writes pixel aligned triangles straight into your vertex buffer, without allocating:
 
 ```cpp
 #include <mb/framemarker/FrameMarker.hpp>
 namespace FM = MB::FrameMarker;
 
-std::array<FM::Quad, FM::MaxQuadCount()> quads;
-const std::size_t count = FM::GenerateQuads({frameIndex, animationTicks, runId, FM::MarkerKind::Frame}, options, origin, quads);
-for (std::size_t i = 0; i < count; ++i)
-  FillRect(quads[i], quads[i].Dark ? Black : White);   // your renderer: a rectangle, two triangles, ...
+std::array<FM::Vertex, FM::MaxFrameTriangleVertexCount()> vertices;   // once
+const std::size_t count = FM::GenerateTriangles({frameIndex, animationTicks, runId, FM::MarkerKind::Frame}, options, origin, vertices);
+DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
 
-`frameIndex` counts rendered frames, `animationTicks` is the time the frame was animated for (100 ns ticks). Choosing the size and
-position, and the start/end markers, are covered in **[Integrating the marker](doc/integrating.md)**.
+`frameIndex` counts rendered frames, `animationTicks` is the time the frame was animated for (100 ns ticks).
+
+- **C++:** see **[Integrating the marker](doc/integrating.md)** for adding the library with CMake (a release archive, git,
+  `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
+- **C#:** the general library [`marker/csharp`](marker/csharp) has the same API (`MarkerGenerator.GenerateTriangles`).
+- **Unity:** the **[Unity package](doc/unity.md)** adds an overlay component that does all of this for you.
 
 ### 2. Every test: record, run, analyse
 
@@ -227,7 +231,7 @@ mb-framepacing analyze <capture folder>                   # (re)analyse
 | Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream   |
 | Live capture     | An HDMI/DP capture card that passes the signal through unchanged (1080p 240 Hz cards are common) |
 | Disk             | A fast SSD: 960×540 writes about 0.5 MB per frame (use `--scale` or `--roi` to reduce it)        |
-| Your application | Its source code, built with the C++20 marker library (any engine, any graphics API)              |
+| Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                 |
 
 ### How fast can it record?
 
@@ -273,6 +277,11 @@ dotnet test mb-framepacing.slnx
 
 # C++ marker library (presets: windows, linux, linux-clang, macos); the tests fetch GoogleTest
 cd marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
+python marker/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
+
+# Unity package: assemble and validate; check it in a real Unity editor (batch mode, needs a Unity license)
+python marker/unity/build_upm.py --output dist/upm --check
+python marker/unity/check_in_unity.py
 
 # Self-contained single-file executables for this machine (or --rid linux-x64, osx-arm64, ...)
 python measure/build_standalone.py
@@ -286,37 +295,45 @@ npm install && npm run format
 dotnet run --project measure/tools/DocImages
 ```
 
-The marker libraries are versioned in [`marker/VERSION`](marker/VERSION) and the tools in [`measure/VERSION`](measure/VERSION). The pieces fit together like this:
+The marker libraries are versioned in [`marker/VERSION`](marker/VERSION) and the tools in [`measure/VERSION`](measure/VERSION);
+[Releasing](doc/releasing.md) describes both release streams. The pieces fit together like this:
 
 ```mermaid
 flowchart TB
-    subgraph cpp["marker/cpp/ (C++20, CMake): goes into your application"]
-        L["mb_framemarker<br/>marker geometry for your engine"]
+    subgraph marker["marker/: goes into your application"]
+        L["marker/cpp: mb_framemarker<br/>C++20 library"]
         R["marker-render<br/>golden test images"]
+        CS["marker/csharp: MB.FrameMarker<br/>C# library (.NET Standard 2.0)"]
+        U["marker/unity<br/>Unity package + helpers"]
     end
     subgraph dotnet["measure/ (.NET 10): records and analyses"]
-        M["MB.FramePacing.Marker<br/>payload, QR decoding"]
+        M["MB.FramePacing.Marker<br/>QR decoding"]
         CAP["MB.FramePacing.Capture<br/>recorder, ffmpeg, video/image/stream sources"]
         AN["MB.FramePacing.Analysis<br/>timeline, animation error, reports"]
         CLI["mb-framepacing<br/>command line"]
         GUI["mb-framepacing-gui<br/>Avalonia"]
     end
-    R -- "test-data/markers" --> M
+    R -- "golden images + module digest" --> CS
+    L -.->|same pixels| CS
+    CS --> U
+    CS -- "draws markers for the synthetic game" --> M
     M --> CAP --> AN --> CLI
     AN --> GUI
 ```
 
-| Path                      | Contents                                                                      |
-| ------------------------- | ----------------------------------------------------------------------------- |
-| `marker/`                 | **Goes into your application**: the marker libraries and their version        |
-| `marker/cpp/`             | The C++20 marker library, `marker-render` (golden images), GoogleTest tests   |
-| `measure/`                | **Measures it**: the recording and analysis tools and their version           |
-| `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                 |
-| `measure/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)           |
-| `measure/tools/DocImages` | Renders `doc/images` (GUI screenshots offscreen, marker examples)             |
-| `doc/`                    | Platform guides, usage guide, integration guide, marker specification, images |
-| `test-data/markers/`      | Golden marker images written by the C++ library and decoded by the C# tests   |
-| `licenses/`               | Licenses of every third-party component                                       |
+| Path                      | Contents                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `marker/`                 | **Goes into your application**: the marker libraries and their version                            |
+| `marker/cpp/`             | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check |
+| `marker/csharp/`          | The general C# marker library `MB.FrameMarker` (.NET Standard 2.0, C# 9) and its NUnit tests      |
+| `marker/unity/`           | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)      |
+| `measure/`                | **Measures it**: the recording and analysis tools and their version                               |
+| `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                                     |
+| `measure/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                               |
+| `measure/tools/DocImages` | Renders `doc/images` (GUI screenshots offscreen, marker examples)                                 |
+| `doc/`                    | Platform, usage, integration, Unity and release guides, marker specification, images              |
+| `test-data/markers/`      | Golden marker images and module digest written by the C++ library, checked by the C# libraries    |
+| `licenses/`               | Licenses of every third-party component                                                           |
 
 ## License
 

@@ -2,24 +2,27 @@
 
 Frame pacing / animation error measurement.
 
-- **`marker/`** holds what goes **into** the application: the C++20 marker library (`marker/cpp/`), which draws a QR marker into every
-  frame.
+- **`marker/`** holds what goes **into** the application: the marker libraries, which draw a QR marker into every frame.
+  They are the C++20 library (`marker/cpp/`), the general C# library (`marker/csharp/`) and the Unity package (`marker/unity/`).
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
 
 See `README.md` for the overview and `doc/marker-format.md` for the marker specification. **The document is the reference**: C++
-(`marker/cpp/src/Payload.cpp`) and C# (`MarkerPayload.cs`) must match it byte for byte.
+(`marker/cpp/src/Payload.cpp`) and C# (`marker/csharp/source/Marker.cs`) must match it byte for byte. The tools'
+`MarkerPayload` delegates to the C# library; ZXing is only used for decoding.
 
 ## Layout
 
-| Path                                              | Contents                                                                           |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                   |
-| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets               |
-| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                               |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis libraries (+ `UnitTest/`), DocImages    |
-| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions |
-| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                               |
-| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses   |
+| Path                                              | Contents                                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                             |
+| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                         |
+| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.0, C# 9, no dependencies) + NUnit tests |
+| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                |
+| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                         |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis libraries (+ `UnitTest/`), DocImages              |
+| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions           |
+| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                         |
+| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses             |
 
 ## Build and test
 
@@ -79,7 +82,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
-- **CI:** `.github/workflows/ci.yml` builds and tests C++ and .NET on Windows, Ubuntu and macOS, and checks formatting. A `tools-v*`
+- **CI:** `.github/workflows/ci.yml` builds and tests C++, the CMake consumer project and .NET on Windows, Ubuntu and macOS, and checks formatting, Python and the Unity package assembly.
+  `.github/workflows/release-marker.yml` releases the marker libraries on a `marker-v*` tag (see `doc/releasing.md`). A `tools-v*`
   tag (which must match `measure/VERSION`) also builds the self-contained tools.
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `marker/cpp/build/<preset>/Release/marker-render --golden test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
