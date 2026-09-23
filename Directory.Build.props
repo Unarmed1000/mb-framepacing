@@ -1,0 +1,21 @@
+<Project>
+  <!-- Shared settings for every .NET project in the repository (marker/ and measure/). marker/Directory.Build.props and
+       measure/Directory.Build.props import this file and add their own target framework and version.
+       MSBuild also imports this file into the Visual Studio C++ projects CMake generates (marker/cpp/build/...), so everything here is
+       limited to C# projects. -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <Company>Mana Battery ApS</Company>
+    <Copyright>Copyright (c) 2026, Mana Battery ApS</Copyright>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- Every project is AnyCPU. Some machines set a Platform=x64 environment variable (for C++ builds); left alone it makes single
+         project builds produce x64 assemblies in bin/x64 and MSB3270 architecture mismatch warnings. Project properties override
+         environment variables, so this pins it (an explicit -p:Platform=... still wins). -->
+    <Platform>AnyCPU</Platform>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- Each library keeps its tests in a UnitTest sub folder; never compile them into the library itself -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);UnitTest\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

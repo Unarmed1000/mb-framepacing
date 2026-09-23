@@ -1,17 +1,17 @@
-# C++ (CMake presets build into cpp/build/<preset>)
-/cpp/build/
-/cpp/out/
+# C++ (CMake presets build into marker/cpp/build/<preset>)
+/marker/cpp/build/
+/marker/cpp/out/
 CMakeUserPresets.json
 
-# .NET - the .csproj/.sln files are generated from MB.gen by FslBuildGen but are committed,
-# so the solution builds with a plain 'dotnet build' without the FslBuild tooling.
+# .NET
 bin/
 obj/
 TestResults/
 *.user
 *.lscache
-/dotnet/build/
-/dotnet/logs/
+/build/
+/measure/build/
+/measure/logs/
 publish/
 
 # Capture output

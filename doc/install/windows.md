@@ -31,7 +31,7 @@ In a new terminal:
 ```powershell
 git clone https://github.com/Unarmed1000/mb-framepacing.git
 cd mb-framepacing
-python dotnet/build_standalone.py        # self-contained executables in dotnet\publish\win-x64\cli and \gui
+python measure/build_standalone.py        # self-contained executables in measure\publish\win-x64\cli and \gui
 ```
 
 Install both into one folder and put it on your PATH (once):
@@ -39,7 +39,7 @@ Install both into one folder and put it on your PATH (once):
 ```powershell
 $dest = "$env:LOCALAPPDATA\Programs\mb-framepacing"
 New-Item -ItemType Directory -Force $dest | Out-Null
-Copy-Item -Recurse -Force dotnet\publish\win-x64\cli\*, dotnet\publish\win-x64\gui\* $dest
+Copy-Item -Recurse -Force measure\publish\win-x64\cli\*, measure\publish\win-x64\gui\* $dest
 [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$dest", "User")
 ```
 
@@ -49,8 +49,8 @@ copy again. On an ARM PC the folders are called `win-arm64`.
 Just trying it? Run it straight from the source instead of installing:
 
 ```powershell
-dotnet run --project dotnet/app/FramePacing.Gui                  # the GUI
-dotnet run --project dotnet/app/FramePacing -- selftest          # the command line: everything after -- goes to mb-framepacing
+dotnet run --project measure/app/FramePacing.Gui                  # the GUI
+dotnet run --project measure/app/FramePacing -- selftest          # the command line: everything after -- goes to mb-framepacing
 ```
 
 ### Prebuilt
@@ -101,7 +101,7 @@ Install Visual Studio 2026 (or 2022) with the "Desktop development with C++" wor
 (`winget install Kitware.CMake`), then:
 
 ```powershell
-cd cpp
+cd marker/cpp
 cmake --preset windows
 cmake --build --preset windows
 ctest --preset windows

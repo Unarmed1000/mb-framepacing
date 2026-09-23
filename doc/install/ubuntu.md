@@ -20,14 +20,14 @@ Needs the .NET 10 SDK, Git and Python 3 (Ubuntu has Python already):
 sudo apt install dotnet-sdk-10.0 git     # if dotnet-sdk-10.0 is not found: sudo add-apt-repository ppa:dotnet/backports && sudo apt update
 git clone https://github.com/Unarmed1000/mb-framepacing.git
 cd mb-framepacing
-python3 dotnet/build_standalone.py        # self-contained executables in dotnet/publish/linux-x64/cli and /gui
+python3 measure/build_standalone.py        # self-contained executables in measure/publish/linux-x64/cli and /gui
 ```
 
 Install both into one folder and link them into `~/.local/bin`, which Ubuntu puts on your PATH:
 
 ```sh
 mkdir -p ~/.local/share/mb-framepacing ~/.local/bin
-cp -r dotnet/publish/linux-x64/cli/. dotnet/publish/linux-x64/gui/. ~/.local/share/mb-framepacing/
+cp -r measure/publish/linux-x64/cli/. measure/publish/linux-x64/gui/. ~/.local/share/mb-framepacing/
 ln -sf ~/.local/share/mb-framepacing/mb-framepacing ~/.local/bin/mb-framepacing
 ln -sf ~/.local/share/mb-framepacing/mb-framepacing-gui ~/.local/bin/mb-framepacing-gui
 ```
@@ -38,8 +38,8 @@ again. On ARM machines the folders are called `linux-arm64`.
 Just trying it? Run it straight from the source instead of installing:
 
 ```sh
-dotnet run --project dotnet/app/FramePacing.Gui                  # the GUI
-dotnet run --project dotnet/app/FramePacing -- selftest          # the command line: everything after -- goes to mb-framepacing
+dotnet run --project measure/app/FramePacing.Gui                  # the GUI
+dotnet run --project measure/app/FramePacing -- selftest          # the command line: everything after -- goes to mb-framepacing
 ```
 
 The GUI needs a few desktop libraries that most desktops already have:
@@ -97,7 +97,7 @@ The library needs CMake 4.0 or newer; Ubuntu's `cmake` package may be older. Get
 
 ```sh
 sudo apt install build-essential        # GCC 12+ (or clang-16+ for the linux-clang preset)
-cd cpp
+cd marker/cpp
 cmake --preset linux
 cmake --build --preset linux
 ctest --preset linux

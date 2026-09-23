@@ -1,4 +1,0 @@
-<Solution>
-  <!-- Per-project solution for mb-quality, which treats every folder with a solution as a target. The IDE solution is dotnet/mb-framepacing.slnx. -->
-  <Project Path="FramePacing.Gui.csproj" />
-</Solution>

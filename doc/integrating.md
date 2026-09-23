@@ -105,7 +105,7 @@ or record with any other tool (a lossless video, a high speed camera's image seq
 
 ## Checking your integration
 
-- `cpp/tools/marker-render` writes marker images (PGM) for any payload, so you can compare your renderer's output pixel by pixel.
+- `marker/cpp/tools/marker-render` writes marker images (PGM) for any payload, so you can compare your renderer's output pixel by pixel.
 - The GUI's live preview shows the decoded marker while capturing; "No marker seen yet" means the marker does not reach the
   capture unmodified (drawn too early, blended, scaled, too small).
 - A capture whose analysis warns about the module size needs a bigger `ModuleSizePx` or a smaller downscale.

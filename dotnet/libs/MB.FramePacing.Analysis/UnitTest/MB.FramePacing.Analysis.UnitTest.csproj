@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="..\..\..\UnitTest.props" />
-
-  <ItemGroup>
-    <ProjectReference Include="..\MB.FramePacing.Analysis.csproj" />
-  </ItemGroup>
-</Project>

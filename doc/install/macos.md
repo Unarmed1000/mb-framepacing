@@ -21,14 +21,14 @@ brew install --cask dotnet-sdk
 brew install python
 git clone https://github.com/Unarmed1000/mb-framepacing.git
 cd mb-framepacing
-python3 dotnet/build_standalone.py        # self-contained executables in dotnet/publish/osx-arm64/cli and /gui
+python3 measure/build_standalone.py        # self-contained executables in measure/publish/osx-arm64/cli and /gui
 ```
 
 Install both into one folder and put it on your PATH (once):
 
 ```sh
 mkdir -p ~/Applications/mb-framepacing
-cp -R dotnet/publish/osx-arm64/cli/ dotnet/publish/osx-arm64/gui/ ~/Applications/mb-framepacing/
+cp -R measure/publish/osx-arm64/cli/ measure/publish/osx-arm64/gui/ ~/Applications/mb-framepacing/
 echo 'export PATH="$HOME/Applications/mb-framepacing:$PATH"' >> ~/.zprofile
 ```
 
@@ -39,8 +39,8 @@ from the terminal.
 Just trying it? Run it straight from the source instead of installing:
 
 ```sh
-dotnet run --project dotnet/app/FramePacing.Gui                  # the GUI
-dotnet run --project dotnet/app/FramePacing -- selftest          # the command line: everything after -- goes to mb-framepacing
+dotnet run --project measure/app/FramePacing.Gui                  # the GUI
+dotnet run --project measure/app/FramePacing -- selftest          # the command line: everything after -- goes to mb-framepacing
 ```
 
 ### Prebuilt
@@ -96,7 +96,7 @@ and reading the results, in the GUI and on the command line.
 ```sh
 xcode-select --install     # AppleClang 15+
 brew install cmake         # 4.0 or newer
-cd cpp
+cd marker/cpp
 cmake --preset macos
 cmake --build --preset macos
 ctest --preset macos

@@ -6,7 +6,7 @@ installing is covered by the platform guides: [Windows](install/windows.md) · [
 
 Everything the GUI does can also be done on the command line (`mb-framepacing <command> --help` lists every option). Examples
 below use `mb-framepacing` / `mb-framepacing-gui`; when running from source, use
-`dotnet run --project dotnet/app/FramePacing -- <command>` and `dotnet run --project dotnet/app/FramePacing.Gui` instead.
+`dotnet run --project measure/app/FramePacing -- <command>` and `dotnet run --project measure/app/FramePacing.Gui` instead.
 
 ## Before you start
 

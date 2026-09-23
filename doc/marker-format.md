@@ -5,7 +5,7 @@ index**, the **animation time** the frame was rendered for and a **run id**. `mb
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
-The C++20 library in [`cpp/`](../cpp) generates the marker geometry. The C# library `MB.FramePacing.Marker` decodes it.
+The C++20 library in [`marker/cpp/`](../marker/cpp) generates the marker geometry. The C# library `MB.FramePacing.Marker` decodes it.
 Both implement this document; if they disagree, this document is the reference.
 
 > **Two counters, never mixed.** The marker's _frame index_ is the application's own rendered-frame counter. The capture tool

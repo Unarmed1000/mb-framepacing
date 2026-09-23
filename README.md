@@ -10,7 +10,7 @@ error**.
 > [!IMPORTANT]
 > **mb-framepacing is a cooperative tool (for now).** It only measures applications that take part: every frame, the
 > application writes **its own frame index and its animation timer** into the image as a marker (a small QR code), using
-> the C++ library in [`cpp/`](cpp).
+> the C++ library in [`marker/cpp/`](marker/cpp).
 >
 > mb-framepacing then compares **the animation time the application wrote into each frame** with **the time that frame
 > actually appeared in the capture**. Where the two disagree, motion on screen stutters. Without the marker there is nothing
@@ -63,10 +63,10 @@ capture period.
 
 There are two halves, and both are needed:
 
-- **Inside your application:** the C++20 marker library ([`cpp/`](cpp)). Every frame, it turns "frame index + animation time +
+- **Inside your application:** the C++20 marker library ([`marker/cpp/`](marker/cpp)). Every frame, it turns "frame index + animation time +
   run id" into a set of pixel aligned black and white rectangles that your renderer draws on top of the finished image. No
   dependencies, no allocations per frame, any graphics API.
-- **On the recording side:** the `mb-framepacing` tools ([`dotnet/`](dotnet), command line and GUI). They record the display
+- **On the recording side:** the `mb-framepacing` tools ([`measure/`](measure), command line and GUI). They record the display
   signal with their own clock, read the marker back from every recorded frame and compare the animation time the frame
   carries with the time it actually appeared in the capture.
 
@@ -268,29 +268,29 @@ AppleClang 15+), Python 3, and Node.js for formatting the docs.
 
 ```sh
 # .NET: libraries, command line tool, GUI and tests (mb-quality from the mb-tools collection, or plain dotnet)
-mb-quality -r --all dotnet
-dotnet test dotnet/mb-framepacing.slnx
+mb-quality -r --all .
+dotnet test mb-framepacing.slnx
 
 # C++ marker library (presets: windows, linux, linux-clang, macos); the tests fetch GoogleTest
-cmake --preset windows && cmake --build --preset windows && ctest --preset windows
+cd marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
 
 # Self-contained single-file executables for this machine (or --rid linux-x64, osx-arm64, ...)
-python dotnet/build_standalone.py
+python measure/build_standalone.py
 
 # Docs: formatting (Prettier) and the images in doc/images (rendered offscreen)
 npm install && npm run format
-dotnet run --project dotnet/tools/DocImages
+dotnet run --project measure/tools/DocImages
 ```
 
-The version of everything comes from the [`VERSION`](VERSION) file. The pieces fit together like this:
+The marker libraries are versioned in [`marker/VERSION`](marker/VERSION) and the tools in [`measure/VERSION`](measure/VERSION). The pieces fit together like this:
 
 ```mermaid
 flowchart TB
-    subgraph cpp["cpp/ (C++20, CMake)"]
+    subgraph cpp["marker/cpp/ (C++20, CMake): goes into your application"]
         L["mb_framemarker<br/>marker geometry for your engine"]
         R["marker-render<br/>golden test images"]
     end
-    subgraph dotnet["dotnet/ (.NET 10)"]
+    subgraph dotnet["measure/ (.NET 10): records and analyses"]
         M["MB.FramePacing.Marker<br/>payload, QR decoding"]
         CAP["MB.FramePacing.Capture<br/>recorder, ffmpeg, video/image/stream sources"]
         AN["MB.FramePacing.Analysis<br/>timeline, animation error, reports"]
@@ -302,19 +302,21 @@ flowchart TB
     AN --> GUI
 ```
 
-| Path                     | Contents                                                                      |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `cpp/`                   | The C++20 marker library, `marker-render` (golden images), GoogleTest tests   |
-| `dotnet/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                 |
-| `dotnet/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)           |
-| `dotnet/tools/DocImages` | Renders `doc/images` (GUI screenshots offscreen, marker examples)             |
-| `doc/`                   | Platform guides, usage guide, integration guide, marker specification, images |
-| `test-data/markers/`     | Golden marker images written by the C++ library and decoded by the C# tests   |
-| `licenses/`              | Licenses of every third-party component                                       |
+| Path                      | Contents                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `marker/`                 | **Goes into your application**: the marker libraries and their version        |
+| `marker/cpp/`             | The C++20 marker library, `marker-render` (golden images), GoogleTest tests   |
+| `measure/`                | **Measures it**: the recording and analysis tools and their version           |
+| `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                 |
+| `measure/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)           |
+| `measure/tools/DocImages` | Renders `doc/images` (GUI screenshots offscreen, marker examples)             |
+| `doc/`                    | Platform guides, usage guide, integration guide, marker specification, images |
+| `test-data/markers/`      | Golden marker images written by the C++ library and decoded by the C# tests   |
+| `licenses/`               | Licenses of every third-party component                                       |
 
 ## License
 
-Two licenses, by path (see [`LICENSE`](LICENSE)): the frame marker libraries that applications embed (`cpp/`), the
+Two licenses, by path (see [`LICENSE`](LICENSE)): the frame marker libraries that applications embed (`marker/`), the
 marker format specification, the integration guide and the golden marker images are BSD 3-Clause. Everything else,
 including the measurement tools, is PolyForm Perimeter 1.0.1: free to use, change and share for any purpose, including
 inside companies, but not to provide others a product that competes with it. Third-party components and their licenses

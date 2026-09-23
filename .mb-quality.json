@@ -1,0 +1,4 @@
+{
+  "cacheDir": "build/.mb-quality-cache",
+  "excludeDirs": ["node_modules", "marker/cpp"]
+}

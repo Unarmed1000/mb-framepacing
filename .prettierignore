@@ -5,12 +5,12 @@ node_modules/
 **/build/
 **/publish/
 **/TestResults/
-cpp/third_party/
+marker/cpp/third_party/
 test-data/
 licenses/*.txt
 package-lock.json
 doc/images/
 
 # clang tool configs (clang-tidy accepts YAML that Prettier rejects)
-cpp/.clang-format
-cpp/.clang-tidy
+marker/cpp/.clang-format
+marker/cpp/.clang-tidy

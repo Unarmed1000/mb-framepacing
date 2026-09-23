@@ -6,11 +6,11 @@ Copyright (c) 2026, Mana Battery ApS
 This repository is licensed under two licenses, by path:
 
 - The BSD 3-Clause License (Part 1 below) covers the frame marker code that applications embed, and the marker format:
-  - cpp/ (the C++ frame marker library)
+  - marker/ (the frame marker libraries)
   - doc/marker-format.md (the marker format specification)
   - doc/integrating.md (the guide to building the markers into an application)
   - test-data/markers/ (the golden marker images)
-  cpp/LICENSE holds the BSD 3-Clause License on its own.
+  marker/LICENSE holds the BSD 3-Clause License on its own.
 
 - The PolyForm Perimeter License 1.0.1 (Part 2 below) covers everything else: the measurement tools and their
   libraries, the scripts, the other documentation, and the build and CI files.
