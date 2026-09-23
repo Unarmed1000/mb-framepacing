@@ -9,153 +9,30 @@
 //
 // Coordinate system: pixels, origin at the top-left corner, +x to the right, +y down.
 // Every quad edge lies on an integer pixel edge and a quad covers exactly the pixels [Left,Right) x [Top,Bottom).
+//
+// This is the header to include: it pulls in every type (one header per type) and declares the functions.
 
+#include <mb/framemarker/Constants.hpp>
+#include <mb/framemarker/IndexedCount.hpp>
+#include <mb/framemarker/MarkerKind.hpp>
+#include <mb/framemarker/MarkerSlot.hpp>
+#include <mb/framemarker/ModuleMatrix.hpp>
+#include <mb/framemarker/Options.hpp>
+#include <mb/framemarker/Payload.hpp>
+#include <mb/framemarker/Point.hpp>
+#include <mb/framemarker/Quad.hpp>
+#include <mb/framemarker/StartMetadata.hpp>
 #include <mb/framemarker/Version.hpp>
+#include <mb/framemarker/Vertex.hpp>
 #include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <ratio>
 #include <span>
-#include <string_view>
 
 namespace MB::FrameMarker
 {
-  //! Frame and end markers are fixed to QR version 2 (25x25 modules), ECC level M, byte mode, so they never change size.
-  inline constexpr int32_t FrameQrVersion = 2;
-  //! Start markers carry metadata and use the smallest version in [FrameQrVersion, MaxQrVersion] that fits.
-  inline constexpr int32_t MaxQrVersion = 6;
-
-  constexpr int32_t QrModuleCountForVersion(const int32_t version) noexcept
-  {
-    return (4 * version) + 17;
-  }
-
-  inline constexpr int32_t FrameQrModuleCount = QrModuleCountForVersion(FrameQrVersion);
-  inline constexpr int32_t MaxQrModuleCount = QrModuleCountForVersion(MaxQrVersion);
-
-  //! Payload header, shared by every marker kind (little endian):
-  //! magic "MF" (2) | format version (1) | kind (1) | frame index u64 (8) | animation ticks i64 (8) | run id u32 (4)
-  inline constexpr std::size_t PayloadByteCount = 24;
-  inline constexpr uint8_t PayloadMagic0 = 'M';
-  inline constexpr uint8_t PayloadMagic1 = 'F';
-  inline constexpr uint8_t PayloadFormatVersion = 1;
-
-  //! Start marker payload: header (24) | start time UTC i64 (8) | name length u8 (1) | name UTF-8 (0..MaxStartNameBytes)
-  inline constexpr std::size_t MaxStartNameBytes = 64;
-  inline constexpr std::size_t StartPayloadFixedByteCount = PayloadByteCount + 8u + 1u;
-  inline constexpr std::size_t MaxEncodedPayloadByteCount = StartPayloadFixedByteCount + MaxStartNameBytes;
-
-  //! C# TimeSpan / DateTime resolution
-  inline constexpr int64_t TicksPerSecond = 10'000'000;
-  //! C# DateTime ticks (since 0001-01-01) at the Unix epoch
-  inline constexpr int64_t UnixEpochDateTimeTicks = 621'355'968'000'000'000;
-
-  //! Recommended distance in source pixels between the marker and the edge of the frame.
-  inline constexpr int32_t RecommendedInsetPx = 32;
-
-  inline constexpr int32_t MinModuleSizePx = 1;
-  inline constexpr int32_t MaxModuleSizePx = 1024;
-  inline constexpr int32_t MaxQuietZoneModules = 16;
-  inline constexpr int32_t RecommendedQuietZoneModules = 4;
-
-  //! What a marker means. Frame markers are drawn every frame of a test run; the sequence markers bracket the run so the analyzer can cut
-  //! the capture to exactly the measured window. See doc/marker-format.md "Test sequences".
-  enum class MarkerKind : uint8_t
-  {
-    Frame = 0,
-    SequenceStart = 1,
-    SequenceEnd = 2,
-  };
-
-  inline constexpr uint8_t MaxMarkerKindValue = static_cast<uint8_t>(MarkerKind::SequenceEnd);
-
-  struct Payload
-  {
-    //! The application's own rendered-frame counter. Unrelated to the capture card's frame counter.
-    uint64_t FrameIndex{0};
-    //! Animation time in C# TimeSpan ticks (100ns).
-    int64_t AnimationTicks{0};
-    //! Identifies one test run. The start marker, every frame marker and the end marker of a run carry the same id.
-    uint32_t RunId{0};
-    MarkerKind Kind{MarkerKind::Frame};
-
-    constexpr bool operator==(const Payload&) const noexcept = default;
-  };
-
-  //! Extra data carried by a SequenceStart marker.
-  struct StartMetadata
-  {
-    //! Wall clock start time as C# DateTime UTC ticks (100ns since 0001-01-01), 0 = unknown. See ToDateTimeTicks.
-    int64_t UtcTicks{0};
-    //! Test name, UTF-8, at most MaxStartNameBytes bytes. Not copied: must stay valid while encoding.
-    std::string_view Name;
-  };
-
-  struct Options
-  {
-    //! Size of one QR module in source pixels. See doc/marker-format.md "Sizing" or RecommendModuleSizePx.
-    int32_t ModuleSizePx{6};
-    //! White border around the symbol in modules. The QR specification asks for 4.
-    int32_t QuietZoneModules{RecommendedQuietZoneModules};
-  };
-
-  struct Point
-  {
-    int32_t X{0};
-    int32_t Y{0};
-
-    constexpr bool operator==(const Point&) const noexcept = default;
-  };
-
-  //! Axis aligned rectangle covering the pixels [Left,Right) x [Top,Bottom).
-  struct Quad
-  {
-    int32_t Left{0};
-    int32_t Top{0};
-    int32_t Right{0};
-    int32_t Bottom{0};
-    //! true: draw black (luma 0), false: draw white (luma 255)
-    bool Dark{false};
-
-    constexpr bool operator==(const Quad&) const noexcept = default;
-  };
-
-  struct Vertex
-  {
-    int32_t X{0};
-    int32_t Y{0};
-    //! 0 (dark) or 255 (light). Render it as the RGB color (Luma, Luma, Luma).
-    uint8_t Luma{0};
-
-    constexpr bool operator==(const Vertex&) const noexcept = default;
-  };
-
-  struct IndexedCount
-  {
-    std::size_t VertexCount{0};
-    std::size_t IndexCount{0};
-  };
-
-  enum class MarkerSlot
-  {
-    TopLeft,
-    MiddleLeft,
-    BottomLeft,
-  };
-
-  //! The QR module matrix, 1 = dark module. Only the top-left Size x Size modules are used; rows are MaxQrModuleCount apart.
-  struct ModuleMatrix
-  {
-    int32_t Size{0};
-    std::array<uint8_t, static_cast<std::size_t>(MaxQrModuleCount) * MaxQrModuleCount> Modules{};
-
-    constexpr bool IsDark(const int32_t x, const int32_t y) const noexcept
-    {
-      return Modules[(static_cast<std::size_t>(y) * MaxQrModuleCount) + static_cast<std::size_t>(x)] != 0;
-    }
-  };
-
   constexpr bool IsValid(const Options& options) noexcept
   {
     return options.ModuleSizePx >= MinModuleSizePx && options.ModuleSizePx <= MaxModuleSizePx && options.QuietZoneModules >= 0 &&

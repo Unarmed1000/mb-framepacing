@@ -16,63 +16,6 @@ using ZXing.QrCode.Internal;
 
 namespace MB.FramePacing.Marker
 {
-  public enum MarkerDecodeStatus
-  {
-    /// <summary>A marker with a valid payload was decoded.</summary>
-    Decoded,
-
-    /// <summary>No readable QR code (missing, torn, blended between two frames or too small).</summary>
-    NotFound,
-
-    /// <summary>A QR code was read but it is not a frame marker (wrong length, magic or format version).</summary>
-    InvalidPayload,
-  }
-
-  /// <summary>The outcome of decoding one marker.</summary>
-  /// <param name="Start">The start metadata when the marker is a <see cref="MarkerKind.SequenceStart"/> marker, otherwise null.</param>
-  /// <param name="Bounds">Marker bounds including the quiet zone, in image pixels. Only valid when a QR code was found.</param>
-  /// <param name="ModuleSizePx">Measured size of one QR module in image pixels. Only valid when a QR code was found.</param>
-  public readonly record struct MarkerDecodeResult(
-    MarkerDecodeStatus Status,
-    MarkerPayload Payload,
-    StartMetadata? Start,
-    PixelRect Bounds,
-    float ModuleSizePx
-  )
-  {
-    public static readonly MarkerDecodeResult NotFound = new MarkerDecodeResult(MarkerDecodeStatus.NotFound, default, null, default, 0);
-
-    public bool IsDecoded => Status == MarkerDecodeStatus.Decoded;
-  }
-
-  /// <summary>
-  /// Where a frame marker was found: its bounds (including the quiet zone) and module size in image pixels. Once the analyzer knows this it
-  /// decodes with <see cref="MarkerDecoder.DecodeLocked"/>, which samples the module grid directly instead of searching for finder patterns.
-  /// </summary>
-  public readonly record struct MarkerLock(PixelRect Bounds, float ModuleSizePx)
-  {
-    /// <summary>Region that holds any marker drawn at the same origin, including the largest start marker.</summary>
-    public PixelRect SearchRegion
-    {
-      get
-      {
-        int margin = (int)Math.Ceiling(2 * ModuleSizePx);
-        int size = (int)Math.Ceiling(MarkerRenderer.MaxMarkerSizePx(1) * ModuleSizePx);
-        return new PixelRect(Bounds.X - margin, Bounds.Y - margin, size + (2 * margin), size + (2 * margin));
-      }
-    }
-
-    /// <summary>The frame marker with 1.5 modules of the quiet zone trimmed off, so the crop is white all around the symbol.</summary>
-    internal PixelRect PureRegion
-    {
-      get
-      {
-        int inset = (int)Math.Round(1.5f * ModuleSizePx);
-        return new PixelRect(Bounds.X + inset, Bounds.Y + inset, Bounds.Width - (2 * inset), Bounds.Height - (2 * inset));
-      }
-    }
-  }
-
   public sealed class MarkerDecoder
   {
     private readonly QRCodeReader m_reader = new QRCodeReader();

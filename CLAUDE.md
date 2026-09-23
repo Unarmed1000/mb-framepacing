@@ -82,7 +82,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 - **Versions:** there are two version files.
   - `marker/VERSION`: the marker libraries. CMake reads it into `Version.hpp`.
   - `measure/VERSION`: the tools. `measure/Directory.Build.props` reads it.
-- **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested).
+- **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested). The C++ public API
+  has one header per type; `FrameMarker.hpp` includes them all and declares the functions. CI runs `tools/check_one_type_per_file.py`.
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
 - **.NET:**
   - hand-maintained SDK csproj files (no FslBuild or MB.gen);

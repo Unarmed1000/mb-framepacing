@@ -5,11 +5,6 @@
 //* pinned array. The source reads pixels straight into a slot, so a frame is copied exactly once (device -> ring) before the writer hands
 //* contiguous runs of slots to the file in large sequential writes.
 //*
-//* - Ring full: the frame is counted as dropped and never written, but the capture index still advances, so the gap is visible to analysis.
-//* - Armed mode (wait for a start marker): the writer keeps only the newest PreRollFrames records and discards older ones until
-//*   StartWriting() is called, so the frames just before the trigger are kept.
-//* - Late device timestamps: the writer resolves pending timestamps just before writing, waiting at most DeviceTicksWait for them.
-//*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
@@ -21,53 +16,6 @@ using NLog;
 
 namespace MB.FramePacing.Capture
 {
-  public sealed record FrameRecorderOptions
-  {
-    /// <summary>Number of frames the ring can hold. Size it for the longest stall of the disk (default: one second of frames).</summary>
-    public int RingFrames { get; init; } = 256;
-
-    /// <summary>Start in armed mode: frames are held back until <see cref="FrameRecorder.StartWriting"/>.</summary>
-    public bool StartArmed { get; init; }
-
-    /// <summary>Frames before the trigger that are kept when armed.</summary>
-    public int PreRollFrames { get; init; } = 64;
-
-    /// <summary>How long the writer waits for a late device timestamp before writing the record without one.</summary>
-    public TimeSpan DeviceTicksWait { get; init; } = TimeSpan.FromMilliseconds(250);
-
-    /// <summary>
-    /// Make the source wait for free ring space instead of dropping the frame (for sources that are not live, e.g. video files, where
-    /// waiting costs nothing and every frame should be kept).
-    /// </summary>
-    public bool WaitWhenFull { get; init; }
-
-    /// <summary>Upper bound on records per write call.</summary>
-    public int MaxBatchRecords { get; init; } = 64;
-
-    /// <summary>How often a copy of the newest frame is kept for live inspection (sequence trigger), zero to disable.</summary>
-    public TimeSpan PreviewInterval { get; init; } = TimeSpan.FromMilliseconds(50);
-
-    /// <summary>Ring size for a frame rate and a memory budget, clamped to [16, fps * seconds].</summary>
-    public static int RingFramesFor(CaptureFormat format, double seconds = 1.0, long memoryBudgetBytes = 512L * 1024 * 1024)
-    {
-      double fps = format.FrameRate.IsKnown ? format.FrameRate.FramesPerSecond : 240;
-      long byTime = (long)Math.Ceiling(fps * seconds);
-      long byMemory = memoryBudgetBytes / format.ToFileHeader().RecordSize;
-      return (int)Math.Clamp(Math.Min(byTime, byMemory), 16, int.MaxValue / 2);
-    }
-  }
-
-  public readonly record struct FrameRecorderStats(
-    long FramesCaptured,
-    long FramesWritten,
-    long FramesDropped,
-    long FramesDiscardedWhileArmed,
-    long BytesWritten,
-    int RingFill,
-    int RingCapacity,
-    bool IsArmed
-  );
-
   public sealed class FrameRecorder : IFrameSink, IDisposable
   {
     private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();

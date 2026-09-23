@@ -83,3 +83,5 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run format:check
+      - name: One class/struct/enum per file
+        run: python3 tools/check_one_type_per_file.py

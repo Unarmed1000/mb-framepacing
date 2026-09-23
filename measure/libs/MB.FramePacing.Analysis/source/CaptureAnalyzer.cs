@@ -22,29 +22,6 @@ using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.Analysis
 {
-  public sealed record AnalysisOptions
-  {
-    public TimeSource TimeSource { get; init; } = TimeSource.Auto;
-    public TimelineOptions Timeline { get; init; } = new TimelineOptions();
-
-    /// <summary>Where the reports go; null = &lt;capture directory&gt;/analysis.</summary>
-    public string? OutputDirectory { get; init; }
-
-    public string ToolVersion { get; init; } = string.Empty;
-  }
-
-  public sealed record AnalysisReport(
-    string CaptureDirectory,
-    string OutputDirectory,
-    CaptureSessionInfo? Session,
-    DecodedCapture Capture,
-    TimelineResult Timeline,
-    IReadOnlyList<string> Warnings
-  )
-  {
-    public double CapturePeriodMs => Timeline.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond;
-  }
-
   public static class CaptureAnalyzer
   {
     public const string AnalysisDirectoryName = "analysis";

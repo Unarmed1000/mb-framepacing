@@ -17,26 +17,6 @@ using Avalonia.Platform.Storage;
 
 namespace MB.FramePacing.Gui
 {
-  public interface IDialogService
-  {
-    Task<string?> PickFolderAsync(string title, string? startDirectory);
-
-    Task<string?> PickFileAsync(string title);
-
-    void ShowInFileManager(string directory);
-
-    /// <summary>Open a web page in the default browser.</summary>
-    void OpenUrl(string url);
-
-    /// <summary>Open a file with its default application (e.g. the configuration file in a text editor).</summary>
-    void OpenFile(string path);
-
-    Task CopyToClipboardAsync(string text);
-
-    /// <summary>Show the setup dialog. True when the user saved the settings.</summary>
-    Task<bool> ShowSetupAsync(ViewModels.SetupViewModel viewModel);
-  }
-
   public sealed class DialogService : IDialogService
   {
     private readonly TopLevel m_topLevel;

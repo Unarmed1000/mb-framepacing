@@ -14,19 +14,6 @@ using NUnit.Framework;
 
 namespace MB.FramePacing.Marker.UnitTest
 {
-  public sealed record GoldenMarker(
-    string Path,
-    MarkerPayload Payload,
-    StartMetadata? Start,
-    int ModuleSizePx,
-    int QuietZoneModules,
-    int OriginX,
-    int OriginY
-  )
-  {
-    public override string ToString() => System.IO.Path.GetFileName(Path);
-  }
-
   public static class TestData
   {
     public static string MarkerDirectory => System.IO.Path.Combine(FindRepositoryRoot(), "test-data", "markers");

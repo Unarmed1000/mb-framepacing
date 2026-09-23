@@ -26,24 +26,6 @@ using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
-  public enum SourceKind
-  {
-    /// <summary>A capture card found by ffmpeg.</summary>
-    Device,
-    VideoFile,
-    ImageFolder,
-    Stream,
-    Synthetic,
-  }
-
-  /// <summary>An entry of the source list. <see cref="Device"/> is only set for capture cards.</summary>
-  public sealed record DeviceItem(string Title, CaptureDevice? Device, SourceKind Kind = SourceKind.Device)
-  {
-    public bool IsSynthetic => Kind == SourceKind.Synthetic;
-
-    public override string ToString() => Title;
-  }
-
   public sealed partial class CaptureViewModel : ObservableObject
   {
     private const string SyntheticTitle = "Synthetic test game";

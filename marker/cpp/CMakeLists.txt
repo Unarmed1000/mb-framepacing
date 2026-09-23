@@ -42,7 +42,20 @@ target_sources(mb_framemarker
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include ${CMAKE_CURRENT_BINARY_DIR}/include
-    FILES include/mb/framemarker/FrameMarker.hpp ${CMAKE_CURRENT_BINARY_DIR}/include/mb/framemarker/Version.hpp)
+    FILES
+      include/mb/framemarker/Constants.hpp
+      include/mb/framemarker/FrameMarker.hpp
+      include/mb/framemarker/IndexedCount.hpp
+      include/mb/framemarker/MarkerKind.hpp
+      include/mb/framemarker/MarkerSlot.hpp
+      include/mb/framemarker/ModuleMatrix.hpp
+      include/mb/framemarker/Options.hpp
+      include/mb/framemarker/Payload.hpp
+      include/mb/framemarker/Point.hpp
+      include/mb/framemarker/Quad.hpp
+      include/mb/framemarker/StartMetadata.hpp
+      include/mb/framemarker/Vertex.hpp
+      ${CMAKE_CURRENT_BINARY_DIR}/include/mb/framemarker/Version.hpp)
 target_compile_features(mb_framemarker PUBLIC cxx_std_20)
 set_target_properties(mb_framemarker PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
 target_include_directories(mb_framemarker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/qrcodegen)

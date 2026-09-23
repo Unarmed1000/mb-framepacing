@@ -3,16 +3,6 @@
 //* ----------------
 //* Turns capture rows into runs, presented frames and animation error. Pure logic: no files, no decoding.
 //*
-//*  1. Runs. If the capture contains start markers, a run is the frame markers between START(run) and END(run). Without start markers the
-//*     whole capture is one run per run id (with a warning).
-//*  2. Segments. Inside a run a large backwards jump of the application frame index (restart) starts a new segment. Small backwards steps
-//*     are flagged out-of-order and left out of the metrics.
-//*  3. Presented frames. Consecutive decoded captures with the same application frame index are one presented frame; its first-seen time is
-//*     the capture time of the first capture that shows it (quantised to one capture period).
-//*  4. Metrics per presented frame i (i > 0 within a segment):
-//*       displayDelta = firstSeen[i] - firstSeen[i-1]      animDelta = anim[i] - anim[i-1]
-//*       animationError = animDelta - displayDelta          drift = (anim[i] - anim[0]) - (firstSeen[i] - firstSeen[0])
-//*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
@@ -23,82 +13,6 @@ using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Analysis
 {
-  public sealed record TimelineOptions
-  {
-    /// <summary>A backwards application frame index jump larger than this starts a new segment (application restart).</summary>
-    public ulong RestartThresholdFrames { get; init; } = 1000;
-
-    /// <summary>Only analyse this run id (null = all runs).</summary>
-    public uint? RunId { get; init; }
-  }
-
-  [Flags]
-  public enum PresentedFrameFlags
-  {
-    None = 0,
-
-    /// <summary>Application frames were rendered but never captured before this one (skipped or shown shorter than a capture period).</summary>
-    SkippedBefore = 1,
-
-    /// <summary>Captures before this frame's first capture could not be decoded or were not recorded, so its first-seen time is uncertain.</summary>
-    UncertainStart = 2,
-  }
-
-  public sealed record PresentedFrame(
-    int Segment,
-    ulong FrameIndex,
-    long AnimationTicks,
-    long FirstCaptureIndex,
-    long FirstSeenTicks,
-    long LastSeenTicks,
-    int CaptureCount,
-    long OnScreenTicks,
-    ulong SkippedBefore,
-    long? DisplayDeltaTicks,
-    long? AnimationDeltaTicks,
-    long? AnimationErrorTicks,
-    long DriftTicks,
-    PresentedFrameFlags Flags
-  );
-
-  public sealed record RunCounts(
-    long Captures,
-    long Decoded,
-    long Undecodable,
-    long Torn,
-    long NotRecorded,
-    long SourceDropEvents,
-    long PresentedFrames,
-    long SkippedFrameIndices,
-    long OutOfOrderCaptures,
-    int Segments
-  );
-
-  public sealed record RunStatistics(
-    Statistics DisplayDeltaMs,
-    Statistics AnimationDeltaMs,
-    Statistics AnimationErrorMs,
-    Statistics AbsoluteAnimationErrorMs,
-    Statistics DriftMs,
-    Statistics OnScreenMs,
-    // Presented frames whose |animation error| exceeds one capture period (larger than the measurement uncertainty)
-    long FramesWithAnimationError
-  );
-
-  public sealed record RunAnalysis(
-    uint RunId,
-    string? Name,
-    DateTime? StartTimeUtc,
-    bool HasStartMarker,
-    bool HasEndMarker,
-    RunCounts Counts,
-    RunStatistics Statistics,
-    IReadOnlyList<PresentedFrame> Frames,
-    IReadOnlyList<string> Warnings
-  );
-
-  public sealed record TimelineResult(long CapturePeriodTicks, IReadOnlyList<RunAnalysis> Runs, IReadOnlyList<string> Warnings);
-
   public static class TimelineAnalyzer
   {
     public static TimelineResult Analyze(IReadOnlyList<CaptureRow> rows, TimelineOptions? options = null)

@@ -10,42 +10,11 @@
 //****************************************************************************************************************************************************
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 namespace MB.FramePacing.Capture.Ffmpeg
 {
-  public enum MediaInputKind
-  {
-    VideoFile,
-    ImageSequence,
-    Stream,
-  }
-
-  public sealed record MediaInputOptions
-  {
-    /// <summary>Frame rate of an image sequence (ignored for videos and streams, which carry their own timestamps).</summary>
-    public double? Fps { get; init; }
-
-    /// <summary>Per-image capture times for an image sequence (see <see cref="ImageSequence"/>).</summary>
-    public string? TimestampFile { get; init; }
-  }
-
-  /// <param name="Mode">Only carries the nominal frame rate of an image sequence.</param>
-  /// <param name="FrameTimestamps">Exact frame times for an image sequence (see <see cref="FfmpegCaptureOptions.FrameTimestamps"/>).</param>
-  public sealed record MediaSource(CaptureDevice Device, RequestedMode Mode, IReadOnlyList<long>? FrameTimestamps)
-  {
-    public FfmpegCaptureOptions ToCaptureOptions(string ffmpegPath) =>
-      new FfmpegCaptureOptions
-      {
-        FfmpegPath = ffmpegPath,
-        Device = Device,
-        Mode = Mode,
-        FrameTimestamps = FrameTimestamps,
-      };
-  }
-
   public static class MediaInput
   {
     public static MediaInputKind Classify(string input) =>

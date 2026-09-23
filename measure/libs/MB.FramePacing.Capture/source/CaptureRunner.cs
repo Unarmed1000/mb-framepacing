@@ -15,56 +15,6 @@ using NLog;
 
 namespace MB.FramePacing.Capture
 {
-  public sealed record CaptureRunOptions
-  {
-    public required string OutputDirectory { get; init; }
-
-    /// <summary>Stop after this long (measured from the first written frame when waiting for a start marker). Null = until cancelled.</summary>
-    public TimeSpan? Duration { get; init; }
-
-    /// <summary>Hold frames back until a start marker is seen (a short pre-roll is kept).</summary>
-    public bool WaitForStart { get; init; }
-
-    /// <summary>Stop once the end marker of the run has been seen (plus <see cref="EndTail"/>).</summary>
-    public bool StopAtEnd { get; init; }
-
-    public TimeSpan EndTail { get; init; } = TimeSpan.FromMilliseconds(500);
-
-    /// <summary>Ring size in frames; null sizes it for one second of frames (at most 512 MiB).</summary>
-    public int? RingFrames { get; init; }
-
-    /// <summary>
-    /// Receives a copy of the newest frame roughly every <see cref="FrameRecorderOptions.PreviewInterval"/> (on the runner's thread; the image
-    /// is reused, copy what you need before returning). Null = no preview.
-    /// </summary>
-    public Action<GrayImage, long>? Preview { get; init; }
-
-    public string ToolVersion { get; init; } = string.Empty;
-    public string? FfmpegVersion { get; init; }
-    public string? FfmpegCommandLine { get; init; }
-  }
-
-  public enum CapturePhase
-  {
-    WaitingForStart,
-    Recording,
-    Stopping,
-    Finished,
-  }
-
-  public readonly record struct CaptureProgress(
-    CapturePhase Phase,
-    TimeSpan Elapsed,
-    FrameRecorderStats Recorder,
-    long SourceDroppedFrames,
-    MarkerDecodeResult? LastMarker
-  )
-  {
-    public double CapturedFps(TimeSpan window) => window > TimeSpan.Zero ? Recorder.FramesCaptured / window.TotalSeconds : 0;
-  }
-
-  public sealed record CaptureResult(string Directory, string FramesPath, CaptureSessionInfo Session);
-
   public static class CaptureRunner
   {
     private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();

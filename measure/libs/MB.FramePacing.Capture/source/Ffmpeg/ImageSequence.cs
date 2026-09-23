@@ -4,10 +4,6 @@
 //* A folder of images as a capture source. The images are listed in an ffconcat file with one duration per image, so ffmpeg delivers them
 //* with the right timestamps: evenly spaced (a frame rate) or taken from a timestamp file.
 //*
-//* Timestamp file (CSV, '#' comments allowed): one line per image, "fileName,timeMs". The images are used in the order of the file; the time
-//* is when the frame was captured, in milliseconds (any origin). Without a timestamp file the images are sorted by name, numbers compared
-//* numerically ("frame2" before "frame10").
-//*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
@@ -21,8 +17,6 @@ using System.Text.RegularExpressions;
 
 namespace MB.FramePacing.Capture.Ffmpeg
 {
-  public sealed record ImageSequenceFrame(string Path, long TimeTicks);
-
   public static partial class ImageSequence
   {
     /// <summary>Image types ffmpeg reads out of the box.</summary>

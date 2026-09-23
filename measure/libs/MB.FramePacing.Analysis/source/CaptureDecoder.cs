@@ -19,22 +19,6 @@ using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Analysis
 {
-  public enum TimeSource
-  {
-    /// <summary>Device timestamps when every record has one, otherwise host timestamps.</summary>
-    Auto,
-    Device,
-    Host,
-  }
-
-  /// <summary>Where the markers are in the capture. <see cref="Locks"/>[0] is the top (timing) marker.</summary>
-  public sealed record MarkerLayout(IReadOnlyList<MarkerLock> Locks, float ModuleSizePx, IReadOnlyList<string> Warnings)
-  {
-    public MarkerLock Primary => Locks[0];
-  }
-
-  public sealed record DecodedCapture(CaptureFileHeader Header, MarkerLayout Layout, TimeSource TimeSource, IReadOnlyList<CaptureRow> Rows);
-
   public static class CaptureDecoder
   {
     public const int LocateSampleCount = 240;

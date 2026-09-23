@@ -12,26 +12,6 @@ using System.Text;
 
 namespace MB.FramePacing.Marker
 {
-  /// <summary>What a marker means. Frame markers are drawn every frame of a test run; the sequence markers bracket the run.</summary>
-  public enum MarkerKind : byte
-  {
-    Frame = 0,
-    SequenceStart = 1,
-    SequenceEnd = 2,
-  }
-
-  /// <summary>Extra data carried by a <see cref="MarkerKind.SequenceStart"/> marker.</summary>
-  /// <param name="UtcTicks">Wall clock start time as <see cref="DateTime"/> UTC ticks, 0 = unknown.</param>
-  /// <param name="Name">Test name, at most <see cref="MarkerPayload.MaxStartNameBytes"/> bytes as UTF-8.</param>
-  public sealed record StartMetadata(long UtcTicks, string Name)
-  {
-    public static readonly StartMetadata Empty = new StartMetadata(0, string.Empty);
-
-    public DateTime? StartTimeUtc => UtcTicks > 0 && UtcTicks <= DateTime.MaxValue.Ticks ? new DateTime(UtcTicks, DateTimeKind.Utc) : null;
-
-    public static StartMetadata Create(DateTime startTimeUtc, string name) => new StartMetadata(startTimeUtc.ToUniversalTime().Ticks, name);
-  }
-
   /// <summary>The header carried by every marker.</summary>
   /// <param name="FrameIndex">The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</param>
   /// <param name="AnimationTicks">The animation time the frame was rendered for, in <see cref="TimeSpan"/> ticks (100ns).</param>

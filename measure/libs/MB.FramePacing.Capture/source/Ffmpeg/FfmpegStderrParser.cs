@@ -21,8 +21,6 @@ using System.Threading;
 
 namespace MB.FramePacing.Capture.Ffmpeg
 {
-  public readonly record struct VideoStreamInfo(int Width, int Height, double Fps);
-
   public sealed partial class FfmpegStderrParser : IDeviceTimestampSource
   {
     private const int MaxDiagnosticLines = 40;

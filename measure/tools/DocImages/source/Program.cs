@@ -6,8 +6,6 @@
 //*     synthetic test game, and each page is saved as PNG. Machine specific text (paths) is replaced with neutral example values first.
 //*   - Marker examples: how the markers look inside an application frame.
 //*
-//*   dotnet run --project measure/tools/DocImages -- [output directory, default doc/images]
-//*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
@@ -30,13 +28,6 @@ using ScottPlot.Avalonia;
 
 namespace MB.FramePacing.DocImages
 {
-  public static class HeadlessApp
-  {
-    // Used by HeadlessUnitTestSession: the real application with the Skia renderer, so text and charts render exactly like on screen
-    public static AppBuilder BuildAvaloniaApp() =>
-      AppBuilder.Configure<App>().UseSkia().UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false }).WithInterFont();
-  }
-
   internal static class Program
   {
     private const string ExampleCaptureRoot = @"D:\captures";

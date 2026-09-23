@@ -14,8 +14,6 @@ using System.Linq;
 
 namespace MB.FramePacing.Analysis
 {
-  public sealed record HistogramBin(double CenterMs, long Count);
-
   public sealed record Histogram(double BinWidthMs, long Total, IReadOnlyList<HistogramBin> Bins)
   {
     /// <summary>Upper bound for the bin count; wider bins (a multiple of the requested width) are used when the range needs more.</summary>
@@ -51,18 +49,5 @@ namespace MB.FramePacing.Analysis
     }
 
     private static long BinOf(long value, long width) => (long)Math.Floor((value / (double)width) + 0.5);
-  }
-
-  /// <summary>The distributions reported per run.</summary>
-  public sealed record RunHistograms(Histogram AnimationErrorMs, Histogram DisplayDeltaMs)
-  {
-    public static RunHistograms Create(RunAnalysis run, long capturePeriodTicks)
-    {
-      var frames = run.Frames.Where(f => f.AnimationErrorTicks.HasValue).ToArray();
-      return new RunHistograms(
-        Histogram.FromTicks(frames.Select(f => f.AnimationErrorTicks!.Value), capturePeriodTicks),
-        Histogram.FromTicks(frames.Select(f => f.DisplayDeltaTicks!.Value), capturePeriodTicks)
-      );
-    }
   }
 }
