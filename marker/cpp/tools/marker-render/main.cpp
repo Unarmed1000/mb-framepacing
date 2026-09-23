@@ -195,7 +195,7 @@ namespace
       {
         for (int32_t x = 0; x < matrix.Size; ++x)
         {
-          current = static_cast<uint8_t>((current << 1u) | (matrix.IsDark(x, y) ? 1u : 0u));
+          current = static_cast<uint8_t>((static_cast<uint32_t>(current) << 1u) | (matrix.IsDark(x, y) ? 1u : 0u));
           if (++bitCount == 8)
           {
             bits += static_cast<char>(current);
@@ -206,7 +206,7 @@ namespace
       }
       if (bitCount > 0)
       {
-        bits += static_cast<char>(static_cast<uint8_t>(current << static_cast<uint32_t>(8 - bitCount)));
+        bits += static_cast<char>(static_cast<uint8_t>(static_cast<uint32_t>(current) << static_cast<uint32_t>(8 - bitCount)));
       }
       digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
              << startUtcTicks << ',' << ToHex(name) << ',' << matrix.Size << ',' << ToHex(bits) << '\n';

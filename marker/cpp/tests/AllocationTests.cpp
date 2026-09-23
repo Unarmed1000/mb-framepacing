@@ -105,8 +105,9 @@ namespace
 TEST(Allocations, CountingWorks)
 {
   const AllocationCounter counter;
-  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-  delete new int(1);
+  // An explicit call: compilers may elide a new-expression pair like 'delete new int(1)' (clang does), but not this.
+  void* const memory = ::operator new(sizeof(int));
+  ::operator delete(memory);
   EXPECT_EQ(AllocationCounter::Count(), 1u);
 }
 
