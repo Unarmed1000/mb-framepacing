@@ -54,6 +54,9 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     clang-tidy --quiet --header-filter=".*mb/framemarker/.*" src/FrameMarker.cpp src/Payload.cpp tools/marker-render/main.cpp tests/FrameMarkerTests.cpp -- -std=c++20 -Iinclude -Ibuild/windows/include -Ithird_party/qrcodegen -Ibuild/windows/_deps/googletest-src/googletest/include -DMB_FRAMEMARKER_EXPECTED_VERSION=\"0.1.0\"
     ```
   - `cmake/Version.hpp.in` is guarded with `// clang-format off`, because formatting breaks its `@VAR@` placeholders.
+- **Python scripts** (`measure/build_standalone.py`, `tools/`, later `marker/unity/build_upm.py`): standard library only. They must pass
+  `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode; tools
+  pinned in `requirements-dev.txt`, installed with `python -m pip install -r requirements-dev.txt`). CI runs all three.
 - **Standalone release archive:** `marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release
   archive, and falls back to `marker/VERSION` and the repository root otherwise.
 - **Docs**

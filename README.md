@@ -277,6 +277,10 @@ cd marker/cpp && cmake --preset windows && cmake --build --preset windows && cte
 # Self-contained single-file executables for this machine (or --rid linux-x64, osx-arm64, ...)
 python measure/build_standalone.py
 
+# Python scripts: lint, format and type check (ruff, basedpyright; pinned in requirements-dev.txt)
+python -m pip install -r requirements-dev.txt
+ruff check . && ruff format --check . && basedpyright
+
 # Docs: formatting (Prettier) and the images in doc/images (rendered offscreen)
 npm install && npm run format
 dotnet run --project measure/tools/DocImages

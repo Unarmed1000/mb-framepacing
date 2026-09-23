@@ -1,0 +1,5 @@
+# Python development tools (the scripts themselves only need the standard library).
+#   python -m pip install -r requirements-dev.txt
+#   ruff check . && ruff format --check . && basedpyright
+basedpyright==1.40.1
+ruff==0.16.8

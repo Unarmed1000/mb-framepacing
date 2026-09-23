@@ -3,7 +3,7 @@
 
 Auto-detects the current OS/CPU into a .NET runtime identifier (RID) and runs
 `dotnet publish` for the command line tool, the GUI or both. Pass --rid to build
-for a different target. The version comes from the repository's VERSION file.
+for a different target. The version comes from measure/VERSION.
 
 Output: measure/publish/<rid>/<app>/ (the executable, NLog.config and licenses/).
 """
@@ -42,30 +42,37 @@ def detect_rid() -> str:
     return f"{os_part}-{arch_part}"
 
 
-def parse_args() -> argparse.Namespace:
+class Arguments(argparse.Namespace):
+    """The parsed command line."""
+
+    app: str = "all"
+    rid: str | None = None
+    configuration: str = "Release"
+
+
+def parse_args() -> Arguments:
     parser = argparse.ArgumentParser(
         description="Build self-contained single-file standalones of the mb-framepacing tools.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--app",
         choices=["cli", "gui", "all"],
         default="all",
         help="Which tool to build: the command line tool (mb-framepacing), the GUI (mb-framepacing-gui) or both.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--rid",
         default=None,
-        help="Target .NET runtime identifier (e.g. win-x64, linux-x64, linux-arm64, osx-arm64). "
-        "Defaults to auto-detecting the current machine.",
+        help="Target .NET runtime identifier (e.g. win-x64, linux-x64, linux-arm64, osx-arm64). Defaults to auto-detecting the current machine.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-c",
         "--configuration",
         default="Release",
         help="Build configuration.",
     )
-    return parser.parse_args()
+    return parser.parse_args(namespace=Arguments())
 
 
 def publish(name: str, project: Path, rid: str, configuration: str) -> int:

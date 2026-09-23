@@ -1,0 +1,46 @@
+# Ruff: lint and format rules for the repository's Python scripts (measure/build_standalone.py, marker/unity/build_upm.py, tools/).
+# See https://docs.astral.sh/ruff/configuration/. Versions are pinned in requirements-dev.txt; CI runs:
+#   ruff check .
+#   ruff format --check .
+# Type checking is done by basedpyright (pyrightconfig.json).
+
+# Ruff's default excludes (.git, build, dist, node_modules, .venv, ...) stay in place; these are the repository's own output folders
+extend-exclude = [
+    "marker/cpp/build",
+    "marker/cpp/third_party",
+    "measure/publish",
+]
+
+line-length = 160
+
+# The scripts run on the Python 3 of the supported platforms (Ubuntu 24.04, current Homebrew and Windows installers)
+target-version = "py311"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+ignore = [
+    "E501",   # Line too long (the formatter wraps code; long strings and comments are fine)
+    "SIM102", # Nested if (readability preference, not a bug)
+    "SIM108", # Ternary operator (readability preference, not a bug)
+    "SIM116", # Dict instead of if-chain (readability preference)
+]
+
+fixable = ["ALL"]
+unfixable = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
+# Keep each file's line endings (LF in the repository, native in checkouts; see .gitattributes)
+line-ending = "auto"

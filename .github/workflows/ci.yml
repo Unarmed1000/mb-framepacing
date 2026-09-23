@@ -85,3 +85,10 @@ jobs:
       - run: npm run format:check
       - name: One class/struct/enum per file
         run: python3 tools/check_one_type_per_file.py
+      - name: Python scripts (ruff, basedpyright)
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r requirements-dev.txt
+          .venv/bin/ruff check .
+          .venv/bin/ruff format --check .
+          .venv/bin/basedpyright

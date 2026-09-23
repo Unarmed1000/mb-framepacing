@@ -14,10 +14,9 @@ import sys
 from pathlib import Path
 
 # Block namespaces are indented by two spaces (CSharpier), so namespace-level types start at column 2
-CS_TYPE = re.compile(
-    r"^  (?:\[[^\]]*\]\s*)*(?:(?:public|internal|private|protected|file|static|sealed|abstract|readonly|partial|unsafe|ref)\s+)*"
-    r"(?:record\s+struct|record\s+class|record|class|struct|interface|enum)\s+\w+"
-)
+CS_MODIFIERS = r"(?:(?:public|internal|private|protected|file|static|sealed|abstract|readonly|partial|unsafe|ref)\s+)*"
+CS_KINDS = r"(?:record\s+struct|record\s+class|record|class|struct|interface|enum)"
+CS_TYPE = re.compile(r"^  (?:\[[^\]]*\]\s*)*" + CS_MODIFIERS + CS_KINDS + r"\s+\w+")
 # Type definitions directly inside a namespace (not forward declarations, which end in ';')
 CPP_TYPE = re.compile(r"^  (?:struct|class|enum\s+class|enum|union)\s+\w+(?:\s*:\s*[\w:<> ]+)?\s*$")
 
@@ -27,13 +26,13 @@ def tracked_files(root: Path, pattern: str) -> list[Path]:
     return [root / line for line in result.stdout.splitlines() if line]
 
 
-def count_types(path: Path, regex: re.Pattern) -> int:
+def count_types(path: Path, regex: re.Pattern[str]) -> int:
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if regex.match(line))
 
 
 def main() -> int:
     root = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip())
-    problems = []
+    problems: list[str] = []
     for path in tracked_files(root, "*.cs"):
         if (n := count_types(path, CS_TYPE)) > 1:
             problems.append(f"{path.relative_to(root)}: {n} namespace-level types")
