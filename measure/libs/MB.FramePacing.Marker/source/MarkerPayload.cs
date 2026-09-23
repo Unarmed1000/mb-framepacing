@@ -1,14 +1,13 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The frame marker payload. Wire format is defined in doc/marker-format.md and must match marker/cpp/src/Payload.cpp byte for byte.
+//* The frame marker payload. The wire format (doc/marker-format.md) is implemented once in C#, by the marker library (MB.FrameMarker).
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
 using System;
-using System.Buffers.Binary;
-using System.Text;
+using FM = MB.FrameMarker;
 
 namespace MB.FramePacing.Marker
 {
@@ -27,42 +26,16 @@ namespace MB.FramePacing.Marker
     public const byte Magic1 = (byte)'F';
     public const byte FormatVersion = 1;
 
-    private const int OffsetMagic0 = 0;
-    private const int OffsetMagic1 = 1;
-    private const int OffsetVersion = 2;
-    private const int OffsetKind = 3;
-    private const int OffsetFrameIndex = 4;
-    private const int OffsetAnimationTicks = 12;
-    private const int OffsetRunId = 20;
-    private const int OffsetStartUtcTicks = ByteCount;
-    private const int OffsetStartNameLength = OffsetStartUtcTicks + 8;
-    private const int OffsetStartName = OffsetStartNameLength + 1;
-
-    private static readonly UTF8Encoding g_utf8 = new UTF8Encoding(false, true);
-
     public TimeSpan AnimationTime => TimeSpan.FromTicks(AnimationTicks);
 
     /// <summary>Serialize the payload. Start markers append the metadata (empty if null), other kinds ignore it.</summary>
     public byte[] Encode(StartMetadata? metadata = null)
     {
-      if (Kind != MarkerKind.SequenceStart)
-      {
-        var header = new byte[ByteCount];
-        WriteHeader(header);
-        return header;
-      }
-
-      metadata ??= StartMetadata.Empty;
-      var name = g_utf8.GetBytes(metadata.Name);
-      if (name.Length > MaxStartNameBytes)
-        throw new ArgumentException($"The start name is {name.Length} bytes as UTF-8, the limit is {MaxStartNameBytes}", nameof(metadata));
-
-      var bytes = new byte[StartFixedByteCount + name.Length];
-      WriteHeader(bytes);
-      BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(OffsetStartUtcTicks, 8), metadata.UtcTicks);
-      bytes[OffsetStartNameLength] = (byte)name.Length;
-      name.CopyTo(bytes, OffsetStartName);
-      return bytes;
+      var buffer = new byte[MaxEncodedByteCount];
+      int count = FM.Marker.EncodePayload(ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), buffer);
+      if (count == 0)
+        throw new ArgumentException($"The start name is longer than {MaxStartNameBytes} bytes as UTF-8", nameof(metadata));
+      return buffer.AsSpan(0, count).ToArray();
     }
 
     /// <summary>Parse the wire format. Fails on a wrong length, magic, format version, unknown kind or invalid UTF-8 name.</summary>
@@ -71,57 +44,18 @@ namespace MB.FramePacing.Marker
     {
       payload = default;
       metadata = null;
-      if (
-        src.Length < ByteCount
-        || src[OffsetMagic0] != Magic0
-        || src[OffsetMagic1] != Magic1
-        || src[OffsetVersion] != FormatVersion
-        || src[OffsetKind] > (byte)MarkerKind.SequenceEnd
-      )
+      var bytes = src.ToArray();
+      if (!FM.Marker.TryDecodePayload(bytes, 0, bytes.Length, out var decoded, out var start))
         return false;
-
-      var kind = (MarkerKind)src[OffsetKind];
-      if (kind == MarkerKind.SequenceStart)
-      {
-        if (src.Length < StartFixedByteCount)
-          return false;
-        int nameLength = src[OffsetStartNameLength];
-        if (nameLength > MaxStartNameBytes || src.Length != StartFixedByteCount + nameLength)
-          return false;
-        string name;
-        try
-        {
-          name = g_utf8.GetString(src.Slice(OffsetStartName, nameLength));
-        }
-        catch (DecoderFallbackException)
-        {
-          return false;
-        }
-        metadata = new StartMetadata(BinaryPrimitives.ReadInt64LittleEndian(src.Slice(OffsetStartUtcTicks, 8)), name);
-      }
-      else if (src.Length != ByteCount)
-        return false;
-
-      payload = new MarkerPayload(
-        BinaryPrimitives.ReadUInt64LittleEndian(src.Slice(OffsetFrameIndex, 8)),
-        BinaryPrimitives.ReadInt64LittleEndian(src.Slice(OffsetAnimationTicks, 8)),
-        BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(OffsetRunId, 4)),
-        kind
-      );
+      payload = new MarkerPayload(decoded.FrameIndex, decoded.AnimationTicks, decoded.RunId, (MarkerKind)decoded.Kind);
+      if (decoded.Kind == FM.MarkerKind.SequenceStart)
+        metadata = new StartMetadata(start.UtcTicks, start.Name);
       return true;
     }
 
     public static bool TryDecode(ReadOnlySpan<byte> src, out MarkerPayload payload) => TryDecode(src, out payload, out _);
 
-    private void WriteHeader(Span<byte> dst)
-    {
-      dst[OffsetMagic0] = Magic0;
-      dst[OffsetMagic1] = Magic1;
-      dst[OffsetVersion] = FormatVersion;
-      dst[OffsetKind] = (byte)Kind;
-      BinaryPrimitives.WriteUInt64LittleEndian(dst.Slice(OffsetFrameIndex, 8), FrameIndex);
-      BinaryPrimitives.WriteInt64LittleEndian(dst.Slice(OffsetAnimationTicks, 8), AnimationTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(dst.Slice(OffsetRunId, 4), RunId);
-    }
+    /// <summary>The same payload as the marker library's type.</summary>
+    public FM.Payload ToFrameMarker() => new FM.Payload(FrameIndex, AnimationTicks, RunId, (FM.MarkerKind)Kind);
   }
 }

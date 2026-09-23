@@ -4,6 +4,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ZXing only decodes; the markers are encoded and drawn by the marker library applications use -->
     <PackageReference Include="ZXing.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\marker\csharp\MB.FrameMarker.csproj" />
   </ItemGroup>
 </Project>

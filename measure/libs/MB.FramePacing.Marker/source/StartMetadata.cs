@@ -7,6 +7,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using FM = MB.FrameMarker;
 
 namespace MB.FramePacing.Marker
 {
@@ -20,5 +21,8 @@ namespace MB.FramePacing.Marker
     public DateTime? StartTimeUtc => UtcTicks > 0 && UtcTicks <= DateTime.MaxValue.Ticks ? new DateTime(UtcTicks, DateTimeKind.Utc) : null;
 
     public static StartMetadata Create(DateTime startTimeUtc, string name) => new StartMetadata(startTimeUtc.ToUniversalTime().Ticks, name);
+
+    /// <summary>The same metadata as the marker library's type.</summary>
+    public FM.StartMetadata ToFrameMarker() => new FM.StartMetadata(UtcTicks, Name);
   }
 }

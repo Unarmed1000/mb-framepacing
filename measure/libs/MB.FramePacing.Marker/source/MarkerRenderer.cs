@@ -2,35 +2,35 @@
 //* File Description
 //* ----------------
 //* C# twin of the C++ marker generator: renders the marker into a GrayImage. Used by the synthetic capture source and the tests; applications
-//* use the C++20 library (marker/cpp/). The symbol parameters and sizing rules are defined in doc/marker-format.md.
+//* use the marker libraries (marker/cpp/, marker/csharp/); this draws with the C# one. The symbol parameters and sizing rules are defined in doc/marker-format.md.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
 using System;
-using System.Collections.Generic;
-using System.Text;
-using ZXing;
-using ZXing.QrCode.Internal;
-using QrEncoder = ZXing.QrCode.Internal.Encoder;
+using FM = MB.FrameMarker;
 
 namespace MB.FramePacing.Marker
 {
   public static class MarkerRenderer
   {
     /// <summary>Frame and end markers are fixed to QR version 2 (25x25 modules).</summary>
-    public const int FrameQrVersion = 2;
+    public const int FrameQrVersion = FM.Marker.FrameQrVersion;
 
     /// <summary>Start markers use the smallest version in [FrameQrVersion, MaxQrVersion] that fits the metadata.</summary>
-    public const int MaxQrVersion = 6;
+    public const int MaxQrVersion = FM.Marker.MaxQrVersion;
 
-    public const int FrameQrModuleCount = (4 * FrameQrVersion) + 17;
-    public const int MaxQrModuleCount = (4 * MaxQrVersion) + 17;
-    public const int RecommendedQuietZoneModules = 4;
-    public const int RecommendedInsetPx = 32;
+    public const int FrameQrModuleCount = FM.Marker.FrameQrModuleCount;
+    public const int MaxQrModuleCount = FM.Marker.MaxQrModuleCount;
+    public const int RecommendedQuietZoneModules = FM.Marker.RecommendedQuietZoneModules;
+    public const int RecommendedInsetPx = FM.Marker.RecommendedInsetPx;
 
-    // ISO-8859-1 maps every byte 0-255 to the char with the same value, so the payload bytes survive the string based ZXing API unchanged.
-    private static readonly Encoding g_latin1 = Encoding.Latin1;
+    // The generator keeps scratch buffers and is not thread safe; captures and analyses render on several threads
+    [ThreadStatic]
+    private static FM.MarkerGenerator? g_generator;
+
+    [ThreadStatic]
+    private static FM.ModuleMatrix? g_matrix;
 
     /// <summary>Marker size (symbol + quiet zone) for a frame or end marker.</summary>
     public static int MarkerSizePx(int moduleSizePx, int quietZoneModules = RecommendedQuietZoneModules) =>
@@ -43,31 +43,26 @@ namespace MB.FramePacing.Marker
       MarkerSizePx(moduleSizePx, quietZoneModules, MaxQrModuleCount);
 
     /// <summary>Hard minimum module size in source pixels: 2 stored pixels per module after all scaling.</summary>
-    public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => ModuleSizeForStoredPx(2, sourceHeight, storedHeight);
+    public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => FM.Marker.MinimumModuleSizePx(sourceHeight, storedHeight);
 
     /// <summary>Recommended module size in source pixels: 3 stored pixels per module (4 for MJPEG capture).</summary>
     public static int RecommendModuleSizePx(int sourceHeight, int storedHeight, bool mjpeg = false) =>
-      ModuleSizeForStoredPx(mjpeg ? 4 : 3, sourceHeight, storedHeight);
+      FM.Marker.RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg);
 
     /// <summary>Build the QR module matrix for the payload. The metadata is only used by start markers.</summary>
     public static ModuleMatrix GenerateModules(MarkerPayload payload, StartMetadata? metadata = null)
     {
-      var hints = new Dictionary<EncodeHintType, object> { [EncodeHintType.CHARACTER_SET] = "ISO-8859-1", [EncodeHintType.DISABLE_ECI] = true };
-      // Frame and end markers are pinned to one version so the symbol never changes size. Start markers let ZXing pick the smallest version.
-      if (payload.Kind != MarkerKind.SequenceStart)
-        hints[EncodeHintType.QR_VERSION] = FrameQrVersion;
+      // The same encoder applications use (MB.FrameMarker), so the synthetic capture shows exactly what a game draws
+      var generator = g_generator ??= new FM.MarkerGenerator();
+      var matrix = g_matrix ??= new FM.ModuleMatrix();
+      if (!generator.GenerateModules(payload.ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), matrix))
+        throw new ArgumentException($"The start name is longer than {MarkerPayload.MaxStartNameBytes} bytes as UTF-8", nameof(metadata));
 
-      var content = g_latin1.GetString(payload.Encode(metadata));
-      var qrCode = QrEncoder.encode(content, ErrorCorrectionLevel.M, hints);
-      if (qrCode.Version.VersionNumber > MaxQrVersion)
-        throw new InvalidOperationException($"Unexpected QR version {qrCode.Version.VersionNumber}");
-
-      var matrix = qrCode.Matrix;
-      var modules = new ModuleMatrix(matrix.Width);
-      for (int y = 0; y < matrix.Height; ++y)
+      var modules = new ModuleMatrix(matrix.Size);
+      for (int y = 0; y < matrix.Size; ++y)
       {
-        for (int x = 0; x < matrix.Width; ++x)
-          modules.Set(x, y, matrix[x, y] == 1);
+        for (int x = 0; x < matrix.Size; ++x)
+          modules.Set(x, y, matrix.IsDark(x, y));
       }
       return modules;
     }
@@ -112,14 +107,6 @@ namespace MB.FramePacing.Marker
             target.FillRect(new PixelRect(symbolLeft + (x * moduleSizePx), symbolTop + (y * moduleSizePx), moduleSizePx, moduleSizePx), 0);
         }
       }
-    }
-
-    private static int ModuleSizeForStoredPx(int storedPxPerModule, int sourceHeight, int storedHeight)
-    {
-      if (sourceHeight <= 0 || storedHeight <= 0)
-        return storedPxPerModule;
-      int size = (int)((((long)storedPxPerModule * sourceHeight) + storedHeight - 1) / storedHeight);
-      return Math.Max(size, storedPxPerModule);
     }
   }
 }

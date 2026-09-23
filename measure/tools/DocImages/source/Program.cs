@@ -150,7 +150,7 @@ namespace MB.FramePacing.DocImages
     private static string FindRepositoryRoot()
     {
       var directory = new DirectoryInfo(AppContext.BaseDirectory);
-      while (directory != null && !File.Exists(Path.Combine(directory.FullName, "LICENSE")))
+      while (directory != null && !File.Exists(Path.Combine(directory.FullName, "mb-framepacing.slnx")))
         directory = directory.Parent;
       return directory?.FullName ?? throw new DirectoryNotFoundException("Run DocImages from inside the repository or pass an output directory");
     }
