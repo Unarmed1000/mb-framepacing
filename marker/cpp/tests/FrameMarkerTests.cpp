@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <mb/framemarker/FrameMarker.hpp>
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <limits>
@@ -372,6 +373,209 @@ TEST(Vertices, QuadsToIndexed)
 
   std::array<uint32_t, 11> tooFewIndices{};
   const FM::IndexedCount failed = FM::QuadsToIndexed(quads, vertices, tooFewIndices);
+  EXPECT_EQ(failed.VertexCount, 0u);
+  EXPECT_EQ(failed.IndexCount, 0u);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Direct triangle output (GenerateTriangles / GenerateIndexed)
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+  //! One marker to generate: a frame, end or start marker (the start marker with metadata).
+  struct TriangleCase
+  {
+    FM::Payload Payload;
+    std::string StartName;
+    FM::Options Options;
+    FM::Point Origin;
+  };
+
+  std::vector<TriangleCase> TriangleCases()
+  {
+    std::vector<TriangleCase> cases;
+    for (const int32_t moduleSize : {1, 2, 3, 6})
+    {
+      for (const int32_t quietZone : {0, 4})
+      {
+        const FM::Options options{moduleSize, quietZone};
+        cases.push_back({{42u, 1'234'567, 3u, FM::MarkerKind::Frame}, {}, options, {5, 7}});
+        cases.push_back({{43u, 1'400'234, 3u, FM::MarkerKind::SequenceEnd}, {}, options, {0, 0}});
+        for (const std::size_t nameLength : {std::size_t{0}, std::size_t{17}, FM::MaxStartNameBytes})
+        {
+          cases.push_back({{41u, 1'067'890, 3u, FM::MarkerKind::SequenceStart}, std::string(nameLength, 'n'), options, {32, 64}});
+        }
+      }
+    }
+    return cases;
+  }
+
+  std::vector<FM::Quad> GenerateCase(const TriangleCase& testCase)
+  {
+    std::vector<FM::Quad> quads(FM::MaxQuadCount());
+    const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
+                                ? FM::GenerateStartQuads(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, quads)
+                                : FM::GenerateQuads(testCase.Payload, testCase.Options, testCase.Origin, quads);
+    quads.resize(count);
+    return quads;
+  }
+
+  std::vector<FM::Vertex> GenerateCaseTriangles(const TriangleCase& testCase)
+  {
+    std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
+    const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
+                                ? FM::GenerateStartTriangles(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, vertices)
+                                : FM::GenerateTriangles(testCase.Payload, testCase.Options, testCase.Origin, vertices);
+    vertices.resize(count);
+    return vertices;
+  }
+
+  //! Rasterize a triangle list like a GPU samples pixel centres: pixel (x,y) is covered when its centre (x+0.5, y+0.5) lies inside the
+  //! triangle or on one of its edges. With vertices on pixel corners no centre lies on an axis aligned edge; centres on the diagonal are
+  //! shared by the two same coloured triangles of one quad, so the tie rule cannot change the image. Triangles are drawn in order.
+  //! Returns false if a vertex lies outside the canvas.
+  bool RasterizeTriangles(const std::vector<FM::Vertex>& vertices, const int32_t width, const int32_t height, std::vector<uint8_t>& rPixels)
+  {
+    rPixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 128u);
+    // Doubled coordinates keep the pixel centres integral
+    const auto edge = [](const FM::Vertex& a, const FM::Vertex& b, const int64_t px, const int64_t py)
+    {
+      return ((2 * static_cast<int64_t>(b.X - a.X)) * (py - (2 * static_cast<int64_t>(a.Y)))) -
+             ((2 * static_cast<int64_t>(b.Y - a.Y)) * (px - (2 * static_cast<int64_t>(a.X))));
+    };
+    for (std::size_t i = 0; i + 2 < vertices.size(); i += 3)
+    {
+      const FM::Vertex& v0 = vertices[i];
+      const FM::Vertex& v1 = vertices[i + 1];
+      const FM::Vertex& v2 = vertices[i + 2];
+      for (const FM::Vertex& v : {v0, v1, v2})
+      {
+        if (v.X < 0 || v.Y < 0 || v.X > width || v.Y > height)
+        {
+          return false;
+        }
+      }
+      const int32_t minX = std::min({v0.X, v1.X, v2.X});
+      const int32_t maxX = std::max({v0.X, v1.X, v2.X});
+      const int32_t minY = std::min({v0.Y, v1.Y, v2.Y});
+      const int32_t maxY = std::max({v0.Y, v1.Y, v2.Y});
+      for (int32_t y = minY; y < maxY; ++y)
+      {
+        for (int32_t x = minX; x < maxX; ++x)
+        {
+          const int64_t px = (2 * static_cast<int64_t>(x)) + 1;
+          const int64_t py = (2 * static_cast<int64_t>(y)) + 1;
+          const int64_t e0 = edge(v0, v1, px, py);
+          const int64_t e1 = edge(v1, v2, px, py);
+          const int64_t e2 = edge(v2, v0, px, py);
+          if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0))
+          {
+            rPixels[(static_cast<std::size_t>(y) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(x)] = v0.Luma;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  std::vector<FM::Vertex> ExpandIndexed(const std::vector<FM::Vertex>& vertices, const std::vector<uint32_t>& indices, const uint32_t baseVertex)
+  {
+    std::vector<FM::Vertex> expanded;
+    expanded.reserve(indices.size());
+    for (const uint32_t index : indices)
+    {
+      expanded.push_back(vertices.at(index - baseVertex));
+    }
+    return expanded;
+  }
+}
+
+TEST(Triangles, DirectOutputEqualsTheConvertedQuads)
+{
+  for (const TriangleCase& testCase : TriangleCases())
+  {
+    SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
+                                    << ", quiet " << testCase.Options.QuietZoneModules << ", name " << testCase.StartName.size());
+    const std::vector<FM::Quad> quads = GenerateCase(testCase);
+    ASSERT_FALSE(quads.empty());
+
+    std::vector<FM::Vertex> converted(quads.size() * 6u);
+    ASSERT_EQ(FM::QuadsToTriangles(quads, converted), converted.size());
+    EXPECT_EQ(GenerateCaseTriangles(testCase), converted);
+
+    constexpr uint32_t BaseVertex = 1000u;
+    std::vector<FM::Vertex> convertedVertices(quads.size() * 4u);
+    std::vector<uint32_t> convertedIndices(quads.size() * 6u);
+    const FM::IndexedCount convertedCount = FM::QuadsToIndexed(quads, convertedVertices, convertedIndices, BaseVertex);
+    ASSERT_EQ(convertedCount.IndexCount, convertedIndices.size());
+
+    std::vector<FM::Vertex> vertices(FM::MaxIndexedVertexCount());
+    std::vector<uint32_t> indices(FM::MaxIndexCount());
+    const FM::IndexedCount count =
+      testCase.Payload.Kind == FM::MarkerKind::SequenceStart
+        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, vertices, indices, BaseVertex)
+        : FM::GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices, BaseVertex);
+    vertices.resize(count.VertexCount);
+    indices.resize(count.IndexCount);
+    EXPECT_EQ(vertices, convertedVertices);
+    EXPECT_EQ(indices, convertedIndices);
+  }
+}
+
+TEST(Triangles, RasterizedTrianglesReproduceTheQuads)
+{
+  for (const TriangleCase& testCase : TriangleCases())
+  {
+    SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
+                                    << ", quiet " << testCase.Options.QuietZoneModules);
+    const int32_t size = testCase.Origin.Y + FM::MaxMarkerSizePx(testCase.Options) + 8;
+    std::vector<uint8_t> fromQuads;
+    ASSERT_TRUE(Rasterize(GenerateCase(testCase), size, size, fromQuads));
+
+    std::vector<uint8_t> fromTriangles;
+    ASSERT_TRUE(RasterizeTriangles(GenerateCaseTriangles(testCase), size, size, fromTriangles));
+    EXPECT_EQ(fromTriangles, fromQuads) << "the triangle list must cover exactly the pixels of the quads";
+
+    std::vector<FM::Vertex> vertices(FM::MaxIndexedVertexCount());
+    std::vector<uint32_t> indices(FM::MaxIndexCount());
+    const FM::IndexedCount count =
+      testCase.Payload.Kind == FM::MarkerKind::SequenceStart
+        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, vertices, indices)
+        : FM::GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices);
+    vertices.resize(count.VertexCount);
+    indices.resize(count.IndexCount);
+    std::vector<uint8_t> fromIndexed;
+    ASSERT_TRUE(RasterizeTriangles(ExpandIndexed(vertices, indices, 0u), size, size, fromIndexed));
+    EXPECT_EQ(fromIndexed, fromQuads) << "the indexed triangle list must cover exactly the pixels of the quads";
+  }
+}
+
+TEST(Triangles, FrameMarkersFitTheFrameBufferSizes)
+{
+  std::vector<FM::Vertex> vertices(FM::MaxFrameTriangleVertexCount());
+  std::vector<FM::Vertex> indexedVertices(FM::MaxFrameIndexedVertexCount());
+  std::vector<uint32_t> indices(FM::MaxFrameIndexCount());
+  for (uint64_t frame = 0; frame < 500u; ++frame)
+  {
+    const FM::Payload payload{frame * 7919u, static_cast<int64_t>(frame) * 166'667, 9u, FM::MarkerKind::Frame};
+    EXPECT_GT(FM::GenerateTriangles(payload, {}, {0, 0}, vertices), 0u) << "frame " << frame;
+    EXPECT_GT(FM::GenerateIndexed(payload, {}, {0, 0}, indexedVertices, indices).IndexCount, 0u) << "frame " << frame;
+  }
+}
+
+TEST(Triangles, InvalidOptionsOrSmallBuffersGenerateNothing)
+{
+  const FM::Payload payload{1u, 2, 3u};
+  std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
+  std::vector<uint32_t> indices(FM::MaxIndexCount());
+  EXPECT_EQ(FM::GenerateTriangles(payload, {0, 4}, {0, 0}, vertices), 0u);
+  EXPECT_EQ(FM::GenerateIndexed(payload, {6, -1}, {0, 0}, vertices, indices).VertexCount, 0u);
+
+  std::vector<FM::Vertex> tooFew(12);
+  EXPECT_EQ(FM::GenerateTriangles(payload, {}, {0, 0}, tooFew), 0u);
+  std::vector<uint32_t> tooFewIndices(12);
+  const FM::IndexedCount failed = FM::GenerateIndexed(payload, {}, {0, 0}, vertices, tooFewIndices);
   EXPECT_EQ(failed.VertexCount, 0u);
   EXPECT_EQ(failed.IndexCount, 0u);
 }

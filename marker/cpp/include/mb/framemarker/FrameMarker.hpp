@@ -84,6 +84,22 @@ namespace MB::FrameMarker
     return MaxQuadCount() * 6u;
   }
 
+  //! Vertex and index counts for a frame or end marker (a start marker needs the Max... variants above).
+  constexpr std::size_t MaxFrameTriangleVertexCount() noexcept
+  {
+    return MaxFrameQuadCount() * 6u;
+  }
+
+  constexpr std::size_t MaxFrameIndexedVertexCount() noexcept
+  {
+    return MaxFrameQuadCount() * 4u;
+  }
+
+  constexpr std::size_t MaxFrameIndexCount() noexcept
+  {
+    return MaxFrameQuadCount() * 6u;
+  }
+
   //! Convert a wall clock time to C# DateTime UTC ticks (the StartMetadata::UtcTicks format).
   constexpr int64_t ToDateTimeTicks(const std::chrono::system_clock::time_point timePoint) noexcept
   {
@@ -177,6 +193,27 @@ namespace MB::FrameMarker
   //! is at most MaxMarkerSizePx(options) wide and high. Same rules as GenerateQuads otherwise.
   std::size_t GenerateStartQuads(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
                                  std::span<Quad> dst) noexcept;
+
+  //! Generate the marker as a triangle list, written straight into dst: 6 vertices per quad (see GenerateQuads for the quad order),
+  //! (TL, TR, BL) (BL, TR, BR), clockwise on screen. Every vertex lies on a pixel corner. Does not allocate.
+  //! Frame/end markers need at most MaxFrameTriangleVertexCount() vertices, start markers MaxTriangleVertexCount().
+  //! Returns the number of vertices written, or 0 if the options are invalid or dst is too small.
+  std::size_t GenerateTriangles(const Payload& payload, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
+
+  //! GenerateTriangles for a start marker carrying metadata (payload.Kind is forced to SequenceStart).
+  std::size_t GenerateStartTriangles(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
+                                     std::span<Vertex> dst) noexcept;
+
+  //! Generate the marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on
+  //! screen. baseVertex is added to every index. Does not allocate.
+  //! Frame/end markers need at most MaxFrameIndexedVertexCount() vertices and MaxFrameIndexCount() indices.
+  //! Returns {0,0} if the options are invalid or a destination is too small.
+  IndexedCount GenerateIndexed(const Payload& payload, const Options& options, Point origin, std::span<Vertex> dstVertices,
+                               std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
+
+  //! GenerateIndexed for a start marker carrying metadata (payload.Kind is forced to SequenceStart).
+  IndexedCount GenerateStartIndexed(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
+                                    std::span<Vertex> dstVertices, std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
 
   //! Convert quads to a triangle list: 6 vertices per quad, (TL, TR, BL) (BL, TR, BR), clockwise on screen (+y down).
   //! Returns the number of vertices written, or 0 if dst is too small.

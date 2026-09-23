@@ -82,7 +82,7 @@ if(MB_FRAMEMARKER_BUILD_TESTS)
   set(BUILD_GMOCK OFF CACHE BOOL "gmock is not used" FORCE)
   FetchContent_MakeAvailable(googletest)
 
-  add_executable(mb_framemarker_tests tests/FrameMarkerTests.cpp)
+  add_executable(mb_framemarker_tests tests/FrameMarkerTests.cpp tests/AllocationTests.cpp)
   target_link_libraries(mb_framemarker_tests PRIVATE mb::framemarker GTest::gtest_main)
   target_compile_options(mb_framemarker_tests PRIVATE ${MB_FRAMEMARKER_CXX_WARNINGS})
   target_compile_definitions(mb_framemarker_tests PRIVATE MB_FRAMEMARKER_EXPECTED_VERSION="${PROJECT_VERSION}")

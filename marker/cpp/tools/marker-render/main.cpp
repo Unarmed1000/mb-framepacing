@@ -130,8 +130,93 @@ namespace
     return hex;
   }
 
+  //! splitmix64: a tiny deterministic generator, so every platform writes the same digest
+  uint64_t NextRandom(uint64_t& rState)
+  {
+    rState += 0x9E3779B97F4A7C15u;
+    uint64_t value = rState;
+    value = (value ^ (value >> 30u)) * 0xBF58476D1CE4E5B9u;
+    value = (value ^ (value >> 27u)) * 0x94D049BB133111EBu;
+    return value ^ (value >> 31u);
+  }
+
+  //! modules.csv: the QR module matrix of many pseudo random payloads (frame, end and start markers with 0-64 byte names, so every symbol
+  //! version and mask occurs). Other implementations of the marker (the C# library) must reproduce every row exactly.
+  //! Columns: kind, run id, frame index, animation ticks, start UTC ticks, start name (hex), symbol size, modules (hex): row major, one
+  //! bit per module (1 = dark), most significant bit first, the last byte zero padded.
+  void WriteModuleDigest(const std::filesystem::path& directory)
+  {
+    constexpr int32_t RowCount = 512;
+    std::ofstream digest(directory / "modules.csv");
+    if (!digest)
+    {
+      throw std::runtime_error("Failed to create modules.csv in '" + directory.string() + "'");
+    }
+    digest << "kind,runId,frameIndex,animationTicks,startUtcTicks,startNameHex,size,modulesHex\n";
+
+    uint64_t state = 0x6D622D6672616D65u;
+    for (int32_t row = 0; row < RowCount; ++row)
+    {
+      FM::Payload payload;
+      payload.Kind = static_cast<FM::MarkerKind>(row % 3);
+      payload.FrameIndex = NextRandom(state);
+      payload.AnimationTicks = static_cast<int64_t>(NextRandom(state));
+      payload.RunId = static_cast<uint32_t>(NextRandom(state));
+      int64_t startUtcTicks = 0;
+      std::string name;
+      if (payload.Kind == FM::MarkerKind::SequenceStart)
+      {
+        startUtcTicks = static_cast<int64_t>(NextRandom(state) >> 1u);
+        // Every length 0..64, with an occasional two byte UTF-8 character
+        const auto length = static_cast<std::size_t>((row / 3) % static_cast<int32_t>(FM::MaxStartNameBytes + 1u));
+        while (name.size() < length)
+        {
+          const uint64_t pick = NextRandom(state);
+          if (pick % 7u == 0u && name.size() + 2u <= length)
+          {
+            name += "\xC3\xA6";
+          }
+          else
+          {
+            name += static_cast<char>(' ' + static_cast<char>(pick % 95u));
+          }
+        }
+      }
+
+      FM::ModuleMatrix matrix;
+      if (!FM::GenerateModules(payload, matrix, {startUtcTicks, name}))
+      {
+        throw std::runtime_error("GenerateModules failed for digest row " + std::to_string(row));
+      }
+      std::string bits;
+      uint8_t current = 0;
+      int32_t bitCount = 0;
+      for (int32_t y = 0; y < matrix.Size; ++y)
+      {
+        for (int32_t x = 0; x < matrix.Size; ++x)
+        {
+          current = static_cast<uint8_t>((current << 1u) | (matrix.IsDark(x, y) ? 1u : 0u));
+          if (++bitCount == 8)
+          {
+            bits += static_cast<char>(current);
+            current = 0;
+            bitCount = 0;
+          }
+        }
+      }
+      if (bitCount > 0)
+      {
+        bits += static_cast<char>(static_cast<uint8_t>(current << static_cast<uint32_t>(8 - bitCount)));
+      }
+      digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
+             << startUtcTicks << ',' << ToHex(name) << ',' << matrix.Size << ',' << ToHex(bits) << '\n';
+    }
+  }
+
   void WriteGolden(const std::filesystem::path& directory)
   {
+    WriteModuleDigest(directory);
+
     constexpr std::array<FM::Payload, 10> Payloads{{
       {0u, 0, 0u, FM::MarkerKind::Frame},
       {1u, 166'667, 1u, FM::MarkerKind::Frame},

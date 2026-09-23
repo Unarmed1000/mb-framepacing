@@ -13,21 +13,23 @@ namespace MB::FrameMarker
     static_assert(MaxFrameQuadCount() == 326u);
     static_assert(MaxQuadCount() == 862u);
 
-    std::size_t BuildQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Quad> dst) noexcept
-    {
-      if (dst.empty())
-      {
-        return 0;
-      }
+    static_assert(MaxFrameTriangleVertexCount() == 326u * 6u);
+    static_assert(MaxFrameIndexCount() == 326u * 6u);
 
+    //! Walk the marker in draw order: the light background (symbol + quiet zone), then one dark quad per horizontal run of dark modules.
+    //! Every quad goes straight to emit, which writes it in its output format and returns false when the output is full.
+    template <typename TEmit>
+    bool WalkQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, TEmit&& emit) noexcept
+    {
       const int32_t moduleSize = options.ModuleSizePx;
       const int32_t markerSize = MarkerSizePx(options, matrix.Size);
       const int32_t symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
       const int32_t symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
 
-      std::size_t count = 0;
-      dst[count++] = Quad{origin.X, origin.Y, origin.X + markerSize, origin.Y + markerSize, false};
-
+      if (!emit(Quad{origin.X, origin.Y, origin.X + markerSize, origin.Y + markerSize, false}))
+      {
+        return false;
+      }
       for (int32_t y = 0; y < matrix.Size; ++y)
       {
         const int32_t top = symbolTop + (y * moduleSize);
@@ -44,14 +46,117 @@ namespace MB::FrameMarker
           {
             ++x;
           }
-          if (count >= dst.size())
+          if (!emit(Quad{symbolLeft + (runStart * moduleSize), top, symbolLeft + (x * moduleSize), top + moduleSize, true}))
           {
-            return 0;
+            return false;
           }
-          dst[count++] = Quad{symbolLeft + (runStart * moduleSize), top, symbolLeft + (x * moduleSize), top + moduleSize, true};
         }
       }
-      return count;
+      return true;
+    }
+
+    //! 6 vertices: (TL, TR, BL) (BL, TR, BR), clockwise on screen (+y down).
+    void WriteTriangles(const Quad& quad, const std::span<Vertex, 6> dst) noexcept
+    {
+      const uint8_t luma = quad.Dark ? 0u : 255u;
+      const Vertex topLeft{quad.Left, quad.Top, luma};
+      const Vertex topRight{quad.Right, quad.Top, luma};
+      const Vertex bottomRight{quad.Right, quad.Bottom, luma};
+      const Vertex bottomLeft{quad.Left, quad.Bottom, luma};
+      dst[0] = topLeft;
+      dst[1] = topRight;
+      dst[2] = bottomLeft;
+      dst[3] = bottomLeft;
+      dst[4] = topRight;
+      dst[5] = bottomRight;
+    }
+
+    //! 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2), clockwise on screen. first is the index of the first vertex.
+    void WriteIndexed(const Quad& quad, const std::span<Vertex, 4> dstVertices, const std::span<uint32_t, 6> dstIndices,
+                      const uint32_t first) noexcept
+    {
+      const uint8_t luma = quad.Dark ? 0u : 255u;
+      dstVertices[0] = Vertex{quad.Left, quad.Top, luma};
+      dstVertices[1] = Vertex{quad.Right, quad.Top, luma};
+      dstVertices[2] = Vertex{quad.Right, quad.Bottom, luma};
+      dstVertices[3] = Vertex{quad.Left, quad.Bottom, luma};
+      dstIndices[0] = first + 0u;
+      dstIndices[1] = first + 1u;
+      dstIndices[2] = first + 3u;
+      dstIndices[3] = first + 3u;
+      dstIndices[4] = first + 1u;
+      dstIndices[5] = first + 2u;
+    }
+
+    std::size_t BuildQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Quad> dst) noexcept
+    {
+      std::size_t count = 0;
+      const bool complete = WalkQuads(matrix, options, origin,
+                                      [&](const Quad& quad) noexcept
+                                      {
+                                        if (count >= dst.size())
+                                        {
+                                          return false;
+                                        }
+                                        dst[count++] = quad;
+                                        return true;
+                                      });
+      return complete ? count : 0;
+    }
+
+    std::size_t BuildTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
+    {
+      std::size_t count = 0;
+      const bool complete = WalkQuads(matrix, options, origin,
+                                      [&](const Quad& quad) noexcept
+                                      {
+                                        if (dst.size() - count < 6u)
+                                        {
+                                          return false;
+                                        }
+                                        WriteTriangles(quad, dst.subspan(count).first<6>());
+                                        count += 6u;
+                                        return true;
+                                      });
+      return complete ? count : 0;
+    }
+
+    IndexedCount BuildIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
+                              const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
+    {
+      IndexedCount count;
+      const bool complete =
+        WalkQuads(matrix, options, origin,
+                  [&](const Quad& quad) noexcept
+                  {
+                    if (dstVertices.size() - count.VertexCount < 4u || dstIndices.size() - count.IndexCount < 6u)
+                    {
+                      return false;
+                    }
+                    WriteIndexed(quad, dstVertices.subspan(count.VertexCount).first<4>(), dstIndices.subspan(count.IndexCount).first<6>(),
+                                 baseVertex + static_cast<uint32_t>(count.VertexCount));
+                    count.VertexCount += 4u;
+                    count.IndexCount += 6u;
+                    return true;
+                  });
+      return complete ? count : IndexedCount{};
+    }
+
+    //! The module matrix for a marker; forceStart makes it a start marker carrying the metadata.
+    bool BuildMatrix(const Payload& payload, const StartMetadata& metadata, const bool forceStart, const Options& options,
+                     ModuleMatrix& rMatrix) noexcept
+    {
+      if (!IsValid(options))
+      {
+        return false;
+      }
+      if (!forceStart)
+      {
+        return GenerateModules(payload, rMatrix);
+      }
+      Payload startPayload = payload;
+      startPayload.Kind = MarkerKind::SequenceStart;
+      return GenerateModules(startPayload, rMatrix, metadata);
     }
   }
 
@@ -89,24 +194,43 @@ namespace MB::FrameMarker
   std::size_t GenerateQuads(const Payload& payload, const Options& options, const Point origin, const std::span<Quad> dst) noexcept
   {
     ModuleMatrix matrix;
-    if (!IsValid(options) || !GenerateModules(payload, matrix))
-    {
-      return 0;
-    }
-    return BuildQuads(matrix, options, origin, dst);
+    return BuildMatrix(payload, {}, false, options, matrix) ? BuildQuads(matrix, options, origin, dst) : 0u;
   }
 
   std::size_t GenerateStartQuads(const Payload& payload, const StartMetadata& metadata, const Options& options, const Point origin,
                                  const std::span<Quad> dst) noexcept
   {
-    Payload startPayload = payload;
-    startPayload.Kind = MarkerKind::SequenceStart;
     ModuleMatrix matrix;
-    if (!IsValid(options) || !GenerateModules(startPayload, matrix, metadata))
-    {
-      return 0;
-    }
-    return BuildQuads(matrix, options, origin, dst);
+    return BuildMatrix(payload, metadata, true, options, matrix) ? BuildQuads(matrix, options, origin, dst) : 0u;
+  }
+
+  std::size_t GenerateTriangles(const Payload& payload, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
+  {
+    ModuleMatrix matrix;
+    return BuildMatrix(payload, {}, false, options, matrix) ? BuildTriangles(matrix, options, origin, dst) : 0u;
+  }
+
+  std::size_t GenerateStartTriangles(const Payload& payload, const StartMetadata& metadata, const Options& options, const Point origin,
+                                     const std::span<Vertex> dst) noexcept
+  {
+    ModuleMatrix matrix;
+    return BuildMatrix(payload, metadata, true, options, matrix) ? BuildTriangles(matrix, options, origin, dst) : 0u;
+  }
+
+  IndexedCount GenerateIndexed(const Payload& payload, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
+                               const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
+  {
+    ModuleMatrix matrix;
+    return BuildMatrix(payload, {}, false, options, matrix) ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex)
+                                                            : IndexedCount{};
+  }
+
+  IndexedCount GenerateStartIndexed(const Payload& payload, const StartMetadata& metadata, const Options& options, const Point origin,
+                                    const std::span<Vertex> dstVertices, const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
+  {
+    ModuleMatrix matrix;
+    return BuildMatrix(payload, metadata, true, options, matrix) ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex)
+                                                                 : IndexedCount{};
   }
 
   std::size_t QuadsToTriangles(const std::span<const Quad> quads, const std::span<Vertex> dst) noexcept
@@ -116,21 +240,9 @@ namespace MB::FrameMarker
     {
       return 0;
     }
-
-    std::size_t i = 0;
-    for (const Quad& quad : quads)
+    for (std::size_t i = 0; i < quads.size(); ++i)
     {
-      const uint8_t luma = quad.Dark ? 0u : 255u;
-      const Vertex topLeft{quad.Left, quad.Top, luma};
-      const Vertex topRight{quad.Right, quad.Top, luma};
-      const Vertex bottomRight{quad.Right, quad.Bottom, luma};
-      const Vertex bottomLeft{quad.Left, quad.Bottom, luma};
-      dst[i++] = topLeft;
-      dst[i++] = topRight;
-      dst[i++] = bottomLeft;
-      dst[i++] = bottomLeft;
-      dst[i++] = topRight;
-      dst[i++] = bottomRight;
+      WriteTriangles(quads[i], dst.subspan(i * 6u).first<6>());
     }
     return required;
   }
@@ -144,23 +256,10 @@ namespace MB::FrameMarker
     {
       return {};
     }
-
-    std::size_t v = 0;
-    std::size_t i = 0;
-    for (const Quad& quad : quads)
+    for (std::size_t i = 0; i < quads.size(); ++i)
     {
-      const uint8_t luma = quad.Dark ? 0u : 255u;
-      const auto first = static_cast<uint32_t>(baseVertex + v);
-      dstVertices[v++] = Vertex{quad.Left, quad.Top, luma};
-      dstVertices[v++] = Vertex{quad.Right, quad.Top, luma};
-      dstVertices[v++] = Vertex{quad.Right, quad.Bottom, luma};
-      dstVertices[v++] = Vertex{quad.Left, quad.Bottom, luma};
-      dstIndices[i++] = first + 0u;
-      dstIndices[i++] = first + 1u;
-      dstIndices[i++] = first + 3u;
-      dstIndices[i++] = first + 3u;
-      dstIndices[i++] = first + 1u;
-      dstIndices[i++] = first + 2u;
+      WriteIndexed(quads[i], dstVertices.subspan(i * 4u).first<4>(), dstIndices.subspan(i * 6u).first<6>(),
+                   baseVertex + static_cast<uint32_t>(i * 4u));
     }
     return {requiredVertices, requiredIndices};
   }
