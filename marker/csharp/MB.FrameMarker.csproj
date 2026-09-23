@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The general C# marker library. No dependencies, .NET Standard 2.0 and C# 9 without nullable annotations, so the same sources also
+       compile inside Unity (2021.3+). Nothing here may allocate on the per-frame path. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>MB.FrameMarker</AssemblyName>
+    <RootNamespace>MB.FrameMarker</RootNamespace>
+    <Product>MB Frame Marker</Product>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FrameMarker.UnitTest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- The marker libraries. Their version comes from marker/VERSION, shared with the C++ library and released with marker-v* tags.
+       MSBuild also imports this file into the Visual Studio projects CMake generates under marker/cpp, so it only touches C# projects. -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <VersionPrefix>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</VersionPrefix>
+  </PropertyGroup>
+</Project>

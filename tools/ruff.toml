@@ -1,0 +1,63 @@
+# Ruff configuration file
+# See https://docs.astral.sh/ruff/configuration/
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "FslBuildGen/mypy_module",
+]
+
+# Set the line length
+line-length = 160
+
+# Assume Python 3.11+
+target-version = "py311"
+
+[lint]
+# Enable specific rule sets
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+# Ignore specific rules
+ignore = [
+    "N802",  # Function name should be lowercase (allow PascalCase)
+    "N803",  # Argument name should be lowercase (allow PascalCase)
+    "N806",  # Variable in function should be lowercase (allow PascalCase)
+    "N999",  # Invalid module name (allow PascalCase filenames)
+    "N801",  # Class name not CapWords (allow project conventions)
+    "N816",  # Mixed-case variable in global scope (allow PascalCase globals)
+    "N818",  # Exception name should end in Error (existing naming convention)
+    "E501",  # Line too long (suppress for now)
+    "SIM102", # Nested if (readability preference, not a bug)
+    "SIM108", # Ternary operator (readability preference, not a bug)
+    "SIM116", # Dict instead of if-chain (readability preference)
+]
+
+# Allow fix for all enabled rules (when `--fix` is provided)
+fixable = ["ALL"]
+unfixable = []
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
+
+# Use `\n` line endings for all files
+line-ending = "auto"

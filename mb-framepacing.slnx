@@ -2,6 +2,9 @@
   <Configurations>
     <Platform Name="Any CPU" />
   </Configurations>
+  <Folder Name="/marker/">
+    <Project Path="marker/csharp/MB.FrameMarker.csproj" />
+  </Folder>
   <Folder Name="/app/">
     <Project Path="measure/app/FramePacing/FramePacing.csproj" />
     <Project Path="measure/app/FramePacing.Gui/FramePacing.Gui.csproj" />
@@ -15,6 +18,7 @@
     <Project Path="measure/tools/DocImages/DocImages.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Analysis/UnitTest/MB.FramePacing.Analysis.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Capture/UnitTest/MB.FramePacing.Capture.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj" />
