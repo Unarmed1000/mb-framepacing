@@ -10,12 +10,20 @@ error**.
 > [!IMPORTANT]
 > **mb-framepacing is a cooperative tool (for now).** It only measures applications that take part: every frame, the
 > application writes **its own frame index and its animation timer** into the image as a marker (a small QR code), using
-> the C++ library in [`marker/cpp/`](marker/cpp).
+> one of the marker libraries below.
 >
 > mb-framepacing then compares **the animation time the application wrote into each frame** with **the time that frame
 > actually appeared in the capture**. Where the two disagree, motion on screen stutters. Without the marker there is nothing
 > to compare, so this needs the application's source code and a small change to its renderer. It cannot measure an
 > unmodified game or app that you cannot rebuild.
+
+The marker libraries put the marker into your application. All three draw exactly the same pixels and allocate nothing per frame:
+
+| Your application                 | Marker library                                                                               | Guide                                        |
+| -------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| C++ (any engine or graphics API) | [`marker/cpp`](marker/cpp): C++20, CMake, no dependencies                                    | [Integrating the marker](doc/integrating.md) |
+| C# / .NET                        | [`marker/csharp`](marker/csharp): `MB.FrameMarker`, .NET Standard 2.0, no dependencies       | [Integrating the marker](doc/integrating.md) |
+| Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component | [Unity](doc/unity.md)                        |
 
 **Get started:** install on [Windows](doc/install/windows.md) · [Ubuntu](doc/install/ubuntu.md) ·
 [macOS (Homebrew)](doc/install/macos.md), add the marker with [Integrating the marker](doc/integrating.md) (C++ or C#) or the
@@ -63,9 +71,10 @@ capture period.
 
 There are two halves, and both are needed:
 
-- **Inside your application:** the C++20 marker library ([`marker/cpp/`](marker/cpp)). Every frame, it turns "frame index + animation time +
-  run id" into a set of pixel aligned black and white rectangles that your renderer draws on top of the finished image. No
-  dependencies, no allocations per frame, any graphics API.
+- **Inside your application:** a marker library: C++20 ([`marker/cpp/`](marker/cpp)), C# ([`marker/csharp/`](marker/csharp)) or
+  the [Unity package](doc/unity.md). Every frame, it turns "frame index + animation time + run id" into pixel aligned black and white
+  triangles (or rectangles) that your renderer draws on top of the finished image. No dependencies, no allocations per frame, any
+  graphics API.
 - **On the recording side:** the `mb-framepacing` tools ([`measure/`](measure), command line and GUI). They record the display
   signal with their own clock, read the marker back from every recorded frame and compare the animation time the frame
   carries with the time it actually appeared in the capture.
