@@ -57,6 +57,13 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 - **Python scripts** (`measure/build_standalone.py`, `tools/`, later `marker/unity/build_upm.py`): standard library only. They must pass
   `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode; tools
   pinned in `requirements-dev.txt`, installed with `python -m pip install -r requirements-dev.txt`). CI runs all three.
+- **Unity package** (`com.manabattery.framemarker`):
+  - It isn't stored as one folder: `marker/unity/build_upm.py` assembles it from `marker/csharp/source` (core) plus
+    `marker/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
+  - CI runs it with `--check`.
+  - `marker/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode; Unity editors are installed on this machine
+    under `C:/Program Files/Unity/Hub/Editor`. Run it after changing the core or the helpers.
+  - The core must stay C# 9 / .NET Standard 2.0 without UnityEngine.
 - **Standalone release archive:** `marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release
   archive, and falls back to `marker/VERSION` and the repository root otherwise.
 - **Docs**

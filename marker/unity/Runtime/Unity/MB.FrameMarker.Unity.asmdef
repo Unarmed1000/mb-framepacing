@@ -1,0 +1,14 @@
+{
+  "name": "MB.FrameMarker.Unity",
+  "rootNamespace": "MB.FrameMarker.Unity",
+  "references": ["MB.FrameMarker"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -92,3 +92,5 @@ jobs:
           .venv/bin/ruff check .
           .venv/bin/ruff format --check .
           .venv/bin/basedpyright
+      - name: Unity package (assemble and validate; Unity itself is not available in CI)
+        run: python3 marker/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check

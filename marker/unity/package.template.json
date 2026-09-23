@@ -1,0 +1,18 @@
+{
+  "name": "com.manabattery.framemarker",
+  "displayName": "MB Frame Marker",
+  "version": "0.0.0",
+  "unity": "2021.3",
+  "description": "Draws the mb-framepacing frame marker (a QR code carrying the frame index and animation time) into every frame, so a capture of the display output can measure animation error. Includes the general MB.FrameMarker library and Unity helpers.",
+  "author": { "name": "Mana Battery ApS", "url": "https://github.com/Unarmed1000/mb-framepacing" },
+  "documentationUrl": "https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/unity.md",
+  "license": "BSD-3-Clause",
+  "keywords": ["frame pacing", "animation error", "benchmark", "capture"],
+  "samples": [
+    {
+      "displayName": "Benchmark",
+      "description": "Pans the camera and brackets it with start and end markers.",
+      "path": "Samples~/Benchmark"
+    }
+  ]
+}
