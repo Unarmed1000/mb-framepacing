@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using MB.FramePacing.Marker;
 
@@ -15,6 +16,9 @@ namespace MB.FramePacing.Analysis
 {
   public static class TimelineAnalyzer
   {
+    // The slow capture warning needs enough presented frames to tell a pattern from a few real skips
+    private const int SlowCaptureMinFrames = 20;
+
     public static TimelineResult Analyze(IReadOnlyList<CaptureRow> rows, TimelineOptions? options = null)
     {
       options ??= new TimelineOptions();
@@ -309,7 +313,43 @@ namespace MB.FramePacing.Analysis
       );
       if (period <= 0)
         warnings.Add("The capture period could not be determined; animation error thresholds are unavailable");
+      if (SlowCaptureWarning(frames, period) is { } slowCapture)
+        warnings.Add(slowCapture);
       return new RunAnalysis(run.RunId, run.Name, run.StartTimeUtc, run.HasStart, run.HasEnd, counts, statistics, frames, warnings);
+    }
+
+    /// <summary>
+    /// A capture at the display's refresh rate (with vsync) sees the next frame index in every refresh, so gaps are rare (stalls and
+    /// skipped frames). When most presented frames come after frame indices that were never captured, the capture is slower than the
+    /// display, or vsync is off: the results then describe what the capture saw, not what the display showed.
+    /// </summary>
+    private static string? SlowCaptureWarning(List<PresentedFrame> frames, long period)
+    {
+      int followers = 0;
+      int afterGap = 0;
+      double indices = 0;
+      double seconds = 0;
+      for (int i = 1; i < frames.Count; ++i)
+      {
+        if (frames[i].Segment != frames[i - 1].Segment)
+          continue;
+        ++followers;
+        if (frames[i].SkippedBefore > 0)
+          ++afterGap;
+        indices += frames[i].FrameIndex - frames[i - 1].FrameIndex;
+        seconds += (frames[i].FirstSeenTicks - frames[i - 1].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
+      }
+      if (followers < SlowCaptureMinFrames || afterGap * 2 < followers)
+        return null;
+
+      string rates =
+        seconds > 0 && period > 0
+          ? string.Create(
+            CultureInfo.InvariantCulture,
+            $" The frame index advances about {indices / seconds:0} times per second; the capture records {TimeSpan.TicksPerSecond / (double)period:0} frames per second."
+          )
+          : string.Empty;
+      return $"{afterGap * 100 / followers}% of the presented frames come after frame indices that were never captured: the capture is most likely slower than the display's refresh rate, or vsync is off, so the results describe what the capture saw, not what the display showed.{rates} Capture at the display's refresh rate with vsync on.";
     }
 
     private static List<PresentedFrame> BuildFrames(List<FrameBuilder> builders, long period)

@@ -109,6 +109,37 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
+    public void CaptureSlowerThanTheDisplay_IsReported()
+    {
+      // Every captured frame index is two after the previous one: every second displayed frame was never captured, like a 60 fps
+      // recording of a 120 Hz display
+      var rows = new RowBuilder().Start(1);
+      for (ulong f = 0; f < 40; ++f)
+        rows.Show(100 + (2 * f), (long)f * 16, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+
+      Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(39));
+      Assert.That(run.Warnings, Has.Some.Contains("slower than the display's refresh rate"));
+      Assert.That(run.Warnings, Has.Some.Contains("advances about 125 times per second; the capture records 250 frames per second"));
+    }
+
+    [Test]
+    public void OccasionalSkips_AreNotReportedAsASlowCapture()
+    {
+      var rows = new RowBuilder().Start(1);
+      for (ulong f = 0; f < 40; ++f)
+        rows.Show(f == 20 ? 1000 + f + 1 : 1000 + f + (f > 20 ? 1UL : 0UL), (long)f * 16, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+
+      Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(1));
+      Assert.That(run.Warnings, Has.None.Contains("slower than the display's refresh rate"));
+    }
+
+    [Test]
     public void OnlyFramesBetweenStartAndEndAreMeasured()
     {
       var rows = new RowBuilder();
