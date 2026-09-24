@@ -87,14 +87,18 @@ A test run is bracketed by a start and an end marker:
 
 ```
 ... frame markers | START (run R, name, UTC time) | frame markers (run R) | END (run R) | ...
-                  |<------- show >= 250 ms ------>|<-- measured window -->|<- >= 250 ms ->|
+                  |<-- >= 1 captured frame ------>|<-- measured window -->|<-- >= 1 ---->|
+                  |    (guidance: ~3 capture frames = 6 ms at 500 fps, 50 ms at 60 fps, 100 ms at 30 fps)
 ```
 
 1. Pick a run id for the run (a counter or a random `u32`). Every marker of the run carries it.
-2. Show the **start marker** for at least **250 ms** before the measured part, so several captured frames contain it even at low
-   capture rates. Put the test name and the wall clock start time in its metadata.
+2. Show the **start marker** before the measured part. Put the test name and the wall clock start time in its metadata.
+   The tools check every captured frame, so **one complete captured frame** of the marker is enough. With vsync (or G-Sync/FreeSync)
+   and a capture card that records every refresh, one rendered frame gives exactly that. As guidance, so that a dropped capture or a
+   capture that skips refreshes (a 30 fps screen recording) cannot lose it, show it for about **three frames of the slowest
+   capture**: 100 ms covers a 30 fps recording, 50 ms 60 fps, and a few milliseconds a 500 fps capture card.
 3. Show **frame markers** for the measured part.
-4. Show the **end marker** for at least **250 ms** afterwards.
+4. Show the **end marker** afterwards, the same way (one complete captured frame is enough, three capture frames recommended).
 5. `FrameIndex` and `AnimationTicks` keep counting while the start and end markers are shown; they are real rendered frames.
 
 The analyzer measures the frames between the last captured start marker and the first captured end marker with the same run id.
@@ -102,7 +106,8 @@ A capture may contain several runs; each one is reported separately. Without sta
 one run (with a warning). A backwards `FrameIndex` jump or a new run id (for example the application restarted) starts a new segment
 and is never counted as an error.
 
-`mb-framepacing capture --wait-for-start --stop-at-end` uses the same markers to start and stop the recording automatically.
+`mb-framepacing capture --wait-for-start --stop-at-end` uses the same markers to start and stop the recording automatically. It
+checks every captured frame (a live capture as it arrives, a video file frame by frame), so one captured frame of each marker is enough.
 
 ## Sizing
 
@@ -146,6 +151,11 @@ Let `s = storedHeight / sourceHeight`. For example, a 2160p source stored at 540
   module and errors if it is below 2.
 
 ## Location
+
+**Measure with vsync or variable refresh (G-Sync/FreeSync within its range).** Then every displayed frame is whole, and the
+marker describes the frame the viewer sees. With vsync off, one refresh shows slices of several frames; the marker then only
+reports the frame at the top of the screen, frames shown only lower down are never seen, and the numbers are easy to misread.
+The rules below keep vsync-off captures consistent, but they are not what the tool is meant for.
 
 **Primary marker: top-left, inset 32 px from both edges.** That is origin `(32, 32)` in source pixels, rounded up to a
 multiple of the downscale ratio.

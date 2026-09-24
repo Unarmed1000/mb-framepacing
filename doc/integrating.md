@@ -133,13 +133,13 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   std::size_t count = 0;
   switch (phase)
   {
-  case Phase::Start:   // show for at least 250 ms
+  case Phase::Start:   // one captured frame is enough; ~3 capture frames (e.g. 100 ms) for slack
     count = FM::GenerateStartTriangles(payload, {startUtc, "camera pan benchmark"}, options, origin, vertices);
     break;
   case Phase::Measure:
     count = FM::GenerateTriangles(payload, options, origin, vertices);
     break;
-  case Phase::End:     // show for at least 250 ms
+  case Phase::End:     // the same
     count = FM::GenerateTriangles({payload.FrameIndex, payload.AnimationTicks, payload.RunId, FM::MarkerKind::SequenceEnd}, options, origin, vertices);
     break;
   case Phase::Done:

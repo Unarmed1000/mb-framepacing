@@ -67,15 +67,16 @@ A simulation that only advances in fixed steps and renders without interpolation
 
 ## Settings
 
-| Setting         | Meaning                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------- |
-| Stored Height   | Height of the frames the capture tool stores; picks the module size. 0 = the output height                    |
-| MJPEG           | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                      |
-| Module Size Px  | Fixed module size in output pixels (overrides Stored Height)                                                  |
-| Slot            | Top-left (recommended), middle-left or bottom-left                                                            |
-| Tearing Markers | Also draw frame markers in the middle and at the bottom, so the analysis can detect tearing                   |
-| Draw When Idle  | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus         |
-| Material        | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored |
+| Setting                 | Meaning                                                                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Stored Height           | Height of the frames the capture tool stores; picks the module size. 0 = the output height                                        |
+| MJPEG                   | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                                          |
+| Module Size Px          | Fixed module size in output pixels (overrides Stored Height)                                                                      |
+| Slot                    | Top-left (recommended), middle-left or bottom-left                                                                                |
+| Tearing Markers         | Also draw frame markers in the middle and at the bottom, so the analysis can detect tearing                                       |
+| Draw When Idle          | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus                             |
+| Material                | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored                     |
+| Sequence Marker Seconds | How long the start and end markers stay on screen (default 0.1 s: three frames of a 30 fps capture; one captured frame is enough) |
 
 ## How it draws, and the rules
 

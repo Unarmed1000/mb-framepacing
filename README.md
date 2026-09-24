@@ -129,13 +129,13 @@ sequenceDiagram
     participant Tool as mb-framepacing
     You->>Tool: start recording (waits for the START marker)
     You->>App: start the test (benchmark path, camera pan, ...)
-    App->>Card: START marker: run id, test name, date (at least 250 ms)
+    App->>Card: START marker: run id, test name, date (a few capture frames)
     Card->>Tool: START seen, keep recording
     loop every frame of the test
         App->>Card: frame + marker (frame index, animation time)
         Card->>Tool: every captured frame + its capture time
     end
-    App->>Card: END marker (at least 250 ms)
+    App->>Card: END marker (a few capture frames)
     Card->>Tool: END seen, stop
     Tool->>Tool: compare each frame's animation time (from the marker) with its capture time
     Tool->>You: report: animation error, frame times, drops, tearing
@@ -153,7 +153,7 @@ clock time, so every report knows what it measured:
 
 ```mermaid
 flowchart LR
-    S["START marker<br/>run 7, name, date<br/>(show ≥ 250 ms)"] --> F1[frame marker] --> F2[frame marker] --> F3[" … "] --> E["END marker<br/>run 7<br/>(show ≥ 250 ms)"]
+    S["START marker<br/>run 7, name, date<br/>(a few capture frames)"] --> F1[frame marker] --> F2[frame marker] --> F3[" … "] --> E["END marker<br/>run 7<br/>(a few capture frames)"]
     style S fill:#1a7f37,color:#fff
     style E fill:#c62828,color:#fff
 ```

@@ -21,9 +21,6 @@ namespace MB.FrameMarker.Unity
   [AddComponentMenu("MB/Frame Marker Overlay")]
   public sealed class FrameMarkerOverlay : MonoBehaviour
   {
-    // How long the start and end markers stay on screen: a little over the 250 ms minimum (doc/marker-format.md "Test sequences")
-    private const double SequenceMarkerSeconds = 0.3;
-
     [Header("Capture")]
     [Tooltip(
       "Height of the frames the capture tool stores, for example 540 for --scale 960x540. Picks the module size (3 stored pixels per module). 0 = the output height."
@@ -50,6 +47,14 @@ namespace MB.FrameMarker.Unity
     [Tooltip("Draw frame markers (run id 0) while no run is active.")]
     [SerializeField]
     private bool m_drawWhenIdle = true;
+
+    [Header("Runs")]
+    [Tooltip(
+      "How long the start and end markers stay on screen. One captured frame is enough; about three frames of the slowest capture leave slack for a dropped or torn capture (0.1 s covers 30 fps)."
+    )]
+    [SerializeField]
+    [Min(0f)]
+    private float m_sequenceMarkerSeconds = 0.1f;
 
     [Tooltip("Optional: an unlit vertex color material without blending, depth test or culling. Empty = Hidden/Internal-Colored.")]
     [SerializeField]
@@ -206,7 +211,7 @@ namespace MB.FrameMarker.Unity
 
     private void UpdatePhase()
     {
-      if (Time.realtimeSinceStartupAsDouble - m_phaseStartTime < SequenceMarkerSeconds)
+      if (Time.realtimeSinceStartupAsDouble - m_phaseStartTime < m_sequenceMarkerSeconds)
         return;
       if (Phase == MarkerPhase.Start)
         EnterPhase(MarkerPhase.Running);
