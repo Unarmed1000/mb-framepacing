@@ -69,6 +69,16 @@ namespace MB.FrameMarker.Unity
     /// <summary>The game's animation clock in seconds. Null = Time.timeAsDouble.</summary>
     public Func<double> AnimationTimeProvider { get; set; }
 
+    /// <summary>
+    /// Draw frame markers (run id 0) while no run is active (the Inspector's Draw When Idle). Turn it off to show markers only during
+    /// runs, for example while a game is still in its menus. Runs always draw their markers.
+    /// </summary>
+    public bool DrawWhenIdle
+    {
+      get => m_drawWhenIdle;
+      set => m_drawWhenIdle = value;
+    }
+
     public MarkerPhase Phase { get; private set; } = MarkerPhase.Idle;
 
     /// <summary>The id of the current (or last) run. Every run gets the next id.</summary>

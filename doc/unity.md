@@ -74,7 +74,7 @@ A simulation that only advances in fixed steps and renders without interpolation
 | Module Size Px  | Fixed module size in output pixels (overrides Stored Height)                                                  |
 | Slot            | Top-left (recommended), middle-left or bottom-left                                                            |
 | Tearing Markers | Also draw frame markers in the middle and at the bottom, so the analysis can detect tearing                   |
-| Draw When Idle  | Draw frame markers (run id 0) while no run is active                                                          |
+| Draw When Idle  | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus         |
 | Material        | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored |
 
 ## How it draws, and the rules
