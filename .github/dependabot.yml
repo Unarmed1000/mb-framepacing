@@ -1,0 +1,40 @@
+# Dependabot opens pull requests for outdated dependencies (free for public repositories). One grouped pull request per ecosystem
+# and week keeps the noise down; CI checks every update. GoogleTest (a FetchContent URL in marker/cpp/CMakeLists.txt) and the
+# vendored qrcodegen are not covered and are updated by hand. A new license or license change needs a row in licenses/README.md.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # Directory.Packages.props (central package versions) and .config/dotnet-tools.json (CSharpier, ApiCompat)
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      nuget:
+        patterns: ["*"]
+
+  # Prettier
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+
+  # requirements-dev.txt: ruff, basedpyright, clang-format, clang-tidy, actionlint
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python-dev-tools:
+        patterns: ["*"]

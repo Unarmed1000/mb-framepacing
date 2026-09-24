@@ -1,5 +1,9 @@
 # Python development tools (the scripts themselves only need the standard library).
 #   python -m pip install -r requirements-dev.txt
 #   ruff check . && ruff format --check . && basedpyright
+# Also the C++ and workflow linters CI uses (python tools/check_cpp.py, actionlint), pinned so every machine formats alike.
+actionlint-py==1.7.12.25
 basedpyright==1.40.1
+clang-format==23.1.1
+clang-tidy==22.1.8
 ruff==0.16.8

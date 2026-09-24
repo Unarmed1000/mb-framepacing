@@ -49,13 +49,14 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   without it, single-project builds go to `bin/x64` and cause MSB3270 warnings.
 - **C++ formatting and linting**
   - C++ follows `marker/cpp/.clang-format` and `marker/cpp/.clang-tidy` (namespaces are CamelCase: `MB::FrameMarker`).
-  - Run both on our sources only (never `third_party/`). The VS generator writes no compile database, so pass the flags to
-    clang-tidy directly:
-    ```
-    cd marker/cpp
-    clang-format -i include/mb/framemarker/*.hpp src/*.cpp tests/*.cpp tools/marker-render/main.cpp
-    clang-tidy --quiet --header-filter=".*mb/framemarker/.*" src/FrameMarker.cpp src/Payload.cpp tools/marker-render/main.cpp tests/FrameMarkerTests.cpp -- -std=c++20 -Iinclude -Ibuild/windows/include -Ithird_party/qrcodegen -Ibuild/windows/_deps/googletest-src/googletest/include -DMB_FRAMEMARKER_EXPECTED_VERSION=\"0.1.0\"
-    ```
+  - `python tools/check_cpp.py` runs both on our sources only (never `third_party/`), with the versions CI pins in
+    `requirements-dev.txt`. clang-tidy needs a configured build: the default is `marker/cpp/build/windows` (the VS generator
+    writes no compile database, so the script passes the include paths); `--build-dir` takes another one. To apply formatting:
+    `clang-format -i` on the files the script lists.
+  - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
+    pass: shift and combine small unsigned types after casting them to `uint32_t`.
+  - The `linux-sanitize` preset (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, compile database) is what CI runs the tests
+    and clang-tidy with.
   - `cmake/Version.hpp.in` is guarded with `// clang-format off`, because formatting breaks its `@VAR@` placeholders.
 - **Python scripts** (`measure/build_standalone.py`, `tools/`, later `marker/unity/build_upm.py`): standard library only. They must pass
   `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode; tools
@@ -82,9 +83,18 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
-- **CI:** `.github/workflows/ci.yml` builds and tests C++, the CMake consumer project and .NET on Windows, Ubuntu and macOS, and checks formatting, Python and the Unity package assembly.
-  `.github/workflows/release-marker.yml` releases the marker libraries on a `marker-v*` tag (see `doc/releasing.md`). A `tools-v*`
-  tag (which must match `measure/VERSION`) also builds the self-contained tools.
+- **CI** (mb-quality is not available there; CI runs the same commands directly):
+  - `.github/workflows/ci.yml` builds and tests C++, the CMake consumer project and .NET on Windows, Ubuntu and macOS.
+  - Its other jobs: `lint` (Prettier, one type per file, ruff, basedpyright, actionlint, the Unity package assembly),
+    `dotnet-lint` (dotnet format as mb-quality applies it, CSharpier, vulnerable packages), `cpp-analysis` (sanitizer tests,
+    clang-format, clang-tidy) and `semver` (`tools/check_semver.py`).
+  - `.github/workflows/release-marker.yml` releases the marker libraries on a `marker-v*` tag (see `doc/releasing.md`). A
+    `tools-v*` tag (which must match `measure/VERSION`) also builds the self-contained tools.
+  - `.github/dependabot.yml` opens weekly grouped updates for GitHub Actions, NuGet (packages and dotnet tools), npm and pip.
+    GoogleTest (FetchContent URL) and qrcodegen (vendored) are updated by hand.
+- **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks both VERSION files and compares the
+  public API of `MB.FrameMarker` with the last `marker-v*` release using ApiCompat. `marker/VERSION` is the next release's version:
+  raise it in the change that alters the API (0.x: minor for any API change; from 1.0: major for breaking changes).
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `marker/cpp/build/<preset>/Release/marker-render --golden test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
   the C# tests.

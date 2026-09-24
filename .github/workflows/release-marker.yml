@@ -1,5 +1,6 @@
 # Release the marker libraries (C++, C# and the Unity package): push a tag marker-v<version> that matches marker/VERSION.
-#   1. verify   the tag is semantic versioning and matches marker/VERSION
+#   1. verify   the tag is semantic versioning and matches marker/VERSION, and the version bump covers the API changes since the
+#               previous release (tools/check_semver.py)
 #   2. test     C++ and C# libraries on Windows, Ubuntu and macOS, and the documented CMake consumer setups
 #   3. package  the C++ source archives (tar.gz, zip) and SHA256SUMS; the extracted archive must build, pass its tests and work through
 #               FetchContent (URL + URL_HASH) before anything is published
@@ -23,11 +24,13 @@ jobs:
   verify:
     name: verify tag
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the previous release is the API baseline
       - id: version
         name: Tag is marker-v<semver> and matches marker/VERSION
         shell: bash
@@ -41,6 +44,13 @@ jobs:
             echo "::error::the tag says $version, marker/VERSION says $expected"; exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: The version bump covers the API changes since the previous release
+        run: |
+          dotnet tool restore
+          python3 tools/check_semver.py
 
   test:
     name: test ${{ matrix.os }}
@@ -57,7 +67,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: CMake 4
-        uses: lukka/get-cmake@latest
+        uses: lukka/get-cmake@v4.4.2
       - name: C++ library
         shell: bash
         run: |
@@ -80,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4
-        uses: lukka/get-cmake@latest
+        uses: lukka/get-cmake@v4.4.2
       - name: Create and verify the archives
         run: python3 marker/cpp/package_release.py --output dist --verify
       - uses: actions/upload-artifact@v7

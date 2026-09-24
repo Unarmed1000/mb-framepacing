@@ -35,7 +35,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: CMake 4
-        uses: lukka/get-cmake@latest
+        uses: lukka/get-cmake@v4.4.2
 
       - name: ffmpeg (for the end-to-end import tests)
         shell: bash
@@ -78,8 +78,8 @@ jobs:
           path: measure/publish/
           retention-days: 30
 
-  format:
-    name: formatting
+  lint:
+    name: lint (formatting, Python, workflows, Unity package)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -91,12 +91,83 @@ jobs:
       - run: npm run format:check
       - name: One class/struct/enum per file
         run: python3 tools/check_one_type_per_file.py
-      - name: Python scripts (ruff, basedpyright)
+      - name: Python dev tools (requirements-dev.txt)
         run: |
           python3 -m venv .venv
           .venv/bin/pip install --quiet -r requirements-dev.txt
-          .venv/bin/ruff check .
-          .venv/bin/ruff format --check .
-          .venv/bin/basedpyright
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Python scripts (ruff, basedpyright)
+        run: |
+          ruff check .
+          ruff format --check .
+          basedpyright
+      - name: Workflows (actionlint)
+        run: actionlint
       - name: Unity package (assemble and validate; Unity itself is not available in CI)
         run: python3 marker/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
+
+  dotnet-lint:
+    name: .NET lint (CSharpier, dotnet format, vulnerable packages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool restore
+      - run: dotnet restore mb-framepacing.slnx
+      # The same as 'mb-quality -r' (which is not available here): apply the automatic fixes of dotnet format ('style' and
+      # 'analyzers' separately, so its whitespace rules do not fight CSharpier), then fail when that changed anything.
+      # Diagnostics without an automatic fix are left to the build (warnings are errors).
+      - name: dotnet format
+        run: |
+          dotnet format style mb-framepacing.slnx --no-restore
+          dotnet format analyzers mb-framepacing.slnx --no-restore
+          git diff --exit-code || { echo "::error::dotnet format changed files; run mb-quality -r --repair . (or dotnet format) and commit"; exit 1; }
+      - name: CSharpier
+        run: dotnet csharpier check .
+      - name: Vulnerable packages (direct and transitive)
+        shell: bash
+        run: |
+          report="$(dotnet list mb-framepacing.slnx package --vulnerable --include-transitive)"
+          echo "$report"
+          if grep -q "has the following vulnerable packages" <<< "$report"; then
+            echo "::error::vulnerable NuGet packages, see the log"; exit 1
+          fi
+
+  cpp-analysis:
+    name: C++ sanitizers and clang-tidy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4
+        uses: lukka/get-cmake@v4.4.2
+      - name: Python dev tools (clang-format, clang-tidy)
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r requirements-dev.txt
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Tests with AddressSanitizer and UndefinedBehaviorSanitizer
+        working-directory: marker/cpp
+        run: |
+          cmake --preset linux-sanitize
+          cmake --build --preset linux-sanitize --parallel
+          ctest --preset linux-sanitize
+      - name: clang-format and clang-tidy
+        run: python3 tools/check_cpp.py --build-dir marker/cpp/build/linux-sanitize
+
+  semver:
+    name: semantic versions (VERSION files, MB.FrameMarker API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the release tags are the baseline
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool restore
+      - run: python3 tools/check_semver.py

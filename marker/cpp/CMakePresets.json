@@ -38,6 +38,18 @@
       }
     },
     {
+      "name": "linux-sanitize",
+      "displayName": "Linux (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, Debug)",
+      "inherits": "linux-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
       "name": "linux-clang",
       "displayName": "Linux (Clang, Release)",
       "inherits": "linux",
@@ -76,6 +88,10 @@
       "configurePreset": "linux-clang"
     },
     {
+      "name": "linux-sanitize",
+      "configurePreset": "linux-sanitize"
+    },
+    {
       "name": "macos",
       "configurePreset": "macos"
     }
@@ -101,6 +117,17 @@
       "configurePreset": "linux-clang",
       "output": {
         "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-sanitize",
+      "configurePreset": "linux-sanitize",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
       }
     },
     {
