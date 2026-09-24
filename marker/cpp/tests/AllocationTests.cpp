@@ -44,15 +44,25 @@ namespace
   };
 }
 
-// Counting replacements of the global allocation functions (the aligned variants keep their default, matching pair).
+// Counting replacements of the global allocation functions. Every non-aligned new (throwing and nothrow; libstdc++'s
+// std::stable_sort uses the nothrow one) allocates with malloc, because every non-aligned delete below frees with free: a
+// sanitizer reports any mismatched pair. The aligned variants keep their default, matching pair.
 // NOLINTBEGIN(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
+namespace
+{
+  void* CountedMalloc(const std::size_t size) noexcept
+  {
+    if (g_countAllocations)
+    {
+      ++g_allocationCount;
+    }
+    return std::malloc(size == 0 ? 1 : size);
+  }
+}
+
 void* operator new(const std::size_t size)
 {
-  if (g_countAllocations)
-  {
-    ++g_allocationCount;
-  }
-  if (void* const memory = std::malloc(size == 0 ? 1 : size))
+  if (void* const memory = CountedMalloc(size))
   {
     return memory;
   }
@@ -62,6 +72,26 @@ void* operator new(const std::size_t size)
 void* operator new[](const std::size_t size)
 {
   return operator new(size);
+}
+
+void* operator new(const std::size_t size, const std::nothrow_t& /*tag*/) noexcept
+{
+  return CountedMalloc(size);
+}
+
+void* operator new[](const std::size_t size, const std::nothrow_t& /*tag*/) noexcept
+{
+  return CountedMalloc(size);
+}
+
+void operator delete(void* const memory, const std::nothrow_t& /*tag*/) noexcept
+{
+  std::free(memory);
+}
+
+void operator delete[](void* const memory, const std::nothrow_t& /*tag*/) noexcept
+{
+  std::free(memory);
 }
 
 void operator delete(void* const memory) noexcept
