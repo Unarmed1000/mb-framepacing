@@ -1,25 +1,40 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
-        x:Class="MB.FramePacing.Gui.Views.SetupWindow"
-        x:DataType="vm:SetupViewModel"
-        Title="Set up mb-framepacing"
-        Width="620" SizeToContent="Height" CanResize="False" CanMinimize="False" CanMaximize="False"
-        WindowStartupLocation="CenterOwner">
+<Window
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  x:Class="MB.FramePacing.Gui.Views.SetupWindow"
+  x:DataType="vm:SetupViewModel"
+  Title="Set up mb-framepacing"
+  Width="620"
+  SizeToContent="Height"
+  CanResize="False"
+  CanMinimize="False"
+  CanMaximize="False"
+  WindowStartupLocation="CenterOwner"
+>
   <StackPanel Margin="24" Spacing="16">
     <StackPanel Spacing="4">
       <TextBlock Classes="title" Text="Let's get you set up" />
-      <TextBlock Classes="subtle" TextWrapping="Wrap"
-                 Text="mb-framepacing reads your capture card through ffmpeg, a free tool you install once. Three quick steps:" />
+      <TextBlock
+        Classes="subtle"
+        TextWrapping="Wrap"
+        Text="mb-framepacing reads your capture card through ffmpeg, a free tool you install once. Three quick steps:"
+      />
     </StackPanel>
 
     <!-- 1. Get ffmpeg -->
     <Border Classes="card">
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-        <Border Classes="step"><TextBlock Text="1" /></Border>
+        <Border Classes="step">
+          <TextBlock Text="1" />
+        </Border>
         <StackPanel Grid.Column="1" Spacing="8">
           <TextBlock Classes="cardTitle" Text="Get ffmpeg" />
-          <TextBlock Classes="subtle" TextWrapping="Wrap" Text="Skip this if ffmpeg is already installed. Either download it, or run this command in a terminal:" />
+          <TextBlock
+            Classes="subtle"
+            TextWrapping="Wrap"
+            Text="Skip this if ffmpeg is already installed. Either download it, or run this command in a terminal:"
+          />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="accent" Content="Download ffmpeg" Command="{Binding DownloadCommand}" />
             <Border Classes="code">
@@ -34,7 +49,9 @@
     <!-- 2. Point to ffmpeg -->
     <Border Classes="card">
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-        <Border Classes="step"><TextBlock Text="2" /></Border>
+        <Border Classes="step">
+          <TextBlock Text="2" />
+        </Border>
         <StackPanel Grid.Column="1" Spacing="8">
           <TextBlock Classes="cardTitle" Text="Find ffmpeg" />
           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -42,8 +59,13 @@
             <Button Content="Browse..." Command="{Binding BrowseFfmpegCommand}" />
             <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsChecking}" VerticalAlignment="Center" />
           </StackPanel>
-          <TextBlock Text="{Binding FfmpegStatus}" TextWrapping="Wrap" FontWeight="SemiBold"
-                     Classes.ok="{Binding FfmpegOk}" Classes.error="{Binding FfmpegProblem}" />
+          <TextBlock
+            Text="{Binding FfmpegStatus}"
+            TextWrapping="Wrap"
+            FontWeight="SemiBold"
+            Classes.ok="{Binding FfmpegOk}"
+            Classes.error="{Binding FfmpegProblem}"
+          />
           <TextBlock Classes="subtle value" Text="{Binding FfmpegPath}" TextWrapping="Wrap" FontSize="12" />
         </StackPanel>
       </Grid>
@@ -52,24 +74,48 @@
     <!-- 3. Captures folder -->
     <Border Classes="card">
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-        <Border Classes="step"><TextBlock Text="3" /></Border>
+        <Border Classes="step">
+          <TextBlock Text="3" />
+        </Border>
         <StackPanel Grid.Column="1" Spacing="8">
           <TextBlock Classes="cardTitle" Text="Where to save captures" />
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <TextBox Text="{Binding CaptureDirectory}" />
             <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCaptureDirectoryCommand}" />
           </Grid>
-          <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="Captures are big: a 960x540 capture at 500 fps writes about 15 GB per minute. Use a fast local SSD." />
+          <TextBlock
+            Classes="subtle"
+            FontSize="12"
+            TextWrapping="Wrap"
+            Text="Captures are big: a 960x540 capture at 500 fps writes about 15 GB per minute. Use a fast local SSD."
+          />
         </StackPanel>
       </Grid>
     </Border>
 
     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-      <Button Classes="link" Content="Open the configuration file" Command="{Binding OpenConfigFileCommand}"
-              ToolTip.Tip="{Binding ConfigPath}" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Content="{Binding SkipText}" Command="{Binding SkipCommand}"
-              ToolTip.Tip="Without ffmpeg you can still capture the built in synthetic test game and analyse captures" />
-      <Button Grid.Column="2" Classes="accent" Content="Done" MinWidth="110" HorizontalContentAlignment="Center" Command="{Binding DoneCommand}" IsDefault="True" />
+      <Button
+        Classes="link"
+        Content="Open the configuration file"
+        Command="{Binding OpenConfigFileCommand}"
+        ToolTip.Tip="{Binding ConfigPath}"
+        VerticalAlignment="Center"
+      />
+      <Button
+        Grid.Column="1"
+        Content="{Binding SkipText}"
+        Command="{Binding SkipCommand}"
+        ToolTip.Tip="Without ffmpeg you can still capture the built in synthetic test game and analyse captures"
+      />
+      <Button
+        Grid.Column="2"
+        Classes="accent"
+        Content="Done"
+        MinWidth="110"
+        HorizontalContentAlignment="Center"
+        Command="{Binding DoneCommand}"
+        IsDefault="True"
+      />
     </Grid>
   </StackPanel>
 </Window>

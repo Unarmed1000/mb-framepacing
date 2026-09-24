@@ -14,3 +14,6 @@ doc/images/
 # clang tool configs (clang-tidy accepts YAML that Prettier rejects)
 marker/cpp/.clang-format
 **/.clang-tidy
+
+# Rewritten by Dependabot in its own JSON style on every update
+.config/dotnet-tools.json

@@ -1,8 +1,10 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
-             x:Class="MB.FramePacing.Gui.Views.CaptureView"
-             x:DataType="vm:CaptureViewModel">
+<UserControl
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  x:Class="MB.FramePacing.Gui.Views.CaptureView"
+  x:DataType="vm:CaptureViewModel"
+>
   <Grid ColumnDefinitions="380,16,*">
     <!-- Left: what to capture and how -->
     <ScrollViewer Grid.Column="0">
@@ -35,8 +37,13 @@
             <Expander Header="Advanced" IsVisible="{Binding !SelectedDevice.IsSynthetic, FallbackValue=False}" HorizontalAlignment="Stretch">
               <StackPanel Spacing="6">
                 <TextBlock Classes="caption" Text="Device mode" IsVisible="{Binding IsFfmpegDevice}" />
-                <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}" HorizontalAlignment="Stretch" PlaceholderText="device default"
-                          IsVisible="{Binding IsFfmpegDevice}" />
+                <ComboBox
+                  ItemsSource="{Binding Modes}"
+                  SelectedItem="{Binding SelectedMode}"
+                  HorizontalAlignment="Stretch"
+                  PlaceholderText="device default"
+                  IsVisible="{Binding IsFfmpegDevice}"
+                />
                 <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding IsFfmpegDevice}">
                   <TextBox Text="{Binding ModeText}" PlaceholderText="1920x1080@240" />
                   <TextBox Grid.Column="2" Text="{Binding InputFormat}" PlaceholderText="format (mjpeg, nv12)" />
@@ -120,8 +127,13 @@
           <Border Background="{DynamicResource PreviewBrush}" CornerRadius="10,10,0,0">
             <Panel>
               <Image Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" />
-              <TextBlock Text="The live picture appears here while capturing" Foreground="#80FFFFFF"
-                         HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasPreview}" />
+              <TextBlock
+                Text="The live picture appears here while capturing"
+                Foreground="#80FFFFFF"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsVisible="{Binding !HasPreview}"
+              />
             </Panel>
           </Border>
           <TextBlock Grid.Row="1" Classes="value" Margin="14,8" Text="{Binding MarkerText}" />

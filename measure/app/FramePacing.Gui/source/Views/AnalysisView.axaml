@@ -1,17 +1,23 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
-             xmlns:scottplot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
-             x:Class="MB.FramePacing.Gui.Views.AnalysisView"
-             x:DataType="vm:AnalysisViewModel">
+<UserControl
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  xmlns:scottplot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+  x:Class="MB.FramePacing.Gui.Views.AnalysisView"
+  x:DataType="vm:AnalysisViewModel"
+>
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
         <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
-        <ComboBox Grid.Column="2" ItemsSource="{Binding TimeSources}" SelectedItem="{Binding SelectedTimeSource}"
-                  ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available." />
+        <ComboBox
+          Grid.Column="2"
+          ItemsSource="{Binding TimeSources}"
+          SelectedItem="{Binding SelectedTimeSource}"
+          ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available."
+        />
         <Button Grid.Column="3" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
         <Button Grid.Column="4" Content="Open reports" Command="{Binding OpenReportsCommand}" />
       </Grid>
@@ -47,8 +53,11 @@
         <Border Classes="tile" ToolTip.Tip="Frames whose animation time is off by more than one capture period (the measurement resolution)">
           <StackPanel>
             <TextBlock Classes="caption" Text="Frames visibly off" />
-            <TextBlock Classes="tileValue" Classes.warning="{Binding SelectedRun.HasErrorFrames, FallbackValue=False}"
-                       Text="{Binding SelectedRun.ErrorFramesTile, FallbackValue='-'}" />
+            <TextBlock
+              Classes="tileValue"
+              Classes.warning="{Binding SelectedRun.HasErrorFrames, FallbackValue=False}"
+              Text="{Binding SelectedRun.ErrorFramesTile, FallbackValue='-'}"
+            />
           </StackPanel>
         </Border>
         <Border Classes="tile" ToolTip.Tip="95% of the frames have an animation error below this">
