@@ -32,6 +32,13 @@ namespace MB.FramePacing.Gui
     public string? LastCaptureDirectory { get; set; }
     public string? MediaPath { get; set; }
     public string? ImageFps { get; set; }
+    public string? TimestampFile { get; set; }
+
+    /// <summary>The Analyze page's time source (a TimeSource name).</summary>
+    public string? TimeSource { get; set; }
+
+    /// <summary>The page that was open when the window closed.</summary>
+    public int SelectedTab { get; set; }
 
     public static GuiSettings Load()
     {

@@ -7,6 +7,7 @@
 //****************************************************************************************************************************************************
 
 using Avalonia.Controls;
+using MB.FramePacing.Gui.ViewModels;
 
 namespace MB.FramePacing.Gui.Views
 {
@@ -15,6 +16,12 @@ namespace MB.FramePacing.Gui.Views
     public MainWindow()
     {
       InitializeComponent();
+    }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+      (DataContext as MainWindowViewModel)?.SaveSettings();
+      base.OnClosing(e);
     }
   }
 }

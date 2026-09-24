@@ -20,11 +20,23 @@ namespace MB.FramePacing.Gui.ViewModels
   public sealed partial class AnalysisViewModel : ObservableObject
   {
     private readonly IDialogService m_dialogs;
+    private readonly GuiSettings m_settings;
 
     public AnalysisViewModel(IDialogService dialogs, GuiSettings settings)
     {
       m_dialogs = dialogs;
+      m_settings = settings;
       CaptureDirectory = settings.LastCaptureDirectory ?? string.Empty;
+      if (Enum.TryParse(settings.TimeSource, out TimeSource timeSource))
+        SelectedTimeSource = timeSource;
+    }
+
+    /// <summary>Copy the current options into the settings (saved when the window closes).</summary>
+    public void StoreSettings()
+    {
+      m_settings.TimeSource = SelectedTimeSource.ToString();
+      if (!string.IsNullOrWhiteSpace(CaptureDirectory))
+        m_settings.LastCaptureDirectory = CaptureDirectory;
     }
 
     public IReadOnlyList<TimeSource> TimeSources { get; } = new[] { TimeSource.Auto, TimeSource.Device, TimeSource.Host };

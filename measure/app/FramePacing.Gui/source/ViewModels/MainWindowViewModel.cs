@@ -23,13 +23,16 @@ namespace MB.FramePacing.Gui.ViewModels
     public const int AnalysisTab = 1;
 
     private readonly IDialogService m_dialogs;
+    private readonly GuiSettings m_settings;
 
     public MainWindowViewModel(IDialogService dialogs)
     {
       m_dialogs = dialogs;
       var settings = GuiSettings.Load();
+      m_settings = settings;
       Capture = new CaptureViewModel(dialogs, settings);
       Analysis = new AnalysisViewModel(dialogs, settings);
+      SelectedTab = settings.SelectedTab is CaptureTab or AnalysisTab ? settings.SelectedTab : CaptureTab;
       Capture.CaptureCompleted += directory =>
       {
         SelectedTab = AnalysisTab;
@@ -72,6 +75,15 @@ namespace MB.FramePacing.Gui.ViewModels
 
     [ObservableProperty]
     public partial int SelectedTab { get; set; }
+
+    /// <summary>Remember every option for the next start (not in demo or --output-root runs, see <see cref="GuiSettings.Save"/>).</summary>
+    public void SaveSettings()
+    {
+      Capture.StoreSettings();
+      Analysis.StoreSettings();
+      m_settings.SelectedTab = SelectedTab;
+      m_settings.Save();
+    }
 
     /// <summary>Called once the main window is shown: find ffmpeg and walk the user through the setup if it is missing.</summary>
     public async Task InitializeAsync()

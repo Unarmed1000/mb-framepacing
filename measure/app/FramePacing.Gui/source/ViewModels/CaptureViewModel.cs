@@ -61,6 +61,7 @@ namespace MB.FramePacing.Gui.ViewModels
       OutputRoot = DefaultOutputRoot();
       MediaPath = settings.MediaPath ?? string.Empty;
       ImageFpsText = settings.ImageFps ?? "240";
+      TimestampFile = settings.TimestampFile ?? string.Empty;
       foreach (var item in g_otherSources)
         Devices.Add(item);
       SelectedDevice = Devices.First(d => d.IsSynthetic);
@@ -530,6 +531,13 @@ namespace MB.FramePacing.Gui.ViewModels
 
     private void SaveSettings()
     {
+      StoreSettings();
+      m_settings.Save();
+    }
+
+    /// <summary>Copy the current options into the settings (saved when a capture starts and when the window closes).</summary>
+    public void StoreSettings()
+    {
       m_settings.LastDevice = SelectedDevice?.Title;
       m_settings.Mode = ModeText;
       m_settings.InputFormat = InputFormat;
@@ -540,7 +548,7 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings.StopAtEnd = StopAtEnd;
       m_settings.MediaPath = MediaPath;
       m_settings.ImageFps = ImageFpsText;
-      m_settings.Save();
+      m_settings.TimestampFile = TimestampFile;
     }
   }
 }
