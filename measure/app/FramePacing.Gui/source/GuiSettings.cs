@@ -42,6 +42,10 @@ namespace MB.FramePacing.Gui
 
     public static GuiSettings Load()
     {
+      // A demo or an explicit --output-root run (also DocImages) starts from the defaults: its result must not depend on, or show, what
+      // the user did last
+      if (Program.Demo || Program.OutputRoot != null)
+        return new GuiSettings();
       try
       {
         if (File.Exists(g_path))

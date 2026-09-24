@@ -98,8 +98,10 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `marker/cpp/build/<preset>/Release/marker-render --golden test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
   the C# tests.
-- **Verify the GUI without touching the desktop:** `mb-framepacing-gui --demo --output-root <dir>` captures and analyses the synthetic
-  game and writes the reports to disk (demo and `--output-root` runs never save settings). Do not take screenshots.
+- **Verify the GUI without touching the desktop:** `dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>` renders
+  every page offscreen (Avalonia.Headless) and runs the synthetic demo capture and analysis; compare the images with `doc/images`
+  (live numbers on the capture page vary). `mb-framepacing-gui --demo` is **not** headless: it opens a real window and waits for it to
+  be closed. Demo, `--output-root` and DocImages runs never load or save the user's GUI settings. Do not take screenshots.
 
 ## Conventions
 
