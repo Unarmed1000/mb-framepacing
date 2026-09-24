@@ -14,8 +14,9 @@ below use `mb-framepacing` / `mb-framepacing-gui`; when running from source, use
   used.
 - **Your application draws the marker** ([Integrating the marker](integrating.md)). mb-framepacing is a cooperative tool:
   without the marker there is nothing to measure. The synthetic test game below needs no application.
-- **Vsync or G-Sync/FreeSync is on** in the application. Every displayed frame is then whole; with vsync off the marker only
-  reports the frame at the top of the screen ([Marker format](marker-format.md#location)).
+- **Vsync is on at a fixed refresh rate** in the application, and G-Sync/FreeSync is off. Every displayed frame is then whole.
+  With vsync off the marker only reports the frame at the top of the screen, and capture cards record variable refresh at a
+  constant rate, so neither measures what the display showed ([Marker format](marker-format.md#location)).
 
 ## 1. Try it without hardware
 
@@ -38,8 +39,13 @@ flowchart LR
 
 Settings that matter:
 
-- Set the application's output to a mode the card captures natively (for example 1920×1080 at 240 Hz), with **HDR off**.
-- Use the card's **highest frame rate**: results are exact to one capture period (±4.2 ms at 240 fps, ±2 ms at 500 fps).
+- **Capture at the same rate the display runs at.** Set the application's output to a mode the card captures natively, and capture
+  it at that refresh rate: a 240 Hz output in the card's 240 fps mode. Every refresh is then exactly one captured frame. A slower
+  capture never sees some of the displayed frames (they are reported as frame indices never seen); a faster one only records
+  duplicates. Results are exact to one refresh (±4.2 ms at 240 Hz, ±2 ms at 500 Hz).
+- Turn **G-Sync/FreeSync off**. Capture cards only pass variable refresh through to the monitor; they record at a constant rate, so
+  the capture would not show when the display showed each frame. (A high speed camera filming the screen does; see below.)
+- Turn **HDR off**.
 - Store frames downscaled (`--scale`) to save disk space, but keep at least 3 stored pixels per marker module: 1920×1080 → 960×540
   needs 6 px modules in the application. `mb-framepacing marker-size --source 1920x1080 --stored 960x540` prints the module size
   for your setup; the rules are in [marker-format.md](marker-format.md#sizing).
@@ -74,6 +80,8 @@ rate works.
 | Folder of images with a time per image   | Image folder   | `mb-framepacing import frames/ --timestamps times.csv --analyze` |
 | Network stream (RTSP, SRT, HTTP, ...)    | Network stream | `mb-framepacing import rtsp://camera/stream -t 30s --analyze`    |
 
+- Record **at the display's refresh rate** (or faster, for a camera filming the screen). A 60 fps screen recording of a 144 Hz
+  display misses most of the frames the viewer saw.
 - Record **lossless or at a high bit rate** (FFV1, lossless H.264/HEVC, PNG images): heavy compression blurs the marker.
 - Images are sorted by name with numbers compared as numbers (`frame2` before `frame10`). A timestamp file is CSV with one line per
   image, `fileName,timeMs`, in the order the frames were taken; `#` comments and a header line are allowed.

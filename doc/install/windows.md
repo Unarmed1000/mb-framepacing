@@ -87,7 +87,8 @@ Tips:
 - Close the vendor's own capture software first: most cards can only be opened by one program at a time.
 - Prefer an uncompressed format (`nv12`, `yuyv422`) over `mjpeg` when the card offers the rate you need; MJPEG blurs the
   marker (see the "Sizing" section of [marker-format.md](../marker-format.md#sizing)).
-- Set the application's output to the card's native mode (for example 1920×1080 at 240 Hz) and turn off HDR for the capture.
+- Set the application's output to the card's native mode and capture at the same refresh rate (for example 1920×1080 at 240 Hz,
+  captured at 240 fps). Turn off HDR for the capture.
 - `dshow` buffers frames in memory (`-rtbufsize`, 1 GB by default); dropped frames are reported in the results.
 
 ## 5. Take a measurement

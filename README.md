@@ -85,7 +85,7 @@ flowchart LR
         A[Render the frame] --> B["Draw the marker last<br/>(frame index, animation time, run id)"]
     end
     B -->|HDMI / DisplayPort| C[Display]
-    B -->|split / passthrough| D["Capture card<br/>at its full frame rate"]
+    B -->|split / passthrough| D["Capture card<br/>at the display's refresh rate"]
     V["Video file / image folder / stream<br/>(high speed camera, recorder, ...)"] --> E
     D --> E["mb-framepacing<br/>capture / import"]
     E --> F[("frames.mbfc<br/>every captured frame + its time")]
@@ -236,12 +236,12 @@ mb-framepacing analyze <capture folder>                   # (re)analyse
 
 ### What you need
 
-| For              | You need                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream   |
-| Live capture     | An HDMI/DP capture card that passes the signal through unchanged (1080p 240 Hz cards are common) |
-| Disk             | A fast SSD: 960×540 writes about 0.5 MB per frame (use `--scale` or `--roi` to reduce it)        |
-| Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                 |
+| For              | You need                                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream                                    |
+| Live capture     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common) |
+| Disk             | A fast SSD: 960×540 writes about 0.5 MB per frame (use `--scale` or `--roi` to reduce it)                                         |
+| Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                                                  |
 
 ### How fast can it record?
 

@@ -9,8 +9,9 @@ The C++20 library in [`marker/cpp/`](../marker/cpp) generates the marker geometr
 Both implement this document; if they disagree, this document is the reference.
 
 > **Two counters, never mixed.** The marker's _frame index_ is the application's own rendered-frame counter. The capture tool
-> keeps a separate _capture index_, one per frame the capture card delivers. The two run at different rates (for example a
-> 144 Hz game captured at 240 fps), and each can have gaps or restart, so they are never compared with each other.
+> keeps a separate _capture index_, one per frame the capture card delivers. The two run at different rates (for example a game
+> rendering 144 frames per second on a 240 Hz display captured at 240 fps), and each can have gaps or restart, so they are never
+> compared with each other.
 
 ## Payload
 
@@ -93,8 +94,8 @@ A test run is bracketed by a start and an end marker:
 
 1. Pick a run id for the run (a counter or a random `u32`). Every marker of the run carries it.
 2. Show the **start marker** before the measured part. Put the test name and the wall clock start time in its metadata.
-   The tools check every captured frame, so **one complete captured frame** of the marker is enough. With vsync (or G-Sync/FreeSync)
-   and a capture card that records every refresh, one rendered frame gives exactly that. As guidance, so that a dropped capture or a
+   The tools check every captured frame, so **one complete captured frame** of the marker is enough. With vsync and a capture card
+   that records every refresh, one rendered frame gives exactly that. As guidance, so that a dropped capture or a
    capture that skips refreshes (a 30 fps screen recording) cannot lose it, show it for about **three frames of the slowest
    capture**: 100 ms covers a 30 fps recording, 50 ms 60 fps, and a few milliseconds a 500 fps capture card.
 3. Show **frame markers** for the measured part.
@@ -154,8 +155,18 @@ origin and the settings for each library.
 
 ## Location
 
-**Measure with vsync or variable refresh (G-Sync/FreeSync within its range).** Then every displayed frame is whole, and the
-marker describes the frame the viewer sees. With vsync off, one refresh shows slices of several frames; the marker then only
+**Capture at the display's refresh rate** (a 240 Hz output in the card's 240 fps mode), so that every refresh is one captured frame;
+a slower capture never sees some displayed frames.
+
+**Measure with vsync at a fixed refresh rate.** Then every displayed frame is whole, and the marker describes the frame the viewer
+sees.
+
+**Variable refresh (G-Sync/FreeSync) is not supported through a capture card.** Cards pass variable refresh through to the monitor
+but record at a constant frame rate, taking the newest frame at each tick, so the capture does not show when the display showed
+each frame. Turn variable refresh off for a capture card measurement. A high speed camera filming the screen does see the real
+display timing, variable refresh included; import its recording.
+
+**Vsync off** is not recommended. With vsync off, one refresh shows slices of several frames; the marker then only
 reports the frame at the top of the screen, frames shown only lower down are never seen, and the numbers are easy to misread.
 The rules below keep vsync-off captures consistent, but they are not what the tool is meant for.
 
