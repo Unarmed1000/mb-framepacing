@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* Runs one capture: source thread -> FrameRecorder -> frames.mbfc, optional start/end marker triggering, duration limit, progress reporting
-//* and the capture.json sidecar. Shared by the CLI and the GUI.
+//* and the capture.json sidecar. Shared by the CLI and the GUI. The start/end triggers inspect every captured frame (the recorder's
+//* inspector); only the live preview image is sampled.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -37,12 +38,19 @@ namespace MB.FramePacing.Capture
         options.Duration is { } duration && format.FrameRate.IsKnown && !options.WaitForStart
           ? (long)Math.Ceiling(duration.TotalSeconds * format.FrameRate.FramesPerSecond * 1.05) + 16
           : 0;
+      double fps = format.FrameRate.IsKnown ? format.FrameRate.FramesPerSecond : 240;
+      // The triggers look at every frame; without them the current marker for the progress display comes from the sampled preview
+      var triggers = options.WaitForStart || options.StopAtEnd ? new SequenceMonitor() : null;
+      var previewMonitor = triggers == null && options.Preview != null ? new SequenceMonitor() : null;
       var recorderOptions = new FrameRecorderOptions
       {
         RingFrames = options.RingFrames ?? FrameRecorderOptions.RingFramesFor(format),
         StartArmed = options.WaitForStart,
+        Inspector = triggers,
+        StopAtEnd = options.StopAtEnd,
+        EndTailFrames = (int)Math.Ceiling(options.EndTail.TotalSeconds * fps),
         WaitWhenFull = !source.IsLive,
-        PreRollFrames = Math.Max(16, (int)Math.Ceiling((format.FrameRate.IsKnown ? format.FrameRate.FramesPerSecond : 240) * 0.25)),
+        PreRollFrames = Math.Max(16, (int)Math.Ceiling(fps * 0.25)),
       };
 
       var clock = new CaptureClock();
@@ -79,9 +87,8 @@ namespace MB.FramePacing.Capture
       );
       sourceThread.Start();
 
-      // The monitor decodes preview frames: needed for the start/end triggers, and it reports the current marker to a live view
-      var monitor = options.WaitForStart || options.StopAtEnd || options.Preview != null ? new SequenceMonitor() : null;
-      var preview = monitor != null || options.Preview != null ? new GrayImage(format.Width, format.Height) : null;
+      var monitor = triggers ?? previewMonitor;
+      var preview = options.Preview != null ? new GrayImage(format.Width, format.Height) : null;
       long lastPreviewIndex = -1;
       long recordingStartTicks = options.WaitForStart ? -1 : 0;
       long stopAtTicks = -1;
@@ -100,24 +107,23 @@ namespace MB.FramePacing.Capture
           {
             lastPreviewIndex = previewIndex;
             options.Preview?.Invoke(preview, previewIndex);
+            previewMonitor?.Inspect(preview, previewIndex);
           }
-          if (monitor != null && previewIndex >= 0 && previewIndex == lastPreviewIndex && monitor.LastInspectedIndex != previewIndex)
-          {
-            monitor.LastInspectedIndex = previewIndex;
-            monitor.Inspect(preview);
-            if (recorder.IsArmed && monitor.Start != null)
-            {
-              g_logger.Info("Start marker seen (run {0} '{1}'), recording", monitor.Start.Value.Payload.RunId, monitor.Start.Value.Start?.Name);
-              recorder.StartWriting();
-              recordingStartTicks = now;
-            }
-            if (options.StopAtEnd && monitor.EndSeen && stopAtTicks < 0)
-            {
-              g_logger.Info("End marker seen, stopping after {0} ms", options.EndTail.TotalMilliseconds);
-              stopAtTicks = now + options.EndTail.Ticks;
-              stopReason = "end marker";
-            }
-          }
+        }
+
+        // The recorder's inspector saw the start marker (in any frame) and started writing
+        if (triggers != null && recordingStartTicks < 0 && !recorder.IsArmed)
+        {
+          var start = triggers.Start;
+          g_logger.Info("Start marker seen (run {0} '{1}'), recording", start?.Payload.RunId, start?.Start?.Name);
+          recordingStartTicks = now;
+        }
+        // ... and the end marker plus its end tail
+        if (recorder.StopRequested && stopAtTicks < 0)
+        {
+          g_logger.Info("End marker seen, stopping after the {0} ms end tail", options.EndTail.TotalMilliseconds);
+          stopAtTicks = now;
+          stopReason = "end marker";
         }
 
         if (recordingStartTicks >= 0 && options.Duration is { } limit && stopAtTicks < 0 && now - recordingStartTicks >= limit.Ticks)
@@ -141,7 +147,10 @@ namespace MB.FramePacing.Capture
 
       if (!stopSource.IsCancellationRequested)
         stopReason = sourceError != null ? "source error" : "source ended";
+      // Completing inspects the frames still in the ring; a file can end before its end marker was inspected
       recorder.Complete();
+      if (recorder.StopRequested && sourceError == null)
+        stopReason = "end marker";
       var stats = recorder.Stats;
       var session = new CaptureSessionInfo
       {

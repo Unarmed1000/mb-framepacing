@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Watches the recorder's preview frames (a copy every ~50ms) for start/end markers while capturing. Finds the marker once with a full
-//* search, then decodes the locked region, which is cheap enough to keep up easily.
+//* Finds the start and end markers of a run. As the recorder's inspector it sees every captured frame in order, so a marker in a single
+//* frame is enough. Finds the marker once with a full search, then decodes the locked region, which is cheap enough to keep up.
+//* The results are read from other threads (progress, capture.json), so they are guarded by a lock.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -11,28 +12,78 @@ using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture
 {
-  public sealed class SequenceMonitor
+  public sealed class SequenceMonitor : IFrameInspector
   {
     private readonly MarkerDecoder m_searchDecoder = new MarkerDecoder(tryHarder: true);
     private readonly MarkerDecoder m_lockedDecoder = new MarkerDecoder();
+    private readonly object m_sync = new object();
     private MarkerLock? m_lock;
+    private MarkerDecodeResult? m_last;
+    private MarkerDecodeResult? m_start;
+    private bool m_endSeen;
 
     /// <summary>The newest decoded marker, if any.</summary>
-    public MarkerDecodeResult? Last { get; private set; }
+    public MarkerDecodeResult? Last
+    {
+      get
+      {
+        lock (m_sync)
+          return m_last;
+      }
+    }
 
     /// <summary>The first start marker seen (run id + metadata).</summary>
-    public MarkerDecodeResult? Start { get; private set; }
+    public MarkerDecodeResult? Start
+    {
+      get
+      {
+        lock (m_sync)
+          return m_start;
+      }
+    }
 
     /// <summary>True once an end marker of the started run (or of any run, if no start was seen) has been seen.</summary>
-    public bool EndSeen { get; private set; }
+    public bool EndSeen
+    {
+      get
+      {
+        lock (m_sync)
+          return m_endSeen;
+      }
+    }
 
     public MarkerLock? Lock => m_lock;
 
-    /// <summary>Capture index of the last inspected preview frame (maintained by the caller).</summary>
-    public long LastInspectedIndex { get; set; } = -1;
+    /// <summary>
+    /// Inspect one frame. Returns <see cref="FrameTrigger.Start"/> for the first start marker and <see cref="FrameTrigger.End"/> for the first
+    /// end marker of that run (of any run when the capture began after the start marker).
+    /// </summary>
+    public FrameTrigger Inspect(GrayImage frame, long captureIndex)
+    {
+      var result = Decode(frame);
+      if (result == null)
+        return FrameTrigger.None;
 
-    /// <summary>Inspect one preview frame. Returns the decoded marker or null.</summary>
-    public MarkerDecodeResult? Inspect(GrayImage frame)
+      lock (m_sync)
+      {
+        m_last = result;
+        var payload = result.Value.Payload;
+        switch (payload.Kind)
+        {
+          case MarkerKind.SequenceStart when m_start == null:
+            m_start = result;
+            return FrameTrigger.Start;
+          case MarkerKind.SequenceEnd when !m_endSeen && (m_start == null || m_start.Value.Payload.RunId == payload.RunId):
+            m_endSeen = true;
+            return FrameTrigger.End;
+          default:
+            return FrameTrigger.None;
+        }
+      }
+    }
+
+    /// <summary>Decode the marker in one frame (locked region once the marker was found). Returns null when there is none.</summary>
+    private MarkerDecodeResult? Decode(GrayImage frame)
     {
       MarkerDecodeResult result;
       if (m_lock is { } markerLock)
@@ -43,21 +94,7 @@ namespace MB.FramePacing.Capture
         if (result.IsDecoded && result.ModuleSizePx > 0)
           m_lock = LockFor(result);
       }
-      if (!result.IsDecoded)
-        return null;
-
-      Last = result;
-      switch (result.Payload.Kind)
-      {
-        case MarkerKind.SequenceStart:
-          Start ??= result;
-          break;
-        case MarkerKind.SequenceEnd:
-          if (Start == null || Start.Value.Payload.RunId == result.Payload.RunId)
-            EndSeen = true;
-          break;
-      }
-      return result;
+      return result.IsDecoded ? result : null;
     }
 
     /// <summary>

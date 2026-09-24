@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 
@@ -191,6 +192,81 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(reader.RecordCount, Is.EqualTo(20));
       Assert.That(reader.ReadRecordHeader(0).CaptureIndex, Is.EqualTo(40), "the pre-roll starts 10 frames before the trigger");
       Assert.That(reader.ReadRecordHeader(19).CaptureIndex, Is.EqualTo(59));
+    }
+
+    /// <summary>Reports a start marker in exactly one frame and an end marker in exactly one later frame; records what it was shown.</summary>
+    private sealed class OneFrameMarkers : IFrameInspector
+    {
+      private readonly long m_startIndex;
+      private readonly long m_endIndex;
+      public readonly List<long> Inspected = new List<long>();
+
+      public OneFrameMarkers(long startIndex, long endIndex)
+      {
+        m_startIndex = startIndex;
+        m_endIndex = endIndex;
+      }
+
+      public FrameTrigger Inspect(Marker.GrayImage frame, long captureIndex)
+      {
+        Inspected.Add(captureIndex);
+        // The pixels are the frame's own (Produce fills them with the low byte of the index)
+        Assert.That(frame.Pixels[0], Is.EqualTo((byte)(captureIndex & 0xFF)));
+        if (captureIndex == m_startIndex)
+          return FrameTrigger.Start;
+        return captureIndex == m_endIndex ? FrameTrigger.End : FrameTrigger.None;
+      }
+    }
+
+    [TestCase(true, TestName = "Inspector_OneFrameStartAndEnd_Trigger(waiting source, like a file)")]
+    [TestCase(false, TestName = "Inspector_OneFrameStartAndEnd_Trigger(live source)")]
+    public void Inspector_OneFrameStartAndEnd_Trigger(bool waitWhenFull)
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("frames.mbfc");
+      var inspector = new OneFrameMarkers(startIndex: 500, endIndex: 700);
+      var options = new FrameRecorderOptions
+      {
+        RingFrames = 64,
+        StartArmed = true,
+        PreRollFrames = 10,
+        Inspector = inspector,
+        StopAtEnd = true,
+        EndTailFrames = 5,
+        WaitWhenFull = waitWhenFull,
+      };
+      using (var writer = new CaptureFileWriter(path, g_header))
+      using (var recorder = new FrameRecorder(writer, options, new CaptureClock()))
+      {
+        // As fast as possible: far faster than real time, like a video file
+        for (long i = 0; i < 1000; ++i)
+        {
+          var pixels = recorder.BeginFrame();
+          pixels.Fill((byte)(i & 0xFF));
+          recorder.EndFrame(i * 100, i * 7, CaptureRecordFlags.None);
+          // A live source cannot run ahead of the inspector without dropping; give it the time real frames would take
+          if (!waitWhenFull && i % 16 == 0)
+            Thread.Sleep(1);
+        }
+        recorder.Complete();
+        Assert.That(recorder.StopRequested, Is.True);
+        if (waitWhenFull)
+        {
+          Assert.That(recorder.Stats.FramesDropped, Is.Zero);
+          Assert.That(inspector.Inspected, Is.EqualTo(Enumerable.Range(0, 1000).Select(i => (long)i)), "every frame inspected, in order");
+        }
+      }
+
+      using var reader = new CaptureFileReader(path);
+      var written = Enumerable.Range(0, (int)reader.RecordCount).Select(i => reader.ReadRecordHeader(i).CaptureIndex).ToList();
+      Assert.That(written, Does.Contain(500L), "the single start marker frame is recorded");
+      Assert.That(written, Does.Contain(700L), "the single end marker frame is recorded");
+      if (waitWhenFull)
+      {
+        Assert.That(written.First(), Is.EqualTo(490), "10 frames of pre-roll");
+        Assert.That(written.Last(), Is.EqualTo(705), "5 frames of end tail, nothing after it");
+        Assert.That(written, Is.EqualTo(Enumerable.Range(490, 216).Select(i => (long)i)));
+      }
     }
   }
 }

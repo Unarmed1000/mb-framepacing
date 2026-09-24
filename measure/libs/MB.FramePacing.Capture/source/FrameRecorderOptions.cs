@@ -16,8 +16,23 @@ namespace MB.FramePacing.Capture
     /// <summary>Number of frames the ring can hold. Size it for the longest stall of the disk (default: one second of frames).</summary>
     public int RingFrames { get; init; } = 256;
 
-    /// <summary>Start in armed mode: frames are held back until <see cref="FrameRecorder.StartWriting"/>.</summary>
+    /// <summary>
+    /// Start in armed mode: frames are held back until the <see cref="Inspector"/> reports a start marker (or until
+    /// <see cref="FrameRecorder.StartWriting"/>).
+    /// </summary>
     public bool StartArmed { get; init; }
+
+    /// <summary>
+    /// Looks at every frame, in order, before it is written or discarded; its start/end triggers drive <see cref="StartArmed"/> and
+    /// <see cref="StopAtEnd"/>. Null = no inspection.
+    /// </summary>
+    public IFrameInspector? Inspector { get; init; }
+
+    /// <summary>Stop writing <see cref="EndTailFrames"/> frames after the frame in which the inspector found the end marker.</summary>
+    public bool StopAtEnd { get; init; }
+
+    /// <summary>Frames written after the end marker frame (so the capture shows how the run ended).</summary>
+    public int EndTailFrames { get; init; } = 32;
 
     /// <summary>Frames before the trigger that are kept when armed.</summary>
     public int PreRollFrames { get; init; } = 64;
@@ -34,7 +49,7 @@ namespace MB.FramePacing.Capture
     /// <summary>Upper bound on records per write call.</summary>
     public int MaxBatchRecords { get; init; } = 64;
 
-    /// <summary>How often a copy of the newest frame is kept for live inspection (sequence trigger), zero to disable.</summary>
+    /// <summary>How often a copy of the newest frame is kept for the live preview (display only; the triggers see every frame), zero to disable.</summary>
     public TimeSpan PreviewInterval { get; init; } = TimeSpan.FromMilliseconds(50);
 
     /// <summary>Ring size for a frame rate and a memory budget, clamped to [16, fps * seconds].</summary>

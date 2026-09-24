@@ -8,6 +8,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Linq;
 using System.Threading;
 using MB.FramePacing.Capture.Synthetic;
 using MB.FramePacing.Marker;
@@ -128,6 +129,62 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(scenario.PresentedFrames[scenario.PresentedIndexAt(first)].Payload.Kind, Is.EqualTo(MarkerKind.SequenceStart));
       Assert.That(scenario.PresentedFrames[scenario.PresentedIndexAt(last)].Payload.Kind, Is.EqualTo(MarkerKind.SequenceEnd));
       Assert.That(last, Is.LessThan(scenario.CaptureCount - 1), "stopped at the end marker, before the source ran out");
+    }
+
+    /// <summary>
+    /// Like importing a video file: read far faster than real time, idle markers first, and the start and end markers in one capture each.
+    /// Every frame is inspected, so both are found and the recording holds exactly the run.
+    /// </summary>
+    [Test]
+    public void CaptureRunner_Unpaced_OneFrameStartAndEndMarkers_AreFound()
+    {
+      using var temp = new TempDirectory();
+      var scenario = new SyntheticScenario(
+        new SyntheticScenarioOptions
+        {
+          CaptureFps = 60,
+          RefreshHz = 60,
+          LeadInSeconds = 2,
+          StartMarkerSeconds = 1.0 / 60,
+          RunSeconds = 1,
+          EndMarkerSeconds = 1.0 / 60,
+          TailSeconds = 2,
+        }
+      );
+      using var source = new SyntheticCaptureSource(scenario, paced: false);
+
+      var result = CaptureRunner.Run(
+        source,
+        new CaptureRunOptions
+        {
+          OutputDirectory = temp.Path,
+          WaitForStart = true,
+          StopAtEnd = true,
+          EndTail = TimeSpan.FromMilliseconds(100),
+        },
+        null,
+        CancellationToken.None
+      );
+
+      var kinds = Enumerable
+        .Range(0, (int)scenario.CaptureCount)
+        .Select(c => scenario.PresentedFrames[scenario.PresentedIndexAt(c)].Payload.Kind)
+        .ToList();
+      long startCapture = kinds.IndexOf(MarkerKind.SequenceStart);
+      long endCapture = kinds.IndexOf(MarkerKind.SequenceEnd);
+      Assert.That(kinds.Count(k => k == MarkerKind.SequenceStart), Is.EqualTo(1), "the scenario shows the start marker in one capture");
+      Assert.That(kinds.Count(k => k == MarkerKind.SequenceEnd), Is.EqualTo(1), "the scenario shows the end marker in one capture");
+
+      Assert.That(result.Session.StopReason, Is.EqualTo("end marker"));
+      Assert.That(result.Session.SequenceRunId, Is.EqualTo(scenario.Options.RunId));
+      Assert.That(result.Session.FramesDroppedByRecorder, Is.Zero);
+
+      using var reader = new CaptureFileReader(result.FramesPath);
+      long first = reader.ReadRecordHeader(0).CaptureIndex;
+      long last = reader.ReadRecordHeader(reader.RecordCount - 1).CaptureIndex;
+      Assert.That(first, Is.EqualTo(startCapture - 16), "16 frames of pre-roll before the start marker");
+      Assert.That(last, Is.EqualTo(endCapture + 6), "100 ms of end tail at 60 fps, nothing after it");
+      Assert.That(reader.RecordCount, Is.EqualTo(last - first + 1), "no frame of the run is missing");
     }
   }
 }

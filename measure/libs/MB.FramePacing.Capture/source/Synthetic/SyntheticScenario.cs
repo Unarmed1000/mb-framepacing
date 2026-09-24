@@ -67,8 +67,10 @@ namespace MB.FramePacing.Capture.Synthetic
     {
       var o = Options;
       long refresh = RefreshIntervalTicks;
-      long startEnd = SecondsToTicks(o.StartMarkerSeconds);
+      long leadInEnd = SecondsToTicks(o.LeadInSeconds);
+      long startEnd = leadInEnd + SecondsToTicks(o.StartMarkerSeconds);
       long runEnd = startEnd + SecondsToTicks(o.RunSeconds);
+      long endEnd = runEnd + SecondsToTicks(o.EndMarkerSeconds);
       long totalEnd = SecondsToTicks(o.TotalSeconds);
 
       long slot = 0;
@@ -93,11 +95,14 @@ namespace MB.FramePacing.Capture.Synthetic
           continue;
         }
 
+        // Idle frame markers (run id 0) before the start and after the end marker
+        bool idle = displayTicks < leadInEnd || displayTicks >= endEnd;
         var kind =
-          displayTicks < startEnd ? MarkerKind.SequenceStart
+          idle ? MarkerKind.Frame
+          : displayTicks < startEnd ? MarkerKind.SequenceStart
           : displayTicks < runEnd ? MarkerKind.Frame
           : MarkerKind.SequenceEnd;
-        m_presented.Add(new SyntheticPresentedFrame(new MarkerPayload(frameIndex, animationTicks, o.RunId, kind), displayTicks));
+        m_presented.Add(new SyntheticPresentedFrame(new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind), displayTicks));
       }
     }
 

@@ -25,10 +25,16 @@ namespace MB.FramePacing.Capture.Synthetic
     public int OriginX { get; init; } = 12;
     public int OriginY { get; init; } = 12;
 
+    /// <summary>Idle frame markers (run id 0) before the start marker, like an application in its menus.</summary>
+    public double LeadInSeconds { get; init; }
+
     /// <summary>Length of the measured part (frame markers).</summary>
     public double RunSeconds { get; init; } = 2;
     public double StartMarkerSeconds { get; init; } = 0.3;
     public double EndMarkerSeconds { get; init; } = 0.3;
+
+    /// <summary>Idle frame markers (run id 0) after the end marker.</summary>
+    public double TailSeconds { get; init; }
 
     public uint RunId { get; init; } = 1;
     public string RunName { get; init; } = "synthetic";
@@ -47,6 +53,6 @@ namespace MB.FramePacing.Capture.Synthetic
     /// <summary>First application frame index (tests a frame index that does not start at zero).</summary>
     public ulong FirstFrameIndex { get; init; } = 1000;
 
-    public double TotalSeconds => StartMarkerSeconds + RunSeconds + EndMarkerSeconds;
+    public double TotalSeconds => LeadInSeconds + StartMarkerSeconds + RunSeconds + EndMarkerSeconds + TailSeconds;
   }
 }
