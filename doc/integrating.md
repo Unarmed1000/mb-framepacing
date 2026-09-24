@@ -74,7 +74,8 @@ every release archive is consumed through its URL and hash before it is publishe
 
 ## 2. Choose the size and place once
 
-The marker must survive the capture's downscale: aim for at least 3 stored pixels per QR module. The library computes it:
+The marker must survive the capture's downscale: aim for at least 3 stored pixels per QR module. The library computes it, and
+`mb-framepacing marker-size --source <output> --stored <capture>` prints it for a setup:
 
 ```cpp
 #include <mb/framemarker/FrameMarker.hpp>

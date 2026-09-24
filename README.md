@@ -222,6 +222,7 @@ The histograms are also in `summary.json` (`runs[].histograms`), so you can plot
 mb-framepacing selftest                                   # check this machine, no hardware needed
 mb-framepacing config --init --set-ffmpeg /path/to/ffmpeg # once, if ffmpeg is not found automatically
 mb-framepacing devices --modes                            # list capture cards and their modes
+mb-framepacing marker-size --source 3840x2160 --stored 960x540  # the module size the application should draw
 mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --scale 960x540 --wait-for-start --stop-at-end --analyze
 mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
 mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images at a known frame rate

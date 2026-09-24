@@ -41,7 +41,8 @@ Settings that matter:
 - Set the application's output to a mode the card captures natively (for example 1920×1080 at 240 Hz), with **HDR off**.
 - Use the card's **highest frame rate**: results are exact to one capture period (±4.2 ms at 240 fps, ±2 ms at 500 fps).
 - Store frames downscaled (`--scale`) to save disk space, but keep at least 3 stored pixels per marker module: 1920×1080 → 960×540
-  needs 6 px modules in the application. The rules are in [marker-format.md](marker-format.md#sizing).
+  needs 6 px modules in the application. `mb-framepacing marker-size --source 1920x1080 --stored 960x540` prints the module size
+  for your setup; the rules are in [marker-format.md](marker-format.md#sizing).
 
 **GUI**
 

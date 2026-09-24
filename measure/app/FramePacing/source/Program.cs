@@ -40,6 +40,7 @@ namespace MB.FramePacing.App
         CaptureCommand.Create(),
         ImportCommand.Create(),
         AnalyzeCommand.Create(),
+        MarkerSizeCommand.Create(),
         SelfTestCommand.Create(),
         ConfigCommand.Create(),
       };

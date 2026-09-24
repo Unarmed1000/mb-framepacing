@@ -123,7 +123,9 @@ Let `s = storedHeight / sourceHeight`. For example, a 2160p source stored at 540
 | **MJPEG capture.** Many USB capture cards only reach high frame rates with MJPEG; the 8×8 DCT blocks smear module edges. | `ceil(4 / s)`            | 4                    |
 
 `MB::FrameMarker::MinimumModuleSizePx(sourceHeight, storedHeight)` and
-`MB::FrameMarker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas.
+`MB::FrameMarker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `Marker.*`).
+`mb-framepacing marker-size --source 3840x2160 --stored 960x540 [--mjpeg]` prints the result for a setup, with the marker sizes, the
+origin and the settings for each library.
 
 | Source → stored             | s     | Minimum module px | Recommended module px   | Marker size at recommended |
 | --------------------------- | ----- | ----------------- | ----------------------- | -------------------------- |
