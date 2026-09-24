@@ -47,6 +47,8 @@ namespace
 // Counting replacements of the global allocation functions. Every non-aligned new (throwing and nothrow; libstdc++'s
 // std::stable_sort uses the nothrow one) allocates with malloc, because every non-aligned delete below frees with free: a
 // sanitizer reports any mismatched pair. The aligned variants keep their default, matching pair.
+// No top-level const on the parameters: clang 22 then treats the sized operator delete as "non-usual" and rejects libstdc++'s
+// __builtin_operator_delete calls (clang-tidy on Linux).
 // NOLINTBEGIN(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
 namespace
 {
@@ -60,7 +62,7 @@ namespace
   }
 }
 
-void* operator new(const std::size_t size)
+void* operator new(std::size_t size)
 {
   if (void* const memory = CountedMalloc(size))
   {
@@ -69,47 +71,47 @@ void* operator new(const std::size_t size)
   throw std::bad_alloc();
 }
 
-void* operator new[](const std::size_t size)
+void* operator new[](std::size_t size)
 {
   return operator new(size);
 }
 
-void* operator new(const std::size_t size, const std::nothrow_t& /*tag*/) noexcept
+void* operator new(std::size_t size, const std::nothrow_t& /*tag*/) noexcept
 {
   return CountedMalloc(size);
 }
 
-void* operator new[](const std::size_t size, const std::nothrow_t& /*tag*/) noexcept
+void* operator new[](std::size_t size, const std::nothrow_t& /*tag*/) noexcept
 {
   return CountedMalloc(size);
 }
 
-void operator delete(void* const memory, const std::nothrow_t& /*tag*/) noexcept
+void operator delete(void* memory, const std::nothrow_t& /*tag*/) noexcept
 {
   std::free(memory);
 }
 
-void operator delete[](void* const memory, const std::nothrow_t& /*tag*/) noexcept
+void operator delete[](void* memory, const std::nothrow_t& /*tag*/) noexcept
 {
   std::free(memory);
 }
 
-void operator delete(void* const memory) noexcept
+void operator delete(void* memory) noexcept
 {
   std::free(memory);
 }
 
-void operator delete[](void* const memory) noexcept
+void operator delete[](void* memory) noexcept
 {
   std::free(memory);
 }
 
-void operator delete(void* const memory, const std::size_t /*size*/) noexcept
+void operator delete(void* memory, std::size_t /*size*/) noexcept
 {
   std::free(memory);
 }
 
-void operator delete[](void* const memory, const std::size_t /*size*/) noexcept
+void operator delete[](void* memory, std::size_t /*size*/) noexcept
 {
   std::free(memory);
 }
