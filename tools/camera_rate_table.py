@@ -86,14 +86,26 @@ def update_doc(text: str) -> bool:
     return True
 
 
-def main() -> int:
+class Arguments(argparse.Namespace):
+    """The parsed command line."""
+
+    refresh: float = 60.0
+    rates: str = DEFAULT_RATES
+    update_doc: bool = False
+
+
+def parse_args() -> Arguments:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     _ = parser.add_argument("--refresh", type=float, default=60.0, help="simulated display refresh rate in Hz (default 60)")
     _ = parser.add_argument("--rates", default=DEFAULT_RATES, help=f"comma separated camera rates (default {DEFAULT_RATES})")
     _ = parser.add_argument("--update-doc", action="store_true", help="replace the generated table in doc/camera.md")
-    args = parser.parse_args()
-    refresh = float(args.refresh)
-    rates = [float(r) for r in str(args.rates).split(",") if r.strip()]
+    return parser.parse_args(namespace=Arguments())
+
+
+def main() -> int:
+    args = parse_args()
+    refresh = args.refresh
+    rates = [float(r) for r in args.rates.split(",") if r.strip()]
 
     _ = subprocess.run(["dotnet", "build", "-c", "Release", str(PROJECT), "-v", "q", "-nologo"], cwd=ROOT, check=True)
     results: list[Result] = []
