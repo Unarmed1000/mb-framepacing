@@ -77,12 +77,16 @@ namespace MB.FramePacing.Capture.Camera
 
     public string ToJson() => JsonSerializer.Serialize(this, g_jsonOptions);
 
-    /// <summary>Write the rig file; a replaced version is kept in the backup folder next to it (<see cref="SettingsFile"/>).</summary>
-    public void Save(string path) => SettingsFile.Write(path, ToJson());
+    /// <summary>Write the rig file; the version it replaces is kept in the backup folder next to it (<see cref="SettingsFile"/>).</summary>
+    public void Save(string path) => SettingsFile.Write(path, ToJson(), FormatVersion);
 
     public static CameraRig FromJson(string json)
     {
       var rig = JsonSerializer.Deserialize<CameraRig>(json, g_jsonOptions) ?? throw new InvalidDataException("The camera rig file is empty");
+      if (rig.FormatVersion > CurrentFormatVersion)
+        throw new InvalidDataException(
+          $"Camera rig format {rig.FormatVersion} was written by a newer mb-framepacing (this one reads {CurrentFormatVersion}); update the tools"
+        );
       if (rig.FormatVersion != CurrentFormatVersion)
         throw new InvalidDataException($"Camera rig format {rig.FormatVersion} is not supported (expected {CurrentFormatVersion}); recalibrate");
       if (rig.Zones.Count == 0 || rig.CameraWidth <= 0 || rig.CameraHeight <= 0)
@@ -90,6 +94,17 @@ namespace MB.FramePacing.Capture.Camera
       return rig;
     }
 
-    public static CameraRig Load(string path) => FromJson(File.ReadAllText(path));
+    /// <summary>Load a rig file. Errors name the file and its newest backup (<see cref="SettingsFile"/>).</summary>
+    public static CameraRig Load(string path)
+    {
+      try
+      {
+        return FromJson(File.ReadAllText(path));
+      }
+      catch (Exception ex) when (ex is InvalidDataException or JsonException)
+      {
+        throw new InvalidDataException($"'{path}': {ex.Message.TrimEnd('.')}.{SettingsFile.BackupHint(path)}", ex);
+      }
+    }
   }
 }

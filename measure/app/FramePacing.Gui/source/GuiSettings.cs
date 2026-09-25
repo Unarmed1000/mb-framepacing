@@ -22,6 +22,15 @@ namespace MB.FramePacing.Gui
       "gui-settings.json"
     );
 
+    /// <summary>The format this version writes and the newest it reads.</summary>
+    public const int CurrentFormatVersion = 1;
+
+    /// <summary>Set when the file was written by a newer version: it is not overwritten.</summary>
+    private bool m_keepFile;
+
+    /// <summary>The file's format. Files from before the field existed count as 1.</summary>
+    public int FormatVersion { get; set; } = CurrentFormatVersion;
+
     public string? LastDevice { get; set; }
     public string? Mode { get; set; }
     public string? InputFormat { get; set; }
@@ -52,25 +61,37 @@ namespace MB.FramePacing.Gui
       // the user did last
       if (Program.Demo || Program.OutputRoot != null)
         return new GuiSettings();
-      try
+      if (!File.Exists(g_path))
+        return new GuiSettings();
+      // The file, then the version the last save replaced: a damaged file falls back to it
+      foreach (var path in new[] { g_path, SettingsFile.PreviousPath(g_path) })
       {
-        if (File.Exists(g_path))
-          return JsonSerializer.Deserialize<GuiSettings>(File.ReadAllText(g_path)) ?? new GuiSettings();
+        try
+        {
+          if (JsonSerializer.Deserialize<GuiSettings>(File.ReadAllText(path)) is not { } settings)
+            continue;
+          // Written by a newer version: use the defaults and leave its file alone
+          if (settings.FormatVersion > CurrentFormatVersion)
+            return new GuiSettings { m_keepFile = true };
+          return settings;
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (JsonException) { }
       }
-      catch (IOException) { }
-      catch (JsonException) { }
       return new GuiSettings();
     }
 
     public void Save()
     {
       // A demo or an explicit --output-root run must not change the remembered settings
-      if (Program.Demo || Program.OutputRoot != null)
+      if (Program.Demo || Program.OutputRoot != null || m_keepFile)
         return;
+      FormatVersion = CurrentFormatVersion;
       try
       {
         // The previous version is kept in the backup folder next to it
-        SettingsFile.Write(g_path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        SettingsFile.Write(g_path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }), CurrentFormatVersion);
       }
       catch (IOException) { }
       catch (UnauthorizedAccessException) { }

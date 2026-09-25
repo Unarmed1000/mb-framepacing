@@ -24,6 +24,12 @@ namespace MB.FramePacing.Capture
   {
     public const string FileName = "mb-framepacing.json";
 
+    /// <summary>The format this version writes and the newest it reads.</summary>
+    public const int CurrentFormatVersion = 1;
+
+    /// <summary>The file's format. Files from before the field existed count as 1; a newer format is refused (update the tools).</summary>
+    public int FormatVersion { get; init; } = CurrentFormatVersion;
+
     /// <summary>Full path of the ffmpeg executable. Null = use MB_FFMPEG or PATH.</summary>
     public string? FfmpegPath { get; init; }
 
@@ -86,11 +92,20 @@ namespace MB.FramePacing.Capture
       try
       {
         var config = JsonSerializer.Deserialize<FramePacingConfig>(File.ReadAllText(path), g_jsonOptions) ?? new FramePacingConfig();
+        if (config.FormatVersion > CurrentFormatVersion)
+          throw new InvalidDataException(
+            $"The configuration file '{path}' has format {config.FormatVersion}, written by a newer mb-framepacing (this one reads up to "
+              + $"{CurrentFormatVersion}). Update the tools.{SettingsFile.BackupHint(path)}"
+          );
+        if (config.FormatVersion < 1)
+          throw new InvalidDataException(
+            $"The configuration file '{path}' has an invalid format version {config.FormatVersion}.{SettingsFile.BackupHint(path)}"
+          );
         return config with { SourcePath = path };
       }
       catch (JsonException ex)
       {
-        throw new InvalidDataException($"The configuration file '{path}' is not valid JSON: {ex.Message}", ex);
+        throw new InvalidDataException($"The configuration file '{path}' is not valid JSON: {ex.Message}{SettingsFile.BackupHint(path)}", ex);
       }
     }
 
@@ -98,7 +113,7 @@ namespace MB.FramePacing.Capture
     public string Save(string? explicitPath = null)
     {
       var path = explicitPath != null ? Path.GetFullPath(explicitPath) : SourcePath ?? ResolvePath();
-      SettingsFile.Write(path, JsonSerializer.Serialize(this, g_jsonOptions));
+      SettingsFile.Write(path, JsonSerializer.Serialize(this with { FormatVersion = CurrentFormatVersion }, g_jsonOptions), CurrentFormatVersion);
       return path;
     }
 
@@ -107,13 +122,17 @@ namespace MB.FramePacing.Capture
     {
       var path = ResolvePath(explicitPath);
       if (!File.Exists(path))
-        SettingsFile.Write(path, Template);
+        SettingsFile.Write(path, Template, CurrentFormatVersion);
       return path;
     }
 
     public const string Template = """
       {
         // mb-framepacing configuration (JSON, comments allowed). Used by both mb-framepacing and mb-framepacing-gui.
+        // The version a save replaces is kept in the "backup" folder next to this file.
+
+        // The file's format version; leave it as it is.
+        "formatVersion": 1,
 
         // Full path of your ffmpeg executable (FFmpeg 5.1 or newer). Remove the line to use MB_FFMPEG or PATH instead.
         // Windows: "C:\\ffmpeg\\bin\\ffmpeg.exe"   macOS (Homebrew): "/opt/homebrew/bin/ffmpeg"   Linux: "/usr/bin/ffmpeg"

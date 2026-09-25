@@ -73,7 +73,7 @@ namespace MB.FramePacing.Capture.Camera
 
     public static bool Exists(string name, string? directory = null) => IsValidName(name) && File.Exists(PathFor(name, directory));
 
-    /// <summary>Delete a saved camera by moving its file to the backup folder (<see cref="SettingsFile"/>). Returns the backup path.</summary>
+    /// <summary>Delete a saved camera, keeping its file in the backup folder (<see cref="SettingsFile"/>). Returns the backup path.</summary>
     public static string Delete(string name, string? directory = null)
     {
       var path = PathFor(name, directory);

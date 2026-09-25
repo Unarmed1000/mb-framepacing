@@ -287,9 +287,17 @@ the region as `--roi … --scale …`, to reuse it without searching again.
 `mb-framepacing.json` stores where ffmpeg is and where captures go; the GUI and the command line share it. Create it with
 `mb-framepacing config --init` or the GUI's setup dialog.
 
-Saved settings keep their history: when the configuration file, the GUI's remembered settings or a saved camera is replaced, the
-previous version is kept in a `backup` folder next to it (`<file>.<date-time>.bak`, the newest 20 per file). A deleted saved
-camera is moved there too. To undo a change, copy a backup back.
+Saved settings are safe and versioned:
+
+- **Safe saves:** the configuration file, the GUI's remembered settings and saved cameras are written to a temporary file,
+  flushed to the disk and then renamed over the old file. A crash or power cut leaves the old or the new version, never a
+  broken file.
+- **Backups:** the `backup` folder next to the file keeps `<file>.bak`, the version the last save replaced (hand edits included)
+  or the deleted file, and `<file>.v<N>.bak`, the last file in format version N whenever a save changes the format. To undo a
+  change, copy a backup back. Errors about a file that can not be read name its backup, and the GUI falls back to the backup of
+  its settings by itself.
+- **Format version:** every settings file has a `formatVersion`. A file written by a newer version of the tools is refused with
+  a request to update, instead of being misread or overwritten.
 
 | Location                                                                                                                            | Used when          |
 | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ |

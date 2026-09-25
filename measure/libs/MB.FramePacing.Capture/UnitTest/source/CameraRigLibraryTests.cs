@@ -54,8 +54,8 @@ namespace MB.FramePacing.Capture.UnitTest
       CameraRigLibrary.Save(Rig() with { CameraFps = 330 }, "desk", directory.Path);
 
       Assert.That(CameraRigLibrary.Load("desk", directory.Path).CameraFps, Is.EqualTo(330));
-      var backups = Directory.GetFiles(Path.Combine(directory.Path, SettingsFile.BackupDirectoryName));
-      Assert.That(backups.Select(p => CameraRig.Load(p).CameraFps), Is.EqualTo(new[] { 240.0 }));
+      var path = CameraRigLibrary.PathFor("desk", directory.Path);
+      Assert.That(CameraRig.Load(SettingsFile.PreviousPath(path)).CameraFps, Is.EqualTo(240));
     }
 
     [Test]
@@ -67,6 +67,17 @@ namespace MB.FramePacing.Capture.UnitTest
       var error = Assert.Throws<FileNotFoundException>(() => CameraRigLibrary.Resolve("lab", directory.Path));
 
       Assert.That(error!.Message, Does.Contain("desk"));
+    }
+
+    [Test]
+    public void Load_NewerFormat_AsksToUpdate()
+    {
+      using var directory = new TempDirectory();
+      var path = CameraRigLibrary.Save(Rig() with { FormatVersion = CameraRig.CurrentFormatVersion + 1 }, "desk", directory.Path);
+
+      var error = Assert.Throws<InvalidDataException>(() => CameraRigLibrary.Load("desk", directory.Path));
+
+      Assert.That(error!.Message, Does.Contain("newer").And.Contain(path));
     }
 
     [Test]

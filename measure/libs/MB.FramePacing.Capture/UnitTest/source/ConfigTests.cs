@@ -41,6 +41,44 @@ namespace MB.FramePacing.Capture.UnitTest
     }
 
     [Test]
+    public void FormatVersion_WrittenAndAFileWithoutItCountsAsTheFirst()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("mb-framepacing.json");
+      File.WriteAllText(path, "{ \"captureDirectory\": \"x\" }");
+
+      Assert.That(FramePacingConfig.Load(path).FormatVersion, Is.EqualTo(1));
+      FramePacingConfig.Load(path).Save(path);
+      Assert.That(File.ReadAllText(path), Does.Contain($"\"formatVersion\": {FramePacingConfig.CurrentFormatVersion}"));
+    }
+
+    [Test]
+    public void FormatVersion_Newer_IsRefused()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("mb-framepacing.json");
+      File.WriteAllText(path, $"{{ \"formatVersion\": {FramePacingConfig.CurrentFormatVersion + 1} }}");
+
+      var error = Assert.Throws<InvalidDataException>(() => FramePacingConfig.Load(path));
+
+      Assert.That(error!.Message, Does.Contain("newer"));
+    }
+
+    [Test]
+    public void InvalidFile_ErrorNamesTheBackup()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("mb-framepacing.json");
+      new FramePacingConfig { CaptureDirectory = "x" }.Save(path);
+      new FramePacingConfig { CaptureDirectory = "y" }.Save(path);
+      File.WriteAllText(path, "{ broken");
+
+      var error = Assert.Throws<InvalidDataException>(() => FramePacingConfig.Load(path));
+
+      Assert.That(error!.Message, Does.Contain(SettingsFile.PreviousPath(path)));
+    }
+
+    [Test]
     public void SaveAndLoad_RoundTrip()
     {
       using var temp = new TempDirectory();

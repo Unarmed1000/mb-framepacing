@@ -144,8 +144,13 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a
   row in `licenses/README.md`, in the same change.
 - **Two counters:** the capture index (capture card) and the marker frame index (application) are unrelated; never compare them.
-- **Settings files** (configuration, GUI settings, saved cameras) are written and deleted through `SettingsFile`: an atomic
-  replace, and the previous or deleted version goes to a `backup` folder next to it (newest 20 per file). Never `File.WriteAllText`
-  or `File.Delete` a settings file directly. Deleting from the GUI asks first.
+- **Settings files** (configuration, GUI settings, saved cameras) are written and deleted through `SettingsFile`: a unique temporary
+  file, flushed to the disk, then renamed over the target. Before that, the `backup` folder next to it gets `<file>.bak` (the version
+  replaced, or the deleted file) and, when the format version changes, `<file>.v<N>.bak` (the last file in format N). Only those; no
+  history. Never `File.WriteAllText` or `File.Delete` a settings file directly. Deleting from the GUI asks first.
+  - Every settings file has a `formatVersion` (`CurrentFormatVersion` on its type). Loaders refuse a newer format ("update the
+    tools"); a file without the field counts as 1. Raise the version when the format changes incompatibly, and migrate older
+    formats in the loader.
+  - Errors about unreadable settings files include `SettingsFile.BackupHint(path)`.
 - **ffmpeg** is an external executable, found via `--ffmpeg` / `MB_FFMPEG` / `mb-framepacing.json` / PATH / install folders
   (`FfmpegLocator`). It is never linked or bundled.

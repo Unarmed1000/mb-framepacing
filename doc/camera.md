@@ -132,7 +132,7 @@ The steps:
    mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --analyze
    ```
 
-`camera-rig list` shows the saved cameras. `camera-rig delete <name>` removes one (its file is moved to `camera-rigs/backup`). `camera-rig verify --rig desk (-d "<camera>" |
+`camera-rig list` shows the saved cameras. `camera-rig delete <name>` removes one (its file is kept as `camera-rigs/backup/<name>.camera-rig.json.bak`). `camera-rig verify --rig desk (-d "<camera>" |
 clip.mp4)` only runs the check. `--camera` and `--rig` also take a rig file path, and `calibrate --output <file>` writes one, for
 example to share a rig between machines.
 
