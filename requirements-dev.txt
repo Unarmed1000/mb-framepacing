@@ -1,5 +1,7 @@
-# Python development tools (the scripts themselves only need the standard library).
-#   python -m pip install -r requirements-dev.txt
+# Python development tools (the scripts themselves only need the standard library). Install them into the project's .venv:
+#   python -m venv .venv
+#   .venv\Scripts\python -m pip install -r requirements-dev.txt     (Linux/macOS: .venv/bin/python -m pip ...)
+#   .venv\Scripts\activate                                           (Linux/macOS: source .venv/bin/activate)
 #   ruff check . && ruff format --check . && basedpyright
 # Also the C++ and workflow linters CI uses (python tools/check_cpp.py, actionlint), pinned so every machine formats alike.
 actionlint-py==1.7.12.25

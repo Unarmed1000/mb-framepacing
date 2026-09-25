@@ -10,7 +10,9 @@ Version.hpp):
   python tools/check_cpp.py                                      # clang-format, then clang-tidy with marker/cpp/build/windows
   python tools/check_cpp.py --build-dir marker/cpp/build/linux-sanitize
   python tools/check_cpp.py --format-only
-The CI versions are pinned in requirements-dev.txt (python -m pip install -r requirements-dev.txt).
+The CI versions are pinned in requirements-dev.txt (installed into .venv, see CLAUDE.md). The clang tools of the Python that runs
+this script win (.venv/Scripts or .venv/bin), so '.venv/Scripts/python tools/check_cpp.py' uses the pinned versions without activating
+the environment; otherwise they come from PATH.
 """
 
 import argparse
@@ -28,6 +30,16 @@ class Arguments(argparse.Namespace):
     format_only: bool = False
 
 
+def tool(name: str) -> str:
+    """The tool installed next to the running Python (a venv's Scripts or bin folder), else the name for a PATH lookup."""
+    exe = name + ".exe" if sys.platform == "win32" else name
+    here = Path(sys.executable).parent
+    for folder in (here, here / "Scripts", here / "bin"):
+        if (folder / exe).is_file():
+            return str(folder / exe)
+    return name
+
+
 def files(cpp: Path, globs: list[str]) -> list[str]:
     return sorted(str(path.relative_to(cpp).as_posix()) for pattern in globs for path in cpp.glob(pattern))
 
@@ -38,7 +50,7 @@ def run(command: list[str], cwd: Path) -> bool:
 
 
 def tidy_command(cpp: Path, build: Path, sources: list[str]) -> list[str]:
-    command = ["clang-tidy", "--quiet", "--warnings-as-errors=*", "--header-filter=.*mb/framemarker/.*"]
+    command = [tool("clang-tidy"), "--quiet", "--warnings-as-errors=*", "--header-filter=.*mb/framemarker/.*"]
     if (build / "compile_commands.json").is_file():
         return [*command, "-p", str(build), *sources]
     version = (cpp.parent / "VERSION").read_text(encoding="utf-8").strip()
@@ -61,7 +73,7 @@ def main() -> int:
 
     root = Path(__file__).resolve().parent.parent
     cpp = root / "marker/cpp"
-    ok = run(["clang-format", "--dry-run", "--Werror", *files(cpp, FORMAT_GLOBS)], cpp)
+    ok = run([tool("clang-format"), "--dry-run", "--Werror", *files(cpp, FORMAT_GLOBS)], cpp)
     if args.format_only:
         return 0 if ok else 1
 

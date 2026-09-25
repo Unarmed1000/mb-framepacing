@@ -71,7 +71,7 @@ as long, torn frames, and the overall drift between the game's clock and the dis
 The difference is where the numbers come from. The application writes its exact animation time into each frame, instead of it
 being estimated. The display time comes from the captured video signal, instead of software flip events, and is precise to one
 capture period. **[Vocabulary](doc/vocabulary.md)** maps the terms used here to their other names (PresentMon, Gamers Nexus,
-Unity, Unreal, Android, video) and links the articles they come from.
+Digital Foundry, Unity, Unreal, Android, video) and links the articles they come from.
 
 ![The Analyze page: every presented frame, its animation error and the headline numbers](doc/images/gui-analysis.png)
 
@@ -332,7 +332,8 @@ python marker/unity/check_in_unity.py
 python measure/build_standalone.py
 
 # Python scripts: lint, format and type check (ruff, basedpyright; pinned in requirements-dev.txt)
-python -m pip install -r requirements-dev.txt
+python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt   # once (Linux/macOS: .venv/bin/python)
+.venv/Scripts/activate                                                                  # Linux/macOS: source .venv/bin/activate
 ruff check . && ruff format --check . && basedpyright
 
 # Docs: formatting (Prettier) and the images in doc/images (rendered offscreen)
