@@ -62,7 +62,7 @@ namespace MB.FramePacing.Gui.Views
         var errors = ErrorPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationErrorTicks!.Value)).ToArray());
         errors.LineWidth = 0;
         errors.MarkerSize = 4;
-        errors.LegendText = "animation delta - display delta";
+        errors.LegendText = "animation time step - display time";
         double resolution = run!.CapturePeriodMs;
         var bandColor = ScottPlot.Colors.Orange;
         var upper = ErrorPlot.Plot.Add.HorizontalLine(resolution, color: bandColor, pattern: ScottPlot.LinePattern.Dashed);
@@ -110,31 +110,36 @@ namespace MB.FramePacing.Gui.Views
       }
       Finish(ErrorPercentilePlot, plot => plot.Axes.SetLimitsX(0, 100));
 
-      // Display delta vs animation delta
-      Reset(FrameTimePlot, "Frame times", "ms");
+      // Display time vs animation time step: their difference is the animation error
+      Reset(DisplayAnimationPlot, "Display time vs animation time step", "ms");
       if (withMetrics.Length > 0)
       {
-        var display = FrameTimePlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
-        display.LegendText = "display delta (captured)";
+        var display = DisplayAnimationPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
+        display.LegendText = "display time (captured)";
         display.MarkerSize = 3;
-        var animation = FrameTimePlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationDeltaTicks!.Value)).ToArray());
-        animation.LegendText = "animation delta (marker)";
+        var animation = DisplayAnimationPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationDeltaTicks!.Value)).ToArray());
+        animation.LegendText = "animation time step (marker)";
         animation.MarkerSize = 3;
-        FrameTimePlot.Plot.ShowLegend();
+        DisplayAnimationPlot.Plot.ShowLegend();
       }
-      Finish(FrameTimePlot);
+      Finish(DisplayAnimationPlot);
 
       // How long frames stayed on screen: steady pacing is one tall bar, stutter shows up as bars at multiples of it
-      Reset(FrameTimeHistogramPlot, "Frame time distribution (captured display delta)", "presented frames (log scale)", "display delta (ms)");
+      Reset(
+        DisplayTimeHistogramPlot,
+        "Display time distribution (how long each frame stayed on screen)",
+        "presented frames (log scale)",
+        "display time (ms)"
+      );
       if (histograms != null && histograms.DisplayDeltaMs.Total > 0)
       {
-        AddLogBars(FrameTimeHistogramPlot, histograms.DisplayDeltaMs);
+        AddLogBars(DisplayTimeHistogramPlot, histograms.DisplayDeltaMs);
         double median = run!.Run.Statistics.DisplayDeltaMs.P50;
-        var line = FrameTimeHistogramPlot.Plot.Add.VerticalLine(median, color: ScottPlot.Colors.Orange, pattern: ScottPlot.LinePattern.Dashed);
+        var line = DisplayTimeHistogramPlot.Plot.Add.VerticalLine(median, color: ScottPlot.Colors.Orange, pattern: ScottPlot.LinePattern.Dashed);
         line.LegendText = $"median {median:0.##} ms";
-        FrameTimeHistogramPlot.Plot.ShowLegend();
+        DisplayTimeHistogramPlot.Plot.ShowLegend();
       }
-      Finish(FrameTimeHistogramPlot, plot => plot.Axes.SetLimitsX(0, plot.Axes.GetLimits().Right));
+      Finish(DisplayTimeHistogramPlot, plot => plot.Axes.SetLimitsX(0, plot.Axes.GetLimits().Right));
 
       // Cumulative drift
       Reset(DriftPlot, "Cumulative drift (animation time - display time)", "drift (ms)");

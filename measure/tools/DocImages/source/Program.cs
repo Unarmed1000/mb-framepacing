@@ -98,7 +98,7 @@ namespace MB.FramePacing.DocImages
         {
           ("ErrorHistogramPlot", "chart-error-histogram.png"),
           ("ErrorPercentilePlot", "chart-error-percentiles.png"),
-          ("FrameTimeHistogramPlot", "chart-frame-time-histogram.png"),
+          ("DisplayTimeHistogramPlot", "chart-display-time-histogram.png"),
         }
       )
       {

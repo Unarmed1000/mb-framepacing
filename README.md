@@ -41,6 +41,13 @@ When these disagree, the eye sees stutter even though the frame counter looks fi
 animated as if it were on time jumps too little; the next one jumps too much. That mismatch is the **animation error**, and it is
 invisible to in-game counters, because the game only knows when it _submitted_ a frame, not when the display _showed_ it.
 
+It happens in two ways, which Gamers Nexus compare to a flipbook:
+
+- **Uneven pacing:** evenly drawn pages flipped at an uneven tempo. The animation time advances evenly, but frames reach the
+  screen unevenly, for example a frame over its budget that shows a refresh late (a hitch).
+- **Uneven animation time:** unevenly drawn pages flipped at a steady tempo. Frames reach the screen evenly, but the animation
+  time advances unevenly, for example when the engine's delta time jitters.
+
 mb-framepacing measures it from the outside, on the real video signal. For every two frames shown one after the other:
 
 > **animation error** = how far the **animation timer** (written by the application) advanced − how much time actually passed
@@ -63,7 +70,8 @@ as long, torn frames, and the overall drift between the game's clock and the dis
 [Intel PresentMon](https://game.intel.com/story/intel-presentmon/)); positive: shown too soon, negative: shown too late.
 The difference is where the numbers come from. The application writes its exact animation time into each frame, instead of it
 being estimated. The display time comes from the captured video signal, instead of software flip events, and is precise to one
-capture period.
+capture period. **[Vocabulary](doc/vocabulary.md)** maps the terms used here to their other names (PresentMon, Gamers Nexus,
+Unity, Unreal, Android, video) and links the articles they come from.
 
 ![The Analyze page: every presented frame, its animation error and the headline numbers](doc/images/gui-analysis.png)
 
@@ -90,7 +98,7 @@ flowchart LR
     D --> E["mb-framepacing<br/>capture / import"]
     E --> F[("frames.mbfc<br/>every captured frame + its time")]
     F --> G["mb-framepacing analyze"]
-    G --> H["Animation error, frame times,<br/>drops, tearing: GUI, CSV, JSON"]
+    G --> H["Animation error, display times,<br/>drops, tearing: GUI, CSV, JSON"]
 ```
 
 ![A marker drawn into a game frame at the recommended position](doc/images/marker-in-frame.png)
@@ -138,7 +146,7 @@ sequenceDiagram
     App->>Card: END marker (a few capture frames)
     Card->>Tool: END seen, stop
     Tool->>Tool: compare each frame's animation time (from the marker) with its capture time
-    Tool->>You: report: animation error, frame times, drops, tearing
+    Tool->>You: report: animation error, display times, drops, tearing
 ```
 
 1. Connect the application's display output through a capture card (it passes the signal on to your monitor). The recording
@@ -200,14 +208,15 @@ Besides the per-frame charts over time, the Analyze page shows how the values ar
 synthetic test game (about 144 fps with injected stalls and skipped frames) captured at 500 fps. The count axes are
 logarithmic, so a handful of bad frames stays visible next to hundreds of good ones.
 
-| Animation error distribution                                       | Frame time distribution                                            |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| ![Animation error histogram](doc/images/chart-error-histogram.png) | ![Frame time histogram](doc/images/chart-frame-time-histogram.png) |
+| Animation error distribution                                       | Display time distribution                                              |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| ![Animation error histogram](doc/images/chart-error-histogram.png) | ![Display time histogram](doc/images/chart-display-time-histogram.png) |
 
 - **Animation error distribution:** how often each error occurred. Each bar is one capture period wide, because that is the
   measurement resolution. Everything between the dashed lines is within ±1 capture period and cannot be told apart from 0. Bars
   further out are real errors: positive = shown too soon (moved too far), negative = shown too late (moved too little).
-- **Frame time distribution:** how long frames stayed on screen. Even pacing is one tall bar. Separate bars further right (often at
+- **Display time distribution:** how long frames stayed on screen (PresentMon's `MsBetweenDisplayChange`; overlays often call
+  this "frame time"). Even pacing is one tall bar. Separate bars further right (often at
   multiples of the refresh period) are frames that stayed on screen too long.
 - **Animation error by percentile:** every frame's absolute error, sorted. The flat part is the typical frame; the rise on the
   right shows how bad the worst 5 % and 1 % are, and makes two runs easy to compare.

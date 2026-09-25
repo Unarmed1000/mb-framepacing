@@ -35,8 +35,8 @@ namespace MB.FramePacing.Gui.ViewModels
       ResolutionText = capturePeriodMs.ToString("0.0 'ms'", CultureInfo.InvariantCulture);
       Statistics = new List<StatisticsRow>
       {
-        StatisticsRow.From("Display delta", s.DisplayDeltaMs),
-        StatisticsRow.From("Animation delta", s.AnimationDeltaMs),
+        StatisticsRow.From("Display time", s.DisplayDeltaMs),
+        StatisticsRow.From("Animation time step", s.AnimationDeltaMs),
         StatisticsRow.From("Animation error", s.AnimationErrorMs),
         StatisticsRow.From("|Animation error|", s.AbsoluteAnimationErrorMs),
         StatisticsRow.From("Drift", s.DriftMs),

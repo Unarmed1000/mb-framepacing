@@ -107,8 +107,8 @@ namespace MB.FramePacing.App.Commands
           .AddColumn(new TableColumn("p99").RightAligned())
           .AddColumn(new TableColumn("max").RightAligned())
           .AddColumn(new TableColumn("stddev").RightAligned());
-        AddRow(table, "Display delta", s.DisplayDeltaMs);
-        AddRow(table, "Animation delta", s.AnimationDeltaMs);
+        AddRow(table, "Display time", s.DisplayDeltaMs);
+        AddRow(table, "Animation time step", s.AnimationDeltaMs);
         AddRow(table, "Animation error", s.AnimationErrorMs);
         AddRow(table, "|Animation error|", s.AbsoluteAnimationErrorMs);
         AddRow(table, "Drift", s.DriftMs);

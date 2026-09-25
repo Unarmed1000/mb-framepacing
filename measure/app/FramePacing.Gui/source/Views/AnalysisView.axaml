@@ -130,11 +130,11 @@
         <TabItem Header="Error percentiles">
           <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
         </TabItem>
-        <TabItem Header="Frame times">
-          <scottplot:AvaPlot x:Name="FrameTimePlot" />
+        <TabItem Header="Display vs animation">
+          <scottplot:AvaPlot x:Name="DisplayAnimationPlot" />
         </TabItem>
-        <TabItem Header="Frame time histogram">
-          <scottplot:AvaPlot x:Name="FrameTimeHistogramPlot" />
+        <TabItem Header="Display time histogram">
+          <scottplot:AvaPlot x:Name="DisplayTimeHistogramPlot" />
         </TabItem>
         <TabItem Header="Drift">
           <scottplot:AvaPlot x:Name="DriftPlot" />
