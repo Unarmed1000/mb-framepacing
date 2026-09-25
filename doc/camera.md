@@ -11,23 +11,8 @@ response. This page describes the experimental camera path: how to set up a came
 
 ## Status
 
-Status on 2026-09-25 (branch `feature/high-speed-camera`):
-
-| Area                                                             | State                                    | Checked by                                                    |
-| ---------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| Rig calibration (`camera-rig calibrate`, GUI **Calibrate**)      | Implemented                              | Synthetic camera unit tests, `selftest --camera`, real ffmpeg |
-| Rig verification before every capture                            | Implemented                              | Unit tests (moved camera fails, start markers accepted)       |
-| Import of recorded clips (`import --camera`, `--recorded-fps`)   | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)      |
-| Rectification in ffmpeg (`crop,perspective,scale,vstack`)        | Implemented                              | End to end through a real ffmpeg                              |
-| Rectification in C# (sources without ffmpeg)                     | Implemented                              | `selftest --camera`, benchmarks                               |
-| Camera analysis (scanout delay, camera tears)                    | Implemented                              | Unit tests against the synthetic ground truth                 |
-| Saved cameras (camera library: calibrate once, then only verify) | Implemented                              | Unit tests, DocImages                                         |
-| GUI camera wizard, camera card and synthetic camera source       | Implemented                              | DocImages (headless)                                          |
-| Live UVC cameras (`capture -d <camera> --camera`)                | Implemented, **never run with a camera** | Same code path as import, not tried with hardware             |
-| Real cameras and displays                                        | **Not validated**                        | Nothing yet                                                   |
-| Machine vision cameras (GenICam GenTL) for 500–1000+ fps live    | Not started                              | Planned as a separate capture source                          |
-| Lens calibration, exposure/focus control (OpenCV)                | Not started                              | Only needed if tests show it; see "Follow-ups"                |
-| Camera statistics on the GUI's Analyze page                      | Not started                              | They are in `summary.json` and the CSV files                  |
+What is implemented, how it was checked, known issues and the next steps are in
+[Camera capture: status and next steps](camera-status.md).
 
 ## What you need
 
@@ -189,10 +174,4 @@ The analysis runs on all cores. In `selftest --camera` it analysed about 8,000 c
 
 ## Follow-ups
 
-- **GenICam GenTL capture source** for USB3/GigE machine vision cameras (500–1000+ fps live with hardware timestamps). It is
-  vendor neutral, since it loads any vendor's `.cti` producer, and slots in as another `ICaptureSource` using the C# rectifier.
-- **OpenCV** (OpenCvSharp4, Apache-2.0) only if real footage shows the need: lens calibration with a full-screen ChArUco board
-  if per-zone transforms are not accurate enough, and camera exposure/focus control on Windows and Linux.
-- Show the camera statistics on the GUI's Analyze page.
-- Validate against a capture card on the same display (vsync on, fixed refresh), where both must agree on the frame-to-frame
-  times.
+See [next steps](camera-status.md#next-steps).
