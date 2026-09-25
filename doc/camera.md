@@ -85,24 +85,33 @@ GUI share it. Replacing or deleting a saved camera keeps the old file in `camera
 
 ### In the GUI: the camera wizard
 
-On the Capture page, open **Camera (very experimental)** and press **Set up camera...**:
+On the Capture page, open **Camera (very experimental)** and press **Set up camera...**. The wizard has two paths, so its step
+count differs:
+
+- **New camera**, 6 steps: Which camera? → Mount → Source → Calibrate → Save → Done.
+- **Saved camera**, 4 steps: Which camera? → Source → Check → Done. Calibration is skipped.
+
+The steps:
 
 1. **Which camera?** Pick a saved camera, which skips calibration, or set up a new one. **Delete** asks first.
+
+   ![Step 1: a saved camera is offered, so calibration can be skipped](images/gui-camera-wizard-saved.png)
+
 2. **Mount** (new camera): a checklist of the requirements above.
 3. **Source**: the live camera (with its mode), a clip filmed with it (with its recorded fps), or the **Synthetic camera** to
    try everything without hardware.
 4. **Calibrate** (new camera): the checks below. Fix every warning and calibrate again. While it runs, the wizard shows what the
-   camera sees a few times per second; afterwards the last frame stays with the calibrated markers outlined (green: the timing
-   zone, orange: the second zone). A saved camera gets a quick **Check now** instead, which is optional because every capture
-   checks anyway; its frame shows where the saved calibration expects the markers, so a moved camera is easy to spot.
+   camera sees a few times per second. Afterwards the last frame stays, with the calibrated markers outlined (green: the timing
+   zone, orange: the second zone).
+
+   ![Step 4 of a new camera: the last camera frame with the calibrated markers outlined, and the checks](images/gui-camera-wizard.png)
+
+   A saved camera gets **Check** here instead (step 3 of 4). Pressing **Check now** is optional, because every capture checks
+   anyway. Its frame shows where the saved calibration expects the markers, so a camera that moved is easy to spot.
+
 5. **Save** (new camera): give it a name.
-
-When the wizard finishes, the capture page films with that camera. **Start capture** verifies it, then stores only the two
-straightened marker zones. The camera card also lets you switch between saved cameras and verify one.
-
-![The camera wizard after calibrating](images/gui-camera-wizard.png)
-
-![The next time, the saved camera is offered and calibration is skipped](images/gui-camera-wizard-saved.png)
+6. **Done**: the capture page now films with that camera. **Start capture** verifies it, then stores only the two straightened
+   marker zones. The camera card also lets you switch between saved cameras and verify one.
 
 ### On the command line
 
