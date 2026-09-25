@@ -30,11 +30,13 @@ namespace MB.FramePacing.App.Commands
     {
       var command = new Command(
         "camera-rig",
-        $"({Experimental}) Calibrate or verify a high speed camera mounted in front of the screen, for 'capture --camera' and 'import --camera'."
+        $"({Experimental}) Calibrate, verify and keep high speed cameras mounted in front of the screen, for 'capture --camera' and 'import --camera'."
       )
       {
         CreateCalibrate(),
         CreateVerify(),
+        CreateList(),
+        CreateDelete(),
       };
       return command;
     }
@@ -44,7 +46,8 @@ namespace MB.FramePacing.App.Commands
       new Option<string?>("--camera")
       {
         Description =
-          $"({Experimental}) A camera rig file from 'camera-rig calibrate': verify the camera did not move, then store only the rectified marker zones.",
+          $"({Experimental}) A saved camera name or a rig file ('camera-rig calibrate'): verify the camera did not move, then store only the "
+          + "rectified marker zones.",
       };
 
     /// <summary>--recorded-fps for video files.</summary>
@@ -59,9 +62,10 @@ namespace MB.FramePacing.App.Commands
     public static void PrintExperimentalWarning() => AnsiConsole.MarkupLineInterpolated($"[yellow]WARNING:[/] {CameraRig.ExperimentalNotice}");
 
     /// <summary>--camera: load the rig, verify the camera still sees the markers where it was calibrated, and rectify the zones.</summary>
-    public static FfmpegCaptureOptions ApplyCamera(FfmpegCaptureOptions options, string rigPath, CancellationToken cancellationToken)
+    public static FfmpegCaptureOptions ApplyCamera(FfmpegCaptureOptions options, string nameOrPath, CancellationToken cancellationToken)
     {
       PrintExperimentalWarning();
+      var rigPath = CameraRigLibrary.Resolve(nameOrPath);
       var rig = CameraRig.Load(rigPath);
       IReadOnlyList<CameraCheck> checks = Array.Empty<CameraCheck>();
       AnsiConsole
@@ -98,10 +102,13 @@ namespace MB.FramePacing.App.Commands
     private static Command CreateCalibrate()
     {
       var source = new SourceOptions();
-      var outputOption = new Option<string>("--output", "-o")
+      var nameOption = new Option<string?>("--name")
       {
-        Description = $"The rig file to write (conventionally <name>{CameraRig.FileExtension}).",
-        Required = true,
+        Description = "Save the calibrated camera under this name in the camera library, to reuse it with --camera <name>.",
+      };
+      var outputOption = new Option<string?>("--output", "-o")
+      {
+        Description = $"Also (or instead) write the rig to this file (conventionally <name>{CameraRig.FileExtension}).",
       };
       var secondsOption = new Option<double>("--seconds")
       {
@@ -114,6 +121,7 @@ namespace MB.FramePacing.App.Commands
         $"({Experimental}) Find both markers (TopLeft and BottomLeft slots) in a clip or a live camera, measure the scanout and check the setup."
       )
       {
+        nameOption,
         outputOption,
         secondsOption,
         forceOption,
@@ -125,7 +133,12 @@ namespace MB.FramePacing.App.Commands
           try
           {
             PrintExperimentalWarning();
-            var output = Path.GetFullPath(parseResult.GetValue(outputOption)!);
+            var name = parseResult.GetValue(nameOption);
+            var outputText = parseResult.GetValue(outputOption);
+            if (name == null && outputText == null)
+              throw new ArgumentException("Give the camera a name (--name, saved in the camera library) or a file (--output)");
+            if (name != null && !CameraRigLibrary.IsValidName(name))
+              throw new ArgumentException($"'{name}' is not a valid camera name: use letters, digits, '-', '_', '.' and spaces");
             using var work = new WorkDirectory();
             var options = source.Create(parseResult, work.Path);
             var calibratorOptions = new CameraCalibratorOptions
@@ -157,8 +170,17 @@ namespace MB.FramePacing.App.Commands
               AnsiConsole.MarkupLine("[red]Calibration failed; no rig file written.[/] Fix the setup and calibrate again (or pass --force).");
               return Program.ResultError;
             }
-            rig.Save(output);
-            AnsiConsole.MarkupLineInterpolated($"Camera rig written to [bold]{output}[/]. Use it with 'capture --camera' or 'import --camera'.");
+            if (name != null)
+            {
+              var saved = CameraRigLibrary.Save(rig, name);
+              AnsiConsole.MarkupLineInterpolated($"Camera saved as [bold]{name}[/] ({saved}). Use it with '--camera \"{name}\"'.");
+            }
+            if (outputText != null)
+            {
+              var output = Path.GetFullPath(outputText);
+              (name != null ? rig with { Name = name } : rig).Save(output);
+              AnsiConsole.MarkupLineInterpolated($"Camera rig written to [bold]{output}[/]. Use it with 'capture --camera' or 'import --camera'.");
+            }
             return Program.ResultSuccess;
           }
           catch (Exception ex)
@@ -174,7 +196,7 @@ namespace MB.FramePacing.App.Commands
     private static Command CreateVerify()
     {
       var source = new SourceOptions();
-      var rigOption = new Option<string>("--rig") { Description = "The camera rig file to check against.", Required = true };
+      var rigOption = new Option<string>("--rig") { Description = "The saved camera name or rig file to check against.", Required = true };
       var command = new Command("verify", $"({Experimental}) Check that the camera still sees both markers where the rig was calibrated.")
       {
         rigOption,
@@ -186,7 +208,7 @@ namespace MB.FramePacing.App.Commands
           try
           {
             PrintExperimentalWarning();
-            var rig = CameraRig.Load(parseResult.GetValue(rigOption)!);
+            var rig = CameraRigLibrary.Load(parseResult.GetValue(rigOption)!);
             using var work = new WorkDirectory();
             var options = source.Create(parseResult, work.Path);
             IReadOnlyList<CameraCheck> checks = Array.Empty<CameraCheck>();
@@ -208,6 +230,64 @@ namespace MB.FramePacing.App.Commands
           }
         }
       );
+      return command;
+    }
+
+    private static Command CreateList()
+    {
+      var command = new Command("list", $"({Experimental}) The saved cameras in the camera library.");
+      command.SetAction(_ =>
+      {
+        var saved = CameraRigLibrary.List();
+        AnsiConsole.MarkupLineInterpolated($"[grey]Camera library: {CameraRigLibrary.DefaultDirectory}[/]");
+        if (saved.Count == 0)
+        {
+          AnsiConsole.MarkupLine("No cameras saved yet. Calibrate one with 'camera-rig calibrate --name <name> ...'.");
+          return Program.ResultSuccess;
+        }
+        var table = new Table().AddColumns("Name", "Camera", "Zones", "Scanout", "Calibrated", "Checks");
+        foreach (var entry in saved)
+        {
+          if (entry.Rig is not { } rig)
+          {
+            table.AddRow(Markup.Escape(entry.Name), "[red]unreadable[/]", "", "", "", Markup.Escape(entry.Error ?? string.Empty));
+            continue;
+          }
+          int warnings = rig.Checks.Count(c => c.Level != CameraCheckLevel.Pass);
+          table.AddRow(
+            Markup.Escape(entry.Name),
+            FormattableString.Invariant($"{rig.CameraWidth}x{rig.CameraHeight} @ {rig.CameraFps:0.#} fps"),
+            rig.Zones.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            rig.ScanoutDelayMs is { } delay ? FormattableString.Invariant($"{delay:0.00} ms") : "-",
+            rig.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+            warnings == 0 ? "[green]all passed[/]" : $"[yellow]{warnings} warning(s)[/]"
+          );
+        }
+        AnsiConsole.Write(table);
+        return Program.ResultSuccess;
+      });
+      return command;
+    }
+
+    private static Command CreateDelete()
+    {
+      var nameArgument = new Argument<string>("name") { Description = "The saved camera to delete." };
+      var command = new Command("delete", $"({Experimental}) Delete a saved camera from the camera library.") { nameArgument };
+      command.SetAction(parseResult =>
+      {
+        try
+        {
+          var name = parseResult.GetValue(nameArgument)!;
+          CameraRigLibrary.Delete(name);
+          AnsiConsole.MarkupLineInterpolated($"Deleted the saved camera [bold]{name}[/].");
+          return Program.ResultSuccess;
+        }
+        catch (Exception ex)
+        {
+          Program.ReportError(ex);
+          return Program.ResultError;
+        }
+      });
       return command;
     }
 

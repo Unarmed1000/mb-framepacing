@@ -13,20 +13,21 @@ response. This page describes the experimental camera path: how to set up a came
 
 Status on 2026-09-25 (branch `feature/high-speed-camera`):
 
-| Area                                                           | State                                    | Checked by                                                    |
-| -------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| Rig calibration (`camera-rig calibrate`, GUI **Calibrate**)    | Implemented                              | Synthetic camera unit tests, `selftest --camera`, real ffmpeg |
-| Rig verification before every capture                          | Implemented                              | Unit tests (moved camera fails, start markers accepted)       |
-| Import of recorded clips (`import --camera`, `--recorded-fps`) | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)      |
-| Rectification in ffmpeg (`crop,perspective,scale,vstack`)      | Implemented                              | End to end through a real ffmpeg                              |
-| Rectification in C# (sources without ffmpeg)                   | Implemented                              | `selftest --camera`, benchmarks                               |
-| Camera analysis (scanout delay, camera tears)                  | Implemented                              | Unit tests against the synthetic ground truth                 |
-| GUI camera rig card and synthetic camera source                | Implemented                              | DocImages (headless)                                          |
-| Live UVC cameras (`capture -d <camera> --camera`)              | Implemented, **never run with a camera** | Same code path as import, not tried with hardware             |
-| Real cameras and displays                                      | **Not validated**                        | Nothing yet                                                   |
-| Machine vision cameras (GenICam GenTL) for 500–1000+ fps live  | Not started                              | Planned as a separate capture source                          |
-| Lens calibration, exposure/focus control (OpenCV)              | Not started                              | Only needed if tests show it; see "Follow-ups"                |
-| Camera statistics on the GUI's Analyze page                    | Not started                              | They are in `summary.json` and the CSV files                  |
+| Area                                                             | State                                    | Checked by                                                    |
+| ---------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| Rig calibration (`camera-rig calibrate`, GUI **Calibrate**)      | Implemented                              | Synthetic camera unit tests, `selftest --camera`, real ffmpeg |
+| Rig verification before every capture                            | Implemented                              | Unit tests (moved camera fails, start markers accepted)       |
+| Import of recorded clips (`import --camera`, `--recorded-fps`)   | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)      |
+| Rectification in ffmpeg (`crop,perspective,scale,vstack`)        | Implemented                              | End to end through a real ffmpeg                              |
+| Rectification in C# (sources without ffmpeg)                     | Implemented                              | `selftest --camera`, benchmarks                               |
+| Camera analysis (scanout delay, camera tears)                    | Implemented                              | Unit tests against the synthetic ground truth                 |
+| Saved cameras (camera library: calibrate once, then only verify) | Implemented                              | Unit tests, DocImages                                         |
+| GUI camera wizard, camera card and synthetic camera source       | Implemented                              | DocImages (headless)                                          |
+| Live UVC cameras (`capture -d <camera> --camera`)                | Implemented, **never run with a camera** | Same code path as import, not tried with hardware             |
+| Real cameras and displays                                        | **Not validated**                        | Nothing yet                                                   |
+| Machine vision cameras (GenICam GenTL) for 500–1000+ fps live    | Not started                              | Planned as a separate capture source                          |
+| Lens calibration, exposure/focus control (OpenCV)                | Not started                              | Only needed if tests show it; see "Follow-ups"                |
+| Camera statistics on the GUI's Analyze page                      | Not started                              | They are in `summary.json` and the CSV files                  |
 
 ## What you need
 
@@ -49,36 +50,62 @@ Live cameras need a UVC (DirectShow, v4l2 or AVFoundation) mode ffmpeg can open.
 resolution (`--input-format mjpeg`), and top out around 240–330 fps. Cameras that record internally (phones in slow motion,
 Chronos, Phantom, Sony RX, ...) are imported as clips afterwards.
 
-## Setting up (4 steps)
+## Setting up
+
+A mounted camera is calibrated **once** and saved under a name in the **camera library**. After that you pick it by name, and
+every capture only checks, in about a second, that the camera has not moved. Recalibrate when the camera, the lens, the zoom or
+the display moves.
+
+The library is the `camera-rigs` folder next to the configuration file (see `mb-framepacing config`). The command line and the
+GUI share it.
+
+### In the GUI: the camera wizard
+
+On the Capture page, open **Camera (very experimental)** and press **Set up camera...**:
+
+1. **Which camera?** Pick a saved camera, which skips calibration, or set up a new one.
+2. **Mount** (new camera): a checklist of the requirements above.
+3. **Source**: the live camera (with its mode), a clip filmed with it (with its recorded fps), or the **Synthetic camera** to
+   try everything without hardware.
+4. **Calibrate** (new camera): the checks below. Fix every warning and calibrate again. A saved camera gets a quick **Check now**
+   instead, which is optional because every capture checks anyway.
+5. **Save** (new camera): give it a name.
+
+When the wizard finishes, the capture page films with that camera. **Start capture** verifies it, then stores only the two
+straightened marker zones. The camera card also lets you switch between saved cameras and verify one.
+
+![The camera wizard after calibrating](images/gui-camera-wizard.png)
+
+![The next time, the saved camera is offered and calibration is skipped](images/gui-camera-wizard-saved.png)
+
+### On the command line
 
 1. **Mount** the camera and point it at the left edge of the screen so both markers are sharp and at least 3 camera pixels per
    module. Fix focus and exposure.
 2. **Run the application** with both markers (TopLeft + BottomLeft) and vsync on.
-3. **Calibrate** from a live camera or a short clip filmed with it. Fix every warning and calibrate again:
+3. **Calibrate once** from a live camera or a short clip filmed with it, and save it by name. Fix every warning and calibrate again:
 
    ```sh
-   mb-framepacing camera-rig calibrate -d "<camera>" --mode 640x360@330 --input-format mjpeg -o desk.camera-rig.json
-   mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 -o desk.camera-rig.json   # a slow motion clip
+   mb-framepacing camera-rig calibrate -d "<camera>" --mode 640x360@330 --input-format mjpeg --name desk
+   mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk   # a slow motion clip
    ```
 
-4. **Capture** with the rig. Every capture verifies the rig first, then stores only the two straightened marker zones:
+4. **Capture** with the saved camera. Every capture verifies it first, then stores only the two straightened marker zones:
 
    ```sh
-   mb-framepacing capture -d "<camera>" --mode 640x360@330 --input-format mjpeg --camera desk.camera-rig.json --wait-for-start --stop-at-end --analyze
-   mb-framepacing import run.mp4 --recorded-fps 960 --camera desk.camera-rig.json --analyze
+   mb-framepacing capture -d "<camera>" --mode 640x360@330 --input-format mjpeg --camera desk --wait-for-start --stop-at-end --analyze
+   mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --analyze
    ```
 
-`mb-framepacing camera-rig verify --rig desk.camera-rig.json (-d "<camera>" | clip.mp4)` only runs the check.
+`camera-rig list` shows the saved cameras. `camera-rig delete <name>` removes one. `camera-rig verify --rig desk (-d "<camera>" |
+clip.mp4)` only runs the check. `--camera` and `--rig` also take a rig file path, and `calibrate --output <file>` writes one, for
+example to share a rig between machines.
 
 **Slow motion clips** are often stored at a playback rate such as 30 fps. `--recorded-fps` gives the rate they were really
 filmed at: frame _n_ is then timed at _n_ / rate and the file's timestamps are ignored. Calibration and verification warn when a
 clip claims less than 120 fps.
 
-**GUI:** open **Camera rig (very experimental)** on the Capture page. Tick **Film the screen with a calibrated high speed
-camera**, choose the camera or a clip as the source (and its recorded fps), press **Calibrate**, then **Start capture**. The rig
-file is written to `<capture folder>/camera-rigs`. The **Synthetic camera** source tries it all without hardware.
-
-![The capture page with the camera rig card during a synthetic camera capture](images/gui-camera.png)
+![The capture page with the camera card during a synthetic camera capture](images/gui-camera.png)
 
 ## Calibration checks
 

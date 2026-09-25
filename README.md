@@ -242,8 +242,8 @@ mb-framepacing import frames/ --timestamps times.csv      # ... or with exact ti
 mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
 mb-framepacing analyze <capture folder>                   # (re)analyse
 # VERY EXPERIMENTAL: a high speed camera filming the screen (doc/camera.md)
-mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 -o desk.camera-rig.json  # calibrate the mounted camera once
-mb-framepacing import run.mp4 --recorded-fps 960 --camera desk.camera-rig.json --analyze
+mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
+mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --analyze       # later: only verifies the saved camera
 mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
 ```
 

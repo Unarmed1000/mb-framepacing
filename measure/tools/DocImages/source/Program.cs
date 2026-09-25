@@ -130,24 +130,54 @@ namespace MB.FramePacing.DocImages
     }
 
     /// <summary>
-    /// The camera rig card (VERY EXPERIMENTAL): calibrate the synthetic camera, capture its rectified marker zones and show the capture page
-    /// while it records.
+    /// The camera wizard and card (VERY EXPERIMENTAL): set up the synthetic camera as a new camera (calibrate, save as "desk"), show that the
+    /// next wizard offers the saved camera, then capture its rectified marker zones.
     /// </summary>
     private static async Task RenderCameraAsync(MainWindow window, MainWindowViewModel viewModel, string output)
     {
       var capture = viewModel.Capture;
+      // Captures and saved cameras go to the automation folder, never to the example path shown in the screenshots
+      capture.OutputRoot = MB.FramePacing.Gui.Program.OutputRoot!;
       viewModel.SelectedTab = MainWindowViewModel.CaptureTab;
       capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.SyntheticCamera);
-      capture.Camera.UseCamera = true;
-      await capture.Camera.CalibrateCommand.ExecuteAsync(null);
-      if (string.IsNullOrEmpty(capture.Camera.RigPath))
-        throw new InvalidOperationException("The synthetic camera did not calibrate: " + capture.Camera.StatusText);
+
+      var wizard = capture.CreateCameraWizard();
+      var wizardWindow = new CameraWizardWindow { DataContext = wizard };
+      wizardWindow.Show();
+      wizard.IsNewCamera = true;
+      wizard.NextCommand.Execute(null); // mount
+      wizard.NextCommand.Execute(null); // source
+      wizard.SelectedSource = wizard.Sources.First(s => s.Kind == SourceKind.SyntheticCamera);
+      wizard.NextCommand.Execute(null); // calibrate
+      await wizard.CalibrateCommand.ExecuteAsync(null);
+      if (wizard.Rig == null)
+        throw new InvalidOperationException("The synthetic camera did not calibrate: " + wizard.StatusText + wizard.ErrorText);
+      // A fixed calibration time, so the images do not change with every run
+      wizard.Rig = wizard.Rig with
+      {
+        CreatedUtc = new DateTime(2026, 9, 23, 10, 0, 0, DateTimeKind.Utc),
+      };
+      await Task.Delay(300);
+      Save(wizardWindow, Path.Combine(output, "gui-camera-wizard.png"));
+      wizard.NextCommand.Execute(null); // save
+      wizard.RigName = "desk";
+      wizard.NextCommand.Execute(null); // done
+      wizard.NextCommand.Execute(null); // finish
+      capture.ApplyCameraWizardResult(wizard.Result ?? throw new InvalidOperationException("The wizard did not finish: " + wizard.ErrorText));
+
+      // The next time the saved camera is offered and calibration is skipped
+      var again = capture.CreateCameraWizard();
+      var againWindow = new CameraWizardWindow { DataContext = again };
+      againWindow.Show();
+      await Task.Delay(300);
+      Save(againWindow, Path.Combine(output, "gui-camera-wizard-saved.png"));
+      again.CancelCommand.Execute(null);
+
       foreach (var expander in window.GetVisualDescendants().OfType<Expander>())
       {
-        if (expander.Header is TextBlock { Text: { } header } && header.StartsWith("Camera rig", StringComparison.Ordinal))
+        if (expander.Header is TextBlock { Text: { } header } && header.StartsWith("Camera", StringComparison.Ordinal))
           expander.IsExpanded = true;
       }
-
       capture.StartCommand.Execute(null);
       try
       {
@@ -164,10 +194,7 @@ namespace MB.FramePacing.DocImages
         );
       }
       await Task.Delay(700);
-      // Neutral paths instead of this machine's temporary folders
-      string rigName = Path.GetFileName(capture.Camera.RigPath);
-      capture.Camera.RigPath = Path.Combine(ExampleCaptureRoot, "camera-rigs", "rig-20260923-120000.camera-rig.json");
-      capture.Camera.StatusText = capture.Camera.StatusText.Replace(rigName, "rig-20260923-120000.camera-rig.json", StringComparison.Ordinal);
+      capture.OutputRoot = ExampleCaptureRoot;
       Save(window, Path.Combine(output, "gui-camera.png"));
       capture.StopCommand.Execute(null);
       await WaitUntil(() => !capture.IsCapturing, TimeSpan.FromSeconds(60));

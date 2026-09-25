@@ -1,9 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The capture page's camera rig card (VERY EXPERIMENTAL camera support): a guided setup for filming the screen with a high speed camera on a
-//* fixed mount. Calibrate from the selected source (a live camera, a clip or the synthetic camera), keep the rig file, verify it before every
-//* capture.
+//* The capture page's camera card (VERY EXPERIMENTAL camera support): film the screen with a saved, calibrated camera. New cameras are set up
+//* in the camera wizard; saved ones are picked from the list, so calibration is skipped and every capture only verifies the camera.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -12,7 +11,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,44 +25,43 @@ namespace MB.FramePacing.Gui.ViewModels
   {
     public const string ExperimentalText = CameraRig.ExperimentalNotice;
 
-    public const string SetupSteps =
-      "1. Mount: put the camera on a tripod or arm at a fixed distance, roughly square to the screen, and do not touch it afterwards. Fix focus "
-      + "and exposure (no auto modes). Set the display to full brightness without strobing.\n"
-      + "2. Markers: the application draws the same marker in the TopLeft and BottomLeft slots, with vsync on. The camera must see both, at "
-      + "3 or more camera pixels per module.\n"
-      + "3. Calibrate: choose the camera (or a clip filmed with it) as the source and press Calibrate. Fix every warning and calibrate again.\n"
-      + "4. Capture: with 'Film the screen' on, every capture verifies the rig first and stores only the two straightened marker zones.";
-
-    private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
-    private readonly Func<string> m_rigDirectory;
-    private readonly Func<CancellationToken, ICaptureSource> m_createCameraSource;
+    private readonly Func<string> m_libraryDirectory;
+    private readonly Func<Task> m_openWizard;
+    private readonly Func<CancellationToken, ICaptureSource> m_openCameraSource;
 
-    /// <param name="rigDirectory">Where calibrated rig files are written.</param>
-    /// <param name="createCameraSource">Opens the selected source as whole camera frames (no region, no rectification).</param>
+    /// <param name="libraryDirectory">Where saved cameras live.</param>
+    /// <param name="openWizard">Opens the camera wizard (it updates this card when it finishes).</param>
+    /// <param name="openCameraSource">Opens the capture page's source as whole camera frames.</param>
     public CameraRigViewModel(
-      IDialogService dialogs,
       GuiSettings settings,
-      Func<string> rigDirectory,
-      Func<CancellationToken, ICaptureSource> createCameraSource
+      Func<string> libraryDirectory,
+      Func<Task> openWizard,
+      Func<CancellationToken, ICaptureSource> openCameraSource
     )
     {
-      m_dialogs = dialogs;
       m_settings = settings;
-      m_rigDirectory = rigDirectory;
-      m_createCameraSource = createCameraSource;
+      m_libraryDirectory = libraryDirectory;
+      m_openWizard = openWizard;
+      m_openCameraSource = openCameraSource;
       UseCamera = settings.UseCamera;
-      RigPath = settings.CameraRig ?? string.Empty;
       RecordedFpsText = settings.CameraRecordedFps ?? string.Empty;
+      ReloadLibrary(settings.CameraRig);
     }
 
-    public ObservableCollection<CameraCheckItem> Checks { get; } = new ObservableCollection<CameraCheckItem>();
+    public ObservableCollection<SavedCameraRig> SavedRigs { get; } = new ObservableCollection<SavedCameraRig>();
+
+    public bool HasSavedRigs => SavedRigs.Count > 0;
 
     [ObservableProperty]
     public partial bool UseCamera { get; set; }
 
     [ObservableProperty]
-    public partial string RigPath { get; set; }
+    [NotifyPropertyChangedFor(nameof(RigSummary))]
+    [NotifyCanExecuteChangedFor(nameof(VerifyCommand))]
+    public partial SavedCameraRig? SelectedRig { get; set; }
+
+    public string RigSummary => SelectedRig is { } saved ? CameraWizardViewModel.Describe(saved) : "No camera saved yet: set one up.";
 
     /// <summary>Video files: the rate a slow motion clip was really recorded at (empty = use the file's timestamps).</summary>
     [ObservableProperty]
@@ -74,9 +71,11 @@ namespace MB.FramePacing.Gui.ViewModels
     public partial string StatusText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CalibrateCommand))]
     [NotifyCanExecuteChangedFor(nameof(VerifyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SetUpCommand))]
     public partial bool IsBusy { get; set; }
+
+    public ObservableCollection<CameraCheckItem> Checks { get; } = new ObservableCollection<CameraCheckItem>();
 
     public double? RecordedFps
     {
@@ -90,15 +89,26 @@ namespace MB.FramePacing.Gui.ViewModels
       }
     }
 
-    /// <summary>The rig file to capture with; throws with a hint when there is none yet.</summary>
-    public CameraRig LoadRig()
+    /// <summary>Read the saved cameras again and select <paramref name="name"/> (or keep the selection).</summary>
+    public void ReloadLibrary(string? name = null)
     {
-      if (string.IsNullOrWhiteSpace(RigPath))
-        throw new InvalidOperationException("No camera rig yet: press Calibrate in the Camera rig card first.");
-      return CameraRig.Load(RigPath.Trim());
+      name ??= SelectedRig?.Name;
+      SavedRigs.Clear();
+      foreach (var saved in CameraRigLibrary.List(m_libraryDirectory()))
+        SavedRigs.Add(saved);
+      SelectedRig = SavedRigs.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase)) ?? SavedRigs.FirstOrDefault();
+      OnPropertyChanged(nameof(HasSavedRigs));
     }
 
-    /// <summary>Show checks (called from any thread by the capture before it starts).</summary>
+    /// <summary>The camera to capture with; throws with a hint when there is none.</summary>
+    public CameraRig LoadRig()
+    {
+      if (SelectedRig is not { } saved)
+        throw new InvalidOperationException("No camera is set up yet: press 'Set up camera...' in the Camera card.");
+      return saved.Rig ?? throw new InvalidOperationException($"The saved camera '{saved.Name}' can not be read: {saved.Error}");
+    }
+
+    /// <summary>Show checks (called by the capture before it starts).</summary>
     public void ShowChecks(IEnumerable<CameraCheck> checks, string status)
     {
       Checks.Clear();
@@ -107,71 +117,32 @@ namespace MB.FramePacing.Gui.ViewModels
       StatusText = status;
     }
 
-    [RelayCommand]
-    private async Task BrowseRigAsync()
-    {
-      var path = await m_dialogs.PickFileAsync($"Select a camera rig file (*{CameraRig.FileExtension})");
-      if (path != null)
-        RigPath = path;
-    }
-
     private bool CanRun() => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanRun))]
-    private async Task CalibrateAsync()
-    {
-      IsBusy = true;
-      ShowChecks(Array.Empty<CameraCheck>(), "Calibrating: finding both markers, measuring the scanout...");
-      try
-      {
-        var rig = await Task.Run(() =>
-        {
-          using var source = m_createCameraSource(CancellationToken.None);
-          return CameraCalibrator.Calibrate(source, new CameraCalibratorOptions(), CancellationToken.None);
-        });
-        if (rig.HasFailures)
-        {
-          ShowChecks(rig.Checks, "Calibration failed: fix the setup and calibrate again. No rig file was written.");
-          return;
-        }
-        var directory = m_rigDirectory();
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, $"rig-{DateTime.Now:yyyyMMdd-HHmmss}{CameraRig.FileExtension}");
-        rig.Save(path);
-        RigPath = path;
-        UseCamera = true;
-        string warnings = rig.Checks.Any(c => c.Level == CameraCheckLevel.Warn) ? " Fix the warnings for reliable results." : string.Empty;
-        ShowChecks(rig.Checks, $"Calibrated and saved as {Path.GetFileName(path)}.{warnings}");
-      }
-      catch (Exception ex)
-      {
-        ShowChecks(Array.Empty<CameraCheck>(), "Calibration failed: " + ex.Message);
-      }
-      finally
-      {
-        IsBusy = false;
-      }
-    }
+    private Task SetUpAsync() => m_openWizard();
 
-    [RelayCommand(CanExecute = nameof(CanRun))]
+    private bool CanVerify() => !IsBusy && SelectedRig?.Rig != null;
+
+    [RelayCommand(CanExecute = nameof(CanVerify))]
     private async Task VerifyAsync()
     {
       IsBusy = true;
-      ShowChecks(Array.Empty<CameraCheck>(), "Verifying the rig...");
+      ShowChecks(Array.Empty<CameraCheck>(), "Checking the camera against its saved calibration...");
       try
       {
         var rig = LoadRig();
         var checks = await Task.Run(() =>
         {
-          using var source = m_createCameraSource(CancellationToken.None);
+          using var source = m_openCameraSource(CancellationToken.None);
           return CameraCalibrator.Verify(rig, source, new CameraCalibratorOptions(), CancellationToken.None);
         });
         bool failed = checks.Any(c => c.Level == CameraCheckLevel.Fail);
-        ShowChecks(checks, failed ? "The camera or display moved: calibrate again." : "The rig still matches.");
+        ShowChecks(checks, failed ? "The camera or display moved: set the camera up again." : "The camera has not moved.");
       }
       catch (Exception ex)
       {
-        ShowChecks(Array.Empty<CameraCheck>(), "Verification failed: " + ex.Message);
+        ShowChecks(Array.Empty<CameraCheck>(), "Check failed: " + ex.Message);
       }
       finally
       {
@@ -182,7 +153,7 @@ namespace MB.FramePacing.Gui.ViewModels
     public void StoreSettings()
     {
       m_settings.UseCamera = UseCamera;
-      m_settings.CameraRig = RigPath;
+      m_settings.CameraRig = SelectedRig?.Name;
       m_settings.CameraRecordedFps = RecordedFpsText;
     }
   }

@@ -1,0 +1,77 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* Saving, listing, resolving and deleting calibrated cameras by name.
+//*
+//* (c) 2026 Mana Battery
+//****************************************************************************************************************************************************
+
+using System.IO;
+using System.Linq;
+using MB.FramePacing.Capture.Camera;
+using MB.FramePacing.Marker;
+using NUnit.Framework;
+
+namespace MB.FramePacing.Capture.UnitTest
+{
+  [TestFixture]
+  public class CameraRigLibraryTests
+  {
+    private static CameraRig Rig() =>
+      new CameraRig
+      {
+        CameraWidth = 640,
+        CameraHeight = 360,
+        CameraFps = 330,
+        Zones = new[] { new CameraZone(new Homography(4, 0, 10, 0, 4, 20, 0, 0), 4, 10, 220, 0, 0.9) },
+      };
+
+    [Test]
+    public void SaveListResolveDelete()
+    {
+      using var directory = new TempDirectory();
+
+      var path = CameraRigLibrary.Save(Rig(), "desk 27in", directory.Path);
+      CameraRigLibrary.Save(Rig(), "bench", directory.Path);
+
+      Assert.That(CameraRigLibrary.List(directory.Path).Select(r => r.Name), Is.EqualTo(new[] { "bench", "desk 27in" }));
+      Assert.That(CameraRigLibrary.Resolve("desk 27in", directory.Path), Is.EqualTo(path));
+      Assert.That(CameraRigLibrary.Resolve(path, directory.Path), Is.EqualTo(Path.GetFullPath(path)));
+      Assert.That(CameraRigLibrary.Load("desk 27in", directory.Path).Name, Is.EqualTo("desk 27in"));
+
+      CameraRigLibrary.Delete("bench", directory.Path);
+      Assert.That(CameraRigLibrary.List(directory.Path).Select(r => r.Name), Is.EqualTo(new[] { "desk 27in" }));
+    }
+
+    [Test]
+    public void Resolve_UnknownName_ListsTheSavedCameras()
+    {
+      using var directory = new TempDirectory();
+      CameraRigLibrary.Save(Rig(), "desk", directory.Path);
+
+      var error = Assert.Throws<FileNotFoundException>(() => CameraRigLibrary.Resolve("lab", directory.Path));
+
+      Assert.That(error!.Message, Does.Contain("desk"));
+    }
+
+    [Test]
+    public void List_ReportsUnreadableFiles()
+    {
+      using var directory = new TempDirectory();
+      File.WriteAllText(directory.File("broken" + CameraRig.FileExtension), "{ not json");
+
+      var entry = CameraRigLibrary.List(directory.Path).Single();
+
+      Assert.That(entry.Rig, Is.Null);
+      Assert.That(entry.Error, Is.Not.Empty);
+    }
+
+    [TestCase("desk", true)]
+    [TestCase("desk 27in_v2.1", true)]
+    [TestCase("", false)]
+    [TestCase(".hidden", false)]
+    [TestCase("a/b", false)]
+    [TestCase("a:b", false)]
+    public void IsValidName(string name, bool valid) => Assert.That(CameraRigLibrary.IsValidName(name), Is.EqualTo(valid));
+  }
+}

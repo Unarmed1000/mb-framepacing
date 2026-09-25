@@ -75,42 +75,38 @@
         <Border Classes="card" IsEnabled="{Binding IsIdle}">
           <Expander IsExpanded="{Binding Camera.UseCamera, Mode=OneTime}" HorizontalAlignment="Stretch">
             <Expander.Header>
-              <TextBlock Classes="cardTitle" Text="Camera rig (very experimental)" />
+              <TextBlock Classes="cardTitle" Text="Camera (very experimental)" />
             </Expander.Header>
             <StackPanel Spacing="8">
               <TextBlock Classes="warning" Text="{x:Static vm:CameraRigViewModel.ExperimentalText}" />
-              <CheckBox Content="Film the screen with a calibrated high speed camera" IsChecked="{Binding Camera.UseCamera}" />
-              <Expander Header="How to set up the camera (4 steps)" HorizontalAlignment="Stretch">
-                <TextBlock Classes="caption" Text="{x:Static vm:CameraRigViewModel.SetupSteps}" TextWrapping="Wrap" />
-              </Expander>
-              <StackPanel Spacing="6" IsVisible="{Binding Camera.UseCamera}">
-                <TextBlock Classes="caption" Text="Rig file" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                  <TextBox Text="{Binding Camera.RigPath}" PlaceholderText="calibrate to create one" />
-                  <Button Grid.Column="1" Content="Browse..." Command="{Binding Camera.BrowseRigCommand}" />
-                </Grid>
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                  <TextBlock Text="Recorded fps (slow motion clips)" VerticalAlignment="Center" />
-                  <TextBox Grid.Column="1" Text="{Binding Camera.RecordedFpsText}" PlaceholderText="empty = the clip's own timestamps" />
-                </Grid>
-                <Grid ColumnDefinitions="*,8,*">
-                  <Button
-                    Content="Calibrate"
-                    HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center"
-                    Command="{Binding Camera.CalibrateCommand}"
-                    ToolTip.Tip="Find both markers in the selected source, fit the camera geometry, measure the scanout and check the setup"
-                  />
-                  <Button
-                    Grid.Column="2"
-                    Content="Verify"
-                    HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center"
-                    Command="{Binding Camera.VerifyCommand}"
-                    ToolTip.Tip="Check that the camera still sees the markers where it was calibrated"
-                  />
-                </Grid>
-              </StackPanel>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <Button
+                  Classes="accent"
+                  Content="Set up camera..."
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center"
+                  Command="{Binding Camera.SetUpCommand}"
+                  ToolTip.Tip="Pick a saved camera, or mount, calibrate and save a new one"
+                />
+                <Button
+                  Grid.Column="1"
+                  Content="Verify"
+                  Command="{Binding Camera.VerifyCommand}"
+                  ToolTip.Tip="Check that the camera still sees the markers where it was calibrated"
+                />
+              </Grid>
+              <CheckBox Content="Film the screen with this camera" IsChecked="{Binding Camera.UseCamera}" IsEnabled="{Binding Camera.HasSavedRigs}" />
+              <ComboBox
+                ItemsSource="{Binding Camera.SavedRigs}"
+                SelectedItem="{Binding Camera.SelectedRig}"
+                HorizontalAlignment="Stretch"
+                IsVisible="{Binding Camera.HasSavedRigs}"
+              />
+              <TextBlock Classes="caption" Text="{Binding Camera.RigSummary}" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding Camera.UseCamera}">
+                <TextBlock Text="Recorded fps (slow motion clips)" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Camera.RecordedFpsText}" PlaceholderText="empty = the clip's own timestamps" />
+              </Grid>
               <TextBlock
                 Classes="caption"
                 Text="{Binding Camera.StatusText}"

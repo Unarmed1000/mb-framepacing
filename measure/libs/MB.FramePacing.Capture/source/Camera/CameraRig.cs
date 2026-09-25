@@ -35,6 +35,9 @@ namespace MB.FramePacing.Capture.Camera
     /// <summary>Written into every rig file so nobody mistakes it for a validated setup.</summary>
     public string Experimental { get; init; } = ExperimentalNotice;
 
+    /// <summary>The name the rig is saved under in the camera library (<see cref="CameraRigLibrary"/>), if any.</summary>
+    public string? Name { get; init; }
+
     public DateTime CreatedUtc { get; init; }
 
     /// <summary>What was calibrated (device name or clip path), for people.</summary>

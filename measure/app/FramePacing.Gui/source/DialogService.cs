@@ -53,6 +53,12 @@ namespace MB.FramePacing.Gui
       return m_topLevel is Window owner ? await window.ShowDialog<bool>(owner) : false;
     }
 
+    public async Task<bool> ShowCameraWizardAsync(ViewModels.CameraWizardViewModel viewModel)
+    {
+      var window = new Views.CameraWizardWindow { DataContext = viewModel };
+      return m_topLevel is Window owner ? await window.ShowDialog<bool>(owner) : false;
+    }
+
     public void ShowInFileManager(string directory)
     {
       if (Directory.Exists(directory))

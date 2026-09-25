@@ -67,10 +67,10 @@ namespace MB.FramePacing.Gui.ViewModels
       foreach (var item in g_otherSources)
         Devices.Add(item);
       SelectedDevice = Devices.First(d => d.Kind == SourceKind.Synthetic);
-      Camera = new CameraRigViewModel(dialogs, settings, () => Path.Combine(OutputRoot, "camera-rigs"), CreateCameraSource);
+      Camera = new CameraRigViewModel(settings, CameraLibraryDirectory, OpenCameraWizardAsync, token => OpenCameraSource(CurrentChoice(), token));
     }
 
-    /// <summary>The camera rig card (VERY EXPERIMENTAL).</summary>
+    /// <summary>The camera card (VERY EXPERIMENTAL).</summary>
     public CameraRigViewModel Camera { get; }
 
     public event Action<string>? CaptureCompleted;
@@ -159,7 +159,7 @@ namespace MB.FramePacing.Gui.ViewModels
           "A folder of frames (png, jpg, bmp, ...), in name order at the given frame rate, or with exact times from a CSV (fileName,timeMs).",
         SourceKind.Stream => "A live stream ffmpeg can open: rtsp://, srt://, udp://, http(s)://. Stop it with Stop or a duration.",
         SourceKind.SyntheticCamera =>
-          "VERY EXPERIMENTAL: the synthetic game (60 Hz) filmed by a simulated 1000 fps camera at an angle. Calibrate it in the Camera rig card, then capture.",
+          "VERY EXPERIMENTAL: the synthetic game (60 Hz) filmed by a simulated 1000 fps camera at an angle. Set it up with Set up camera... in the Camera card, then capture.",
         _ => "Records the capture card through ffmpeg. The defaults use the device's own mode; open Advanced to choose one.",
       };
 
@@ -401,13 +401,13 @@ namespace MB.FramePacing.Gui.ViewModels
       if (device?.Kind == SourceKind.SyntheticCamera)
       {
         if (!Camera.UseCamera)
-          throw new InvalidOperationException("The synthetic camera needs a camera rig: press Calibrate in the Camera rig card first.");
+          throw new InvalidOperationException("The synthetic camera needs a camera: press Set up camera... in the Camera card first.");
         var syntheticRig = VerifyRig(new SyntheticCameraSource(CreateSyntheticCamera()), cancellationToken);
         runOptions = runOptions with { Camera = syntheticRig };
         return new RectifyingCaptureSource(new SyntheticCameraSource(CreateSyntheticCamera()), syntheticRig);
       }
 
-      var ffmpegOptions = CreateFfmpegOptions(device, runOptions.OutputDirectory);
+      var ffmpegOptions = CreateFfmpegOptions(CurrentChoice() with { Source = device ?? Devices[0] }, runOptions.OutputDirectory);
       if (ffmpegOptions != null && Camera.UseCamera)
       {
         // EXPERIMENTAL camera capture: check the camera still sees the markers where it was calibrated, then store the rectified zones
@@ -469,16 +469,65 @@ namespace MB.FramePacing.Gui.ViewModels
       }
     }
 
-    /// <summary>The selected source as whole camera frames, for calibrating or verifying the camera rig.</summary>
-    private ICaptureSource CreateCameraSource(CancellationToken cancellationToken)
+    /// <summary>The capture page's source as the camera wizard and the camera card see it.</summary>
+    public CameraSourceChoice CurrentChoice()
     {
-      var device = SelectedDevice;
-      if (device?.Kind == SourceKind.SyntheticCamera)
+      double? recordedFps;
+      try
+      {
+        recordedFps = Camera?.RecordedFps;
+      }
+      catch (FormatException)
+      {
+        recordedFps = null;
+      }
+      return new CameraSourceChoice(SelectedDevice ?? Devices[0], MediaPath, ModeText, InputFormat, recordedFps);
+    }
+
+    /// <summary>A source as whole camera frames, for calibrating or verifying a camera rig.</summary>
+    private ICaptureSource OpenCameraSource(CameraSourceChoice choice, CancellationToken cancellationToken)
+    {
+      if (choice.Source.Kind == SourceKind.SyntheticCamera)
         return new SyntheticCameraSource(CreateSyntheticCamera());
       var options =
-        CreateFfmpegOptions(device, Path.Combine(Path.GetTempPath(), "mb-framepacing-camera"))
+        CreateFfmpegOptions(choice, Path.Combine(Path.GetTempPath(), "mb-framepacing-camera"))
         ?? throw new InvalidOperationException("Choose the camera (a capture device), a clip filmed with it or the synthetic camera as the source.");
       return FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(30));
+    }
+
+    /// <summary>Saved cameras: the shared library, or a folder in the output root for demo and automation runs (never the user's library).</summary>
+    private string CameraLibraryDirectory() =>
+      Program.OutputRoot != null ? Path.Combine(Program.OutputRoot, CameraRigLibrary.DirectoryName)
+      : Program.Demo ? Path.Combine(DefaultOutputRoot(), CameraRigLibrary.DirectoryName)
+      : CameraRigLibrary.DefaultDirectory;
+
+    /// <summary>Open the camera rig wizard; when it finishes the capture page films with the chosen camera.</summary>
+    private async Task OpenCameraWizardAsync()
+    {
+      var wizard = CreateCameraWizard();
+      if (await m_dialogs.ShowCameraWizardAsync(wizard) && wizard.Result is { } result)
+        ApplyCameraWizardResult(result);
+    }
+
+    /// <summary>A camera rig wizard for the capture page's sources, starting from its current source.</summary>
+    public CameraWizardViewModel CreateCameraWizard() =>
+      new CameraWizardViewModel(m_dialogs, CameraLibraryDirectory(), Devices, CurrentChoice(), OpenCameraSource);
+
+    /// <summary>Capture with the camera and source the wizard set up.</summary>
+    public void ApplyCameraWizardResult(CameraWizardResult result)
+    {
+      var source = result.Source;
+      SelectedDevice = Devices.FirstOrDefault(d => d.Title == source.Source.Title) ?? SelectedDevice;
+      if (source.Source.Kind is SourceKind.VideoFile or SourceKind.ImageFolder or SourceKind.Stream)
+        MediaPath = source.MediaPath;
+      if (source.Source.Kind == SourceKind.Device)
+      {
+        ModeText = source.ModeText;
+        InputFormat = source.InputFormat;
+      }
+      Camera.RecordedFpsText = source.RecordedFps is { } fps ? fps.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty;
+      Camera.ReloadLibrary(result.RigName);
+      Camera.UseCamera = true;
     }
 
     /// <summary>The synthetic camera: the 60 Hz synthetic game with stalls and skips, filmed at an angle by a simulated 1000 fps camera.</summary>
@@ -502,13 +551,16 @@ namespace MB.FramePacing.Gui.ViewModels
     /// The ffmpeg options for the selected capture device, video file, image folder or stream, without crop and scale; null for the synthetic
     /// game. An image folder writes its ffconcat list into <paramref name="workDirectory"/>.
     /// </summary>
-    private FfmpegCaptureOptions? CreateFfmpegOptions(DeviceItem? device, string workDirectory)
+    private FfmpegCaptureOptions? CreateFfmpegOptions(CameraSourceChoice choice, string workDirectory)
     {
-      if (device?.Kind is SourceKind.VideoFile or SourceKind.ImageFolder or SourceKind.Stream)
+      var device = choice.Source;
+      if (device.Kind is SourceKind.VideoFile or SourceKind.ImageFolder or SourceKind.Stream)
       {
         var ffmpegPath = m_ffmpeg ?? throw new InvalidOperationException("ffmpeg is not set up. Open Settings to set it up.");
-        if (string.IsNullOrWhiteSpace(MediaPath))
-          throw new InvalidOperationException($"Choose the {MediaPathLabel.ToLowerInvariant()} first.");
+        if (string.IsNullOrWhiteSpace(choice.MediaPath))
+          throw new InvalidOperationException(
+            $"Choose the {(device.Kind == SourceKind.ImageFolder ? "folder with the images" : device.Kind == SourceKind.VideoFile ? "video file" : "stream URL")} first."
+          );
         double? fps = null;
         if (device.Kind == SourceKind.ImageFolder && string.IsNullOrWhiteSpace(TimestampFile))
         {
@@ -517,26 +569,26 @@ namespace MB.FramePacing.Gui.ViewModels
           fps = parsed;
         }
         var media = MediaInput.Create(
-          MediaPath.Trim(),
+          choice.MediaPath.Trim(),
           new MediaInputOptions
           {
             Fps = fps,
             TimestampFile = string.IsNullOrWhiteSpace(TimestampFile) ? null : TimestampFile.Trim(),
-            RecordedFps = device.Kind == SourceKind.VideoFile ? Camera.RecordedFps : null,
+            RecordedFps = device.Kind == SourceKind.VideoFile ? choice.RecordedFps : null,
           },
           workDirectory
         );
         return media.ToCaptureOptions(ffmpegPath);
       }
 
-      if (device?.Device is not { } captureDevice)
+      if (device.Device is not { } captureDevice)
         return null;
       return new FfmpegCaptureOptions
       {
         FfmpegPath = m_ffmpeg ?? throw new InvalidOperationException("ffmpeg is not set up. Open Settings to set it up."),
         Device = captureDevice,
-        Mode = string.IsNullOrWhiteSpace(ModeText) ? default : RequestedMode.Parse(ModeText.Trim()),
-        InputFormat = string.IsNullOrWhiteSpace(InputFormat) ? null : InputFormat.Trim(),
+        Mode = string.IsNullOrWhiteSpace(choice.ModeText) ? default : RequestedMode.Parse(choice.ModeText.Trim()),
+        InputFormat = string.IsNullOrWhiteSpace(choice.InputFormat) ? null : choice.InputFormat.Trim(),
       };
     }
 
@@ -564,14 +616,14 @@ namespace MB.FramePacing.Gui.ViewModels
       ErrorText = string.Empty;
       IsLocating = true;
       LocateText = "Looking for the marker...";
-      var device = SelectedDevice;
+      var choice = CurrentChoice();
       try
       {
         var workDirectory = Path.Combine(Path.GetTempPath(), "mb-framepacing-locate");
         var result = await Task.Run(() =>
         {
           var options =
-            CreateFfmpegOptions(device, workDirectory)
+            CreateFfmpegOptions(choice, workDirectory)
             ?? throw new InvalidOperationException("The synthetic sources need no region; choose a capture device or a file.");
           return FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, CancellationToken.None);
         });

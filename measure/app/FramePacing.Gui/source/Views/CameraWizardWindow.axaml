@@ -1,0 +1,188 @@
+<Window
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  x:Class="MB.FramePacing.Gui.Views.CameraWizardWindow"
+  x:DataType="vm:CameraWizardViewModel"
+  Title="Set up a high speed camera (very experimental)"
+  Width="700"
+  Height="660"
+  CanResize="False"
+  CanMinimize="False"
+  CanMaximize="False"
+  WindowStartupLocation="CenterOwner"
+>
+  <DockPanel Margin="24">
+    <!-- Header: where we are -->
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
+      <TextBlock Classes="caption" Text="{Binding StepText}" />
+      <TextBlock Classes="title" Text="{Binding StepTitle}" />
+      <TextBlock Classes="warning" FontSize="12" Text="{Binding ExperimentalText}" />
+    </StackPanel>
+
+    <!-- Footer: navigation -->
+    <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,16,0,0">
+      <TextBlock Classes="error" Text="{Binding ErrorText}" IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+        <Button Content="Cancel" Command="{Binding CancelCommand}" />
+        <Button Grid.Column="2" Content="Back" Command="{Binding BackCommand}" MinWidth="90" HorizontalContentAlignment="Center" />
+        <Button
+          Grid.Column="3"
+          Classes="accent"
+          Content="{Binding NextText}"
+          Command="{Binding NextCommand}"
+          MinWidth="90"
+          HorizontalContentAlignment="Center"
+        />
+      </Grid>
+    </StackPanel>
+
+    <ScrollViewer>
+      <Panel>
+        <!-- 1. Saved or new camera -->
+        <StackPanel Spacing="12" IsVisible="{Binding IsChooseStep}">
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <RadioButton GroupName="camera" Content="Use a saved camera" IsChecked="{Binding IsSavedCamera}" IsEnabled="{Binding HasSavedRigs}" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasSavedRigs}" Margin="28,0,0,0">
+                <ComboBox ItemsSource="{Binding SavedRigs}" SelectedItem="{Binding SelectedSavedRig}" HorizontalAlignment="Stretch" />
+                <Button Grid.Column="1" Content="Delete" Command="{Binding DeleteSavedRigCommand}" ToolTip.Tip="Delete this saved camera" />
+              </Grid>
+              <TextBlock Classes="caption" Margin="28,0,0,0" TextWrapping="Wrap" Text="{Binding SavedRigSummary}" />
+              <TextBlock
+                Classes="caption"
+                Margin="28,0,0,0"
+                TextWrapping="Wrap"
+                IsVisible="{Binding !HasSavedRigs}"
+                Text="No cameras are saved yet. Set one up once; after that it is picked here and calibration is skipped."
+              />
+            </StackPanel>
+          </Border>
+          <Border Classes="card">
+            <StackPanel Spacing="4">
+              <RadioButton GroupName="camera" Content="Set up a new camera" IsChecked="{Binding IsNewCamera}" />
+              <TextBlock
+                Classes="caption"
+                Margin="28,0,0,0"
+                TextWrapping="Wrap"
+                Text="Mount it, calibrate it once and save it under a name. Recalibrate whenever the camera, the lens or the display moves."
+              />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- 2. Mount (new camera) -->
+        <Border Classes="card" IsVisible="{Binding IsMountStep}">
+          <StackPanel Spacing="10">
+            <TextBlock TextWrapping="Wrap" Text="Before calibrating, check that:" />
+            <ItemsControl ItemsSource="{x:Static vm:CameraWizardViewModel.MountChecklist}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Grid ColumnDefinitions="20,*" Margin="0,3">
+                    <TextBlock Text="•" />
+                    <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="doc/camera.md explains every requirement and check." />
+          </StackPanel>
+        </Border>
+
+        <!-- 3. Source -->
+        <Border Classes="card" IsVisible="{Binding IsSourceStep}">
+          <StackPanel Spacing="10">
+            <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" HorizontalAlignment="Stretch" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding SourceHint}" />
+            <StackPanel Spacing="6" IsVisible="{Binding IsMediaSource}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBox Text="{Binding MediaPath}" PlaceholderText="clip, folder or rtsp://..." />
+                <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseMediaCommand}" />
+              </Grid>
+            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding IsVideoFile}">
+              <TextBlock Text="Recorded fps (slow motion clips)" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding RecordedFpsText}" PlaceholderText="empty = the clip's own timestamps" />
+            </Grid>
+            <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding IsDeviceSource}">
+              <TextBox Text="{Binding ModeText}" PlaceholderText="mode, e.g. 640x360@330" />
+              <TextBox Grid.Column="2" Text="{Binding InputFormat}" PlaceholderText="format, e.g. mjpeg" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- 4. Calibrate (new camera) -->
+        <Border Classes="card" IsVisible="{Binding IsCalibrateStep}">
+          <StackPanel Spacing="10">
+            <TextBlock
+              TextWrapping="Wrap"
+              Text="Run the application with both markers and vsync on, then calibrate. It reads about two seconds of camera frames."
+            />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Classes="accent" Content="Calibrate" Command="{Binding CalibrateCommand}" />
+              <ProgressBar IsIndeterminate="True" Width="120" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock TextWrapping="Wrap" Text="{Binding StatusText}" />
+            <ItemsControl ItemsSource="{Binding Checks}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CameraCheckItem">
+                  <TextBlock
+                    Text="{Binding Text}"
+                    FontSize="12"
+                    TextWrapping="Wrap"
+                    Margin="0,2"
+                    Classes.ok="{Binding IsPass}"
+                    Classes.warning="{Binding IsWarn}"
+                    Classes.error="{Binding IsFail}"
+                  />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- 5. Save (new camera) -->
+        <Border Classes="card" IsVisible="{Binding IsSaveStep}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Name" />
+            <TextBox Text="{Binding RigName}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding RigNameHint}" />
+          </StackPanel>
+        </Border>
+
+        <!-- 3b. Verify (saved camera) -->
+        <Border Classes="card" IsVisible="{Binding IsVerifyStep}">
+          <StackPanel Spacing="10">
+            <TextBlock TextWrapping="Wrap" Text="{Binding SavedRigSummary}" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Classes="accent" Content="Check now" Command="{Binding VerifyCommand}" />
+              <ProgressBar IsIndeterminate="True" Width="120" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Optional: every capture checks the camera before it starts." />
+            <TextBlock TextWrapping="Wrap" Text="{Binding StatusText}" />
+            <ItemsControl ItemsSource="{Binding Checks}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CameraCheckItem">
+                  <TextBlock
+                    Text="{Binding Text}"
+                    FontSize="12"
+                    TextWrapping="Wrap"
+                    Margin="0,2"
+                    Classes.ok="{Binding IsPass}"
+                    Classes.warning="{Binding IsWarn}"
+                    Classes.error="{Binding IsFail}"
+                  />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- Done -->
+        <Border Classes="card" IsVisible="{Binding IsDoneStep}">
+          <TextBlock TextWrapping="Wrap" Text="{Binding DoneText}" />
+        </Border>
+      </Panel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

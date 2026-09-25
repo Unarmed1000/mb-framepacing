@@ -91,6 +91,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - Every place users meet it says "very experimental": CLI help, the GUI card, `CameraRig.ExperimentalNotice` in rig files and
     analysis warnings, docs. Keep it that way until it is validated with real hardware, and keep the Status table in
     `doc/camera.md` current.
+  - Saved cameras: `CameraRigLibrary` (`camera-rigs/` next to the config file; demo/automation GUI runs use their output root, never
+    the user's library). GUI: `CameraWizardViewModel` + `CameraWizardWindow` (the wizard), `CameraRigViewModel` (the capture page card).
   - `Capture/source/Camera/`: `CameraCalibrator` (calibrate/verify), `CameraRig`/`CameraZone` (the rig file), `CameraRectifier` and
     `RectifyingCaptureSource` (C# path). `FfmpegCommandBuilder.BuildCameraFilter` is the ffmpeg path; both produce the same layout:
     zones of `CameraZone.StoredSizePx` stacked in scanout order.

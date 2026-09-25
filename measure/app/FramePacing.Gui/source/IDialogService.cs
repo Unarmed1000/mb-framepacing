@@ -29,5 +29,8 @@ namespace MB.FramePacing.Gui
 
     /// <summary>Show the setup dialog. True when the user saved the settings.</summary>
     Task<bool> ShowSetupAsync(ViewModels.SetupViewModel viewModel);
+
+    /// <summary>Show the camera rig wizard (VERY EXPERIMENTAL). True when a camera was set up or chosen.</summary>
+    Task<bool> ShowCameraWizardAsync(ViewModels.CameraWizardViewModel viewModel);
   }
 }
