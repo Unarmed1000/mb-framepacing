@@ -4,10 +4,8 @@
 > Camera capture is **VERY EXPERIMENTAL**. How to use it: [camera.md](camera.md). This page records what exists, how each part
 > was checked, what is known to be missing, and what to do next. Keep it current with every camera change.
 
-Status on 2026-09-25, branch `feature/high-speed-camera` (not merged, not pushed). Commits:
-
-- `bf10f9c` High speed camera capture (very experimental)
-- `d0a078a` Camera capture: camera wizard and saved cameras (very experimental)
+Status on 2026-09-26: merged into `master` as very experimental (PR #2). CI passes on Windows, Ubuntu and macOS. Validation
+with real hardware is still pending (next steps 1–3).
 
 ## Summary
 
@@ -77,7 +75,8 @@ In priority order:
 7. **OpenCV** (OpenCvSharp4, Apache-2.0; not Emgu CV), only if real footage shows the need:
    - lens calibration with a full-screen ChArUco board, if per-zone transforms are not accurate enough;
    - exposure and focus control on Windows and Linux.
-8. **Merge:** once steps 1–2 give credible numbers, review the branch, keep the "very experimental" labels, and merge.
+8. **Drop "very experimental":** merged early with the labels on (PR #2). Once steps 1–3 give credible numbers, review the
+   results and decide whether the labels can be softened.
 
 ## Where things are
 
