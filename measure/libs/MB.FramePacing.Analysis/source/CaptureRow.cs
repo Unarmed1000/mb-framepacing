@@ -11,6 +11,7 @@ using MB.FramePacing.Marker;
 namespace MB.FramePacing.Analysis
 {
   /// <param name="CaptureIndex">The capture card's frame counter. Unrelated to <see cref="MarkerPayload.FrameIndex"/>.</param>
+  /// <param name="SecondaryFrameIndex">EXPERIMENTAL camera captures: the frame index the second (lower) zone shows, if it decoded.</param>
   /// <param name="CaptureTicks">The capture time used for analysis (device or host clock, TimeSpan ticks). Unknown for NotRecorded rows.</param>
   public readonly record struct CaptureRow(
     long CaptureIndex,
@@ -18,7 +19,8 @@ namespace MB.FramePacing.Analysis
     CaptureStatus Status,
     MarkerPayload Payload,
     StartMetadata? Start = null,
-    bool SourceDropBefore = false
+    bool SourceDropBefore = false,
+    ulong? SecondaryFrameIndex = null
   )
   {
     public bool IsDecoded => Status == CaptureStatus.Decoded;

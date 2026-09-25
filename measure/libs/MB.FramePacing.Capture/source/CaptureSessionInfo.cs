@@ -10,6 +10,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MB.FramePacing.Capture.Camera;
 
 namespace MB.FramePacing.Capture
 {
@@ -42,11 +43,21 @@ namespace MB.FramePacing.Capture
     public uint? SequenceRunId { get; init; }
     public string? SequenceName { get; init; }
 
+    /// <summary>The real recording rate of a slow motion clip, when the timestamps were generated from it.</summary>
+    public double? RecordedFps { get; init; }
+
+    /// <summary>
+    /// EXPERIMENTAL: set for a camera capture. The frames are the rig's rectified zones stacked in scanout order, and the analysis treats
+    /// differing zones as scanout progress instead of tearing.
+    /// </summary>
+    public CameraRig? Camera { get; init; }
+
     private static readonly JsonSerializerOptions g_jsonOptions = new JsonSerializerOptions
     {
       WriteIndented = true,
       PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
       DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+      Converters = { new JsonStringEnumConverter() },
     };
 
     public void Save(string directory) => File.WriteAllText(Path.Combine(directory, FileName), JsonSerializer.Serialize(this, g_jsonOptions));

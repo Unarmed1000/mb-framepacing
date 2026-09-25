@@ -23,6 +23,7 @@ namespace MB.FramePacing.Analysis
     long? AnimationDeltaTicks,
     long? AnimationErrorTicks,
     long DriftTicks,
-    PresentedFrameFlags Flags
+    PresentedFrameFlags Flags,
+    long? FirstSeenSecondaryTicks = null
   );
 }

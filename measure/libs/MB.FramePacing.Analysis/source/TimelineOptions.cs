@@ -13,6 +13,9 @@ namespace MB.FramePacing.Analysis
     /// <summary>A backwards application frame index jump larger than this starts a new segment (application restart).</summary>
     public ulong RestartThresholdFrames { get; init; } = 1000;
 
+    /// <summary>How a capture relates to the scanout (EXPERIMENTAL: Camera).</summary>
+    public ScanoutModel Scanout { get; init; } = ScanoutModel.SingleScanout;
+
     /// <summary>Only analyse this run id (null = all runs).</summary>
     public uint? RunId { get; init; }
   }

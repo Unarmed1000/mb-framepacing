@@ -185,6 +185,9 @@ namespace MB.FramePacing.Analysis
       public int CaptureCount;
       public ulong SkippedBefore;
       public bool UncertainStart;
+      public int GapCaptures;
+      public long? FirstSeenSecondaryTicks;
+      public bool Torn;
     }
 
     private static RunAnalysis AnalyzeRun(RunRows run, long period, TimelineOptions options)
@@ -204,25 +207,33 @@ namespace MB.FramePacing.Analysis
       FrameBuilder? current = null;
       int segment = 0;
       bool gapSinceLastFrame = false;
+      int gapCaptures = 0;
+      bool camera = options.Scanout == ScanoutModel.Camera;
+      var firstSecondary = new Dictionary<ulong, long>();
 
       for (int i = 0; i <= lastDecoded; ++i)
       {
         var row = rows[i];
         if (row.SourceDropBefore)
           ++sourceDrops;
+        if (camera && row.SecondaryFrameIndex is { } secondaryIndex && row.Status != CaptureStatus.NotRecorded)
+          firstSecondary.TryAdd(secondaryIndex, row.CaptureTicks);
         switch (row.Status)
         {
           case CaptureStatus.Undecodable:
             ++undecodable;
             gapSinceLastFrame = true;
+            ++gapCaptures;
             continue;
           case CaptureStatus.Torn:
             ++torn;
             gapSinceLastFrame = true;
+            ++gapCaptures;
             continue;
           case CaptureStatus.NotRecorded:
             ++notRecorded;
             gapSinceLastFrame = true;
+            ++gapCaptures;
             continue;
         }
         ++decoded;
@@ -232,6 +243,7 @@ namespace MB.FramePacing.Analysis
           current.LastSeenTicks = row.CaptureTicks;
           current.CaptureCount++;
           gapSinceLastFrame = false;
+          gapCaptures = 0;
           continue;
         }
 
@@ -266,8 +278,10 @@ namespace MB.FramePacing.Analysis
           CaptureCount = 1,
           SkippedBefore = builders.Count > 0 && builders[^1].Segment == segment ? skipped : 0,
           UncertainStart = gapSinceLastFrame,
+          GapCaptures = gapCaptures,
         };
         gapSinceLastFrame = false;
+        gapCaptures = 0;
         builders.Add(current);
       }
 
@@ -288,6 +302,7 @@ namespace MB.FramePacing.Analysis
         }
       }
 
+      var cameraStatistics = camera ? AnalyzeCamera(builders, firstSecondary, period, warnings) : null;
       var frames = BuildFrames(builders, period);
       var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
       var statistics = new RunStatistics(
@@ -315,7 +330,81 @@ namespace MB.FramePacing.Analysis
         warnings.Add("The capture period could not be determined; animation error thresholds are unavailable");
       if (SlowCaptureWarning(frames, period) is { } slowCapture)
         warnings.Add(slowCapture);
-      return new RunAnalysis(run.RunId, run.Name, run.StartTimeUtc, run.HasStart, run.HasEnd, counts, statistics, frames, warnings);
+      return new RunAnalysis(run.RunId, run.Name, run.StartTimeUtc, run.HasStart, run.HasEnd, counts, statistics, frames, warnings, cameraStatistics);
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL camera captures. The scanout reaches the second (lower) zone a roughly constant time after the timing zone. A frame that
+    /// reaches the second zone clearly earlier than that was presented while the scanout was between the zones (vsync off): the camera saw a
+    /// tear. Frame indices only the second zone shows were replaced before the next scanout reached the timing zone. Frames normally follow a
+    /// few undecodable captures (the scanout crossing the marker, the panel switching), so a start only counts as uncertain when the gap is
+    /// clearly longer than usual.
+    /// </summary>
+    private static CameraRunStatistics AnalyzeCamera(
+      List<FrameBuilder> builders,
+      Dictionary<ulong, long> firstSecondary,
+      long period,
+      List<string> warnings
+    )
+    {
+      var delays = new List<long>();
+      foreach (var builder in builders)
+      {
+        if (firstSecondary.TryGetValue(builder.FrameIndex, out long secondary))
+        {
+          builder.FirstSeenSecondaryTicks = secondary;
+          delays.Add(secondary - builder.FirstSeenTicks);
+        }
+      }
+
+      long typical = Median(delays);
+      long tornFrames = 0;
+      if (delays.Count >= 3 && period > 0 && typical > 4 * period)
+      {
+        long margin = Math.Max(3 * period, typical / 2);
+        foreach (var builder in builders)
+        {
+          if (builder.FirstSeenSecondaryTicks is { } secondary && secondary - builder.FirstSeenTicks < typical - margin)
+          {
+            builder.Torn = true;
+            ++tornFrames;
+          }
+        }
+      }
+      else if (delays.Count >= 3)
+      {
+        warnings.Add(
+          "Camera capture: the scanout reaches both marker zones less than 4 camera frames apart, so tears between them can not be told apart. "
+            + "Film at a higher frame rate or keep the zones further apart."
+        );
+      }
+
+      long secondZoneOnly = 0;
+      if (builders.Count > 1)
+      {
+        var seen = builders.Select(b => b.FrameIndex).ToHashSet();
+        ulong first = builders.Min(b => b.FrameIndex);
+        ulong last = builders.Max(b => b.FrameIndex);
+        secondZoneOnly = firstSecondary.Keys.LongCount(k => k > first && k < last && !seen.Contains(k));
+      }
+
+      var gaps = builders.Skip(1).Select(b => (long)b.GapCaptures).ToList();
+      long usualGap = Median(gaps);
+      foreach (var builder in builders)
+        builder.UncertainStart = builder.GapCaptures > usualGap + 2;
+
+      var normal = builders
+        .Where(b => b.FirstSeenSecondaryTicks.HasValue && !b.Torn)
+        .Select(b => b.FirstSeenSecondaryTicks!.Value - b.FirstSeenTicks);
+      return new CameraRunStatistics(Statistics.FromTicks(normal), delays.Count, tornFrames, secondZoneOnly);
+    }
+
+    private static long Median(List<long> values)
+    {
+      if (values.Count == 0)
+        return 0;
+      var sorted = values.OrderBy(v => v).ToList();
+      return sorted[sorted.Count / 2];
     }
 
     /// <summary>
@@ -374,6 +463,8 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.SkippedBefore;
         if (b.UncertainStart && hasPrevious)
           flags |= PresentedFrameFlags.UncertainStart;
+        if (b.Torn)
+          flags |= PresentedFrameFlags.Torn;
 
         frames.Add(
           new PresentedFrame(
@@ -390,7 +481,8 @@ namespace MB.FramePacing.Analysis
             animationDelta,
             displayDelta.HasValue ? animationDelta!.Value - displayDelta.Value : null,
             (b.AnimationTicks - first.AnimationTicks) - (b.FirstSeenTicks - first.FirstSeenTicks),
-            flags
+            flags,
+            b.FirstSeenSecondaryTicks
           )
         );
       }

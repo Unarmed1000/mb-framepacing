@@ -169,7 +169,12 @@ sees.
 **Variable refresh (G-Sync/FreeSync) is not supported through a capture card.** Cards pass variable refresh through to the monitor
 but record at a constant frame rate, taking the newest frame at each tick, so the capture does not show when the display showed
 each frame. Turn variable refresh off for a capture card measurement. A high speed camera filming the screen does see the real
-display timing, variable refresh included; import its recording.
+display timing, variable refresh included. That is **very experimental**: see [camera capture](camera.md).
+
+**Camera capture (very experimental)** needs the same frame marker in the **TopLeft and BottomLeft** slots (drawing MiddleLeft as
+well is fine), at a fixed position, with at least 3 camera pixels per module. The camera sees the two zones at different times
+while the scanout rolls down the screen. The analysis uses that to measure the scanout and to find tears, instead of treating
+different markers in one camera frame as tearing.
 
 **Vsync off** is not recommended. With vsync off, one refresh shows slices of several frames; the marker then only
 reports the frame at the top of the screen, frames shown only lower down are never seen, and the numbers are easy to misread.

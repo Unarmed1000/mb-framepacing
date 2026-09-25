@@ -84,7 +84,10 @@ namespace MB.FramePacing.Capture.Ffmpeg
 
         var output = source.m_parser.Output!.Value;
         var input = source.m_parser.Input;
-        double fps = options.Mode.HasFps ? options.Mode.Fps : input?.Fps ?? 0;
+        double fps =
+          options.RecordedFps is > 0 ? options.RecordedFps.Value
+          : options.Mode.HasFps ? options.Mode.Fps
+          : input?.Fps ?? 0;
         source.Format = new CaptureFormat(
           output.Width,
           output.Height,
@@ -138,7 +141,10 @@ namespace MB.FramePacing.Capture.Ffmpeg
           reportedDrops = drops;
           flags |= CaptureRecordFlags.SourceDropBefore;
         }
-        long deviceTicks = knownTimestamps != null ? knownTimestamps[frameNumber] : DeviceTimestampsPending;
+        long deviceTicks =
+          knownTimestamps != null ? knownTimestamps[frameNumber]
+          : Options.RecordedFps is > 0 ? (long)Math.Round(frameNumber * (double)TimeSpan.TicksPerSecond / Options.RecordedFps.Value)
+          : DeviceTimestampsPending;
         ++frameNumber;
         sink.EndFrame(hostTicks, deviceTicks, flags);
       }

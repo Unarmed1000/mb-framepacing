@@ -154,7 +154,8 @@ sequenceDiagram
 2. Start the recording: **Start capture** in the GUI, or `mb-framepacing capture --wait-for-start --stop-at-end --analyze`.
 3. Run the test in your application. It shows the **start** marker, then the normal frame markers, then the **end** marker.
 4. The recording stops by itself at the end marker and the analysis opens. Record with other equipment instead (a lossless video,
-   a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources.
+   a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. Filming the screen
+   with a calibrated high speed camera is **very experimental**: see [doc/camera.md](doc/camera.md).
 
 The start and end markers bracket exactly the part you want measured. The start marker also carries a test name and the wall
 clock time, so every report knows what it measured:
@@ -240,6 +241,10 @@ mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images a
 mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeMs)
 mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
 mb-framepacing analyze <capture folder>                   # (re)analyse
+# VERY EXPERIMENTAL: a high speed camera filming the screen (doc/camera.md)
+mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 -o desk.camera-rig.json  # calibrate the mounted camera once
+mb-framepacing import run.mp4 --recorded-fps 960 --camera desk.camera-rig.json --analyze
+mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
 ```
 
 `mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
@@ -263,7 +268,8 @@ There is no built-in frame rate limit: mb-framepacing records whatever the sourc
   disk: every stored frame is width × height bytes (grey), so 960×540 at 500 fps is about 250 MiB/s. When the disk falls behind,
   frames are counted as dropped, never silently lost.
 - **Video files and image folders:** any rate. They are read as fast as the disk allows and nothing is dropped; the times come
-  from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works.
+  from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works. Footage of a
+  camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [doc/camera.md](doc/camera.md)).
 - **Faster is more precise:** results are exact to one capture period, so 240 fps resolves about ±4.2 ms, 500 fps ±2 ms,
   1000 fps ±1 ms.
 

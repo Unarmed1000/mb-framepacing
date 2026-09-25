@@ -13,7 +13,7 @@ namespace MB.FramePacing.Gui.ViewModels
   /// <summary>An entry of the source list. <see cref="Device"/> is only set for capture cards.</summary>
   public sealed record DeviceItem(string Title, CaptureDevice? Device, SourceKind Kind = SourceKind.Device)
   {
-    public bool IsSynthetic => Kind == SourceKind.Synthetic;
+    public bool IsSynthetic => Kind is SourceKind.Synthetic or SourceKind.SyntheticCamera;
 
     public override string ToString() => Title;
   }

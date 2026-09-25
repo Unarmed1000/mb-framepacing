@@ -46,9 +46,13 @@ namespace MB.FramePacing.App.Commands
       };
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the result." };
       var ffmpegOption = CommonOptions.Ffmpeg();
+      var cameraOption = CameraRigCommand.CameraOption();
+      var recordedFpsOption = CameraRigCommand.RecordedFpsOption();
 
       var command = new Command("import", "Read a video file, an image sequence or a stream instead of a capture card.")
       {
+        cameraOption,
+        recordedFpsOption,
         inputArgument,
         fpsOption,
         timestampsOption,
@@ -76,12 +80,25 @@ namespace MB.FramePacing.App.Commands
 
             var media = MediaInput.Create(
               input,
-              new MediaInputOptions { Fps = parseResult.GetValue(fpsOption), TimestampFile = parseResult.GetValue(timestampsOption) },
+              new MediaInputOptions
+              {
+                Fps = parseResult.GetValue(fpsOption),
+                TimestampFile = parseResult.GetValue(timestampsOption),
+                RecordedFps = parseResult.GetValue(recordedFpsOption),
+              },
               output
             );
-            var options = CaptureCommand.ApplyRegion(media.ToCaptureOptions(ffmpeg), roiText, scaleText, cancellationToken);
+            var cameraText = parseResult.GetValue(cameraOption);
+            if (cameraText != null && (roiText != null || scaleText != null))
+              throw new ArgumentException("--camera stores the rig's rectified zones; it can not be combined with --roi or --scale");
+            var options =
+              cameraText != null
+                ? CameraRigCommand.ApplyCamera(media.ToCaptureOptions(ffmpeg), cameraText, cancellationToken)
+                : CaptureCommand.ApplyRegion(media.ToCaptureOptions(ffmpeg), roiText, scaleText, cancellationToken);
             var runOptions = new CaptureRunOptions
             {
+              Camera = options.Camera,
+              RecordedFps = options.RecordedFps,
               OutputDirectory = output,
               Duration = DurationParser.ParseOptional(parseResult.GetValue(durationOption)),
               WaitForStart = parseResult.GetValue(waitOption),

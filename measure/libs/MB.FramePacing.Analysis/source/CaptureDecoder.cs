@@ -15,6 +15,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MB.FramePacing.Capture;
+using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Analysis
@@ -27,26 +28,28 @@ namespace MB.FramePacing.Analysis
       CaptureFileReader reader,
       TimeSource timeSource = TimeSource.Auto,
       IProgress<double>? progress = null,
-      CancellationToken cancellationToken = default
+      CancellationToken cancellationToken = default,
+      ScanoutModel scanout = ScanoutModel.SingleScanout
     )
     {
-      var layout = Locate(reader, cancellationToken);
+      var layout = scanout == ScanoutModel.Camera ? CameraLayout(reader.Header) : Locate(reader, cancellationToken);
       var effectiveTime = timeSource == TimeSource.Auto ? (AllRecordsHaveDeviceTicks(reader) ? TimeSource.Device : TimeSource.Host) : timeSource;
 
       long count = reader.RecordCount;
       var headers = new CaptureRecordHeader[count];
-      var results = new (CaptureStatus Status, MarkerPayload Payload, StartMetadata? Start)[count];
+      var results = new (CaptureStatus Status, MarkerPayload Payload, StartMetadata? Start, ulong? Secondary)[count];
       long done = 0;
 
       Parallel.For(
         0,
         count,
         new ParallelOptions { CancellationToken = cancellationToken },
-        () => (Decoder: new MarkerDecoder(), Image: reader.CreateFrameImage()),
+        () => (Decoder: new MarkerDecoder(sampleModuleGrid: scanout == ScanoutModel.Camera), Image: reader.CreateFrameImage()),
         (index, _, local) =>
         {
           headers[index] = reader.ReadRecord(index, local.Image);
-          results[index] = DecodeFrame(local.Decoder, local.Image, layout);
+          results[index] =
+            scanout == ScanoutModel.Camera ? DecodeCameraFrame(local.Decoder, local.Image, layout) : DecodeFrame(local.Decoder, local.Image, layout);
           long finished = Interlocked.Increment(ref done);
           if (progress != null && finished % 256 == 0)
             progress.Report((double)finished / count);
@@ -64,8 +67,10 @@ namespace MB.FramePacing.Analysis
         for (; expectedIndex < header.CaptureIndex; ++expectedIndex)
           rows.Add(new CaptureRow(expectedIndex, 0, CaptureStatus.NotRecorded, default));
         long ticks = effectiveTime == TimeSource.Device && header.HasDeviceTicks ? header.DeviceTicks : header.HostTicks;
-        var (status, payload, start) = results[i];
-        rows.Add(new CaptureRow(header.CaptureIndex, ticks, status, payload, start, (header.Flags & CaptureRecordFlags.SourceDropBefore) != 0));
+        var (status, payload, start, secondary) = results[i];
+        rows.Add(
+          new CaptureRow(header.CaptureIndex, ticks, status, payload, start, (header.Flags & CaptureRecordFlags.SourceDropBefore) != 0, secondary)
+        );
         expectedIndex = header.CaptureIndex + 1;
       }
       return new DecodedCapture(reader.Header, layout, effectiveTime, rows);
@@ -134,7 +139,41 @@ namespace MB.FramePacing.Analysis
       return new MarkerLayout(locks, module, warnings);
     }
 
-    private static (CaptureStatus, MarkerPayload, StartMetadata?) DecodeFrame(MarkerDecoder decoder, GrayImage image, MarkerLayout layout)
+    /// <summary>
+    /// EXPERIMENTAL camera captures store the rig's rectified zones stacked top to bottom in scanout order, each marker at a known origin with
+    /// <see cref="CameraZone.StoredPxPerModule"/> pixel modules: no search needed.
+    /// </summary>
+    public static MarkerLayout CameraLayout(CaptureFileHeader header)
+    {
+      int zones = header.Height / CameraZone.StoredSizePx;
+      if (zones < 1 || header.Width != CameraZone.StoredSizePx)
+        throw new InvalidOperationException(
+          $"A {header.Width}x{header.Height} capture is not a camera capture (expected {CameraZone.StoredSizePx} pixel wide stacked zones)"
+        );
+      var locks = Enumerable.Range(0, zones).Select(CameraZone.StoredLock).ToList();
+      return new MarkerLayout(locks, CameraZone.StoredPxPerModule, new[] { "Camera capture: " + CameraRig.ExperimentalNotice });
+    }
+
+    /// <summary>
+    /// Camera: the zones legitimately show different frames while the scanout rolls down the screen, so they are not compared here; the
+    /// timeline uses the second zone's frame index to measure the scanout and find tears.
+    /// </summary>
+    private static (CaptureStatus, MarkerPayload, StartMetadata?, ulong?) DecodeCameraFrame(
+      MarkerDecoder decoder,
+      GrayImage image,
+      MarkerLayout layout
+    )
+    {
+      var primary = decoder.DecodeLocked(image, layout.Primary);
+      ulong? secondary = null;
+      if (layout.Locks.Count > 1 && decoder.DecodeLocked(image, layout.Locks[1]) is { IsDecoded: true } other)
+        secondary = other.Payload.FrameIndex;
+      return primary.IsDecoded
+        ? (CaptureStatus.Decoded, primary.Payload, primary.Start, secondary)
+        : (CaptureStatus.Undecodable, default, null, secondary);
+    }
+
+    private static (CaptureStatus, MarkerPayload, StartMetadata?, ulong?) DecodeFrame(MarkerDecoder decoder, GrayImage image, MarkerLayout layout)
     {
       var primary = decoder.DecodeLocked(image, layout.Primary);
       bool torn = false;
@@ -147,8 +186,8 @@ namespace MB.FramePacing.Analysis
           torn = true;
       }
       if (!primary.IsDecoded)
-        return (torn ? CaptureStatus.Torn : CaptureStatus.Undecodable, default, null);
-      return (torn ? CaptureStatus.Torn : CaptureStatus.Decoded, primary.Payload, primary.Start);
+        return (torn ? CaptureStatus.Torn : CaptureStatus.Undecodable, default, null, null);
+      return (torn ? CaptureStatus.Torn : CaptureStatus.Decoded, primary.Payload, primary.Start, null);
     }
 
     private static bool AllRecordsHaveDeviceTicks(CaptureFileReader reader)

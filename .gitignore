@@ -34,3 +34,6 @@ __pycache__/
 
 # Node (Prettier)
 node_modules/
+
+# BenchmarkDotNet results (measure/tools/Benchmarks)
+BenchmarkDotNet.Artifacts/

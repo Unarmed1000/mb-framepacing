@@ -8,6 +8,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture
@@ -35,6 +36,12 @@ namespace MB.FramePacing.Capture
     /// is reused, copy what you need before returning). Null = no preview.
     /// </summary>
     public Action<GrayImage, long>? Preview { get; init; }
+
+    /// <summary>EXPERIMENTAL: the camera rig whose rectified zones the source delivers (recorded in capture.json for the analysis).</summary>
+    public CameraRig? Camera { get; init; }
+
+    /// <summary>The real recording rate of a slow motion clip, if the timestamps were generated from it.</summary>
+    public double? RecordedFps { get; init; }
 
     public string ToolVersion { get; init; } = string.Empty;
     public string? FfmpegVersion { get; init; }

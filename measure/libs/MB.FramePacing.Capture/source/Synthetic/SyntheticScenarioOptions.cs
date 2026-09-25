@@ -47,6 +47,13 @@ namespace MB.FramePacing.Capture.Synthetic
     /// <summary>Every n-th frame is rendered but never presented (0 = never).</summary>
     public int SkipEvery { get; init; }
 
+    /// <summary>
+    /// Every n-th frame is presented <see cref="TearFraction"/> of a refresh after its vsync, as with vsync off (0 = never). A capture card
+    /// sees it from the next scanout on; a camera sees a tear.
+    /// </summary>
+    public int TearEvery { get; init; }
+    public double TearFraction { get; init; } = 0.5;
+
     /// <summary>Offset of the capture clock against vsync, as a fraction of a capture period.</summary>
     public double CapturePhase { get; init; } = 0.37;
 

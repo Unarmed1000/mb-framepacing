@@ -61,9 +61,11 @@ namespace MB.FramePacing.App.Commands
       };
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the capture afterwards." };
       var ffmpegOption = CommonOptions.Ffmpeg();
+      var cameraOption = CameraRigCommand.CameraOption();
 
       var command = new Command("capture", "Record a capture device to disk.")
       {
+        cameraOption,
         deviceOption,
         modeOption,
         inputFormatOption,
@@ -97,9 +99,16 @@ namespace MB.FramePacing.App.Commands
               Mode = modeText != null ? RequestedMode.Parse(modeText) : default,
               InputFormat = parseResult.GetValue(inputFormatOption),
             };
-            options = ApplyRegion(options, roiText, scaleText, cancellationToken);
+            var cameraText = parseResult.GetValue(cameraOption);
+            if (cameraText != null && (roiText != null || scaleText != null))
+              throw new ArgumentException("--camera stores the rig's rectified zones; it can not be combined with --roi or --scale");
+            options =
+              cameraText != null
+                ? CameraRigCommand.ApplyCamera(options, cameraText, cancellationToken)
+                : ApplyRegion(options, roiText, scaleText, cancellationToken);
             var runOptions = new CaptureRunOptions
             {
+              Camera = options.Camera,
               OutputDirectory = Path.GetFullPath(parseResult.GetValue(outputOption) ?? DefaultOutputDirectory(config)),
               Duration = DurationParser.ParseOptional(durationText),
               WaitForStart = parseResult.GetValue(waitOption),
@@ -116,7 +125,8 @@ namespace MB.FramePacing.App.Commands
             AnsiConsole.MarkupLineInterpolated(
               $"Capturing [bold]{options.Device.Name}[/]: source {format.SourceWidth}x{format.SourceHeight} @ {format.FrameRate} fps -> stored {format.Width}x{format.Height} Gray8"
             );
-            CheckModuleSize(parseResult.GetValue(moduleOption), format);
+            if (options.Camera == null)
+              CheckModuleSize(parseResult.GetValue(moduleOption), format);
             AnsiConsole.MarkupLine("[grey]Press Ctrl+C to stop.[/]");
 
             var result = await Task.Run(() => RunWithStatus(source, runOptions, cancellationToken), CancellationToken.None);

@@ -19,7 +19,7 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 | `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.0, C# 9, no dependencies) + NUnit tests |
 | `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                         |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis libraries (+ `UnitTest/`), DocImages              |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis libraries (+ `UnitTest/`), DocImages, Benchmarks  |
 | root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions           |
 | `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                         |
 | `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses             |
@@ -87,6 +87,18 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - The crop starts a whole number of downscale steps before the marker origin; otherwise module edges fall between stored pixels
     and dense start markers stop decoding.
   - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures.
+- **Camera capture (VERY EXPERIMENTAL, `doc/camera.md`):**
+  - Every place users meet it says "very experimental": CLI help, the GUI card, `CameraRig.ExperimentalNotice` in rig files and
+    analysis warnings, docs. Keep it that way until it is validated with real hardware, and keep the Status table in
+    `doc/camera.md` current.
+  - `Capture/source/Camera/`: `CameraCalibrator` (calibrate/verify), `CameraRig`/`CameraZone` (the rig file), `CameraRectifier` and
+    `RectifyingCaptureSource` (C# path). `FfmpegCommandBuilder.BuildCameraFilter` is the ffmpeg path; both produce the same layout:
+    zones of `CameraZone.StoredSizePx` stacked in scanout order.
+  - The analysis switches to `ScanoutModel.Camera` when `capture.json` has a `camera` section.
+  - The synthetic camera (`Capture/source/Synthetic/SyntheticCamera.cs`) is the ground truth. `selftest --camera --fps 1000
+--refresh 60 [--tear-every 9]` runs it end to end.
+  - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the
+    folder's `.slnx` does not build the libraries optimized.
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
 - **CI** (mb-quality is not available there; CI runs the same commands directly):

@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture.Ffmpeg
@@ -38,6 +39,18 @@ namespace MB.FramePacing.Capture.Ffmpeg
     /// last one. Used for image sequences, where the times come from --fps or a timestamp file and ffmpeg's own are too coarse.
     /// </summary>
     public IReadOnlyList<long>? FrameTimestamps { get; init; }
+
+    /// <summary>
+    /// The rate the frames were really recorded at, for a high speed camera clip stored at a slower playback rate. When set, frame n gets the
+    /// timestamp n / RecordedFps and the file's own timestamps are ignored.
+    /// </summary>
+    public double? RecordedFps { get; init; }
+
+    /// <summary>
+    /// EXPERIMENTAL camera capture: rectify and store only the rig's marker zones, stacked top to bottom in scanout order (replaces Roi and
+    /// Scale).
+    /// </summary>
+    public CameraRig? Camera { get; init; }
 
     /// <summary>Extra arguments inserted before '-i' (advanced device options).</summary>
     public IReadOnlyList<string> ExtraInputArguments { get; init; } = Array.Empty<string>();

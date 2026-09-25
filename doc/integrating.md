@@ -159,7 +159,9 @@ origin while it is shown.
 mb-framepacing capture -d "<your capture card>" --scale 960x540 --wait-for-start --stop-at-end --analyze
 ```
 
-or record with any other tool (a lossless video, a high speed camera's image sequence) and use `mb-framepacing import`.
+or record with any other tool (a lossless video, a high speed camera's image sequence) and use `mb-framepacing import`. To film
+the screen with a high speed camera, draw the marker in the TopLeft and BottomLeft slots and see the very experimental
+[camera capture](camera.md).
 
 ## Checking your integration
 

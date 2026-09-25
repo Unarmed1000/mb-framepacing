@@ -44,7 +44,8 @@ Settings that matter:
   capture never sees some of the displayed frames (they are reported as frame indices never seen); a faster one only records
   duplicates. Results are exact to one refresh (±4.2 ms at 240 Hz, ±2 ms at 500 Hz).
 - Turn **G-Sync/FreeSync off**. Capture cards only pass variable refresh through to the monitor; they record at a constant rate, so
-  the capture would not show when the display showed each frame. (A high speed camera filming the screen does; see below.)
+  the capture would not show when the display showed each frame. (A high speed camera filming the screen does: see the very
+  experimental [camera capture](camera.md).)
 - Turn **HDR off**.
 - Store frames downscaled (`--scale`) to save disk space, but keep at least 3 stored pixels per marker module: 1920×1080 → 960×540
   needs 6 px modules in the application. `mb-framepacing marker-size --source 1920x1080 --stored 960x540` prints the module size
@@ -91,7 +92,8 @@ stored size now.
 ## 3. Measure from a recording
 
 Recorded with other equipment, such as a high speed camera or a recorder? Import the recording. Nothing is dropped, and any frame
-rate works.
+rate works. A camera filming the screen needs a calibrated camera rig and `--camera`; that is **very experimental**, see
+[camera capture](camera.md).
 
 | Source                                   | GUI source     | Command line                                                     |
 | ---------------------------------------- | -------------- | ---------------------------------------------------------------- |

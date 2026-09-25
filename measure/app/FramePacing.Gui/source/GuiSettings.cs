@@ -34,6 +34,11 @@ namespace MB.FramePacing.Gui
     public string? ImageFps { get; set; }
     public string? TimestampFile { get; set; }
 
+    /// <summary>EXPERIMENTAL camera capture: film the screen with the calibrated rig, its file, a slow motion clip's recorded fps.</summary>
+    public bool UseCamera { get; set; }
+    public string? CameraRig { get; set; }
+    public string? CameraRecordedFps { get; set; }
+
     /// <summary>The Analyze page's time source (a TimeSource name).</summary>
     public string? TimeSource { get; set; }
 

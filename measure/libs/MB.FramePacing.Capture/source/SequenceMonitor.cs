@@ -15,7 +15,7 @@ namespace MB.FramePacing.Capture
   public sealed class SequenceMonitor : IFrameInspector
   {
     private readonly MarkerDecoder m_searchDecoder = new MarkerDecoder(tryHarder: true);
-    private readonly MarkerDecoder m_lockedDecoder = new MarkerDecoder();
+    private readonly MarkerDecoder m_lockedDecoder;
     private readonly object m_sync = new object();
     private MarkerLock? m_lock;
     private MarkerDecodeResult? m_last;
@@ -50,6 +50,14 @@ namespace MB.FramePacing.Capture
         lock (m_sync)
           return m_endSeen;
       }
+    }
+
+    /// <param name="knownLock">Where the marker is, when that is known up front (camera captures store it at a fixed place).</param>
+    /// <param name="sampleModuleGrid">EXPERIMENTAL camera captures: decode the soft rectified markers by sampling the module grid.</param>
+    public SequenceMonitor(MarkerLock? knownLock = null, bool sampleModuleGrid = false)
+    {
+      m_lock = knownLock;
+      m_lockedDecoder = new MarkerDecoder(sampleModuleGrid: sampleModuleGrid);
     }
 
     public MarkerLock? Lock => m_lock;

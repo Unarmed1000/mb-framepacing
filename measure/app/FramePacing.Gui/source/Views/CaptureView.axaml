@@ -71,6 +71,70 @@
           </StackPanel>
         </Border>
 
+        <!-- VERY EXPERIMENTAL: filming the screen with a calibrated high speed camera -->
+        <Border Classes="card" IsEnabled="{Binding IsIdle}">
+          <Expander IsExpanded="{Binding Camera.UseCamera, Mode=OneTime}" HorizontalAlignment="Stretch">
+            <Expander.Header>
+              <TextBlock Classes="cardTitle" Text="Camera rig (very experimental)" />
+            </Expander.Header>
+            <StackPanel Spacing="8">
+              <TextBlock Classes="warning" Text="{x:Static vm:CameraRigViewModel.ExperimentalText}" />
+              <CheckBox Content="Film the screen with a calibrated high speed camera" IsChecked="{Binding Camera.UseCamera}" />
+              <Expander Header="How to set up the camera (4 steps)" HorizontalAlignment="Stretch">
+                <TextBlock Classes="caption" Text="{x:Static vm:CameraRigViewModel.SetupSteps}" TextWrapping="Wrap" />
+              </Expander>
+              <StackPanel Spacing="6" IsVisible="{Binding Camera.UseCamera}">
+                <TextBlock Classes="caption" Text="Rig file" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                  <TextBox Text="{Binding Camera.RigPath}" PlaceholderText="calibrate to create one" />
+                  <Button Grid.Column="1" Content="Browse..." Command="{Binding Camera.BrowseRigCommand}" />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                  <TextBlock Text="Recorded fps (slow motion clips)" VerticalAlignment="Center" />
+                  <TextBox Grid.Column="1" Text="{Binding Camera.RecordedFpsText}" PlaceholderText="empty = the clip's own timestamps" />
+                </Grid>
+                <Grid ColumnDefinitions="*,8,*">
+                  <Button
+                    Content="Calibrate"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding Camera.CalibrateCommand}"
+                    ToolTip.Tip="Find both markers in the selected source, fit the camera geometry, measure the scanout and check the setup"
+                  />
+                  <Button
+                    Grid.Column="2"
+                    Content="Verify"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding Camera.VerifyCommand}"
+                    ToolTip.Tip="Check that the camera still sees the markers where it was calibrated"
+                  />
+                </Grid>
+              </StackPanel>
+              <TextBlock
+                Classes="caption"
+                Text="{Binding Camera.StatusText}"
+                TextWrapping="Wrap"
+                IsVisible="{Binding Camera.StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+              />
+              <ItemsControl ItemsSource="{Binding Camera.Checks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CameraCheckItem">
+                    <TextBlock
+                      Text="{Binding Text}"
+                      FontSize="12"
+                      TextWrapping="Wrap"
+                      Classes.ok="{Binding IsPass}"
+                      Classes.warning="{Binding IsWarn}"
+                      Classes.error="{Binding IsFail}"
+                    />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Expander>
+        </Border>
+
         <Border Classes="card" IsEnabled="{Binding IsIdle}">
           <StackPanel Spacing="10">
             <TextBlock Classes="cardTitle" Text="Recording" />

@@ -43,9 +43,11 @@ namespace MB.FramePacing.Capture.Synthetic
       (long)Math.Round((captureIndex + Options.CapturePhase) * TimeSpan.TicksPerSecond / Options.CaptureFps);
 
     /// <summary>Index into <see cref="PresentedFrames"/> of the frame on screen at a capture, -1 if nothing is shown yet.</summary>
-    public int PresentedIndexAt(long captureIndex)
+    public int PresentedIndexAt(long captureIndex) => PresentedIndexAtTicks(CaptureTicks(captureIndex));
+
+    /// <summary>Index into <see cref="PresentedFrames"/> of the latest frame presented at or before <paramref name="ticks"/>, -1 if none.</summary>
+    public int PresentedIndexAtTicks(long ticks)
     {
-      long ticks = CaptureTicks(captureIndex);
       int lo = 0;
       int hi = m_presented.Count - 1;
       int found = -1;
@@ -87,6 +89,10 @@ namespace MB.FramePacing.Capture.Synthetic
         long displayTicks = slot * refresh;
         if (displayTicks >= totalEnd)
           break;
+
+        // Vsync off: the frame is presented part way through the scanout, so the scanout shows the old frame above and the new one below
+        if (o.TearEvery > 0 && k > 0 && k % o.TearEvery == 0)
+          displayTicks += (long)Math.Round(o.TearFraction * refresh);
 
         // Skipped frames are rendered (frame index and animation advance) but never shown: the next frame takes this vsync.
         if (o.SkipEvery > 0 && k > 0 && k % o.SkipEvery == 0)

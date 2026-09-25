@@ -29,6 +29,9 @@ namespace MB.FramePacing.Analysis
     public const string CapturesFileName = "captures.csv";
     public const double MovedMarkerUndecodableFraction = 0.05;
 
+    /// <summary>A camera capture always loses a few captures per frame to the scanout crossing the marker; more than this is a problem.</summary>
+    public const double CameraUndecodableFraction = 0.2;
+
     private static readonly JsonSerializerOptions g_jsonOptions = new JsonSerializerOptions
     {
       WriteIndented = true,
@@ -49,17 +52,23 @@ namespace MB.FramePacing.Analysis
         throw new FileNotFoundException($"'{captureDirectory}' does not contain a capture ({CaptureSessionInfo.FramesFileName})", framesPath);
 
       var session = CaptureSessionInfo.TryLoad(captureDirectory);
+      var scanout = session?.Camera != null ? ScanoutModel.Camera : ScanoutModel.SingleScanout;
       DecodedCapture capture;
       using (var reader = new CaptureFileReader(framesPath))
-        capture = CaptureDecoder.Decode(reader, options.TimeSource, progress, cancellationToken);
+        capture = CaptureDecoder.Decode(reader, options.TimeSource, progress, cancellationToken, scanout);
 
-      var timeline = TimelineAnalyzer.Analyze(capture.Rows, options.Timeline);
+      var timeline = TimelineAnalyzer.Analyze(capture.Rows, options.Timeline with { Scanout = scanout });
       var warnings = new List<string>(capture.Layout.Warnings);
       warnings.AddRange(timeline.Warnings);
       if (MarkerMayHaveMoved(capture))
         warnings.Add(
           $"Many captures could not be decoded and only the region {capture.Header.Roi} was stored: the marker may have moved out of it. "
             + "Keep the marker at a fixed position, or locate it again ('locate', --roi auto)."
+        );
+      if (scanout == ScanoutModel.Camera && UndecodableFraction(capture) is var fraction && fraction > CameraUndecodableFraction)
+        warnings.Add(
+          $"Camera capture: {fraction:P0} of the captures could not be decoded. Check focus, exposure and flicker ('camera-rig verify'), and "
+            + "that the camera films well above the refresh rate."
         );
       if (capture.TimeSource == TimeSource.Host)
         warnings.Add("Host timestamps are used (the capture has no device timestamps): expect extra jitter from process scheduling.");
@@ -88,12 +97,19 @@ namespace MB.FramePacing.Analysis
       return recorded > 0 && undecodable > recorded * MovedMarkerUndecodableFraction;
     }
 
+    private static double UndecodableFraction(DecodedCapture capture)
+    {
+      int recorded = capture.Rows.Count(r => r.Status != CaptureStatus.NotRecorded);
+      return recorded > 0 ? capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable) / (double)recorded : 0;
+    }
+
     public static string RunFramesFileName(RunAnalysis run, int ordinal) =>
       ordinal == 0 ? $"run-{run.RunId}-frames.csv" : $"run-{run.RunId}-{ordinal + 1}-frames.csv";
 
     private static void WriteReports(AnalysisReport report, AnalysisOptions options)
     {
-      WriteCaptures(Path.Combine(report.OutputDirectory, CapturesFileName), report.Capture.Rows);
+      bool camera = report.Session?.Camera != null;
+      WriteCaptures(Path.Combine(report.OutputDirectory, CapturesFileName), report.Capture.Rows, camera);
       var ordinals = new Dictionary<uint, int>();
       var runFiles = new List<string>();
       foreach (var run in report.Timeline.Runs)
@@ -102,15 +118,15 @@ namespace MB.FramePacing.Analysis
         ordinals[run.RunId] = ordinal + 1;
         var name = RunFramesFileName(run, ordinal);
         runFiles.Add(name);
-        WriteFrames(Path.Combine(report.OutputDirectory, name), run.Frames);
+        WriteFrames(Path.Combine(report.OutputDirectory, name), run.Frames, camera);
       }
       WriteSummary(Path.Combine(report.OutputDirectory, SummaryFileName), report, options, runFiles);
     }
 
-    private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows)
+    private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows, bool camera)
     {
       using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-      writer.WriteLine("captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropBefore");
+      writer.WriteLine("captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropBefore" + (camera ? ",secondZoneFrameIndex" : ""));
       foreach (var row in rows)
       {
         bool hasMarker = row.Status is CaptureStatus.Decoded or CaptureStatus.Torn && row.Payload != default;
@@ -125,16 +141,17 @@ namespace MB.FramePacing.Analysis
             hasMarker ? row.Payload.FrameIndex.ToString(CultureInfo.InvariantCulture) : string.Empty,
             hasMarker ? Ms(row.Payload.AnimationTicks) : string.Empty,
             row.SourceDropBefore ? "1" : "0"
-          )
+          ) + (camera ? "," + (row.SecondaryFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty) : string.Empty)
         );
       }
     }
 
-    private static void WriteFrames(string path, IReadOnlyList<PresentedFrame> frames)
+    private static void WriteFrames(string path, IReadOnlyList<PresentedFrame> frames, bool camera)
     {
       using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
       writer.WriteLine(
         "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags"
+          + (camera ? ",secondZoneFirstSeenMs,scanoutDelayMs" : "")
       );
       foreach (var frame in frames)
       {
@@ -155,6 +172,13 @@ namespace MB.FramePacing.Analysis
             Ms(frame.DriftTicks),
             frame.Flags == PresentedFrameFlags.None ? string.Empty : frame.Flags.ToString().Replace(", ", "|", StringComparison.Ordinal)
           )
+            + (
+              camera
+                ? frame.FirstSeenSecondaryTicks is { } secondary
+                  ? "," + Ms(secondary) + "," + Ms(secondary - frame.FirstSeenTicks)
+                  : ",,"
+                : string.Empty
+            )
         );
       }
     }
@@ -165,6 +189,8 @@ namespace MB.FramePacing.Analysis
       var summary = new
       {
         toolVersion = options.ToolVersion,
+        experimental = report.Session?.Camera != null ? "Camera capture: " + Capture.Camera.CameraRig.ExperimentalNotice : null,
+        scanout = report.Session?.Camera != null ? ScanoutModel.Camera : ScanoutModel.SingleScanout,
         analysedUtc = DateTime.UtcNow,
         captureDirectory = Path.GetFullPath(report.CaptureDirectory),
         capture = report.Session,
@@ -187,6 +213,7 @@ namespace MB.FramePacing.Analysis
               run.Counts,
               run.Statistics,
               histograms = RunHistograms.Create(run, report.Timeline.CapturePeriodTicks),
+              camera = run.Camera,
               run.Warnings,
             }
         ),

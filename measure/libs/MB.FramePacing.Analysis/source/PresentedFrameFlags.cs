@@ -20,5 +20,8 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>Captures before this frame's first capture could not be decoded or were not recorded, so its first-seen time is uncertain.</summary>
     UncertainStart = 2,
+
+    /// <summary>EXPERIMENTAL camera captures: the frame reached the second (lower) zone before the timing zone, so it was presented mid-scanout.</summary>
+    Torn = 4,
   }
 }

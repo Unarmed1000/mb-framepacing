@@ -32,7 +32,9 @@ namespace MB.FramePacing.Capture.Ffmpeg
       {
         case MediaInputKind.VideoFile:
           var file = Path.GetFullPath(input);
-          return new MediaSource(new CaptureDevice(FfmpegInputKind.Media, file, Path.GetFileName(file)), default, null);
+          if (options.RecordedFps is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "The recorded frame rate must be positive");
+          return new MediaSource(new CaptureDevice(FfmpegInputKind.Media, file, Path.GetFileName(file)), default, null, options.RecordedFps);
 
         case MediaInputKind.ImageSequence:
           var folder = Path.GetFullPath(input);

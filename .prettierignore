@@ -17,3 +17,4 @@ marker/cpp/.clang-format
 
 # Rewritten by Dependabot in its own JSON style on every update
 .config/dotnet-tools.json
+BenchmarkDotNet.Artifacts/

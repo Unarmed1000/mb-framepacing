@@ -16,5 +16,8 @@ namespace MB.FramePacing.Gui.ViewModels
     ImageFolder,
     Stream,
     Synthetic,
+
+    /// <summary>EXPERIMENTAL: the synthetic game filmed by a simulated high speed camera (needs a calibrated camera rig).</summary>
+    SyntheticCamera,
   }
 }

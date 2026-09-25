@@ -123,8 +123,54 @@ namespace MB.FramePacing.DocImages
       await Task.Delay(300);
       Save(setup, Path.Combine(output, "gui-setup.png"));
       setup.Close();
+
+      await RenderCameraAsync(window, viewModel, output);
       window.Close();
       return true;
+    }
+
+    /// <summary>
+    /// The camera rig card (VERY EXPERIMENTAL): calibrate the synthetic camera, capture its rectified marker zones and show the capture page
+    /// while it records.
+    /// </summary>
+    private static async Task RenderCameraAsync(MainWindow window, MainWindowViewModel viewModel, string output)
+    {
+      var capture = viewModel.Capture;
+      viewModel.SelectedTab = MainWindowViewModel.CaptureTab;
+      capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.SyntheticCamera);
+      capture.Camera.UseCamera = true;
+      await capture.Camera.CalibrateCommand.ExecuteAsync(null);
+      if (string.IsNullOrEmpty(capture.Camera.RigPath))
+        throw new InvalidOperationException("The synthetic camera did not calibrate: " + capture.Camera.StatusText);
+      foreach (var expander in window.GetVisualDescendants().OfType<Expander>())
+      {
+        if (expander.Header is TextBlock { Text: { } header } && header.StartsWith("Camera rig", StringComparison.Ordinal))
+          expander.IsExpanded = true;
+      }
+
+      capture.StartCommand.Execute(null);
+      try
+      {
+        await WaitUntil(
+          () => capture.HasPreview && capture.IsCapturing && capture.MarkerText.Contains("Frame", StringComparison.Ordinal),
+          TimeSpan.FromSeconds(60)
+        );
+      }
+      catch (TimeoutException)
+      {
+        throw new TimeoutException(
+          $"The camera capture did not show a frame marker: phase '{capture.PhaseText}', marker '{capture.MarkerText}', preview {capture.HasPreview}, "
+            + $"error '{capture.ErrorText}', camera '{capture.Camera.StatusText}'"
+        );
+      }
+      await Task.Delay(700);
+      // Neutral paths instead of this machine's temporary folders
+      string rigName = Path.GetFileName(capture.Camera.RigPath);
+      capture.Camera.RigPath = Path.Combine(ExampleCaptureRoot, "camera-rigs", "rig-20260923-120000.camera-rig.json");
+      capture.Camera.StatusText = capture.Camera.StatusText.Replace(rigName, "rig-20260923-120000.camera-rig.json", StringComparison.Ordinal);
+      Save(window, Path.Combine(output, "gui-camera.png"));
+      capture.StopCommand.Execute(null);
+      await WaitUntil(() => !capture.IsCapturing, TimeSpan.FromSeconds(60));
     }
 
     private static void Save(TopLevel topLevel, string path)

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Developer tool: BenchmarkDotNet measurements of the per-capture paths (marker decoding, camera rectification and calibration). Not shipped. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Benchmarks</AssemblyName>
+    <RootNamespace>MB.FramePacing.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\libs\MB.FramePacing.Analysis\MB.FramePacing.Analysis.csproj" />
+  </ItemGroup>
+</Project>

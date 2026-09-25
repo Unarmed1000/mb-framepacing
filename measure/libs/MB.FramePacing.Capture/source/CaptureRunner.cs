@@ -40,8 +40,11 @@ namespace MB.FramePacing.Capture
           : 0;
       double fps = format.FrameRate.IsKnown ? format.FrameRate.FramesPerSecond : 240;
       // The triggers look at every frame; without them the current marker for the progress display comes from the sampled preview
-      var triggers = options.WaitForStart || options.StopAtEnd ? new SequenceMonitor() : null;
-      var previewMonitor = triggers == null && options.Preview != null ? new SequenceMonitor() : null;
+      // Camera captures store the timing zone's marker at a fixed place: no search (it would see two markers)
+      MarkerLock? knownLock = options.Camera != null ? Camera.CameraZone.StoredLock(0) : null;
+      bool camera = options.Camera != null;
+      var triggers = options.WaitForStart || options.StopAtEnd ? new SequenceMonitor(knownLock, camera) : null;
+      var previewMonitor = triggers == null && options.Preview != null ? new SequenceMonitor(knownLock, camera) : null;
       var recorderOptions = new FrameRecorderOptions
       {
         RingFrames = options.RingFrames ?? FrameRecorderOptions.RingFramesFor(format),
@@ -176,6 +179,8 @@ namespace MB.FramePacing.Capture
         StopReason = stopReason,
         SequenceRunId = monitor?.Start?.Payload.RunId,
         SequenceName = monitor?.Start?.Start?.Name,
+        RecordedFps = options.RecordedFps,
+        Camera = options.Camera,
       };
       session.Save(options.OutputDirectory);
       progress?.Invoke(
