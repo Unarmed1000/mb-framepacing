@@ -77,7 +77,8 @@ namespace MB.FramePacing.Capture.Camera
 
     public string ToJson() => JsonSerializer.Serialize(this, g_jsonOptions);
 
-    public void Save(string path) => File.WriteAllText(path, ToJson());
+    /// <summary>Write the rig file; a replaced version is kept in the backup folder next to it (<see cref="SettingsFile"/>).</summary>
+    public void Save(string path) => SettingsFile.Write(path, ToJson());
 
     public static CameraRig FromJson(string json)
     {

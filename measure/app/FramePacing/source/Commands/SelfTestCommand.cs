@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.CommandLine;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -193,6 +194,7 @@ namespace MB.FramePacing.App.Commands
       double period = TimeSpan.TicksPerSecond / scenario.Options.CaptureFps;
       int checkedFrames = 0;
       int insideTears = 0;
+      var errorsMs = new List<double>();
       if (run == null)
         failures.Add("no run was found");
       else
@@ -210,6 +212,7 @@ namespace MB.FramePacing.App.Commands
               continue;
             double truthDelta = camera.ToCameraTicks(expected[i].DisplayTicks - expected[i - 1].DisplayTicks);
             ++checkedFrames;
+            errorsMs.Add(Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - truthDelta) / TimeSpan.TicksPerMillisecond);
             if (Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - truthDelta) > (2 * period) + 1)
               failures.Add($"frame {expected[i].Payload.FrameIndex}: display delta off by more than two camera periods");
           }
@@ -230,6 +233,18 @@ namespace MB.FramePacing.App.Commands
       }
 
       AnsiConsole.WriteLine();
+      if (errorsMs.Count > 0)
+      {
+        // Invariant numbers on one unwrapped line: tools/camera_rate_table.py reads it
+        errorsMs.Sort();
+        double p95 = errorsMs[Math.Min(errorsMs.Count - 1, (int)Math.Ceiling(0.95 * errorsMs.Count) - 1)];
+        Console.WriteLine(
+          string.Create(
+            CultureInfo.InvariantCulture,
+            $"Display time error against the simulation: mean {errorsMs.Average():0.00} ms, p95 {p95:0.00} ms, max {errorsMs[^1]:0.00} ms (camera period {period / TimeSpan.TicksPerMillisecond:0.00} ms, {errorsMs.Count} frames)."
+          )
+        );
+      }
       if (failures.Count == 0)
       {
         AnsiConsole.MarkupLineInterpolated(

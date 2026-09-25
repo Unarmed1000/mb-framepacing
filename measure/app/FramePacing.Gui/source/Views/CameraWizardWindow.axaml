@@ -6,7 +6,7 @@
   x:DataType="vm:CameraWizardViewModel"
   Title="Set up a high speed camera (very experimental)"
   Width="700"
-  Height="660"
+  Height="820"
   CanResize="False"
   CanMinimize="False"
   CanMaximize="False"
@@ -48,6 +48,22 @@
                 <ComboBox ItemsSource="{Binding SavedRigs}" SelectedItem="{Binding SelectedSavedRig}" HorizontalAlignment="Stretch" />
                 <Button Grid.Column="1" Content="Delete" Command="{Binding DeleteSavedRigCommand}" ToolTip.Tip="Delete this saved camera" />
               </Grid>
+              <Border Classes="card" Margin="28,0,0,0" IsVisible="{Binding IsConfirmingDelete}">
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="warning" TextWrapping="Wrap" Text="{Binding DeleteQuestion}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Delete" Command="{Binding ConfirmDeleteSavedRigCommand}" />
+                    <Button Classes="accent" Content="Keep it" Command="{Binding KeepSavedRigCommand}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              <TextBlock
+                Classes="caption"
+                Margin="28,0,0,0"
+                TextWrapping="Wrap"
+                Text="{Binding DeletedText}"
+                IsVisible="{Binding DeletedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+              />
               <TextBlock Classes="caption" Margin="28,0,0,0" TextWrapping="Wrap" Text="{Binding SavedRigSummary}" />
               <TextBlock
                 Classes="caption"
@@ -123,6 +139,12 @@
               <ProgressBar IsIndeterminate="True" Width="120" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
             </StackPanel>
             <TextBlock TextWrapping="Wrap" Text="{Binding StatusText}" />
+            <StackPanel Spacing="4" IsVisible="{Binding HasCameraFrame}">
+              <Border Background="{DynamicResource PreviewBrush}" CornerRadius="6" Height="230">
+                <Image Source="{Binding CameraFrame}" Stretch="Uniform" />
+              </Border>
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CameraFrameCaption}" />
+            </StackPanel>
             <ItemsControl ItemsSource="{Binding Checks}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:CameraCheckItem">
@@ -160,6 +182,12 @@
             </StackPanel>
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="Optional: every capture checks the camera before it starts." />
             <TextBlock TextWrapping="Wrap" Text="{Binding StatusText}" />
+            <StackPanel Spacing="4" IsVisible="{Binding HasCameraFrame}">
+              <Border Background="{DynamicResource PreviewBrush}" CornerRadius="6" Height="230">
+                <Image Source="{Binding CameraFrame}" Stretch="Uniform" />
+              </Border>
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CameraFrameCaption}" />
+            </StackPanel>
             <ItemsControl ItemsSource="{Binding Checks}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:CameraCheckItem">

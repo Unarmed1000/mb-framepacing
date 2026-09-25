@@ -98,8 +98,7 @@ namespace MB.FramePacing.Capture
     public string Save(string? explicitPath = null)
     {
       var path = explicitPath != null ? Path.GetFullPath(explicitPath) : SourcePath ?? ResolvePath();
-      Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-      File.WriteAllText(path, JsonSerializer.Serialize(this, g_jsonOptions));
+      SettingsFile.Write(path, JsonSerializer.Serialize(this, g_jsonOptions));
       return path;
     }
 
@@ -108,10 +107,7 @@ namespace MB.FramePacing.Capture
     {
       var path = ResolvePath(explicitPath);
       if (!File.Exists(path))
-      {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, Template);
-      }
+        SettingsFile.Write(path, Template);
       return path;
     }
 

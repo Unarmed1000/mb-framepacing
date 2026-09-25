@@ -58,7 +58,10 @@ namespace MB.FramePacing.Capture.Camera
       return list.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    /// <summary>Save <paramref name="rig"/> as <paramref name="name"/> (replacing a camera of that name). Returns the file path.</summary>
+    /// <summary>
+    /// Save <paramref name="rig"/> as <paramref name="name"/> (replacing a camera of that name; the replaced version is kept in the backup folder).
+    /// Returns the file path.
+    /// </summary>
     public static string Save(CameraRig rig, string name, string? directory = null)
     {
       ArgumentNullException.ThrowIfNull(rig);
@@ -70,12 +73,13 @@ namespace MB.FramePacing.Capture.Camera
 
     public static bool Exists(string name, string? directory = null) => IsValidName(name) && File.Exists(PathFor(name, directory));
 
-    public static void Delete(string name, string? directory = null)
+    /// <summary>Delete a saved camera by moving its file to the backup folder (<see cref="SettingsFile"/>). Returns the backup path.</summary>
+    public static string Delete(string name, string? directory = null)
     {
       var path = PathFor(name, directory);
       if (!File.Exists(path))
         throw new FileNotFoundException($"There is no saved camera '{name}'", path);
-      File.Delete(path);
+      return SettingsFile.Delete(path);
     }
 
     /// <summary>A rig file path, or the name of a saved camera. Throws with the saved names when neither exists.</summary>

@@ -39,8 +39,23 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(CameraRigLibrary.Resolve(path, directory.Path), Is.EqualTo(Path.GetFullPath(path)));
       Assert.That(CameraRigLibrary.Load("desk 27in", directory.Path).Name, Is.EqualTo("desk 27in"));
 
-      CameraRigLibrary.Delete("bench", directory.Path);
+      var backup = CameraRigLibrary.Delete("bench", directory.Path);
       Assert.That(CameraRigLibrary.List(directory.Path).Select(r => r.Name), Is.EqualTo(new[] { "desk 27in" }));
+      // The deleted camera is kept in the backup folder, which the library does not list
+      Assert.That(CameraRig.Load(backup).Name, Is.EqualTo("bench"));
+    }
+
+    [Test]
+    public void Save_ReplacingACamera_KeepsThePreviousVersion()
+    {
+      using var directory = new TempDirectory();
+      CameraRigLibrary.Save(Rig() with { CameraFps = 240 }, "desk", directory.Path);
+
+      CameraRigLibrary.Save(Rig() with { CameraFps = 330 }, "desk", directory.Path);
+
+      Assert.That(CameraRigLibrary.Load("desk", directory.Path).CameraFps, Is.EqualTo(330));
+      var backups = Directory.GetFiles(Path.Combine(directory.Path, SettingsFile.BackupDirectoryName));
+      Assert.That(backups.Select(p => CameraRig.Load(p).CameraFps), Is.EqualTo(new[] { 240.0 }));
     }
 
     [Test]

@@ -101,6 +101,9 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 --refresh 60 [--tear-every 9]` runs it end to end.
   - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the
     folder's `.slnx` does not build the libraries optimized.
+  - The precision-by-camera-rate table in `doc/camera.md` is generated: `python tools/camera_rate_table.py --update-doc` (runs
+    `selftest --camera` per rate; selftest prints its error against the simulation for it). Rerun it after changes to the camera
+    pipeline.
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
 - **CI** (mb-quality is not available there; CI runs the same commands directly):
@@ -141,5 +144,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a
   row in `licenses/README.md`, in the same change.
 - **Two counters:** the capture index (capture card) and the marker frame index (application) are unrelated; never compare them.
+- **Settings files** (configuration, GUI settings, saved cameras) are written and deleted through `SettingsFile`: an atomic
+  replace, and the previous or deleted version goes to a `backup` folder next to it (newest 20 per file). Never `File.WriteAllText`
+  or `File.Delete` a settings file directly. Deleting from the GUI asks first.
 - **ffmpeg** is an external executable, found via `--ffmpeg` / `MB_FFMPEG` / `mb-framepacing.json` / PATH / install folders
   (`FfmpegLocator`). It is never linked or bundled.

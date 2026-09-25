@@ -278,8 +278,8 @@ namespace MB.FramePacing.App.Commands
         try
         {
           var name = parseResult.GetValue(nameArgument)!;
-          CameraRigLibrary.Delete(name);
-          AnsiConsole.MarkupLineInterpolated($"Deleted the saved camera [bold]{name}[/].");
+          var backup = CameraRigLibrary.Delete(name);
+          AnsiConsole.MarkupLineInterpolated($"Deleted the saved camera [bold]{name}[/]. A copy is kept in {backup}.");
           return Program.ResultSuccess;
         }
         catch (Exception ex)

@@ -10,6 +10,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.Gui
 {
@@ -68,8 +69,8 @@ namespace MB.FramePacing.Gui
         return;
       try
       {
-        Directory.CreateDirectory(Path.GetDirectoryName(g_path)!);
-        File.WriteAllText(g_path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        // The previous version is kept in the backup folder next to it
+        SettingsFile.Write(g_path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
       }
       catch (IOException) { }
       catch (UnauthorizedAccessException) { }

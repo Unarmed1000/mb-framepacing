@@ -26,7 +26,7 @@ labelled "very experimental" until the validation below has been done.
 | Rectification in C# (`CameraRectifier`, sources without ffmpeg)    | Implemented                              | `selftest --camera`, benchmarks (no allocations)                   |
 | Camera decoding (module grid sampler, camera captures only)        | Implemented                              | Unit tests; capture cards keep the pure barcode path               |
 | Camera analysis (scanout delay, camera tears, second zone only)    | Implemented                              | Unit tests against the synthetic ground truth                      |
-| GUI camera wizard, camera card, synthetic camera source            | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
+| GUI camera wizard (shows the camera frames), camera card           | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
 | Live UVC cameras (`capture -d <camera> --camera`)                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                |
 | Real cameras and displays                                          | **Not validated**                        | Nothing yet                                                        |
 
@@ -37,6 +37,9 @@ Results on the synthetic camera (`selftest --camera --fps 1000 --refresh 60`):
 - The scanout delay matches the simulation (10.0 ms).
 - With vsync off (`--tear-every`), every tear between the zones is found. A tear at the very start or end of a run is not
   counted.
+- Precision by camera rate: the table in [camera.md](camera.md#what-you-need), regenerated with
+  `python tools/camera_rate_table.py --update-doc`. On a 60 Hz display the mean error is about half a camera period and the
+  maximum about one period; every frame was found even at 100 fps (1.7× refresh), because the simulated panel is idealised.
 
 Performance numbers are in [camera.md](camera.md#performance). Per camera frame the work is about 35 µs of decoding plus 0.2 ms
 of C# rectification, well above 1000 fps on one core.

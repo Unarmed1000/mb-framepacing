@@ -11,14 +11,18 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Camera;
+using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
@@ -208,26 +212,54 @@ namespace MB.FramePacing.Gui.ViewModels
     [NotifyPropertyChangedFor(nameof(SavedRigSummary))]
     [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteSavedRigCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmDeleteSavedRigCommand))]
+    [NotifyPropertyChangedFor(nameof(DeleteQuestion))]
     public partial SavedCameraRig? SelectedSavedRig { get; set; }
 
     public string SavedRigSummary => SelectedSavedRig is { } saved ? Describe(saved) : string.Empty;
 
     partial void OnSelectedSavedRigChanged(SavedCameraRig? value)
     {
+      IsConfirmingDelete = false;
       if (value != null)
         IsNewCamera = false;
     }
+
+    /// <summary>Delete was pressed: the wizard asks before the saved camera is removed.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeleteQuestion))]
+    public partial bool IsConfirmingDelete { get; set; }
+
+    public string DeleteQuestion =>
+      SelectedSavedRig is { } saved
+        ? $"Delete the saved camera '{saved.Name}'? Its file is moved to the backup folder of the camera library, so it can be restored."
+        : string.Empty;
+
+    [ObservableProperty]
+    public partial string DeletedText { get; set; } = string.Empty;
 
     private bool CanDeleteSavedRig() => SelectedSavedRig != null;
 
     [RelayCommand(CanExecute = nameof(CanDeleteSavedRig))]
     private void DeleteSavedRig()
     {
+      DeletedText = string.Empty;
+      IsConfirmingDelete = true;
+    }
+
+    [RelayCommand]
+    private void KeepSavedRig() => IsConfirmingDelete = false;
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSavedRig))]
+    private void ConfirmDeleteSavedRig()
+    {
+      IsConfirmingDelete = false;
       if (SelectedSavedRig is not { } saved)
         return;
       try
       {
-        CameraRigLibrary.Delete(saved.Name, m_libraryDirectory);
+        var backup = CameraRigLibrary.Delete(saved.Name, m_libraryDirectory);
+        DeletedText = $"Deleted '{saved.Name}'. A copy is kept in {backup}.";
       }
       catch (Exception ex)
       {
@@ -270,7 +302,7 @@ namespace MB.FramePacing.Gui.ViewModels
         "The camera sees both markers sharply, at 3 or more camera pixels per module (zoom in or draw a larger marker).",
         "Focus and exposure are fixed (no auto modes). A short exposure, half the frame time or less, reduces blending.",
         "The display runs at full brightness without strobing or PWM dimming.",
-        "The camera films at least twice the refresh rate, ideally 500-1000 fps.",
+        "The camera films at least 4x the frame rate and 2x the refresh rate: for 60 fps on a 60 Hz display, 240 fps is enough, 500 fps is better.",
       };
 
     // ---- Source ----------------------------------------------------------------------------------------------------------------------------
@@ -363,6 +395,7 @@ namespace MB.FramePacing.Gui.ViewModels
       Rig = null;
       await RunAsync(
         "Calibrating: finding both markers, fitting the camera geometry, measuring the scanout...",
+        null,
         (source, token) =>
         {
           var rig = CameraCalibrator.Calibrate(source, new CameraCalibratorOptions(), token);
@@ -373,7 +406,9 @@ namespace MB.FramePacing.Gui.ViewModels
           rig is null ? "Calibration failed."
           : rig.HasFailures ? "Calibration failed: fix what the checks say and calibrate again."
           : rig.Checks.Any(c => c.Level == CameraCheckLevel.Warn) ? "Calibrated. Fix the warnings for reliable results, or continue."
-          : "Calibrated: every check passed."
+          : "Calibrated: every check passed.",
+        rig => rig?.Zones,
+        "The last camera frame with the markers as calibrated: green is the timing zone, orange the second zone."
       );
     }
 
@@ -384,35 +419,47 @@ namespace MB.FramePacing.Gui.ViewModels
         return;
       await RunAsync(
         "Checking the camera against the saved calibration...",
+        rig.Zones,
         (source, token) => (CameraCalibrator.Verify(rig, source, new CameraCalibratorOptions(), token), (CameraRig?)null),
         _ => { },
         _ =>
           Checks.Any(c => c.IsFail)
             ? "The camera or display moved: go back and set up the camera as new (calibrate again)."
-            : "The camera has not moved."
+            : "The camera has not moved.",
+        _ => rig.Zones,
+        "The last camera frame with the markers where the saved calibration expects them (green: timing zone, orange: second zone)."
       );
     }
 
+    /// <param name="zonesWhileRunning">Zones outlined on the frames shown while it runs (null: the plain frames).</param>
+    /// <param name="zonesAfter">Zones outlined on the last frame once it finished.</param>
     private async Task RunAsync(
       string busyText,
+      IReadOnlyList<CameraZone>? zonesWhileRunning,
       Func<ICaptureSource, CancellationToken, (IReadOnlyList<CameraCheck> Checks, CameraRig? Rig)> work,
       Action<CameraRig?> apply,
-      Func<CameraRig?, string> status
+      Func<CameraRig?, string> status,
+      Func<CameraRig?, IReadOnlyList<CameraZone>?> zonesAfter,
+      string lastFrameCaption
     )
     {
       IsBusy = true;
       ErrorText = string.Empty;
       Checks.Clear();
       StatusText = busyText;
+      HasCameraFrame = false;
+      CameraFrameCaption = "What the camera sees, a few frames per second.";
       m_cancel = new CancellationTokenSource();
       CameraRig? rig = null;
+      PreviewCaptureSource? preview = null;
       try
       {
         var choice = CurrentChoice();
         var token = m_cancel.Token;
         var (checks, result) = await Task.Run(() =>
         {
-          using var source = m_openSource(choice, token);
+          using var source = new PreviewCaptureSource(m_openSource(choice, token), frame => ShowCameraFrame(frame, zonesWhileRunning, true));
+          preview = source;
           return work(source, token);
         });
         rig = result;
@@ -420,6 +467,11 @@ namespace MB.FramePacing.Gui.ViewModels
           Checks.Add(new CameraCheckItem(check));
         apply(rig);
         StatusText = status(rig);
+        if (preview is { HasFrame: true })
+        {
+          ShowCameraFrame(preview.LastFrame, zonesAfter(rig), false);
+          CameraFrameCaption = lastFrameCaption;
+        }
       }
       catch (Exception ex)
       {
@@ -432,6 +484,43 @@ namespace MB.FramePacing.Gui.ViewModels
         m_cancel.Dispose();
         m_cancel = null;
       }
+    }
+
+    // ---- Camera frames ---------------------------------------------------------------------------------------------------------------------
+
+    private WriteableBitmap? m_cameraBitmap;
+    private long m_lastCameraFrameTicks;
+
+    /// <summary>What the camera sees while calibrating or checking, and the last frame with the marker zones outlined afterwards.</summary>
+    [ObservableProperty]
+    public partial WriteableBitmap? CameraFrame { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasCameraFrame { get; set; }
+
+    [ObservableProperty]
+    public partial string CameraFrameCaption { get; set; } = string.Empty;
+
+    /// <summary>Converts a frame and hands it to the UI thread; while running only a few frames per second, since the camera is far faster.</summary>
+    private void ShowCameraFrame(GrayImage frame, IReadOnlyList<CameraZone>? zones, bool throttle)
+    {
+      long now = Stopwatch.GetTimestamp();
+      if (throttle && Stopwatch.GetElapsedTime(m_lastCameraFrameTicks, now) < TimeSpan.FromMilliseconds(250))
+        return;
+      m_lastCameraFrameTicks = now;
+      var pixels = GrayBitmap.ToBgra(frame);
+      int width = frame.Width;
+      int height = frame.Height;
+      if (zones != null)
+        CameraOverlay.Draw(pixels, width, height, zones);
+      Dispatcher.UIThread.Post(() =>
+      {
+        m_cameraBitmap = GrayBitmap.Update(m_cameraBitmap, pixels, width, height);
+        // Force the Image control to redraw the reused bitmap
+        CameraFrame = null;
+        CameraFrame = m_cameraBitmap;
+        HasCameraFrame = true;
+      });
     }
 
     // ---- Save ------------------------------------------------------------------------------------------------------------------------------
