@@ -51,7 +51,21 @@
                 <TextBlock Classes="caption" Text="Stored size (smaller = less disk, keep the ratio an integer)" />
                 <TextBox Text="{Binding ScaleText}" PlaceholderText="e.g. 960x540 (empty = full size)" />
                 <TextBlock Classes="caption" Text="Only store a region (source pixels)" />
-                <TextBox Text="{Binding RoiText}" PlaceholderText="x,y,width,height (empty = whole frame)" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                  <TextBox Text="{Binding RoiText}" PlaceholderText="x,y,width,height or auto (empty = whole frame)" />
+                  <Button
+                    Grid.Column="1"
+                    Content="Locate marker"
+                    Command="{Binding LocateMarkerCommand}"
+                    ToolTip.Tip="Find the marker and store only its region: far less disk. The marker must not move."
+                  />
+                </Grid>
+                <TextBlock
+                  Classes="caption"
+                  Text="{Binding LocateText}"
+                  TextWrapping="Wrap"
+                  IsVisible="{Binding LocateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                />
               </StackPanel>
             </Expander>
           </StackPanel>

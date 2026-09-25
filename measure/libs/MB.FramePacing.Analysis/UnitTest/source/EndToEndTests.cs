@@ -162,5 +162,35 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(report.Capture.Layout.Locks, Has.Count.EqualTo(2));
       Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Torn), Is.EqualTo(9), "captures 7, 11, ... 39 are torn");
     }
+
+    [TestCase(true, 20, true)]
+    [TestCase(true, 1, false)]
+    [TestCase(false, 20, false)]
+    public void Analyzer_RegionCapture_WarnsWhenTheMarkerMayHaveMoved(bool region, int lostCaptures, bool expectWarning)
+    {
+      // Only the marker's region was stored (fast capture); the last captures lost the marker, as if the application moved it
+      var header = new CaptureFileHeader(160, 160, FrameRate.FromFps(240), 1920, 1080, region ? new PixelRect(16, 16, 320, 320) : default);
+      Directory.CreateDirectory(m_directory);
+      var frame = new GrayImage(header.Width, header.Height, 96);
+      var record = new byte[header.RecordSize];
+      const int Captures = 40;
+      using (var writer = new CaptureFileWriter(Path.Combine(m_directory, CaptureSessionInfo.FramesFileName), header))
+      {
+        for (int i = 0; i < Captures; ++i)
+        {
+          Array.Fill(frame.Pixels, (byte)96);
+          if (i < Captures - lostCaptures)
+            MarkerRenderer.Render(frame, new MarkerPayload((ulong)(i / 4), i / 4 * 166_667L, 1, MarkerKind.Frame), 8, 8, 3);
+          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, CaptureRecordFlags.None, header.PixelByteCount).Write(record);
+          frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
+          writer.WriteRecords(record);
+        }
+      }
+
+      var report = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions());
+
+      Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable), Is.EqualTo(lostCaptures));
+      Assert.That(report.Warnings.Any(w => w.Contains("may have moved", StringComparison.Ordinal)), Is.EqualTo(expectWarning));
+    }
   }
 }

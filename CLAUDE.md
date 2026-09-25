@@ -81,6 +81,12 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - Image sequences get their exact times from `--fps` or the timestamp CSV (`FrameTimestamps`), not from ffmpeg: its concat
     timestamps are 40 ms coarse.
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
+- **Fast capture** (`--roi auto`, `locate`, the GUI's "Locate marker"):
+  - `FfmpegMarkerLocator` runs ffmpeg uncropped into `MarkerProbe` (nothing is recorded). `MarkerCrop` then picks the region and
+    the integer downscale, and the capture starts a new ffmpeg with `crop=...:exact=1,scale=...`.
+  - The crop starts a whole number of downscale steps before the marker origin; otherwise module edges fall between stored pixels
+    and dense start markers stop decoding.
+  - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures.
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
 - **CI** (mb-quality is not available there; CI runs the same commands directly):

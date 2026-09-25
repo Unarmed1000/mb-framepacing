@@ -36,7 +36,9 @@ namespace MB.FramePacing.App.Commands
       var scaleOption = new Option<string?>("--scale") { Description = "Stored frame size WIDTHxHEIGHT (area downscale). Prefer integer ratios." };
       var roiOption = new Option<string?>("--roi")
       {
-        Description = "Only store this region of the source: x,y,width,height (source pixels, before --scale).",
+        Description =
+          "Only store this region of the source: x,y,width,height (source pixels, before --scale), or 'auto' to find the marker first and "
+          + "store only its region (fast capture; the marker must not move).",
       };
       var durationOption = new Option<string?>("--duration", "-t")
       {
@@ -94,9 +96,8 @@ namespace MB.FramePacing.App.Commands
               Device = CaptureDevice.Parse(parseResult.GetValue(deviceOption)!),
               Mode = modeText != null ? RequestedMode.Parse(modeText) : default,
               InputFormat = parseResult.GetValue(inputFormatOption),
-              Scale = scaleText != null ? RequestedMode.ParseSize(scaleText, scaleText) : null,
-              Roi = roiText != null ? PixelRect.Parse(roiText) : null,
             };
+            options = ApplyRegion(options, roiText, scaleText, cancellationToken);
             var runOptions = new CaptureRunOptions
             {
               OutputDirectory = Path.GetFullPath(parseResult.GetValue(outputOption) ?? DefaultOutputDirectory(config)),
@@ -140,6 +141,27 @@ namespace MB.FramePacing.App.Commands
     {
       var root = config.CaptureDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "mb-framepacing");
       return Path.Combine(root, $"capture-{DateTime.Now:yyyyMMdd-HHmmss}");
+    }
+
+    /// <summary>--roi and --scale; '--roi auto' locates the marker and chooses both.</summary>
+    internal static FfmpegCaptureOptions ApplyRegion(
+      FfmpegCaptureOptions options,
+      string? roiText,
+      string? scaleText,
+      CancellationToken cancellationToken
+    )
+    {
+      if (FfmpegMarkerLocator.IsAutoRoi(roiText))
+      {
+        if (scaleText != null)
+          throw new ArgumentException("--roi auto chooses the stored size itself; leave out --scale.");
+        return LocateCommand.LocateAndApply(options, cancellationToken);
+      }
+      return options with
+      {
+        Scale = scaleText != null ? RequestedMode.ParseSize(scaleText, scaleText) : null,
+        Roi = roiText != null ? PixelRect.Parse(roiText) : null,
+      };
     }
 
     internal static CaptureResult RunWithStatus(ICaptureSource source, CaptureRunOptions options, CancellationToken cancellationToken)

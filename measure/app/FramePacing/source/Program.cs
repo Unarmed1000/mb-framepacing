@@ -38,6 +38,7 @@ namespace MB.FramePacing.App
       {
         DevicesCommand.Create(),
         CaptureCommand.Create(),
+        LocateCommand.Create(),
         ImportCommand.Create(),
         AnalyzeCommand.Create(),
         MarkerSizeCommand.Create(),

@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
-using MB.FramePacing.Marker;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -34,7 +33,10 @@ namespace MB.FramePacing.App.Commands
         Description = "Image sequences: a CSV with 'fileName,timeMs' per image (overrides --fps; the images are used in this order).",
       };
       var scaleOption = new Option<string?>("--scale") { Description = "Stored frame size WIDTHxHEIGHT (area downscale). Prefer integer ratios." };
-      var roiOption = new Option<string?>("--roi") { Description = "Only store this region: x,y,width,height (source pixels, before --scale)." };
+      var roiOption = new Option<string?>("--roi")
+      {
+        Description = "Only store this region: x,y,width,height (source pixels, before --scale), or 'auto' for the marker's region.",
+      };
       var durationOption = new Option<string?>("--duration", "-t") { Description = "Stop after this long (mostly for streams), e.g. 30s." };
       var waitOption = new Option<bool>("--wait-for-start") { Description = "Skip everything before the start marker (keeps a short pre-roll)." };
       var stopOption = new Option<bool>("--stop-at-end") { Description = "Stop once the end marker of the run has been seen." };
@@ -77,11 +79,7 @@ namespace MB.FramePacing.App.Commands
               new MediaInputOptions { Fps = parseResult.GetValue(fpsOption), TimestampFile = parseResult.GetValue(timestampsOption) },
               output
             );
-            var options = media.ToCaptureOptions(ffmpeg) with
-            {
-              Scale = scaleText != null ? RequestedMode.ParseSize(scaleText, scaleText) : null,
-              Roi = roiText != null ? PixelRect.Parse(roiText) : null,
-            };
+            var options = CaptureCommand.ApplyRegion(media.ToCaptureOptions(ffmpeg), roiText, scaleText, cancellationToken);
             var runOptions = new CaptureRunOptions
             {
               OutputDirectory = output,

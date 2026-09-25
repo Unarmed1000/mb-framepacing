@@ -68,6 +68,26 @@ mb-framepacing capture -d "<device>" --mode 1920x1080@240 --scale 960x540 --wait
 Add `--module-px 6` (the module size your application draws) to have the size checked before recording, and `-t 2m` as a safety
 limit.
 
+**Fast capture: store only the marker**
+
+When the disk is the limit (high frame rates, long runs, a laptop), store only the marker instead of whole frames:
+
+```sh
+mb-framepacing locate -d "<device>" --mode 1920x1080@240     # optional: shows where the marker is and what would be stored
+mb-framepacing capture -d "<device>" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end --analyze
+```
+
+`--roi auto` reads the source for a moment (nothing is recorded), finds the marker, then records only the region around it,
+downscaled to 3 stored pixels per module (4 with MJPEG). With 6 px modules in a 1080p source that is about 27 KB per captured frame
+instead of 2 MB. In the GUI, type `auto` as the region under **Advanced**, or press **Locate marker** to fill in the region and
+stored size now.
+
+- The application must already draw the marker when the capture starts (idle frame markers are enough), and the marker must
+  **not move**: a marker that leaves the region shows as undecodable captures, and the analysis warns about it.
+- Only the top marker is stored, so tearing is not checked.
+- `--roi auto` chooses the stored size itself; leave out `--scale`. `locate` prints the region as `--roi … --scale …` to reuse it
+  without searching again.
+
 ## 3. Measure from a recording
 
 Recorded with other equipment, such as a high speed camera or a recorder? Import the recording. Nothing is dropped, and any frame
@@ -85,7 +105,7 @@ rate works.
 - Record **lossless or at a high bit rate** (FFV1, lossless H.264/HEVC, PNG images): heavy compression blurs the marker.
 - Images are sorted by name with numbers compared as numbers (`frame2` before `frame10`). A timestamp file is CSV with one line per
   image, `fileName,timeMs`, in the order the frames were taken; `#` comments and a header line are allowed.
-- `--scale` and `--roi x,y,width,height` work on imports too.
+- `--scale`, `--roi x,y,width,height` and `--roi auto` work on imports too.
 
 ## 4. Results
 
@@ -127,7 +147,7 @@ or use **Browse...** and **Analyze** on the Analyze page.
 | "ffmpeg not found"                               | Install it (platform guide, step 1). If it is not on PATH, point to it: GUI **Settings**, `mb-framepacing config --set-ffmpeg <path>`, or `--ffmpeg <path>`.                                                                                                |
 | "No marker seen yet" / many undecodable captures | The marker must be drawn **last** (after post effects, UI and upscaling), unblended, pure black and white, with HDR off. Check it is at least 3 stored pixels per module after `--scale`; avoid MJPEG if the card has another format.                       |
 | Recording never starts with the start marker     | The start marker must appear whole in at least one captured frame (every frame is checked). Show it for about three capture frames (100 ms at 30 fps) so a dropped or torn capture cannot lose it, and check that the preview shows "SequenceStart marker". |
-| Frames dropped by the recorder                   | The disk is too slow: use a smaller `--scale`, a `--roi` around the marker, or a faster SSD. `selftest --fps <rate> --size <size>` shows what this machine sustains.                                                                                        |
+| Frames dropped by the recorder                   | The disk is too slow: store only the marker (`--roi auto`), use a smaller `--scale`, or a faster SSD. `selftest --fps <rate> --size <size>` shows what this machine sustains.                                                                               |
 | Frames dropped by the device / ffmpeg            | The card or its USB link cannot keep up in that format: try an uncompressed format (`--input-format nv12` or `yuyv422`) or a lower mode.                                                                                                                    |
 | Warning about host timestamps                    | The source gives no per-frame timestamps, so the recording PC's clock is used and has more jitter. Prefer device timestamps (v4l2 and most DirectShow cards provide them).                                                                                  |
 | macOS: no frames arrive                          | Allow camera access: **System Settings → Privacy & Security → Camera**.                                                                                                                                                                                     |

@@ -79,7 +79,8 @@ The capture pipeline only works if the marker reaches the display output unmodif
    points down). Do **not** add the old D3D9 half-pixel offset.
 4. Render at the swap chain's resolution. If the application renders at a lower resolution and upscales, draw the marker
    after the upscale.
-5. Keep the marker at a **fixed position** every frame. The analyzer locks onto the region after the first detection.
+5. Keep the marker at a **fixed position** every frame. The analyzer locks onto the region after the first detection, and a fast
+   capture (`--roi auto`) stores only that region, so a marker that moves is lost.
 6. Update the payload every frame, including frames that repeat the same animation time.
 
 ## Test sequences
@@ -130,7 +131,7 @@ origin and the settings for each library.
 
 | Source → stored             | s     | Minimum module px | Recommended module px   | Marker size at recommended |
 | --------------------------- | ----- | ----------------- | ----------------------- | -------------------------- |
-| 1:1 (or `--roi`)            | 1     | 2                 | 3 (4 if MJPEG)          | 99 px (132 px)             |
+| 1:1                         | 1     | 2                 | 3 (4 if MJPEG)          | 99 px (132 px)             |
 | 1440p → 1080p               | 0.75  | 3                 | 4                       | 132 px                     |
 | 1080p → 540p, 2160p → 1080p | 0.5   | 4                 | **6 (library default)** | 198 px                     |
 | 1080p → 360p                | 0.333 | 6                 | 9                       | 297 px                     |
@@ -144,7 +145,11 @@ origin and the settings for each library.
 - **At the hard minimum (2 stored px per module) alignment is required, not optional.** The test suite shows that aligned
   2 px markers decode reliably, while the same markers shifted off the scaling grid do not decode at all.
 - A non-integer ratio (for example 1440p → 1080p) still works, but use at least the recommended size, not the minimum.
-- With `capture --roi`, the marker region is stored at native resolution (`s = 1`) whatever `--scale` is.
+- `--roi` crops first and `--scale` then scales the crop, so `s` is the `--scale` height divided by the `--roi` height (1 without
+  `--scale`).
+- `--roi auto` (fast capture) crops the region around the marker's origin that holds the largest start marker, starting a whole
+  number of downscale steps before the origin, and downscales it by the largest integer ratio that keeps the recommended stored
+  size (3 px per module, 4 with MJPEG). Only the top marker is stored, so tearing is not checked.
 
 ### Checks in the tools
 

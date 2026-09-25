@@ -191,7 +191,17 @@ namespace MB.FramePacing.Gui.ViewModels
     [NotifyPropertyChangedFor(nameof(IsIdle))]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LocateMarkerCommand))]
     public partial bool IsCapturing { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LocateMarkerCommand))]
+    public partial bool IsLocating { get; set; }
+
+    /// <summary>What 'Locate marker' found.</summary>
+    [ObservableProperty]
+    public partial string LocateText { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string PhaseText { get; set; } = "Ready";
@@ -318,7 +328,7 @@ namespace MB.FramePacing.Gui.ViewModels
     [RelayCommand(CanExecute = nameof(CanOpenLastCapture))]
     private void OpenLastCapture() => m_dialogs.ShowInFileManager(LastCaptureDirectory);
 
-    private bool CanStart() => !IsCapturing;
+    private bool CanStart() => !IsCapturing && !IsLocating;
 
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()
@@ -349,7 +359,7 @@ namespace MB.FramePacing.Gui.ViewModels
         var result = await Task.Run(
           () =>
           {
-            using var source = CreateSource(device, ref runOptions);
+            using var source = CreateSource(device, ref runOptions, token);
             return CaptureRunner.Run(source, runOptions, progress => Dispatcher.UIThread.Post(() => ShowProgress(progress)), token);
           },
           CancellationToken.None
@@ -378,7 +388,45 @@ namespace MB.FramePacing.Gui.ViewModels
     [RelayCommand(CanExecute = nameof(CanStop))]
     private void Stop() => m_cancel?.Cancel();
 
-    private ICaptureSource CreateSource(DeviceItem? device, ref CaptureRunOptions runOptions)
+    private ICaptureSource CreateSource(DeviceItem? device, ref CaptureRunOptions runOptions, CancellationToken cancellationToken)
+    {
+      var ffmpegOptions = CreateFfmpegOptions(device, runOptions.OutputDirectory);
+      if (ffmpegOptions != null)
+      {
+        ffmpegOptions = ApplyRegion(ffmpegOptions, cancellationToken);
+        runOptions = runOptions with
+        {
+          FfmpegVersion = m_ffmpegVersion,
+          FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(ffmpegOptions)),
+        };
+        return FfmpegCaptureSource.Start(ffmpegOptions, TimeSpan.FromSeconds(device?.Device != null ? 20 : 30));
+      }
+
+      // The synthetic game: a 144 Hz game with stalls and skipped frames, captured at 500 fps, with start/end markers
+      var scenario = new SyntheticScenario(
+        new SyntheticScenarioOptions
+        {
+          CaptureFps = 500,
+          RefreshHz = 144,
+          RunSeconds = 3,
+          Width = 480,
+          Height = 270,
+          ModuleSizePx = 3,
+          OriginX = 24,
+          OriginY = 24,
+          StallEvery = 37,
+          SkipEvery = 53,
+          RunName = "synthetic test game",
+        }
+      );
+      return new SyntheticCaptureSource(scenario, paced: true);
+    }
+
+    /// <summary>
+    /// The ffmpeg options for the selected capture device, video file, image folder or stream, without crop and scale; null for the synthetic
+    /// game. An image folder writes its ffconcat list into <paramref name="workDirectory"/>.
+    /// </summary>
+    private FfmpegCaptureOptions? CreateFfmpegOptions(DeviceItem? device, string workDirectory)
     {
       if (device?.Kind is SourceKind.VideoFile or SourceKind.ImageFolder or SourceKind.Stream)
       {
@@ -395,59 +443,70 @@ namespace MB.FramePacing.Gui.ViewModels
         var media = MediaInput.Create(
           MediaPath.Trim(),
           new MediaInputOptions { Fps = fps, TimestampFile = string.IsNullOrWhiteSpace(TimestampFile) ? null : TimestampFile.Trim() },
-          runOptions.OutputDirectory
+          workDirectory
         );
-        var mediaOptions = media.ToCaptureOptions(ffmpegPath) with
-        {
-          Scale = string.IsNullOrWhiteSpace(ScaleText) ? null : RequestedMode.ParseSize(ScaleText.Trim(), "scale"),
-          Roi = string.IsNullOrWhiteSpace(RoiText) ? null : PixelRect.Parse(RoiText.Trim()),
-        };
-        runOptions = runOptions with
-        {
-          FfmpegVersion = m_ffmpegVersion,
-          FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(mediaOptions)),
-        };
-        return FfmpegCaptureSource.Start(mediaOptions, TimeSpan.FromSeconds(30));
+        return media.ToCaptureOptions(ffmpegPath);
       }
 
       if (device?.Device is not { } captureDevice)
+        return null;
+      return new FfmpegCaptureOptions
       {
-        // The synthetic game: a 144 Hz game with stalls and skipped frames, captured at 500 fps, with start/end markers
-        var scenario = new SyntheticScenario(
-          new SyntheticScenarioOptions
-          {
-            CaptureFps = 500,
-            RefreshHz = 144,
-            RunSeconds = 3,
-            Width = 480,
-            Height = 270,
-            ModuleSizePx = 3,
-            OriginX = 24,
-            OriginY = 24,
-            StallEvery = 37,
-            SkipEvery = 53,
-            RunName = "synthetic test game",
-          }
-        );
-        return new SyntheticCaptureSource(scenario, paced: true);
-      }
-
-      var ffmpeg = m_ffmpeg ?? throw new InvalidOperationException("ffmpeg is not set up. Open Settings to set it up.");
-      var options = new FfmpegCaptureOptions
-      {
-        FfmpegPath = ffmpeg,
+        FfmpegPath = m_ffmpeg ?? throw new InvalidOperationException("ffmpeg is not set up. Open Settings to set it up."),
         Device = captureDevice,
         Mode = string.IsNullOrWhiteSpace(ModeText) ? default : RequestedMode.Parse(ModeText.Trim()),
         InputFormat = string.IsNullOrWhiteSpace(InputFormat) ? null : InputFormat.Trim(),
+      };
+    }
+
+    /// <summary>The stored size and region; "auto" as the region finds the marker first and stores only its region (fast capture).</summary>
+    private FfmpegCaptureOptions ApplyRegion(FfmpegCaptureOptions options, CancellationToken cancellationToken)
+    {
+      if (FfmpegMarkerLocator.IsAutoRoi(RoiText))
+      {
+        if (!string.IsNullOrWhiteSpace(ScaleText))
+          throw new InvalidOperationException("The region 'auto' chooses the stored size itself; clear the stored size.");
+        Dispatcher.UIThread.Post(() => PhaseText = "Looking for the marker...");
+        return FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, cancellationToken).Apply(options);
+      }
+      return options with
+      {
         Scale = string.IsNullOrWhiteSpace(ScaleText) ? null : RequestedMode.ParseSize(ScaleText.Trim(), "scale"),
         Roi = string.IsNullOrWhiteSpace(RoiText) ? null : PixelRect.Parse(RoiText.Trim()),
       };
-      runOptions = runOptions with
+    }
+
+    /// <summary>Find the marker now and fill in the region and stored size, so the next captures store only the marker's region.</summary>
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private async Task LocateMarkerAsync()
+    {
+      ErrorText = string.Empty;
+      IsLocating = true;
+      LocateText = "Looking for the marker...";
+      var device = SelectedDevice;
+      try
       {
-        FfmpegVersion = m_ffmpegVersion,
-        FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(options)),
-      };
-      return FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(20));
+        var workDirectory = Path.Combine(Path.GetTempPath(), "mb-framepacing-locate");
+        var result = await Task.Run(() =>
+        {
+          var options =
+            CreateFfmpegOptions(device, workDirectory)
+            ?? throw new InvalidOperationException("The synthetic test game needs no region; choose a capture device or a file.");
+          return FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, CancellationToken.None);
+        });
+        RoiText = result.Crop.Roi.ToString();
+        ScaleText = result.Scale is { } scale ? $"{scale.Width}x{scale.Height}" : string.Empty;
+        LocateText = result.Summary + " The marker must not move.";
+      }
+      catch (Exception ex)
+      {
+        LocateText = string.Empty;
+        ErrorText = ex.Message;
+      }
+      finally
+      {
+        IsLocating = false;
+      }
     }
 
     private async Task LoadModesAsync(string ffmpeg, CaptureDevice device)

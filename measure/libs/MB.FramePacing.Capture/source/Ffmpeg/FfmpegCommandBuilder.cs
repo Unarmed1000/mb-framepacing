@@ -31,8 +31,9 @@ namespace MB.FramePacing.Capture.Ffmpeg
     public static string BuildFilter(FfmpegCaptureOptions options)
     {
       var filters = new List<string>();
+      // exact=1: crop at the given pixel even on chroma subsampled inputs (only luma is stored), so the marker grid stays where it was located
       if (options.Roi is { } roi && !roi.IsEmpty)
-        filters.Add(Invariant($"crop={roi.Width}:{roi.Height}:{roi.X}:{roi.Y}"));
+        filters.Add(Invariant($"crop={roi.Width}:{roi.Height}:{roi.X}:{roi.Y}:exact=1"));
       if (options.Scale is { } scale)
         filters.Add(Invariant($"scale={scale.Width}:{scale.Height}:flags=area"));
       filters.Add("format=gray");

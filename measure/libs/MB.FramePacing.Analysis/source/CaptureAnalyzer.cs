@@ -27,6 +27,7 @@ namespace MB.FramePacing.Analysis
     public const string AnalysisDirectoryName = "analysis";
     public const string SummaryFileName = "summary.json";
     public const string CapturesFileName = "captures.csv";
+    public const double MovedMarkerUndecodableFraction = 0.05;
 
     private static readonly JsonSerializerOptions g_jsonOptions = new JsonSerializerOptions
     {
@@ -55,6 +56,11 @@ namespace MB.FramePacing.Analysis
       var timeline = TimelineAnalyzer.Analyze(capture.Rows, options.Timeline);
       var warnings = new List<string>(capture.Layout.Warnings);
       warnings.AddRange(timeline.Warnings);
+      if (MarkerMayHaveMoved(capture))
+        warnings.Add(
+          $"Many captures could not be decoded and only the region {capture.Header.Roi} was stored: the marker may have moved out of it. "
+            + "Keep the marker at a fixed position, or locate it again ('locate', --roi auto)."
+        );
       if (capture.TimeSource == TimeSource.Host)
         warnings.Add("Host timestamps are used (the capture has no device timestamps): expect extra jitter from process scheduling.");
       if (session is { FramesDroppedByRecorder: > 0 })
@@ -67,6 +73,19 @@ namespace MB.FramePacing.Analysis
       var report = new AnalysisReport(captureDirectory, outputDirectory, session, capture, timeline, warnings);
       WriteReports(report, options);
       return report;
+    }
+
+    /// <summary>
+    /// A capture that stored only a region relies on the marker staying inside it: more than <see cref="MovedMarkerUndecodableFraction"/>
+    /// undecodable captures hint that it did not.
+    /// </summary>
+    private static bool MarkerMayHaveMoved(DecodedCapture capture)
+    {
+      if (capture.Header.Roi.IsEmpty)
+        return false;
+      int recorded = capture.Rows.Count(r => r.Status != CaptureStatus.NotRecorded);
+      int undecodable = capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable);
+      return recorded > 0 && undecodable > recorded * MovedMarkerUndecodableFraction;
     }
 
     public static string RunFramesFileName(RunAnalysis run, int ordinal) =>

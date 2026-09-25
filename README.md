@@ -233,6 +233,8 @@ mb-framepacing config --init --set-ffmpeg /path/to/ffmpeg # once, if ffmpeg is n
 mb-framepacing devices --modes                            # list capture cards and their modes
 mb-framepacing marker-size --source 3840x2160 --stored 960x540  # the module size the application should draw
 mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --scale 960x540 --wait-for-start --stop-at-end --analyze
+mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end  # fast capture
+mb-framepacing locate -d "Cam Link 4K" --mode 1920x1080@240  # where the marker is, and the region a fast capture stores
 mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
 mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images at a known frame rate
 mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeMs)
@@ -249,7 +251,7 @@ mb-framepacing analyze <capture folder>                   # (re)analyse
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream                                    |
 | Live capture     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common) |
-| Disk             | A fast SSD: 960×540 writes about 0.5 MB per frame (use `--scale` or `--roi` to reduce it)                                         |
+| Disk             | A fast SSD: 960×540 writes about 0.5 MB per frame (`--roi auto` stores only the marker: about 27 KB)                              |
 | Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                                                  |
 
 ### How fast can it record?
@@ -264,6 +266,12 @@ There is no built-in frame rate limit: mb-framepacing records whatever the sourc
   from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works.
 - **Faster is more precise:** results are exact to one capture period, so 240 fps resolves about ±4.2 ms, 500 fps ±2 ms,
   1000 fps ±1 ms.
+
+**Fast capture** (`--roi auto`, or **Locate marker** in the GUI) stores only the marker instead of whole frames. It first reads
+the source for a moment to find the marker, then has ffmpeg crop to that region and downscale it to 3 stored pixels per module.
+A 1080p source with 6 px modules then writes about 27 KB per captured frame instead of 2 MB (0.5 MB at 960×540): about 6 MiB/s at
+240 fps. The marker must stay at a fixed position, and only the top marker is stored, so tearing is not checked. `locate` prints
+the region as `--roi … --scale …`, to reuse it without searching again.
 
 `mb-framepacing selftest --fps <rate>` checks what this machine sustains. On the development PC (NVMe SSD), 960×540 at
 2000 fps (about 980 MiB/s) ran with no drops and every frame matched.

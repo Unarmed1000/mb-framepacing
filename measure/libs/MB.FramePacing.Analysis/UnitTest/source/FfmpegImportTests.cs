@@ -104,36 +104,9 @@ namespace MB.FramePacing.Analysis.UnitTest
       return CaptureAnalyzer.Analyze(output, new AnalysisOptions());
     }
 
-    private static void AssertMatchesGroundTruth(SyntheticScenario scenario, AnalysisReport report, double capturePeriodMs)
+    /// <summary>Render the scenario and encode it losslessly into a 240 fps video with ffmpeg itself.</summary>
+    private string EncodeVideo(SyntheticScenario scenario)
     {
-      var run = report.Timeline.Runs.Single();
-      Assert.That(run.RunId, Is.EqualTo(5));
-      Assert.That(run.Name, Is.EqualTo("ffmpeg import"));
-      Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
-      Assert.That(report.CapturePeriodMs, Is.EqualTo(capturePeriodMs).Within(0.01));
-      var expected = ExpectedFrames(scenario);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void ImageSequence_ImportsWithExactTimes()
-    {
-      var scenario = CreateScenario();
-      var images = Directory.CreateDirectory(Path.Combine(m_directory, "images")).FullName;
-      var sink = new PgmSink(images, scenario.Options.Width, scenario.Options.Height);
-      new SyntheticCaptureSource(scenario, paced: false).Run(sink, new CaptureClock(), CancellationToken.None);
-
-      var report = ImportAndAnalyze(images, new MediaInputOptions { Fps = 240 });
-
-      Assert.That(report.Capture.Rows.Count, Is.EqualTo(sink.Count), "one capture per image, the concat list's repeated last entry is not recorded");
-      Assert.That(report.Capture.TimeSource, Is.EqualTo(TimeSource.Device));
-      AssertMatchesGroundTruth(scenario, report, 1000.0 / 240);
-    }
-
-    [Test]
-    public void VideoFile_ImportsWithTheFilesTimestamps()
-    {
-      var scenario = CreateScenario();
       var images = Directory.CreateDirectory(Path.Combine(m_directory, "images")).FullName;
       new SyntheticCaptureSource(scenario, paced: false).Run(
         new PgmSink(images, scenario.Options.Width, scenario.Options.Height),
@@ -141,7 +114,6 @@ namespace MB.FramePacing.Analysis.UnitTest
         CancellationToken.None
       );
 
-      // Encode the frames losslessly into a 240 fps video with ffmpeg itself
       var video = Path.Combine(m_directory, "markers.mkv");
       var encode = new ProcessStartInfo(m_ffmpeg)
       {
@@ -173,10 +145,77 @@ namespace MB.FramePacing.Analysis.UnitTest
         process.WaitForExit();
         Assert.That(process.ExitCode, Is.Zero, errors);
       }
+      return video;
+    }
+
+    private static void AssertMatchesGroundTruth(SyntheticScenario scenario, AnalysisReport report, double capturePeriodMs)
+    {
+      var run = report.Timeline.Runs.Single();
+      Assert.That(run.RunId, Is.EqualTo(5));
+      Assert.That(run.Name, Is.EqualTo("ffmpeg import"));
+      Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
+      Assert.That(report.CapturePeriodMs, Is.EqualTo(capturePeriodMs).Within(0.01));
+      var expected = ExpectedFrames(scenario);
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void ImageSequence_ImportsWithExactTimes()
+    {
+      var scenario = CreateScenario();
+      var images = Directory.CreateDirectory(Path.Combine(m_directory, "images")).FullName;
+      var sink = new PgmSink(images, scenario.Options.Width, scenario.Options.Height);
+      new SyntheticCaptureSource(scenario, paced: false).Run(sink, new CaptureClock(), CancellationToken.None);
+
+      var report = ImportAndAnalyze(images, new MediaInputOptions { Fps = 240 });
+
+      Assert.That(report.Capture.Rows.Count, Is.EqualTo(sink.Count), "one capture per image, the concat list's repeated last entry is not recorded");
+      Assert.That(report.Capture.TimeSource, Is.EqualTo(TimeSource.Device));
+      AssertMatchesGroundTruth(scenario, report, 1000.0 / 240);
+    }
+
+    [Test]
+    public void VideoFile_ImportsWithTheFilesTimestamps()
+    {
+      var scenario = CreateScenario();
+      var video = EncodeVideo(scenario);
 
       var report = ImportAndAnalyze(video, new MediaInputOptions());
 
       // Matroska stores millisecond timestamps, so the period is 4 ms (+-1) rather than 4.167 ms; the frames must still all be there
+      var run = report.Timeline.Runs.Single();
+      Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(ExpectedFrames(scenario)));
+    }
+
+    /// <summary>Fast capture (--roi auto): locate the marker, store only its region downscaled, and still recover every frame.</summary>
+    [Test]
+    public void VideoFile_AutoRoi_StoresOnlyTheMarkerRegion()
+    {
+      var scenario = new SyntheticScenario(CreateScenario().Options with { Width = 640, Height = 360, ModuleSizePx = 6, OriginX = 64, OriginY = 48 });
+      var video = EncodeVideo(scenario);
+      var output = Path.Combine(m_directory, "capture");
+      var options = MediaInput.Create(video, new MediaInputOptions(), output).ToCaptureOptions(m_ffmpeg);
+
+      var located = FfmpegMarkerLocator.Locate(options, TimeSpan.FromSeconds(30), CancellationToken.None);
+
+      Assert.That(located.SourceLock.Bounds.X, Is.EqualTo(64).Within(1));
+      Assert.That(located.SourceLock.Bounds.Y, Is.EqualTo(48).Within(1));
+      Assert.That(located.Crop.Factor, Is.EqualTo(2), "6 px modules are stored at 3 px");
+      Assert.That(located.Scale, Is.EqualTo((located.Crop.StoredWidth, located.Crop.StoredHeight)));
+      using (var source = FfmpegCaptureSource.Start(located.Apply(options), TimeSpan.FromSeconds(30)))
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output }, null, CancellationToken.None);
+      var report = CaptureAnalyzer.Analyze(output, new AnalysisOptions());
+
+      var header = report.Capture.Header;
+      Assert.That(header.Roi, Is.EqualTo(located.Crop.Roi));
+      Assert.That((header.Width, header.Height), Is.EqualTo((located.Crop.StoredWidth, located.Crop.StoredHeight)));
+      Assert.That(header.RecordSize, Is.EqualTo(located.RecordSize));
+      Assert.That(located.RecordSize * 4, Is.LessThan(located.FullFrameRecordSize), "far less to write than whole frames");
+      var framesLength = new FileInfo(Path.Combine(output, CaptureSessionInfo.FramesFileName)).Length;
+      Assert.That(framesLength, Is.EqualTo(CaptureFileHeader.HeaderSize + (report.Capture.Rows.Count * (long)header.RecordSize)));
+      Assert.That(report.Warnings, Has.None.Contains("moved"));
+
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
       Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(ExpectedFrames(scenario)));

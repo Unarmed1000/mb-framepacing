@@ -148,7 +148,7 @@ namespace MB.FramePacing.Capture.UnitTest
       };
       var args = string.Join(" ", FfmpegCommandBuilder.BuildCapture(options));
       Assert.That(args, Does.Contain("-f dshow -rtbufsize 1024M -video_size 1920x1080 -framerate 240 -vcodec mjpeg -i video=Cam Link 4K"));
-      Assert.That(args, Does.Contain("-copyts -fps_mode passthrough -vf crop=960:540:0:0,scale=480:270:flags=area,format=gray,showinfo"));
+      Assert.That(args, Does.Contain("-copyts -fps_mode passthrough -vf crop=960:540:0:0:exact=1,scale=480:270:flags=area,format=gray,showinfo"));
       Assert.That(args, Does.EndWith("-f rawvideo -pix_fmt gray pipe:1"));
     }
 
