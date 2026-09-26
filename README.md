@@ -70,8 +70,9 @@ as long, torn frames, and the overall drift between the game's clock and the dis
 [Intel PresentMon](https://game.intel.com/story/intel-presentmon/)); positive: shown too soon, negative: shown too late.
 The difference is where the numbers come from. The application writes its exact animation time into each frame, instead of it
 being estimated. The display time comes from the captured video signal, instead of software flip events, and is precise to one
-capture period. **[Vocabulary](doc/vocabulary.md)** maps the terms used here to their other names (PresentMon, Gamers Nexus,
-Digital Foundry, Unity, Unreal, Android, video) and links the articles they come from.
+capture period. **[Vocabulary](doc/vocabulary.md)** lists where each term appears in the CSV and the charts;
+[mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) explains the terms, with their other names,
+diagrams and sources.
 
 ![The Analyze page: every presented frame, its animation error and the headline numbers](doc/images/gui-analysis.png)
 
