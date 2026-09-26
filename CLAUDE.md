@@ -72,7 +72,7 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     under `C:/Program Files/Unity/Hub/Editor`. Run it after changing the core or the helpers.
   - The core must stay C# 9 / .NET Standard 2.0 without UnityEngine.
 - **Standalone release archive:** `marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release
-  archive, and falls back to `marker/VERSION` and the repository root otherwise.
+  archive, and falls back to `marker/VERSION`, `marker/LICENSE` and the repository root's `licenses/` otherwise.
 - **Docs**
   - Formatting: `npm install && npm run format` (Prettier: Markdown/JSON/YAML; config `.prettierrc.json`, ignores in
     `.prettierignore`).
@@ -144,6 +144,13 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     CSharpier (`.csharpierrc`, width 150).
 - **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored, GoogleTest
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
+- **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):
+  - BSD 3-Clause: `marker/` (the libraries applications embed; `marker/LICENSE` holds the text alone and is what the C++ archive,
+    the CMake install and the Unity package ship), `doc/marker-format.md`, `doc/integrating.md`, `test-data/markers/`.
+  - PolyForm Perimeter 1.0.1: everything else (the tools, their libraries, scripts, other docs, build and CI files). The tools ship
+    the root `LICENSE`, which holds both texts, since they include the BSD marker library.
+  - A new file belongs to the license of its path. Moving code across that line (for example from `measure/` into `marker/`)
+    changes its license: only Mana Battery can decide that.
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a
   row in `licenses/README.md`, in the same change.
 - **Two counters:** the capture index (capture card) and the marker frame index (application) are unrelated; never compare them.

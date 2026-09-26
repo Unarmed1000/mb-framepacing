@@ -28,7 +28,7 @@ REPOSITORY_ROOT = MARKER_DIR.parent
 EXCLUDED_DIRECTORIES = {"build", "out", ".vs", ".vscode", "__pycache__"}
 EXTRA_FILES = {
     "VERSION": MARKER_DIR / "VERSION",
-    "LICENSE": REPOSITORY_ROOT / "LICENSE",
+    "LICENSE": MARKER_DIR / "LICENSE",
     "licenses/qrcodegen-MIT.txt": REPOSITORY_ROOT / "licenses" / "qrcodegen-MIT.txt",
     "licenses/googletest-BSD-3-Clause.txt": REPOSITORY_ROOT / "licenses" / "googletest-BSD-3-Clause.txt",
     "doc/marker-format.md": REPOSITORY_ROOT / "doc" / "marker-format.md",

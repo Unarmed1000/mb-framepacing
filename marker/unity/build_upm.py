@@ -5,7 +5,7 @@ The package is not kept as one folder on master (its core would duplicate marker
 
   package.json            package.template.json with the version from marker/VERSION
   README.md               marker/unity/README.md
-  LICENSE.md              the repository's LICENSE
+  LICENSE.md              marker/LICENSE (BSD 3-Clause)
   Third Party Notices.md  qrcodegen (MIT), ported in the core
   Runtime/Core/           marker/csharp/source/*.cs + MB.FrameMarker.asmdef (engine free)
   Runtime/Unity/          the Unity helpers + MB.FrameMarker.Unity.asmdef
@@ -103,7 +103,7 @@ def assemble(output: Path, version: str) -> None:
     _ = (output / "package.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     _ = shutil.copy2(SCRIPT_DIR / "README.md", output / "README.md")
-    _ = shutil.copy2(REPOSITORY_ROOT / "LICENSE", output / "LICENSE.md")
+    _ = shutil.copy2(MARKER_DIR / "LICENSE", output / "LICENSE.md")
     qrcodegen = (REPOSITORY_ROOT / "licenses" / "qrcodegen-MIT.txt").read_text(encoding="utf-8")
     notices = "\n".join(
         [

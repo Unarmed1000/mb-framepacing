@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 4.0)
 
-# Inside the repository the version, LICENSE and license texts live above this directory (marker/VERSION, shared with the C# marker
-# library, and the repository root). A standalone release archive carries them next to this file instead.
+# Inside the repository the version and LICENSE live in marker/ (shared with the C# marker library) and the third-party license
+# texts in the repository root's licenses/. A standalone release archive carries them all next to this file instead.
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/VERSION")
   set(MB_FRAMEMARKER_META_DIR "${CMAKE_CURRENT_LIST_DIR}")
   set(MB_FRAMEMARKER_LEGAL_DIR "${CMAKE_CURRENT_LIST_DIR}")
@@ -101,7 +101,7 @@ install(TARGETS mb_framemarker EXPORT mb_framemarkerTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 # The library's own license and the one third-party component compiled into it (qrcodegen)
-install(FILES ${MB_FRAMEMARKER_LEGAL_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framemarker)
+install(FILES ${MB_FRAMEMARKER_META_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framemarker)
 install(FILES ${MB_FRAMEMARKER_LEGAL_DIR}/licenses/qrcodegen-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framemarker/licenses)
 install(EXPORT mb_framemarkerTargets NAMESPACE mb:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framemarker)
 configure_package_config_file(cmake/mb_framemarkerConfig.cmake.in
