@@ -299,7 +299,7 @@ namespace MB.FramePacing.Gui.ViewModels
       new[]
       {
         "The camera is on a tripod or arm at a fixed distance, roughly square to the screen. Nothing may move after calibration.",
-        "The application draws the same marker in the TopLeft and BottomLeft slots (Unity: Tearing markers), with vsync on.",
+        "The application draws the main marker and the sync marker (Unity: Sync Marker), with vsync on.",
         "The camera sees both markers sharply, at 3 or more camera pixels per module (zoom in or draw a larger marker).",
         "Focus and exposure are fixed (no auto modes). A short exposure, half the frame time or less, reduces blending.",
         "The display runs at full brightness without strobing or PWM dimming.",

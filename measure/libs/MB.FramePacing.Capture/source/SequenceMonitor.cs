@@ -99,20 +99,20 @@ namespace MB.FramePacing.Capture
         result = m_lockedDecoder.DecodeLocked(frame, markerLock);
       else
       {
-        result = m_searchDecoder.Decode(frame);
+        result = m_searchDecoder.DecodeMain(frame);
         if (result.IsDecoded && result.ModuleSizePx > 0)
           m_lock = LockFor(result);
       }
       return result.IsDecoded ? result : null;
     }
 
-    /// <summary>
-    /// All markers are drawn at the same origin; the frame marker lock is the origin plus the frame marker size, whichever marker kind was found.
-    /// </summary>
-    public static MarkerLock LockFor(MarkerDecodeResult result)
-    {
-      int size = (int)System.Math.Round(MarkerRenderer.MarkerSizePx(1) * result.ModuleSizePx);
-      return new MarkerLock(new PixelRect(result.Bounds.X, result.Bounds.Y, size, size), result.ModuleSizePx);
-    }
+    /// <summary>The lock on the marker that was found: its origin plus the size of its kind (main or sync marker).</summary>
+    public static MarkerLock LockFor(MarkerDecodeResult result) =>
+      MarkerLock.At(
+        result.Bounds.X,
+        result.Bounds.Y,
+        result.ModuleSizePx,
+        result.Payload.Kind == MarkerKind.Sync ? MarkerKind.Sync : MarkerKind.Frame
+      );
   }
 }

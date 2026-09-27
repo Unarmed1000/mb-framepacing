@@ -1,10 +1,10 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Calibrates and verifies a camera rig (EXPERIMENTAL camera support). The application draws the same marker in the TopLeft and BottomLeft
-//* slots; the camera films both. Calibration finds each marker, fits its module to camera transform (detector points, then a refinement
-//* against the known module pattern), measures how much later the scanout reaches the second zone and the refresh rate, and checks module
-//* size, focus, exposure, flicker and stability. Verification only checks that both markers are still where the rig says.
+//* Calibrates and verifies a camera rig (EXPERIMENTAL camera support). The application draws the main marker (top-left) and the sync marker
+//* (bottom-left); the camera films both. Calibration finds each marker, fits its module to camera transform (detector points, then a
+//* refinement against the known module pattern), measures how much later the scanout reaches the sync marker and the refresh rate, and
+//* checks module size, focus, exposure, flicker and stability. Verification only checks that both markers are still where the rig says.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -27,8 +27,6 @@ namespace MB.FramePacing.Capture.Camera
     /// <summary>Below this many camera pixels per module decoding is unreliable; below the recommended size it is marginal.</summary>
     public const double MinimumModulePx = 2.0;
     public const double RecommendedModulePx = 3.0;
-
-    private const int FrameModules = MarkerRenderer.FrameQrModuleCount;
 
     /// <summary>Collect frames from <paramref name="source"/> and calibrate from them.</summary>
     public static CameraRig Calibrate(ICaptureSource source, CameraCalibratorOptions options, CancellationToken cancellationToken)
@@ -58,36 +56,32 @@ namespace MB.FramePacing.Capture.Camera
 
       var hits = FindMarkers(frames, options.GeometryFrames, cancellationToken);
       var clusters = Cluster(hits);
-      if (clusters.Count < RequiredZones)
+      // The main marker (any kind but sync) and the sync marker, each the best supported position of its kind
+      var main = clusters.FirstOrDefault(c => c[0].Payload.Kind != MarkerKind.Sync);
+      var sync = clusters.FirstOrDefault(c => c[0].Payload.Kind == MarkerKind.Sync);
+      if (main == null || sync == null)
       {
         checks.Add(
           new CameraCheck(
             "zones",
             CameraCheckLevel.Fail,
-            $"Found {clusters.Count} of {RequiredZones} markers in {Math.Min(frames.Count, options.GeometryFrames)} frames. The application must "
-              + "draw the marker in the TopLeft and BottomLeft slots and the camera must see both, sharp and not too small."
+            $"Found {(main != null ? "the main marker" : "no main marker")} and {(sync != null ? "the sync marker" : "no sync marker")} in "
+              + $"{Math.Min(frames.Count, options.GeometryFrames)} frames. The application must draw the main marker and the sync marker "
+              + "(doc/marker-format.md, Location) and the camera must see both, sharp and not too small."
           )
         );
         return CreateRig(frames, options, cameraFps, Array.Empty<CameraZone>(), null, null, checks);
       }
-      // The outermost two well supported markers: an application that also draws the MiddleLeft tearing marker still works, and the zones
-      // stay as far apart in the scanout as possible
-      int enough = Math.Max(2, clusters[0].Count / 4);
-      var supported = clusters.Where(c => c.Count >= enough).OrderBy(c => c[0].Centre.Y).ToList();
-      var chosen = supported.Count >= RequiredZones ? new List<List<Hit>> { supported[0], supported[^1] } : clusters.Take(RequiredZones).ToList();
+      var chosen = new List<List<Hit>> { main, sync };
       checks.Add(new CameraCheck("zones", CameraCheckLevel.Pass, $"Both markers found ({chosen[0].Count} and {chosen[1].Count} detections)."));
 
-      var fits = chosen.Select(cluster => FitZone(frames, cluster, options.RefineFrames)).ToList();
+      var fits = chosen
+        .Select((cluster, z) => FitZone(frames, cluster, options.RefineFrames, z == CameraZone.MainZone ? MarkerKind.Frame : MarkerKind.Sync))
+        .ToList();
       var timing = MeasureTiming(frames, fits.Select(f => f.Zone).ToList(), cancellationToken);
 
-      // Scanout order: the zone the scanout reaches first times the frames
+      // The scanout reaches the main marker (top) before the sync marker (bottom); a display that scans the other way can not show tears
       double? delayMs = timing.DelayMs;
-      if (delayMs < 0)
-      {
-        fits.Reverse();
-        timing = timing.Swapped();
-        delayMs = -delayMs;
-      }
       var zones = new List<CameraZone>();
       for (int z = 0; z < fits.Count; ++z)
         zones.Add(fits[z].Zone with { ScanDelayMs = z == 0 ? 0 : delayMs ?? 0, DecodeRate = timing.DecodeRate[z] });
@@ -139,14 +133,13 @@ namespace MB.FramePacing.Capture.Camera
         {
           if (ImagePoint.Distance(hit.Geometry.TopLeft, zone.ModuleToCamera.Map(new ImagePoint(3.5, 3.5))) > 6 * zone.ModuleSizePx)
             continue;
-          // The top-right finder centre sits 3.5 modules in from the right edge: that gives the symbol size (QR version) in module space
-          double right = cameraToModule.Map(hit.Geometry.TopRight).X + 3.5;
-          int version = Math.Clamp((int)Math.Round((right - 17) / 4), MarkerRenderer.FrameQrVersion, MarkerRenderer.MaxQrVersion);
-          var expected = MarkerGeometry.ModulePoints(17 + (4 * version)).Select(p => zone.ModuleToCamera.Map(p)).ToArray();
+          if ((hit.Payload.Kind == MarkerKind.Sync) != (zone.Kind == MarkerKind.Sync))
+            continue;
+          var expected = MarkerGeometry.ModulePoints(zone.ModuleCount).Select(p => zone.ModuleToCamera.Map(p)).ToArray();
           var found = hit.Geometry.ToArray();
           offsets.Add(Enumerable.Range(0, 4).Max(i => ImagePoint.Distance(found[i], expected[i])) / zone.ModuleSizePx);
         }
-        string name = z == 0 ? "first zone" : "second zone";
+        string name = zone.Kind == MarkerKind.Sync ? "sync marker" : "main marker";
         if (offsets.Count == 0)
         {
           checks.Add(
@@ -188,16 +181,7 @@ namespace MB.FramePacing.Capture.Camera
 
     private sealed record ZoneFit(CameraZone Zone, double SpreadModules, double RelativeResidual, int Refined);
 
-    private sealed record Timing(double? DelayMs, double? RefreshHz, double[] DecodeRate, double[] WhiteVariation, int DelaySamples)
-    {
-      public Timing Swapped() =>
-        this with
-        {
-          DelayMs = -DelayMs,
-          DecodeRate = DecodeRate.Reverse().ToArray(),
-          WhiteVariation = WhiteVariation.Reverse().ToArray(),
-        };
-    }
+    private sealed record Timing(double? DelayMs, double? RefreshHz, double[] DecodeRate, double[] WhiteVariation, int DelaySamples);
 
     /// <summary>
     /// Full detector search (slow, so only on a spread of frames). Start markers are larger versions; calibration skips them because it fits
@@ -244,19 +228,20 @@ namespace MB.FramePacing.Capture.Camera
       return clusters.OrderByDescending(c => c.Count).ToList();
     }
 
-    private static ZoneFit FitZone(CameraFrameSet frames, List<Hit> hits, int refineFrames)
+    private static ZoneFit FitZone(CameraFrameSet frames, List<Hit> hits, int refineFrames, MarkerKind kind)
     {
+      int moduleCount = MarkerRenderer.QrModuleCountFor(kind);
       // Start from the median of every detector point, then refine against the known module pattern on several frames
       var points = new ImagePoint[4];
       for (int p = 0; p < 4; ++p)
       {
         points[p] = new ImagePoint(Median(hits.Select(h => h.Geometry.ToArray()[p].X)), Median(hits.Select(h => h.Geometry.ToArray()[p].Y)));
       }
-      if (!Homography.TryFromPoints(MarkerGeometry.ModulePoints(FrameModules), points, out var initial))
+      if (!Homography.TryFromPoints(MarkerGeometry.ModulePoints(moduleCount), points, out var initial))
         throw new InvalidOperationException("The marker detections do not define a transform");
 
       double spread = Spread(hits);
-      var corners = new ImagePoint[] { new(0, 0), new(FrameModules, 0), new(0, FrameModules), new(FrameModules, FrameModules) };
+      var corners = new ImagePoint[] { new(0, 0), new(moduleCount, 0), new(0, moduleCount), new(moduleCount, moduleCount) };
       int step = Math.Max(1, hits.Count / Math.Max(1, refineFrames));
       var refined = new List<HomographyRefinement>();
       var chosen = hits.Where((_, i) => i % step == 0).Take(refineFrames).ToList();
@@ -305,7 +290,7 @@ namespace MB.FramePacing.Capture.Camera
         ImagePoint.Distance(quad[1], quad[3]),
         ImagePoint.Distance(quad[2], quad[3]),
       }.Min();
-      var zone = new CameraZone(final, shortestSide / FrameModules, black, white, 0, 0);
+      var zone = new CameraZone(final, shortestSide / moduleCount, black, white, 0, 0, kind);
       return new ZoneFit(zone, spread / zone.ModuleSizePx, residual, refined.Count);
     }
 
@@ -374,7 +359,8 @@ namespace MB.FramePacing.Capture.Camera
       }
       double? delay = delays.Count >= 3 ? Median(delays) : null;
 
-      var ordered = firstSeen[0].OrderBy(kv => kv.Key).ToList();
+      // The refresh from the sync marker: the scanout crosses the small marker quickly, so its first-seen times are the sharpest
+      var ordered = firstSeen[zoneCount > 1 ? CameraZone.SyncZone : CameraZone.MainZone].OrderBy(kv => kv.Key).ToList();
       var intervals = new List<double>();
       for (int k = 1; k < ordered.Count; ++k)
       {
@@ -402,13 +388,13 @@ namespace MB.FramePacing.Capture.Camera
       return new Timing(delay, refreshHz, decodeRate, whiteVariation, delays.Count);
     }
 
-    /// <summary>Points in the quiet zone (always white) around the frame marker, for the brightness over time.</summary>
+    /// <summary>Points in the quiet zone (always white) around the zone's marker, for the brightness over time.</summary>
     private static ImagePoint[] QuietZonePoints(CameraZone zone)
     {
       var points = new List<ImagePoint>();
       for (int i = 0; i <= 8; ++i)
       {
-        double t = -1.5 + ((FrameModules + 3.0) * i / 8);
+        double t = -1.5 + ((zone.ModuleCount + 3.0) * i / 8);
         points.Add(zone.ModuleToCamera.Map(new ImagePoint(t, -1.5)));
         points.Add(zone.ModuleToCamera.Map(new ImagePoint(-1.5, t)));
       }

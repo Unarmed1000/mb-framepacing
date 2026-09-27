@@ -131,9 +131,13 @@ namespace MB.FramePacing.App.Commands
         if (run.Pacing is { } pacing)
         {
           AnsiConsole.MarkupLineInterpolated(
-            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), shown a refresh or more after the {pacing.TargetFrameMs:0.##} ms target ({TargetReason(pacing)})."
+            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), {(pacing.Source == PacingSource.Schedule ? "shown half a refresh or more after their intended display time" : $"shown a refresh or more after the {pacing.TargetFrameMs:0.##} ms target")} ({TargetReason(pacing)})."
           );
           AnsiConsole.MarkupLineInterpolated($"{RefreshText(pacing)}");
+          if (pacing.PacingErrorMs is { } pacingError && pacing.PredictionErrorMs is { } predictionError)
+            AnsiConsole.MarkupLineInterpolated(
+              $"Against the pacer's schedule: pacing error p95 {pacingError.P95:0.##} ms (max {pacingError.Max:0.##}), prediction error p95 {predictionError.P95:0.##} ms (max {predictionError.Max:0.##}); animation error = prediction - pacing error."
+            );
           AnsiConsole.MarkupLineInterpolated($"Cause: {VerdictText(pacing)}");
         }
       }
@@ -160,7 +164,14 @@ namespace MB.FramePacing.App.Commands
       return text + ".";
     }
 
-    private static string TargetReason(RunPacing pacing) => pacing.TargetGiven ? "the given target frame rate" : "the run's median display time";
+    private static string TargetReason(RunPacing pacing) =>
+      pacing.Source switch
+      {
+        PacingSource.Schedule => "the pacer's schedule in the markers",
+        PacingSource.TargetFrameTime => "the pacer's target frame time in the markers",
+        PacingSource.GivenTarget => "the given target frame rate",
+        _ => "no pacing information: the display's native refresh rate",
+      };
 
     /// <summary>One line on which cause dominates the animation error, with the counts behind it.</summary>
     public static string VerdictText(RunPacing pacing)

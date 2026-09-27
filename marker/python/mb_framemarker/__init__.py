@@ -3,28 +3,28 @@
 
 """mb_framemarker: the frame marker of mb-framepacing, in Python.
 
-Draw a QR marker with the frame index, the animation time and the run id into every frame of an application, so mb-framepacing can
-measure the animation error on the real display output. It draws exactly the same pixels as the C++ and C# libraries: the tests check
-it against the golden images the C++ library writes (test-data/markers). The format is specified in doc/marker-format.md.
+Draw a QR marker with the frame index, the animation time, the run id and (optionally) the frame pacer's intended display time and
+target frame time into every frame of an application, so mb-framepacing can measure the animation error on the real display output.
+It draws exactly the same pixels as the C++ and C# libraries: the tests check it against the golden images the C++ library writes
+(test-data/markers). The format is specified in doc/marker-format.md.
 
-    from mb_framemarker import Options, Payload, generate_quads, fill_quads, recommended_origin, seconds_to_ticks, MarkerSlot
+    from mb_framemarker import Options, Payload, generate_quads, fill_quads, recommended_origin, seconds_to_ticks, MarkerKind
 
     options = Options(module_size_px=3)
-    origin = recommended_origin(MarkerSlot.TOP_LEFT, width, height, options)
+    origin = recommended_origin(MarkerKind.FRAME, width, height, options)
     quads = generate_quads(Payload(frame_index, seconds_to_ticks(animation_seconds), run_id=1), options, origin)
     fill_quads(rgb24_frame, width, height, quads, channels=3)
+
+    # Optional (required for camera capture): the small sync marker, bottom-left, with the same frame index
+    sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)
+    fill_quads(rgb24_frame, width, height, generate_quads(Payload(frame_index, 0, kind=MarkerKind.SYNC), options, sync_origin), channels=3)
 
 Standard library only, Python 3.11 or later.
 """
 
 from .marker import (
-    FRAME_QR_MODULE_COUNT,
-    FRAME_QR_VERSION,
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
-    MAX_FRAME_QUAD_COUNT,
     MAX_MODULE_SIZE_PX,
-    MAX_QR_MODULE_COUNT,
-    MAX_QR_VERSION,
     MAX_QUAD_COUNT,
     MAX_QUIET_ZONE_MODULES,
     MAX_START_NAME_BYTES,
@@ -32,9 +32,15 @@ from .marker import (
     PAYLOAD_BYTE_COUNT,
     PAYLOAD_FORMAT_VERSION,
     PAYLOAD_MAGIC,
+    QR_CAPACITY_BYTES,
+    QR_MODULE_COUNT,
+    QR_VERSION,
     RECOMMENDED_INSET_PX,
     RECOMMENDED_QUIET_ZONE_MODULES,
     START_PAYLOAD_FIXED_BYTE_COUNT,
+    SYNC_PAYLOAD_BYTE_COUNT,
+    SYNC_QR_MODULE_COUNT,
+    SYNC_QR_VERSION,
     TICKS_PER_SECOND,
     UNIX_EPOCH_DATE_TIME_TICKS,
     encode_payload,
@@ -47,9 +53,8 @@ from .marker import (
     generate_triangles,
     is_valid,
     marker_size_px,
-    max_marker_size_px,
     minimum_module_size_px,
-    qr_module_count_for_version,
+    qr_module_count_for,
     quads_to_indexed,
     quads_to_triangles,
     recommend_module_size_px,
@@ -59,18 +64,13 @@ from .marker import (
     try_decode_payload,
 )
 from .raster import fill_quads
-from .structures import MarkerKind, MarkerSlot, ModuleMatrix, Options, Payload, Point, Quad, StartMetadata, Vertex
+from .structures import MarkerKind, ModuleMatrix, Options, Payload, Point, Quad, StartMetadata, Vertex
 
 __version__ = "0.1.0"
 
 __all__ = [
-    "FRAME_QR_MODULE_COUNT",
-    "FRAME_QR_VERSION",
     "MAX_ENCODED_PAYLOAD_BYTE_COUNT",
-    "MAX_FRAME_QUAD_COUNT",
     "MAX_MODULE_SIZE_PX",
-    "MAX_QR_MODULE_COUNT",
-    "MAX_QR_VERSION",
     "MAX_QUAD_COUNT",
     "MAX_QUIET_ZONE_MODULES",
     "MAX_START_NAME_BYTES",
@@ -78,13 +78,18 @@ __all__ = [
     "PAYLOAD_BYTE_COUNT",
     "PAYLOAD_FORMAT_VERSION",
     "PAYLOAD_MAGIC",
+    "QR_CAPACITY_BYTES",
+    "QR_MODULE_COUNT",
+    "QR_VERSION",
     "RECOMMENDED_INSET_PX",
     "RECOMMENDED_QUIET_ZONE_MODULES",
     "START_PAYLOAD_FIXED_BYTE_COUNT",
+    "SYNC_PAYLOAD_BYTE_COUNT",
+    "SYNC_QR_MODULE_COUNT",
+    "SYNC_QR_VERSION",
     "TICKS_PER_SECOND",
     "UNIX_EPOCH_DATE_TIME_TICKS",
     "MarkerKind",
-    "MarkerSlot",
     "ModuleMatrix",
     "Options",
     "Payload",
@@ -103,9 +108,8 @@ __all__ = [
     "generate_triangles",
     "is_valid",
     "marker_size_px",
-    "max_marker_size_px",
     "minimum_module_size_px",
-    "qr_module_count_for_version",
+    "qr_module_count_for",
     "quads_to_indexed",
     "quads_to_triangles",
     "recommend_module_size_px",

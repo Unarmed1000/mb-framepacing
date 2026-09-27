@@ -20,16 +20,34 @@ namespace MB.FramePacing.Capture.Camera
   /// <param name="White">Camera luma of a light module.</param>
   /// <param name="ScanDelayMs">How much later than the first zone the scanout reaches this zone (0 for the first zone).</param>
   /// <param name="DecodeRate">Share of the calibration frames in which this zone decoded.</param>
-  public sealed record CameraZone(Homography ModuleToCamera, double ModuleSizePx, double Black, double White, double ScanDelayMs, double DecodeRate)
+  /// <param name="Kind">The marker in this zone: the main marker (<see cref="MarkerKind.Frame"/>) or the sync marker.</param>
+  public sealed record CameraZone(
+    Homography ModuleToCamera,
+    double ModuleSizePx,
+    double Black,
+    double White,
+    double ScanDelayMs,
+    double DecodeRate,
+    MarkerKind Kind = MarkerKind.Frame
+  )
   {
-    /// <summary>Modules stored around the largest start marker's symbol: the quiet zone plus 2 modules of margin for the analyzer's search.</summary>
+    /// <summary>The zone of the main marker (frame, start and end) and of the sync marker in a rig and in a stored camera capture.</summary>
+    public const int MainZone = 0;
+
+    public const int SyncZone = 1;
+
+    /// <summary>Modules per side of this zone's symbol.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ModuleCount => MarkerRenderer.QrModuleCountFor(Kind);
+
+    /// <summary>Modules stored around the marker's symbol: the quiet zone plus 2 modules of margin for the analyzer's search.</summary>
     public const int MarginModules = MarkerRenderer.RecommendedQuietZoneModules + 2;
 
     /// <summary>Stored pixels per module after rectification.</summary>
     public const int StoredPxPerModule = 4;
 
-    /// <summary>Side of the square area stored per zone, in modules: the largest start marker plus the margin on both sides.</summary>
-    public const int StoredModules = MarkerRenderer.MaxQrModuleCount + (2 * MarginModules);
+    /// <summary>Side of the square area stored per zone, in modules: the main marker plus the margin on both sides (the sync marker fits too).</summary>
+    public const int StoredModules = MarkerRenderer.QrModuleCount + (2 * MarginModules);
 
     /// <summary>Side of the stored (rectified) zone image in pixels.</summary>
     public const int StoredSizePx = StoredModules * StoredPxPerModule;
@@ -37,18 +55,23 @@ namespace MB.FramePacing.Capture.Camera
     /// <summary>Where the marker origin (top-left of the quiet zone) lands in the stored zone image.</summary>
     public const int StoredMarkerOriginPx = (MarginModules - MarkerRenderer.RecommendedQuietZoneModules) * StoredPxPerModule;
 
-    /// <summary>The marker lock of zone <paramref name="index"/> in a stored camera capture (the zones are stacked top to bottom).</summary>
-    public static MarkerLock StoredLock(int index)
-    {
-      int size = MarkerRenderer.MarkerSizePx(StoredPxPerModule);
-      return new MarkerLock(new PixelRect(StoredMarkerOriginPx, (index * StoredSizePx) + StoredMarkerOriginPx, size, size), StoredPxPerModule);
-    }
+    /// <summary>
+    /// The marker lock of zone <paramref name="index"/> in a stored camera capture: the zones are stacked, the main marker's first
+    /// (<see cref="MainZone"/>), then the sync marker's (<see cref="SyncZone"/>).
+    /// </summary>
+    public static MarkerLock StoredLock(int index) =>
+      MarkerLock.At(
+        StoredMarkerOriginPx,
+        (index * StoredSizePx) + StoredMarkerOriginPx,
+        StoredPxPerModule,
+        index == MainZone ? MarkerKind.Frame : MarkerKind.Sync
+      );
 
     /// <summary>The camera positions of the stored square's corners: top-left, top-right, bottom-left, bottom-right.</summary>
     public ImagePoint[] StoredQuad()
     {
       double near = -MarginModules;
-      double far = MarkerRenderer.MaxQrModuleCount + MarginModules;
+      double far = MarkerRenderer.QrModuleCount + MarginModules;
       return new[]
       {
         ModuleToCamera.Map(new ImagePoint(near, near)),
@@ -80,11 +103,11 @@ namespace MB.FramePacing.Capture.Camera
       return new PixelRect(left, top, right - left, bottom - top).Intersect(new PixelRect(0, 0, cameraWidth, cameraHeight));
     }
 
-    /// <summary>The camera region of the frame marker itself (quiet zone included), for a quick decode.</summary>
+    /// <summary>The camera region of the zone's marker itself (quiet zone included), for a quick decode.</summary>
     public PixelRect FrameMarkerBounds(int cameraWidth, int cameraHeight, int marginModules = 2)
     {
       double near = -MarkerRenderer.RecommendedQuietZoneModules - marginModules;
-      double far = MarkerRenderer.FrameQrModuleCount + MarkerRenderer.RecommendedQuietZoneModules + marginModules;
+      double far = ModuleCount + MarkerRenderer.RecommendedQuietZoneModules + marginModules;
       double minX = double.MaxValue,
         minY = double.MaxValue,
         maxX = double.MinValue,
@@ -104,7 +127,8 @@ namespace MB.FramePacing.Capture.Camera
       );
     }
 
-    /// <summary>The centre of the frame marker's symbol in camera pixels.</summary>
-    public ImagePoint Centre => ModuleToCamera.Map(new ImagePoint(MarkerRenderer.FrameQrModuleCount / 2.0, MarkerRenderer.FrameQrModuleCount / 2.0));
+    /// <summary>The centre of the zone's symbol in camera pixels.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public ImagePoint Centre => ModuleToCamera.Map(new ImagePoint(ModuleCount / 2.0, ModuleCount / 2.0));
   }
 }

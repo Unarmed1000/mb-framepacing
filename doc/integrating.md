@@ -84,7 +84,7 @@ namespace FM = MB::FrameMarker;
 
 // Output 1920x1080, capture stored at 960x540 (2:1)
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};       // 6 px modules
-const FM::Point origin = FM::RecommendedOrigin(FM::MarkerSlot::TopLeft, 1920, 1080, options, /*alignPx*/ 2); // (32, 32)
+const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, /*alignPx*/ 2); // (32, 32)
 ```
 
 ## 3. Draw it every frame
@@ -93,7 +93,7 @@ Generate the marker straight into your vertex buffer. Nothing is allocated, and 
 +y down):
 
 ```cpp
-std::array<FM::Vertex, FM::MaxFrameTriangleVertexCount()> vertices;   // once
+std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
@@ -108,8 +108,25 @@ The same geometry comes in other forms:
 - **`GenerateIndexed`:** 4 vertices and 6 indices per quad, for index buffers.
 - **`GenerateQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs.
 
-Triangles are `(TL, TR, BL) (BL, TR, BR)`, clockwise on screen. Size your buffers with the `Max…Count()` functions: the `MaxFrame…`
-ones for frame and end markers, the others for start markers.
+Triangles are `(TL, TR, BL) (BL, TR, BR)`, clockwise on screen. Size your buffers with the `Max…Count()` functions; they fit every
+marker kind.
+
+**Frame pacing (recommended).** If your game paces its frames, put what the pacer aims for into the payload: the time it intends the
+frame to become visible (steady clock ticks, any epoch) and its target frame time. The analysis then measures every frame against
+your plan, separates pacing errors from animation timing errors, and does not count a rate you chose (30 fps for a busy stretch) as
+late:
+
+```cpp
+const FM::Payload payload{frameIndex, ticks, runId, FM::MarkerKind::Frame, intendedDisplayTicks, targetFrameTicks};
+```
+
+**The sync marker (optional; required for camera capture).** Draw the small sync marker bottom-left as well, with the same frame
+index. The analysis flags tearing when the two disagree, and a camera filming the screen times the frames by it:
+
+```cpp
+const FM::Point syncOrigin = FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 2);
+const std::size_t syncCount = FM::GenerateTriangles({frameIndex, 0, 0u, FM::MarkerKind::Sync}, options, syncOrigin, vertices);
+```
 
 **Rules that matter** (the capture can only read an unmodified marker):
 
@@ -130,7 +147,7 @@ enum class Phase { Start, Measure, End, Done };
 void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
 {
   static const int64_t startUtc = FM::ToDateTimeTicks(std::chrono::system_clock::now());
-  static std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // start markers are larger
+  static std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
   const FM::Payload payload{frameIndex, static_cast<int64_t>(animationSeconds * FM::TicksPerSecond), /*runId*/ 7};
   std::size_t count = 0;
   switch (phase)
@@ -151,8 +168,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
 }
 ```
 
-The start marker is larger than the frame marker (it carries the name); keep `FM::MaxMarkerSizePx(options)` free around the
-origin while it is shown.
+Every main marker kind has the same size, so the start and end markers cover exactly the frame marker's area.
 
 ## 5. Capture and analyse
 
@@ -161,7 +177,7 @@ mb-framepacing capture -d "<your capture card>" --scale 960x540 --wait-for-start
 ```
 
 or record with any other tool (a lossless video, a high speed camera's image sequence) and use `mb-framepacing import`. To film
-the screen with a high speed camera, draw the marker in the TopLeft and BottomLeft slots and see the very experimental
+the screen with a high speed camera, draw the sync marker as well and see the very experimental
 [camera capture](camera.md).
 
 ## Checking your integration

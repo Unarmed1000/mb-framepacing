@@ -63,8 +63,19 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(results, Has.Count.EqualTo(2));
       int shown = camera.Scenario.PresentedIndexAtTicks((long)camera.TrueTicks(capture));
       Assert.That(results[0].Payload, Is.EqualTo(camera.Scenario.PresentedFrames[shown].Payload));
-      Assert.That(results[1].Payload, Is.EqualTo(camera.Scenario.PresentedFrames[shown - 1].Payload));
+      // The bottom zone is the sync marker: it only carries the frame index
+      Assert.That(
+        results[1].Payload,
+        Is.EqualTo(new MarkerPayload(camera.Scenario.PresentedFrames[shown - 1].Payload.FrameIndex, 0, 0, MarkerKind.Sync))
+      );
     }
+
+    /// <summary>Zone 0 shows the main marker, zone 1 the sync marker.</summary>
+    private static int ZoneModules(int zone) => MarkerRenderer.QrModuleCountFor(zone == 0 ? MarkerKind.Frame : MarkerKind.Sync);
+
+    /// <summary>The symbol's corners and centre in module coordinates.</summary>
+    private static ImagePoint[] SymbolPoints(int modules) =>
+      new ImagePoint[] { new(0, 0), new(modules, 0), new(0, modules), new(modules, modules), new(modules / 2.0, modules / 2.0) };
 
     [TestCase(0)]
     [TestCase(1)]
@@ -77,11 +88,12 @@ namespace MB.FramePacing.Capture.UnitTest
       var results = new MarkerDecoder(tryHarder: true).DecodeEach(frame, 2);
       Assert.That(results, Has.Count.EqualTo(2));
       Assert.That(results[zone].Geometry.HasValue, Is.True);
-      Assert.That(results[zone].Geometry!.Value.TryGetModuleToImage(MarkerRenderer.FrameQrModuleCount, out var measured), Is.True);
+      int modules = ZoneModules(zone);
+      Assert.That(results[zone].Geometry!.Value.TryGetModuleToImage(modules, out var measured), Is.True);
 
       // The raw detector points of a single frame; the camera calibrator refines them further
       var truth = camera.ZoneModuleToCamera(zone);
-      foreach (var module in new ImagePoint[] { new(0, 0), new(25, 0), new(0, 25), new(25, 25), new(12.5, 12.5) })
+      foreach (var module in SymbolPoints(modules))
         Assert.That(ImagePoint.Distance(truth.Map(module), measured.Map(module)), Is.LessThan(1.5), $"module {module}");
     }
 
@@ -96,13 +108,14 @@ namespace MB.FramePacing.Capture.UnitTest
       camera.Render(CaptureAfterVsync(camera, 0.4, 0.010), frame);
       var results = new MarkerDecoder(tryHarder: true).DecodeEach(frame, 2);
       Assert.That(results, Has.Count.EqualTo(2));
-      Assert.That(results[zone].Geometry!.Value.TryGetModuleToImage(MarkerRenderer.FrameQrModuleCount, out var detected), Is.True);
+      int modules = ZoneModules(zone);
+      Assert.That(results[zone].Geometry!.Value.TryGetModuleToImage(modules, out var detected), Is.True);
 
       var refined = HomographyRefiner.Refine(frame, detected, MarkerRenderer.GenerateModules(results[zone].Payload));
 
       double before = 0;
       double after = 0;
-      foreach (var module in new ImagePoint[] { new(0, 0), new(25, 0), new(0, 25), new(25, 25), new(12.5, 12.5) })
+      foreach (var module in SymbolPoints(modules))
       {
         var truth = camera.ZoneModuleToObserved(zone, module);
         before = Math.Max(before, ImagePoint.Distance(truth, detected.Map(module)));
@@ -113,8 +126,9 @@ namespace MB.FramePacing.Capture.UnitTest
           + $"residual {refined.RelativeResidual:0.000} converged {refined.Converged}"
       );
       Assert.That(refined.Converged, Is.True);
-      // Lens distortion bends the marker slightly, which one homography per zone can not follow exactly
-      Assert.That(after, Is.LessThan(lensDistortion > 0 ? 0.4 : 0.25));
+      // Lens distortion bends the marker slightly, which one homography per zone can not follow exactly; the 41 module symbol's corners lie
+      // far enough out for it to show
+      Assert.That(after, Is.LessThan(lensDistortion > 0 ? 0.5 : 0.25));
       Assert.That(refined.Black, Is.EqualTo(camera.Options.ScreenBlack).Within(15));
       Assert.That(refined.White, Is.EqualTo(camera.Options.ScreenWhite).Within(15));
     }

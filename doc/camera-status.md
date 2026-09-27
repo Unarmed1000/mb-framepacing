@@ -34,7 +34,7 @@ labelled "very experimental" until the validation below has been done.
 Results on the synthetic camera (`selftest --camera --fps 1000 --refresh 60`):
 
 - Every presented frame is found.
-- Display deltas are within two camera periods of the truth, with a mean error of about 0.66 ms.
+- Display deltas are within two camera periods of the truth, with a mean error of about 0.62 ms (timed by the sync marker).
 - The scanout delay matches the simulation (10.0 ms).
 - With vsync off (`--tear-every`), every tear between the zones is found. A tear at the very start or end of a run is not
   counted.
@@ -49,12 +49,18 @@ of C# rectification, well above 1000 fps on one core.
 
 - **Not validated** with real cameras, displays or reference hardware.
 - Only tears **between** the two zones are detectable, and only when the zones are at least 4 camera frames apart in the scanout.
-- A start marker in the **BottomLeft** slot is larger than the frame marker and runs off the bottom of the screen. Verification
-  therefore reads a whole second of frames. A display that scans bottom to top makes the BottomLeft zone the timing zone, and its
-  start markers are then cut off.
+- **The main marker is version 6 (41×41 modules), the sync marker version 2 (25×25).** The camera times the frames by the sync
+  marker: timing by the taller main marker scattered "first seen" by 2 to 3 camera frames (the scanout needs longer to cross it,
+  and when a half switched row still decodes depends on the payload), which doubled the display time error. With the sync marker
+  the synthetic camera is back to a mean error of 0.62 ms at 1000 fps.
+- **Steep angles:** ZXing's finder search estimates the symbol size from the finder distances and gives up when that estimate is
+  off by about a module, which happens across 41 modules at an angle. Calibration (which searches) works at about 20 degrees off
+  the screen normal and fails at about 30 (`CameraCalibratorTests`, the 30 degree case is explicit). Captures are not affected: they
+  decode through the rig's transform. Next step: a detector that uses the known symbol size.
+- A display that scans bottom to top reaches the sync marker first: tears can not be told apart then.
 - **Exposure and focus** can not be set through ffmpeg; the user sets them in the camera or its tools.
-- "First seen" is when the timing zone shows the new frame completely. That is a roughly constant time after vsync (the scanout
-  crossing the marker plus the panel response). Frame-to-frame times are unaffected, but absolute times are late.
+- "First seen" is when the sync marker shows the new frame completely. That is a roughly constant time after vsync (the scanout
+  reaching and crossing it plus the panel response). Frame-to-frame times are unaffected, but absolute times are late.
 - The GUI's Analyze page does not show the camera statistics yet. They are only in `summary.json` (`runs[].camera`) and the CSV
   files.
 - **The refresh rate is calculated from each run** (a capture card captures at the refresh rate and needs none). The first-seen
@@ -68,8 +74,8 @@ of C# rectification, well above 1000 fps on one core.
 - **Animation error noise:** a camera's animation error is the difference of two first-seen times, each good to about one camera
   period. The error count uses ±1 camera period, so a clean synthetic run at 1000 fps still counts a few dozen frames above it; the
   pacing verdict ignores errors below 2 camera periods.
-- **Vsync off:** a frame that only the lower zone saw (replaced before the next scanout reached the timing zone) makes the next
-  frame reach the timing zone 2 refreshes after the previous one, so it is marked late although its animation error is about 0.
+- **Vsync off:** a frame the main marker never saw (presented below it and replaced before the next scanout reached it) has no data
+  of its own and counts as skipped; the frames around it can be marked late although their animation error is about 0.
 - The synthetic camera models a simple exponential panel response and a global shutter. Rolling shutter cameras (most phones)
   and overdrive are not modelled.
 

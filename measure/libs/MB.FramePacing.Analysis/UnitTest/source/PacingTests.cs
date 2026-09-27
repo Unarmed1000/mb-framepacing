@@ -23,7 +23,17 @@ namespace MB.FramePacing.Analysis.UnitTest
     private const long Refresh = 16 * Ms; // 62.5 Hz display, captured at 62.5 fps
 
     /// <summary>A run of frames: each shown for its number of refreshes, with its animation time step (ms) from the previous frame.</summary>
-    private static List<CaptureRow> Rows(IEnumerable<(int Refreshes, long StepMs)> frames, long refresh = Refresh)
+    private static List<CaptureRow> Rows(IEnumerable<(int Refreshes, long StepMs)> frames, long refresh = Refresh) =>
+      PacedRows(frames.Select(f => (f.Refreshes, f.StepMs, 0L, 0u)), refresh);
+
+    /// <summary>
+    /// A run of frames with pacing information: each shown for its number of refreshes, with its animation time step (ms), the pacer's
+    /// intended display time (ms on its own clock, 0 = none) and target frame time (ticks, 0 = none).
+    /// </summary>
+    private static List<CaptureRow> PacedRows(
+      IEnumerable<(int Refreshes, long StepMs, long IntendedMs, uint TargetTicks)> frames,
+      long refresh = Refresh
+    )
     {
       var rows = new List<CaptureRow>();
       void Add(MarkerPayload payload, StartMetadata? start = null) =>
@@ -33,11 +43,11 @@ namespace MB.FramePacing.Analysis.UnitTest
         Add(new MarkerPayload(0, 0, 1, MarkerKind.SequenceStart), new StartMetadata(0, "pacing"));
       ulong index = 100;
       long animationMs = 0;
-      foreach (var (refreshes, step) in frames)
+      foreach (var (refreshes, step, intendedMs, target) in frames)
       {
         animationMs += step;
         for (int c = 0; c < refreshes; ++c)
-          Add(new MarkerPayload(index, animationMs * Ms, 1));
+          Add(new MarkerPayload(index, animationMs * Ms, 1, MarkerKind.Frame, intendedMs * Ms, target));
         ++index;
       }
       for (int i = 0; i < 3; ++i)
@@ -61,7 +71,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(pacing.RefreshPeriodMs, Is.EqualTo(16));
       Assert.That(pacing.RefreshCalculated, Is.False, "a capture card's refresh is its capture period");
       Assert.That(pacing.TargetFrameMs, Is.EqualTo(16));
-      Assert.That(pacing.TargetGiven, Is.False);
+      Assert.That(pacing.Source, Is.EqualTo(PacingSource.NativeRefresh));
       Assert.That(pacing.LateFrames, Is.Zero);
       Assert.That(pacing.Verdict, Is.EqualTo(PacingVerdict.None));
     }
@@ -114,12 +124,23 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void HalfRate_IsMeasuredAgainstItsMedian()
+    public void HalfRate_WithoutPacingInformation_IsLateAgainstTheNativeRate()
     {
-      // 31.25 fps on 62.5 Hz: two refreshes per frame are normal, three are late
+      // Nothing says the game aims for half rate: the display's refresh rate is the target, so every frame is a refresh late
+      var run = Analyze(Rows(Steady(20, refreshes: 2)));
+
+      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
+      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(16));
+      Assert.That(run.Pacing.LateFrames, Is.EqualTo(19));
+    }
+
+    [Test]
+    public void HalfRate_WithAGivenTarget_OnlyTheSlowFrameIsLate()
+    {
+      // 31.25 fps on 62.5 Hz: two refreshes per frame are the target, three are late
       var frames = Steady(20, refreshes: 2).ToList();
       frames[9] = (3, 32);
-      var run = Analyze(Rows(frames));
+      var run = Analyze(Rows(frames), targetFps: 31.25);
 
       Assert.That(run.Pacing!.TargetFrameMs, Is.EqualTo(32));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
@@ -127,12 +148,83 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void GivenTargetFps_OverridesTheMedian()
+    public void MarkerTargetFrameTime_FollowsARateSwitch()
+    {
+      // A Swappy-like pacer: 60 fps, then a stretch at 30 fps it chose itself, then 60 again. A frame's target frame time is the interval
+      // before it, so the 30 fps targets start one frame after the first frame shown for two refreshes
+      const uint Full = 160_000;
+      const uint Half = 320_000;
+      var frames = new List<(int, long, long, uint)>();
+      for (int i = 0; i < 30; ++i)
+      {
+        bool halfRate = i >= 10 && i < 20;
+        bool halfTarget = i >= 11 && i <= 20;
+        frames.Add((halfRate ? 2 : 1, halfTarget ? 32L : 16L, 0L, halfTarget ? Half : Full));
+      }
+      frames[25] = (2, 16L, 0L, Full); // one real miss at 60 fps
+      var run = Analyze(PacedRows(frames));
+
+      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.TargetFrameTime));
+      Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1), "the chosen 30 fps stretch is not late, the miss is");
+      Assert.That(IsLate(run.Frames[26]));
+      Assert.That(run.Frames[15].TargetTicks, Is.EqualTo(32 * Ms));
+    }
+
+    [Test]
+    public void Schedule_FindsFramesThatStayLateAfterAHitch()
+    {
+      // A full frame queue: after frame 10 misses a refresh, every later frame is shown a refresh after its intended time, with even steps
+      var frames = new List<(int, long, long, uint)>();
+      long intended = 1000;
+      for (int i = 0; i < 30; ++i, intended += 16)
+        frames.Add((i == 9 ? 2 : 1, 16L, intended, 160_000u));
+      var run = Analyze(PacedRows(frames));
+
+      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule));
+      Assert.That(run.Frames.Take(10).Count(IsLate), Is.Zero);
+      Assert.That(run.Frames.Skip(10).All(IsLate), Is.True, "every frame after the hitch stays a refresh late");
+      Assert.That(run.Frames[20].LatenessTicks, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[20].DisplayDeltaTicks, Is.EqualTo(16 * Ms), "the steps look even; only the schedule shows the delay");
+    }
+
+    [Test]
+    public void Schedule_SplitsTheAnimationErrorIntoPacingAndPrediction()
+    {
+      // The pacer shows every frame on time, but the game animates with a naive delta time: all of the error is prediction error
+      var frames = new List<(int, long, long, uint)>();
+      long intended = 1000;
+      for (int i = 0; i < 20; ++i, intended += 16)
+        frames.Add(
+          (
+            1,
+            i % 4 == 2 ? 32L
+            : i % 4 == 3 ? 0L
+            : 16L,
+            intended,
+            160_000u
+          )
+        );
+      var run = Analyze(PacedRows(frames));
+
+      var errors = run.Frames.Where(f => f.AnimationErrorTicks is { } e && e != 0).ToList();
+      Assert.That(errors, Is.Not.Empty);
+      foreach (var frame in errors)
+      {
+        Assert.That(frame.PacingErrorTicks, Is.Zero);
+        Assert.That(frame.AnimationErrorTicks, Is.EqualTo(frame.PredictionErrorTicks - frame.PacingErrorTicks));
+      }
+      Assert.That(run.Pacing!.LateFrames, Is.Zero);
+      Assert.That(run.Pacing.PredictionErrorMs!.Max, Is.EqualTo(16));
+      Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.DeltaTimeJitter));
+    }
+
+    [Test]
+    public void GivenTargetFps_IsTheTarget()
     {
       // A game meant to run at 62.5 fps that only manages half: every frame is late
       var run = Analyze(Rows(Steady(20, refreshes: 2)), targetFps: 62.5);
 
-      Assert.That(run.Pacing!.TargetGiven);
+      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.GivenTarget));
       Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(16));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(19), "all but the first frame, which has no display time");
     }

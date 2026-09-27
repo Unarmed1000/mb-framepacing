@@ -23,10 +23,10 @@ namespace MB.FrameMarker.UnitTest
     private readonly int[] m_indices = new int[Marker.MaxIndexCount];
     private readonly byte[] m_payloadBytes = new byte[Marker.MaxEncodedPayloadByteCount];
 
-    // The longest name (64 bytes as UTF-8, including two byte characters)
+    // The longest name (60 bytes as UTF-8, including two byte characters)
     private readonly StartMetadata m_metadata = new StartMetadata(
       638_000_000_000_000_000,
-      "allocation-test æøå 01234567890123456789012345678901234567890"
+      "allocation-test æøå 0123456789012345678901234567890123456"
     );
 
     [Test]
@@ -50,7 +50,7 @@ namespace MB.FrameMarker.UnitTest
     {
       long written = 0;
       var options = Options.Default;
-      var origin = Marker.RecommendedOrigin(MarkerSlot.TopLeft, 1920, 1080, options, 2);
+      var origin = Marker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 2);
       for (int frame = 0; frame < frames; ++frame)
       {
         var payload = new Payload((ulong)frame, Marker.SecondsToTicks(frame / 60.0), 7);

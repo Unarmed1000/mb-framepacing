@@ -27,6 +27,9 @@ namespace MB.FramePacing.Marker
     private readonly IDictionary<DecodeHintType, object> m_hints;
     private readonly Dictionary<int, BitMatrix> m_matrices = new Dictionary<int, BitMatrix>();
 
+    // The last sampled modules as they were read: ZXing's decoder removes the data mask from its matrix in place
+    private BitMatrix? m_sampled;
+
     public ModuleGridSampler(IDictionary<DecodeHintType, object> hints)
     {
       m_hints = hints;
@@ -69,6 +72,7 @@ namespace MB.FramePacing.Marker
         }
       }
 
+      m_sampled = (BitMatrix)bits.Clone();
       try
       {
         var result = m_decoder.decode(bits, m_hints);
@@ -78,6 +82,28 @@ namespace MB.FramePacing.Marker
       {
         return null;
       }
+    }
+
+    /// <summary>
+    /// How many modules of the last <see cref="TryRead"/> differ from <paramref name="expected"/>, the symbol the decoded payload renders to.
+    /// Error correction decodes a marker the scanout has only partly replaced (the bottom rows still show the previous frame); those differ
+    /// from the re-rendered symbol in whole rows, sampling noise in a few modules.
+    /// </summary>
+    public int CountMismatches(ModuleMatrix expected)
+    {
+      var bits = m_sampled;
+      if (bits == null || bits.Width != expected.Size)
+        return expected.Size * expected.Size;
+      int mismatches = 0;
+      for (int y = 0; y < expected.Size; ++y)
+      {
+        for (int x = 0; x < expected.Size; ++x)
+        {
+          if (bits[x, y] != expected.IsDark(x, y))
+            ++mismatches;
+        }
+      }
+      return mismatches;
     }
 
     /// <summary>Average of the central half of a module (a 2x2 set of bilinear samples), away from the blurred edges.</summary>

@@ -38,12 +38,9 @@ namespace MB.FrameMarker.Unity
     private int m_moduleSizePx;
 
     [Header("Placement")]
+    [Tooltip("Also draw the small sync marker at the bottom left: the analysis detects tearing with it, and camera capture needs it for its timing.")]
     [SerializeField]
-    private MarkerSlot m_slot = MarkerSlot.TopLeft;
-
-    [Tooltip("Also draw frame markers in the middle and at the bottom, so the analysis can detect tearing.")]
-    [SerializeField]
-    private bool m_tearingMarkers;
+    private bool m_syncMarker;
 
     [Tooltip("Draw frame markers (run id 0) while no run is active.")]
     [SerializeField]
@@ -61,8 +58,6 @@ namespace MB.FrameMarker.Unity
     [SerializeField]
     private Material m_material;
 
-    private static readonly MarkerSlot[] g_tearingSlots = { MarkerSlot.TopLeft, MarkerSlot.MiddleLeft, MarkerSlot.BottomLeft };
-
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
     private readonly Quad[] m_quads = new Quad[Marker.MaxQuadCount];
     private WaitForEndOfFrame m_endOfFrame;
@@ -74,6 +69,18 @@ namespace MB.FrameMarker.Unity
 
     /// <summary>The game's animation clock in seconds. Null = Time.timeAsDouble.</summary>
     public Func<double> AnimationTimeProvider { get; set; }
+
+    /// <summary>
+    /// When the game's frame pacer intends the frame to become visible, in ticks (100 ns) on a steady clock, for example the desired present
+    /// time a pacing plugin schedules. Null (or 0) = unknown: Unity does not expose it.
+    /// </summary>
+    public Func<long> IntendedDisplayTicksProvider { get; set; }
+
+    /// <summary>
+    /// The interval the game aims for between frames, in ticks (100 ns). Null = from Application.targetFrameRate, or from the refresh rate
+    /// and QualitySettings.vSyncCount; 0 when neither is set.
+    /// </summary>
+    public Func<uint> TargetFrameTicksProvider { get; set; }
 
     /// <summary>
     /// Draw frame markers (run id 0) while no run is active (the Inspector's Draw When Idle). Turn it off to show markers only during
@@ -166,17 +173,20 @@ namespace MB.FrameMarker.Unity
       int align = height % storedHeight == 0 ? height / storedHeight : 1;
       WarnOnce(moduleSize, height, storedHeight);
 
-      var payload = new Payload((ulong)Time.frameCount, Marker.SecondsToTicks(AnimationTime()), Phase == MarkerPhase.Idle ? 0u : RunId, Kind());
+      var payload = new Payload(
+        (ulong)Time.frameCount,
+        Marker.SecondsToTicks(AnimationTime()),
+        Phase == MarkerPhase.Idle ? 0u : RunId,
+        Kind(),
+        IntendedDisplayTicksProvider != null ? IntendedDisplayTicksProvider() : 0,
+        TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks()
+      );
 
-      if (m_tearingMarkers && payload.Kind == MarkerKind.Frame)
+      DrawMarker(material, payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height);
+      if (m_syncMarker)
       {
-        // Sequence markers only at the primary slot: the start marker is larger and would overlap the middle marker
-        foreach (var slot in g_tearingSlots)
-          DrawMarker(material, payload, options, Marker.RecommendedOrigin(slot, width, height, options, align), width, height);
-      }
-      else
-      {
-        DrawMarker(material, payload, options, Marker.RecommendedOrigin(m_slot, width, height, options, align), width, height);
+        var sync = payload.WithKind(MarkerKind.Sync);
+        DrawMarker(material, sync, options, Marker.RecommendedOrigin(MarkerKind.Sync, width, height, options, align), width, height);
       }
     }
 
@@ -190,6 +200,26 @@ namespace MB.FrameMarker.Unity
     }
 
     private double AnimationTime() => AnimationTimeProvider != null ? AnimationTimeProvider() : Time.timeAsDouble;
+
+    /// <summary>The frame rate Unity aims for: Application.targetFrameRate, else the refresh rate divided by the vsync count; 0 if unknown.</summary>
+    private static uint DefaultTargetFrameTicks()
+    {
+      double fps = 0;
+      if (QualitySettings.vSyncCount > 0)
+      {
+#if UNITY_2022_2_OR_NEWER
+        double refreshHz = Screen.currentResolution.refreshRateRatio.value;
+#else
+        double refreshHz = Screen.currentResolution.refreshRate;
+#endif
+        fps = refreshHz / QualitySettings.vSyncCount;
+      }
+      else if (Application.targetFrameRate > 0)
+      {
+        fps = Application.targetFrameRate;
+      }
+      return fps > 0 ? (uint)Math.Round(Marker.TicksPerSecond / fps) : 0u;
+    }
 
     private MarkerKind Kind()
     {
@@ -259,7 +289,7 @@ namespace MB.FrameMarker.Unity
 
     private static string FitName(string name)
     {
-      // The start marker carries at most 64 bytes of UTF-8
+      // The start marker carries at most MaxStartNameBytes bytes of UTF-8
       if (string.IsNullOrEmpty(name) || Encoding.UTF8.GetByteCount(name) <= Marker.MaxStartNameBytes)
         return name;
       int length = name.Length;

@@ -31,11 +31,16 @@ namespace MB.FramePacing.Marker
     /// <summary>Stored pixels per module at the recommended size.</summary>
     public required double StoredPxPerModule { get; init; }
 
-    /// <summary>Frame and end marker size (square, source pixels, including the quiet zone).</summary>
-    public required int FrameMarkerPx { get; init; }
+    /// <summary>Main marker size (frame, start and end; square, source pixels, including the quiet zone).</summary>
+    public required int MarkerPx { get; init; }
 
-    /// <summary>Largest start marker (a 64 byte name); keep this area free around the origin while it shows.</summary>
-    public required int MaxStartMarkerPx { get; init; }
+    /// <summary>Sync marker size (tearing check, camera capture).</summary>
+    public required int SyncMarkerPx { get; init; }
+
+    /// <summary>Recommended top-left origin of the sync marker (bottom-left of the frame).</summary>
+    public required int SyncOriginX { get; init; }
+
+    public required int SyncOriginY { get; init; }
 
     /// <summary>The integer downscale ratio the origin is aligned to (1 when the ratio is not an integer).</summary>
     public required int AlignPx { get; init; }

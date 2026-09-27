@@ -2,7 +2,8 @@
 # Copyright (c) 2026, Mana Battery ApS
 
 """The Python library must draw exactly what the C++ library draws: the same module matrix for 512 pseudo random payloads
-(test-data/markers/modules.csv) and byte identical golden images from quads, triangle lists and indexed triangle lists.
+(test-data/markers/modules.csv, 128 per marker kind) and byte identical golden images from quads, triangle lists and indexed
+triangle lists, for every kind including the sync marker.
 """
 
 import unittest
@@ -18,6 +19,7 @@ from .. import (
     generate_start_quads,
     generate_start_triangles,
     generate_triangles,
+    qr_module_count_for,
 )
 from . import golden_data, software_raster
 
@@ -39,8 +41,14 @@ class CrossLanguageTests(unittest.TestCase):
             if matrix.size != row.size or pack(matrix) != row.modules_hex:
                 mismatches.append(f"line {row.line}: {row.payload} size {matrix.size} (expected {row.size})")
         self.assertEqual(mismatches, [], "\n".join(mismatches[:10]))
-        # Every start marker version occurs, so the version choice is covered too
-        self.assertEqual(sorted({row.size for row in rows}), [25, 29, 33, 37, 41])
+        # Every marker kind is pinned to its version: 6 for the main markers, 2 for the sync marker
+        for kind in MarkerKind:
+            with self.subTest(kind):
+                self.assertEqual({row.size for row in rows if row.payload.kind == kind}, {qr_module_count_for(kind)})
+
+    def test_golden_images_cover_every_marker_kind(self) -> None:
+        goldens = golden_data.markers(golden_data.require_marker_directory(self))
+        self.assertEqual({golden.payload.kind for golden in goldens}, set(MarkerKind))
 
     def test_golden_images_from_quads(self) -> None:
         directory = golden_data.require_marker_directory(self)

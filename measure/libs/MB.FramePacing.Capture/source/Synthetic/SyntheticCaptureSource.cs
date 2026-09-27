@@ -31,7 +31,7 @@ namespace MB.FramePacing.Capture.Synthetic
         throw new ArgumentException(
           $"A capture card captures at the display's native refresh rate: capture rate {o.CaptureFps:0.###} fps differs from the {o.RefreshHz:0.###} Hz refresh"
         );
-      int maxMarker = MarkerRenderer.MaxMarkerSizePx(o.ModuleSizePx);
+      int maxMarker = MarkerRenderer.MarkerSizePx(o.ModuleSizePx);
       if (o.OriginX + maxMarker > o.Width || o.OriginY + maxMarker > o.Height)
         throw new ArgumentException($"A {o.Width}x{o.Height} frame is too small for a start marker of {maxMarker}px at ({o.OriginX},{o.OriginY})");
       Format = new CaptureFormat(o.Width, o.Height, FrameRate.FromFps(o.CaptureFps), o.Width, o.Height);

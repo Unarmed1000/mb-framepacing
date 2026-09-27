@@ -26,7 +26,8 @@ namespace MB.FramePacing.Marker
       var options = new FM.Options(module);
       // Integer downscales keep module edges on stored pixel edges when the origin is a multiple of the ratio
       int align = sourceHeight % storedHeight == 0 ? sourceHeight / storedHeight : 1;
-      var origin = FM.Marker.RecommendedOrigin(FM.MarkerSlot.TopLeft, sourceWidth, sourceHeight, options, align);
+      var origin = FM.Marker.RecommendedOrigin(FM.MarkerKind.Frame, sourceWidth, sourceHeight, options, align);
+      var syncOrigin = FM.Marker.RecommendedOrigin(FM.MarkerKind.Sync, sourceWidth, sourceHeight, options, align);
       return new MarkerSizingAdvice
       {
         SourceWidth = sourceWidth,
@@ -36,8 +37,10 @@ namespace MB.FramePacing.Marker
         RecommendedModulePx = module,
         MinimumModulePx = FM.Marker.MinimumModuleSizePx(sourceHeight, storedHeight),
         StoredPxPerModule = module * (double)storedHeight / sourceHeight,
-        FrameMarkerPx = FM.Marker.MarkerSizePx(options),
-        MaxStartMarkerPx = FM.Marker.MaxMarkerSizePx(options),
+        MarkerPx = FM.Marker.MarkerSizePx(options),
+        SyncMarkerPx = FM.Marker.MarkerSizePx(options, FM.MarkerKind.Sync),
+        SyncOriginX = syncOrigin.X,
+        SyncOriginY = syncOrigin.Y,
         AlignPx = align,
         OriginX = origin.X,
         OriginY = origin.Y,

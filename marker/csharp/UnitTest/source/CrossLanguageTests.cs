@@ -41,8 +41,9 @@ namespace MB.FrameMarker.UnitTest
       }
       Assert.That(mismatches, Is.Empty, string.Join("\n", mismatches.Take(10)));
 
-      // Every start marker version occurs, so the version choice is covered too
-      Assert.That(rows.Select(r => r.Size).Distinct().OrderBy(s => s), Is.EqualTo(new[] { 25, 29, 33, 37, 41 }));
+      // Every main marker is version 6, every sync marker version 2
+      Assert.That(rows.Select(r => r.Size).Distinct().OrderBy(s => s), Is.EqualTo(new[] { Marker.SyncQrModuleCount, Marker.QrModuleCount }));
+      Assert.That(rows.Where(r => r.Payload.Kind == MarkerKind.Sync).Select(r => r.Size).Distinct(), Is.EqualTo(new[] { Marker.SyncQrModuleCount }));
     }
 
     [TestCaseSource(nameof(Golden))]

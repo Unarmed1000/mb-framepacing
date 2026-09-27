@@ -119,7 +119,7 @@ namespace MB.FramePacing.App.Commands
       var forceOption = new Option<bool>("--force") { Description = "Write the rig file even when a check failed." };
       var command = new Command(
         "calibrate",
-        $"({Experimental}) Find both markers (TopLeft and BottomLeft slots) in a clip or a live camera, measure the scanout and check the setup."
+        $"({Experimental}) Find both markers (the main marker and the sync marker) in a clip or a live camera, measure the scanout and check the setup."
       )
       {
         nameOption,

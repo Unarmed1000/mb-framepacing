@@ -121,8 +121,10 @@ namespace MB.FramePacing.Analysis.UnitTest
         .Runs.Single();
 
       Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
-      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(CapturesPerFrame).Within(0.01), "two refreshes per frame");
       Assert.That(run.Pacing.MatchesExpectedRefresh, Is.True);
+      // Without pacing information the target is the native rate, so every frame of the half rate game is a refresh late
+      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
+      Assert.That(run.Pacing.LateFrames, Is.EqualTo(run.Frames.Count - 1));
     }
 
     [Test]

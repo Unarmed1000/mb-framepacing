@@ -58,10 +58,13 @@ public static class FrameMarkerUnityCheck
         ulong.Parse(f[2], CultureInfo.InvariantCulture),
         long.Parse(f[3], CultureInfo.InvariantCulture),
         uint.Parse(f[1], CultureInfo.InvariantCulture),
-        (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture)
+        (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture),
+        long.Parse(f[4], CultureInfo.InvariantCulture),
+        uint.Parse(f[5], CultureInfo.InvariantCulture)
       );
-      var start = new StartMetadata(long.Parse(f[4], CultureInfo.InvariantCulture), Encoding.UTF8.GetString(FromHex(f[5])));
-      if (!generator.GenerateModules(payload, start, matrix) || matrix.Size != int.Parse(f[6], CultureInfo.InvariantCulture) || Pack(matrix) != f[7])
+      // Columns: kind, runId, frameIndex, animationTicks, intendedDisplayTicks, targetFrameTicks, startUtcTicks, startNameHex, size, modulesHex
+      var start = new StartMetadata(long.Parse(f[6], CultureInfo.InvariantCulture), Encoding.UTF8.GetString(FromHex(f[7])));
+      if (!generator.GenerateModules(payload, start, matrix) || matrix.Size != int.Parse(f[8], CultureInfo.InvariantCulture) || Pack(matrix) != f[9])
       {
         if (++mismatches <= 5)
           Debug.LogError($"FrameMarkerUnityCheck: module digest line {i + 1} differs ({payload})");

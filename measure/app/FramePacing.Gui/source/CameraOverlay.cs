@@ -27,7 +27,7 @@ namespace MB.FramePacing.Gui
     {
       int thickness = Math.Max(2, Math.Min(width, height) / 120);
       double near = -MarkerRenderer.RecommendedQuietZoneModules;
-      double far = MarkerRenderer.FrameQrModuleCount + MarkerRenderer.RecommendedQuietZoneModules;
+      double far = MarkerRenderer.QrModuleCount + MarkerRenderer.RecommendedQuietZoneModules;
       for (int i = 0; i < zones.Count; ++i)
       {
         var map = zones[i].ModuleToCamera;

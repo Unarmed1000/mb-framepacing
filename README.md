@@ -174,10 +174,10 @@ flowchart LR
 | -------------------------------------------- | -------------------------------------------- | ---------------------------------------- |
 | ![Start marker](doc/images/marker-start.png) | ![Frame marker](doc/images/marker-frame.png) | ![End marker](doc/images/marker-end.png) |
 
-For tearing checks, draw the same marker at the top, middle and bottom of the frame; when they disagree, the capture shows parts
-of two frames:
+For tearing checks, also draw the small **sync marker** at the bottom left. It carries the frame index; when it disagrees with the
+main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
 
-![The same marker at three heights to detect tearing](doc/images/marker-tearing.png)
+![The main marker top-left and the sync marker bottom-left](doc/images/marker-tearing.png)
 
 The exact format, sizing rules and placement are in [`doc/marker-format.md`](doc/marker-format.md).
 
@@ -216,9 +216,12 @@ period is the capture period, and display times and animation errors are whole r
 exactly. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
 from the frames, and compared with the display rate you expect when you give one (`--display-hz`, **Display refresh rate**).
 
-**Late frames** are shown at least one refresh later than the target frame time after the previous frame. The target is the
-frame rate the application aims for (`--target-fps`, or **Target frame rate** in the GUI, for example 30 for a game locked to
-30 fps on a 60 Hz display); without one it is the run's median display time. Under the headline numbers, **Cause** tells which
+**Late frames** are shown later than the application meant. When its frame pacer writes the **intended display time** into the
+marker, a frame is late when it appears half a refresh or more after that time, which also catches frames that stay late after a
+hitch; the animation error then splits into **pacing error** (shown off the plan) and **prediction error** (animated for another
+moment than planned). With only a **target frame time** in the marker, or a target frame rate given to the tools (`--target-fps`,
+**Target frame rate** in the GUI, for example 30 for a game locked to 30 fps on a 60 Hz display), a frame is late when it appears a
+refresh or more after its target. Without any of them the target is the display's native refresh rate. Under the headline numbers, **Cause** tells which
 of the two causes of animation error dominates: frames with an error where the display time jumps are **bad pacing** (late,
 early or dropped frames); frames with an error while the display time stays even are **delta time jitter** (uneven animation
 steps).

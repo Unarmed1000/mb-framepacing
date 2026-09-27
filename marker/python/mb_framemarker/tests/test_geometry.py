@@ -7,12 +7,15 @@ import unittest
 
 from .. import (
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
-    MAX_FRAME_QUAD_COUNT,
-    MAX_QR_MODULE_COUNT,
     MAX_QUAD_COUNT,
     MAX_QUIET_ZONE_MODULES,
+    MAX_START_NAME_BYTES,
+    QR_CAPACITY_BYTES,
+    QR_MODULE_COUNT,
+    QR_VERSION,
+    SYNC_QR_MODULE_COUNT,
+    SYNC_QR_VERSION,
     MarkerKind,
-    MarkerSlot,
     Options,
     Payload,
     Point,
@@ -23,10 +26,11 @@ from .. import (
     generate_indexed,
     generate_modules,
     generate_quads,
+    generate_start_quads,
     generate_triangles,
     marker_size_px,
-    max_marker_size_px,
     minimum_module_size_px,
+    qr_module_count_for,
     quads_to_indexed,
     quads_to_triangles,
     recommend_module_size_px,
@@ -36,16 +40,30 @@ from .. import (
 
 class GeometryTests(unittest.TestCase):
     def test_buffer_sizes_match_the_cpp_library(self) -> None:
-        self.assertEqual(MAX_FRAME_QUAD_COUNT, 326)
+        self.assertEqual(QR_VERSION, 6)
+        self.assertEqual(QR_MODULE_COUNT, 41)
+        self.assertEqual(QR_CAPACITY_BYTES, 106)
+        self.assertEqual(SYNC_QR_VERSION, 2)
+        self.assertEqual(SYNC_QR_MODULE_COUNT, 25)
         self.assertEqual(MAX_QUAD_COUNT, 862)
-        self.assertEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, 97)
+        self.assertEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, 105)
+        self.assertLessEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, QR_CAPACITY_BYTES)
 
     def test_marker_size(self) -> None:
-        self.assertEqual(marker_size_px(Options()), 198)
-        self.assertEqual(marker_size_px(Options(3)), 99)
-        self.assertEqual(marker_size_px(Options(12)), 396)
-        self.assertEqual(marker_size_px(Options(1, 0)), 25)
-        self.assertEqual(max_marker_size_px(Options()), 294)
+        self.assertEqual(marker_size_px(Options()), 294)
+        self.assertEqual(marker_size_px(Options(3)), 147)
+        self.assertEqual(marker_size_px(Options(4)), 196)
+        self.assertEqual(marker_size_px(Options(12)), 588)
+        self.assertEqual(marker_size_px(Options(1, 0)), 41)
+        for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
+            self.assertEqual(marker_size_px(Options(), kind), 294)
+            self.assertEqual(qr_module_count_for(kind), QR_MODULE_COUNT)
+
+    def test_sync_marker_size(self) -> None:
+        self.assertEqual(qr_module_count_for(MarkerKind.SYNC), SYNC_QR_MODULE_COUNT)
+        self.assertEqual(marker_size_px(Options(), MarkerKind.SYNC), 198)
+        self.assertEqual(marker_size_px(Options(3), MarkerKind.SYNC), 99)
+        self.assertEqual(marker_size_px(Options(1, 0), MarkerKind.SYNC), 25)
 
     def test_module_size_recommendations_match_the_documentation(self) -> None:
         self.assertEqual(minimum_module_size_px(1080, 1080), 2)
@@ -66,30 +84,53 @@ class GeometryTests(unittest.TestCase):
 
     def test_recommended_origins(self) -> None:
         options = Options()
-        self.assertEqual(recommended_origin(MarkerSlot.TOP_LEFT, 1920, 1080, options), Point(32, 32))
-        self.assertEqual(recommended_origin(MarkerSlot.MIDDLE_LEFT, 1920, 1080, options), Point(32, 441))
-        self.assertEqual(recommended_origin(MarkerSlot.BOTTOM_LEFT, 1920, 1080, options), Point(32, 1080 - 32 - 198))
-        self.assertEqual(recommended_origin(MarkerSlot.TOP_LEFT, 1920, 1080, options, 3), Point(33, 33))
-        self.assertEqual(recommended_origin(MarkerSlot.MIDDLE_LEFT, 1920, 1080, options, 3), Point(33, 441))
-        self.assertEqual(recommended_origin(MarkerSlot.BOTTOM_LEFT, 1920, 1080, options, 3), Point(33, 849))
-        self.assertEqual(recommended_origin(MarkerSlot.TOP_LEFT, 1920, 1080, options, 4), Point(32, 32))
-        # A frame lower than the marker: C# truncates toward zero, Python's // would floor
-        self.assertEqual(recommended_origin(MarkerSlot.MIDDLE_LEFT, 100, 100, options), Point(32, -49))
-        self.assertEqual(recommended_origin(MarkerSlot.MIDDLE_LEFT, 100, 100, options, 3), Point(33, -48))
+        # The main marker top-left, the sync marker bottom-left
+        self.assertEqual(recommended_origin(MarkerKind.FRAME, 1920, 1080, options), Point(32, 32))
+        self.assertEqual(recommended_origin(MarkerKind.SEQUENCE_START, 1920, 1080, options), Point(32, 32))
+        self.assertEqual(recommended_origin(MarkerKind.SEQUENCE_END, 1920, 1080, options), Point(32, 32))
+        self.assertEqual(recommended_origin(MarkerKind.SYNC, 1920, 1080, options), Point(32, 1080 - 32 - 198))
+        # Aligned to a 3:1 downscale ratio
+        self.assertEqual(recommended_origin(MarkerKind.FRAME, 1920, 1080, options, 3), Point(33, 33))
+        self.assertEqual(recommended_origin(MarkerKind.SYNC, 1920, 1080, options, 3), Point(33, 849))
+        self.assertEqual(recommended_origin(MarkerKind.FRAME, 1920, 1080, options, 4), Point(32, 32))
+        # A frame lower than the marker: C# and C++ truncate toward zero, Python's // would floor
+        self.assertEqual(recommended_origin(MarkerKind.SYNC, 100, 100, options), Point(32, -130))
+        self.assertEqual(recommended_origin(MarkerKind.SYNC, 100, 100, options, 3), Point(33, -129))
 
-    def test_symbols_frame_and_end_are_version_2_start_grows_with_the_name(self) -> None:
-        self.assertEqual(generate_modules(Payload(1, 2, 3)).size, 25)
-        self.assertEqual(generate_modules(Payload(1, 2, 3, MarkerKind.SEQUENCE_END)).size, 25)
-        self.assertEqual(generate_modules(Payload(1, 2, 3, MarkerKind.SEQUENCE_START)).size, 29, "33 bytes do not fit version 2-M")
+    def test_every_main_marker_kind_is_version_6(self) -> None:
+        for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
+            with self.subTest(kind):
+                self.assertEqual(generate_modules(Payload(1, 2, 3, kind, 4, 5)).size, 41)
         start = Payload(1, 2, 3, MarkerKind.SEQUENCE_START)
-        self.assertEqual(generate_modules(start, StartMetadata(0, "x" * 64)).size, MAX_QR_MODULE_COUNT)
+        self.assertEqual(generate_modules(start, StartMetadata(0, "x" * MAX_START_NAME_BYTES)).size, QR_MODULE_COUNT)
         with self.assertRaises(ValueError):
-            _ = generate_modules(start, StartMetadata(0, "x" * 65))
+            _ = generate_modules(start, StartMetadata(0, "x" * (MAX_START_NAME_BYTES + 1)))
+
+    def test_sync_markers_are_version_2(self) -> None:
+        self.assertEqual(generate_modules(Payload(1, 2, 3, MarkerKind.SYNC, 4, 5)).size, SYNC_QR_MODULE_COUNT)
+        self.assertEqual(generate_modules(Payload(0xFFFF_FFFF_FFFF_FFFF, 0, 0, MarkerKind.SYNC)).size, 25)
+        # The background quad follows the symbol size, in every output
+        payload, options, origin = Payload(7, 0, 0, MarkerKind.SYNC), Options(3, 4), Point(10, 20)
+        quads = generate_quads(payload, options, origin)
+        self.assertEqual(quads[0], Quad(10, 20, 10 + 99, 20 + 99, False))
+        self.assertTrue(all(quad.right <= 10 + 99 - 12 and quad.bottom <= 20 + 99 - 12 for quad in quads[1:]))
+        self.assertEqual(generate_triangles(payload, options, origin), quads_to_triangles(quads))
+        self.assertEqual(generate_indexed(payload, options, origin, 5), quads_to_indexed(quads, 5))
+        # The other fields are not encoded: the same symbol whatever they hold
+        self.assertEqual(generate_quads(Payload(7, 123, 4, MarkerKind.SYNC, 5, 6), options, origin), quads)
+
+    def test_every_main_marker_kind_has_the_same_size(self) -> None:
+        options, origin = Options(), Point(32, 32)
+        expected = Quad(32, 32, 32 + 294, 32 + 294, False)
+        start = Payload(1, 2, 3, MarkerKind.SEQUENCE_START)
+        self.assertEqual(generate_quads(Payload(1, 2, 3), options, origin)[0], expected)
+        self.assertEqual(generate_quads(Payload(1, 2, 3, MarkerKind.SEQUENCE_END), options, origin)[0], expected)
+        self.assertEqual(generate_start_quads(start, StartMetadata(0, "x" * MAX_START_NAME_BYTES), options, origin)[0], expected)
 
     def test_quads_are_pixel_aligned_background_first(self) -> None:
         quads = generate_quads(Payload(5, 6, 7), Options(3, 4), Point(10, 20))
-        self.assertTrue(2 <= len(quads) <= MAX_FRAME_QUAD_COUNT)
-        self.assertEqual(quads[0], Quad(10, 20, 10 + 99, 20 + 99, False))
+        self.assertTrue(2 <= len(quads) <= MAX_QUAD_COUNT)
+        self.assertEqual(quads[0], Quad(10, 20, 10 + 147, 20 + 147, False))
         for quad in quads[1:]:
             self.assertTrue(quad.dark)
             self.assertEqual(quad.height, 3)
@@ -122,9 +163,10 @@ class GeometryTests(unittest.TestCase):
             with self.subTest(options), self.assertRaises(ValueError):
                 _ = generate_quads(payload, options, Point(0, 0))
 
-    def test_frame_markers_fit_the_frame_quad_count(self) -> None:
+    def test_markers_fit_the_quad_count(self) -> None:
         for frame in range(0, 500, 7):
-            self.assertLessEqual(len(generate_quads(Payload(frame * 7919, frame * 166_667, 9), Options(), Point(0, 0))), MAX_FRAME_QUAD_COUNT)
+            payload = Payload(frame * 7919, frame * 166_667, 9, MarkerKind(frame % 4), frame * 166_700, 166_667)
+            self.assertLessEqual(len(generate_quads(payload, Options(), Point(0, 0))), MAX_QUAD_COUNT)
 
 
 class FillQuadsTests(unittest.TestCase):

@@ -22,8 +22,10 @@ This page only lists where each term appears in mb-framepacing.
 | **On-screen time**      | `onScreenMs` (CSV)                                                                             |
 | **Frametime**           | Not measured: the capture sees the display side; the animation time step stands in             |
 | **Frame pacing**        | The display time histogram, late frames and the refresh strip (Timeline tab)                   |
-| **Late frame**          | Shown at least one refresh after the target frame time: `Late` in the frames CSV `flags`, red  |
-| **Target frame time**   | The target frame rate (`--target-fps`) in whole refreshes, else the median display time        |
+| **Late frame**          | Shown after its intended time, or a refresh after its target: `Late` in the CSV `flags`, red   |
+| **Target frame time**   | The marker's target, the pacer's schedule, `--target-fps`, else one refresh: `targetMs` (CSV)  |
+| **Pacing error**        | With the pacer's schedule: display step minus intended step, `pacingErrorMs` (CSV)             |
+| **Prediction error**    | With the pacer's schedule: animation time step minus intended step, `predictionErrorMs` (CSV)  |
 | **Stutter**             | Large animation errors                                                                         |
 | **Hitch**               | A frame with a long display time and a large negative animation error                          |
 | **Short / long frame**  | Positive / negative animation error                                                            |

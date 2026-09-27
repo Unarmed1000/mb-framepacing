@@ -18,9 +18,13 @@ namespace MB.FramePacing.Analysis
   /// frames for an EXPERIMENTAL camera capture.
   /// </param>
   /// <param name="RefreshCalculated">True when the refresh was calculated from a camera capture's frames.</param>
-  /// <param name="TargetFrameMs">The frame time the run is measured against, in whole refreshes.</param>
-  /// <param name="TargetGiven">True when it comes from the given target frame rate, false when from the run's median display time.</param>
-  /// <param name="LateFrames">Presented frames shown at least one refresh later than the target frame time.</param>
+  /// <param name="TargetFrameMs">The frame time the run is measured against, in whole refreshes (the median of every frame's target).</param>
+  /// <param name="Source">Where the targets come from: the pacer's schedule or target frame time in the markers, a given target frame rate, or
+  /// the display's native refresh rate.</param>
+  /// <param name="LateFrames">
+  /// Presented frames shown late: at least half a refresh after their intended time with a schedule, otherwise at least one refresh later than
+  /// their target frame time after the previous frame.
+  /// </param>
   /// <param name="LateShare">Late frames as a share of the presented frames with a display time (0..1).</param>
   /// <param name="WorstLateShare">The highest share of late frames in any <see cref="LateShare.WindowSeconds"/> window (0..1).</param>
   /// <param name="ErrorFramesWithUnevenDisplay">
@@ -33,7 +37,7 @@ namespace MB.FramePacing.Analysis
     double RefreshPeriodMs,
     bool RefreshCalculated,
     double TargetFrameMs,
-    bool TargetGiven,
+    PacingSource Source,
     long LateFrames,
     double LateShare,
     double WorstLateShare,
@@ -43,6 +47,15 @@ namespace MB.FramePacing.Analysis
     double? ExpectedRefreshHz = null
   )
   {
+    /// <summary>With a schedule: every frame's display step minus its intended step (ms). Late or early frames, as the pacer sees them.</summary>
+    public Statistics? PacingErrorMs { get; init; }
+
+    /// <summary>
+    /// With a schedule: every frame's animation time step minus its intended step (ms). The game animated for another moment than it planned
+    /// to show the frame (a naive delta time, say). The animation error is the prediction error minus the pacing error.
+    /// </summary>
+    public Statistics? PredictionErrorMs { get; init; }
+
     /// <summary>The refresh rate the run was measured with (Hz).</summary>
     public double RefreshHz => RefreshPeriodMs > 0 ? 1000 / RefreshPeriodMs : 0;
 

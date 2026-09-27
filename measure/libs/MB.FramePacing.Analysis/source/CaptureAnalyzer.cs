@@ -160,8 +160,9 @@ namespace MB.FramePacing.Analysis
     {
       using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
       writer.WriteLine(
-        "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags"
-          + (camera ? ",secondZoneFirstSeenMs,scanoutDelayMs" : "")
+        "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags,"
+          + "intendedDisplayMs,markerTargetMs,targetMs,pacingErrorMs,predictionErrorMs,latenessMs"
+          + (camera ? ",mainMarkerFirstSeenMs,scanoutDelayMs" : "")
       );
       foreach (var frame in frames)
       {
@@ -180,12 +181,18 @@ namespace MB.FramePacing.Analysis
             frame.AnimationDeltaTicks is { } animation ? Ms(animation) : string.Empty,
             frame.AnimationErrorTicks is { } error ? Ms(error) : string.Empty,
             Ms(frame.DriftTicks),
-            frame.Flags == PresentedFrameFlags.None ? string.Empty : frame.Flags.ToString().Replace(", ", "|", StringComparison.Ordinal)
+            frame.Flags == PresentedFrameFlags.None ? string.Empty : frame.Flags.ToString().Replace(", ", "|", StringComparison.Ordinal),
+            frame.IntendedDisplayTicks != 0 ? Ms(frame.IntendedDisplayTicks) : string.Empty,
+            frame.MarkerTargetFrameTicks != 0 ? Ms(frame.MarkerTargetFrameTicks) : string.Empty,
+            frame.TargetTicks is { } target ? Ms(target) : string.Empty,
+            frame.PacingErrorTicks is { } pacing ? Ms(pacing) : string.Empty,
+            frame.PredictionErrorTicks is { } prediction ? Ms(prediction) : string.Empty,
+            frame.LatenessTicks is { } lateness ? Ms(lateness) : string.Empty
           )
             + (
               camera
-                ? frame.FirstSeenSecondaryTicks is { } secondary
-                  ? "," + Ms(secondary) + "," + Ms(secondary - frame.FirstSeenTicks)
+                ? frame.FirstSeenMainTicks is { } main
+                  ? "," + Ms(main) + "," + Ms(frame.FirstSeenTicks - main)
                   : ",,"
                 : string.Empty
             )

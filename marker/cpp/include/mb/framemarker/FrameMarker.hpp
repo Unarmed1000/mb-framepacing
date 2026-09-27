@@ -15,7 +15,6 @@
 #include <mb/framemarker/Constants.hpp>
 #include <mb/framemarker/IndexedCount.hpp>
 #include <mb/framemarker/MarkerKind.hpp>
-#include <mb/framemarker/MarkerSlot.hpp>
 #include <mb/framemarker/ModuleMatrix.hpp>
 #include <mb/framemarker/Options.hpp>
 #include <mb/framemarker/Payload.hpp>
@@ -39,34 +38,23 @@ namespace MB::FrameMarker
            options.QuietZoneModules <= MaxQuietZoneModules;
   }
 
-  //! Width and height in source pixels of a marker (symbol + quiet zone) with the given symbol size.
-  constexpr int32_t MarkerSizePx(const Options& options, const int32_t moduleCount) noexcept
+  //! Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.
+  constexpr int32_t QrModuleCountFor(const MarkerKind kind) noexcept
   {
-    return (moduleCount + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
+    return kind == MarkerKind::Sync ? SyncQrModuleCount : QrModuleCount;
   }
 
-  //! Width and height in source pixels of a frame or end marker (symbol + quiet zone).
-  constexpr int32_t MarkerSizePx(const Options& options) noexcept
+  //! Width and height in source pixels of a marker (symbol + quiet zone). Frame, start and end markers have one size, the sync marker is
+  //! smaller.
+  constexpr int32_t MarkerSizePx(const Options& options, const MarkerKind kind = MarkerKind::Frame) noexcept
   {
-    return MarkerSizePx(options, FrameQrModuleCount);
-  }
-
-  //! Largest possible start marker (a 64 byte name). Keep this area free around the marker origin while the start marker shows.
-  constexpr int32_t MaxMarkerSizePx(const Options& options) noexcept
-  {
-    return MarkerSizePx(options, MaxQrModuleCount);
+    return (QrModuleCountFor(kind) + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
   }
 
   //! Upper bound on the number of quads for any marker: one background quad plus at most one quad per dark run.
   constexpr std::size_t MaxQuadCount() noexcept
   {
-    return 1u + (static_cast<std::size_t>(MaxQrModuleCount) * ((static_cast<std::size_t>(MaxQrModuleCount) + 1u) / 2u));
-  }
-
-  //! Upper bound on the number of quads for a frame or end marker.
-  constexpr std::size_t MaxFrameQuadCount() noexcept
-  {
-    return 1u + (static_cast<std::size_t>(FrameQrModuleCount) * ((static_cast<std::size_t>(FrameQrModuleCount) + 1u) / 2u));
+    return 1u + (static_cast<std::size_t>(QrModuleCount) * ((static_cast<std::size_t>(QrModuleCount) + 1u) / 2u));
   }
 
   constexpr std::size_t MaxTriangleVertexCount() noexcept
@@ -82,22 +70,6 @@ namespace MB::FrameMarker
   constexpr std::size_t MaxIndexCount() noexcept
   {
     return MaxQuadCount() * 6u;
-  }
-
-  //! Vertex and index counts for a frame or end marker (a start marker needs the Max... variants above).
-  constexpr std::size_t MaxFrameTriangleVertexCount() noexcept
-  {
-    return MaxFrameQuadCount() * 6u;
-  }
-
-  constexpr std::size_t MaxFrameIndexedVertexCount() noexcept
-  {
-    return MaxFrameQuadCount() * 4u;
-  }
-
-  constexpr std::size_t MaxFrameIndexCount() noexcept
-  {
-    return MaxFrameQuadCount() * 6u;
   }
 
   //! Convert a wall clock time to C# DateTime UTC ticks (the StartMetadata::UtcTicks format).
@@ -148,31 +120,26 @@ namespace MB::FrameMarker
     return Detail::ModuleSizeForStoredPx(mjpeg ? 4 : 3, sourceHeight, storedHeight);
   }
 
-  //! Recommended marker origin for the given slot. alignPx should be the integer downscale ratio (1 if none) so module edges land on
-  //! stored pixel edges.
-  constexpr Point RecommendedOrigin(const MarkerSlot slot, const int32_t sourceWidth, const int32_t sourceHeight, const Options& options,
+  //! Recommended origin of a marker: the main marker (frame, start and end) top-left, the sync marker bottom-left. alignPx should be the
+  //! integer downscale ratio (1 if none) so module edges land on stored pixel edges.
+  constexpr Point RecommendedOrigin(const MarkerKind kind, const int32_t sourceWidth, const int32_t sourceHeight, const Options& options,
                                     const int32_t alignPx = 1) noexcept
   {
     (void)sourceWidth;
-    const int32_t size = MarkerSizePx(options);
     const int32_t inset = Detail::AlignUp(RecommendedInsetPx, alignPx);
-    switch (slot)
+    if (kind == MarkerKind::Sync)
     {
-    case MarkerSlot::MiddleLeft:
-      return {inset, Detail::AlignDown((sourceHeight - size) / 2, alignPx)};
-    case MarkerSlot::BottomLeft:
-      return {inset, Detail::AlignDown(sourceHeight - inset - size, alignPx)};
-    case MarkerSlot::TopLeft:
-    default:
-      return {inset, inset};
+      return {inset, Detail::AlignDown(sourceHeight - inset - MarkerSizePx(options, kind), alignPx)};
     }
+    return {inset, inset};
   }
 
-  //! Serialize the 24 byte payload header (the complete payload of frame and end markers).
+  //! Serialize the 36 byte payload header (the complete payload of frame and end markers; a sync marker uses its first 12 bytes).
   std::array<uint8_t, PayloadByteCount> EncodePayload(const Payload& payload) noexcept;
 
   //! Serialize a complete payload into dst (MaxEncodedPayloadByteCount bytes is always enough). Start markers append the metadata, other
-  //! kinds ignore it. Returns the number of bytes written, or 0 if dst is too small or the name is longer than MaxStartNameBytes.
+  //! kinds ignore it; a sync marker is SyncPayloadByteCount bytes. Returns the number of bytes written, or 0 if dst is too small or the name is
+  //! longer than MaxStartNameBytes.
   std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, std::span<uint8_t> dst) noexcept;
 
   //! Parse the wire format. Returns false on a wrong length, magic, format version or an unknown kind.
@@ -185,18 +152,18 @@ namespace MB::FrameMarker
 
   //! Generate the marker as quads. The first quad is the light background (symbol + quiet zone), followed by one dark quad per
   //! horizontal run of dark modules. Draw them in order. Does not allocate.
-  //! Frame/end markers produce at most MaxFrameQuadCount() quads. A start marker generated here carries empty metadata.
+  //! Frame, end and sync markers (by payload.Kind). Every marker produces at most MaxQuadCount() quads. A start marker generated here
+  //! carries empty metadata.
   //! Returns the number of quads written, or 0 if the options are invalid or dst is smaller than the generated quad count.
   std::size_t GenerateQuads(const Payload& payload, const Options& options, Point origin, std::span<Quad> dst) noexcept;
 
-  //! Generate a start marker carrying metadata (payload.Kind is forced to SequenceStart). At most MaxQuadCount() quads, and the marker
-  //! is at most MaxMarkerSizePx(options) wide and high. Same rules as GenerateQuads otherwise.
+  //! Generate a start marker carrying metadata (payload.Kind is forced to SequenceStart). Same rules as GenerateQuads.
   std::size_t GenerateStartQuads(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
                                  std::span<Quad> dst) noexcept;
 
   //! Generate the marker as a triangle list, written straight into dst: 6 vertices per quad (see GenerateQuads for the quad order),
   //! (TL, TR, BL) (BL, TR, BR), clockwise on screen. Every vertex lies on a pixel corner. Does not allocate.
-  //! Frame/end markers need at most MaxFrameTriangleVertexCount() vertices, start markers MaxTriangleVertexCount().
+  //! Every marker needs at most MaxTriangleVertexCount() vertices.
   //! Returns the number of vertices written, or 0 if the options are invalid or dst is too small.
   std::size_t GenerateTriangles(const Payload& payload, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
 
@@ -206,7 +173,7 @@ namespace MB::FrameMarker
 
   //! Generate the marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on
   //! screen. baseVertex is added to every index. Does not allocate.
-  //! Frame/end markers need at most MaxFrameIndexedVertexCount() vertices and MaxFrameIndexCount() indices.
+  //! Every marker needs at most MaxIndexedVertexCount() vertices and MaxIndexCount() indices.
   //! Returns {0,0} if the options are invalid or a destination is too small.
   IndexedCount GenerateIndexed(const Payload& payload, const Options& options, Point origin, std::span<Vertex> dstVertices,
                                std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;

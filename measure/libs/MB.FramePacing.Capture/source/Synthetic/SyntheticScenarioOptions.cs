@@ -45,6 +45,11 @@ namespace MB.FramePacing.Capture.Synthetic
     public string RunName { get; init; } = "synthetic";
     public long RunStartUtcTicks { get; init; } = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc).Ticks;
 
+    /// <summary>
+    /// Write the pacer's intended display time (the vsync each frame is rendered for) and target frame time (one refresh) into the markers.
+    /// </summary>
+    public bool PacingInformation { get; init; } = true;
+
     /// <summary>Every n-th frame misses <see cref="StallSlots"/> extra vsyncs (0 = never).</summary>
     public int StallEvery { get; init; }
     public int StallSlots { get; init; } = 1;

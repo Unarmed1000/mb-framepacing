@@ -19,24 +19,31 @@ namespace MB.FrameMarker
 {
   public static class Marker
   {
-    /// <summary>Frame and end markers are fixed to QR version 2 (25x25 modules), error correction level M, byte mode.</summary>
-    public const int FrameQrVersion = 2;
+    /// <summary>
+    /// Every marker (frame, start and end) is QR version 6 (41x41 modules), error correction level M, byte mode, so the marker never changes
+    /// size. Version 6-M holds <see cref="QrCapacityBytes"/> bytes: a frame or end marker uses <see cref="PayloadByteCount"/> of them, the rest
+    /// is room for future fields.
+    /// </summary>
+    public const int QrVersion = 6;
 
-    /// <summary>Start markers carry metadata and use the smallest version in [FrameQrVersion, MaxQrVersion] that fits.</summary>
-    public const int MaxQrVersion = 6;
+    public const int QrModuleCount = (4 * QrVersion) + 17;
+    public const int QrCapacityBytes = 106;
 
-    public const int FrameQrModuleCount = (4 * FrameQrVersion) + 17;
-    public const int MaxQrModuleCount = (4 * MaxQrVersion) + 17;
+    /// <summary>The sync marker (<see cref="MarkerKind.Sync"/>) is QR version 2 (25x25 modules): magic | format version | kind | frame index.</summary>
+    public const int SyncQrVersion = 2;
+
+    public const int SyncQrModuleCount = (4 * SyncQrVersion) + 17;
+    public const int SyncPayloadByteCount = 12;
 
     /// <summary>Payload header, shared by every marker kind (little endian): magic "MF" | format version | kind | frame index u64 |
-    /// animation ticks i64 | run id u32.</summary>
-    public const int PayloadByteCount = 24;
+    /// animation ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32.</summary>
+    public const int PayloadByteCount = 36;
     public const byte PayloadMagic0 = (byte)'M';
     public const byte PayloadMagic1 = (byte)'F';
     public const byte PayloadFormatVersion = 1;
 
     /// <summary>Start marker payload: header | start time UTC i64 | name length u8 | name UTF-8 (0..MaxStartNameBytes).</summary>
-    public const int MaxStartNameBytes = 64;
+    public const int MaxStartNameBytes = 60;
     public const int StartPayloadFixedByteCount = PayloadByteCount + 8 + 1;
     public const int MaxEncodedPayloadByteCount = StartPayloadFixedByteCount + MaxStartNameBytes;
 
@@ -55,22 +62,18 @@ namespace MB.FrameMarker
     public const int RecommendedQuietZoneModules = 4;
 
     /// <summary>Upper bound on the number of quads for any marker: one background quad plus at most one quad per dark run.</summary>
-    public const int MaxQuadCount = 1 + (MaxQrModuleCount * ((MaxQrModuleCount + 1) / 2));
-
-    /// <summary>Upper bound on the number of quads for a frame or end marker.</summary>
-    public const int MaxFrameQuadCount = 1 + (FrameQrModuleCount * ((FrameQrModuleCount + 1) / 2));
+    public const int MaxQuadCount = 1 + (QrModuleCount * ((QrModuleCount + 1) / 2));
 
     public const int MaxTriangleVertexCount = MaxQuadCount * 6;
     public const int MaxIndexedVertexCount = MaxQuadCount * 4;
     public const int MaxIndexCount = MaxQuadCount * 6;
-    public const int MaxFrameTriangleVertexCount = MaxFrameQuadCount * 6;
-    public const int MaxFrameIndexedVertexCount = MaxFrameQuadCount * 4;
-    public const int MaxFrameIndexCount = MaxFrameQuadCount * 6;
 
     private const int OffsetKind = 3;
     private const int OffsetFrameIndex = 4;
     private const int OffsetAnimationTicks = 12;
     private const int OffsetRunId = 20;
+    private const int OffsetIntendedDisplayTicks = 24;
+    private const int OffsetTargetFrameTicks = 32;
     private const int OffsetStartUtcTicks = PayloadByteCount;
     private const int OffsetStartNameLength = OffsetStartUtcTicks + 8;
     private const int OffsetStartName = OffsetStartNameLength + 1;
@@ -78,22 +81,21 @@ namespace MB.FrameMarker
     // Decoding rejects names that are not valid UTF-8, like the analysis tools
     private static readonly UTF8Encoding g_strictUtf8 = new UTF8Encoding(false, true);
 
-    public static int QrModuleCountForVersion(int version) => (4 * version) + 17;
-
     public static bool IsValid(in Options options) =>
       options.ModuleSizePx >= MinModuleSizePx
       && options.ModuleSizePx <= MaxModuleSizePx
       && options.QuietZoneModules >= 0
       && options.QuietZoneModules <= MaxQuietZoneModules;
 
-    /// <summary>Width and height in source pixels of a marker (symbol + quiet zone) with the given symbol size.</summary>
-    public static int MarkerSizePx(in Options options, int moduleCount) => (moduleCount + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
+    /// <summary>Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.</summary>
+    public static int QrModuleCountFor(MarkerKind kind) => kind == MarkerKind.Sync ? SyncQrModuleCount : QrModuleCount;
 
-    /// <summary>Width and height in source pixels of a frame or end marker (symbol + quiet zone).</summary>
-    public static int MarkerSizePx(in Options options) => MarkerSizePx(options, FrameQrModuleCount);
-
-    /// <summary>Largest possible start marker (a 64 byte name). Keep this area free around the marker origin while the start marker shows.</summary>
-    public static int MaxMarkerSizePx(in Options options) => MarkerSizePx(options, MaxQrModuleCount);
+    /// <summary>
+    /// Width and height in source pixels of a marker (symbol + quiet zone). Frame, start and end markers have one size, the sync marker is
+    /// smaller.
+    /// </summary>
+    public static int MarkerSizePx(in Options options, MarkerKind kind = MarkerKind.Frame) =>
+      (QrModuleCountFor(kind) + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
 
     /// <summary>Hard minimum module size: 2 stored pixels per module after all scaling (source -> capture -> stored).</summary>
     public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => ModuleSizeForStoredPx(2, sourceHeight, storedHeight);
@@ -103,22 +105,15 @@ namespace MB.FrameMarker
       ModuleSizeForStoredPx(mjpeg ? 4 : 3, sourceHeight, storedHeight);
 
     /// <summary>
-    /// Recommended marker origin for the given slot. <paramref name="alignPx"/> should be the integer downscale ratio (1 if none) so module
-    /// edges land on stored pixel edges.
+    /// Recommended origin of a marker: the main marker (frame, start and end) top-left, the sync marker bottom-left.
+    /// <paramref name="alignPx"/> should be the integer downscale ratio (1 if none) so module edges land on stored pixel edges.
     /// </summary>
-    public static Point RecommendedOrigin(MarkerSlot slot, int sourceWidth, int sourceHeight, in Options options, int alignPx = 1)
+    public static Point RecommendedOrigin(MarkerKind kind, int sourceWidth, int sourceHeight, in Options options, int alignPx = 1)
     {
-      int size = MarkerSizePx(options);
       int inset = AlignUp(RecommendedInsetPx, alignPx);
-      switch (slot)
-      {
-        case MarkerSlot.MiddleLeft:
-          return new Point(inset, AlignDown((sourceHeight - size) / 2, alignPx));
-        case MarkerSlot.BottomLeft:
-          return new Point(inset, AlignDown(sourceHeight - inset - size, alignPx));
-        default:
-          return new Point(inset, inset);
-      }
+      if (kind == MarkerKind.Sync)
+        return new Point(inset, AlignDown(sourceHeight - inset - MarkerSizePx(options, kind), alignPx));
+      return new Point(inset, inset);
     }
 
     /// <summary>Convert a wall clock time to DateTime UTC ticks (the <see cref="StartMetadata.UtcTicks"/> format).</summary>
@@ -139,7 +134,10 @@ namespace MB.FrameMarker
       int nameBytes = isStart ? Encoding.UTF8.GetByteCount(name) : 0;
       if (nameBytes > MaxStartNameBytes)
         return 0;
-      int byteCount = isStart ? StartPayloadFixedByteCount + nameBytes : PayloadByteCount;
+      int byteCount =
+        isStart ? StartPayloadFixedByteCount + nameBytes
+        : payload.Kind == MarkerKind.Sync ? SyncPayloadByteCount
+        : PayloadByteCount;
       if (destination == null || offset < 0 || destination.Length - offset < byteCount)
         return 0;
 
@@ -148,8 +146,13 @@ namespace MB.FrameMarker
       destination[offset + 2] = PayloadFormatVersion;
       destination[offset + OffsetKind] = (byte)payload.Kind;
       WriteLittleEndian(destination, offset + OffsetFrameIndex, payload.FrameIndex, 8);
+      // A sync marker is the start of the header: magic, format version, kind and frame index
+      if (payload.Kind == MarkerKind.Sync)
+        return byteCount;
       WriteLittleEndian(destination, offset + OffsetAnimationTicks, unchecked((ulong)payload.AnimationTicks), 8);
       WriteLittleEndian(destination, offset + OffsetRunId, payload.RunId, 4);
+      WriteLittleEndian(destination, offset + OffsetIntendedDisplayTicks, unchecked((ulong)payload.IntendedDisplayTicks), 8);
+      WriteLittleEndian(destination, offset + OffsetTargetFrameTicks, payload.TargetFrameTicks, 4);
       if (isStart)
       {
         WriteLittleEndian(destination, offset + OffsetStartUtcTicks, unchecked((ulong)metadata.UtcTicks), 8);
@@ -173,16 +176,25 @@ namespace MB.FrameMarker
       if (
         source == null
         || offset < 0
-        || count < PayloadByteCount
+        || count < SyncPayloadByteCount
         || source.Length - offset < count
         || source[offset] != PayloadMagic0
         || source[offset + 1] != PayloadMagic1
         || source[offset + 2] != PayloadFormatVersion
-        || source[offset + OffsetKind] > (byte)MarkerKind.SequenceEnd
+        || source[offset + OffsetKind] > (byte)MarkerKind.Sync
       )
         return false;
 
       var kind = (MarkerKind)source[offset + OffsetKind];
+      if (kind == MarkerKind.Sync)
+      {
+        if (count != SyncPayloadByteCount)
+          return false;
+        payload = new Payload(ReadLittleEndian(source, offset + OffsetFrameIndex, 8), 0, 0, kind);
+        return true;
+      }
+      if (count < PayloadByteCount)
+        return false;
       if (kind == MarkerKind.SequenceStart)
       {
         if (count < StartPayloadFixedByteCount)
@@ -210,7 +222,9 @@ namespace MB.FrameMarker
         ReadLittleEndian(source, offset + OffsetFrameIndex, 8),
         unchecked((long)ReadLittleEndian(source, offset + OffsetAnimationTicks, 8)),
         (uint)ReadLittleEndian(source, offset + OffsetRunId, 4),
-        kind
+        kind,
+        unchecked((long)ReadLittleEndian(source, offset + OffsetIntendedDisplayTicks, 8)),
+        (uint)ReadLittleEndian(source, offset + OffsetTargetFrameTicks, 4)
       );
       return true;
     }

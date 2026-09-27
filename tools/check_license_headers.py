@@ -73,7 +73,8 @@ def insert_at(relative: str, lines: list[str]) -> int:
 
 def tracked_files(root: Path) -> list[str]:
     result = subprocess.run(["git", "ls-files", "--", *PATTERNS], cwd=root, capture_output=True, text=True, check=True)
-    return sorted(line for line in result.stdout.splitlines() if line and "/third_party/" not in line)
+    # Deleted but not yet staged files are still listed; they have nothing to check
+    return sorted(line for line in result.stdout.splitlines() if line and "/third_party/" not in line and (root / line).is_file())
 
 
 def check(root: Path, relative: str, fix: bool) -> str | None:

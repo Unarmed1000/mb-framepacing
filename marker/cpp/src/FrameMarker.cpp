@@ -7,14 +7,12 @@ namespace MB::FrameMarker
 {
   namespace
   {
-    constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(MaxQrVersion);
+    constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(QrVersion);
 
     static_assert(MaxEncodedPayloadByteCount <= QrBufferLength);
-    static_assert(MaxFrameQuadCount() == 326u);
+    static_assert(QrModuleCount == 41);
     static_assert(MaxQuadCount() == 862u);
-
-    static_assert(MaxFrameTriangleVertexCount() == 326u * 6u);
-    static_assert(MaxFrameIndexCount() == 326u * 6u);
+    static_assert(MaxTriangleVertexCount() == 862u * 6u);
 
     //! Walk the marker in draw order: the light background (symbol + quiet zone), then one dark quad per horizontal run of dark modules.
     //! Every quad goes straight to emit, which writes it in its output format and returns false when the output is full.
@@ -22,7 +20,7 @@ namespace MB::FrameMarker
     bool WalkQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, TEmit&& emit) noexcept
     {
       const int32_t moduleSize = options.ModuleSizePx;
-      const int32_t markerSize = MarkerSizePx(options, matrix.Size);
+      const int32_t markerSize = (matrix.Size + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
       const int32_t symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
       const int32_t symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
 
@@ -170,10 +168,9 @@ namespace MB::FrameMarker
       return false;
     }
 
-    // Frame and end markers are pinned to one version so the symbol never changes size between frames.
-    const int32_t maxVersion = payload.Kind == MarkerKind::SequenceStart ? MaxQrVersion : FrameQrVersion;
-    if (!qrcodegen_encodeBinary(dataAndTemp.data(), byteCount, qrCode.data(), qrcodegen_Ecc_MEDIUM, FrameQrVersion, maxVersion, qrcodegen_Mask_AUTO,
-                                false))
+    // Every kind is pinned to one version, so the symbol never changes size between frames.
+    const int32_t version = payload.Kind == MarkerKind::Sync ? SyncQrVersion : QrVersion;
+    if (!qrcodegen_encodeBinary(dataAndTemp.data(), byteCount, qrCode.data(), qrcodegen_Ecc_MEDIUM, version, version, qrcodegen_Mask_AUTO, false))
     {
       return false;
     }
@@ -184,7 +181,7 @@ namespace MB::FrameMarker
     {
       for (int32_t x = 0; x < rMatrix.Size; ++x)
       {
-        rMatrix.Modules[(static_cast<std::size_t>(y) * MaxQrModuleCount) + static_cast<std::size_t>(x)] =
+        rMatrix.Modules[(static_cast<std::size_t>(y) * QrModuleCount) + static_cast<std::size_t>(x)] =
           qrcodegen_getModule(qrCode.data(), x, y) ? 1u : 0u;
       }
     }

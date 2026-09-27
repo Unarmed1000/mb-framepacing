@@ -137,14 +137,16 @@ The headline numbers on the Analyze page:
 | Frames visibly off  | Frames with an animation error: a refresh or more for a capture card, more than one camera period for a camera |
 | Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                                     |
 | Worst error         | The largest absolute animation error                                                                           |
-| Late frames         | Frames shown at least one refresh later than the target frame time, and their share of the run                 |
+| Late frames         | Frames shown later than planned (see below), and their share of the run                                        |
 | Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches                      |
 | Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                              |
 
 Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
 early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it
-the target frame time and the refresh rate used, compared with the expected display rate when one was given. The target is the **target frame rate** given at capture or analysis time, rounded up to
-whole refreshes; without one, the run's median display time.
+the target frame time and the refresh rate used, compared with the expected display rate when one was given. What "late" is
+measured against, in order: the intended display times the application's frame pacer writes into the marker (then **Detailed
+statistics** also shows the pacing and prediction error), its target frame time in the marker, the **target frame rate** given at
+capture or analysis time (rounded up to whole refreshes), and otherwise the display's native refresh rate.
 
 The charts are explained in the README under [Reading the results](../README.md#reading-the-results). To analyse again, for
 example with a different clock or only one run:

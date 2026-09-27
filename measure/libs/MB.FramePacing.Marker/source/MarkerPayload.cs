@@ -16,16 +16,27 @@ namespace MB.FramePacing.Marker
   /// <param name="FrameIndex">The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</param>
   /// <param name="AnimationTicks">The animation time the frame was rendered for, in <see cref="TimeSpan"/> ticks (100ns).</param>
   /// <param name="RunId">Identifies one test run: the start marker, every frame marker and the end marker of a run share it.</param>
-  public readonly record struct MarkerPayload(ulong FrameIndex, long AnimationTicks, uint RunId = 0, MarkerKind Kind = MarkerKind.Frame)
+  /// <param name="IntendedDisplayTicks">
+  /// When the application's frame pacer intends the frame to become visible, in ticks (100ns) on its steady clock; 0 = unknown.
+  /// </param>
+  /// <param name="TargetFrameTicks">The interval the frame pacer aims for before this frame, in ticks (100ns); 0 = unknown.</param>
+  public readonly record struct MarkerPayload(
+    ulong FrameIndex,
+    long AnimationTicks,
+    uint RunId = 0,
+    MarkerKind Kind = MarkerKind.Frame,
+    long IntendedDisplayTicks = 0,
+    uint TargetFrameTicks = 0
+  )
   {
     /// <summary>Size of the header, which is the complete payload of frame and end markers.</summary>
-    public const int ByteCount = 24;
-    public const int MaxStartNameBytes = 64;
-    public const int StartFixedByteCount = ByteCount + 8 + 1;
-    public const int MaxEncodedByteCount = StartFixedByteCount + MaxStartNameBytes;
-    public const byte Magic0 = (byte)'M';
-    public const byte Magic1 = (byte)'F';
-    public const byte FormatVersion = 1;
+    public const int ByteCount = FM.Marker.PayloadByteCount;
+    public const int MaxStartNameBytes = FM.Marker.MaxStartNameBytes;
+    public const int StartFixedByteCount = FM.Marker.StartPayloadFixedByteCount;
+    public const int MaxEncodedByteCount = FM.Marker.MaxEncodedPayloadByteCount;
+    public const byte Magic0 = FM.Marker.PayloadMagic0;
+    public const byte Magic1 = FM.Marker.PayloadMagic1;
+    public const byte FormatVersion = FM.Marker.PayloadFormatVersion;
 
     public TimeSpan AnimationTime => TimeSpan.FromTicks(AnimationTicks);
 
@@ -48,7 +59,14 @@ namespace MB.FramePacing.Marker
       var bytes = src.ToArray();
       if (!FM.Marker.TryDecodePayload(bytes, 0, bytes.Length, out var decoded, out var start))
         return false;
-      payload = new MarkerPayload(decoded.FrameIndex, decoded.AnimationTicks, decoded.RunId, (MarkerKind)decoded.Kind);
+      payload = new MarkerPayload(
+        decoded.FrameIndex,
+        decoded.AnimationTicks,
+        decoded.RunId,
+        (MarkerKind)decoded.Kind,
+        decoded.IntendedDisplayTicks,
+        decoded.TargetFrameTicks
+      );
       if (decoded.Kind == FM.MarkerKind.SequenceStart)
         metadata = new StartMetadata(start.UtcTicks, start.Name);
       return true;
@@ -57,6 +75,7 @@ namespace MB.FramePacing.Marker
     public static bool TryDecode(ReadOnlySpan<byte> src, out MarkerPayload payload) => TryDecode(src, out payload, out _);
 
     /// <summary>The same payload as the marker library's type.</summary>
-    public FM.Payload ToFrameMarker() => new FM.Payload(FrameIndex, AnimationTicks, RunId, (FM.MarkerKind)Kind);
+    public FM.Payload ToFrameMarker() =>
+      new FM.Payload(FrameIndex, AnimationTicks, RunId, (FM.MarkerKind)Kind, IntendedDisplayTicks, TargetFrameTicks);
   }
 }

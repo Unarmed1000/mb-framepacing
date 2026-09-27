@@ -120,7 +120,6 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
 
       // Every tile holds its marker axis aligned at the known origin with 4 px modules: the locked fast path must decode most captures
-      int size = MarkerRenderer.MarkerSizePx(CameraZone.StoredPxPerModule);
       var decoder = new MarkerDecoder(sampleModuleGrid: true);
       var decoded = new int[2];
       int records = 0;
@@ -133,9 +132,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           ++records;
           for (int zone = 0; zone < 2; ++zone)
           {
-            int y = (zone * CameraZone.StoredSizePx) + CameraZone.StoredMarkerOriginPx;
-            var markerLock = new MarkerLock(new PixelRect(CameraZone.StoredMarkerOriginPx, y, size, size), CameraZone.StoredPxPerModule);
-            if (decoder.DecodeLocked(image, markerLock).IsDecoded)
+            if (decoder.DecodeLocked(image, CameraZone.StoredLock(zone)).IsDecoded)
               ++decoded[zone];
           }
           var dump = Environment.GetEnvironmentVariable("MB_FRAMEPACING_TEST_DUMP");

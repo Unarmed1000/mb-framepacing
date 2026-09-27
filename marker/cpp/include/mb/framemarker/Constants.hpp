@@ -9,30 +9,30 @@
 
 namespace MB::FrameMarker
 {
-  //! Frame and end markers are fixed to QR version 2 (25x25 modules), ECC level M, byte mode, so they never change size.
-  inline constexpr int32_t FrameQrVersion = 2;
-  //! Start markers carry metadata and use the smallest version in [FrameQrVersion, MaxQrVersion] that fits.
-  inline constexpr int32_t MaxQrVersion = 6;
+  //! Every marker (frame, start and end) is QR version 6 (41x41 modules), ECC level M, byte mode, so the marker never changes size.
+  //! Version 6-M holds 106 bytes: a frame or end marker uses PayloadByteCount of them, the rest is room for future fields.
+  inline constexpr int32_t QrVersion = 6;
+  inline constexpr int32_t QrModuleCount = (4 * QrVersion) + 17;
+  inline constexpr std::size_t QrCapacityBytes = 106;
 
-  constexpr int32_t QrModuleCountForVersion(const int32_t version) noexcept
-  {
-    return (4 * version) + 17;
-  }
-
-  inline constexpr int32_t FrameQrModuleCount = QrModuleCountForVersion(FrameQrVersion);
-  inline constexpr int32_t MaxQrModuleCount = QrModuleCountForVersion(MaxQrVersion);
+  //! The sync marker (MarkerKind::Sync) is QR version 2 (25x25 modules), ECC level M: magic | format version | kind | frame index u64.
+  inline constexpr int32_t SyncQrVersion = 2;
+  inline constexpr int32_t SyncQrModuleCount = (4 * SyncQrVersion) + 17;
+  inline constexpr std::size_t SyncPayloadByteCount = 12;
 
   //! Payload header, shared by every marker kind (little endian):
-  //! magic "MF" (2) | format version (1) | kind (1) | frame index u64 (8) | animation ticks i64 (8) | run id u32 (4)
-  inline constexpr std::size_t PayloadByteCount = 24;
+  //! magic "MF" (2) | format version (1) | kind (1) | frame index u64 (8) | animation ticks i64 (8) | run id u32 (4) |
+  //! intended display ticks i64 (8) | target frame ticks u32 (4)
+  inline constexpr std::size_t PayloadByteCount = 36;
   inline constexpr uint8_t PayloadMagic0 = 'M';
   inline constexpr uint8_t PayloadMagic1 = 'F';
   inline constexpr uint8_t PayloadFormatVersion = 1;
 
   //! Start marker payload: header (24) | start time UTC i64 (8) | name length u8 (1) | name UTF-8 (0..MaxStartNameBytes)
-  inline constexpr std::size_t MaxStartNameBytes = 64;
+  inline constexpr std::size_t MaxStartNameBytes = 60;
   inline constexpr std::size_t StartPayloadFixedByteCount = PayloadByteCount + 8u + 1u;
   inline constexpr std::size_t MaxEncodedPayloadByteCount = StartPayloadFixedByteCount + MaxStartNameBytes;
+  static_assert(MaxEncodedPayloadByteCount <= QrCapacityBytes);
 
   //! C# TimeSpan / DateTime resolution
   inline constexpr int64_t TicksPerSecond = 10'000'000;

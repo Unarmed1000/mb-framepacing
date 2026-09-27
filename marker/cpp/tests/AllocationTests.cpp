@@ -129,8 +129,8 @@ namespace
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> g_payloadBytes{};
   FM::ModuleMatrix g_matrix{};
 
-  // 64 bytes, the longest start marker name
-  constexpr std::string_view LongestName = "allocation-test 012345678901234567890123456789012345678901234567";
+  // 60 bytes, the longest start marker name
+  constexpr std::string_view LongestName = "allocation-test 01234567890123456789012345678901234567890123";
   static_assert(LongestName.size() == FM::MaxStartNameBytes);
 }
 
@@ -146,7 +146,7 @@ TEST(Allocations, CountingWorks)
 TEST(Allocations, GeneratingMarkersDoesNotAllocate)
 {
   const FM::Options options{};
-  const FM::Point origin = FM::RecommendedOrigin(FM::MarkerSlot::TopLeft, 1920, 1080, options, 2);
+  const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 2);
   const FM::StartMetadata metadata{FM::UnixEpochDateTimeTicks, LongestName};
 
   std::size_t written = 0;

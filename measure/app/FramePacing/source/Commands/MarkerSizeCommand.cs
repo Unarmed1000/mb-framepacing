@@ -72,9 +72,9 @@ namespace MB.FramePacing.App.Commands
         )
       );
       table.AddRow("Minimum module size", $"{advice.MinimumModulePx} px (2 stored px per module)");
-      table.AddRow("Frame / end marker", $"{advice.FrameMarkerPx}x{advice.FrameMarkerPx} px");
-      table.AddRow("Largest start marker", $"{advice.MaxStartMarkerPx}x{advice.MaxStartMarkerPx} px (keep this area free)");
+      table.AddRow("Marker", $"{advice.MarkerPx}x{advice.MarkerPx} px");
       table.AddRow("Top-left origin", $"{advice.OriginX}, {advice.OriginY}");
+      table.AddRow("Sync marker (optional)", $"{advice.SyncMarkerPx}x{advice.SyncMarkerPx} px at {advice.SyncOriginX}, {advice.SyncOriginY}");
       AnsiConsole.Write(table);
 
       if (advice.StoredHeight > advice.SourceHeight)

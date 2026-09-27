@@ -102,8 +102,15 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
     (`TimelineAnalyzer.RefreshTolerance`) is a warning.
   - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
-    summary.json). The target frame rate (`--target-fps`, GUI "Target frame rate") is stored in capture.json and can be overridden
-    at analysis time.
+    summary.json). Every frame's target comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`:
+    lateness against the schedule, and the animation error split into pacing and prediction error), its target frame time in the
+    markers, the target frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time),
+    and otherwise one refresh (the native rate). The synthetic game writes a schedule; its prediction error is 0 by construction.
+- **Markers (format version 1, `doc/marker-format.md`):** a 36 byte header (with the intended display time and target frame time)
+  on every kind; every main marker (frame, start, end) is QR version 6 (41×41), so it never changes size and has room for future
+  fields; the start name is at most 60 bytes. The sync marker (kind 3, 12 bytes: frame index only) is QR version 2 (25×25), drawn
+  bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `RecommendedOrigin(kind, …)`
+  places both; there are no other slots.
 - **Camera capture (VERY EXPERIMENTAL, `doc/camera.md`):**
   - Every place users meet it says "very experimental": CLI help, the GUI card, `CameraRig.ExperimentalNotice` in rig files and
     analysis warnings, docs. Keep it that way until it is validated with real hardware, and keep `doc/camera-status.md`
@@ -114,6 +121,9 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     `RectifyingCaptureSource` (C# path). `FfmpegCommandBuilder.BuildCameraFilter` is the ffmpeg path; both produce the same layout:
     zones of `CameraZone.StoredSizePx` stacked in scanout order.
   - The analysis switches to `ScanoutModel.Camera` when `capture.json` has a `camera` section.
+  - Zones: `CameraZone.MainZone` (the main marker, identifies each frame) and `CameraZone.SyncZone` (the sync marker, times it:
+    `TimelineAnalyzer.TimeBySyncMarker`). A camera decode only counts when every sampled module matches the decoded payload's symbol
+    (`MarkerDecoder.MaxModuleMismatchFraction`).
   - The synthetic camera (`Capture/source/Synthetic/SyntheticCamera.cs`) is the ground truth. `selftest --camera --fps 1000
 --refresh 60 [--tear-every 9]` runs it end to end.
   - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the

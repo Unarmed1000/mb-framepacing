@@ -37,7 +37,9 @@ namespace MB.FramePacing.Marker.UnitTest
           ulong.Parse(Field("frameIndex"), CultureInfo.InvariantCulture),
           long.Parse(Field("animationTicks"), CultureInfo.InvariantCulture),
           uint.Parse(Field("runId"), CultureInfo.InvariantCulture),
-          kind
+          kind,
+          long.Parse(Field("intendedDisplayTicks"), CultureInfo.InvariantCulture),
+          uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture)
         );
         StartMetadata? start = null;
         if (kind == MarkerKind.SequenceStart)

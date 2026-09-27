@@ -49,12 +49,12 @@ What is implemented, how it was checked, known issues and the next steps are in
 
   | Camera (on 60 Hz) | × refresh | Camera period | All frames found | Mean error    | P95 error     | Max error     |
   | ----------------- | --------- | ------------- | ---------------- | ------------- | ------------- | ------------- |
-  | 100 fps           | 1.7×      | 10.0 ms       | yes              | 4.4 ms (27 %) | 6.7 ms (40 %) | 6.7 ms (40 %) |
+  | 100 fps           | 1.7×      | 10.0 ms       | yes              | 4.5 ms (27 %) | 6.7 ms (40 %) | 6.7 ms (40 %) |
   | 130 fps           | 2.2×      | 7.7 ms        | yes              | 2.2 ms (13 %) | 6.4 ms (38 %) | 6.4 ms (38 %) |
-  | 250 fps           | 4.2×      | 4.0 ms        | yes              | 1.3 ms (8 %)  | 3.3 ms (20 %) | 4.7 ms (28 %) |
+  | 250 fps           | 4.2×      | 4.0 ms        | yes              | 1.2 ms (7 %)  | 3.3 ms (20 %) | 4.7 ms (28 %) |
   | 330 fps           | 5.5×      | 3.0 ms        | yes              | 1.5 ms (9 %)  | 1.5 ms (9 %)  | 3.0 ms (18 %) |
-  | 500 fps           | 8.3×      | 2.0 ms        | yes              | 0.9 ms (6 %)  | 1.3 ms (8 %)  | 2.7 ms (16 %) |
-  | 1000 fps          | 16.7×     | 1.0 ms        | yes              | 0.6 ms (4 %)  | 1.3 ms (8 %)  | 1.7 ms (10 %) |
+  | 500 fps           | 8.3×      | 2.0 ms        | yes              | 0.9 ms (5 %)  | 1.3 ms (8 %)  | 1.3 ms (8 %)  |
+  | 1000 fps          | 16.7×     | 1.0 ms        | yes              | 0.6 ms (4 %)  | 1.7 ms (10 %) | 1.7 ms (10 %) |
 
   <!-- /camera-rate-table -->
 
@@ -64,9 +64,9 @@ What is implemented, how it was checked, known issues and the next steps are in
   between frames.
 - **Full brightness, no strobing.** PWM dimming and strobing/backlight modes (ULMB, "motion blur reduction") make the white level
   flicker between camera frames. Calibration reports this as a warning.
-- **Two marker zones.** The application draws the **same** marker in the **TopLeft** and **BottomLeft** slots
-  (`Marker::RecommendedOrigin`). In Unity, turn on **Tearing markers** (it also draws MiddleLeft, which is fine: calibration uses
-  the outermost two). The two zones give the scanout delay and camera tear detection.
+- **Two marker zones.** The application draws the main marker (top-left) and the **sync marker** (bottom-left,
+  `Marker::RecommendedOrigin(MarkerKind::Sync, ...)`). In Unity, turn on **Sync Marker**. The sync marker times the frames, the main
+  marker identifies them; together they give the scanout delay and camera tear detection.
 - **Vsync on** while you calibrate, so the refresh rate and the scanout delay can be measured.
 
 Live cameras need a UVC (DirectShow, v4l2 or AVFoundation) mode ffmpeg can open. High frame rate UVC modes are usually MJPEG at low
@@ -117,7 +117,7 @@ The steps:
 
 1. **Mount** the camera and point it at the left edge of the screen so both markers are sharp and at least 3 camera pixels per
    module. Fix focus and exposure.
-2. **Run the application** with both markers (TopLeft + BottomLeft) and vsync on.
+2. **Run the application** with both markers (the main marker and the sync marker) and vsync on.
 3. **Calibrate once** from a live camera or a short clip filmed with it, and save it by name. Fix every warning and calibrate again:
 
    ```sh
@@ -146,7 +146,7 @@ clip claims less than 120 fps.
 
 | Check       | Pass                                               | What to do otherwise                                                  |
 | ----------- | -------------------------------------------------- | --------------------------------------------------------------------- |
-| zones       | Both markers found                                 | Draw TopLeft and BottomLeft; the camera must see both, sharp          |
+| zones       | Both markers found                                 | Draw the main and the sync marker; the camera must see both, sharp    |
 | module size | ≥ 3 camera px per module (fail below 2)            | Move closer, zoom in or draw a larger marker                          |
 | stability   | Detections within 0.5 modules of each other        | Use a rigid mount; nothing may vibrate                                |
 | focus       | The marker model fits the image (residual < 0.18)  | Focus on the screen; avoid moiré (tiny defocus helps)                 |
@@ -158,19 +158,20 @@ clip claims less than 120 fps.
 
 ## Reading the results
 
-A camera capture has one timing zone: the zone the scanout reaches first, normally the top one. "First seen" is the first camera
-frame in which that zone shows the new frame completely. That is a roughly constant time after the scanout started: the scanout
-has to pass the marker and the panel has to switch. Frame-to-frame times (display time, animation error) are therefore not
-affected by it, but absolute times are later than vsync.
+A camera capture times the frames by the **sync marker**: "first seen" is the first camera frame in which the sync marker shows
+the new frame completely. The scanout crosses the small marker quickly, so that moment is sharp; the taller main marker only
+identifies the frame and carries its data. First seen is a roughly constant time after vsync (the scanout has to reach and pass
+the sync marker, and the panel has to switch), so frame-to-frame times (display time, animation error) are not affected by it, but
+absolute times are later than vsync.
 
 The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`run-*-frames.csv`):
 
-- **Scanout delay** (`scanoutDelay`, `scanoutDelayMs`): how much later the second zone shows each frame than the timing zone.
-  It is roughly constant; its median is the time the scanout takes between the two markers.
-- **Camera tears** (`tornFrames`, flag `Torn`): a frame that reached the second zone clearly before the timing zone was
-  presented while the scanout was between the zones (vsync off).
-- **Second zone only** (`secondZoneOnlyFrames`): frames only the second zone ever showed. They were presented below the timing
-  zone and replaced before the next scanout reached it, so they appear as skipped frame indices in the timeline.
+- **Scanout delay** (`scanoutDelay`, `scanoutDelayMs`, with `mainMarkerFirstSeenMs`): how much later the sync marker shows each
+  frame than the main marker. It is roughly constant; its median is the time the scanout takes between the two markers.
+- **Camera tears** (`tornFrames`, flag `Torn`): a frame that reached the sync marker clearly before the main marker was
+  presented while the scanout was between them (vsync off).
+- **Sync marker only** (`secondZoneOnlyFrames`): frames only the sync marker ever showed. They were presented below the main
+  marker and replaced before the next scanout reached it, so they appear as skipped frame indices in the timeline.
 - `captures.csv` gets `secondZoneFrameIndex`. Zones that disagree are normal for a camera and are **not** counted as torn
   captures.
 - `UncertainStart` is only set when the gap before a frame is clearly longer than the usual scanout transition.
@@ -191,14 +192,14 @@ Every camera report carries the "VERY EXPERIMENTAL" warning.
 
 ## How it works
 
-1. **Calibration.** A version 2 frame marker always has its three finder patterns and its alignment pattern at the same module
-   positions, whatever the payload. ZXing's detector finds them even at an angle, and those four points define the perspective
+1. **Calibration.** Each marker (the version 6 main marker and the version 2 sync marker) always has its three finder patterns and
+   its alignment pattern at the same module positions, whatever the payload. ZXing's detector finds them even at an angle, and those four points define the perspective
    transform from module coordinates to camera pixels. The median over many frames is then refined by fitting the known module
    pattern to the image (Gauss-Newton on the four symbol corners plus black/white levels). That brings the detector's ~1 px
    error down to about 0.1–0.2 px. Each zone has its own transform, which also absorbs most lens distortion. The same frames
    give the scanout delay, the refresh rate, the decode rate and the flicker.
 2. **Rectification.** ffmpeg crops each zone, undoes the perspective (`perspective=...:sense=source`) and scales it to 212×212
-   pixels (53 modules at 4 px, room for the largest start marker). The zones are stacked in scanout order (`vstack`). A camera
+   pixels (53 modules at 4 px, room for the main marker). The zones are stacked, the main marker's first (`vstack`). A camera
    frame becomes a 212×424 grey image, about 90 KB, however large the camera frame was. Sources without ffmpeg use the same
    layout through a precomputed C# lookup table.
 3. **Decoding.** Every stored marker sits at a known place with 4 px modules. The locked decoder samples each module centre and
@@ -210,10 +211,11 @@ Every camera report carries the "VERY EXPERIMENTAL" warning.
 - **Nothing is validated against real hardware yet** (see Status).
 - Only tears **between** the two zones can be detected, and only when the zones are at least 4 camera frames apart in the
   scanout.
-- A **start marker in the BottomLeft slot** is larger than the frame marker and usually runs off the bottom of the screen. That
-  zone then only shows frame markers. Verification therefore looks at a whole second of frames.
-- If a display scans **bottom to top** (rotated), the BottomLeft zone becomes the timing zone, and its start markers are cut
-  off. Keep the display in its normal orientation.
+- If a display scans **bottom to top** (rotated), the scanout reaches the sync marker first and tears can not be told apart. Keep
+  the display in its normal orientation.
+- **Steep camera angles:** calibration finds the main marker with ZXing's finder search, which misses many 41 module markers when
+  the camera looks at the screen from far to the side. It works at about 20 degrees off the screen normal and fails at about 30
+  (synthetic camera). Mount the camera roughly square to the screen.
 - The camera clock and the display clock drift apart by a few parts per million. That does not matter for frame-to-frame times.
 - **Exposure and focus** cannot be set portably through ffmpeg: set them in the camera, its vendor tool, `v4l2-ctl`, or the
   DirectShow property dialog (`-show_video_device_dialog`).

@@ -60,13 +60,24 @@ def _name(hex_text: str) -> str:
     return bytes.fromhex(hex_text).decode("utf-8")
 
 
+def _payload(row: dict[str, str]) -> Payload:
+    return Payload(
+        int(row["frameIndex"]),
+        int(row["animationTicks"]),
+        int(row["runId"]),
+        MarkerKind(int(row["kind"])),
+        int(row["intendedDisplayTicks"]),
+        int(row["targetFrameTicks"]),
+    )
+
+
 def markers(directory: Path) -> list[GoldenMarker]:
     with (directory / "manifest.csv").open(newline="", encoding="ascii") as file:
         rows = list(csv.DictReader(file))
     return [
         GoldenMarker(
             row["file"],
-            Payload(int(row["frameIndex"]), int(row["animationTicks"]), int(row["runId"]), MarkerKind(int(row["kind"]))),
+            _payload(row),
             StartMetadata(int(row["startUtcTicks"]), _name(row["startNameHex"])),
             Options(int(row["moduleSizePx"]), int(row["quietZoneModules"])),
             Point(int(row["originX"]), int(row["originY"])),
@@ -83,7 +94,7 @@ def module_digest(directory: Path) -> list[ModuleDigestRow]:
     return [
         ModuleDigestRow(
             line,
-            Payload(int(row["frameIndex"]), int(row["animationTicks"]), int(row["runId"]), MarkerKind(int(row["kind"]))),
+            _payload(row),
             StartMetadata(int(row["startUtcTicks"]), _name(row["startNameHex"])),
             int(row["size"]),
             row["modulesHex"],

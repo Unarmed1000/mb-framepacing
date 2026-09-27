@@ -52,12 +52,9 @@ namespace MB.FramePacing.Marker
     /// </summary>
     public MarkerDecodeResult DecodeLocked(GrayImage image, MarkerLock markerLock)
     {
+      // Camera captures: only the grid read, which rejects a marker the scanout has only partly replaced; ZXing's paths would decode it early
       if (m_sampleModuleGrid)
-      {
-        var grid = DecodeGrid(image, markerLock);
-        if (grid.IsDecoded)
-          return grid;
-      }
+        return DecodeGrid(image, markerLock);
 
       var pure = markerLock.PureRegion.Intersect(image.Bounds);
       if (!pure.IsEmpty && pure == markerLock.PureRegion)
@@ -78,8 +75,14 @@ namespace MB.FramePacing.Marker
     }
 
     /// <summary>
-    /// Sample the module grid of the lock at every module centre: the frame marker size first, then the larger start marker versions drawn at
-    /// the same origin.
+    /// Modules of a camera decode that may differ from the re-rendered symbol (sampling noise). More means the scanout had only partly replaced
+    /// the marker: error correction still decodes it, but its first-seen time would be early by up to the scanout time across the marker.
+    /// </summary>
+    public const double MaxModuleMismatchFraction = 0.02;
+
+    /// <summary>
+    /// Sample the module grid of the lock at every module centre (every marker kind has the same version and size). Only a marker whose every
+    /// module matches its payload counts (up to <see cref="MaxModuleMismatchFraction"/>), so a partly replaced marker is not decoded early.
     /// </summary>
     public MarkerDecodeResult DecodeGrid(GrayImage image, MarkerLock markerLock)
     {
@@ -87,13 +90,13 @@ namespace MB.FramePacing.Marker
         return MarkerDecodeResult.NotFound;
       double symbolX = markerLock.Bounds.X + (MarkerRenderer.RecommendedQuietZoneModules * (double)markerLock.ModuleSizePx);
       double symbolY = markerLock.Bounds.Y + (MarkerRenderer.RecommendedQuietZoneModules * (double)markerLock.ModuleSizePx);
-      for (int version = MarkerRenderer.FrameQrVersion; version <= MarkerRenderer.MaxQrVersion; ++version)
-      {
-        var bytes = m_grid.TryRead(image, symbolX, symbolY, markerLock.ModuleSizePx, 17 + (4 * version));
-        if (bytes != null && MarkerPayload.TryDecode(bytes, out var payload, out var start))
-          return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, markerLock.Bounds, markerLock.ModuleSizePx);
-      }
-      return MarkerDecodeResult.NotFound;
+      var bytes = m_grid.TryRead(image, symbolX, symbolY, markerLock.ModuleSizePx, markerLock.ModuleCount);
+      if (bytes == null || !MarkerPayload.TryDecode(bytes, out var payload, out var start))
+        return MarkerDecodeResult.NotFound;
+      var expected = MarkerRenderer.GenerateModules(payload, start);
+      if (m_grid.CountMismatches(expected) > MaxModuleMismatchFraction * expected.Size * expected.Size)
+        return MarkerDecodeResult.NotFound;
+      return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, markerLock.Bounds, markerLock.ModuleSizePx);
     }
 
     /// <summary>Decode a single marker, optionally restricted to a region of the image.</summary>
@@ -115,7 +118,24 @@ namespace MB.FramePacing.Marker
       return result == null ? MarkerDecodeResult.NotFound : ToDecodeResult(result, area);
     }
 
-    /// <summary>Find and decode every marker in the image (region search for tearing markers), sorted top to bottom.</summary>
+    /// <summary>
+    /// Decode the main marker (frame, start or end) of an image: when the search finds the sync marker first, every marker is searched for the
+    /// main one.
+    /// </summary>
+    public MarkerDecodeResult DecodeMain(GrayImage image, PixelRect? region = null)
+    {
+      var result = Decode(image, region);
+      if (!result.IsDecoded || result.Payload.Kind != MarkerKind.Sync)
+        return result;
+      foreach (var other in DecodeAll(image, region))
+      {
+        if (other.IsDecoded && other.Payload.Kind != MarkerKind.Sync)
+          return other;
+      }
+      return MarkerDecodeResult.NotFound;
+    }
+
+    /// <summary>Find and decode every marker in the image (the main and the sync marker), sorted top to bottom.</summary>
     public List<MarkerDecodeResult> DecodeAll(GrayImage image, PixelRect? region = null)
     {
       var list = new List<MarkerDecodeResult>();
@@ -293,7 +313,7 @@ namespace MB.FramePacing.Marker
       }
       float distance = (ResultPoint.distance(topLeft, topRight) + ResultPoint.distance(topLeft, bottomLeft)) * 0.5f;
       if (count == 0)
-        return distance / (MarkerRenderer.FrameQrModuleCount - 7);
+        return distance / (MarkerRenderer.QrModuleCount - 7);
       estimate /= count;
 
       // QR symbol sizes are 17 + 4 * version

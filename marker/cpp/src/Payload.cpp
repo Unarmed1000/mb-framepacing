@@ -13,11 +13,14 @@ namespace MB::FrameMarker
     constexpr std::size_t OffsetFrameIndex = 4;
     constexpr std::size_t OffsetAnimationTicks = 12;
     constexpr std::size_t OffsetRunId = 20;
+    constexpr std::size_t OffsetIntendedDisplayTicks = 24;
+    constexpr std::size_t OffsetTargetFrameTicks = 32;
     constexpr std::size_t OffsetStartUtcTicks = PayloadByteCount;
     constexpr std::size_t OffsetStartNameLength = OffsetStartUtcTicks + 8;
     constexpr std::size_t OffsetStartName = OffsetStartNameLength + 1;
 
-    static_assert(OffsetRunId + 4 == PayloadByteCount);
+    static_assert(OffsetTargetFrameTicks + 4 == PayloadByteCount);
+    static_assert(OffsetFrameIndex + 8 == SyncPayloadByteCount);
     static_assert(OffsetStartName == StartPayloadFixedByteCount);
     static_assert(MaxStartNameBytes <= 255u);
 
@@ -53,6 +56,8 @@ namespace MB::FrameMarker
     // Two's complement, identical to C# BinaryPrimitives.WriteInt64LittleEndian
     WriteLE<8>(bytes, OffsetAnimationTicks, static_cast<uint64_t>(payload.AnimationTicks));
     WriteLE<4>(bytes, OffsetRunId, payload.RunId);
+    WriteLE<8>(bytes, OffsetIntendedDisplayTicks, static_cast<uint64_t>(payload.IntendedDisplayTicks));
+    WriteLE<4>(bytes, OffsetTargetFrameTicks, payload.TargetFrameTicks);
     return bytes;
   }
 
@@ -63,14 +68,17 @@ namespace MB::FrameMarker
     {
       return 0;
     }
-    const std::size_t byteCount = isStart ? StartPayloadFixedByteCount + metadata.Name.size() : PayloadByteCount;
+    const std::size_t byteCount = isStart                            ? StartPayloadFixedByteCount + metadata.Name.size()
+                                  : payload.Kind == MarkerKind::Sync ? SyncPayloadByteCount
+                                                                     : PayloadByteCount;
     if (dst.size() < byteCount)
     {
       return 0;
     }
 
+    // A sync marker is the start of the header: magic, format version, kind and frame index
     const std::array<uint8_t, PayloadByteCount> header = EncodePayload(payload);
-    std::copy(header.begin(), header.end(), dst.begin());
+    std::copy_n(header.begin(), std::min(byteCount, PayloadByteCount), dst.begin());
     if (isStart)
     {
       WriteLE<8>(dst, OffsetStartUtcTicks, static_cast<uint64_t>(metadata.UtcTicks));
@@ -85,13 +93,30 @@ namespace MB::FrameMarker
 
   bool TryDecodePayload(const std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* const pMetadata) noexcept
   {
-    if (bytes.size() < PayloadByteCount || bytes[OffsetMagic0] != PayloadMagic0 || bytes[OffsetMagic1] != PayloadMagic1 ||
+    if (bytes.size() < SyncPayloadByteCount || bytes[OffsetMagic0] != PayloadMagic0 || bytes[OffsetMagic1] != PayloadMagic1 ||
         bytes[OffsetVersion] != PayloadFormatVersion || bytes[OffsetKind] > MaxMarkerKindValue)
     {
       return false;
     }
 
     const auto kind = static_cast<MarkerKind>(bytes[OffsetKind]);
+    if (kind == MarkerKind::Sync)
+    {
+      if (bytes.size() != SyncPayloadByteCount)
+      {
+        return false;
+      }
+      rPayload = Payload{ReadLE<8>(bytes, OffsetFrameIndex), 0, 0u, kind};
+      if (pMetadata != nullptr)
+      {
+        *pMetadata = StartMetadata{};
+      }
+      return true;
+    }
+    if (bytes.size() < PayloadByteCount)
+    {
+      return false;
+    }
     StartMetadata metadata;
     if (kind == MarkerKind::SequenceStart)
     {
@@ -116,6 +141,8 @@ namespace MB::FrameMarker
     rPayload.FrameIndex = ReadLE<8>(bytes, OffsetFrameIndex);
     rPayload.AnimationTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetAnimationTicks));
     rPayload.RunId = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId));
+    rPayload.IntendedDisplayTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetIntendedDisplayTicks));
+    rPayload.TargetFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetTargetFrameTicks));
     if (pMetadata != nullptr)
     {
       *pMetadata = metadata;

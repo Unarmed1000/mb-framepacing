@@ -13,25 +13,29 @@ import struct
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from .structures import MarkerKind, MarkerSlot, ModuleMatrix, Options, Payload, Point, Quad, StartMetadata, Vertex
+from .structures import MarkerKind, ModuleMatrix, Options, Payload, Point, Quad, StartMetadata, Vertex
 from .third_party.qrcodegen import encode as _encode_qr
 
-FRAME_QR_VERSION = 2
-"""Frame and end markers are fixed to QR version 2 (25x25 modules), error correction level M, byte mode."""
+QR_VERSION = 6
+"""Every main marker (frame, start and end) is QR version 6 (41x41 modules), error correction level M, byte mode, so the marker never
+changes size."""
+QR_MODULE_COUNT = (4 * QR_VERSION) + 17
+QR_CAPACITY_BYTES = 106
+"""Version 6-M holds 106 bytes: a frame or end marker uses PAYLOAD_BYTE_COUNT of them, the rest is room for future fields."""
 
-MAX_QR_VERSION = 6
-"""Start markers carry metadata and use the smallest version in [FRAME_QR_VERSION, MAX_QR_VERSION] that fits."""
+SYNC_QR_VERSION = 2
+"""The sync marker (MarkerKind.SYNC) is QR version 2 (25x25 modules), error correction level M: magic | format version | kind | frame
+index u64."""
+SYNC_QR_MODULE_COUNT = (4 * SYNC_QR_VERSION) + 17
+SYNC_PAYLOAD_BYTE_COUNT = 12
 
-FRAME_QR_MODULE_COUNT = (4 * FRAME_QR_VERSION) + 17
-MAX_QR_MODULE_COUNT = (4 * MAX_QR_VERSION) + 17
-
-PAYLOAD_BYTE_COUNT = 24
+PAYLOAD_BYTE_COUNT = 36
 """Payload header, shared by every marker kind (little endian): magic "MF" | format version | kind | frame index u64 | animation
-ticks i64 | run id u32."""
+ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32."""
 PAYLOAD_MAGIC = b"MF"
 PAYLOAD_FORMAT_VERSION = 1
 
-MAX_START_NAME_BYTES = 64
+MAX_START_NAME_BYTES = 60
 """Start marker payload: header | start time UTC i64 | name length u8 | name UTF-8 (0..MAX_START_NAME_BYTES)."""
 START_PAYLOAD_FIXED_BYTE_COUNT = PAYLOAD_BYTE_COUNT + 8 + 1
 MAX_ENCODED_PAYLOAD_BYTE_COUNT = START_PAYLOAD_FIXED_BYTE_COUNT + MAX_START_NAME_BYTES
@@ -49,33 +53,28 @@ MAX_MODULE_SIZE_PX = 1024
 MAX_QUIET_ZONE_MODULES = 16
 RECOMMENDED_QUIET_ZONE_MODULES = 4
 
-MAX_QUAD_COUNT = 1 + (MAX_QR_MODULE_COUNT * ((MAX_QR_MODULE_COUNT + 1) // 2))
+MAX_QUAD_COUNT = 1 + (QR_MODULE_COUNT * ((QR_MODULE_COUNT + 1) // 2))
 """Upper bound on the number of quads for any marker: one background quad plus at most one quad per dark run."""
-MAX_FRAME_QUAD_COUNT = 1 + (FRAME_QR_MODULE_COUNT * ((FRAME_QR_MODULE_COUNT + 1) // 2))
-"""Upper bound on the number of quads for a frame or end marker."""
 
-_HEADER = struct.Struct("<2sBBQqI")
+_HEADER = struct.Struct("<2sBBQqIqI")
+_SYNC = struct.Struct("<2sBBQ")
 _START_FIELDS = struct.Struct("<qB")
 _DATE_TIME_EPOCH = datetime(1, 1, 1, tzinfo=UTC)
-
-
-def qr_module_count_for_version(version: int) -> int:
-    return (4 * version) + 17
 
 
 def is_valid(options: Options) -> bool:
     return MIN_MODULE_SIZE_PX <= options.module_size_px <= MAX_MODULE_SIZE_PX and 0 <= options.quiet_zone_modules <= MAX_QUIET_ZONE_MODULES
 
 
-def marker_size_px(options: Options, module_count: int = FRAME_QR_MODULE_COUNT) -> int:
-    """Width and height in source pixels of a marker (symbol + quiet zone) with the given symbol size; by default a frame or end
-    marker."""
-    return (module_count + (2 * options.quiet_zone_modules)) * options.module_size_px
+def qr_module_count_for(kind: MarkerKind) -> int:
+    """Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker."""
+    return SYNC_QR_MODULE_COUNT if kind == MarkerKind.SYNC else QR_MODULE_COUNT
 
 
-def max_marker_size_px(options: Options) -> int:
-    """Largest possible start marker (a 64 byte name). Keep this area free around the marker origin while the start marker shows."""
-    return marker_size_px(options, MAX_QR_MODULE_COUNT)
+def marker_size_px(options: Options, kind: MarkerKind = MarkerKind.FRAME) -> int:
+    """Width and height in source pixels of a marker (symbol + quiet zone). Frame, start and end markers have one size, the sync marker
+    is smaller."""
+    return (qr_module_count_for(kind) + (2 * options.quiet_zone_modules)) * options.module_size_px
 
 
 def minimum_module_size_px(source_height: int, stored_height: int) -> int:
@@ -88,19 +87,14 @@ def recommend_module_size_px(source_height: int, stored_height: int, mjpeg: bool
     return _module_size_for_stored_px(4 if mjpeg else 3, source_height, stored_height)
 
 
-def recommended_origin(slot: MarkerSlot, source_width: int, source_height: int, options: Options, align_px: int = 1) -> Point:
-    """Recommended marker origin for the given slot. `align_px` should be the integer downscale ratio (1 if none) so module edges land
-    on stored pixel edges."""
-    del source_width  # the marker sits at the left edge; the width is part of the API for other slots
-    size = marker_size_px(options)
+def recommended_origin(kind: MarkerKind, source_width: int, source_height: int, options: Options, align_px: int = 1) -> Point:
+    """Recommended origin of a marker: the main marker (frame, start and end) top-left, the sync marker bottom-left. `align_px` should
+    be the integer downscale ratio (1 if none) so module edges land on stored pixel edges."""
+    del source_width  # the markers sit at the left edge; the width is part of the API as in the C# and C++ libraries
     inset = _align_up(RECOMMENDED_INSET_PX, align_px)
-    match slot:
-        case MarkerSlot.MIDDLE_LEFT:
-            return Point(inset, _align_down(_divide(source_height - size, 2), align_px))
-        case MarkerSlot.BOTTOM_LEFT:
-            return Point(inset, _align_down(source_height - inset - size, align_px))
-        case _:
-            return Point(inset, inset)
+    if kind == MarkerKind.SYNC:
+        return Point(inset, _align_down(source_height - inset - marker_size_px(options, kind), align_px))
+    return Point(inset, inset)
 
 
 def to_date_time_ticks(time: datetime) -> int:
@@ -115,10 +109,25 @@ def seconds_to_ticks(seconds: float) -> int:
 
 
 def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> bytes:
-    """Serialize the payload. Start markers append the metadata, other kinds ignore it. Raises ValueError when the name is longer than
-    MAX_START_NAME_BYTES bytes as UTF-8, or a field is out of its range."""
+    """Serialize the payload. Start markers append the metadata, other kinds ignore it; a sync marker is SYNC_PAYLOAD_BYTE_COUNT bytes
+    (the start of the header, up to the frame index) and ignores the other fields. Raises ValueError when the name is longer than
+    MAX_START_NAME_BYTES bytes as UTF-8, or an encoded field is out of its range."""
+    if payload.kind == MarkerKind.SYNC:
+        try:
+            return _SYNC.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.frame_index)
+        except struct.error as error:
+            raise ValueError(f"payload out of range: {payload}") from error
     try:
-        header = _HEADER.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.frame_index, payload.animation_ticks, payload.run_id)
+        header = _HEADER.pack(
+            PAYLOAD_MAGIC,
+            PAYLOAD_FORMAT_VERSION,
+            payload.kind,
+            payload.frame_index,
+            payload.animation_ticks,
+            payload.run_id,
+            payload.intended_display_ticks,
+            payload.target_frame_ticks,
+        )
     except struct.error as error:
         raise ValueError(f"payload out of range: {payload}") from error
     if payload.kind != MarkerKind.SEQUENCE_START:
@@ -136,13 +145,21 @@ def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> b
 
 def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | None:
     """Parse the wire format: the payload and, for a start marker, its metadata. None on a wrong length, magic, format version, an
-    unknown kind or (start markers) a name that is not valid UTF-8."""
+    unknown kind or (start markers) a name that is not valid UTF-8. A sync payload (exactly SYNC_PAYLOAD_BYTE_COUNT bytes) decodes to
+    its frame index with the other fields 0."""
+    if len(data) < SYNC_PAYLOAD_BYTE_COUNT:
+        return None
+    magic, version, kind, frame_index = cast(tuple[bytes, int, int, int], _SYNC.unpack_from(data))
+    if magic != PAYLOAD_MAGIC or version != PAYLOAD_FORMAT_VERSION or kind > max(MarkerKind):
+        return None
+    if kind == MarkerKind.SYNC:
+        return (Payload(frame_index, 0, 0, MarkerKind.SYNC), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
     if len(data) < PAYLOAD_BYTE_COUNT:
         return None
-    magic, version, kind, frame_index, animation_ticks, run_id = cast(tuple[bytes, int, int, int, int, int], _HEADER.unpack_from(data))
-    if magic != PAYLOAD_MAGIC or version != PAYLOAD_FORMAT_VERSION or kind > MarkerKind.SEQUENCE_END:
-        return None
-    payload = Payload(frame_index, animation_ticks, run_id, MarkerKind(kind))
+    _, _, _, _, animation_ticks, run_id, intended_display_ticks, target_frame_ticks = cast(
+        tuple[bytes, int, int, int, int, int, int, int], _HEADER.unpack_from(data)
+    )
+    payload = Payload(frame_index, animation_ticks, run_id, MarkerKind(kind), intended_display_ticks, target_frame_ticks)
     if payload.kind != MarkerKind.SEQUENCE_START:
         return (payload, None) if len(data) == PAYLOAD_BYTE_COUNT else None
     if len(data) < START_PAYLOAD_FIXED_BYTE_COUNT:
@@ -161,23 +178,24 @@ def generate_modules(payload: Payload, metadata: StartMetadata | None = None) ->
     """Build the QR module matrix for the payload. The metadata is only used by start markers. Raises ValueError if the start name is
     too long."""
     data = encode_payload(payload, metadata)
-    # Frame and end markers are pinned to one version so the symbol never changes size between frames
-    max_version = MAX_QR_VERSION if payload.kind == MarkerKind.SEQUENCE_START else FRAME_QR_VERSION
-    symbol = _encode_qr(data, FRAME_QR_VERSION, max_version)
-    if symbol is None:  # every payload encode_payload accepts fits its version range
-        raise ValueError(f"the payload does not fit QR version {max_version}: {payload}")
+    # Every kind is pinned to one version, so the symbol never changes size between frames
+    version = SYNC_QR_VERSION if payload.kind == MarkerKind.SYNC else QR_VERSION
+    symbol = _encode_qr(data, version, version)
+    if symbol is None:  # every payload encode_payload accepts fits the version
+        raise ValueError(f"the payload does not fit QR version {version}: {payload}")
     return ModuleMatrix(symbol.size, tuple(tuple(row) for row in symbol.modules))
 
 
 def generate_quads(payload: Payload, options: Options, origin: Point) -> list[Quad]:
     """The marker as quads, for renderers that fill rectangles: the light background first, then one dark quad per horizontal run of
-    dark modules. A start marker made this way carries empty metadata. Raises ValueError if the options are invalid."""
+    dark modules. Frame, end and sync markers (by the payload's kind); a start marker made this way carries empty metadata. Raises
+    ValueError if the options are invalid."""
     return _walk(_build_matrix(payload, None, False, options), options, origin)
 
 
 def generate_start_quads(payload: Payload, metadata: StartMetadata, options: Options, origin: Point) -> list[Quad]:
-    """generate_quads for a start marker carrying metadata (the payload's kind is forced to SEQUENCE_START). The marker is at most
-    max_marker_size_px wide and high."""
+    """generate_quads for a start marker carrying metadata (the payload's kind is forced to SEQUENCE_START). Same size as the frame
+    and end markers."""
     return _walk(_build_matrix(payload, metadata, True, options), options, origin)
 
 
@@ -246,7 +264,7 @@ def _build_matrix(payload: Payload, metadata: StartMetadata | None, force_start:
 def _walk(matrix: ModuleMatrix, options: Options, origin: Point) -> list[Quad]:
     """The marker in draw order: the background quad, then every horizontal run of dark modules, row by row."""
     module_size = options.module_size_px
-    marker_size = marker_size_px(options, matrix.size)
+    marker_size = (matrix.size + (2 * options.quiet_zone_modules)) * module_size
     symbol_left = origin.x + (options.quiet_zone_modules * module_size)
     symbol_top = origin.y + (options.quiet_zone_modules * module_size)
 

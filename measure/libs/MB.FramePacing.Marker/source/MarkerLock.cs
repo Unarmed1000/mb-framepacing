@@ -18,15 +18,24 @@ namespace MB.FramePacing.Marker
   /// </summary>
   public readonly record struct MarkerLock(PixelRect Bounds, float ModuleSizePx)
   {
-    /// <summary>Region that holds any marker drawn at the same origin, including the largest start marker.</summary>
+    /// <summary>Region that holds the marker drawn at the same origin, with a small margin.</summary>
     public PixelRect SearchRegion
     {
       get
       {
         int margin = (int)Math.Ceiling(2 * ModuleSizePx);
-        int size = (int)Math.Ceiling(MarkerRenderer.MaxMarkerSizePx(1) * ModuleSizePx);
-        return new PixelRect(Bounds.X - margin, Bounds.Y - margin, size + (2 * margin), size + (2 * margin));
+        return new PixelRect(Bounds.X - margin, Bounds.Y - margin, Bounds.Width + (2 * margin), Bounds.Height + (2 * margin));
       }
+    }
+
+    /// <summary>Modules per side of the locked symbol (41 for the main marker, 25 for the sync marker), from the bounds.</summary>
+    public int ModuleCount => ModuleSizePx > 0 ? (int)Math.Round(Bounds.Width / ModuleSizePx) - (2 * MarkerRenderer.RecommendedQuietZoneModules) : 0;
+
+    /// <summary>A lock on the marker of <paramref name="kind"/> at <paramref name="originX"/>, <paramref name="originY"/>.</summary>
+    public static MarkerLock At(int originX, int originY, float moduleSizePx, MarkerKind kind = MarkerKind.Frame)
+    {
+      int size = (int)Math.Round(MarkerRenderer.MarkerSizePx(1, MarkerRenderer.RecommendedQuietZoneModules, kind) * moduleSizePx);
+      return new MarkerLock(new PixelRect(originX, originY, size, size), moduleSizePx);
     }
 
     /// <summary>The frame marker with 1.5 modules of the quiet zone trimmed off, so the crop is white all around the symbol.</summary>

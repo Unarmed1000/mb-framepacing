@@ -29,9 +29,9 @@ namespace MB.FrameMarker
       int byteCount = Marker.EncodePayload(payload, metadata, m_payloadBytes);
       if (byteCount == 0)
         return false;
-      // Frame and end markers are pinned to one version so the symbol never changes size between frames
-      int maxVersion = payload.Kind == MarkerKind.SequenceStart ? Marker.MaxQrVersion : Marker.FrameQrVersion;
-      if (!m_encoder.Encode(m_payloadBytes, byteCount, Marker.FrameQrVersion, maxVersion))
+      // Every kind is pinned to one version, so the symbol never changes size between frames
+      int version = payload.Kind == MarkerKind.Sync ? Marker.SyncQrVersion : Marker.QrVersion;
+      if (!m_encoder.Encode(m_payloadBytes, byteCount, version, version))
         return false;
       matrix.CopyFrom(m_encoder);
       return true;
@@ -42,7 +42,7 @@ namespace MB.FrameMarker
 
     /// <summary>
     /// Generate the marker as a triangle list: 6 vertices per quad, (TL, TR, BL) (BL, TR, BR), clockwise on screen, every vertex on a pixel
-    /// corner. Frame and end markers need at most <see cref="Marker.MaxFrameTriangleVertexCount"/> vertices. Returns the number of vertices
+    /// corner. Every marker needs at most <see cref="Marker.MaxTriangleVertexCount"/> vertices. Returns the number of vertices
     /// written, or 0 if the options are invalid or <paramref name="destination"/> is too small.
     /// </summary>
     public int GenerateTriangles(in Payload payload, in Options options, Point origin, Vertex[] destination)
@@ -55,7 +55,7 @@ namespace MB.FrameMarker
 
     /// <summary>
     /// <see cref="GenerateTriangles"/> for a start marker carrying metadata (the payload's kind is forced to SequenceStart). At most
-    /// <see cref="Marker.MaxTriangleVertexCount"/> vertices, and the marker is at most <see cref="Marker.MaxMarkerSizePx"/> wide and high.
+    /// <see cref="Marker.MaxTriangleVertexCount"/> vertices.
     /// </summary>
     public int GenerateStartTriangles(in Payload payload, in StartMetadata metadata, in Options options, Point origin, Vertex[] destination)
     {
@@ -67,8 +67,8 @@ namespace MB.FrameMarker
 
     /// <summary>
     /// Generate the marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on
-    /// screen. <paramref name="baseVertex"/> is added to every index. Frame and end markers need at most
-    /// <see cref="Marker.MaxFrameIndexedVertexCount"/> vertices and <see cref="Marker.MaxFrameIndexCount"/> indices. Returns an empty count
+    /// screen. <paramref name="baseVertex"/> is added to every index. Every marker needs at most
+    /// <see cref="Marker.MaxIndexedVertexCount"/> vertices and <see cref="Marker.MaxIndexCount"/> indices. Returns an empty count
     /// if the options are invalid or a destination is too small.
     /// </summary>
     public IndexedCount GenerateIndexed(in Payload payload, in Options options, Point origin, Vertex[] vertices, int[] indices, int baseVertex = 0)
@@ -97,8 +97,8 @@ namespace MB.FrameMarker
     }
 
     /// <summary>
-    /// Generate the marker as quads, for renderers that fill rectangles. Frame and end markers produce at most
-    /// <see cref="Marker.MaxFrameQuadCount"/> quads. Returns the number of quads written, or 0 if the options are invalid or
+    /// Generate the marker as quads, for renderers that fill rectangles. Every marker produces at most
+    /// <see cref="Marker.MaxQuadCount"/> quads. Returns the number of quads written, or 0 if the options are invalid or
     /// <paramref name="destination"/> is too small.
     /// </summary>
     public int GenerateQuads(in Payload payload, in Options options, Point origin, Quad[] destination)
@@ -132,7 +132,7 @@ namespace MB.FrameMarker
       where TEmitter : struct, IQuadEmitter
     {
       int moduleSize = options.ModuleSizePx;
-      int markerSize = Marker.MarkerSizePx(options, m_matrix.Size);
+      int markerSize = (m_matrix.Size + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
       int symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
       int symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
 

@@ -31,16 +31,18 @@ namespace MB.FrameMarker.UnitTest
           ulong.Parse(f[3], CultureInfo.InvariantCulture),
           long.Parse(f[4], CultureInfo.InvariantCulture),
           uint.Parse(f[2], CultureInfo.InvariantCulture),
-          (MarkerKind)byte.Parse(f[1], CultureInfo.InvariantCulture)
+          (MarkerKind)byte.Parse(f[1], CultureInfo.InvariantCulture),
+          long.Parse(f[5], CultureInfo.InvariantCulture),
+          uint.Parse(f[6], CultureInfo.InvariantCulture)
         );
         yield return new GoldenMarker(
           f[0],
           payload,
-          new StartMetadata(long.Parse(f[5], CultureInfo.InvariantCulture), FromHex(f[6])),
-          new Options(int.Parse(f[7], CultureInfo.InvariantCulture), int.Parse(f[8], CultureInfo.InvariantCulture)),
-          new Point(int.Parse(f[9], CultureInfo.InvariantCulture), int.Parse(f[10], CultureInfo.InvariantCulture)),
-          int.Parse(f[11], CultureInfo.InvariantCulture),
-          int.Parse(f[12], CultureInfo.InvariantCulture)
+          new StartMetadata(long.Parse(f[7], CultureInfo.InvariantCulture), FromHex(f[8])),
+          new Options(int.Parse(f[9], CultureInfo.InvariantCulture), int.Parse(f[10], CultureInfo.InvariantCulture)),
+          new Point(int.Parse(f[11], CultureInfo.InvariantCulture), int.Parse(f[12], CultureInfo.InvariantCulture)),
+          int.Parse(f[13], CultureInfo.InvariantCulture),
+          int.Parse(f[14], CultureInfo.InvariantCulture)
         );
       }
     }
@@ -56,14 +58,16 @@ namespace MB.FrameMarker.UnitTest
           ulong.Parse(f[2], CultureInfo.InvariantCulture),
           long.Parse(f[3], CultureInfo.InvariantCulture),
           uint.Parse(f[1], CultureInfo.InvariantCulture),
-          (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture)
+          (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture),
+          long.Parse(f[4], CultureInfo.InvariantCulture),
+          uint.Parse(f[5], CultureInfo.InvariantCulture)
         );
         yield return new ModuleDigestRow(
           line,
           payload,
-          new StartMetadata(long.Parse(f[4], CultureInfo.InvariantCulture), FromHex(f[5])),
-          int.Parse(f[6], CultureInfo.InvariantCulture),
-          f[7]
+          new StartMetadata(long.Parse(f[6], CultureInfo.InvariantCulture), FromHex(f[7])),
+          int.Parse(f[8], CultureInfo.InvariantCulture),
+          f[9]
         );
       }
     }

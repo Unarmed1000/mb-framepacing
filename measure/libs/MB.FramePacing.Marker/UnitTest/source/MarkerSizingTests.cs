@@ -22,7 +22,7 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(advice.RecommendedModulePx, Is.EqualTo(12), "3 stored pixels per module at a 4:1 downscale");
       Assert.That(advice.MinimumModulePx, Is.EqualTo(8));
       Assert.That(advice.StoredPxPerModule, Is.EqualTo(3.0));
-      Assert.That(advice.FrameMarkerPx, Is.EqualTo(33 * 12), "25 modules plus a 4 module quiet zone on each side");
+      Assert.That(advice.MarkerPx, Is.EqualTo(49 * 12), "41 modules plus a 4 module quiet zone on each side");
       Assert.That(advice.AlignPx, Is.EqualTo(4));
       Assert.That(advice.OriginX % 4, Is.Zero);
       Assert.That(advice.OriginY % 4, Is.Zero);
@@ -45,7 +45,7 @@ namespace MB.FramePacing.Marker.UnitTest
       var advice = MarkerSizing.Advise(1920, 1080, 1080);
       Assert.That(advice.RecommendedModulePx, Is.EqualTo(MarkerRenderer.RecommendModuleSizePx(1080, 1080)));
       Assert.That(advice.MinimumModulePx, Is.EqualTo(MarkerRenderer.MinimumModuleSizePx(1080, 1080)));
-      Assert.That(advice.MaxStartMarkerPx, Is.GreaterThan(advice.FrameMarkerPx));
+      Assert.That(advice.MarkerPx, Is.EqualTo(MarkerRenderer.MarkerSizePx(advice.RecommendedModulePx)));
     }
 
     [Test]

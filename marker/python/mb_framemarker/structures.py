@@ -13,29 +13,28 @@ from typing import Self
 
 
 class MarkerKind(IntEnum):
-    """What a marker marks: a frame of a run, or the start or end of a run (a test sequence)."""
+    """What a marker marks: a frame of a run, or the start or end of a run (a test sequence). SYNC is the small second marker for
+    tearing checks and camera timing: it only carries the frame index."""
 
     FRAME = 0
     SEQUENCE_START = 1
     SEQUENCE_END = 2
-
-
-class MarkerSlot(IntEnum):
-    """Where to place a marker: near the top, the middle or the bottom of the frame's left edge."""
-
-    TOP_LEFT = 0
-    MIDDLE_LEFT = 1
-    BOTTOM_LEFT = 2
+    SYNC = 3
 
 
 @dataclass(frozen=True, slots=True)
 class Payload:
-    """What a marker carries: the frame index (u64), the animation time in TimeSpan ticks (100 ns, i64), the run id (u32) and the kind."""
+    """What a marker carries: the frame index (u64), the animation time in TimeSpan ticks (100 ns, i64), the run id (u32), the kind
+    and, when the application paces its frames, the intended display time (i64 ticks on the frame pacer's steady clock, any epoch, the
+    same clock for the whole run) and the target frame time (u32 ticks, 166_667 for 60 fps); 0 = unknown for both. A sync marker only
+    carries the frame index."""
 
     frame_index: int
     animation_ticks: int
     run_id: int = 0
     kind: MarkerKind = MarkerKind.FRAME
+    intended_display_ticks: int = 0
+    target_frame_ticks: int = 0
 
     def with_kind(self, kind: MarkerKind) -> Self:
         return replace(self, kind=kind)
@@ -43,7 +42,7 @@ class Payload:
 
 @dataclass(frozen=True, slots=True)
 class StartMetadata:
-    """What a start marker carries besides the payload: the start time in DateTime UTC ticks (0 = unknown) and a name of at most 64
+    """What a start marker carries besides the payload: the start time in DateTime UTC ticks (0 = unknown) and a name of at most 60
     bytes as UTF-8."""
 
     utc_ticks: int = 0

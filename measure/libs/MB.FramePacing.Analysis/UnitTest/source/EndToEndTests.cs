@@ -106,10 +106,14 @@ namespace MB.FramePacing.Analysis.UnitTest
         }
       }
 
-      // Every stall holds the previous frame for an extra refresh, so the frame after it is late
-      int stalls = Enumerable
-        .Range(1, expected.Count - 1)
-        .Count(i => expected[i].FirstSeenTicks - expected[i - 1].FirstSeenTicks > scenario.RefreshIntervalTicks * 3 / 2);
+      // A stalled frame is shown at least a refresh after the vsync it was rendered for (the synthetic pacer's schedule)
+      var truth = scenario.PresentedFrames.ToDictionary(f => f.Payload.FrameIndex);
+      int stalls = expected
+        .Skip(1)
+        .Count(e =>
+          truth[e.FrameIndex].DisplayTicks - (truth[e.FrameIndex].Payload.IntendedDisplayTicks - SyntheticScenario.PacerEpochTicks)
+          >= scenario.RefreshIntervalTicks / 2
+        );
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(report.CapturePeriodMs), "a capture card captures at the display's refresh rate");
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
@@ -146,7 +150,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void Analyzer_TearingMarkers_DetectTornCaptures()
     {
-      // Two markers per frame; for a few captures the lower one shows the next frame (a tear between them)
+      // The main marker and the sync marker below it; for a few captures the sync marker shows the next frame (a tear between them)
       var header = new CaptureFileHeader(200, 320, FrameRate.FromFps(240));
       Directory.CreateDirectory(m_directory);
       var framesPath = Path.Combine(m_directory, CaptureSessionInfo.FramesFileName);
@@ -164,7 +168,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           Array.Fill(frame.Pixels, (byte)96);
           MarkerRenderer.Render(frame, new MarkerPayload(top, (long)top * 166_667, 1, kind), 12, 12, 3, metadata: start);
           if (kind == MarkerKind.Frame)
-            MarkerRenderer.Render(frame, new MarkerPayload(bottom, (long)bottom * 166_667, 1, kind), 12, 200, 3);
+            MarkerRenderer.Render(frame, new MarkerPayload(bottom, 0, 0, MarkerKind.Sync), 12, 200, 3);
           new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, CaptureRecordFlags.None, header.PixelByteCount).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);

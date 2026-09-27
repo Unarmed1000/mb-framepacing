@@ -14,7 +14,7 @@ namespace MB.FramePacing.Capture.Synthetic
 {
   public sealed record SyntheticCameraOptions
   {
-    /// <summary>Screen size in screen pixels. The markers are drawn in the TopLeft and BottomLeft slots.</summary>
+    /// <summary>Screen size in screen pixels. The main marker is drawn top-left, the sync marker bottom-left.</summary>
     public int ScreenWidth { get; init; } = 640;
     public int ScreenHeight { get; init; } = 480;
 
@@ -23,9 +23,6 @@ namespace MB.FramePacing.Capture.Synthetic
 
     /// <summary>Distance of the marker slots from the screen edges in screen pixels.</summary>
     public int InsetPx { get; init; } = 16;
-
-    /// <summary>Also draw the MiddleLeft tearing marker (the Unity overlay's tearing markers draw all three slots).</summary>
-    public bool MiddleMarker { get; init; }
 
     /// <summary>Stored camera frame size.</summary>
     public int CameraWidth { get; init; } = 360;

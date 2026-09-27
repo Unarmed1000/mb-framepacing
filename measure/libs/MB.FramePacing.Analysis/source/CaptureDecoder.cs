@@ -106,7 +106,7 @@ namespace MB.FramePacing.Analysis
           "No frame markers were found in the capture. Check that the application draws the marker, and see doc/marker-format.md 'Sizing'."
         );
 
-      // Cluster by origin (all markers of one slot share it, whatever their kind)
+      // Cluster by origin (the main marker's frame, start and end kinds share it; the sync marker has its own)
       var clusters = new List<List<MarkerDecodeResult>>();
       foreach (var marker in found)
       {
@@ -119,6 +119,7 @@ namespace MB.FramePacing.Analysis
           cluster.Add(marker);
       }
 
+      // The main marker first: it carries the payload and the timing; a sync marker only checks tearing
       var locks = clusters
         .Where(c => c.Count >= Math.Max(1, found.Count / 10))
         .Select(c =>
@@ -126,10 +127,12 @@ namespace MB.FramePacing.Analysis
           float moduleSize = Median(c.Select(m => m.ModuleSizePx));
           int x = (int)Math.Round(Median(c.Select(m => (float)m.Bounds.X)));
           int y = (int)Math.Round(Median(c.Select(m => (float)m.Bounds.Y)));
-          int size = (int)Math.Round(MarkerRenderer.MarkerSizePx(1) * moduleSize);
-          return new MarkerLock(new PixelRect(x, y, size, size), moduleSize);
+          bool sync = c.Count(m => m.Payload.Kind == MarkerKind.Sync) * 2 > c.Count;
+          return (Sync: sync, Lock: MarkerLock.At(x, y, moduleSize, sync ? MarkerKind.Sync : MarkerKind.Frame));
         })
-        .OrderBy(l => l.Bounds.Y)
+        .OrderBy(l => l.Sync)
+        .ThenBy(l => l.Lock.Bounds.Y)
+        .Select(l => l.Lock)
         .ToList();
 
       float module = locks[0].ModuleSizePx;

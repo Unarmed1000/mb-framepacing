@@ -3,7 +3,7 @@
 // marker-render: payload -> quads -> software rasterizer -> binary PGM (P5).
 // Used to produce the golden images the C# decoder tests consume (test-data/markers).
 //
-//   marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end] [--name <utf8>] [--utc-ticks <i64>]
+//   marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync] [--name <utf8>] [--utc-ticks <i64>]
 //                 [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>] [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>
 #include <mb/framemarker/FrameMarker.hpp>
@@ -47,7 +47,7 @@ namespace
 
   Image Render(const RenderRequest& request)
   {
-    const int32_t markerSize = FM::MaxMarkerSizePx(request.Options);
+    const int32_t markerSize = FM::MarkerSizePx(request.Options);
     Image image;
     image.Width = request.CanvasWidth > 0 ? request.CanvasWidth : request.Origin.X + markerSize + FM::RecommendedInsetPx;
     image.Height = request.CanvasHeight > 0 ? request.CanvasHeight : request.Origin.Y + markerSize + FM::RecommendedInsetPx;
@@ -140,10 +140,10 @@ namespace
     return value ^ (value >> 31u);
   }
 
-  //! modules.csv: the QR module matrix of many pseudo random payloads (frame, end and start markers with 0-64 byte names, so every symbol
-  //! version and mask occurs). Other implementations of the marker (the C# library) must reproduce every row exactly.
-  //! Columns: kind, run id, frame index, animation ticks, start UTC ticks, start name (hex), symbol size, modules (hex): row major, one
-  //! bit per module (1 = dark), most significant bit first, the last byte zero padded.
+  //! modules.csv: the QR module matrix of many pseudo random payloads (frame, end and start markers with 0-60 byte names, so every mask
+  //! occurs). Other implementations of the marker (C#, Python) must reproduce every row exactly.
+  //! Columns: kind, run id, frame index, animation ticks, intended display ticks, target frame ticks, start UTC ticks, start name (hex),
+  //! symbol size, modules (hex): row major, one bit per module (1 = dark), most significant bit first, the last byte zero padded.
   void WriteModuleDigest(const std::filesystem::path& directory)
   {
     constexpr int32_t RowCount = 512;
@@ -152,23 +152,25 @@ namespace
     {
       throw std::runtime_error("Failed to create modules.csv in '" + directory.string() + "'");
     }
-    digest << "kind,runId,frameIndex,animationTicks,startUtcTicks,startNameHex,size,modulesHex\n";
+    digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,startUtcTicks,startNameHex,size,modulesHex\n";
 
     uint64_t state = 0x6D622D6672616D65u;
     for (int32_t row = 0; row < RowCount; ++row)
     {
       FM::Payload payload;
-      payload.Kind = static_cast<FM::MarkerKind>(row % 3);
+      payload.Kind = static_cast<FM::MarkerKind>(row % 4);
       payload.FrameIndex = NextRandom(state);
       payload.AnimationTicks = static_cast<int64_t>(NextRandom(state));
       payload.RunId = static_cast<uint32_t>(NextRandom(state));
+      payload.IntendedDisplayTicks = static_cast<int64_t>(NextRandom(state));
+      payload.TargetFrameTicks = static_cast<uint32_t>(NextRandom(state));
       int64_t startUtcTicks = 0;
       std::string name;
       if (payload.Kind == FM::MarkerKind::SequenceStart)
       {
         startUtcTicks = static_cast<int64_t>(NextRandom(state) >> 1u);
-        // Every length 0..64, with an occasional two byte UTF-8 character
-        const auto length = static_cast<std::size_t>((row / 3) % static_cast<int32_t>(FM::MaxStartNameBytes + 1u));
+        // Every length 0..60, with an occasional two byte UTF-8 character
+        const auto length = static_cast<std::size_t>((row / 4) % static_cast<int32_t>(FM::MaxStartNameBytes + 1u));
         while (name.size() < length)
         {
           const uint64_t pick = NextRandom(state);
@@ -209,7 +211,8 @@ namespace
         bits += static_cast<char>(static_cast<uint8_t>(static_cast<uint32_t>(current) << static_cast<uint32_t>(8 - bitCount)));
       }
       digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
-             << startUtcTicks << ',' << ToHex(name) << ',' << matrix.Size << ',' << ToHex(bits) << '\n';
+             << payload.IntendedDisplayTicks << ',' << payload.TargetFrameTicks << ',' << startUtcTicks << ',' << ToHex(name) << ',' << matrix.Size
+             << ',' << ToHex(bits) << '\n';
     }
   }
 
@@ -217,17 +220,19 @@ namespace
   {
     WriteModuleDigest(directory);
 
-    constexpr std::array<FM::Payload, 10> Payloads{{
+    constexpr std::array<FM::Payload, 11> Payloads{{
       {0u, 0, 0u, FM::MarkerKind::Frame},
       {1u, 166'667, 1u, FM::MarkerKind::Frame},
-      {123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame},
+      {123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame, 987'654'321'000, 166'667u},
       {42u, -1, 2u, FM::MarkerKind::Frame},
       {7u, std::numeric_limits<int64_t>::min(), 3u, FM::MarkerKind::Frame},
-      {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame},
-      {0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame},
+      {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
+       std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max()},
+      {0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u},
       {600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart},
       {601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart},
       {900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd},
+      {0x0102030405060708u, 0, 0u, FM::MarkerKind::Sync},
     }};
     constexpr std::array<int32_t, 4> ModuleSizes{2, 3, 4, 6};
 
@@ -236,8 +241,8 @@ namespace
     {
       throw std::runtime_error("Failed to create manifest in '" + directory.string() + "'");
     }
-    manifest << "file,kind,runId,frameIndex,animationTicks,startUtcTicks,startNameHex,moduleSizePx,quietZoneModules,originX,originY,width,"
-                "height\n";
+    manifest << "file,kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,startUtcTicks,startNameHex,moduleSizePx,"
+                "quietZoneModules,originX,originY,width,height\n";
 
     for (std::size_t payloadIndex = 0; payloadIndex < Payloads.size(); ++payloadIndex)
     {
@@ -247,14 +252,14 @@ namespace
         request.Payload = Payloads[payloadIndex];
         if (request.Payload.Kind == FM::MarkerKind::SequenceStart && request.Payload.RunId == 6u)
         {
-          // 2026-09-23T12:00:00Z and a 61 byte UTF-8 name (limit is 64)
+          // 2026-09-23T12:00:00Z and a 60 byte UTF-8 name (the limit)
           request.StartUtcTicks = 639'257'616'000'000'000;
-          request.StartName = "golden-run \xC3\xA6\xC3\xB8\xC3\xA5 0123456789012345678901234567890123456789012";
+          request.StartName = "golden-run \xC3\xA6\xC3\xB8\xC3\xA5 012345678901234567890123456789012345678901";
         }
         request.Options.ModuleSizePx = moduleSize;
         // Origin and canvas are multiples of 12 (lcm of 2,3,4,6) so every integer downscale test keeps module edges pixel aligned.
         request.Origin = {36, 36};
-        const int32_t canvas = ((request.Origin.X + FM::MaxMarkerSizePx(request.Options) + 36 + 11) / 12) * 12;
+        const int32_t canvas = ((request.Origin.X + FM::MarkerSizePx(request.Options) + 36 + 11) / 12) * 12;
         request.CanvasWidth = canvas;
         request.CanvasHeight = canvas;
 
@@ -266,9 +271,10 @@ namespace
         fileName += ".pgm";
         WritePgm(directory / fileName, image);
         manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind) << ',' << request.Payload.RunId << ','
-                 << request.Payload.FrameIndex << ',' << request.Payload.AnimationTicks << ',' << request.StartUtcTicks << ','
-                 << ToHex(request.StartName) << ',' << request.Options.ModuleSizePx << ',' << request.Options.QuietZoneModules << ','
-                 << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ',' << image.Height << '\n';
+                 << request.Payload.FrameIndex << ',' << request.Payload.AnimationTicks << ',' << request.Payload.IntendedDisplayTicks << ','
+                 << request.Payload.TargetFrameTicks << ',' << request.StartUtcTicks << ',' << ToHex(request.StartName) << ','
+                 << request.Options.ModuleSizePx << ',' << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y
+                 << ',' << image.Width << ',' << image.Height << '\n';
       }
     }
   }
@@ -276,7 +282,8 @@ namespace
   void PrintUsage()
   {
     std::cout << "Usage:\n"
-                 "  marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end] [--name <utf8>]\n"
+                 "  marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync] [--name <utf8>]\n"
+                 "                [--intended-ticks <i64>] [--target-ticks <u32>]\n"
                  "                [--utc-ticks <i64>] [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]\n"
                  "                [--background <0-255>] -o <file.pgm>\n"
                  "  marker-render --golden <directory>\n";
@@ -316,6 +323,14 @@ int main(int argc, char* argv[])
       {
         request.Payload.AnimationTicks = ParseNumber<int64_t>(next(), arg);
       }
+      else if (arg == "--intended-ticks")
+      {
+        request.Payload.IntendedDisplayTicks = ParseNumber<int64_t>(next(), arg);
+      }
+      else if (arg == "--target-ticks")
+      {
+        request.Payload.TargetFrameTicks = ParseNumber<uint32_t>(next(), arg);
+      }
       else if (arg == "--name")
       {
         request.StartName = next();
@@ -343,9 +358,13 @@ int main(int argc, char* argv[])
         {
           request.Payload.Kind = FM::MarkerKind::SequenceEnd;
         }
+        else if (kind == "sync")
+        {
+          request.Payload.Kind = FM::MarkerKind::Sync;
+        }
         else
         {
-          throw std::invalid_argument("--kind must be frame, start or end");
+          throw std::invalid_argument("--kind must be frame, start, end or sync");
         }
       }
       else if (arg == "--module")

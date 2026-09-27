@@ -178,10 +178,20 @@ namespace MB.FramePacing.Gui.Views
         animation.LegendText = "animation time step";
         animation.MarkerSize = 3;
         AddLateMarkers(DisplayAnimationPlot, lateTimes, late.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
-        if (pacing != null)
-          DisplayAnimationPlot
-            .Plot.Add.HorizontalLine(pacing.TargetFrameMs, color: ScottPlot.Colors.Gray, pattern: ScottPlot.LinePattern.Dotted)
-            .LegendText = $"target {pacing.TargetFrameMs.ToString("0.##", CultureInfo.InvariantCulture)} ms";
+        // Every frame's target: steps where the pacer changes its rate (or follows its schedule)
+        var targeted = withMetrics.Where(f => f.TargetTicks.HasValue).ToArray();
+        if (targeted.Length > 0)
+        {
+          var target = DisplayAnimationPlot.Plot.Add.Scatter(
+            targeted.Select(seconds).ToArray(),
+            targeted.Select(f => Ms(f.TargetTicks!.Value)).ToArray()
+          );
+          target.ConnectStyle = ScottPlot.ConnectStyle.StepHorizontal;
+          target.MarkerSize = 0;
+          target.LinePattern = ScottPlot.LinePattern.Dotted;
+          target.Color = ScottPlot.Colors.Gray;
+          target.LegendText = "target";
+        }
         TimelineLegend(DisplayAnimationPlot);
       }
 

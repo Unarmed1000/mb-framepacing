@@ -102,7 +102,7 @@ namespace MB.FramePacing.Capture
           return;
         m_lastDecodeTicks = hostTicks;
 
-        var result = m_decoder.Decode(m_frame);
+        var result = m_decoder.DecodeMain(m_frame);
         if (!result.IsDecoded || result.ModuleSizePx <= 0)
           return;
         var hit = SequenceMonitor.LockFor(result);

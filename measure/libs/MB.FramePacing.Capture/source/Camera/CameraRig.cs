@@ -23,7 +23,7 @@ namespace MB.FramePacing.Capture.Camera
   /// </summary>
   public sealed record CameraRig
   {
-    public const int CurrentFormatVersion = 1;
+    public const int CurrentFormatVersion = 2;
     public const string FileExtension = ".camera-rig.json";
 
     /// <summary>Shown wherever camera capture is offered or used.</summary>
@@ -54,10 +54,13 @@ namespace MB.FramePacing.Capture.Camera
     public string? Mode { get; init; }
     public string? InputFormat { get; init; }
 
-    /// <summary>The zones in scanout order: the zone the scanout reaches first is [0] and times the frames.</summary>
+    /// <summary>
+    /// The zones: the main marker ([<see cref="CameraZone.MainZone"/>], it identifies each frame) and the sync marker
+    /// ([<see cref="CameraZone.SyncZone"/>], it times the frames).
+    /// </summary>
     public IReadOnlyList<CameraZone> Zones { get; init; } = Array.Empty<CameraZone>();
 
-    /// <summary>Time the scanout takes from the first zone to the second one.</summary>
+    /// <summary>Time the scanout takes from the main marker to the sync marker.</summary>
     public double? ScanoutDelayMs { get; init; }
 
     /// <summary>The refresh rate estimated from the calibration (median time between consecutive frames).</summary>

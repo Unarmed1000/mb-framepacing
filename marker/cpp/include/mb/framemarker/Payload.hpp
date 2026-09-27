@@ -17,6 +17,11 @@ namespace MB::FrameMarker
     //! Identifies one test run. The start marker, every frame marker and the end marker of a run carry the same id.
     uint32_t RunId{0};
     MarkerKind Kind{MarkerKind::Frame};
+    //! When the frame pacer intends this frame to become visible, in ticks (100ns) on its steady clock (any epoch, the same clock for
+    //! the whole run). 0 = unknown.
+    int64_t IntendedDisplayTicks{0};
+    //! The interval the frame pacer aims for between the previous frame and this one, in ticks (100ns): 166'667 for 60 fps. 0 = unknown.
+    uint32_t TargetFrameTicks{0};
 
     constexpr bool operator==(const Payload&) const noexcept = default;
   };

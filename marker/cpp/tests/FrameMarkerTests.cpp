@@ -17,7 +17,7 @@ namespace MB::FrameMarker
   void PrintTo(const Payload& value, std::ostream* os)
   {
     *os << "{frame " << value.FrameIndex << ", ticks " << value.AnimationTicks << ", run " << value.RunId << ", kind "
-        << static_cast<uint32_t>(value.Kind) << "}";
+        << static_cast<uint32_t>(value.Kind) << ", intended " << value.IntendedDisplayTicks << ", target " << value.TargetFrameTicks << "}";
   }
 
   void PrintTo(const Quad& value, std::ostream* os)
@@ -74,10 +74,11 @@ namespace
 
 TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
 {
-  const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::SequenceEnd};
+  const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::SequenceEnd, 0x3132333435363738, 0x41424344u};
   const auto bytes = FM::EncodePayload(payload);
   const std::array<uint8_t, FM::PayloadByteCount> expected{'M',   'F',   1u,    2u,    0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u,
-                                                           0x18u, 0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x24u, 0x23u, 0x22u, 0x21u};
+                                                           0x18u, 0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x24u, 0x23u, 0x22u, 0x21u,
+                                                           0x38u, 0x37u, 0x36u, 0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x44u, 0x43u, 0x42u, 0x41u};
   EXPECT_EQ(bytes, expected);
 }
 
@@ -92,10 +93,12 @@ TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
 
 TEST(Payload, RoundTrips)
 {
-  const std::array<FM::Payload, 6> payloads{{
+  const std::array<FM::Payload, 7> payloads{{
     {0u, 0, 0u, FM::MarkerKind::Frame},
     {1u, 166'667, 7u, FM::MarkerKind::Frame},
-    {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame},
+    {2u, 333'334, 7u, FM::MarkerKind::Frame, 1'234'567'890'123, 166'667u},
+    {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
+     std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max()},
     {7u, std::numeric_limits<int64_t>::min(), 1u, FM::MarkerKind::SequenceStart},
     {42u, -1, 3u, FM::MarkerKind::SequenceEnd},
     {0u, 0, 0u, FM::MarkerKind::SequenceStart},
@@ -154,7 +157,7 @@ TEST(Payload, StartMetadataRoundTrips)
   // A start payload with a truncated name is rejected
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded, &metadata));
 
-  // Frame payloads ignore the metadata and stay 24 bytes
+  // Frame payloads ignore the metadata and stay 36 bytes
   EXPECT_EQ(FM::EncodePayload({1u, 2, 3u, FM::MarkerKind::Frame}, {5, name}, buffer), FM::PayloadByteCount);
 }
 
@@ -171,10 +174,11 @@ TEST(Payload, ToDateTimeTicksMatchesCSharpDateTimeTicks)
 
 TEST(Geometry, MarkerSize)
 {
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{}), 198);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{3, 4}), 99);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{12, 4}), 396);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{1, 0}), 25);
+  EXPECT_EQ(FM::MarkerSizePx(FM::Options{}, FM::MarkerKind::Sync), 198);
+  EXPECT_EQ(FM::MarkerSizePx(FM::Options{}), 294);
+  EXPECT_EQ(FM::MarkerSizePx(FM::Options{3, 4}), 147);
+  EXPECT_EQ(FM::MarkerSizePx(FM::Options{12, 4}), 588);
+  EXPECT_EQ(FM::MarkerSizePx(FM::Options{1, 0}), 41);
 }
 
 TEST(Geometry, InvalidOptionsGenerateNothing)
@@ -191,27 +195,56 @@ TEST(Geometry, TooSmallDestinationGeneratesNothing)
   EXPECT_EQ(FM::GenerateQuads({}, FM::Options{}, {}, quads), 0u);
 }
 
-TEST(Symbol, FrameAndEndMarkersAreVersion2StartMarkersGrowWithTheName)
+TEST(Symbol, SyncMarkersAreVersion2)
+{
+  FM::ModuleMatrix matrix;
+  ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::Sync, 4, 5u}, matrix));
+  EXPECT_EQ(matrix.Size, FM::SyncQrModuleCount);
+  EXPECT_EQ(matrix.Size, 25);
+
+  const FM::Options options{3, 4};
+  std::vector<FM::Quad> quads(FM::MaxQuadCount());
+  const std::size_t count = FM::GenerateQuads({7u, 0, 0u, FM::MarkerKind::Sync}, options, {10, 20}, quads);
+  ASSERT_GT(count, 0u);
+  EXPECT_EQ(quads.front(), (FM::Quad{10, 20, 10 + 99, 20 + 99, false}));
+}
+
+TEST(Payload, SyncMarkerCarriesOnlyTheFrameIndex)
+{
+  std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
+  const FM::Payload payload{0x0102030405060708u, 123, 4u, FM::MarkerKind::Sync, 5, 6u};
+  const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
+  ASSERT_EQ(byteCount, FM::SyncPayloadByteCount);
+  const std::array<uint8_t, FM::SyncPayloadByteCount> expected{'M', 'F', 1u, 3u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
+  EXPECT_TRUE(std::equal(expected.begin(), expected.end(), buffer.begin()));
+
+  FM::Payload decoded{};
+  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  EXPECT_EQ(decoded, (FM::Payload{payload.FrameIndex, 0, 0u, FM::MarkerKind::Sync}));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));
+}
+
+TEST(Symbol, EveryMarkerIsVersion6)
 {
   FM::ModuleMatrix matrix;
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::Frame}, matrix));
-  EXPECT_EQ(matrix.Size, 25);
+  EXPECT_EQ(matrix.Size, 41);
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceEnd}, matrix));
-  EXPECT_EQ(matrix.Size, 25);
-
-  // A 33 byte payload does not fit version 2-M (26 bytes) -> version 3 (29 modules)
+  EXPECT_EQ(matrix.Size, 41);
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {}));
-  EXPECT_EQ(matrix.Size, 29);
+  EXPECT_EQ(matrix.Size, 41);
 
+  // The longest name fills version 6-M (106 bytes) up to one byte
   const std::string maxName(FM::MaxStartNameBytes, 'x');
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {123, maxName}));
-  EXPECT_LE(matrix.Size, FM::MaxQrModuleCount);
+  EXPECT_EQ(matrix.Size, FM::QrModuleCount);
+  EXPECT_EQ(FM::MaxEncodedPayloadByteCount, 105u);
 
   const std::string tooLong(FM::MaxStartNameBytes + 1, 'x');
   EXPECT_FALSE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {123, tooLong}));
 }
 
-TEST(Geometry, StartQuadsStayWithinMaxMarkerSizeAndMaxQuadCount)
+TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
 {
   const std::string maxName(FM::MaxStartNameBytes, 'y');
   const FM::Options options{};
@@ -223,7 +256,7 @@ TEST(Geometry, StartQuadsStayWithinMaxMarkerSizeAndMaxQuadCount)
   const FM::Quad& background = quads.front();
   EXPECT_EQ(background.Left, origin.X);
   EXPECT_EQ(background.Top, origin.Y);
-  EXPECT_LE(background.Right - background.Left, FM::MaxMarkerSizePx(options));
+  EXPECT_EQ(background.Right - background.Left, FM::MarkerSizePx(options));
   for (std::size_t i = 1; i < count; ++i)
   {
     EXPECT_LE(quads[i].Right, background.Right) << "quad " << i;
@@ -245,7 +278,7 @@ TEST(Geometry, QuadsArePixelAlignedAndReproduceTheModuleMatrix)
       const int32_t size = FM::MarkerSizePx(options);
 
       ASSERT_FALSE(quads.empty());
-      ASSERT_LE(quads.size(), FM::MaxFrameQuadCount());
+      ASSERT_LE(quads.size(), FM::MaxQuadCount());
       EXPECT_EQ(quads.front(), (FM::Quad{origin.X, origin.Y, origin.X + size, origin.Y + size, false}));
 
       for (std::size_t i = 1; i < quads.size(); ++i)
@@ -330,8 +363,8 @@ TEST(Symbol, FinderPatternsArePresent)
   }
   EXPECT_FALSE(matrix.IsDark(1, 1));
   EXPECT_TRUE(matrix.IsDark(3, 3));
-  EXPECT_TRUE(matrix.IsDark(FM::FrameQrModuleCount - 1, 0));
-  EXPECT_TRUE(matrix.IsDark(0, FM::FrameQrModuleCount - 1));
+  EXPECT_TRUE(matrix.IsDark(FM::QrModuleCount - 1, 0));
+  EXPECT_TRUE(matrix.IsDark(0, FM::QrModuleCount - 1));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -400,7 +433,7 @@ namespace
       for (const int32_t quietZone : {0, 4})
       {
         const FM::Options options{moduleSize, quietZone};
-        cases.push_back({{42u, 1'234'567, 3u, FM::MarkerKind::Frame}, {}, options, {5, 7}});
+        cases.push_back({{42u, 1'234'567, 3u, FM::MarkerKind::Frame, 987'654'321, 166'667u}, {}, options, {5, 7}});
         cases.push_back({{43u, 1'400'234, 3u, FM::MarkerKind::SequenceEnd}, {}, options, {0, 0}});
         for (const std::size_t nameLength : {std::size_t{0}, std::size_t{17}, FM::MaxStartNameBytes})
         {
@@ -529,7 +562,7 @@ TEST(Triangles, RasterizedTrianglesReproduceTheQuads)
   {
     SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
                                     << ", quiet " << testCase.Options.QuietZoneModules);
-    const int32_t size = testCase.Origin.Y + FM::MaxMarkerSizePx(testCase.Options) + 8;
+    const int32_t size = testCase.Origin.Y + FM::MarkerSizePx(testCase.Options) + 8;
     std::vector<uint8_t> fromQuads;
     ASSERT_TRUE(Rasterize(GenerateCase(testCase), size, size, fromQuads));
 
@@ -551,11 +584,11 @@ TEST(Triangles, RasterizedTrianglesReproduceTheQuads)
   }
 }
 
-TEST(Triangles, FrameMarkersFitTheFrameBufferSizes)
+TEST(Triangles, FrameMarkersFitTheBufferSizes)
 {
-  std::vector<FM::Vertex> vertices(FM::MaxFrameTriangleVertexCount());
-  std::vector<FM::Vertex> indexedVertices(FM::MaxFrameIndexedVertexCount());
-  std::vector<uint32_t> indices(FM::MaxFrameIndexCount());
+  std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
+  std::vector<FM::Vertex> indexedVertices(FM::MaxIndexedVertexCount());
+  std::vector<uint32_t> indices(FM::MaxIndexCount());
   for (uint64_t frame = 0; frame < 500u; ++frame)
   {
     const FM::Payload payload{frame * 7919u, static_cast<int64_t>(frame) * 166'667, 9u, FM::MarkerKind::Frame};
@@ -613,14 +646,14 @@ TEST(Sizing, ModuleSizeRecommendationsMatchTheDocumentation)
 TEST(Sizing, RecommendedOrigins)
 {
   const FM::Options options{};
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerSlot::TopLeft, 1920, 1080, options), (FM::Point{32, 32}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerSlot::MiddleLeft, 1920, 1080, options), (FM::Point{32, 441}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerSlot::BottomLeft, 1920, 1080, options), (FM::Point{32, 1080 - 32 - 198}));
+  // The main marker top-left, the sync marker bottom-left
+  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options), (FM::Point{32, 32}));
+  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::SequenceStart, 1920, 1080, options), (FM::Point{32, 32}));
+  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options), (FM::Point{32, 1080 - 32 - 198}));
   // Aligned to a 3:1 downscale ratio
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerSlot::TopLeft, 1920, 1080, options, 3), (FM::Point{33, 33}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerSlot::MiddleLeft, 1920, 1080, options, 3), (FM::Point{33, 441}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerSlot::BottomLeft, 1920, 1080, options, 3), (FM::Point{33, 849}));
-  static_assert(FM::RecommendedOrigin(FM::MarkerSlot::TopLeft, 1920, 1080, FM::Options{}, 4) == FM::Point{32, 32});
+  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 3), (FM::Point{33, 33}));
+  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 3), (FM::Point{33, 849}));
+  static_assert(FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, FM::Options{}, 4) == FM::Point{32, 32});
 }
 
 TEST(Version, MatchesTheVersionFile)

@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Fast capture: the smallest region of the source that holds every marker drawn at a located origin (the largest start marker included),
+//* Fast capture: the smallest region of the source that holds the main marker drawn at a located origin (every kind has one size),
 //* and the integer downscale that still leaves the recommended number of stored pixels per module. The marker must not move. The crop is
 //* applied exactly (ffmpeg crop exact=1: odd offsets on chroma subsampled inputs are fine, only luma is stored).
 //*

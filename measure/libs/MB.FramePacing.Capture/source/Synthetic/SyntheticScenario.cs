@@ -39,6 +39,9 @@ namespace MB.FramePacing.Capture.Synthetic
 
     public long RefreshIntervalTicks => (long)Math.Round(TimeSpan.TicksPerSecond / Options.RefreshHz);
 
+    /// <summary>Where the synthetic pacer's steady clock starts.</summary>
+    public const long PacerEpochTicks = TimeSpan.TicksPerSecond;
+
     /// <summary>Capture instant of capture index <paramref name="captureIndex"/>, in TimeSpan ticks.</summary>
     public long CaptureTicks(long captureIndex) =>
       (long)Math.Round((captureIndex + Options.CapturePhase) * TimeSpan.TicksPerSecond / Options.CaptureFps);
@@ -77,6 +80,10 @@ namespace MB.FramePacing.Capture.Synthetic
       long totalEnd = SecondsToTicks(o.TotalSeconds);
 
       long slot = 0;
+      // The pacer's plan: every frame one vsync after the previous one. A stall shows a frame later than planned, a skipped frame (replaced
+      // before its scanout) makes the next one show a vsync early; either way the pacer plans on from the frame it actually showed
+      long planned = 0;
+      bool replan = false;
       ulong frameIndex = o.FirstFrameIndex;
       long animationTicks = 0;
       for (long k = 0; ; ++k, ++frameIndex, animationTicks += refresh)
@@ -84,8 +91,18 @@ namespace MB.FramePacing.Capture.Synthetic
         if (k > 0)
         {
           slot += 1;
-          if (o.StallEvery > 0 && k % o.StallEvery == 0)
-            slot += o.StallSlots;
+          planned += 1;
+        }
+        long intendedSlot = planned;
+        if (replan)
+        {
+          planned = slot;
+          replan = false;
+        }
+        if (k > 0 && o.StallEvery > 0 && k % o.StallEvery == 0)
+        {
+          slot += o.StallSlots;
+          planned += o.StallSlots;
         }
         long displayTicks = slot * refresh;
         if (displayTicks >= totalEnd)
@@ -99,6 +116,7 @@ namespace MB.FramePacing.Capture.Synthetic
         if (o.SkipEvery > 0 && k > 0 && k % o.SkipEvery == 0)
         {
           slot -= 1;
+          replan = true;
           continue;
         }
 
@@ -109,7 +127,11 @@ namespace MB.FramePacing.Capture.Synthetic
           : displayTicks < startEnd ? MarkerKind.SequenceStart
           : displayTicks < runEnd ? MarkerKind.Frame
           : MarkerKind.SequenceEnd;
-        m_presented.Add(new SyntheticPresentedFrame(new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind), displayTicks));
+        // The pacer's clock has its own epoch: intended display times never start at 0 (which means unknown)
+        var payload = o.PacingInformation
+          ? new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind, PacerEpochTicks + (intendedSlot * refresh), (uint)refresh)
+          : new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind);
+        m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
       }
     }
 

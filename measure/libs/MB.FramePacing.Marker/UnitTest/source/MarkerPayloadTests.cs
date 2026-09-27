@@ -18,7 +18,14 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void Encode_MatchesDocumentedLayout()
     {
-      var payload = new MarkerPayload(0x0102030405060708UL, 0x1112131415161718L, 0x21222324u, MarkerKind.SequenceEnd);
+      var payload = new MarkerPayload(
+        0x0102030405060708UL,
+        0x1112131415161718L,
+        0x21222324u,
+        MarkerKind.SequenceEnd,
+        0x3132333435363738L,
+        0x41424344u
+      );
       byte[] expected =
       [
         (byte)'M',
@@ -45,6 +52,18 @@ namespace MB.FramePacing.Marker.UnitTest
         0x23,
         0x22,
         0x21,
+        0x38,
+        0x37,
+        0x36,
+        0x35,
+        0x34,
+        0x33,
+        0x32,
+        0x31,
+        0x44,
+        0x43,
+        0x42,
+        0x41,
       ];
       Assert.That(payload.Encode(), Is.EqualTo(expected));
     }

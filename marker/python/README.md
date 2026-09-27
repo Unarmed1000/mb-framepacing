@@ -11,10 +11,10 @@ It draws exactly the same pixels as the C++ and C# libraries: the tests check it
 ## Quick start
 
 ```python
-from mb_framemarker import MarkerSlot, Options, Payload, fill_quads, generate_quads, recommended_origin, seconds_to_ticks
+from mb_framemarker import MarkerKind, Options, Payload, fill_quads, generate_quads, recommended_origin, seconds_to_ticks
 
 options = Options(module_size_px=3)
-origin = recommended_origin(MarkerSlot.TOP_LEFT, width, height, options)
+origin = recommended_origin(MarkerKind.FRAME, width, height, options)
 
 # Every frame, last (after post effects and UI), without blending:
 quads = generate_quads(Payload(frame_index, seconds_to_ticks(animation_seconds), run_id=1), options, origin)
@@ -23,9 +23,26 @@ fill_quads(rgb24_frame, width, height, quads, channels=3)
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`seconds_to_ticks`).
+- **Frame pacing (optional):** when the application paces its frames, `Payload(..., intended_display_ticks=..., target_frame_ticks=...)`
+  carries when the pacer intends the frame to be shown (100 ns ticks on its steady clock, any epoch) and the interval it aims for
+  (`166_667` for 60 fps). Both default to `0` (unknown).
 - **Start and end:** bracket the part to measure with `generate_start_quads(payload, StartMetadata(utc_ticks, name), options,
-origin)` and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few frames; keep `max_marker_size_px(options)` free
-  around the origin while the start marker shows.
+origin)` (a name of at most 60 bytes as UTF-8) and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few frames.
+- **Size:** every main marker (frame, start and end) is QR version 6, 41×41 modules, so it never changes size:
+  `marker_size_px(options)` is `49 × module_size_px` with the default quiet zone (294 px for the default 6 px modules).
+- **Sync marker (optional; required for camera capture):** a small second marker that carries only the frame index, drawn every frame
+  next to the main marker. It checks tearing on a capture card and times the frames for a camera. It is QR version 2, 25×25
+  modules: `marker_size_px(options, MarkerKind.SYNC)` is `33 × module_size_px` (198 px for 6 px modules).
+
+```python
+sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)  # bottom-left
+sync_quads = generate_quads(Payload(frame_index, 0, kind=MarkerKind.SYNC), options, sync_origin)
+fill_quads(rgb24_frame, width, height, sync_quads, channels=3)
+```
+
+`recommended_origin(kind, ...)` places the main marker top-left and the sync marker bottom-left, both inset 32 px (rounded up to the
+`align_px` downscale ratio). A sync payload is 12 bytes (magic, format version, kind, frame index); its other fields are not encoded
+and decode as `0`.
 
 ## API
 
@@ -34,11 +51,11 @@ The same API as the C# library (`MB.FrameMarker`), in Python's naming:
 | Python                                                                           | What it does                                                                     |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `Payload`, `StartMetadata`, `MarkerKind`                                         | What a marker carries                                                            |
-| `Options`, `MarkerSlot`, `Point`                                                 | Size and place                                                                   |
+| `Options`, `Point`                                                               | Size and place                                                                   |
 | `generate_quads`, `generate_start_quads`                                         | The marker as quads: the light background, then one dark quad per run of modules |
 | `generate_triangles`, `generate_indexed` (and `generate_start_…`)                | The marker as a triangle list or indexed triangles, for a GPU                    |
 | `fill_quads`                                                                     | Draws quads into a pixel buffer (grey or rgb24, any stride)                      |
-| `marker_size_px`, `max_marker_size_px`, `recommended_origin`                     | Sizing and placement                                                             |
+| `marker_size_px`, `qr_module_count_for`, `recommended_origin`                    | Sizing and placement                                                             |
 | `minimum_module_size_px`, `recommend_module_size_px`                             | Module size for a capture's scaling                                              |
 | `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks` | The wire format and its time units                                               |
 | `generate_modules`                                                               | The QR module matrix                                                             |

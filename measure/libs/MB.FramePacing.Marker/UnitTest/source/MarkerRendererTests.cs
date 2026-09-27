@@ -15,19 +15,25 @@ namespace MB.FramePacing.Marker.UnitTest
   public class MarkerRendererTests
   {
     [Test]
-    public void FrameAndEndMarkers_AreVersion2()
+    public void EveryMarkerKind_IsVersion6()
     {
-      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3)).Size, Is.EqualTo(25));
-      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3, MarkerKind.SequenceEnd)).Size, Is.EqualTo(25));
+      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3)).Size, Is.EqualTo(41));
+      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3, MarkerKind.SequenceEnd)).Size, Is.EqualTo(41));
+      var start = new MarkerPayload(1, 2, 3, MarkerKind.SequenceStart);
+      Assert.That(MarkerRenderer.GenerateModules(start).Size, Is.EqualTo(41));
+      var full = MarkerRenderer.GenerateModules(start, new StartMetadata(1, new string('x', MarkerPayload.MaxStartNameBytes)));
+      Assert.That(full.Size, Is.EqualTo(MarkerRenderer.QrModuleCount));
     }
 
     [Test]
-    public void StartMarker_GrowsWithName_UpToMaxVersion()
+    public void PacingFields_SurviveRenderingAndDecoding()
     {
-      var start = new MarkerPayload(1, 2, 3, MarkerKind.SequenceStart);
-      Assert.That(MarkerRenderer.GenerateModules(start).Size, Is.EqualTo(29));
-      var full = MarkerRenderer.GenerateModules(start, new StartMetadata(1, new string('x', MarkerPayload.MaxStartNameBytes)));
-      Assert.That(full.Size, Is.LessThanOrEqualTo(MarkerRenderer.MaxQrModuleCount));
+      var payload = new MarkerPayload(10, 20, 30, MarkerKind.Frame, 1_234_567_890_123, 166_667);
+      var image = new GrayImage(400, 400, 96);
+      MarkerRenderer.Render(image, payload, 20, 20, 3, MarkerRenderer.RecommendedQuietZoneModules);
+      var result = new MarkerDecoder().Decode(image);
+      Assert.That(result.IsDecoded, Is.True);
+      Assert.That(result.Payload, Is.EqualTo(payload));
     }
 
     [TestCase(1080, 1080, false, 2, 3)]
@@ -46,10 +52,11 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void DecodeAll_FindsTearingMarkersTopToBottom()
     {
-      var image = new GrayImage(640, 900, 128);
+      // 294 px markers at the top, middle and bottom of the frame
+      var image = new GrayImage(640, 1100, 128);
       MarkerRenderer.Render(image, new MarkerPayload(10, 100, 1), 32, 32, 6);
-      MarkerRenderer.Render(image, new MarkerPayload(10, 100, 1), 32, 351, 6);
-      MarkerRenderer.Render(image, new MarkerPayload(11, 200, 1), 32, 670, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(10, 100, 1), 32, 400, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(11, 200, 1), 32, 768, 6);
 
       var results = new MarkerDecoder(tryHarder: true).DecodeAll(image);
 

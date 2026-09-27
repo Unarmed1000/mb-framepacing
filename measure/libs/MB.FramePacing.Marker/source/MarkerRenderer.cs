@@ -15,14 +15,13 @@ namespace MB.FramePacing.Marker
 {
   public static class MarkerRenderer
   {
-    /// <summary>Frame and end markers are fixed to QR version 2 (25x25 modules).</summary>
-    public const int FrameQrVersion = FM.Marker.FrameQrVersion;
+    /// <summary>Every marker (frame, start and end) is QR version 6 (41x41 modules).</summary>
+    public const int QrVersion = FM.Marker.QrVersion;
 
-    /// <summary>Start markers use the smallest version in [FrameQrVersion, MaxQrVersion] that fits the metadata.</summary>
-    public const int MaxQrVersion = FM.Marker.MaxQrVersion;
+    public const int QrModuleCount = FM.Marker.QrModuleCount;
 
-    public const int FrameQrModuleCount = FM.Marker.FrameQrModuleCount;
-    public const int MaxQrModuleCount = FM.Marker.MaxQrModuleCount;
+    /// <summary>The sync marker (<see cref="MarkerKind.Sync"/>) is QR version 2 (25x25 modules).</summary>
+    public const int SyncQrModuleCount = FM.Marker.SyncQrModuleCount;
     public const int RecommendedQuietZoneModules = FM.Marker.RecommendedQuietZoneModules;
     public const int RecommendedInsetPx = FM.Marker.RecommendedInsetPx;
 
@@ -33,15 +32,12 @@ namespace MB.FramePacing.Marker
     [ThreadStatic]
     private static FM.ModuleMatrix? g_matrix;
 
-    /// <summary>Marker size (symbol + quiet zone) for a frame or end marker.</summary>
-    public static int MarkerSizePx(int moduleSizePx, int quietZoneModules = RecommendedQuietZoneModules) =>
-      MarkerSizePx(moduleSizePx, quietZoneModules, FrameQrModuleCount);
+    /// <summary>Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.</summary>
+    public static int QrModuleCountFor(MarkerKind kind) => FM.Marker.QrModuleCountFor((FM.MarkerKind)kind);
 
-    public static int MarkerSizePx(int moduleSizePx, int quietZoneModules, int moduleCount) => (moduleCount + (2 * quietZoneModules)) * moduleSizePx;
-
-    /// <summary>Largest possible start marker; the area the analyzer must search around the marker origin.</summary>
-    public static int MaxMarkerSizePx(int moduleSizePx, int quietZoneModules = RecommendedQuietZoneModules) =>
-      MarkerSizePx(moduleSizePx, quietZoneModules, MaxQrModuleCount);
+    /// <summary>Marker size (symbol + quiet zone): frame, start and end markers have one size, the sync marker is smaller.</summary>
+    public static int MarkerSizePx(int moduleSizePx, int quietZoneModules = RecommendedQuietZoneModules, MarkerKind kind = MarkerKind.Frame) =>
+      (QrModuleCountFor(kind) + (2 * quietZoneModules)) * moduleSizePx;
 
     /// <summary>Hard minimum module size in source pixels: 2 stored pixels per module after all scaling.</summary>
     public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => FM.Marker.MinimumModuleSizePx(sourceHeight, storedHeight);
@@ -95,7 +91,7 @@ namespace MB.FramePacing.Marker
       if (moduleSizePx < 1)
         throw new ArgumentOutOfRangeException(nameof(moduleSizePx));
 
-      int size = MarkerSizePx(moduleSizePx, quietZoneModules, modules.Size);
+      int size = (modules.Size + (2 * quietZoneModules)) * moduleSizePx;
       target.FillRect(new PixelRect(originX, originY, size, size), 255);
 
       int symbolLeft = originX + (quietZoneModules * moduleSizePx);

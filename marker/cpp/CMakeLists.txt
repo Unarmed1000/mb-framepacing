@@ -53,7 +53,6 @@ target_sources(mb_framemarker
       include/mb/framemarker/FrameMarker.hpp
       include/mb/framemarker/IndexedCount.hpp
       include/mb/framemarker/MarkerKind.hpp
-      include/mb/framemarker/MarkerSlot.hpp
       include/mb/framemarker/ModuleMatrix.hpp
       include/mb/framemarker/Options.hpp
       include/mb/framemarker/Payload.hpp

@@ -24,7 +24,8 @@ CPP_TYPE = re.compile(r"^  (?:struct|class|enum\s+class|enum|union)\s+\w+(?:\s*:
 
 def tracked_files(root: Path, pattern: str) -> list[Path]:
     result = subprocess.run(["git", "ls-files", pattern], cwd=root, capture_output=True, text=True, check=True)
-    return [root / line for line in result.stdout.splitlines() if line]
+    # Deleted but not yet staged files are still listed; they have nothing to check
+    return [root / line for line in result.stdout.splitlines() if line and (root / line).is_file()]
 
 
 def count_types(path: Path, regex: re.Pattern[str]) -> int:

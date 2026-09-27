@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Renders what a high speed camera filming the screen of a SyntheticScenario records: the TopLeft and BottomLeft markers seen through a
+//* Renders what a high speed camera filming the screen of a SyntheticScenario records: the main and the sync marker seen through a
 //* perspective transform and lens, with a rolling scanout (row y shows a new frame y/height of the scanout after vsync), panel response,
 //* exposure blending, blur, noise and a drifting camera clock. It is the ground truth for the camera calibration, rectification and analysis.
 //*
@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture.Synthetic
@@ -29,28 +30,26 @@ namespace MB.FramePacing.Capture.Synthetic
       Scenario = scenario ?? throw new ArgumentNullException(nameof(scenario));
       Options = options ?? throw new ArgumentNullException(nameof(options));
       var o = options;
-      int frameMarker = MarkerRenderer.MarkerSizePx(o.ModuleSizePx);
-      if (o.InsetPx + frameMarker > o.ScreenWidth || (2 * (o.InsetPx + frameMarker)) > o.ScreenHeight)
-        throw new ArgumentException($"A {o.ScreenWidth}x{o.ScreenHeight} screen is too small for two {frameMarker}px markers");
+      int mainMarker = MarkerRenderer.MarkerSizePx(o.ModuleSizePx);
+      int syncMarker = MarkerRenderer.MarkerSizePx(o.ModuleSizePx, MarkerRenderer.RecommendedQuietZoneModules, MarkerKind.Sync);
+      if (o.InsetPx + mainMarker > o.ScreenWidth || (2 * o.InsetPx) + mainMarker + syncMarker > o.ScreenHeight)
+        throw new ArgumentException($"A {o.ScreenWidth}x{o.ScreenHeight} screen is too small for the {mainMarker}px and {syncMarker}px markers");
 
       ScreenToCamera = o.ScreenToCamera ?? DefaultScreenToCamera(o);
       if (!ScreenToCamera.TryInvert(out var cameraToScreen))
         throw new ArgumentException("The screen to camera transform is singular", nameof(options));
 
-      var markers = new List<PixelRect>
+      ZoneMarkers = new List<PixelRect>
       {
-        new PixelRect(o.InsetPx, o.InsetPx, frameMarker, frameMarker),
-        new PixelRect(o.InsetPx, o.ScreenHeight - o.InsetPx - frameMarker, frameMarker, frameMarker),
+        new PixelRect(o.InsetPx, o.InsetPx, mainMarker, mainMarker),
+        new PixelRect(o.InsetPx, o.ScreenHeight - o.InsetPx - syncMarker, syncMarker, syncMarker),
       };
-      if (o.MiddleMarker)
-        markers.Add(new PixelRect(o.InsetPx, (o.ScreenHeight - frameMarker) / 2, frameMarker, frameMarker));
-      ZoneMarkers = markers;
-      m_zones = new Zone[markers.Count];
+      m_zones = new Zone[ZoneMarkers.Count];
       m_base = new byte[o.CameraWidth * o.CameraHeight];
       m_scratch = new float[o.CameraWidth * o.CameraHeight];
       m_horizontal = new float[o.CameraWidth * o.CameraHeight];
       for (int z = 0; z < ZoneCount; ++z)
-        m_zones[z] = new Zone(ZoneMarkers[z].Y, o.ModuleSizePx, o.TimeSamples);
+        m_zones[z] = new Zone(ZoneMarkers[z], z == CameraZone.MainZone ? MarkerKind.Frame : MarkerKind.Sync, o.TimeSamples);
       Precompute(cameraToScreen);
     }
 
@@ -62,8 +61,8 @@ namespace MB.FramePacing.Capture.Synthetic
     public Homography ScreenToCamera { get; }
 
     /// <summary>
-    /// Frame marker bounds (including the quiet zone) in screen pixels: [0] the TopLeft slot, [1] the BottomLeft slot, [2] the MiddleLeft slot
-    /// when <see cref="SyntheticCameraOptions.MiddleMarker"/> is set.
+    /// Marker bounds (including the quiet zone) in screen pixels: [<see cref="CameraZone.MainZone"/>] the main marker (top-left),
+    /// [<see cref="CameraZone.SyncZone"/>] the sync marker (bottom-left).
     /// </summary>
     public IReadOnlyList<PixelRect> ZoneMarkers { get; }
 
@@ -81,11 +80,10 @@ namespace MB.FramePacing.Capture.Synthetic
     /// <summary>Converts a display clock time to the camera clock.</summary>
     public double ToCameraTicks(double displayTicks) => displayTicks * (1 + (Options.ClockDriftPpm * 1e-6));
 
-    /// <summary>Time from vsync until the scanout has drawn the whole frame marker of a zone (its bottom symbol row), in display clock ticks.</summary>
+    /// <summary>Time from vsync until the scanout has drawn the whole marker of a zone (its bottom symbol row), in display clock ticks.</summary>
     public double ZoneScanTicks(int zone)
     {
-      double bottomRow =
-        ZoneMarkers[zone].Y + ((MarkerRenderer.RecommendedQuietZoneModules + MarkerRenderer.FrameQrModuleCount) * (double)Options.ModuleSizePx);
+      double bottomRow = ZoneMarkers[zone].Bottom - (MarkerRenderer.RecommendedQuietZoneModules * (double)Options.ModuleSizePx);
       return bottomRow / Options.ScreenHeight * ScanoutTicks;
     }
 
@@ -159,8 +157,8 @@ namespace MB.FramePacing.Capture.Synthetic
           int current = Scenario.PresentedIndexAtTicks((long)Math.Floor(scan));
           int previous = Scenario.PresentedIndexAtTicks((long)Math.Floor(scan - refresh));
           int index = (s * zone.RowCount) + r;
-          zone.Current[index] = MatrixFor(current);
-          zone.Previous[index] = MatrixFor(previous);
+          zone.Current[index] = MatrixFor(current, zone.Kind);
+          zone.Previous[index] = MatrixFor(previous, zone.Kind);
           zone.Weight[index] = current == previous || tau <= 0 ? 0f : (float)Math.Exp(-(t - scan) / tau);
         }
       }
@@ -280,17 +278,22 @@ namespace MB.FramePacing.Capture.Synthetic
       return (sum - 2) * Math.Sqrt(3);
     }
 
-    private ModuleMatrix? MatrixFor(int presentedIndex)
+    /// <summary>The main marker of a presented frame, or its sync marker (the same frame index).</summary>
+    private ModuleMatrix? MatrixFor(int presentedIndex, MarkerKind zoneKind)
     {
       if (presentedIndex < 0)
         return null;
+      bool sync = zoneKind == MarkerKind.Sync;
+      int key = (presentedIndex * 2) + (sync ? 1 : 0);
       lock (m_matrices)
       {
-        if (!m_matrices.TryGetValue(presentedIndex, out var matrix))
+        if (!m_matrices.TryGetValue(key, out var matrix))
         {
           var payload = Scenario.PresentedFrames[presentedIndex].Payload;
-          matrix = MarkerRenderer.GenerateModules(payload, payload.Kind == MarkerKind.SequenceStart ? Scenario.StartMetadata : null);
-          m_matrices.Add(presentedIndex, matrix);
+          matrix = sync
+            ? MarkerRenderer.GenerateModules(payload with { Kind = MarkerKind.Sync })
+            : MarkerRenderer.GenerateModules(payload, payload.Kind == MarkerKind.SequenceStart ? Scenario.StartMetadata : null);
+          m_matrices.Add(key, matrix);
         }
         return matrix;
       }
@@ -316,7 +319,6 @@ namespace MB.FramePacing.Capture.Synthetic
     {
       var o = Options;
       int quiet = MarkerRenderer.RecommendedQuietZoneModules;
-      int zoneSize = MarkerRenderer.MaxMarkerSizePx(o.ModuleSizePx);
       int n = o.SpatialSamples;
       double halfDiagonal = Math.Sqrt((o.CameraWidth * o.CameraWidth) + (o.CameraHeight * o.CameraHeight)) / 2;
       var builders = new List<ZoneBuilder>();
@@ -345,18 +347,11 @@ namespace MB.FramePacing.Capture.Synthetic
                 constant += o.SurroundLuma;
                 continue;
               }
-              // A zone's frame marker wins over another zone's start marker area (which only matters while a start marker shows)
               int zone = -1;
               for (int z = 0; z < ZoneCount && zone < 0; ++z)
               {
                 var marker = ZoneMarkers[z];
                 if (screen.X >= marker.X && screen.Y >= marker.Y && screen.X < marker.Right && screen.Y < marker.Bottom)
-                  zone = z;
-              }
-              for (int z = 0; z < ZoneCount && zone < 0; ++z)
-              {
-                var origin = ZoneMarkers[z];
-                if (screen.X >= origin.X && screen.Y >= origin.Y && screen.X < origin.X + zoneSize && screen.Y < origin.Y + zoneSize)
                   zone = z;
               }
               if (zone < 0 || (zoneOfPixel >= 0 && zone != zoneOfPixel))
@@ -411,15 +406,17 @@ namespace MB.FramePacing.Capture.Synthetic
 
     private sealed class Zone
     {
-      public Zone(int originY, int moduleSizePx, int timeSamples)
+      public Zone(PixelRect marker, MarkerKind kind, int timeSamples)
       {
-        RowMin = originY;
-        RowCount = MarkerRenderer.MaxMarkerSizePx(moduleSizePx);
+        Kind = kind;
+        RowMin = marker.Y;
+        RowCount = marker.Height;
         Current = new ModuleMatrix?[timeSamples * RowCount];
         Previous = new ModuleMatrix?[timeSamples * RowCount];
         Weight = new float[timeSamples * RowCount];
       }
 
+      public MarkerKind Kind { get; }
       public int RowMin { get; }
       public int RowCount { get; }
       public ModuleMatrix?[] Current { get; }

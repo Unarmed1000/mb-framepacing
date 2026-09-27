@@ -68,18 +68,17 @@ namespace MB.FramePacing.DocImages
       )
       {
         var modules = MarkerRenderer.GenerateModules(payload, metadata);
-        int size = MarkerRenderer.MarkerSizePx(6, MarkerRenderer.RecommendedQuietZoneModules, modules.Size);
+        int size = MarkerRenderer.MarkerSizePx(6);
         var image = new RgbImage(size, size);
         DrawModules(image, modules, 0, 0, 6);
         image.Save(Path.Combine(directory, name));
       }
 
-      // Tearing check: the same marker at the top, middle and bottom of the frame
+      // Tearing check and camera timing: the main marker top-left, the small sync marker (same frame index) bottom-left
       var tearing = CreateScene(1280, 720);
-      int markerSize = MarkerRenderer.MarkerSizePx(3);
+      int syncSize = MarkerRenderer.MarkerSizePx(3, MarkerRenderer.RecommendedQuietZoneModules, MarkerKind.Sync);
       DrawMarker(tearing, frameMarker, null, 32, 32, 3);
-      DrawMarker(tearing, frameMarker, null, 32, (720 - markerSize) / 2, 3);
-      DrawMarker(tearing, frameMarker, null, 32, 720 - 32 - markerSize, 3);
+      DrawMarker(tearing, frameMarker with { Kind = MarkerKind.Sync }, null, 32, 720 - 32 - syncSize, 3);
       tearing.Save(Path.Combine(directory, "marker-tearing.png"));
     }
 
@@ -116,7 +115,7 @@ namespace MB.FramePacing.DocImages
     private static void DrawModules(RgbImage image, ModuleMatrix modules, int originX, int originY, int moduleSize)
     {
       int quiet = MarkerRenderer.RecommendedQuietZoneModules;
-      int size = MarkerRenderer.MarkerSizePx(moduleSize, quiet, modules.Size);
+      int size = (modules.Size + (2 * quiet)) * moduleSize;
       image.Fill(originX, originY, size, size, Rgb(255, 255, 255));
       for (int y = 0; y < modules.Size; ++y)
       {

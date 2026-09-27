@@ -1,7 +1,8 @@
 # Frame marker format (version 1)
 
 The frame marker is a QR code that the application under test draws into every frame. It carries the application's **frame
-index**, the **animation time** the frame was rendered for and a **run id**. `mb-framepacing` captures the display output with an
+index**, the **animation time** the frame was rendered for, a **run id** and, when the application paces its frames, **when it
+intends the frame to be shown** and its **target frame time**. `mb-framepacing` captures the display output with an
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
@@ -17,24 +18,35 @@ Both implement this document; if they disagree, this document is the reference.
 
 ## Payload
 
-Every marker starts with the same 24 byte header, little endian:
+Every marker starts with the same 36 byte header, little endian:
 
-| Offset | Size | Field          | Notes                                                                                                               |
-| ------ | ---- | -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 0      | 2    | Magic          | ASCII `"MF"` (`0x4D 0x46`)                                                                                          |
-| 2      | 1    | Format version | `1`                                                                                                                 |
-| 3      | 1    | Kind           | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd                                                                 |
-| 4      | 8    | Frame index    | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.      |
-| 12     | 8    | Animation time | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.             |
-| 20     | 4    | Run id         | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id. |
+| Offset | Size | Field                 | Notes                                                                                                                                                                                 |
+| ------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | 2    | Magic                 | ASCII `"MF"` (`0x4D 0x46`)                                                                                                                                                            |
+| 2      | 1    | Format version        | `1`                                                                                                                                                                                   |
+| 3      | 1    | Kind                  | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd (`3` = Sync is the small sync marker, see below)                                                                                  |
+| 4      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                        |
+| 12     | 8    | Animation time        | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.                                                                               |
+| 20     | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                   |
+| 24     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below). |
+| 32     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                             |
 
-Frame and end markers are exactly these 24 bytes. A **start marker** appends its metadata:
+Frame and end markers are exactly these 36 bytes. A **start marker** appends its metadata:
 
 | Offset | Size | Field       | Notes                                                                                                                                                     |
 | ------ | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 24     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
-| 32     | 1    | Name length | `0`..`64`                                                                                                                                                 |
-| 33     | n    | Name        | UTF-8 test name, at most 64 bytes, no terminator                                                                                                          |
+| 36     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
+| 44     | 1    | Name length | `0`..`60`                                                                                                                                                 |
+| 45     | n    | Name        | UTF-8 test name, at most 60 bytes, no terminator                                                                                                          |
+
+A **sync marker** (kind `3`) is a small second marker for tearing checks and camera timing. It carries only what those need:
+
+| Offset | Size | Field          | Notes                                      |
+| ------ | ---- | -------------- | ------------------------------------------ |
+| 0      | 2    | Magic          | ASCII `"MF"`                               |
+| 2      | 1    | Format version | `1`                                        |
+| 3      | 1    | Kind           | `3` = Sync                                 |
+| 4      | 8    | Frame index    | `u64`, the same as the frame's main marker |
 
 Decoders reject a payload with the wrong length, magic, format version, an unknown kind or (for start markers) invalid UTF-8.
 
@@ -42,31 +54,49 @@ Decoders reject a payload with the wrong length, magic, format version, an unkno
 wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `static_cast<int64_t>(t * 10'000'000.0)` in C++, or
 `std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(d).count()`.
 
+### Frame pacing: intended display time and target frame time
+
+Only the application's frame pacer knows what it is aiming for. A capture cannot tell a pacer that deliberately runs at 30 fps
+(Swappy dropping to 30 for a busy stretch, a 30 fps cap) from a game that fails to hold 60, and it cannot see that every frame after
+a hitch stays a refresh late in a full frame queue. The two pacing fields tell the analysis:
+
+- **Intended display time:** the time the pacer schedules the frame to become visible: the vsync it targets, or the desired
+  present time it passes to a present timing API (`VK_GOOGLE_display_timing`, `VK_EXT_present_timing`, Swappy, DXGI frame
+  statistics). Use a steady clock (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) converted to 100 ns ticks;
+  its epoch does not matter, only the differences between frames. The analysis lines the clock up with the capture clock itself.
+  A frame shown a refresh or more after its intended time is **late**; that also finds frames that stay late after a hitch.
+- **Target frame time:** the interval the pacer aims for before this frame (`1 / target frame rate`). Fill it even without an
+  intended display time, for example from a frame limiter. It changes on the frame where the pacer changes its rate.
+- Leave both `0` when the application does not pace its frames. The analysis then measures against a target frame rate given to
+  the tools, or against the display's native refresh rate (one frame per refresh).
+- With intended display times the analysis splits every frame's animation error exactly: **pacing error** (the display step minus
+  the intended step: the frame was shown off the plan) and **prediction error** (the animation time step minus the intended step:
+  the frame was animated for another moment than planned). The animation error is prediction minus pacing error.
+
 ## Symbol
 
 - QR code, **ECC level M**, **byte mode**, mask chosen automatically.
-- **Frame and end markers are fixed to version 2** (25×25 modules), so they never change size between frames. Version 2-M
-  holds 26 bytes; the 24 byte payload fits.
-- **Start markers** use the smallest version from 2 to 6 that fits the metadata: version 3 (29 modules) with an empty name, up to
-  version 6 (41 modules) with a 64 byte name. They are drawn at the **same origin** as the frame marker and are larger, so keep
-  `MaxMarkerSizePx(options)` (49 modules with the default quiet zone) clear around the origin while a start marker is shown.
+- **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
+  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 36 of them, which leaves room for future fields, and
+  a start marker with a 60 byte name uses 105.
+- **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 12.
 - The Reed-Solomon error correction is the integrity check. A capture that mixes two frames (tearing, or a capture taken
   while the display changed frame) either fails ECC or decodes one of the two frames. The analyzer reports what it saw and never
   guesses.
 - **Quiet zone:** 4 modules of white around the symbol, as the QR standard requires. It is part of the marker geometry, so
   the application does not need to clear the area first.
 
-Marker size in source pixels = `(moduleCount + 2 × QuietZoneModules) × ModuleSizePx`: `33 × ModuleSizePx` for frame and end
-markers with the default quiet zone, at most `49 × ModuleSizePx` for a start marker.
+Marker size in source pixels = `(modules + 2 × QuietZoneModules) × ModuleSizePx`: `49 × ModuleSizePx` for the main marker and
+`33 × ModuleSizePx` for the sync marker with the default quiet zone (`MarkerSizePx(options, kind)`).
 
 ## Geometry
 
 - Pixel coordinates with the **origin at the top-left**, **+x right**, **+y down**.
 - Every vertex lies on an integer **pixel edge**. A quad covers exactly the pixels `[Left, Right) × [Top, Bottom)`.
-- `GenerateQuads` (frame and end markers) and `GenerateStartQuads` (start marker with metadata) return the light background
+- `GenerateQuads` (frame, end and sync markers, chosen by the payload's kind) and `GenerateStartQuads` (start marker with metadata) return the light background
   quad first (symbol plus quiet zone), then one dark quad per horizontal run of dark modules. Draw them in that order.
-  Frame and end markers produce at most 326 quads (`MaxFrameQuadCount()`), start markers at most 862 (`MaxQuadCount()`).
-  Size caller buffers with `MaxQuadCount()` / `MaxTriangleVertexCount()` to handle every kind.
+  Every marker produces at most 862 quads (`MaxQuadCount()`); size caller buffers with `MaxQuadCount()` /
+  `MaxTriangleVertexCount()`.
 - `QuadsToTriangles` produces 6 vertices per quad. `QuadsToIndexed` produces 4 vertices and 6 indices per quad. Both wind clockwise on screen
   (+y down). Disable back-face culling for the marker draw, or pick the cull mode that matches.
 
@@ -133,11 +163,11 @@ origin and the settings for each library.
 
 | Source → stored             | s     | Minimum module px | Recommended module px   | Marker size at recommended |
 | --------------------------- | ----- | ----------------- | ----------------------- | -------------------------- |
-| 1:1                         | 1     | 2                 | 3 (4 if MJPEG)          | 99 px (132 px)             |
-| 1440p → 1080p               | 0.75  | 3                 | 4                       | 132 px                     |
-| 1080p → 540p, 2160p → 1080p | 0.5   | 4                 | **6 (library default)** | 198 px                     |
-| 1080p → 360p                | 0.333 | 6                 | 9                       | 297 px                     |
-| 2160p → 540p                | 0.25  | 8                 | 12                      | 396 px                     |
+| 1:1                         | 1     | 2                 | 3 (4 if MJPEG)          | 147 px (196 px)            |
+| 1440p → 1080p               | 0.75  | 3                 | 4                       | 196 px                     |
+| 1080p → 540p, 2160p → 1080p | 0.5   | 4                 | **6 (library default)** | 294 px                     |
+| 1080p → 360p                | 0.333 | 6                 | 9                       | 441 px                     |
+| 2160p → 540p                | 0.25  | 8                 | 12                      | 588 px                     |
 
 ### Alignment
 
@@ -149,7 +179,7 @@ origin and the settings for each library.
 - A non-integer ratio (for example 1440p → 1080p) still works, but use at least the recommended size, not the minimum.
 - `--roi` crops first and `--scale` then scales the crop, so `s` is the `--scale` height divided by the `--roi` height (1 without
   `--scale`).
-- `--roi auto` (fast capture) crops the region around the marker's origin that holds the largest start marker, starting a whole
+- `--roi auto` (fast capture) crops the region around the marker's origin that holds the marker, starting a whole
   number of downscale steps before the origin, and downscales it by the largest integer ratio that keeps the recommended stored
   size (3 px per module, 4 with MJPEG). Only the top marker is stored, so tearing is not checked.
 
@@ -173,10 +203,10 @@ but record at a constant frame rate, taking the newest frame at each tick, so th
 each frame. Turn variable refresh off for a capture card measurement. A high speed camera filming the screen does see the real
 display timing, variable refresh included. That is **very experimental**: see [camera capture](camera.md).
 
-**Camera capture (very experimental)** needs the same frame marker in the **TopLeft and BottomLeft** slots (drawing MiddleLeft as
-well is fine), at a fixed position, with at least 3 camera pixels per module. The camera sees the two zones at different times
-while the scanout rolls down the screen. The analysis uses that to measure the scanout and to find tears, instead of treating
-different markers in one camera frame as tearing.
+**Camera capture (very experimental)** needs the **sync marker** as well, at a fixed position, with at least 3 camera pixels per
+module. The camera sees the two markers at different times while the scanout rolls down the screen. The analysis times every frame
+by the small sync marker, which the scanout crosses quickly, reads the frame's data from the main marker, measures the scanout
+between the two, and finds tears instead of treating different markers in one camera frame as tearing.
 
 **Vsync off** is not recommended. With vsync off, one refresh shows slices of several frames; the marker then only
 reports the frame at the top of the screen, frames shown only lower down are never seen, and the numbers are easy to misread.
@@ -190,11 +220,12 @@ multiple of the downscale ratio.
 - The inset keeps the marker away from scaler edge artefacts and capture-card cropping, and clear of TV overscan if the
   signal is mirrored to a TV.
 
-**Optional tearing markers:** at the same X, vertically centred (`MiddleLeft`) and at the bottom (`BottomLeft`,
-`y = sourceHeight − 32 − markerSize`). Encode the same payload in all of them. When they decode to different frames, the
-analyzer flags the capture as _torn_ and uses the top marker for timing.
+**Sync marker: bottom-left**, at the same X, `y = sourceHeight − 32 − syncMarkerSize`. It carries the same frame index as the main
+marker. Optional for a capture card, where it checks tearing: when the two markers show different frames, the analyzer flags the
+capture as _torn_ and uses the main marker for timing. Required for camera capture.
 
-`MB::FrameMarker::RecommendedOrigin(slot, sourceWidth, sourceHeight, options, alignPx)` returns these positions.
+`MB::FrameMarker::RecommendedOrigin(kind, sourceWidth, sourceHeight, options, alignPx)` returns these positions: bottom-left for
+`MarkerKind::Sync`, top-left for every other kind.
 
 ## Example (C++)
 
@@ -204,14 +235,15 @@ namespace FM = MB::FrameMarker;
 
 // Once: 1080p output captured and stored at 540p (2:1)
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};   // 6 px
-const FM::Point origin = FM::RecommendedOrigin(FM::MarkerSlot::TopLeft, 1920, 1080, options, 2);
+const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 2);
 
 std::array<FM::Quad, FM::MaxQuadCount()> quads;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, after all post-processing and UI
 std::size_t quadCount = 0;
-const FM::Payload payload{frameIndex, animationTicks, runId, kind};
+// Pacing: when the pacer intends this frame to be shown (steady clock ticks) and its target frame time; 0 = unknown
+const FM::Payload payload{frameIndex, animationTicks, runId, kind, intendedDisplayTicks, targetFrameTicks};
 if (kind == FM::MarkerKind::SequenceStart)
 {
   // startUtcTicks captured once when the run started: FM::ToDateTimeTicks(std::chrono::system_clock::now())

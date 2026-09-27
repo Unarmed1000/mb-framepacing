@@ -72,8 +72,7 @@ A simulation that only advances in fixed steps and renders without interpolation
 | Stored Height           | Height of the frames the capture tool stores; picks the module size. 0 = the output height                                        |
 | MJPEG                   | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                                          |
 | Module Size Px          | Fixed module size in output pixels (overrides Stored Height)                                                                      |
-| Slot                    | Top-left (recommended), middle-left or bottom-left                                                                                |
-| Tearing Markers         | Also draw frame markers in the middle and at the bottom, so the analysis can detect tearing                                       |
+| Sync Marker             | Also draw the small sync marker at the bottom left: it detects tearing, and camera capture needs it for its timing                |
 | Draw When Idle          | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus                             |
 | Material                | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored                     |
 | Sequence Marker Seconds | How long the start and end markers stay on screen (default 0.1 s: three frames of a 30 fps capture; one captured frame is enough) |
@@ -106,7 +105,7 @@ var material = FrameMarkerGL.CreateMaterial();           // once, or your own un
 
 // every frame, as the last thing drawn into the output
 var options = new Options(Marker.RecommendModuleSizePx(Screen.height, 540));
-var origin = Marker.RecommendedOrigin(MarkerSlot.TopLeft, Screen.width, Screen.height, options);
+var origin = Marker.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height, options);
 var payload = new Payload((ulong)Time.frameCount, Marker.SecondsToTicks(Time.timeAsDouble), runId);
 markerMesh.Update(payload, default, options, origin, Screen.height);
 commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Screen.width, Screen.height));
@@ -122,7 +121,7 @@ straight into your arrays:
 
 ```csharp
 var generator = new MarkerGenerator();
-var vertices = new Vertex[Marker.MaxFrameTriangleVertexCount];
+var vertices = new Vertex[Marker.MaxTriangleVertexCount];
 
 int count = generator.GenerateTriangles(payload, options, origin, vertices); // 6 vertices per quad, pixel coordinates, top-left origin
 ```

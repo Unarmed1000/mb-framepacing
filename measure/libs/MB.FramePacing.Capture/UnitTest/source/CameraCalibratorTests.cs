@@ -55,7 +55,7 @@ namespace MB.FramePacing.Capture.UnitTest
       // Zone 0 is the one the scanout reaches first: the TopLeft slot
       for (int zone = 0; zone < 2; ++zone)
       {
-        foreach (var module in new ImagePoint[] { new(0, 0), new(25, 0), new(0, 25), new(25, 25) })
+        foreach (var module in new ImagePoint[] { new(0, 0), new(41, 0), new(0, 41), new(41, 41) })
         {
           double error = ImagePoint.Distance(camera.ZoneModuleToObserved(zone, module), rig.Zones[zone].ModuleToCamera.Map(module));
           Assert.That(error, Is.LessThan(0.3), $"zone {zone} module {module}");
@@ -101,18 +101,53 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(checks.Any(c => c.Level == CameraCheckLevel.Fail), Is.True, string.Join("\n", checks));
     }
 
-    [Test]
-    public void Calibrate_WithTheMiddleTearingMarker_UsesTheTopAndBottomZones()
+    /// <summary>
+    /// A camera looking at the screen from further to the side: about 20 and 30 degrees off the screen normal (for a 50 to 65 degree field of
+    /// view). The finder search misses many 41 module main markers at such angles, but calibration only needs some detections of each.
+    /// </summary>
+    [TestCase(0.13, 0.10, 0.85, "about 20 degrees")]
+    [TestCase(0.18, 0.12, 0.80, "about 30 degrees", Explicit = true, Reason = "Known limit: ZXing misses the main marker (doc/camera-status.md)")]
+    public void Calibrate_AtASteepAngle_FindsBothMarkers(double topRightY, double bottomLeftX, double bottomRightY, string angle)
     {
-      var camera = CreateCamera(new SyntheticCameraOptions { MiddleMarker = true, LensDistortion = 0 });
+      var probe = new SyntheticCameraOptions();
+      double visible = probe.ScreenWidth * 0.45;
+      double w = probe.CameraWidth;
+      double h = probe.CameraHeight;
+      var screen = new ImagePoint[] { new(0, 0), new(visible, 0), new(0, probe.ScreenHeight), new(visible, probe.ScreenHeight) };
+      var view = new ImagePoint[]
+      {
+        new(w * 0.06, h * 0.03),
+        new(w * 0.95, h * topRightY),
+        new(w * bottomLeftX, h * 0.97),
+        new(w * 0.90, h * bottomRightY),
+      };
+      Assert.That(Homography.TryFromPoints(screen, view, out var screenToCamera), Is.True);
+      var camera = CreateCamera(new SyntheticCameraOptions { LensDistortion = 0, ScreenToCamera = screenToCamera });
+
+      var rig = CameraCalibrator.Calibrate(Collect(camera, g_options.Seconds), g_options);
+
+      Assert.That(rig.HasFailures, Is.False, $"{angle}: " + string.Join(Environment.NewLine, rig.Checks));
+      Assert.That(rig.Zones.Select(z => z.Kind), Is.EqualTo(new[] { MarkerKind.Frame, MarkerKind.Sync }));
+      for (int zone = 0; zone < 2; ++zone)
+      {
+        var centre = new ImagePoint(rig.Zones[zone].ModuleCount / 2.0, rig.Zones[zone].ModuleCount / 2.0);
+        Assert.That(ImagePoint.Distance(camera.ZoneModuleToObserved(zone, centre), rig.Zones[zone].ModuleToCamera.Map(centre)), Is.LessThan(0.5));
+      }
+    }
+
+    [Test]
+    public void Calibrate_FindsTheMainAndTheSyncMarker()
+    {
+      var camera = CreateCamera(new SyntheticCameraOptions { LensDistortion = 0 });
 
       var rig = CameraCalibrator.Calibrate(Collect(camera, g_options.Seconds), g_options);
 
       Assert.That(rig.HasFailures, Is.False, string.Join(Environment.NewLine, rig.Checks));
-      Assert.That(rig.Zones, Has.Count.EqualTo(2));
+      Assert.That(rig.Zones.Select(z => z.Kind), Is.EqualTo(new[] { MarkerKind.Frame, MarkerKind.Sync }));
+      Assert.That(rig.ScanoutDelayMs, Is.GreaterThan(0), "the scanout reaches the main marker (top) before the sync marker (bottom)");
       for (int zone = 0; zone < 2; ++zone)
       {
-        var centre = new ImagePoint(12.5, 12.5);
+        var centre = new ImagePoint(rig.Zones[zone].ModuleCount / 2.0, rig.Zones[zone].ModuleCount / 2.0);
         Assert.That(ImagePoint.Distance(camera.ZoneModuleToObserved(zone, centre), rig.Zones[zone].ModuleToCamera.Map(centre)), Is.LessThan(0.5));
       }
     }

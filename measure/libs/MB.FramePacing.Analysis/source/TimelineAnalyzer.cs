@@ -193,6 +193,8 @@ namespace MB.FramePacing.Analysis
       public int Segment;
       public ulong FrameIndex;
       public long AnimationTicks;
+      public long IntendedDisplayTicks;
+      public uint TargetFrameTicks;
       public long FirstCaptureIndex;
       public long FirstSeenTicks;
       public long LastSeenTicks;
@@ -286,6 +288,8 @@ namespace MB.FramePacing.Analysis
           Segment = segment,
           FrameIndex = payload.FrameIndex,
           AnimationTicks = payload.AnimationTicks,
+          IntendedDisplayTicks = payload.IntendedDisplayTicks,
+          TargetFrameTicks = payload.TargetFrameTicks,
           FirstCaptureIndex = row.CaptureIndex,
           FirstSeenTicks = row.CaptureTicks,
           LastSeenTicks = row.CaptureTicks,
@@ -317,6 +321,8 @@ namespace MB.FramePacing.Analysis
       }
 
       var cameraStatistics = camera ? AnalyzeCamera(builders, firstSecondary, period, warnings) : null;
+      if (cameraStatistics != null)
+        TimeBySyncMarker(builders, cameraStatistics);
       var frames = BuildFrames(builders, period);
       var pacing = AnalyzePacing(frames, period, threshold, camera, options, warnings);
       var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
@@ -424,6 +430,25 @@ namespace MB.FramePacing.Analysis
         .Where(b => b.FirstSeenSecondaryTicks.HasValue && !b.Torn)
         .Select(b => b.FirstSeenSecondaryTicks!.Value - b.FirstSeenTicks);
       return new CameraRunStatistics(Statistics.FromTicks(normal), delays.Count, tornFrames, secondZoneOnly);
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL camera captures: the sync marker times the frames. The scanout crosses the small marker quickly, so the first camera
+    /// frame that shows it complete is sharp; the main marker is taller and only identifies the frame (its payload). A frame the sync marker
+    /// missed is timed by its main marker plus the usual scanout delay. Afterwards <see cref="FrameBuilder.FirstSeenSecondaryTicks"/> holds
+    /// the main marker's first-seen time.
+    /// </summary>
+    private static void TimeBySyncMarker(List<FrameBuilder> builders, CameraRunStatistics camera)
+    {
+      long typicalDelay = (long)Math.Round(camera.ScanoutDelay.P50 * TimeSpan.TicksPerMillisecond);
+      foreach (var builder in builders)
+      {
+        long main = builder.FirstSeenTicks;
+        long sync = builder.FirstSeenSecondaryTicks ?? (main + typicalDelay);
+        builder.LastSeenTicks += sync - main;
+        builder.FirstSeenTicks = sync;
+        builder.FirstSeenSecondaryTicks = main;
+      }
     }
 
     /// <summary>
@@ -585,7 +610,9 @@ namespace MB.FramePacing.Analysis
             displayDelta.HasValue ? animationDelta!.Value - displayDelta.Value : null,
             (b.AnimationTicks - first.AnimationTicks) - (b.FirstSeenTicks - first.FirstSeenTicks),
             flags,
-            b.FirstSeenSecondaryTicks
+            b.FirstSeenSecondaryTicks,
+            b.IntendedDisplayTicks,
+            b.TargetFrameTicks
           )
         );
       }

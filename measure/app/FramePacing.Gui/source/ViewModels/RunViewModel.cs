@@ -42,9 +42,16 @@ namespace MB.FramePacing.Gui.ViewModels
         LateShareText = pacing.LateShare.ToString("P1", CultureInfo.InvariantCulture);
         WorstLateShareText = pacing.WorstLateShare.ToString("P1", CultureInfo.InvariantCulture);
         HasLateFrames = pacing.LateFrames > 0;
-        TargetText =
-          $"Late = shown at least one refresh after the {pacing.TargetFrameMs.ToString("0.##", CultureInfo.InvariantCulture)} ms target "
-          + (pacing.TargetGiven ? "(the given target frame rate)." : "(the run's median display time).");
+        string target = pacing.TargetFrameMs.ToString("0.##", CultureInfo.InvariantCulture);
+        TargetText = pacing.Source switch
+        {
+          PacingSource.Schedule =>
+            $"Late = shown half a refresh or more after the frame's intended display time (the pacer's schedule in the markers, typically {target} ms per frame).",
+          PacingSource.TargetFrameTime =>
+            $"Late = shown at least one refresh after each frame's target frame time (the pacer's target in the markers, typically {target} ms).",
+          PacingSource.GivenTarget => $"Late = shown at least one refresh after the {target} ms target (the given target frame rate).",
+          _ => $"Late = shown at least one refresh after the {target} ms target (no pacing information: the display's native refresh rate).",
+        };
         RefreshText =
           string.Create(
             CultureInfo.InvariantCulture,
@@ -69,7 +76,7 @@ namespace MB.FramePacing.Gui.ViewModels
             _ => "Cause: none, no animation error above the threshold",
           } + $" ({pacing.ErrorFramesWithUnevenDisplay} error frame(s) at uneven display, {pacing.ErrorFramesWithEvenDisplay} on an even display).";
       }
-      Statistics = new List<StatisticsRow>
+      var statistics = new List<StatisticsRow>
       {
         StatisticsRow.From("Display time", s.DisplayDeltaMs),
         StatisticsRow.From("Animation time step", s.AnimationDeltaMs),
@@ -78,6 +85,13 @@ namespace MB.FramePacing.Gui.ViewModels
         StatisticsRow.From("Drift", s.DriftMs),
         StatisticsRow.From("On screen", s.OnScreenMs),
       };
+      // With the pacer's schedule in the markers: the animation error split into its two parts
+      if (run.Pacing?.PacingErrorMs is { } pacingError && run.Pacing.PredictionErrorMs is { } predictionError)
+      {
+        statistics.Add(StatisticsRow.From("Pacing error", pacingError));
+        statistics.Add(StatisticsRow.From("Prediction error", predictionError));
+      }
+      Statistics = statistics;
     }
 
     public RunAnalysis Run { get; }
