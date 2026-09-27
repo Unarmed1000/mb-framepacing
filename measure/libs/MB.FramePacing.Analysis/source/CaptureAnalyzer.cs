@@ -57,7 +57,16 @@ namespace MB.FramePacing.Analysis
       using (var reader = new CaptureFileReader(framesPath))
         capture = CaptureDecoder.Decode(reader, options.TimeSource, progress, cancellationToken, scanout);
 
-      var timeline = TimelineAnalyzer.Analyze(capture.Rows, options.Timeline with { Scanout = scanout });
+      var timeline = TimelineAnalyzer.Analyze(
+        capture.Rows,
+        options.Timeline with
+        {
+          Scanout = scanout,
+          TargetFps = options.Timeline.TargetFps ?? session?.TargetFps,
+          ExpectedRefreshHz = options.Timeline.ExpectedRefreshHz ?? session?.ExpectedRefreshHz,
+          CalibratedRefreshHz = session?.Camera?.RefreshHz,
+        }
+      );
       var warnings = new List<string>(capture.Layout.Warnings);
       warnings.AddRange(timeline.Warnings);
       if (MarkerMayHaveMoved(capture))
@@ -198,6 +207,7 @@ namespace MB.FramePacing.Analysis
         timeSource = report.Capture.TimeSource,
         capturePeriodMs = report.CapturePeriodMs,
         measurementResolutionMs = report.CapturePeriodMs,
+        errorThresholdMs = report.ErrorThresholdMs,
         markers = layout.Locks.Select(l => new { bounds = l.Bounds.ToString(), moduleSizePx = l.ModuleSizePx }),
         warnings = report.Warnings,
         runs = report.Timeline.Runs.Select(
@@ -212,6 +222,7 @@ namespace MB.FramePacing.Analysis
               framesFile = runFiles[i],
               run.Counts,
               run.Statistics,
+              run.Pacing,
               histograms = RunHistograms.Create(run, report.Timeline.CapturePeriodTicks),
               camera = run.Camera,
               run.Warnings,

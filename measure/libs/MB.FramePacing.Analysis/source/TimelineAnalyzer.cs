@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Analysis
@@ -19,11 +20,15 @@ namespace MB.FramePacing.Analysis
     // The slow capture warning needs enough presented frames to tell a pattern from a few real skips
     private const int SlowCaptureMinFrames = 20;
 
+    /// <summary>How far the refresh rate may differ from the expected or calibrated one before the analysis warns (relative).</summary>
+    public const double RefreshTolerance = 0.01;
+
     public static TimelineResult Analyze(IReadOnlyList<CaptureRow> rows, TimelineOptions? options = null)
     {
       options ??= new TimelineOptions();
       var warnings = new List<string>();
       long period = EstimateCapturePeriod(rows);
+      long threshold = ErrorThreshold(period, options.Scanout);
 
       var runRows = SplitIntoRuns(rows, warnings);
       var runs = new List<RunAnalysis>();
@@ -31,12 +36,20 @@ namespace MB.FramePacing.Analysis
       {
         if (options.RunId.HasValue && run.RunId != options.RunId.Value)
           continue;
-        runs.Add(AnalyzeRun(run, period, options));
+        runs.Add(AnalyzeRun(run, period, threshold, options));
       }
       if (runs.Count == 0)
         warnings.Add(options.RunId.HasValue ? $"Run {options.RunId} was not found in the capture" : "No frame markers were found in the capture");
-      return new TimelineResult(period, runs, warnings);
+      return new TimelineResult(period, threshold, runs, warnings);
     }
+
+    /// <summary>
+    /// The |animation error| above which a frame counts as off. A capture card captures at the display's refresh rate and sees one whole
+    /// refresh per capture, so display times and errors are whole refreshes: anything from half a capture period on is a real error (one
+    /// missed refresh counts). An EXPERIMENTAL camera films asynchronously: its times are only exact to one camera period.
+    /// </summary>
+    public static long ErrorThreshold(long capturePeriodTicks, ScanoutModel scanout) =>
+      scanout == ScanoutModel.Camera ? capturePeriodTicks : capturePeriodTicks / 2;
 
     /// <summary>Median interval between consecutive recorded captures.</summary>
     public static long EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
@@ -190,7 +203,7 @@ namespace MB.FramePacing.Analysis
       public bool Torn;
     }
 
-    private static RunAnalysis AnalyzeRun(RunRows run, long period, TimelineOptions options)
+    private static RunAnalysis AnalyzeRun(RunRows run, long period, long threshold, TimelineOptions options)
     {
       var warnings = new List<string>(run.Warnings);
       long decoded = 0;
@@ -304,6 +317,7 @@ namespace MB.FramePacing.Analysis
 
       var cameraStatistics = camera ? AnalyzeCamera(builders, firstSecondary, period, warnings) : null;
       var frames = BuildFrames(builders, period);
+      var pacing = AnalyzePacing(frames, period, threshold, camera, options, warnings);
       var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
       var statistics = new RunStatistics(
         Statistics.FromTicks(withMetrics.Select(f => f.DisplayDeltaTicks!.Value)),
@@ -312,7 +326,7 @@ namespace MB.FramePacing.Analysis
         Statistics.FromTicks(withMetrics.Select(f => Math.Abs(f.AnimationErrorTicks!.Value))),
         Statistics.FromTicks(frames.Select(f => f.DriftTicks)),
         Statistics.FromTicks(frames.Select(f => f.OnScreenTicks)),
-        withMetrics.LongCount(f => period > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > period)
+        withMetrics.LongCount(f => period > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > threshold)
       );
       var counts = new RunCounts(
         rows.Count,
@@ -330,7 +344,19 @@ namespace MB.FramePacing.Analysis
         warnings.Add("The capture period could not be determined; animation error thresholds are unavailable");
       if (SlowCaptureWarning(frames, period) is { } slowCapture)
         warnings.Add(slowCapture);
-      return new RunAnalysis(run.RunId, run.Name, run.StartTimeUtc, run.HasStart, run.HasEnd, counts, statistics, frames, warnings, cameraStatistics);
+      return new RunAnalysis(
+        run.RunId,
+        run.Name,
+        run.StartTimeUtc,
+        run.HasStart,
+        run.HasEnd,
+        counts,
+        statistics,
+        frames,
+        warnings,
+        cameraStatistics,
+        pacing
+      );
     }
 
     /// <summary>
@@ -397,6 +423,82 @@ namespace MB.FramePacing.Analysis
         .Where(b => b.FirstSeenSecondaryTicks.HasValue && !b.Torn)
         .Select(b => b.FirstSeenSecondaryTicks!.Value - b.FirstSeenTicks);
       return new CameraRunStatistics(Statistics.FromTicks(normal), delays.Count, tornFrames, secondZoneOnly);
+    }
+
+    /// <summary>
+    /// Late frames and the pacing verdict. A capture card captures at the display's refresh rate, so the refresh period is the capture period;
+    /// an EXPERIMENTAL camera films faster, so the refresh is calculated from when it first saw each frame.
+    /// </summary>
+    private static RunPacing? AnalyzePacing(
+      List<PresentedFrame> frames,
+      long period,
+      long threshold,
+      bool camera,
+      TimelineOptions options,
+      List<string> warnings
+    )
+    {
+      if (period <= 0)
+        return null;
+      double? expected = options.ExpectedRefreshHz is > 0 ? options.ExpectedRefreshHz : null;
+      long refresh = period;
+      if (camera)
+      {
+        // The user's expected rate settles an ambiguous estimate (a steady game below the refresh rate) before the rig's calibration
+        double? hintHz = expected ?? (options.CalibratedRefreshHz is > 0 ? options.CalibratedRefreshHz : null);
+        double? hint = hintHz is { } hz ? TimeSpan.TicksPerSecond / hz : null;
+        if (RefreshEstimator.EstimatePeriodTicks(CameraIntervals(frames), period, hint) is not { } estimate)
+        {
+          warnings.Add(
+            "Camera capture: the display's refresh rate could not be calculated from the frames (too few, or the camera is too slow), so late frames are not marked."
+          );
+          return null;
+        }
+        refresh = (long)Math.Round(estimate);
+        double calculatedHz = TimeSpan.TicksPerSecond / estimate;
+        if (expected is { } expectedHz && !WithinTolerance(calculatedHz, expectedHz))
+          warnings.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"Camera capture: the frames give a {calculatedHz:0.##} Hz display, but {expectedHz:0.##} Hz was expected. Check the display's refresh rate (or the camera's frame rate, --recorded-fps for slow motion clips)."
+            )
+          );
+        else if (expected == null && options.CalibratedRefreshHz is > 0 && !WithinTolerance(calculatedHz, options.CalibratedRefreshHz.Value))
+          warnings.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"Camera capture: the frames give a {calculatedHz:0.#} Hz display, the camera rig measured {options.CalibratedRefreshHz:0.#} Hz at calibration. Was the refresh rate changed?"
+            )
+          );
+      }
+      else if (expected is { } expectedHz && !WithinTolerance(TimeSpan.TicksPerSecond / (double)period, expectedHz))
+      {
+        warnings.Add(
+          string.Create(
+            CultureInfo.InvariantCulture,
+            $"The capture runs at {TimeSpan.TicksPerSecond / (double)period:0.##} fps, but a {expectedHz:0.##} Hz display was expected. A capture card must capture at the display's refresh rate: check the card's mode and the display's refresh rate."
+          )
+        );
+      }
+      // A camera's animation error is the difference of two first-seen times, each good to about one camera period: the verdict only
+      // attributes errors beyond that noise
+      return PacingAnalyzer.Analyze(frames, refresh, camera, options.TargetFps, camera ? 2 * threshold : threshold) with
+      {
+        ExpectedRefreshHz = expected,
+      };
+    }
+
+    private static bool WithinTolerance(double actualHz, double expectedHz) => Math.Abs((actualHz / expectedHz) - 1) <= RefreshTolerance;
+
+    /// <summary>First-seen intervals a camera measured reliably: not across a tear or an uncertain start.</summary>
+    private static IEnumerable<double> CameraIntervals(List<PresentedFrame> frames)
+    {
+      const PresentedFrameFlags Unreliable = PresentedFrameFlags.Torn | PresentedFrameFlags.UncertainStart;
+      for (int i = 1; i < frames.Count; ++i)
+      {
+        if (frames[i].DisplayDeltaTicks is { } delta && (frames[i].Flags & Unreliable) == 0 && (frames[i - 1].Flags & PresentedFrameFlags.Torn) == 0)
+          yield return delta;
+      }
     }
 
     private static long Median(List<long> values)

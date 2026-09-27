@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Notes on a presented frame: application frames were skipped before it, or its first-seen time is uncertain.
+//* Notes on a presented frame: application frames were skipped before it, its first-seen time is uncertain, it was torn or it was late.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -23,5 +23,8 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>EXPERIMENTAL camera captures: the frame reached the second (lower) zone before the timing zone, so it was presented mid-scanout.</summary>
     Torn = 4,
+
+    /// <summary>Shown at least one refresh later than the target frame time after the previous frame (see <see cref="RunPacing"/>).</summary>
+    Late = 8,
   }
 }

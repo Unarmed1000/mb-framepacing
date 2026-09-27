@@ -9,7 +9,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
         <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
         <ComboBox
@@ -18,8 +18,22 @@
           SelectedItem="{Binding SelectedTimeSource}"
           ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available."
         />
-        <Button Grid.Column="3" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
-        <Button Grid.Column="4" Content="Open reports" Command="{Binding OpenReportsCommand}" />
+        <TextBox
+          Grid.Column="3"
+          Width="120"
+          Text="{Binding TargetFpsText}"
+          PlaceholderText="Target fps"
+          ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Empty = the target stored with the capture, or each run's median display time."
+        />
+        <TextBox
+          Grid.Column="4"
+          Width="120"
+          Text="{Binding DisplayHzText}"
+          PlaceholderText="Display Hz"
+          ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Empty = the rate stored with the capture, or no comparison."
+        />
+        <Button Grid.Column="5" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
+        <Button Grid.Column="6" Content="Open reports" Command="{Binding OpenReportsCommand}" />
       </Grid>
     </Border>
 
@@ -50,7 +64,10 @@
             <TextBlock Classes="tileValue" Text="{Binding SelectedRun.PresentedFramesText, FallbackValue='-'}" />
           </StackPanel>
         </Border>
-        <Border Classes="tile" ToolTip.Tip="Frames whose animation time is off by more than one capture period (the measurement resolution)">
+        <Border
+          Classes="tile"
+          ToolTip.Tip="Frames whose animation time is off: by a refresh or more for a capture card (it sees whole refreshes), by more than one camera period for a camera"
+        >
           <StackPanel>
             <TextBlock Classes="caption" Text="Frames visibly off" />
             <TextBlock
@@ -72,13 +89,43 @@
             <TextBlock Classes="tileValue" Text="{Binding SelectedRun.WorstErrorText, FallbackValue='-'}" />
           </StackPanel>
         </Border>
-        <Border Classes="tile" ToolTip.Tip="One capture period: times are only known to this precision">
+        <Border Classes="tile" ToolTip.Tip="Frames shown at least one refresh later than the target frame time after the previous frame">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Late frames" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock
+                Classes="tileValue"
+                Classes.warning="{Binding SelectedRun.HasLateFrames, FallbackValue=False}"
+                Text="{Binding SelectedRun.LateFramesText, FallbackValue='-'}"
+              />
+              <TextBlock Classes="caption" VerticalAlignment="Bottom" Text="{Binding SelectedRun.LateShareText, FallbackValue=''}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Classes="tile" ToolTip.Tip="The highest share of late frames in any 2 s stretch: rare spikes stay low, busy stretches stand out">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Worst 2 s late" />
+            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.WorstLateShareText, FallbackValue='-'}" />
+          </StackPanel>
+        </Border>
+        <Border
+          Classes="tile"
+          ToolTip.Tip="One capture period: the capture card's refresh (it captures at the display's refresh rate), or the camera's frame time"
+        >
           <StackPanel>
             <TextBlock Classes="caption" Text="Resolution" />
             <TextBlock Classes="tileValue" Text="{Binding SelectedRun.ResolutionText, FallbackValue='-'}" />
           </StackPanel>
         </Border>
       </WrapPanel>
+      <TextBlock Text="{Binding SelectedRun.VerdictText, FallbackValue=''}" TextWrapping="Wrap" />
+      <TextBlock Classes="caption" Text="{Binding SelectedRun.TargetText, FallbackValue=''}" TextWrapping="Wrap" />
+      <TextBlock
+        Classes="caption"
+        Classes.warning="{Binding SelectedRun.RefreshMismatch, FallbackValue=False}"
+        Text="{Binding SelectedRun.RefreshText, FallbackValue=''}"
+        TextWrapping="Wrap"
+      />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.CountsText, FallbackValue=''}" TextWrapping="Wrap" />
       <ItemsControl ItemsSource="{Binding SelectedRun.Warnings, FallbackValue={x:Null}}">
         <ItemsControl.ItemTemplate>
@@ -121,17 +168,22 @@
     <!-- Charts -->
     <Border Grid.Row="3" Classes="card" Padding="4" IsVisible="{Binding HasRun}">
       <TabControl>
-        <TabItem Header="Animation error">
-          <scottplot:AvaPlot x:Name="ErrorPlot" />
+        <TabItem Header="Timeline">
+          <!-- Four plots on one linked time axis need more height than the other tabs: the tab scrolls, the plots zoom -->
+          <ScrollViewer>
+            <Grid x:Name="TimelinePanel" RowDefinitions="240,240,160,110">
+              <scottplot:AvaPlot x:Name="ErrorPlot" />
+              <scottplot:AvaPlot Grid.Row="1" x:Name="DisplayAnimationPlot" />
+              <scottplot:AvaPlot Grid.Row="2" x:Name="LateSharePlot" />
+              <scottplot:AvaPlot Grid.Row="3" x:Name="RefreshStripPlot" />
+            </Grid>
+          </ScrollViewer>
         </TabItem>
         <TabItem Header="Error histogram">
           <scottplot:AvaPlot x:Name="ErrorHistogramPlot" />
         </TabItem>
         <TabItem Header="Error percentiles">
           <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
-        </TabItem>
-        <TabItem Header="Display vs animation">
-          <scottplot:AvaPlot x:Name="DisplayAnimationPlot" />
         </TabItem>
         <TabItem Header="Display time histogram">
           <scottplot:AvaPlot x:Name="DisplayTimeHistogramPlot" />

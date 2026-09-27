@@ -25,6 +25,7 @@ using MB.FramePacing.Gui;
 using MB.FramePacing.Gui.ViewModels;
 using MB.FramePacing.Gui.Views;
 using ScottPlot.Avalonia;
+using SkiaSharp;
 
 namespace MB.FramePacing.DocImages
 {
@@ -105,6 +106,14 @@ namespace MB.FramePacing.DocImages
         analysisView.FindControl<AvaPlot>(name)!.Plot.SavePng(Path.Combine(output, file), 900, 400);
         Console.WriteLine($"  {file} (900x400)");
       }
+      SaveStacked(
+        Path.Combine(output, "chart-timeline.png"),
+        900,
+        (analysisView.FindControl<AvaPlot>("ErrorPlot")!, 300),
+        (analysisView.FindControl<AvaPlot>("DisplayAnimationPlot")!, 300),
+        (analysisView.FindControl<AvaPlot>("LateSharePlot")!, 200),
+        (analysisView.FindControl<AvaPlot>("RefreshStripPlot")!, 150)
+      );
 
       // The setup dialog as a user without ffmpeg sees it after pressing 'Find automatically'
       var setupViewModel = new SetupViewModel(
@@ -198,6 +207,23 @@ namespace MB.FramePacing.DocImages
       Save(window, Path.Combine(output, "gui-camera.png"));
       capture.StopCommand.Execute(null);
       await WaitUntil(() => !capture.IsCapturing, TimeSpan.FromSeconds(60));
+    }
+
+    /// <summary>The Timeline tab's plots, one below the other, as one image.</summary>
+    private static void SaveStacked(string path, int width, params (AvaPlot Plot, int Height)[] parts)
+    {
+      int height = parts.Sum(p => p.Height);
+      using var surface = SKSurface.Create(new SKImageInfo(width, height));
+      int y = 0;
+      foreach (var (plot, partHeight) in parts)
+      {
+        using var image = SKImage.FromEncodedData(plot.Plot.GetImage(width, partHeight).GetImageBytes());
+        surface.Canvas.DrawImage(image, 0, y);
+        y += partHeight;
+      }
+      using var png = surface.Snapshot().Encode(SKEncodedImageFormat.Png, 100);
+      File.WriteAllBytes(path, png.ToArray());
+      Console.WriteLine($"  {Path.GetFileName(path)} ({width}x{height})");
     }
 
     private static void Save(TopLevel topLevel, string path)

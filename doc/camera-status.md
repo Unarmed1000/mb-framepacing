@@ -26,6 +26,7 @@ labelled "very experimental" until the validation below has been done.
 | Rectification in C# (`CameraRectifier`, sources without ffmpeg)    | Implemented                              | `selftest --camera`, benchmarks (no allocations)                   |
 | Camera decoding (module grid sampler, camera captures only)        | Implemented                              | Unit tests; capture cards keep the pure barcode path               |
 | Camera analysis (scanout delay, camera tears, second zone only)    | Implemented                              | Unit tests against the synthetic ground truth                      |
+| Refresh rate calculated per run (`RefreshEstimator`), late frames  | Implemented                              | Unit tests, `selftest --camera` (60 Hz found as 16.67 ms)          |
 | GUI camera wizard (shows the camera frames), camera card           | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
 | Live UVC cameras (`capture -d <camera> --camera`)                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                |
 | Real cameras and displays                                          | **Not validated**                        | Nothing yet                                                        |
@@ -56,6 +57,19 @@ of C# rectification, well above 1000 fps on one core.
   crossing the marker plus the panel response). Frame-to-frame times are unaffected, but absolute times are late.
 - The GUI's Analyze page does not show the camera statistics yet. They are only in `summary.json` (`runs[].camera`) and the CSV
   files.
+- **The refresh rate is calculated from each run** (a capture card captures at the refresh rate and needs none). The first-seen
+  intervals form clusters at whole refreshes; the refresh is the largest period that makes every well-populated cluster a whole
+  multiple, so a game alternating 2 and 3 refreshes still gives the refresh. A steady game below the refresh rate (only
+  2-refresh intervals) can not be told from a slower display; the rig's calibrated refresh settles that, and the analysis warns
+  when the two disagree by more than 1 %. The user can give the **expected display rate** (`--display-hz`, GUI "Display refresh
+  rate"): it settles the ambiguity first, and the analysis compares it with the calculated rate (`runs[].pacing.refreshDeviation`,
+  a warning above 1 %). The calibration uses the same estimator, so a calibration clip must show one frame per
+  refresh for most of it (vsync on, full rate).
+- **Animation error noise:** a camera's animation error is the difference of two first-seen times, each good to about one camera
+  period. The error count uses ±1 camera period, so a clean synthetic run at 1000 fps still counts a few dozen frames above it; the
+  pacing verdict ignores errors below 2 camera periods.
+- **Vsync off:** a frame that only the lower zone saw (replaced before the next scanout reached the timing zone) makes the next
+  frame reach the timing zone 2 refreshes after the previous one, so it is marked late although its animation error is about 0.
 - The synthetic camera models a simple exponential panel response and a global shutter. Rolling shutter cameras (most phones)
   and overdrive are not modelled.
 

@@ -15,7 +15,7 @@ namespace MB.FramePacing.Analysis
     Statistics AbsoluteAnimationErrorMs,
     Statistics DriftMs,
     Statistics OnScreenMs,
-    // Presented frames whose |animation error| exceeds one capture period (larger than the measurement uncertainty)
+    // Presented frames whose |animation error| exceeds the error threshold (TimelineResult.ErrorThresholdTicks)
     long FramesWithAnimationError
   );
 }

@@ -25,7 +25,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var scenario = new SyntheticScenario(
         new SyntheticScenarioOptions
         {
-          RefreshHz = 60,
+          RefreshHz = 240,
           CaptureFps = 240,
           StartMarkerSeconds = 0.25,
           RunSeconds = 1,
@@ -55,7 +55,7 @@ namespace MB.FramePacing.Capture.UnitTest
         new SyntheticScenarioOptions
         {
           CaptureFps = 500,
-          RefreshHz = 144,
+          RefreshHz = 500,
           RunSeconds = 1,
           StallEvery = 13,
           SkipEvery = 29,
@@ -96,7 +96,7 @@ namespace MB.FramePacing.Capture.UnitTest
         new SyntheticScenarioOptions
         {
           CaptureFps = 240,
-          RefreshHz = 60,
+          RefreshHz = 240,
           StartMarkerSeconds = 0.4,
           RunSeconds = 0.6,
           EndMarkerSeconds = 0.4,

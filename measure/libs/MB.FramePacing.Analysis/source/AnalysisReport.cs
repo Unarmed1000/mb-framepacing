@@ -22,5 +22,8 @@ namespace MB.FramePacing.Analysis
   )
   {
     public double CapturePeriodMs => Timeline.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond;
+
+    /// <summary>The |animation error| above which a frame counts as off: half a capture period for a capture card, one camera period for a camera.</summary>
+    public double ErrorThresholdMs => Timeline.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
   }
 }

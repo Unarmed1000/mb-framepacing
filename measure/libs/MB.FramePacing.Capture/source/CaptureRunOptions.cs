@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Options for CaptureRunner: output directory, duration, start and end marker triggering, ring size, live preview and the version information
-//* stored in capture.json.
+//* Options for CaptureRunner: output directory, duration, start and end marker triggering, ring size, live preview, the target frame
+//* rate, the expected display refresh rate and the version information stored in capture.json.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -42,6 +42,12 @@ namespace MB.FramePacing.Capture
 
     /// <summary>The real recording rate of a slow motion clip, if the timestamps were generated from it.</summary>
     public double? RecordedFps { get; init; }
+
+    /// <summary>The frame rate the application aims for, stored in capture.json for the analysis (null = judged from the frames).</summary>
+    public double? TargetFps { get; init; }
+
+    /// <summary>The display refresh rate the user expects, stored in capture.json for the analysis to compare with (null = none).</summary>
+    public double? ExpectedRefreshHz { get; init; }
 
     public string ToolVersion { get; init; } = string.Empty;
     public string? FfmpegVersion { get; init; }

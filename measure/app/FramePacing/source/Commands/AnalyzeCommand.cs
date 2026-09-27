@@ -8,6 +8,7 @@
 
 using System;
 using System.CommandLine;
+using System.Globalization;
 using System.IO;
 using MB.FramePacing.Analysis;
 using Spectre.Console;
@@ -26,6 +27,8 @@ namespace MB.FramePacing.App.Commands
         DefaultValueFactory = _ => TimeSource.Auto,
       };
       var outputOption = new Option<string?>("--output", "-o") { Description = "Report directory (default: <capture>/analysis)." };
+      var targetOption = CommonOptions.TargetFps("overrides the one stored in capture.json");
+      var displayOption = CommonOptions.DisplayHz("overrides the one stored in capture.json");
 
       var command = new Command("analyze", "Decode the markers of a capture and report animation error.")
       {
@@ -33,13 +36,20 @@ namespace MB.FramePacing.App.Commands
         runOption,
         timeOption,
         outputOption,
+        targetOption,
+        displayOption,
       };
       command.SetAction(parseResult =>
       {
         var options = new AnalysisOptions
         {
           TimeSource = parseResult.GetValue(timeOption),
-          Timeline = new TimelineOptions { RunId = parseResult.GetValue(runOption) },
+          Timeline = new TimelineOptions
+          {
+            RunId = parseResult.GetValue(runOption),
+            TargetFps = parseResult.GetValue(targetOption),
+            ExpectedRefreshHz = parseResult.GetValue(displayOption),
+          },
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,
         };
@@ -115,10 +125,54 @@ namespace MB.FramePacing.App.Commands
         AddRow(table, "On screen", s.OnScreenMs);
         AnsiConsole.Write(table);
         AnsiConsole.MarkupLineInterpolated(
-          $"{s.FramesWithAnimationError} frame(s) with |animation error| above the {report.CapturePeriodMs:0.###} ms measurement resolution."
+          $"{s.FramesWithAnimationError} frame(s) with |animation error| above {report.ErrorThresholdMs:0.###} ms ({ThresholdReason(report)})."
         );
+        if (run.Pacing is { } pacing)
+        {
+          AnsiConsole.MarkupLineInterpolated(
+            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), shown a refresh or more after the {pacing.TargetFrameMs:0.##} ms target ({TargetReason(pacing)})."
+          );
+          AnsiConsole.MarkupLineInterpolated($"{RefreshText(pacing)}");
+          AnsiConsole.MarkupLineInterpolated($"Cause: {VerdictText(pacing)}");
+        }
       }
       AnsiConsole.MarkupLineInterpolated($"[grey]Reports written to {report.OutputDirectory}[/]");
+    }
+
+    private static string ThresholdReason(AnalysisReport report) =>
+      report.Session?.Camera != null
+        ? "one camera period: a camera films asynchronously"
+        : "half a capture period: a capture card sees whole refreshes";
+
+    /// <summary>The refresh rate the run was measured with, where it comes from, and how it compares with the expected rate.</summary>
+    public static string RefreshText(RunPacing pacing)
+    {
+      string text = string.Create(
+        CultureInfo.InvariantCulture,
+        $"Display refresh {pacing.RefreshHz:0.##} Hz ({(pacing.RefreshCalculated ? "calculated from the camera frames" : "the capture rate")})"
+      );
+      if (pacing.ExpectedRefreshHz is { } expected && pacing.RefreshDeviation is { } deviation)
+        text += string.Create(
+          CultureInfo.InvariantCulture,
+          $", expected {expected:0.##} Hz: {(pacing.MatchesExpectedRefresh == true ? "matches" : $"differs by {deviation:+0.0%;-0.0%}")}"
+        );
+      return text + ".";
+    }
+
+    private static string TargetReason(RunPacing pacing) => pacing.TargetGiven ? "the given target frame rate" : "the run's median display time";
+
+    /// <summary>One line on which cause dominates the animation error, with the counts behind it.</summary>
+    public static string VerdictText(RunPacing pacing)
+    {
+      string counts =
+        $"{pacing.ErrorFramesWithUnevenDisplay} error frame(s) at uneven display, {pacing.ErrorFramesWithEvenDisplay} on an even display";
+      return pacing.Verdict switch
+      {
+        PacingVerdict.BadPacing => $"mostly bad pacing: frames shown late or early, or dropped ({counts}).",
+        PacingVerdict.DeltaTimeJitter => $"mostly delta time jitter: an even display with uneven animation steps ({counts}).",
+        PacingVerdict.Both => $"both bad pacing and delta time jitter ({counts}).",
+        _ => "no animation error above the threshold.",
+      };
     }
 
     private static void AddRow(Table table, string name, Statistics stats)

@@ -58,15 +58,17 @@ namespace MB.FramePacing.Analysis.UnitTest
       return expected;
     }
 
-    [TestCase(240.0, 60.0, 10, 0)]
-    [TestCase(500.0, 144.0, 13, 29)]
-    [TestCase(240.0, 144.0, 0, 11)]
-    public void Analyzer_RecoversTheGroundTruth(double captureFps, double refreshHz, int stallEvery, int skipEvery)
+    // A capture card captures at the display's refresh rate
+    [TestCase(60.0, 10, 0)]
+    [TestCase(144.0, 13, 29)]
+    [TestCase(240.0, 0, 11)]
+    [TestCase(500.0, 37, 53)]
+    public void Analyzer_RecoversTheGroundTruth(double refreshHz, int stallEvery, int skipEvery)
     {
       var scenario = new SyntheticScenario(
         new SyntheticScenarioOptions
         {
-          CaptureFps = captureFps,
+          CaptureFps = refreshHz,
           RefreshHz = refreshHz,
           RunSeconds = 2,
           StallEvery = stallEvery,
@@ -103,12 +105,23 @@ namespace MB.FramePacing.Analysis.UnitTest
         }
       }
 
+      // Every stall holds the previous frame for an extra refresh, so the frame after it is late
+      int stalls = Enumerable
+        .Range(1, expected.Count - 1)
+        .Count(i => expected[i].FirstSeenTicks - expected[i - 1].FirstSeenTicks > scenario.RefreshIntervalTicks * 3 / 2);
+      Assert.That(run.Pacing, Is.Not.Null);
+      Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(report.CapturePeriodMs), "a capture card captures at the display's refresh rate");
+      Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
       if (stallEvery > 0)
-        Assert.That(run.Statistics.FramesWithAnimationError, Is.GreaterThan(0), "stalls must show up as animation error");
+      {
+        Assert.That(stalls, Is.GreaterThan(0));
+        Assert.That(run.Statistics.FramesWithAnimationError, Is.GreaterThanOrEqualTo(stalls), "a stall of one refresh is a real animation error");
+        Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.BadPacing));
+      }
       else
         Assert.That(
           run.Statistics.AnimationErrorMs.Min,
-          Is.GreaterThanOrEqualTo(-1000.0 / captureFps - 1e-6),
+          Is.GreaterThanOrEqualTo(-1000.0 / refreshHz - 1e-6),
           "no stalls: only skips (positive) and quantisation"
         );
 

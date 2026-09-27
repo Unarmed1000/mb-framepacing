@@ -1,13 +1,16 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Analysis page view. The charts are ScottPlot controls, redrawn whenever the selected run changes (ScottPlot is not bindable).
+//* Analysis page view. The charts are ScottPlot controls, redrawn whenever the selected run changes (ScottPlot is not bindable). The Timeline
+//* tab stacks the animation error, its causes (display time and animation time step), the late share and the refresh strip on one linked
+//* time axis.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
 
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Styling;
@@ -19,13 +22,32 @@ namespace MB.FramePacing.Gui.Views
 {
   public partial class AnalysisView : UserControl
   {
+    // The Timeline plots share this left axis width, so their data areas line up
+    private const float TimelineLeftAxisPixels = 70;
+
+    private static readonly ScottPlot.Color g_lateColor = ScottPlot.Color.FromHex("#E4572E");
+
     private AnalysisViewModel? m_viewModel;
 
     public AnalysisView()
     {
       InitializeComponent();
+      LinkTimeline();
       DataContextChanged += (_, _) => Attach(DataContext as AnalysisViewModel);
       ActualThemeVariantChanged += (_, _) => Redraw();
+    }
+
+    private AvaPlot[] TimelinePlots => new[] { ErrorPlot, DisplayAnimationPlot, LateSharePlot, RefreshStripPlot };
+
+    /// <summary>Panning or zooming one Timeline plot moves the others along the time axis.</summary>
+    private void LinkTimeline()
+    {
+      var plots = TimelinePlots;
+      foreach (var plot in plots)
+      {
+        foreach (var other in plots.Where(other => other != plot))
+          plot.Plot.Axes.Link(other, x: true, y: false);
+      }
     }
 
     private void Attach(AnalysisViewModel? viewModel)
@@ -50,27 +72,10 @@ namespace MB.FramePacing.Gui.Views
       var frames = run?.Run.Frames.ToArray() ?? Array.Empty<PresentedFrame>();
       long origin = frames.Length > 0 ? frames[0].FirstSeenTicks : 0;
       double Seconds(PresentedFrame f) => (f.FirstSeenTicks - origin) / (double)TimeSpan.TicksPerSecond;
-      static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
 
       var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToArray();
-      double[] times = withMetrics.Select(Seconds).ToArray();
 
-      // Animation error with the measurement resolution band (+- one capture period)
-      Reset(ErrorPlot, "Animation error per presented frame", "animation error (ms)");
-      if (withMetrics.Length > 0)
-      {
-        var errors = ErrorPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationErrorTicks!.Value)).ToArray());
-        errors.LineWidth = 0;
-        errors.MarkerSize = 4;
-        errors.LegendText = "animation time step - display time";
-        double resolution = run!.CapturePeriodMs;
-        var bandColor = ScottPlot.Colors.Orange;
-        var upper = ErrorPlot.Plot.Add.HorizontalLine(resolution, color: bandColor, pattern: ScottPlot.LinePattern.Dashed);
-        upper.LegendText = "+- capture period (measurement resolution)";
-        ErrorPlot.Plot.Add.HorizontalLine(-resolution, color: bandColor, pattern: ScottPlot.LinePattern.Dashed);
-        ErrorPlot.Plot.ShowLegend();
-      }
-      Finish(ErrorPlot);
+      DrawTimeline(run, frames, withMetrics, Seconds);
 
       long periodTicks = run != null ? (long)Math.Round(run.CapturePeriodMs * TimeSpan.TicksPerMillisecond) : 0;
       var histograms = run != null ? RunHistograms.Create(run.Run, periodTicks) : null;
@@ -80,7 +85,7 @@ namespace MB.FramePacing.Gui.Views
       if (histograms != null && histograms.AnimationErrorMs.Total > 0)
       {
         AddLogBars(ErrorHistogramPlot, histograms.AnimationErrorMs);
-        AddResolutionLines(ErrorHistogramPlot, run!.CapturePeriodMs, vertical: true);
+        AddThresholdLines(ErrorHistogramPlot, run!, vertical: true);
       }
       Finish(
         ErrorHistogramPlot,
@@ -103,26 +108,12 @@ namespace MB.FramePacing.Gui.Views
         curve.MarkerSize = 0;
         curve.LineWidth = 2;
         curve.LegendText = "|animation error|";
-        AddResolutionLines(ErrorPercentilePlot, run!.CapturePeriodMs, vertical: false);
+        AddThresholdLines(ErrorPercentilePlot, run!, vertical: false, symmetric: false);
         foreach (double p in new[] { 95.0, 99.0 })
           ErrorPercentilePlot.Plot.Add.VerticalLine(p, color: ScottPlot.Colors.Gray, pattern: ScottPlot.LinePattern.Dotted).Text = $"p{p:0}";
         ErrorPercentilePlot.Plot.ShowLegend();
       }
       Finish(ErrorPercentilePlot, plot => plot.Axes.SetLimitsX(0, 100));
-
-      // Display time vs animation time step: their difference is the animation error
-      Reset(DisplayAnimationPlot, "Display time vs animation time step", "ms");
-      if (withMetrics.Length > 0)
-      {
-        var display = DisplayAnimationPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
-        display.LegendText = "display time (captured)";
-        display.MarkerSize = 3;
-        var animation = DisplayAnimationPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationDeltaTicks!.Value)).ToArray());
-        animation.LegendText = "animation time step (marker)";
-        animation.MarkerSize = 3;
-        DisplayAnimationPlot.Plot.ShowLegend();
-      }
-      Finish(DisplayAnimationPlot);
 
       // How long frames stayed on screen: steady pacing is one tall bar, stutter shows up as bars at multiples of it
       Reset(
@@ -150,6 +141,124 @@ namespace MB.FramePacing.Gui.Views
       }
       Finish(DriftPlot);
     }
+
+    /// <summary>
+    /// The Timeline tab: the animation error on top, the display time and animation time step that cause it below (error while the display
+    /// time stays flat is delta time jitter, error where it jumps is bad pacing), the share of late frames over the last seconds, and the
+    /// refresh strip. Late frames are red throughout.
+    /// </summary>
+    private void DrawTimeline(RunViewModel? run, PresentedFrame[] frames, PresentedFrame[] withMetrics, Func<PresentedFrame, double> seconds)
+    {
+      static bool IsLate(PresentedFrame f) => f.Flags.HasFlag(PresentedFrameFlags.Late);
+      double[] times = withMetrics.Select(seconds).ToArray();
+      var late = withMetrics.Where(IsLate).ToArray();
+      double[] lateTimes = late.Select(seconds).ToArray();
+      var pacing = run?.Run.Pacing;
+
+      Reset(ErrorPlot, "Animation error per presented frame", "error (ms)", string.Empty);
+      if (withMetrics.Length > 0)
+      {
+        var errors = ErrorPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationErrorTicks!.Value)).ToArray());
+        errors.LineWidth = 0;
+        errors.MarkerSize = 4;
+        errors.LegendText = "animation error";
+        AddLateMarkers(ErrorPlot, lateTimes, late.Select(f => Ms(f.AnimationErrorTicks!.Value)).ToArray());
+        AddThresholdLines(ErrorPlot, run!, vertical: false, symmetric: true);
+        TimelineLegend(ErrorPlot);
+      }
+
+      Reset(DisplayAnimationPlot, "Display time and animation time step (their difference is the error)", "ms", string.Empty);
+      if (withMetrics.Length > 0)
+      {
+        var display = DisplayAnimationPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
+        display.LegendText = "display time";
+        display.MarkerSize = 3;
+        var animation = DisplayAnimationPlot.Plot.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationDeltaTicks!.Value)).ToArray());
+        animation.LegendText = "animation time step";
+        animation.MarkerSize = 3;
+        AddLateMarkers(DisplayAnimationPlot, lateTimes, late.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
+        if (pacing != null)
+          DisplayAnimationPlot
+            .Plot.Add.HorizontalLine(pacing.TargetFrameMs, color: ScottPlot.Colors.Gray, pattern: ScottPlot.LinePattern.Dotted)
+            .LegendText = $"target {pacing.TargetFrameMs.ToString("0.##", CultureInfo.InvariantCulture)} ms";
+        TimelineLegend(DisplayAnimationPlot);
+      }
+
+      Reset(
+        LateSharePlot,
+        $"Share of late frames in the last {LateShare.WindowSeconds:0} s: rare spikes or busy stretches?",
+        "late (%)",
+        string.Empty
+      );
+      double maxShare = 0;
+      if (frames.Length > 0 && pacing != null)
+      {
+        var shares = LateShare.Rolling(frames, LateShare.WindowTicks).Select(s => s * 100).ToArray();
+        maxShare = shares.Max();
+        var line = LateSharePlot.Plot.Add.Scatter(frames.Select(seconds).ToArray(), shares);
+        line.MarkerSize = 0;
+        line.LineWidth = 2;
+        line.Color = g_lateColor;
+        line.LegendText = $"late frames (whole run {pacing.LateShare.ToString("P1", CultureInfo.InvariantCulture)})";
+        TimelineLegend(LateSharePlot);
+      }
+
+      Reset(RefreshStripPlot, "Refresh strip: one cell per refresh, shaded by frame; zoom in to see the holds", string.Empty);
+      RefreshStripPlot.Plot.Axes.Left.TickGenerator = new ScottPlot.TickGenerators.NumericManual();
+      if (frames.Length > 0 && pacing != null)
+        RefreshStripPlot.Plot.Add.Plottable(CreateRefreshStrip(run!, frames, seconds, pacing));
+
+      double start = frames.Length > 0 ? seconds(frames[0]) : 0;
+      double end = frames.Length > 0 ? Math.Max(start + 0.001, seconds(frames[^1]) + (run!.CapturePeriodMs / 1000)) : 1;
+      foreach (var plot in TimelinePlots)
+      {
+        plot.Plot.Axes.Left.MinimumSize = TimelineLeftAxisPixels;
+        Finish(plot, p => p.Axes.SetLimitsX(start, end));
+      }
+      LateSharePlot.Plot.Axes.SetLimitsY(0, Math.Max(5, maxShare * 1.5));
+      RefreshStripPlot.Plot.Axes.SetLimitsY(0, 1);
+      LateSharePlot.Refresh();
+      RefreshStripPlot.Refresh();
+    }
+
+    private RefreshStripPlottable CreateRefreshStrip(
+      RunViewModel run,
+      PresentedFrame[] frames,
+      Func<PresentedFrame, double> seconds,
+      RunPacing pacing
+    )
+    {
+      bool dark = ActualThemeVariant == ThemeVariant.Dark;
+      return new RefreshStripPlottable(frames, seconds, pacing.RefreshPeriodMs / 1000, run.CapturePeriodMs / 1000, run.IsCamera)
+      {
+        EvenColor = ScottPlot.Color.FromHex(dark ? "#4C8DD6" : "#2F6DB5"),
+        OddColor = ScottPlot.Color.FromHex(dark ? "#8DB8E8" : "#9CC2EC"),
+        LateColor = g_lateColor,
+        UnknownColor = ScottPlot.Color.FromHex(dark ? "#3A3E45" : "#D5D8DD"),
+        EdgeColor = ScottPlot.Color.FromHex(dark ? "#202328" : "#FFFFFF"),
+        MarkColor = ScottPlot.Color.FromHex(dark ? "#D6DAE0" : "#2B2F36"),
+      };
+    }
+
+    /// <summary>The Timeline's legends: one line at the top left, with room above the data so they do not hide it.</summary>
+    private static void TimelineLegend(AvaPlot plot)
+    {
+      plot.Plot.ShowLegend(ScottPlot.Alignment.UpperLeft, ScottPlot.Orientation.Horizontal);
+      plot.Plot.Axes.Margins(bottom: 0.08, top: 0.3);
+    }
+
+    private static void AddLateMarkers(AvaPlot plot, double[] times, double[] values)
+    {
+      if (times.Length == 0)
+        return;
+      var markers = plot.Plot.Add.Scatter(times, values);
+      markers.LineWidth = 0;
+      markers.MarkerSize = 6;
+      markers.Color = g_lateColor;
+      markers.LegendText = "late frame";
+    }
+
+    private static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
 
     private void Reset(AvaPlot plot, string title, string yLabel, string xLabel = "time since the first frame (s)")
     {
@@ -185,25 +294,30 @@ namespace MB.FramePacing.Gui.Views
       {
         IntegerTicksOnly = true,
         MinorTickGenerator = new ScottPlot.TickGenerators.LogMinorTickGenerator(),
-        LabelFormatter = y => Math.Pow(10, y).ToString("N0", System.Globalization.CultureInfo.CurrentCulture),
+        LabelFormatter = y => Math.Pow(10, y).ToString("N0", CultureInfo.CurrentCulture),
       };
       plot.Plot.Axes.Margins(bottom: 0);
     }
 
-    /// <summary>The +- one capture period band: differences smaller than this are below the measurement resolution.</summary>
-    private static void AddResolutionLines(AvaPlot plot, double capturePeriodMs, bool vertical)
+    /// <summary>
+    /// The error threshold: errors inside it are not counted. A capture card sees whole refreshes, so it is half a refresh (one missed refresh
+    /// is outside); an EXPERIMENTAL camera films asynchronously, so it is one camera period (its measurement resolution).
+    /// </summary>
+    private static void AddThresholdLines(AvaPlot plot, RunViewModel run, bool vertical, bool symmetric = true)
     {
       var color = ScottPlot.Colors.Orange;
+      double threshold = run.ErrorThresholdMs;
+      string legend = run.IsCamera ? "1 camera period (the measurement resolution)" : "½ refresh (errors are whole refreshes)";
       if (vertical)
       {
-        plot.Plot.Add.VerticalLine(capturePeriodMs, color: color, pattern: ScottPlot.LinePattern.Dashed).LegendText =
-          "+- capture period (measurement resolution)";
-        plot.Plot.Add.VerticalLine(-capturePeriodMs, color: color, pattern: ScottPlot.LinePattern.Dashed);
+        plot.Plot.Add.VerticalLine(threshold, color: color, pattern: ScottPlot.LinePattern.Dashed).LegendText = "±" + legend;
+        plot.Plot.Add.VerticalLine(-threshold, color: color, pattern: ScottPlot.LinePattern.Dashed);
       }
       else
       {
-        plot.Plot.Add.HorizontalLine(capturePeriodMs, color: color, pattern: ScottPlot.LinePattern.Dashed).LegendText =
-          "capture period (measurement resolution)";
+        plot.Plot.Add.HorizontalLine(threshold, color: color, pattern: ScottPlot.LinePattern.Dashed).LegendText = (symmetric ? "±" : "") + legend;
+        if (symmetric)
+          plot.Plot.Add.HorizontalLine(-threshold, color: color, pattern: ScottPlot.LinePattern.Dashed);
       }
       plot.Plot.ShowLegend();
     }

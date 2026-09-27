@@ -180,6 +180,8 @@ namespace MB.FramePacing.Capture
         SequenceRunId = monitor?.Start?.Payload.RunId,
         SequenceName = monitor?.Start?.Start?.Name,
         RecordedFps = options.RecordedFps,
+        TargetFps = options.TargetFps,
+        ExpectedRefreshHz = options.ExpectedRefreshHz,
         Camera = options.Camera,
       };
       session.Save(options.OutputDirectory);

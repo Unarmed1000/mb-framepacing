@@ -77,6 +77,54 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
+    public void Refresh_IsCalculatedFromTheFrames()
+    {
+      var rows = Rows(30, longGapFrame: -1, tornFrame: -1, secondZoneOnly: -1);
+      var run = Analyze(rows);
+
+      Assert.That(run.Pacing, Is.Not.Null);
+      Assert.That(run.Pacing!.RefreshCalculated);
+      Assert.That(run.Pacing.RefreshPeriodMs, Is.EqualTo(CapturesPerFrame).Within(0.01), "one frame per refresh, 17 camera periods apart");
+      Assert.That(run.Pacing.LateFrames, Is.Zero);
+
+      var mismatch = TimelineAnalyzer.Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera, CalibratedRefreshHz = 60 }).Runs.Single();
+      Assert.That(mismatch.Warnings, Has.Some.Contains("the camera rig measured 60 Hz"));
+    }
+
+    [Test]
+    public void ExpectedDisplayRate_IsComparedWithTheCalculatedOne()
+    {
+      var rows = Rows(30, longGapFrame: -1, tornFrame: -1, secondZoneOnly: -1);
+      RunAnalysis Expecting(double hz) =>
+        TimelineAnalyzer.Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera, ExpectedRefreshHz = hz }).Runs.Single();
+
+      // One frame every 17 ms: a 58.8 Hz display
+      var matching = Expecting(1000.0 / CapturesPerFrame);
+      Assert.That(matching.Pacing!.MatchesExpectedRefresh, Is.True);
+      Assert.That(matching.Pacing.RefreshDeviation, Is.EqualTo(0).Within(0.001));
+      Assert.That(matching.Warnings, Has.None.Contains("was expected"));
+
+      var wrong = Expecting(60);
+      Assert.That(wrong.Pacing!.MatchesExpectedRefresh, Is.False);
+      Assert.That(wrong.Pacing.ExpectedRefreshHz, Is.EqualTo(60));
+      Assert.That(wrong.Warnings, Has.Some.Contains("58.82 Hz display, but 60 Hz was expected"));
+    }
+
+    [Test]
+    public void ExpectedDisplayRate_SettlesASteadyGameBelowTheRefreshRate()
+    {
+      // Every frame is 17 camera periods apart; told the display runs twice as fast, the game is at half rate
+      var rows = Rows(30, longGapFrame: -1, tornFrame: -1, secondZoneOnly: -1);
+      var run = TimelineAnalyzer
+        .Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera, ExpectedRefreshHz = 2000.0 / CapturesPerFrame })
+        .Runs.Single();
+
+      Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
+      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(CapturesPerFrame).Within(0.01), "two refreshes per frame");
+      Assert.That(run.Pacing.MatchesExpectedRefresh, Is.True);
+    }
+
+    [Test]
     public void LongGap_IsUncertain()
     {
       var run = Analyze(Rows(30, longGapFrame: 12, tornFrame: -1, secondZoneOnly: -1));

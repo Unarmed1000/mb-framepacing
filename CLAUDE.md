@@ -90,6 +90,18 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - The crop starts a whole number of downscale steps before the marker origin; otherwise module edges fall between stored pixels
     and dense start markers stop decoding.
   - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures.
+- **Refresh rate and pacing:**
+  - A capture card captures at the display's native refresh rate: that is a fundamental assumption, not a setting. The analysis
+    takes the capture period as the refresh period, errors are whole refreshes, and one missed refresh counts (the error threshold
+    is half a capture period; `TimelineAnalyzer.ErrorThreshold`). `SyntheticCaptureSource` refuses a capture rate that differs
+    from the refresh; `selftest --fps N` simulates an N Hz display.
+  - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`, also used
+    by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
+    estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
+    (`TimelineAnalyzer.RefreshTolerance`) is a warning.
+  - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
+    summary.json). The target frame rate (`--target-fps`, GUI "Target frame rate") is stored in capture.json and can be overridden
+    at analysis time.
 - **Camera capture (VERY EXPERIMENTAL, `doc/camera.md`):**
   - Every place users meet it says "very experimental": CLI help, the GUI card, `CameraRig.ExperimentalNotice` in rig files and
     analysis warnings, docs. Keep it that way until it is validated with real hardware, and keep `doc/camera-status.md`

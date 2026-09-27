@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Result of TimelineAnalyzer: the capture period, every analysed run and the warnings.
+//* Result of TimelineAnalyzer: the capture period, the animation error threshold, every analysed run and the warnings.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -10,5 +10,11 @@ using System.Collections.Generic;
 
 namespace MB.FramePacing.Analysis
 {
-  public sealed record TimelineResult(long CapturePeriodTicks, IReadOnlyList<RunAnalysis> Runs, IReadOnlyList<string> Warnings);
+  /// <param name="ErrorThresholdTicks">The |animation error| above which a frame counts as off (<see cref="TimelineAnalyzer.ErrorThreshold"/>).</param>
+  public sealed record TimelineResult(
+    long CapturePeriodTicks,
+    long ErrorThresholdTicks,
+    IReadOnlyList<RunAnalysis> Runs,
+    IReadOnlyList<string> Warnings
+  );
 }

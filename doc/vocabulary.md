@@ -21,14 +21,16 @@ This page only lists where each term appears in mb-framepacing.
 | **Display time**        | `displayDeltaMs` (CSV), the display time histogram                                             |
 | **On-screen time**      | `onScreenMs` (CSV)                                                                             |
 | **Frametime**           | Not measured: the capture sees the display side; the animation time step stands in             |
-| **Frame pacing**        | The display time histogram                                                                     |
+| **Frame pacing**        | The display time histogram, late frames and the refresh strip (Timeline tab)                   |
+| **Late frame**          | Shown at least one refresh after the target frame time: `Late` in the frames CSV `flags`, red  |
+| **Target frame time**   | The target frame rate (`--target-fps`) in whole refreshes, else the median display time        |
 | **Stutter**             | Large animation errors                                                                         |
 | **Hitch**               | A frame with a long display time and a large negative animation error                          |
 | **Short / long frame**  | Positive / negative animation error                                                            |
-| **Delta time jitter**   | Animation errors while the display time is even                                                |
+| **Delta time jitter**   | Animation errors while the display time is even: the **Cause** line                            |
 | **Microstutter**        | Display time spread plus alternating animation errors                                          |
 | **Runt frame**          | Torn frames (the tearing check)                                                                |
-| **Judder**              | Shows as a display time spread                                                                 |
+| **Judder**              | Shows as a display time spread and in the refresh strip                                        |
 | **Dropped frame**       | `skippedBefore` (CSV), counted in the report                                                   |
 | **Drift**               | `driftMs` (CSV), the Drift chart                                                               |
 | **Tearing**             | Torn frames (the tearing check)                                                                |

@@ -27,10 +27,19 @@ namespace MB.FramePacing.App.Commands
 {
   internal static class SelfTestCommand
   {
+    private const double CameraRefreshHz = 60;
+
     public static Command Create()
     {
-      var fpsOption = new Option<double>("--fps") { Description = "Capture rate.", DefaultValueFactory = _ => 500 };
-      var refreshOption = new Option<double>("--refresh") { Description = "Simulated display refresh rate (Hz).", DefaultValueFactory = _ => 144 };
+      var fpsOption = new Option<double>("--fps")
+      {
+        Description = "Capture rate. A capture card captures at the display's refresh rate, so this is also the simulated display's rate.",
+        DefaultValueFactory = _ => 500,
+      };
+      var refreshOption = new Option<double?>("--refresh")
+      {
+        Description = $"--camera: the simulated display's refresh rate (Hz, default {CameraRefreshHz:0}); the camera films faster than it.",
+      };
       var secondsOption = new Option<double>("--seconds") { Description = "Length of the measured run.", DefaultValueFactory = _ => 5 };
       var sizeOption = new Option<string>("--size") { Description = "Stored frame size.", DefaultValueFactory = _ => "960x540" };
       var stallOption = new Option<int>("--stall-every")
@@ -81,11 +90,16 @@ namespace MB.FramePacing.App.Commands
           try
           {
             var (width, height) = MB.FramePacing.Capture.Ffmpeg.RequestedMode.ParseSize(parseResult.GetValue(sizeOption)!, "--size");
+            bool camera = parseResult.GetValue(cameraOption);
+            double fps = parseResult.GetValue(fpsOption);
+            double? refresh = parseResult.GetValue(refreshOption);
+            if (!camera && refresh is { } requested && Math.Abs(requested - fps) > 1e-9 * fps)
+              throw new ArgumentException("--refresh is for --camera: a capture card captures at the display's refresh rate, which is --fps");
             var scenario = new SyntheticScenario(
               new SyntheticScenarioOptions
               {
-                CaptureFps = parseResult.GetValue(fpsOption),
-                RefreshHz = parseResult.GetValue(refreshOption),
+                CaptureFps = fps,
+                RefreshHz = camera ? refresh ?? CameraRefreshHz : fps,
                 RunSeconds = parseResult.GetValue(secondsOption),
                 Width = width,
                 Height = height,
@@ -99,7 +113,7 @@ namespace MB.FramePacing.App.Commands
                 RunId = 1,
               }
             );
-            if (parseResult.GetValue(cameraOption))
+            if (camera)
               return await RunCameraAsync(scenario, directory, cancellationToken);
             bool paced = !parseResult.GetValue(unpacedOption);
             AnsiConsole.MarkupLineInterpolated(
@@ -167,6 +181,7 @@ namespace MB.FramePacing.App.Commands
           OutputDirectory = directory,
           ToolVersion = Program.VersionString,
           Camera = rig,
+          ExpectedRefreshHz = scenario.Options.RefreshHz,
         };
         capture = await Task.Run(() => CaptureCommand.RunWithStatus(source, runOptions, cancellationToken), CancellationToken.None);
       }
@@ -217,6 +232,14 @@ namespace MB.FramePacing.App.Commands
               failures.Add($"frame {expected[i].Payload.FrameIndex}: display delta off by more than two camera periods");
           }
         }
+        // The analysis calculates the display's refresh rate from the camera frames; it must match the simulated display
+        if (run.Pacing?.MatchesExpectedRefresh != true)
+          failures.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"calculated display refresh {run.Pacing?.RefreshHz:0.##} Hz, expected {scenario.Options.RefreshHz:0.##} Hz"
+            )
+          );
         double scanout = camera.ToCameraTicks(camera.ZoneScanTicks(1) - camera.ZoneScanTicks(0)) / TimeSpan.TicksPerMillisecond;
         if (run.Camera == null || Math.Abs(run.Camera.ScanoutDelay.P50 - scanout) > Math.Max(1, period / TimeSpan.TicksPerMillisecond))
           failures.Add($"scanout delay {run.Camera?.ScanoutDelay.P50:0.00} ms, expected {scanout:0.00} ms");
@@ -248,7 +271,7 @@ namespace MB.FramePacing.App.Commands
       if (failures.Count == 0)
       {
         AnsiConsole.MarkupLineInterpolated(
-          $"[green]PASS[/] (camera, {CameraRigCommand.Experimental}): all presented frames found, {checkedFrames} display deltas within two camera periods, scanout delay as simulated, all {insideTears} tears inside the run found."
+          $"[green]PASS[/] (camera, {CameraRigCommand.Experimental}): all presented frames found, {checkedFrames} display deltas within two camera periods, display refresh calculated as simulated, scanout delay as simulated, all {insideTears} tears inside the run found."
         );
         return true;
       }

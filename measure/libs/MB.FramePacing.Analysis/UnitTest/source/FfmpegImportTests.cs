@@ -59,7 +59,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         new SyntheticScenarioOptions
         {
           CaptureFps = 240,
-          RefreshHz = 60,
+          RefreshHz = 240,
           RunSeconds = 1,
           StartMarkerSeconds = 0.25,
           EndMarkerSeconds = 0.25,

@@ -206,16 +206,41 @@ Run `mb-framepacing-gui`. The first time, a short setup dialog helps you get ffm
 
 ### Reading the results
 
-Besides the per-frame charts over time, the Analyze page shows how the values are distributed. The examples below are the
-synthetic test game (about 144 fps with injected stalls and skipped frames) captured at 500 fps. The count axes are
-logarithmic, so a handful of bad frames stays visible next to hundreds of good ones.
+The examples below are the synthetic test game (a 144 Hz game with injected stalls and skipped frames), captured at 144 fps
+like a capture card.
+
+A capture card captures at the display's refresh rate, so every capture is one refresh. The analysis relies on that: the refresh
+period is the capture period, and display times and animation errors are whole refreshes, so one missed refresh is measured
+exactly. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
+from the frames, and compared with the display rate you expect when you give one (`--display-hz`, **Display refresh rate**).
+
+**Late frames** are shown at least one refresh later than the target frame time after the previous frame. The target is the
+frame rate the application aims for (`--target-fps`, or **Target frame rate** in the GUI, for example 30 for a game locked to
+30 fps on a 60 Hz display); without one it is the run's median display time. Under the headline numbers, **Cause** tells which
+of the two causes of animation error dominates: frames with an error where the display time jumps are **bad pacing** (late,
+early or dropped frames); frames with an error while the display time stays even are **delta time jitter** (uneven animation
+steps).
+
+The **Timeline** tab puts everything on one time axis; zooming or panning one chart moves the others:
+
+![The Timeline tab: animation error, display time and animation time step, late share and refresh strip](doc/images/chart-timeline.png)
+
+- **Animation error per presented frame**, with late frames in red. Everything between the dashed lines counts as no error.
+- **Display time and animation time step:** their difference is the error. An error where the display time (blue) jumps is bad
+  pacing; an error while it stays flat and the animation time step (orange) jumps is delta time jitter.
+- **Share of late frames in the last 2 s:** rare spikes stay low, busy stretches stand out, and they call for different fixes.
+- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
+  Zoom in to see hold patterns such as 3-then-1.
+
+The other tabs show how the values are distributed. The count axes are logarithmic, so a handful of bad frames stays visible next
+to hundreds of good ones.
 
 | Animation error distribution                                       | Display time distribution                                              |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
 | ![Animation error histogram](doc/images/chart-error-histogram.png) | ![Display time histogram](doc/images/chart-display-time-histogram.png) |
 
-- **Animation error distribution:** how often each error occurred. Each bar is one capture period wide, because that is the
-  measurement resolution. Everything between the dashed lines is within ±1 capture period and cannot be told apart from 0. Bars
+- **Animation error distribution:** how often each error occurred. Each bar is one capture period (one refresh) wide. Everything
+  between the dashed lines (±½ refresh; ±1 camera period for a camera, its measurement resolution) counts as no error. Bars
   further out are real errors: positive = shown too soon (moved too far), negative = shown too late (moved too little).
 - **Display time distribution:** how long frames stayed on screen (PresentMon's `MsBetweenDisplayChange`; overlays often call
   this "frame time"). Even pacing is one tall bar. Separate bars further right (often at
@@ -225,7 +250,8 @@ logarithmic, so a handful of bad frames stays visible next to hundreds of good o
 
 ![Animation error by percentile](doc/images/chart-error-percentiles.png)
 
-The histograms are also in `summary.json` (`runs[].histograms`), so you can plot or compare them with your own tools.
+The histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`), and late frames carry
+`Late` in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools.
 
 ### The command line
 
@@ -242,9 +268,10 @@ mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images a
 mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeMs)
 mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
 mb-framepacing analyze <capture folder>                   # (re)analyse
+mb-framepacing analyze <capture folder> --target-fps 30   # ... measuring late frames against a 30 fps target
 # VERY EXPERIMENTAL: a high speed camera filming the screen (doc/camera.md)
 mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
-mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --analyze       # later: only verifies the saved camera
+mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --display-hz 60 --analyze  # later: checks the camera and the display rate
 mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
 ```
 
@@ -271,8 +298,8 @@ There is no built-in frame rate limit: mb-framepacing records whatever the sourc
 - **Video files and image folders:** any rate. They are read as fast as the disk allows and nothing is dropped; the times come
   from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works. Footage of a
   camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [doc/camera.md](doc/camera.md)).
-- **Faster is more precise:** results are exact to one capture period, so 240 fps resolves about ±4.2 ms, 500 fps ±2 ms,
-  1000 fps ±1 ms.
+- **Faster is more precise:** a capture card captures at the display's refresh rate and measures in whole refreshes (4.2 ms at
+  240 Hz, 2 ms at 500 Hz); a camera filming the screen is good to about one camera period (1 ms at 1000 fps).
 
 **Fast capture** (`--roi auto`, or **Locate marker** in the GUI) stores only the marker instead of whole frames. It first reads
 the source for a moment to find the marker, then has ffmpeg crop to that region and downscale it to 3 stored pixels per module.

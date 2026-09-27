@@ -29,12 +29,16 @@ namespace MB.FramePacing.Gui.ViewModels
       CaptureDirectory = settings.LastCaptureDirectory ?? string.Empty;
       if (Enum.TryParse(settings.TimeSource, out TimeSource timeSource))
         SelectedTimeSource = timeSource;
+      TargetFpsText = settings.AnalysisTargetFps ?? string.Empty;
+      DisplayHzText = settings.AnalysisDisplayHz ?? string.Empty;
     }
 
     /// <summary>Copy the current options into the settings (saved when the window closes).</summary>
     public void StoreSettings()
     {
       m_settings.TimeSource = SelectedTimeSource.ToString();
+      m_settings.AnalysisTargetFps = TargetFpsText;
+      m_settings.AnalysisDisplayHz = DisplayHzText;
       if (!string.IsNullOrWhiteSpace(CaptureDirectory))
         m_settings.LastCaptureDirectory = CaptureDirectory;
     }
@@ -51,6 +55,14 @@ namespace MB.FramePacing.Gui.ViewModels
 
     [ObservableProperty]
     public partial TimeSource SelectedTimeSource { get; set; } = TimeSource.Auto;
+
+    /// <summary>Overrides the capture's target frame rate (empty = the capture's own, or each run's median display time).</summary>
+    [ObservableProperty]
+    public partial string TargetFpsText { get; set; }
+
+    /// <summary>Overrides the capture's expected display refresh rate (empty = the capture's own, or no comparison).</summary>
+    [ObservableProperty]
+    public partial string DisplayHzText { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
@@ -117,7 +129,16 @@ namespace MB.FramePacing.Gui.ViewModels
       try
       {
         var directory = CaptureDirectory.Trim();
-        var options = new AnalysisOptions { TimeSource = SelectedTimeSource, ToolVersion = MainWindowViewModel.Version };
+        var options = new AnalysisOptions
+        {
+          TimeSource = SelectedTimeSource,
+          Timeline = new TimelineOptions
+          {
+            TargetFps = FrameRateText.ParseOptional(TargetFpsText),
+            ExpectedRefreshHz = FrameRateText.ParseOptional(DisplayHzText),
+          },
+          ToolVersion = MainWindowViewModel.Version,
+        };
         var progress = new Progress<double>(value => ProgressPercent = value * 100);
         var report = await Task.Run(() => CaptureAnalyzer.Analyze(directory, options, progress));
 
@@ -129,7 +150,7 @@ namespace MB.FramePacing.Gui.ViewModels
         foreach (var warning in report.Warnings)
           Warnings.Add(warning);
         foreach (var run in report.Timeline.Runs)
-          Runs.Add(new RunViewModel(run, report.CapturePeriodMs));
+          Runs.Add(new RunViewModel(run, report.CapturePeriodMs, report.ErrorThresholdMs, report.Session?.Camera != null));
         SelectedRun = Runs.Count > 0 ? Runs[0] : null;
         ReportDirectory = report.OutputDirectory;
         ProgressPercent = 100;

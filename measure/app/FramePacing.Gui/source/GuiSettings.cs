@@ -44,6 +44,12 @@ namespace MB.FramePacing.Gui
     public string? ImageFps { get; set; }
     public string? TimestampFile { get; set; }
 
+    /// <summary>The frame rate the application aims for, stored with each capture (empty = judged from the frames).</summary>
+    public string? TargetFps { get; set; }
+
+    /// <summary>The display refresh rate the user expects, stored with each capture for the analysis to compare with (empty = none).</summary>
+    public string? DisplayHz { get; set; }
+
     /// <summary>EXPERIMENTAL camera capture: film the screen with the calibrated rig, its file, a slow motion clip's recorded fps.</summary>
     public bool UseCamera { get; set; }
     public string? CameraRig { get; set; }
@@ -51,6 +57,12 @@ namespace MB.FramePacing.Gui
 
     /// <summary>The Analyze page's time source (a TimeSource name).</summary>
     public string? TimeSource { get; set; }
+
+    /// <summary>The Analyze page's target frame rate override (empty = the capture's own, or judged from the frames).</summary>
+    public string? AnalysisTargetFps { get; set; }
+
+    /// <summary>The Analyze page's expected display refresh rate override (empty = the capture's own, or none).</summary>
+    public string? AnalysisDisplayHz { get; set; }
 
     /// <summary>The page that was open when the window closed.</summary>
     public int SelectedTab { get; set; }

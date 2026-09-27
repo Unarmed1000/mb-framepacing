@@ -380,15 +380,9 @@ namespace MB.FramePacing.Capture.Camera
         if (ordered[k].Key == ordered[k - 1].Key + 1 && ordered[k - 1].Value != frames.Ticks[0])
           intervals.Add(ordered[k].Value - ordered[k - 1].Value);
       }
-      // The intervals are whole camera periods (16 or 17 ms for 60 Hz at 1000 fps): average the ones near the median instead of taking it
-      double? refreshHz = null;
-      if (intervals.Count >= 5)
-      {
-        double median = Median(intervals);
-        double period = TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames));
-        var near = intervals.Where(i => Math.Abs(i - median) <= 1.5 * period).ToList();
-        refreshHz = TimeSpan.TicksPerSecond / near.Average();
-      }
+      // The intervals are whole refreshes quantised to camera periods (16 or 17 ms for 60 Hz at 1000 fps)
+      double? refreshPeriod = RefreshEstimator.EstimatePeriodTicks(intervals, TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames)));
+      double? refreshHz = refreshPeriod is { } refresh ? TimeSpan.TicksPerSecond / refresh : null;
 
       var decodeRate = decoded.Select(d => d.Count(v => v >= 0) / (double)Math.Max(1, frames.Count)).ToArray();
       var whiteVariation = new double[zoneCount];

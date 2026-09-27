@@ -140,6 +140,22 @@
             </Grid>
             <CheckBox Content="Start at the start marker" IsChecked="{Binding WaitForStart}" />
             <CheckBox Content="Stop at the end marker" IsChecked="{Binding StopAtEnd}" />
+            <Grid
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="10"
+              ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Stored with the capture."
+            >
+              <TextBlock Text="Target frame rate" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding TargetFpsText}" PlaceholderText="empty = from the frames" />
+            </Grid>
+            <Grid
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="10"
+              ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Stored with the capture."
+            >
+              <TextBlock Text="Display refresh rate" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding DisplayHzText}" PlaceholderText="Hz, empty = no check" />
+            </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding OutputRoot, StringFormat='Saved in {0}'}" />
           </StackPanel>
         </Border>

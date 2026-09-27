@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The analysis of one test run (start marker to end marker): counts, statistics, presented frames and warnings.
+//* The analysis of one test run (start marker to end marker): counts, statistics, presented frames, pacing and warnings.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -21,6 +21,7 @@ namespace MB.FramePacing.Analysis
     RunStatistics Statistics,
     IReadOnlyList<PresentedFrame> Frames,
     IReadOnlyList<string> Warnings,
-    CameraRunStatistics? Camera = null
+    CameraRunStatistics? Camera = null,
+    RunPacing? Pacing = null
   );
 }

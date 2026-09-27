@@ -46,6 +46,15 @@ namespace MB.FramePacing.Capture
     /// <summary>The real recording rate of a slow motion clip, when the timestamps were generated from it.</summary>
     public double? RecordedFps { get; init; }
 
+    /// <summary>The frame rate the application aims for (for example 30 on a 60 Hz display); null = the analysis judges it from the frames.</summary>
+    public double? TargetFps { get; init; }
+
+    /// <summary>
+    /// The display refresh rate the user expects (Hz): the analysis compares it with the refresh rate a camera capture calculates, or
+    /// with a capture card's capture rate. Null = no comparison.
+    /// </summary>
+    public double? ExpectedRefreshHz { get; init; }
+
     /// <summary>
     /// EXPERIMENTAL: set for a camera capture. The frames are the rig's rectified zones stacked in scanout order, and the analysis treats
     /// differing zones as scanout progress instead of tearing.

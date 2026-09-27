@@ -77,17 +77,7 @@ namespace MB.FramePacing.Gui.ViewModels
 
     public ObservableCollection<CameraCheckItem> Checks { get; } = new ObservableCollection<CameraCheckItem>();
 
-    public double? RecordedFps
-    {
-      get
-      {
-        if (string.IsNullOrWhiteSpace(RecordedFpsText))
-          return null;
-        if (!double.TryParse(RecordedFpsText.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double fps) || fps <= 0)
-          throw new FormatException($"'{RecordedFpsText}' is not a frame rate");
-        return fps;
-      }
-    }
+    public double? RecordedFps => FrameRateText.ParseOptional(RecordedFpsText);
 
     /// <summary>Read the saved cameras again and select <paramref name="name"/> (or keep the selection).</summary>
     public void ReloadLibrary(string? name = null)

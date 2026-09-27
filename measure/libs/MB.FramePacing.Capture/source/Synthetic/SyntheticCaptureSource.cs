@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Capture source that renders a SyntheticScenario: frames carry real markers, device ticks are the exact simulated capture instants. Runs
-//* either paced in real time (to exercise the recorder like real hardware) or as fast as possible.
+//* Capture source that renders a SyntheticScenario like a capture card, at the display's native refresh rate: frames carry real markers,
+//* device ticks are the exact simulated capture instants. Runs either paced in real time (to exercise the recorder like real hardware) or as
+//* fast as possible.
 //*
 //* (c) 2026 Mana Battery
 //****************************************************************************************************************************************************
@@ -25,6 +26,10 @@ namespace MB.FramePacing.Capture.Synthetic
       m_scenario = scenario ?? throw new ArgumentNullException(nameof(scenario));
       m_paced = paced;
       var o = scenario.Options;
+      if (Math.Abs(o.CaptureFps - o.RefreshHz) > 1e-9 * o.RefreshHz)
+        throw new ArgumentException(
+          $"A capture card captures at the display's native refresh rate: capture rate {o.CaptureFps:0.###} fps differs from the {o.RefreshHz:0.###} Hz refresh"
+        );
       int maxMarker = MarkerRenderer.MaxMarkerSizePx(o.ModuleSizePx);
       if (o.OriginX + maxMarker > o.Width || o.OriginY + maxMarker > o.Height)
         throw new ArgumentException($"A {o.Width}x{o.Height} frame is too small for a start marker of {maxMarker}px at ({o.OriginX},{o.OriginY})");

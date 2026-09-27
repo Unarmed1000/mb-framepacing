@@ -40,9 +40,10 @@ flowchart LR
 Settings that matter:
 
 - **Capture at the same rate the display runs at.** Set the application's output to a mode the card captures natively, and capture
-  it at that refresh rate: a 240 Hz output in the card's 240 fps mode. Every refresh is then exactly one captured frame. A slower
-  capture never sees some of the displayed frames (they are reported as frame indices never seen); a faster one only records
-  duplicates. Results are exact to one refresh (±4.2 ms at 240 Hz, ±2 ms at 500 Hz).
+  it at that refresh rate: a 240 Hz output in the card's 240 fps mode. Every refresh is then exactly one captured frame, and the
+  analysis relies on it: the refresh period is the capture period. Display times and animation errors are then whole refreshes,
+  so one missed refresh (4.2 ms at 240 Hz) is measured exactly. A slower capture never sees some of the displayed frames (they
+  are reported as frame indices never seen).
 - Turn **G-Sync/FreeSync off**. Capture cards only pass variable refresh through to the monitor; they record at a constant rate, so
   the capture would not show when the display showed each frame. (A high speed camera filming the screen does: see the very
   experimental [camera capture](camera.md).)
@@ -54,7 +55,10 @@ Settings that matter:
 **GUI**
 
 1. **Source:** pick the card, then its **mode** (highest frame rate). Under **Advanced**, set **Scale** (for example 960x540).
-2. Tick **Start at the start marker** and **Stop at the end marker**.
+2. Tick **Start at the start marker** and **Stop at the end marker**. If the application aims for a frame rate below the
+   refresh rate (30 fps on 60 Hz), enter it as **Target frame rate**; it is stored with the capture. **Display refresh rate** is
+   the rate you expect the display to run at: the analysis checks it against the capture rate (and, for a camera, against the
+   rate it calculates from the frames).
 3. Press **Start capture**. The preview shows the decoded marker ("Frame marker, run 7, frame 1234"); "No marker seen yet" means
    the marker does not reach the card intact (see [Troubleshooting](#troubleshooting)).
 4. Run the test in your application. Recording stops by itself after the end marker and the Analyze page opens.
@@ -66,8 +70,9 @@ mb-framepacing devices --modes          # the card's name (Windows), /dev/videoN
 mb-framepacing capture -d "<device>" --mode 1920x1080@240 --scale 960x540 --wait-for-start --stop-at-end --analyze
 ```
 
-Add `--module-px 6` (the module size your application draws) to have the size checked before recording, and `-t 2m` as a safety
-limit.
+Add `--module-px 6` (the module size your application draws) to have the size checked before recording, `-t 2m` as a safety
+limit, `--target-fps 30` when the application aims for less than the refresh rate, and `--display-hz 240` to have the display
+rate you expect checked against the capture.
 
 **Fast capture: store only the marker**
 
@@ -102,8 +107,9 @@ rate works. A camera filming the screen needs a calibrated camera rig and `--cam
 | Folder of images with a time per image   | Image folder   | `mb-framepacing import frames/ --timestamps times.csv --analyze` |
 | Network stream (RTSP, SRT, HTTP, ...)    | Network stream | `mb-framepacing import rtsp://camera/stream -t 30s --analyze`    |
 
-- Record **at the display's refresh rate** (or faster, for a camera filming the screen). A 60 fps screen recording of a 144 Hz
-  display misses most of the frames the viewer saw.
+- Record **at the display's refresh rate**: like a capture card, a recording is analysed as one refresh per recorded frame. A
+  60 fps screen recording of a 144 Hz display misses most of the frames the viewer saw. Only a camera filming the screen
+  (`--camera`) films faster; its refresh rate is calculated from the frames.
 - Record **lossless or at a high bit rate** (FFV1, lossless H.264/HEVC, PNG images): heavy compression blurs the marker.
 - Images are sorted by name with numbers compared as numbers (`frame2` before `frame10`). A timestamp file is CSV with one line per
   image, `fileName,timeMs`, in the order the frames were taken; `#` comments and a header line are allowed.
@@ -125,22 +131,30 @@ capture-20260924-153000/          (import-... for imports)
 
 The headline numbers on the Analyze page:
 
-| Tile                | Meaning                                                                                   |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| Presented frames    | Application frames that reached the display during the run                                |
-| Frames visibly off  | Frames whose animation error is larger than one capture period (a real, measurable error) |
-| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                |
-| Worst error         | The largest absolute animation error                                                      |
-| Resolution          | One capture period: smaller differences cannot be measured                                |
+| Tile                | Meaning                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Presented frames    | Application frames that reached the display during the run                                                     |
+| Frames visibly off  | Frames with an animation error: a refresh or more for a capture card, more than one camera period for a camera |
+| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                                     |
+| Worst error         | The largest absolute animation error                                                                           |
+| Late frames         | Frames shown at least one refresh later than the target frame time, and their share of the run                 |
+| Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches                      |
+| Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                              |
+
+Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
+early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it
+the target frame time and the refresh rate used, compared with the expected display rate when one was given. The target is the **target frame rate** given at capture or analysis time, rounded up to
+whole refreshes; without one, the run's median display time.
 
 The charts are explained in the README under [Reading the results](../README.md#reading-the-results). To analyse again, for
 example with a different clock or only one run:
 
 ```sh
 mb-framepacing analyze capture-20260924-153000 --time host --run 7
+mb-framepacing analyze capture-20260924-153000 --target-fps 30        # late frames against a 30 fps target
 ```
 
-or use **Browse...** and **Analyze** on the Analyze page.
+or use **Browse...**, **Target fps** and **Analyze** on the Analyze page.
 
 ## Troubleshooting
 

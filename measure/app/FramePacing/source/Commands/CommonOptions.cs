@@ -27,5 +27,39 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "Path to the ffmpeg executable (default: $MB_FFMPEG, then ffmpegPath in the configuration file, then PATH). Needs FFmpeg 5.1+.",
       };
+
+    /// <summary>--display-hz: the display refresh rate the user expects, compared with the one the capture shows.</summary>
+    public static Option<double?> DisplayHz(string where) =>
+      new Option<double?>("--display-hz")
+      {
+        Description =
+          $"The display's refresh rate you expect (Hz). A camera capture compares it with the refresh rate calculated from the frames; a "
+          + $"capture card, with its capture rate. A mismatch is a warning ({where}).",
+        Validators =
+        {
+          result =>
+          {
+            if (result.GetValue<double?>("--display-hz") is <= 0)
+              result.AddError("--display-hz must be positive");
+          },
+        },
+      };
+
+    /// <summary>--target-fps: the frame rate the application aims for; late frames are measured against it.</summary>
+    public static Option<double?> TargetFps(string where) =>
+      new Option<double?>("--target-fps")
+      {
+        Description =
+          $"The frame rate the application aims for, e.g. 30 on a 60 Hz display; frames shown a refresh later are late ({where}). "
+          + "Default: each run's median display time.",
+        Validators =
+        {
+          result =>
+          {
+            if (result.GetValue<double?>("--target-fps") is <= 0)
+              result.AddError("--target-fps must be positive");
+          },
+        },
+      };
   }
 }

@@ -58,6 +58,8 @@ namespace MB.FramePacing.Gui.ViewModels
       ScaleText = settings.Scale ?? string.Empty;
       RoiText = settings.Roi ?? string.Empty;
       DurationText = settings.Duration ?? "30s";
+      TargetFpsText = settings.TargetFps ?? string.Empty;
+      DisplayHzText = settings.DisplayHz ?? string.Empty;
       WaitForStart = settings.WaitForStart;
       StopAtEnd = settings.StopAtEnd;
       OutputRoot = DefaultOutputRoot();
@@ -152,7 +154,7 @@ namespace MB.FramePacing.Gui.ViewModels
       SelectedDevice?.Kind switch
       {
         SourceKind.Synthetic =>
-          "A simulated 144 Hz game with stalls and skipped frames, captured at 500 fps. Use it to try the tool without hardware.",
+          "A simulated 144 Hz game with stalls and skipped frames, captured at 144 fps like a capture card. Use it to try the tool without hardware.",
         SourceKind.VideoFile =>
           "Any video ffmpeg can read (mp4, mkv, mov, ...), e.g. a lossless recording or a high speed camera clip. Its own timestamps are used.",
         SourceKind.ImageFolder =>
@@ -192,6 +194,17 @@ namespace MB.FramePacing.Gui.ViewModels
 
     [ObservableProperty]
     public partial bool StopAtEnd { get; set; }
+
+    /// <summary>The frame rate the application aims for; late frames are measured against it (empty = judged from the frames).</summary>
+    [ObservableProperty]
+    public partial string TargetFpsText { get; set; }
+
+    /// <summary>
+    /// The display refresh rate the user expects: a camera capture compares it with the refresh rate calculated from the frames, a capture
+    /// card with its capture rate (empty = no comparison).
+    /// </summary>
+    [ObservableProperty]
+    public partial string DisplayHzText { get; set; }
 
     // ---- Live status ---------------------------------------------------------------------------------------------------------------------
 
@@ -361,6 +374,8 @@ namespace MB.FramePacing.Gui.ViewModels
           Duration = DurationParser.ParseOptional(DurationText),
           WaitForStart = WaitForStart,
           StopAtEnd = StopAtEnd,
+          TargetFps = FrameRateText.ParseOptional(TargetFpsText),
+          ExpectedRefreshHz = FrameRateText.ParseOptional(DisplayHzText),
           ToolVersion = MainWindowViewModel.Version,
           Preview = OnPreview,
         };
@@ -433,11 +448,11 @@ namespace MB.FramePacing.Gui.ViewModels
         return FfmpegCaptureSource.Start(ffmpegOptions, TimeSpan.FromSeconds(device?.Device != null ? 20 : 30));
       }
 
-      // The synthetic game: a 144 Hz game with stalls and skipped frames, captured at 500 fps, with start/end markers
+      // The synthetic game: a 144 Hz game with stalls and skipped frames, captured at the display's 144 Hz, with start/end markers
       var scenario = new SyntheticScenario(
         new SyntheticScenarioOptions
         {
-          CaptureFps = 500,
+          CaptureFps = 144,
           RefreshHz = 144,
           RunSeconds = 3,
           Width = 480,
@@ -738,6 +753,8 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings.Duration = DurationText;
       m_settings.WaitForStart = WaitForStart;
       m_settings.StopAtEnd = StopAtEnd;
+      m_settings.TargetFps = TargetFpsText;
+      m_settings.DisplayHz = DisplayHzText;
       m_settings.MediaPath = MediaPath;
       m_settings.ImageFps = ImageFpsText;
       m_settings.TimestampFile = TimestampFile;

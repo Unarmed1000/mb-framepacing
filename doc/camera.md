@@ -174,6 +174,18 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
 - `captures.csv` gets `secondZoneFrameIndex`. Zones that disagree are normal for a camera and are **not** counted as torn
   captures.
 - `UncertainStart` is only set when the gap before a frame is clearly longer than the usual scanout transition.
+- **The display's refresh rate** (`runs[].pacing.refreshPeriodMs`, `refreshCalculated: true`): a capture card captures at the
+  refresh rate, a camera films faster, so the refresh is calculated from the frames. The first-seen intervals are whole refreshes
+  quantised to camera periods; the refresh is the largest period that makes them whole multiples. A steady game below the refresh
+  rate is ambiguous alone: the rig's calibrated refresh settles it, and the analysis warns when the two disagree. Late frames
+  and the pacing verdict are measured against it.
+- **The expected display rate** (`--display-hz 60` on `capture`, `import` or `analyze`; **Display refresh rate** in the GUI's
+  Recording card, **Display Hz** on the Analyze page): the rate you believe the display runs at. It settles an ambiguous estimate
+  before the rig's calibration, and the calculated rate is compared with it: the Analyze page shows "Display refresh 59.99 Hz
+  (calculated from the camera frames), expected 60 Hz: matches", and a difference above 1 % is a warning
+  (`runs[].pacing.expectedRefreshHz`, `refreshDeviation`, `matchesExpectedRefresh`).
+- The animation error threshold (the dashed band, "frames visibly off") is one camera period, the measurement resolution. The
+  pacing verdict only attributes errors above 2 camera periods, the noise of two first-seen times.
 
 Every camera report carries the "VERY EXPERIMENTAL" warning.
 
@@ -191,7 +203,7 @@ Every camera report carries the "VERY EXPERIMENTAL" warning.
    layout through a precomputed C# lookup table.
 3. **Decoding.** Every stored marker sits at a known place with 4 px modules. The locked decoder samples each module centre and
    thresholds it against the finder patterns' own black and white. That is robust to the soft edges of camera footage.
-4. **Analysis.** As for a capture card, plus the scanout delay and camera tears above.
+4. **Analysis.** As for a capture card, plus the scanout delay, camera tears and the calculated refresh rate above.
 
 ## Limits and known issues
 

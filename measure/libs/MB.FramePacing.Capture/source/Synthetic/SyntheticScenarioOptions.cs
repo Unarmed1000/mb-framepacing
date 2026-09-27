@@ -13,7 +13,11 @@ namespace MB.FramePacing.Capture.Synthetic
 {
   public sealed record SyntheticScenarioOptions
   {
-    public double CaptureFps { get; init; } = 240;
+    /// <summary>
+    /// Capture rate. A capture card captures at the display's native refresh rate, so for <see cref="SyntheticCaptureSource"/> it must equal
+    /// <see cref="RefreshHz"/>; only the synthetic camera films faster.
+    /// </summary>
+    public double CaptureFps { get; init; } = 60;
     public double RefreshHz { get; init; } = 60;
 
     /// <summary>Stored frame size.</summary>

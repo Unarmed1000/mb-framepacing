@@ -108,6 +108,16 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Camera.SecondZoneOnlyFrames, Is.EqualTo(0));
       Assert.That(run.Frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStart)), Is.EqualTo(0));
       Assert.That(run.Counts.Torn, Is.EqualTo(0), "zones that disagree are scanout progress, not torn captures");
+
+      // The camera films faster than the display, so the display's refresh is calculated from the frames; the stalls are late
+      double refreshMs = camera.ToCameraTicks(camera.Scenario.RefreshIntervalTicks) / TimeSpan.TicksPerMillisecond;
+      Assert.That(run.Pacing, Is.Not.Null);
+      Assert.That(run.Pacing!.RefreshCalculated);
+      Assert.That(run.Pacing.RefreshPeriodMs, Is.EqualTo(refreshMs).Within(0.1));
+      int stalls = Enumerable
+        .Range(1, truth.Count - 1)
+        .Count(i => truth[i].DisplayTicks - truth[i - 1].DisplayTicks > camera.Scenario.RefreshIntervalTicks);
+      Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
     }
 
     [Test]

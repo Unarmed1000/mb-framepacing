@@ -44,6 +44,8 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "Capture folder to create (default: a new import-<date>-<time> folder in the configured capture directory).",
       };
+      var targetOption = CommonOptions.TargetFps("stored in capture.json");
+      var displayOption = CommonOptions.DisplayHz("stored in capture.json");
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the result." };
       var ffmpegOption = CommonOptions.Ffmpeg();
       var cameraOption = CameraRigCommand.CameraOption();
@@ -62,6 +64,8 @@ namespace MB.FramePacing.App.Commands
         waitOption,
         stopOption,
         outputOption,
+        targetOption,
+        displayOption,
         analyzeOption,
         ffmpegOption,
       };
@@ -103,6 +107,8 @@ namespace MB.FramePacing.App.Commands
               Duration = DurationParser.ParseOptional(parseResult.GetValue(durationOption)),
               WaitForStart = parseResult.GetValue(waitOption),
               StopAtEnd = parseResult.GetValue(stopOption),
+              TargetFps = parseResult.GetValue(targetOption),
+              ExpectedRefreshHz = parseResult.GetValue(displayOption),
               ToolVersion = Program.VersionString,
               FfmpegVersion = FfmpegDevices.GetVersion(ffmpeg),
               FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(options)),
