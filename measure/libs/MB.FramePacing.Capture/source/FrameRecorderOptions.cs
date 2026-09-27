@@ -38,8 +38,15 @@ namespace MB.FramePacing.Capture
     /// <summary>Frames before the trigger that are kept when armed.</summary>
     public int PreRollFrames { get; init; } = 64;
 
-    /// <summary>How long the writer waits for a late device timestamp before writing the record without one.</summary>
+    /// <summary>
+    /// How long the writer waits for a late device timestamp before writing the record without one. A live source must not stall; a
+    /// source that is not live (<see cref="WaitWhenFull"/>) is given <see cref="NotLiveDeviceTicksWait"/>, since one record without a
+    /// device timestamp makes the analysis fall back to the host clock for the whole capture.
+    /// </summary>
     public TimeSpan DeviceTicksWait { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>The <see cref="DeviceTicksWait"/> for sources that are not live.</summary>
+    public static readonly TimeSpan NotLiveDeviceTicksWait = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Make the source wait for free ring space instead of dropping the frame (for sources that are not live, e.g. video files, where

@@ -314,7 +314,8 @@ namespace MB.FramePacing.Capture
           }
 
           int count = (int)Math.Min(Math.Min(end - tail, m_slotCount - (tail % m_slotCount)), m_options.MaxBatchRecords);
-          bool ringPressure = (Volatile.Read(ref m_head) - tail) * 2 > m_slotCount;
+          // A live source drops frames when the ring is full, so late timestamps are given up first; a source that is not live waits
+          bool ringPressure = !m_options.WaitWhenFull && (Volatile.Read(ref m_head) - tail) * 2 > m_slotCount;
           int resolved = ResolveDeviceTicks(tail, count, completing || ringPressure, waitTicks);
           if (resolved == 0)
           {

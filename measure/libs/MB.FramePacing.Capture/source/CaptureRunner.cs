@@ -54,6 +54,7 @@ namespace MB.FramePacing.Capture
         StopAtEnd = options.StopAtEnd,
         EndTailFrames = (int)Math.Ceiling(options.EndTail.TotalSeconds * fps),
         WaitWhenFull = !source.IsLive,
+        DeviceTicksWait = source.IsLive ? new FrameRecorderOptions().DeviceTicksWait : FrameRecorderOptions.NotLiveDeviceTicksWait,
         PreRollFrames = Math.Max(16, (int)Math.Ceiling(fps * 0.25)),
       };
 

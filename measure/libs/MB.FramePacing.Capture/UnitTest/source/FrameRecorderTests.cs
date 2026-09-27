@@ -151,6 +151,48 @@ namespace MB.FramePacing.Capture.UnitTest
       }
     }
 
+    /// <summary>
+    /// A source that is not live (a video file) with timestamps that arrive late and a full ring: the recorder waits for them instead of
+    /// writing records without one (one record without a device timestamp would put the whole capture on the host clock).
+    /// </summary>
+    [Test]
+    public void NotLive_LateDeviceTicksWithAFullRing_AreAllFilledIn()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("frames.mbfc");
+      var timestamps = new DictionaryTimestamps();
+      const int Frames = 40;
+      var options = new FrameRecorderOptions
+      {
+        RingFrames = 16,
+        WaitWhenFull = true,
+        DeviceTicksWait = FrameRecorderOptions.NotLiveDeviceTicksWait,
+      };
+      using (var writer = new CaptureFileWriter(path, g_header))
+      using (var recorder = new FrameRecorder(writer, options, new CaptureClock(), timestamps))
+      {
+        // The timestamps (ffmpeg's stderr) lag behind the frames by more than a live source would wait
+        var late = System.Threading.Tasks.Task.Run(async () =>
+        {
+          for (int i = 0; i < Frames; ++i)
+          {
+            await System.Threading.Tasks.Task.Delay(i == 0 ? 400 : 5);
+            lock (timestamps.Values)
+              timestamps.Values[i] = 1_000_000 + i;
+          }
+        });
+        Produce(recorder, Frames, DeviceTimestamps.PendingTicks);
+        late.Wait();
+        recorder.Complete();
+        Assert.That(recorder.Stats.FramesDropped, Is.Zero);
+      }
+
+      using var reader = new CaptureFileReader(path);
+      Assert.That(reader.RecordCount, Is.EqualTo(Frames));
+      for (int i = 0; i < Frames; ++i)
+        Assert.That(reader.ReadRecordHeader(i).DeviceTicks, Is.EqualTo(1_000_000 + i), $"record {i}");
+    }
+
     [Test]
     public void Armed_KeepsOnlyThePreRoll_ThenWritesEverything()
     {

@@ -153,6 +153,9 @@ namespace MB.FramePacing.Capture.Ffmpeg
       if (Volatile.Read(ref m_stopRequested) == 0)
       {
         m_process.WaitForExit(2000);
+        // The last frames' timestamps (showinfo lines on stderr) can arrive after their pixels: read stderr to its end before the capture
+        // completes, or those frames would be written without a device timestamp
+        m_stderrThread.Join(TimeSpan.FromSeconds(10));
         if (m_process.HasExited && m_process.ExitCode != 0)
           throw new InvalidOperationException($"ffmpeg stopped unexpectedly (exit code {m_process.ExitCode}):{Environment.NewLine}{RecentLog}");
       }
