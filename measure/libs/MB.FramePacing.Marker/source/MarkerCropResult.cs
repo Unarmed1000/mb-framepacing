@@ -13,7 +13,7 @@ namespace MB.FramePacing.Marker
   /// <param name="Roi">Crop in source pixels; its size and its distance to the marker origin are multiples of <paramref name="Factor"/>.</param>
   /// <param name="Factor">Integer downscale of the crop (1 = stored at source resolution).</param>
   /// <param name="StoredModulePx">Marker module size in stored pixels.</param>
-  public readonly record struct MarkerCropResult(PixelRect Roi, int Factor, float StoredModulePx)
+  public readonly record struct MarkerCropResult(PixelRect Roi, int Factor, double StoredModulePx)
   {
     public int StoredWidth => Roi.Width / Factor;
     public int StoredHeight => Roi.Height / Factor;

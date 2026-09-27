@@ -86,10 +86,10 @@ namespace MB.FramePacing.Marker
     /// </summary>
     public MarkerDecodeResult DecodeGrid(GrayImage image, MarkerLock markerLock)
     {
-      if (markerLock.ModuleSizePx < 1.5f)
+      if (markerLock.ModuleSizePx < 1.5)
         return MarkerDecodeResult.NotFound;
-      double symbolX = markerLock.Bounds.X + (MarkerRenderer.RecommendedQuietZoneModules * (double)markerLock.ModuleSizePx);
-      double symbolY = markerLock.Bounds.Y + (MarkerRenderer.RecommendedQuietZoneModules * (double)markerLock.ModuleSizePx);
+      double symbolX = markerLock.Bounds.X + (MarkerRenderer.RecommendedQuietZoneModules * markerLock.ModuleSizePx);
+      double symbolY = markerLock.Bounds.Y + (MarkerRenderer.RecommendedQuietZoneModules * markerLock.ModuleSizePx);
       var bytes = m_grid.TryRead(image, symbolX, symbolY, markerLock.ModuleSizePx, markerLock.ModuleCount);
       if (bytes == null || !MarkerPayload.TryDecode(bytes, out var payload, out var start))
         return MarkerDecodeResult.NotFound;
@@ -273,7 +273,7 @@ namespace MB.FramePacing.Marker
     /// ZXing reports the finder pattern centres as [bottom-left, top-left, top-right, (alignment)]. Each finder carries an estimated module size;
     /// the finder centres sit 3.5 modules inside the symbol corners, so the marker bounds (including the quiet zone) follow from the centres.
     /// </summary>
-    private static (PixelRect Bounds, float ModuleSize) EstimateBounds(ResultPoint[]? points, PixelRect area)
+    private static (PixelRect Bounds, double ModuleSize) EstimateBounds(ResultPoint[]? points, PixelRect area)
     {
       if (points == null || points.Length < 3)
         return (area, 0);
@@ -281,15 +281,15 @@ namespace MB.FramePacing.Marker
       var bottomLeft = points[0];
       var topLeft = points[1];
       var topRight = points[2];
-      float moduleSize = EstimateModuleSize(bottomLeft, topLeft, topRight);
+      double moduleSize = EstimateModuleSize(bottomLeft, topLeft, topRight);
       if (moduleSize <= 0)
         return (area, 0);
 
-      float minX = Math.Min(Math.Min(topLeft.X, topRight.X), bottomLeft.X);
-      float minY = Math.Min(Math.Min(topLeft.Y, topRight.Y), bottomLeft.Y);
-      float maxX = Math.Max(Math.Max(topLeft.X, topRight.X), bottomLeft.X);
-      float maxY = Math.Max(Math.Max(topLeft.Y, topRight.Y), bottomLeft.Y);
-      float margin = (3.5f + MarkerRenderer.RecommendedQuietZoneModules) * moduleSize;
+      double minX = Math.Min(Math.Min(topLeft.X, topRight.X), bottomLeft.X);
+      double minY = Math.Min(Math.Min(topLeft.Y, topRight.Y), bottomLeft.Y);
+      double maxX = Math.Max(Math.Max(topLeft.X, topRight.X), bottomLeft.X);
+      double maxY = Math.Max(Math.Max(topLeft.Y, topRight.Y), bottomLeft.Y);
+      double margin = (3.5 + MarkerRenderer.RecommendedQuietZoneModules) * moduleSize;
 
       int left = (int)Math.Floor(minX - margin) + area.X;
       int top = (int)Math.Floor(minY - margin) + area.Y;
@@ -298,10 +298,10 @@ namespace MB.FramePacing.Marker
       return (new PixelRect(left, top, right - left, bottom - top), moduleSize);
     }
 
-    private static float EstimateModuleSize(ResultPoint bottomLeft, ResultPoint topLeft, ResultPoint topRight)
+    private static double EstimateModuleSize(ResultPoint bottomLeft, ResultPoint topLeft, ResultPoint topRight)
     {
       // First estimate from the finder patterns themselves, then refine using the finder distance which must be (moduleCount - 7) modules
-      float estimate = 0;
+      double estimate = 0;
       int count = 0;
       foreach (var point in new[] { bottomLeft, topLeft, topRight })
       {
@@ -311,13 +311,13 @@ namespace MB.FramePacing.Marker
           ++count;
         }
       }
-      float distance = (ResultPoint.distance(topLeft, topRight) + ResultPoint.distance(topLeft, bottomLeft)) * 0.5f;
+      double distance = ((double)ResultPoint.distance(topLeft, topRight) + ResultPoint.distance(topLeft, bottomLeft)) * 0.5;
       if (count == 0)
         return distance / (MarkerRenderer.QrModuleCount - 7);
       estimate /= count;
 
       // QR symbol sizes are 17 + 4 * version
-      int version = Math.Clamp((int)Math.Round(((distance / estimate) + 7 - 17) / 4f), 1, 40);
+      int version = Math.Clamp((int)Math.Round(((distance / estimate) + 7 - 17) / 4.0), 1, 40);
       return distance / ((17 + (4 * version)) - 7);
     }
   }

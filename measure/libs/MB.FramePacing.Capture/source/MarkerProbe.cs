@@ -66,10 +66,10 @@ namespace MB.FramePacing.Capture
     /// <summary>Two locks describe the same marker position when origin and module size agree within about a module.</summary>
     private static bool Agrees(MarkerLock first, MarkerLock other)
     {
-      float tolerance = Math.Max(2f, first.ModuleSizePx);
+      double tolerance = Math.Max(2, first.ModuleSizePx);
       return Math.Abs(first.Bounds.X - other.Bounds.X) <= tolerance
         && Math.Abs(first.Bounds.Y - other.Bounds.Y) <= tolerance
-        && Math.Abs(first.ModuleSizePx - other.ModuleSizePx) <= 0.25f * first.ModuleSizePx;
+        && Math.Abs(first.ModuleSizePx - other.ModuleSizePx) <= 0.25 * first.ModuleSizePx;
     }
 
     private sealed class Sink : IFrameSink

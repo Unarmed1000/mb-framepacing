@@ -40,7 +40,7 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(result.Status, Is.EqualTo(MarkerDecodeStatus.Decoded));
       Assert.That(result.Payload, Is.EqualTo(golden.Payload));
       Assert.That(result.Start, Is.EqualTo(golden.Start));
-      Assert.That(result.ModuleSizePx, Is.EqualTo(golden.ModuleSizePx).Within(0.25f));
+      Assert.That(result.ModuleSizePx, Is.EqualTo(golden.ModuleSizePx).Within(0.25));
     }
 
     [TestCaseSource(nameof(AllGolden))]

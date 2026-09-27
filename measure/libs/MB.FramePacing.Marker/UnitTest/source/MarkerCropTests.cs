@@ -98,7 +98,7 @@ namespace MB.FramePacing.Marker.UnitTest
         Assert.That(stored.Width, Is.EqualTo(crop.StoredWidth));
 
         // The lock the analyzer finds in the stored image: the source lock moved into the crop and scaled
-        float module = sourceLock.ModuleSizePx / crop.Factor;
+        double module = sourceLock.ModuleSizePx / crop.Factor;
         int size = (int)Math.Round(MarkerRenderer.MarkerSizePx(1) * module);
         var storedLock = new MarkerLock(
           new PixelRect((originX - crop.Roi.X) / crop.Factor, (originY - crop.Roi.Y) / crop.Factor, size, size),

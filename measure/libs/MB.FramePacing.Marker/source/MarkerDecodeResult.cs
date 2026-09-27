@@ -21,7 +21,7 @@ namespace MB.FramePacing.Marker
     MarkerPayload Payload,
     StartMetadata? Start,
     PixelRect Bounds,
-    float ModuleSizePx,
+    double ModuleSizePx,
     MarkerGeometry? Geometry = null
   )
   {

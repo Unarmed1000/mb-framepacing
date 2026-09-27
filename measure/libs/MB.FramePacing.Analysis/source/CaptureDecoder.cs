@@ -124,9 +124,9 @@ namespace MB.FramePacing.Analysis
         .Where(c => c.Count >= Math.Max(1, found.Count / 10))
         .Select(c =>
         {
-          float moduleSize = Median(c.Select(m => m.ModuleSizePx));
-          int x = (int)Math.Round(Median(c.Select(m => (float)m.Bounds.X)));
-          int y = (int)Math.Round(Median(c.Select(m => (float)m.Bounds.Y)));
+          double moduleSize = Median(c.Select(m => m.ModuleSizePx));
+          int x = (int)Math.Round(Median(c.Select(m => (double)m.Bounds.X)));
+          int y = (int)Math.Round(Median(c.Select(m => (double)m.Bounds.Y)));
           bool sync = c.Count(m => m.Payload.Kind == MarkerKind.Sync) * 2 > c.Count;
           return (Sync: sync, Lock: MarkerLock.At(x, y, moduleSize, sync ? MarkerKind.Sync : MarkerKind.Frame));
         })
@@ -135,10 +135,10 @@ namespace MB.FramePacing.Analysis
         .Select(l => l.Lock)
         .ToList();
 
-      float module = locks[0].ModuleSizePx;
-      if (module < 2f)
+      double module = locks[0].ModuleSizePx;
+      if (module < 2)
         warnings.Add($"The marker is only {module:0.0} stored pixels per module (minimum 2, recommended 3): decoding will be unreliable.");
-      else if (module < 2.75f)
+      else if (module < 2.75)
         warnings.Add($"The marker is {module:0.0} stored pixels per module (recommended 3 or more).");
       return new MarkerLayout(locks, module, warnings);
     }
@@ -222,7 +222,7 @@ namespace MB.FramePacing.Analysis
         yield return i;
     }
 
-    private static float Median(IEnumerable<float> values)
+    private static double Median(IEnumerable<double> values)
     {
       var sorted = values.OrderBy(v => v).ToArray();
       return sorted.Length == 0 ? 0 : sorted[sorted.Length / 2];
