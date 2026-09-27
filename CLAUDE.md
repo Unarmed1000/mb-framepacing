@@ -25,6 +25,7 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 | root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions           |
 | `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                         |
 | `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses             |
+| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`              |
 
 ## Build and test
 
