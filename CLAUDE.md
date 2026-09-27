@@ -3,7 +3,8 @@
 Frame pacing / animation error measurement.
 
 - **`marker/`** holds what goes **into** the application: the marker libraries, which draw a QR marker into every frame.
-  They are the C++20 library (`marker/cpp/`), the general C# library (`marker/csharp/`) and the Unity package (`marker/unity/`).
+  They are the C++20 library (`marker/cpp/`), the general C# library (`marker/csharp/`), the Unity package (`marker/unity/`) and
+  the Python library (`marker/python/`).
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
 
 See `README.md` for the overview and `doc/marker-format.md` for the marker specification. **The document is the reference**: C++
@@ -18,6 +19,7 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 | `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                         |
 | `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.0, C# 9, no dependencies) + NUnit tests |
 | `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                |
+| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests        |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                         |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis libraries (+ `UnitTest/`), DocImages, Benchmarks  |
 | root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions           |
@@ -135,7 +137,7 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   raise it in the change that alters the API (0.x: minor for any API change; from 1.0: major for breaking changes).
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `marker/cpp/build/<preset>/Release/marker-render --golden test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
-  the C# tests.
+  the C# tests and the Python tests (`python -m unittest discover -s marker/python -t marker/python`).
 - **Verify the GUI without touching the desktop:** `dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>` renders
   every page offscreen (Avalonia.Headless) and runs the synthetic demo capture and analysis; compare the images with `doc/images`
   (live numbers on the capture page vary). `mb-framepacing-gui --demo` is **not** headless: it opens a real window and waits for it to
@@ -164,7 +166,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - Every source file names its license on an `SPDX-License-Identifier` line near its top: `BSD-3-Clause` under `marker/` and
     `test-data/markers/`, `LicenseRef-PolyForm-Perimeter-1.0.1` elsewhere (inside the boxed C# header, after a shebang, as an XML
     comment in XAML/MSBuild/solution files). `python tools/check_license_headers.py` checks it (CI `lint`), `--fix` adds missing
-    ones. Third-party code (`third_party/`) keeps its own notices.
+    ones. Third-party code (`third_party/`) keeps its own notices; each language's marker library keeps it in a `third_party/`
+    folder of its own (`marker/cpp/third_party/`, `marker/python/mb_framemarker/third_party/`), with its license text next to it.
   - A new file belongs to the license of its path. Moving code across that line (for example from `measure/` into `marker/`)
     changes its license: only Mana Battery can decide that.
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a

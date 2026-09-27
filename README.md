@@ -17,13 +17,15 @@ error**.
 > to compare, so this needs the application's source code and a small change to its renderer. It cannot measure an
 > unmodified game or app that you cannot rebuild.
 
-The marker libraries put the marker into your application. All three draw exactly the same pixels and allocate nothing per frame:
+The marker libraries put the marker into your application. All of them draw exactly the same pixels; the C++ and C# libraries
+allocate nothing per frame:
 
 | Your application                 | Marker library                                                                               | Guide                                        |
 | -------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | C++ (any engine or graphics API) | [`marker/cpp`](marker/cpp): C++20, CMake, no dependencies                                    | [Integrating the marker](doc/integrating.md) |
 | C# / .NET                        | [`marker/csharp`](marker/csharp): `MB.FrameMarker`, .NET Standard 2.0, no dependencies       | [Integrating the marker](doc/integrating.md) |
 | Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component | [Unity](doc/unity.md)                        |
+| Python 3.11+                     | [`marker/python`](marker/python): `mb_framemarker`, standard library only                    | [Python library](marker/python/README.md)    |
 
 **Get started:** install on [Windows](doc/install/windows.md) · [Ubuntu](doc/install/ubuntu.md) ·
 [macOS (Homebrew)](doc/install/macos.md), add the marker with [Integrating the marker](doc/integrating.md) (C++ or C#) or the

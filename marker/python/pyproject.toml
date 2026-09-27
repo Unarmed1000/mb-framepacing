@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mb-framemarker"
+# The marker libraries' version, marker/VERSION (a test checks that mb_framemarker.__version__ matches it)
+version = "0.1.0"
+description = "The mb-framepacing frame marker: draw the frame index and animation time into every frame as a QR code"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+license-files = ["mb_framemarker/LICENSE"]
+authors = [{ name = "Mana Battery ApS" }]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Unarmed1000/mb-framepacing"
+
+[tool.setuptools.packages.find]
+include = ["mb_framemarker*"]

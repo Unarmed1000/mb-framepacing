@@ -5,7 +5,9 @@ index**, the **animation time** the frame was rendered for and a **run id**. `mb
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
-The C++20 library in [`marker/cpp/`](../marker/cpp) generates the marker geometry. The C# library `MB.FramePacing.Marker` decodes it.
+The C++20 library in [`marker/cpp/`](../marker/cpp) generates the marker geometry, and so do the C# library `MB.FrameMarker`
+([`marker/csharp/`](../marker/csharp)) and the Python library `mb_framemarker` ([`marker/python/`](../marker/python)). The C# library
+`MB.FramePacing.Marker` decodes it.
 Both implement this document; if they disagree, this document is the reference.
 
 > **Two counters, never mixed.** The marker's _frame index_ is the application's own rendered-frame counter. The capture tool
@@ -125,7 +127,7 @@ Let `s = storedHeight / sourceHeight`. For example, a 2160p source stored at 540
 | **MJPEG capture.** Many USB capture cards only reach high frame rates with MJPEG; the 8×8 DCT blocks smear module edges. | `ceil(4 / s)`            | 4                    |
 
 `MB::FrameMarker::MinimumModuleSizePx(sourceHeight, storedHeight)` and
-`MB::FrameMarker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `Marker.*`).
+`MB::FrameMarker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `Marker.*`; Python: `minimum_module_size_px`, `recommend_module_size_px`).
 `mb-framepacing marker-size --source 3840x2160 --stored 960x540 [--mjpeg]` prints the result for a setup, with the marker sizes, the
 origin and the settings for each library.
 
