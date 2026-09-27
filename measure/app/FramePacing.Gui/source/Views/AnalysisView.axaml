@@ -65,10 +65,7 @@
             <TextBlock Classes="tileValue" Text="{Binding SelectedRun.PresentedFramesText, FallbackValue='-'}" />
           </StackPanel>
         </Border>
-        <Border
-          Classes="tile"
-          ToolTip.Tip="Frames whose animation time is off: by a refresh or more for a capture card (it sees whole refreshes), by more than one camera period for a camera"
-        >
+        <Border Classes="tile" ToolTip.Tip="Frames whose animation time is off by more than the error threshold (1 ms unless changed)">
           <StackPanel>
             <TextBlock Classes="caption" Text="Frames visibly off" />
             <TextBlock

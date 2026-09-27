@@ -1,9 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Histograms of per-frame values. Captured times are quantised to the capture period, so the bins are one capture period wide and
-//* centred on its multiples: every possible measured value falls in the middle of a bin. The bins cover min..max without gaps (empty
-//* bins included), so they can be drawn directly.
+//* Histograms of per-frame values, in bins of a fixed width centred on its multiples, whatever captured the frames: the report shows the
+//* measured values, and a coarse measurement shows as their spread. The bins cover min..max without gaps (empty bins included), so they
+//* can be drawn directly.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -19,6 +19,9 @@ namespace MB.FramePacing.Analysis
   {
     /// <summary>Upper bound for the bin count; wider bins (a multiple of the requested width) are used when the range needs more.</summary>
     public const int DefaultMaxBins = 400;
+
+    /// <summary>The width of the reported bins: 0.1 ms, fine enough to show a spread well below a refresh.</summary>
+    public const long DefaultBinWidthTicks = TimeSpan.TicksPerMillisecond / 10;
 
     public static readonly Histogram Empty = new Histogram(0, 0, Array.Empty<HistogramBin>());
 

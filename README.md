@@ -212,8 +212,8 @@ The examples below are the synthetic test game (a 144 Hz game with injected stal
 like a capture card.
 
 A capture card captures at the display's refresh rate, so every capture is one refresh. The analysis relies on that: the refresh
-period is the capture period, and display times and animation errors are whole refreshes, so one missed refresh is measured
-exactly. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
+period is the capture period, and display times are whole refreshes, measured exactly. The animation error (the marker's animation
+time step against the display time) is then exact too, to the 100 ns tick. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
 from the frames, and compared with the display rate you expect when you give one (`--display-hz`, **Display refresh rate**).
 
 **Late frames** are shown later than the application meant. When its frame pacer writes the **intended display time** into the
@@ -244,9 +244,9 @@ to hundreds of good ones.
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
 | ![Animation error histogram](doc/images/chart-error-histogram.png) | ![Display time histogram](doc/images/chart-display-time-histogram.png) |
 
-- **Animation error distribution:** how often each error occurred. Each bar is one capture period (one refresh) wide. Everything
-  between the dashed lines (±½ refresh; ±1 camera period for a camera, its measurement resolution) counts as no error. Bars
-  further out are real errors: positive = shown too soon (moved too far), negative = shown too late (moved too little).
+- **Animation error distribution:** how often each error occurred, in 0.1 ms bars for every capture source. Everything between the
+  dashed lines (the error threshold, ±1 ms unless `--error-threshold-ms` changes it) counts as no error. Bars further out are real
+  errors: positive = shown too soon (moved too far), negative = shown too late (moved too little).
 - **Display time distribution:** how long frames stayed on screen (PresentMon's `MsBetweenDisplayChange`; overlays often call
   this "frame time"). Even pacing is one tall bar. Separate bars further right (often at
   multiples of the refresh period) are frames that stayed on screen too long.
@@ -303,8 +303,8 @@ There is no built-in frame rate limit: mb-framepacing records whatever the sourc
 - **Video files and image folders:** any rate. They are read as fast as the disk allows and nothing is dropped; the times come
   from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works. Footage of a
   camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [doc/camera.md](doc/camera.md)).
-- **Faster is more precise:** a capture card captures at the display's refresh rate and measures in whole refreshes (4.2 ms at
-  240 Hz, 2 ms at 500 Hz); a camera filming the screen is good to about one camera period (1 ms at 1000 fps).
+- **Precision:** a capture card captures at the display's refresh rate, so display times are whole refreshes and exact; a camera
+  filming the screen is good to about one camera period (1 ms at 1000 fps), which shows as noise in its errors.
 
 **Fast capture** (`--roi auto`, or **Locate marker** in the GUI) stores only the marker instead of whole frames. It first reads
 the source for a moment to find the marker, then has ffmpeg crop to that region and downscale it to 3 stored pixels per module.

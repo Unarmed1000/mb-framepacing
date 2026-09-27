@@ -52,7 +52,7 @@ namespace MB.FramePacing.App.Commands
       {
         Description =
           $"The frame rate the application aims for, e.g. 30 on a 60 Hz display; frames shown a refresh later are late ({where}). "
-          + "Default: each run's median display time.",
+          + "Default: the pacing in the markers, else one refresh per frame (the display's native rate).",
         Validators =
         {
           result =>

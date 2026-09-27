@@ -78,10 +78,9 @@ namespace MB.FramePacing.Gui.Views
 
       DrawTimeline(run, frames, withMetrics, Seconds);
 
-      long periodTicks = run != null ? (long)Math.Round(run.CapturePeriodMs * TimeSpan.TicksPerMillisecond) : 0;
-      var histograms = run != null ? RunHistograms.Create(run.Run, periodTicks) : null;
+      var histograms = run != null ? RunHistograms.Create(run.Run) : null;
 
-      // How often each animation error occurs; bins are one capture period wide, so each bar is one measurable value
+      // How often each animation error occurs, in the fixed 0.1 ms bins every capture source gets
       Reset(ErrorHistogramPlot, "Animation error distribution", "presented frames (log scale)", "animation error (ms)");
       if (histograms != null && histograms.AnimationErrorMs.Total > 0)
       {
@@ -131,7 +130,7 @@ namespace MB.FramePacing.Gui.Views
         line.LegendText = $"median {median:0.##} ms";
         DisplayTimeHistogramPlot.Plot.ShowLegend();
       }
-      Finish(DisplayTimeHistogramPlot, plot => plot.Axes.SetLimitsX(0, plot.Axes.GetLimits().Right));
+      Finish(DisplayTimeHistogramPlot, plot => plot.Axes.SetLimitsX(0, plot.Axes.GetLimits().Right * 1.05));
 
       // Cumulative drift
       Reset(DriftPlot, "Cumulative drift (animation time - display time)", "drift (ms)");
@@ -310,15 +309,12 @@ namespace MB.FramePacing.Gui.Views
       plot.Plot.Axes.Margins(bottom: 0);
     }
 
-    /// <summary>
-    /// The error threshold: errors inside it are not counted. A capture card sees whole refreshes, so it is half a refresh (one missed refresh
-    /// is outside); an EXPERIMENTAL camera films asynchronously, so it is one camera period (its measurement resolution).
-    /// </summary>
+    /// <summary>The error threshold: errors inside it are not counted as frames with animation error.</summary>
     private static void AddThresholdLines(AvaPlot plot, RunViewModel run, bool vertical, bool symmetric = true)
     {
       var color = ScottPlot.Colors.Orange;
       double threshold = run.ErrorThresholdMs;
-      string legend = run.IsCamera ? "1 camera period (the measurement resolution)" : "½ refresh (errors are whole refreshes)";
+      string legend = $"{threshold.ToString("0.###", CultureInfo.CurrentCulture)} ms error threshold";
       if (vertical)
       {
         plot.Plot.Add.VerticalLine(threshold, color: color, pattern: ScottPlot.LinePattern.Dashed).LegendText = "±" + legend;

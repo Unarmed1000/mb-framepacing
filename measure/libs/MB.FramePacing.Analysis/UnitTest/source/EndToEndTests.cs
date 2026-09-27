@@ -138,7 +138,13 @@ namespace MB.FramePacing.Analysis.UnitTest
         var histograms = summary.RootElement.GetProperty("runs")[0].GetProperty("histograms");
         long withError = run.Frames.LongCount(f => f.AnimationErrorTicks.HasValue);
         Assert.That(histograms.GetProperty("animationErrorMs").GetProperty("total").GetInt64(), Is.EqualTo(withError));
-        Assert.That(histograms.GetProperty("displayDeltaMs").GetProperty("binWidthMs").GetDouble(), Is.EqualTo(report.CapturePeriodMs).Within(1e-9));
+        long binWidthTicks = (long)
+          Math.Round(histograms.GetProperty("displayDeltaMs").GetProperty("binWidthMs").GetDouble() * TimeSpan.TicksPerMillisecond);
+        Assert.That(
+          binWidthTicks % Histogram.DefaultBinWidthTicks,
+          Is.Zero,
+          "the fixed bin width (or a multiple for a wide range), whatever the capture period"
+        );
       }
       Assert.That(
         File.ReadLines(Path.Combine(report.OutputDirectory, CaptureAnalyzer.CapturesFileName)).Count(),

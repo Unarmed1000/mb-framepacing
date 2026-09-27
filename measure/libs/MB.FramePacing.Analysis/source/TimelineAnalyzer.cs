@@ -24,12 +24,22 @@ namespace MB.FramePacing.Analysis
     /// <summary>How far the refresh rate may differ from the expected or calibrated one before the analysis warns (relative).</summary>
     public const double RefreshTolerance = 0.01;
 
+    /// <summary>The default |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThresholdTicks"/>): 1 ms.</summary>
+    public const long DefaultErrorThresholdTicks = TimeSpan.TicksPerMillisecond;
+
     public static TimelineResult Analyze(IReadOnlyList<CaptureRow> rows, TimelineOptions? options = null)
     {
       options ??= new TimelineOptions();
       var warnings = new List<string>();
       long period = EstimateCapturePeriod(rows);
-      long threshold = ErrorThreshold(period, options.Scanout);
+      long threshold = options.ErrorThresholdTicks;
+      // The report is the same for every source; a camera's coarser timing shows as noise in the errors, and the warning says how much
+      if (options.Scanout == ScanoutModel.Camera && period > threshold)
+        warnings.Add(
+          $"The camera times each frame to about one camera period ({period / (double)TimeSpan.TicksPerMillisecond:0.##} ms), more than the "
+            + $"{threshold / (double)TimeSpan.TicksPerMillisecond:0.###} ms error threshold: smaller animation errors are measurement noise. "
+            + $"--error-threshold-ms {period / (double)TimeSpan.TicksPerMillisecond:0.##} counts only the errors the camera resolves."
+        );
 
       var runRows = SplitIntoRuns(rows, warnings);
       var runs = new List<RunAnalysis>();
@@ -43,14 +53,6 @@ namespace MB.FramePacing.Analysis
         warnings.Add(options.RunId.HasValue ? $"Run {options.RunId} was not found in the capture" : "No frame markers were found in the capture");
       return new TimelineResult(period, threshold, runs, warnings);
     }
-
-    /// <summary>
-    /// The |animation error| above which a frame counts as off. A capture card captures at the display's refresh rate and sees one whole
-    /// refresh per capture, so display times and errors are whole refreshes: anything from half a capture period on is a real error (one
-    /// missed refresh counts). An EXPERIMENTAL camera films asynchronously: its times are only exact to one camera period.
-    /// </summary>
-    public static long ErrorThreshold(long capturePeriodTicks, ScanoutModel scanout) =>
-      scanout == ScanoutModel.Camera ? capturePeriodTicks : capturePeriodTicks / 2;
 
     /// <summary>Median interval between consecutive recorded captures.</summary>
     public static long EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
@@ -348,7 +350,7 @@ namespace MB.FramePacing.Analysis
         frames.Count > 0 ? frames[^1].Segment + 1 : 0
       );
       if (period <= 0)
-        warnings.Add("The capture period could not be determined; animation error thresholds are unavailable");
+        warnings.Add("The capture period could not be determined");
       if (SlowCaptureWarning(frames, period) is { } slowCapture)
         warnings.Add(slowCapture);
       return new RunAnalysis(

@@ -108,7 +108,7 @@ namespace MB.FramePacing.Analysis
         };
       }
 
-      var (uneven, even) = schedule ? SplitBySchedule(frames, errorThresholdTicks) : SplitByDisplay(frames, half, errorThresholdTicks);
+      var (uneven, even) = Split(frames, half, errorThresholdTicks);
       var targets = frames.Where(f => f.DisplayDeltaTicks.HasValue).Select(f => (double)f.TargetTicks!.Value).Order().ToArray();
       return new RunPacing(
         refreshTicks / (double)TimeSpan.TicksPerMillisecond,
@@ -151,41 +151,33 @@ namespace MB.FramePacing.Analysis
     private static long WholeRefreshes(double ticks, long refreshTicks) =>
       Math.Max(1, (long)Math.Ceiling((ticks / refreshTicks) - TargetRoundingSlack)) * refreshTicks;
 
-    /// <summary>With a schedule the animation error of every frame splits exactly: a frame counts for the larger of its two parts.</summary>
-    private static (long Uneven, long Even) SplitBySchedule(List<PresentedFrame> frames, long errorThresholdTicks)
-    {
-      long pacing = 0;
-      long prediction = 0;
-      foreach (var frame in frames)
-      {
-        if (frame.AnimationErrorTicks is not { } error || Math.Abs(error) <= errorThresholdTicks)
-          continue;
-        if (frame.PacingErrorTicks is { } p && frame.PredictionErrorTicks is { } q && Math.Abs(q) > Math.Abs(p))
-          ++prediction;
-        else
-          ++pacing;
-      }
-      return (pacing, prediction);
-    }
-
     /// <summary>
-    /// Without a schedule: frames with an error where this or the previous frame was shown off its target (or after skipped frames) are bad
-    /// pacing, the rest delta time jitter. A capture card sees whole refreshes; a camera times a frame to about one camera period, so it tells
-    /// smaller deviations (and tears, presented mid-refresh with vsync off) from an even display.
+    /// Which cause each frame with an error counts for: bad pacing (uneven) or delta time jitter (even).
+    /// <list type="bullet">
+    /// <item>With the pacer's schedule the animation error splits exactly: the frame counts for the larger of its pacing and prediction error.</item>
+    /// <item>
+    /// Otherwise (no schedule, or a frame without a split) it is bad pacing when this or the previous frame was shown off its target (or
+    /// after skipped frames, or torn), else delta time jitter. A display changes frames on refreshes, so a display time counts as off its
+    /// target from half a refresh on, whatever captured it.
+    /// </item>
+    /// </list>
     /// </summary>
-    private static (long Uneven, long Even) SplitByDisplay(List<PresentedFrame> frames, long half, long errorThresholdTicks)
+    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, long half, long errorThresholdTicks)
     {
-      long slack = Math.Min(half, 2 * errorThresholdTicks);
-      bool Uneven(PresentedFrame f) =>
-        f.Flags.HasFlag(PresentedFrameFlags.Torn) || (f.DisplayDeltaTicks is { } display && Math.Abs(display - f.TargetTicks!.Value) >= slack);
+      bool OffTarget(PresentedFrame f) =>
+        f.Flags.HasFlag(PresentedFrameFlags.Torn) || (f.DisplayDeltaTicks is { } display && Math.Abs(display - f.TargetTicks!.Value) >= half);
       long uneven = 0;
       long even = 0;
       for (int i = 0; i < frames.Count; ++i)
       {
-        if (frames[i].AnimationErrorTicks is not { } error || Math.Abs(error) <= errorThresholdTicks)
+        var frame = frames[i];
+        if (frame.AnimationErrorTicks is not { } error || Math.Abs(error) <= errorThresholdTicks)
           continue;
-        bool previousUneven = i > 0 && frames[i - 1].Segment == frames[i].Segment && Uneven(frames[i - 1]);
-        if (Uneven(frames[i]) || previousUneven || frames[i].SkippedBefore > 0)
+        bool pacing =
+          frame.PacingErrorTicks is { } p && frame.PredictionErrorTicks is { } q
+            ? Math.Abs(p) >= Math.Abs(q)
+            : OffTarget(frame) || frame.SkippedBefore > 0 || (i > 0 && frames[i - 1].Segment == frame.Segment && OffTarget(frames[i - 1]));
+        if (pacing)
           ++uneven;
         else
           ++even;

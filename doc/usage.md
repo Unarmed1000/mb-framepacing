@@ -41,8 +41,8 @@ Settings that matter:
 
 - **Capture at the same rate the display runs at.** Set the application's output to a mode the card captures natively, and capture
   it at that refresh rate: a 240 Hz output in the card's 240 fps mode. Every refresh is then exactly one captured frame, and the
-  analysis relies on it: the refresh period is the capture period. Display times and animation errors are then whole refreshes,
-  so one missed refresh (4.2 ms at 240 Hz) is measured exactly. A slower capture never sees some of the displayed frames (they
+  analysis relies on it: the refresh period is the capture period. Display times are then whole refreshes, measured exactly, and
+  so is the animation error. A slower capture never sees some of the displayed frames (they
   are reported as frame indices never seen).
 - Turn **G-Sync/FreeSync off**. Capture cards only pass variable refresh through to the monitor; they record at a constant rate, so
   the capture would not show when the display showed each frame. (A high speed camera filming the screen does: see the very
@@ -131,15 +131,15 @@ capture-20260924-153000/          (import-... for imports)
 
 The headline numbers on the Analyze page:
 
-| Tile                | Meaning                                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Presented frames    | Application frames that reached the display during the run                                                     |
-| Frames visibly off  | Frames with an animation error: a refresh or more for a capture card, more than one camera period for a camera |
-| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                                     |
-| Worst error         | The largest absolute animation error                                                                           |
-| Late frames         | Frames shown later than planned (see below), and their share of the run                                        |
-| Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches                      |
-| Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                              |
+| Tile                | Meaning                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Presented frames    | Application frames that reached the display during the run                                             |
+| Frames visibly off  | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms` |
+| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                             |
+| Worst error         | The largest absolute animation error                                                                   |
+| Late frames         | Frames shown later than planned (see below), and their share of the run                                |
+| Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches              |
+| Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                      |
 
 Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
 early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it

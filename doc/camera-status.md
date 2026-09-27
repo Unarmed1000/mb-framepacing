@@ -72,8 +72,8 @@ of C# rectification, well above 1000 fps on one core.
   a warning above 1 %). The calibration uses the same estimator, so a calibration clip must show one frame per
   refresh for most of it (vsync on, full rate).
 - **Animation error noise:** a camera's animation error is the difference of two first-seen times, each good to about one camera
-  period. The error count uses ±1 camera period, so a clean synthetic run at 1000 fps still counts a few dozen frames above it; the
-  pacing verdict ignores errors below 2 camera periods.
+  period. The error threshold is the same for every source (1 ms, `--error-threshold-ms`), so a slower camera's noise counts as
+  error frames; the analysis warns when the camera period is longer than the threshold.
 - **Vsync off:** a frame the main marker never saw (presented below it and replaced before the next scanout reached it) has no data
   of its own and counts as skipped; the frames around it can be marked late although their animation error is about 0.
 - The synthetic camera models a simple exponential panel response and a global shutter. Rolling shutter cameras (most phones)

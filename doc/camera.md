@@ -185,8 +185,9 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
   before the rig's calibration, and the calculated rate is compared with it: the Analyze page shows "Display refresh 59.99 Hz
   (calculated from the camera frames), expected 60 Hz: matches", and a difference above 1 % is a warning
   (`runs[].pacing.expectedRefreshHz`, `refreshDeviation`, `matchesExpectedRefresh`).
-- The animation error threshold (the dashed band, "frames visibly off") is one camera period, the measurement resolution. The
-  pacing verdict only attributes errors above 2 camera periods, the noise of two first-seen times.
+- The animation error threshold (the dashed band, "frames visibly off") is the same as for every capture source: 1 ms unless
+  `analyze --error-threshold-ms` changes it. A camera's animation error carries noise of about one camera period (two first-seen
+  times), so when the camera period is longer than the threshold the report warns and suggests the camera period as the threshold.
 
 Every camera report carries the "VERY EXPERIMENTAL" warning.
 

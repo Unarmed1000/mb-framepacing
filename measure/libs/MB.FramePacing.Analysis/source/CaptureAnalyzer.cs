@@ -231,7 +231,7 @@ namespace MB.FramePacing.Analysis
               run.Counts,
               run.Statistics,
               run.Pacing,
-              histograms = RunHistograms.Create(run, report.Timeline.CapturePeriodTicks),
+              histograms = RunHistograms.Create(run),
               camera = run.Camera,
               run.Warnings,
             }

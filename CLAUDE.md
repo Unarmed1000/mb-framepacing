@@ -95,9 +95,12 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures.
 - **Refresh rate and pacing:**
   - A capture card captures at the display's native refresh rate: that is a fundamental assumption, not a setting. The analysis
-    takes the capture period as the refresh period, errors are whole refreshes, and one missed refresh counts (the error threshold
-    is half a capture period; `TimelineAnalyzer.ErrorThreshold`). `SyntheticCaptureSource` refuses a capture rate that differs
+    takes the capture period as the refresh period; display times are whole refreshes. `SyntheticCaptureSource` refuses a capture rate that differs
     from the refresh; `selftest --fps N` simulates an N Hz display.
+  - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
+    0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
+    `TimelineOptions.ErrorThresholdTicks`), and a display time is off its target from half a refresh on. A source's precision (a
+    camera's period) goes into warnings, never into the binning or the thresholds.
   - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`, also used
     by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %

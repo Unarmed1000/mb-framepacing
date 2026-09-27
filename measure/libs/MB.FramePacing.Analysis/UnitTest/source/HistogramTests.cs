@@ -49,7 +49,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var histogram = Histogram.FromTicks(new[] { 0, 1000 * Ms }, 2 * Ms, maxBins: 100);
 
       Assert.That(histogram.Bins, Has.Count.LessThanOrEqualTo(100));
-      Assert.That(histogram.BinWidthMs % 2, Is.Zero, "still a multiple of the capture period");
+      Assert.That(histogram.BinWidthMs % 2, Is.Zero, "still a multiple of the requested width");
       Assert.That(histogram.Bins.Sum(b => b.Count), Is.EqualTo(2));
     }
 

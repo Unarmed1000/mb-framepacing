@@ -21,7 +21,13 @@ namespace MB.FramePacing.Analysis
     /// <summary>Only analyse this run id (null = all runs).</summary>
     public uint? RunId { get; init; }
 
-    /// <summary>The frame rate the application aims for (null = each run's median display time, in whole refreshes).</summary>
+    /// <summary>
+    /// The |animation error| above which a frame counts as off, the same for every capture source. The animation error is measured exactly
+    /// (the marker's animation time against the display time), so the default is small: 1 ms.
+    /// </summary>
+    public long ErrorThresholdTicks { get; init; } = TimelineAnalyzer.DefaultErrorThresholdTicks;
+
+    /// <summary>The frame rate the application aims for (null = the markers' pacing, else one refresh per frame).</summary>
     public double? TargetFps { get; init; }
 
     /// <summary>

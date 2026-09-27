@@ -30,6 +30,19 @@ namespace MB.FramePacing.App.Commands
       var outputOption = new Option<string?>("--output", "-o") { Description = "Report directory (default: <capture>/analysis)." };
       var targetOption = CommonOptions.TargetFps("overrides the one stored in capture.json");
       var displayOption = CommonOptions.DisplayHz("overrides the one stored in capture.json");
+      var thresholdOption = new Option<double?>("--error-threshold-ms")
+      {
+        Description =
+          $"The |animation error| above which a frame counts as off, in ms (default {TimelineAnalyzer.DefaultErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond:0.###}).",
+        Validators =
+        {
+          result =>
+          {
+            if (result.GetValueOrDefault<double?>() is <= 0)
+              result.AddError("--error-threshold-ms must be greater than 0.");
+          },
+        },
+      };
 
       var command = new Command("analyze", "Decode the markers of a capture and report animation error.")
       {
@@ -39,6 +52,7 @@ namespace MB.FramePacing.App.Commands
         outputOption,
         targetOption,
         displayOption,
+        thresholdOption,
       };
       command.SetAction(parseResult =>
       {
@@ -50,6 +64,9 @@ namespace MB.FramePacing.App.Commands
             RunId = parseResult.GetValue(runOption),
             TargetFps = parseResult.GetValue(targetOption),
             ExpectedRefreshHz = parseResult.GetValue(displayOption),
+            ErrorThresholdTicks = parseResult.GetValue(thresholdOption) is { } ms
+              ? (long)Math.Round(ms * TimeSpan.TicksPerMillisecond)
+              : TimelineAnalyzer.DefaultErrorThresholdTicks,
           },
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,
@@ -126,7 +143,7 @@ namespace MB.FramePacing.App.Commands
         AddRow(table, "On screen", s.OnScreenMs);
         AnsiConsole.Write(table);
         AnsiConsole.MarkupLineInterpolated(
-          $"{s.FramesWithAnimationError} frame(s) with |animation error| above {report.ErrorThresholdMs:0.###} ms ({ThresholdReason(report)})."
+          $"{s.FramesWithAnimationError} frame(s) with |animation error| above {report.ErrorThresholdMs:0.###} ms (the error threshold, --error-threshold-ms)."
         );
         if (run.Pacing is { } pacing)
         {
@@ -143,11 +160,6 @@ namespace MB.FramePacing.App.Commands
       }
       AnsiConsole.MarkupLineInterpolated($"[grey]Reports written to {report.OutputDirectory}[/]");
     }
-
-    private static string ThresholdReason(AnalysisReport report) =>
-      report.Session?.Camera != null
-        ? "one camera period: a camera films asynchronously"
-        : "half a capture period: a capture card sees whole refreshes";
 
     /// <summary>The refresh rate the run was measured with, where it comes from, and how it compares with the expected rate.</summary>
     public static string RefreshText(RunPacing pacing)
