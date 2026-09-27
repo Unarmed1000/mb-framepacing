@@ -255,8 +255,10 @@ to hundreds of good ones.
 
 ![Animation error by percentile](doc/images/chart-error-percentiles.png)
 
-The histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`), and late frames carry
-`Late` in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools.
+The charts can also be written as PNG files next to the reports (`run-<id>-timeline.png`, `-error-histogram.png`,
+`-error-percentiles.png`, `-display-time-histogram.png`, `-drift.png`): `--charts` on the command line, **Save charts** in the GUI. The
+histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`), and late frames carry `Late`
+in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools.
 
 ### The command line
 
@@ -281,7 +283,8 @@ mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline 
 ```
 
 `mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
-`captures.csv` (one row per captured frame) and `run-<id>-frames.csv` (one row per presented application frame).
+`captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
+the charts as `run-<id>-*.png`.
 
 ### What you need
 

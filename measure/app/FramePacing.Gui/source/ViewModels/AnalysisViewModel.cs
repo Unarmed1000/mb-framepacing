@@ -11,10 +11,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Charts;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
@@ -22,6 +24,7 @@ namespace MB.FramePacing.Gui.ViewModels
   {
     private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
+    private AnalysisReport? m_report;
 
     public AnalysisViewModel(IDialogService dialogs, GuiSettings settings)
     {
@@ -115,6 +118,24 @@ namespace MB.FramePacing.Gui.ViewModels
         m_dialogs.ShowInFileManager(ReportDirectory);
     }
 
+    /// <summary>Write the charts of every run as PNG images next to the reports (the same files as 'analyze --charts').</summary>
+    [RelayCommand]
+    private async Task SaveChartsAsync()
+    {
+      if (m_report is not { } report)
+        return;
+      try
+      {
+        var files = await Task.Run(() => ChartFiles.Write(report, ChartTheme.Light));
+        ErrorText = string.Empty;
+        SummaryText = $"{files.Count} chart image(s) written to {report.OutputDirectory}";
+      }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+      {
+        ErrorText = "Could not write the chart images: " + ex.Message;
+      }
+    }
+
     private bool CanAnalyze() => !IsBusy && !string.IsNullOrWhiteSpace(CaptureDirectory);
 
     [RelayCommand(CanExecute = nameof(CanAnalyze))]
@@ -126,6 +147,7 @@ namespace MB.FramePacing.Gui.ViewModels
       Warnings.Clear();
       Runs.Clear();
       SelectedRun = null;
+      m_report = null;
       SummaryText = "Decoding markers...";
       try
       {
@@ -141,7 +163,10 @@ namespace MB.FramePacing.Gui.ViewModels
           ToolVersion = MainWindowViewModel.Version,
         };
         var progress = new Progress<double>(value => ProgressPercent = value * 100);
-        var report = await Task.Run(() => CaptureAnalyzer.Analyze(directory, options, progress));
+        var report = await Task.Run(() =>
+        {
+          return CaptureAnalyzer.Analyze(directory, options, progress);
+        });
 
         var layout = report.Capture.Layout;
         SummaryText =
@@ -151,9 +176,10 @@ namespace MB.FramePacing.Gui.ViewModels
         foreach (var warning in report.Warnings)
           Warnings.Add(warning);
         foreach (var run in report.Timeline.Runs)
-          Runs.Add(new RunViewModel(run, report.CapturePeriodMs, report.ErrorThresholdMs, report.Session?.Camera != null));
+          Runs.Add(new RunViewModel(ChartRun.From(report, run)));
         SelectedRun = Runs.Count > 0 ? Runs[0] : null;
         ReportDirectory = report.OutputDirectory;
+        m_report = report;
         ProgressPercent = 100;
       }
       catch (Exception ex)

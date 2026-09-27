@@ -13,19 +13,19 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 
 ## Layout
 
-| Path                                              | Contents                                                                                     |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                             |
-| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                         |
-| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.0, C# 9, no dependencies) + NUnit tests |
-| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                |
-| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests        |
-| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                         |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis libraries (+ `UnitTest/`), DocImages, Benchmarks  |
-| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions           |
-| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                         |
-| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses             |
-| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`              |
+| Path                                              | Contents                                                                                           |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                                   |
+| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                               |
+| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.0, C# 9, no dependencies) + NUnit tests       |
+| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                      |
+| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests              |
+| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                               |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks |
+| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                 |
+| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                               |
+| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses                   |
+| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                    |
 
 ## Build and test
 
@@ -97,6 +97,10 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - A capture card captures at the display's native refresh rate: that is a fundamental assumption, not a setting. The analysis
     takes the capture period as the refresh period; display times are whole refreshes. `SyntheticCaptureSource` refuses a capture rate that differs
     from the refresh; `selftest --fps N` simulates an N Hz display.
+  - **Charts** live in `MB.FramePacing.Charts` (`RunCharts`, ScottPlot core, no GUI): the GUI draws them into its controls, and on request
+    (`--charts`, the GUI's "Save charts") `ChartFiles` writes them as `run-<id>-*.png` next to the reports. Test chart changes with
+    `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
+    with `VideoClipTests` by linked source files).
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
     0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
     `TimelineOptions.ErrorThresholdTicks`), and a display time is off its target from half a refresh on. A source's precision (a

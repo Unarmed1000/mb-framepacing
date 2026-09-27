@@ -1,0 +1,15 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The analysis charts, drawn with ScottPlot: the GUI shows them, the command line and the GUI write them as PNG files -->
+  <ItemGroup>
+    <PackageReference Include="ScottPlot" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.Charts.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Analysis\MB.FramePacing.Analysis.csproj" />
+  </ItemGroup>
+</Project>

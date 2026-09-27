@@ -63,6 +63,7 @@ namespace MB.FramePacing.App.Commands
       var targetOption = CommonOptions.TargetFps("stored in capture.json");
       var displayOption = CommonOptions.DisplayHz("stored in capture.json");
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the capture afterwards." };
+      var chartsOption = CommonOptions.Charts();
       var ffmpegOption = CommonOptions.Ffmpeg();
       var cameraOption = CameraRigCommand.CameraOption();
 
@@ -83,6 +84,7 @@ namespace MB.FramePacing.App.Commands
         targetOption,
         displayOption,
         analyzeOption,
+        chartsOption,
         ffmpegOption,
       };
 
@@ -140,7 +142,11 @@ namespace MB.FramePacing.App.Commands
             PrintResult(result.Session);
 
             if (parseResult.GetValue(analyzeOption))
-              return AnalyzeCommand.Run(result.Directory, new AnalysisOptions { ToolVersion = Program.VersionString });
+              return AnalyzeCommand.Run(
+                result.Directory,
+                new AnalysisOptions { ToolVersion = Program.VersionString },
+                charts: parseResult.GetValue(chartsOption)
+              );
             return Program.ResultSuccess;
           }
           catch (Exception ex)

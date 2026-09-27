@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* The refresh strip: one cell per display refresh, shaded by the frame on screen, so hold patterns (3-then-1, 2-2-2) show at a glance
-//* when zoomed in. Draws only the visible frames.
+//* when zoomed in. The frames' spans and cell counts are computed in ticks; only drawing converts them. Draws only the visible frames.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -14,13 +14,15 @@ using MB.FramePacing.Analysis;
 using ScottPlot;
 using SkiaSharp;
 
-namespace MB.FramePacing.Gui.Views
+namespace MB.FramePacing.Charts
 {
   internal sealed class RefreshStripPlottable : IPlottable
   {
     // Cell and frame edges are only drawn when they are at least this far apart on screen
     private const float MinCellPixels = 4;
 
+    private readonly long[] m_startTicks;
+    private readonly long[] m_endTicks;
     private readonly double[] m_start;
     private readonly double[] m_end;
     private readonly int[] m_cells;
@@ -28,22 +30,18 @@ namespace MB.FramePacing.Gui.Views
     private readonly bool[] m_skippedBefore;
 
     /// <param name="frames">The run's presented frames.</param>
-    /// <param name="seconds">A frame's first-seen time on the chart's x axis (seconds).</param>
-    /// <param name="refreshSeconds">The display's refresh period.</param>
-    /// <param name="capturePeriodSeconds">The capture period.</param>
+    /// <param name="originTicks">The time at x = 0 (the run's first frame).</param>
+    /// <param name="refreshTicks">The display's refresh period.</param>
+    /// <param name="capturePeriodTicks">The capture period.</param>
     /// <param name="camera">
     /// A camera sees each frame until the next one (the undecodable captures between are the scanout crossing the marker); a capture card
-    /// sees whole refreshes, so captures between two frames that could not be decoded stay unknown (grey).
+    /// sees whole refreshes, so captures between two frames that could not be decoded stay unknown.
     /// </param>
-    public RefreshStripPlottable(
-      IReadOnlyList<PresentedFrame> frames,
-      Func<PresentedFrame, double> seconds,
-      double refreshSeconds,
-      double capturePeriodSeconds,
-      bool camera
-    )
+    public RefreshStripPlottable(IReadOnlyList<PresentedFrame> frames, long originTicks, long refreshTicks, long capturePeriodTicks, bool camera)
     {
       int n = frames.Count;
+      m_startTicks = new long[n];
+      m_endTicks = new long[n];
       m_start = new double[n];
       m_end = new double[n];
       m_cells = new int[n];
@@ -53,18 +51,29 @@ namespace MB.FramePacing.Gui.Views
       {
         var frame = frames[i];
         bool hasNext = i + 1 < n && frames[i + 1].Segment == frame.Segment;
-        double start = seconds(frame);
-        double lastSeen = start + ((frame.LastSeenTicks - frame.FirstSeenTicks) / (double)TimeSpan.TicksPerSecond) + capturePeriodSeconds;
-        double end = camera && hasNext ? seconds(frames[i + 1]) : lastSeen;
+        long start = frame.FirstSeenTicks - originTicks;
+        long end = camera && hasNext ? frames[i + 1].FirstSeenTicks - originTicks : frame.LastSeenTicks + capturePeriodTicks - originTicks;
         if (hasNext)
-          end = Math.Min(end, seconds(frames[i + 1]));
-        m_start[i] = start;
-        m_end[i] = end;
-        m_cells[i] = Math.Max(1, (int)Math.Round((end - start) / refreshSeconds));
+          end = Math.Min(end, frames[i + 1].FirstSeenTicks - originTicks);
+        m_startTicks[i] = start;
+        m_endTicks[i] = end;
+        m_start[i] = start / (double)TimeSpan.TicksPerSecond;
+        m_end[i] = end / (double)TimeSpan.TicksPerSecond;
+        m_cells[i] = refreshTicks > 0 ? (int)Math.Max(1, ((end - start) + (refreshTicks / 2)) / refreshTicks) : 1;
         m_flags[i] = frame.Flags;
         m_skippedBefore[i] = frame.SkippedBefore > 0;
       }
     }
+
+    /// <summary>Each frame's span on the strip, from the origin: from its first capture to the next frame (or past its last capture).</summary>
+    internal IReadOnlyList<long> StartTicks => m_startTicks;
+
+    internal IReadOnlyList<long> EndTicks => m_endTicks;
+
+    /// <summary>Each frame's refreshes: its span in whole refreshes (at least one).</summary>
+    internal IReadOnlyList<int> Cells => m_cells;
+
+    internal IReadOnlyList<PresentedFrameFlags> Flags => m_flags;
 
     public Color EvenColor { get; set; } = Colors.SteelBlue;
     public Color OddColor { get; set; } = Colors.LightSteelBlue;
@@ -98,7 +107,7 @@ namespace MB.FramePacing.Gui.Views
         StrokeWidth = 1,
       };
 
-      // Unknown (grey) behind everything: captures between frames that could not be decoded
+      // Unknown behind everything: captures between frames that could not be decoded
       paint.Color = UnknownColor.ToSKColor();
       canvas.DrawRect(new SKRect(Axes.GetPixelX(Math.Max(left, m_start[0])), top, Axes.GetPixelX(Math.Min(right, m_end[^1])), bottom), paint);
 

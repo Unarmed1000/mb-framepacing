@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\libs\MB.FramePacing.Analysis\MB.FramePacing.Analysis.csproj" />
+    <ProjectReference Include="..\..\libs\MB.FramePacing.Charts\MB.FramePacing.Charts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

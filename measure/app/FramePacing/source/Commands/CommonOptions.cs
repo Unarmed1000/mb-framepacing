@@ -29,6 +29,13 @@ namespace MB.FramePacing.App.Commands
         Description = "Path to the ffmpeg executable (default: $MB_FFMPEG, then ffmpegPath in the configuration file, then PATH). Needs FFmpeg 5.1+.",
       };
 
+    /// <summary>--charts: also write the Analyze page's charts as PNG images next to the reports.</summary>
+    public static Option<bool> Charts() =>
+      new Option<bool>("--charts")
+      {
+        Description = "Also write the charts as PNG images next to the reports (run-<id>-timeline.png, -error-histogram.png, ...).",
+      };
+
     /// <summary>--display-hz: the display refresh rate the user expects, compared with the one the capture shows.</summary>
     public static Option<double?> DisplayHz(string where) =>
       new Option<double?>("--display-hz")

@@ -126,8 +126,13 @@ capture-20260924-153000/          (import-... for imports)
 └── analysis/
     ├── summary.json              counts, statistics, histograms, warnings per run
     ├── captures.csv              one row per recorded frame: capture time and what its marker said
-    └── run-<id>-frames.csv       one row per application frame shown: display time, animation error, drift
+    ├── run-<id>-frames.csv       one row per application frame shown: display time, animation error, drift
+    └── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, error-histogram,
+                                  error-percentiles, display-time-histogram, drift)
 ```
+
+The chart images are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the GUI's **Save charts**; both
+write the same files.
 
 The headline numbers on the Analyze page:
 

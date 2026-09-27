@@ -7,20 +7,26 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Charts;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
   public sealed class RunViewModel
   {
-    public RunViewModel(RunAnalysis run, double capturePeriodMs, double errorThresholdMs, bool camera)
+    public RunViewModel(ChartRun chart)
     {
+      var run = chart.Run;
+      double capturePeriodMs = chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond;
+      double errorThresholdMs = chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+      Chart = chart;
       Run = run;
       CapturePeriodMs = capturePeriodMs;
       ErrorThresholdMs = errorThresholdMs;
-      IsCamera = camera;
+      IsCamera = chart.Camera;
       Title = $"Run {run.RunId}" + (run.Name != null ? $"  '{run.Name}'" : string.Empty);
       var c = run.Counts;
       StartText = run.StartTimeUtc is { } start ? $"Started {start.ToLocalTime():yyyy-MM-dd HH:mm:ss}" : "No start time";
@@ -93,6 +99,9 @@ namespace MB.FramePacing.Gui.ViewModels
       }
       Statistics = statistics;
     }
+
+    /// <summary>What the charts are drawn from.</summary>
+    public ChartRun Chart { get; }
 
     public RunAnalysis Run { get; }
     public double CapturePeriodMs { get; }

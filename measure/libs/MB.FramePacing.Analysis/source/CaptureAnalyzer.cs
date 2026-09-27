@@ -113,8 +113,13 @@ namespace MB.FramePacing.Analysis
       return recorded > 0 ? capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable) / (double)recorded : 0;
     }
 
-    public static string RunFramesFileName(RunAnalysis run, int ordinal) =>
-      ordinal == 0 ? $"run-{run.RunId}-frames.csv" : $"run-{run.RunId}-{ordinal + 1}-frames.csv";
+    /// <summary>
+    /// The start of every report file of a run: "run-{id}", and "run-{id}-{n}" for the n-th run with the same id (<paramref name="ordinal"/>
+    /// counts from 0 among the runs with that id).
+    /// </summary>
+    public static string RunFilePrefix(RunAnalysis run, int ordinal) => ordinal == 0 ? $"run-{run.RunId}" : $"run-{run.RunId}-{ordinal + 1}";
+
+    public static string RunFramesFileName(RunAnalysis run, int ordinal) => RunFilePrefix(run, ordinal) + "-frames.csv";
 
     private static void WriteReports(AnalysisReport report, AnalysisOptions options)
     {

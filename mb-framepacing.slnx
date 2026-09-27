@@ -13,6 +13,7 @@
   <Folder Name="/libs/">
     <Project Path="measure/libs/MB.FramePacing.Analysis/MB.FramePacing.Analysis.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Capture/MB.FramePacing.Capture.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Charts/MB.FramePacing.Charts.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Marker/MB.FramePacing.Marker.csproj" />
   </Folder>
   <Folder Name="/tools/">
@@ -23,6 +24,7 @@
     <Project Path="marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Analysis/UnitTest/MB.FramePacing.Analysis.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Capture/UnitTest/MB.FramePacing.Capture.UnitTest.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Charts/UnitTest/MB.FramePacing.Charts.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj" />
   </Folder>
 </Solution>

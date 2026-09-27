@@ -12,6 +12,7 @@ using System.CommandLine;
 using System.Globalization;
 using System.IO;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Charts;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -30,6 +31,7 @@ namespace MB.FramePacing.App.Commands
       var outputOption = new Option<string?>("--output", "-o") { Description = "Report directory (default: <capture>/analysis)." };
       var targetOption = CommonOptions.TargetFps("overrides the one stored in capture.json");
       var displayOption = CommonOptions.DisplayHz("overrides the one stored in capture.json");
+      var chartsOption = CommonOptions.Charts();
       var thresholdOption = new Option<double?>("--error-threshold-ms")
       {
         Description =
@@ -53,6 +55,7 @@ namespace MB.FramePacing.App.Commands
         targetOption,
         displayOption,
         thresholdOption,
+        chartsOption,
       };
       command.SetAction(parseResult =>
       {
@@ -71,12 +74,13 @@ namespace MB.FramePacing.App.Commands
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,
         };
-        return Run(Path.GetFullPath(parseResult.GetValue(directoryArgument)!), options);
+        return Run(Path.GetFullPath(parseResult.GetValue(directoryArgument)!), options, charts: parseResult.GetValue(chartsOption));
       });
       return command;
     }
 
-    public static int Run(string directory, AnalysisOptions options)
+    /// <summary>Analyses a capture, writes the reports (and the chart images when <paramref name="charts"/> is set) and prints the results.</summary>
+    public static int Run(string directory, AnalysisOptions options, bool charts)
     {
       try
       {
@@ -90,7 +94,10 @@ namespace MB.FramePacing.App.Commands
             report = CaptureAnalyzer.Analyze(directory, options, new Progress<double>(value => task.Value = value));
             task.Value = 1.0;
           });
+        var chartFiles = charts ? ChartFiles.Write(report!, ChartTheme.Light) : Array.Empty<string>();
         Print(report!);
+        if (chartFiles.Count > 0)
+          AnsiConsole.MarkupLineInterpolated($"[grey]{chartFiles.Count} chart image(s) written next to them (run-*-timeline.png, ...)[/]");
         return Program.ResultSuccess;
       }
       catch (Exception ex)

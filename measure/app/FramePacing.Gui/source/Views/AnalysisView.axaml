@@ -10,7 +10,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
         <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
         <ComboBox
@@ -24,7 +24,7 @@
           Width="120"
           Text="{Binding TargetFpsText}"
           PlaceholderText="Target fps"
-          ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Empty = the target stored with the capture, or each run's median display time."
+          ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Empty = the target stored with the capture, else the pacing in the markers, else one refresh per frame."
         />
         <TextBox
           Grid.Column="4"
@@ -35,6 +35,13 @@
         />
         <Button Grid.Column="5" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
         <Button Grid.Column="6" Content="Open reports" Command="{Binding OpenReportsCommand}" />
+        <Button
+          Grid.Column="7"
+          Content="Save charts"
+          Command="{Binding SaveChartsCommand}"
+          IsEnabled="{Binding HasRun}"
+          ToolTip.Tip="Write the charts of every run as PNG images next to the reports (the same files as 'analyze --charts')."
+        />
       </Grid>
     </Border>
 
