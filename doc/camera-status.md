@@ -28,6 +28,7 @@ labelled "very experimental" until the validation below has been done.
 | Camera analysis (scanout delay, camera tears, second zone only)    | Implemented                              | Unit tests against the synthetic ground truth                      |
 | Refresh rate calculated per run (`RefreshEstimator`), late frames  | Implemented                              | Unit tests, `selftest --camera` (60 Hz found as 16.67 ms)          |
 | GUI camera wizard (shows the camera frames), camera card           | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
+| GUI: hidden unless Settings → Experimental features is on          | Implemented                              | DocImages (headless: off for the capture page, on for the camera)  |
 | Live UVC cameras (`capture -d <camera> --camera`)                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                |
 | Real cameras and displays                                          | **Not validated**                        | Nothing yet                                                        |
 

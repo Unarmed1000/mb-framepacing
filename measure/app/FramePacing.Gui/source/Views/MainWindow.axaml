@@ -28,7 +28,12 @@
             <TextBlock Text="{Binding FfmpegSummary}" FontSize="12" />
           </StackPanel>
         </Border>
-        <Button Grid.Column="3" Content="Settings" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="ffmpeg and where captures are saved" />
+        <Button
+          Grid.Column="3"
+          Content="Settings"
+          Command="{Binding OpenSettingsCommand}"
+          ToolTip.Tip="ffmpeg, where captures are saved, experimental features"
+        />
       </Grid>
     </Border>
 
@@ -38,6 +43,9 @@
       </TabItem>
       <TabItem Header="Analyze">
         <views:AnalysisView DataContext="{Binding Analysis}" Margin="0,8,0,0" />
+      </TabItem>
+      <TabItem Header="Settings">
+        <views:SettingsView DataContext="{Binding Settings}" Margin="0,8,0,0" />
       </TabItem>
     </TabControl>
   </DockPanel>

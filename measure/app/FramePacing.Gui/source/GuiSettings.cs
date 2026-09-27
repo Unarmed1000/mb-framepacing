@@ -23,6 +23,9 @@ namespace MB.FramePacing.Gui
       "gui-settings.json"
     );
 
+    /// <summary>Where the settings are saved.</summary>
+    public static string FilePath => g_path;
+
     /// <summary>The format this version writes and the newest it reads.</summary>
     public const int CurrentFormatVersion = 1;
 
@@ -50,6 +53,9 @@ namespace MB.FramePacing.Gui
 
     /// <summary>The display refresh rate the user expects, stored with each capture for the analysis to compare with (empty = none).</summary>
     public string? DisplayHz { get; set; }
+
+    /// <summary>Show the experimental features (camera capture). Off: they are hidden and never used.</summary>
+    public bool ExperimentalFeatures { get; set; }
 
     /// <summary>EXPERIMENTAL camera capture: film the screen with the calibrated rig, its file, a slow motion clip's recorded fps.</summary>
     public bool UseCamera { get; set; }

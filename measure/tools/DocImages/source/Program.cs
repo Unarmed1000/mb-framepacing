@@ -150,6 +150,8 @@ namespace MB.FramePacing.DocImages
       // Captures and saved cameras go to the automation folder, never to the example path shown in the screenshots
       capture.OutputRoot = MB.FramePacing.Gui.Program.OutputRoot!;
       viewModel.SelectedTab = MainWindowViewModel.CaptureTab;
+      // The camera is an experimental feature: the Settings page's switch shows it (the other screenshots show the default, off)
+      viewModel.Settings.ExperimentalFeatures = true;
       capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.SyntheticCamera);
 
       var wizard = capture.CreateCameraWizard();

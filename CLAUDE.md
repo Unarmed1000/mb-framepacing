@@ -120,6 +120,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `RecommendedOrigin(kind, …)`
   places both; there are no other slots.
 - **Camera capture (VERY EXPERIMENTAL, `doc/camera.md`):**
+  - The GUI hides it (the camera card, the synthetic camera source) unless **Settings → Experimental features** is on
+    (`GuiSettings.ExperimentalFeatures`, `CaptureViewModel.ExperimentalFeatures`); switched off, a camera chosen earlier is not used.
   - Every place users meet it says "very experimental": CLI help, the GUI card, `CameraRig.ExperimentalNotice` in rig files and
     analysis warnings, docs. Keep it that way until it is validated with real hardware, and keep `doc/camera-status.md`
     (status, known issues, next steps) current with every camera change.

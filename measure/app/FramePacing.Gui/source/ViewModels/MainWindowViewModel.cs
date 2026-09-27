@@ -22,6 +22,7 @@ namespace MB.FramePacing.Gui.ViewModels
   {
     public const int CaptureTab = 0;
     public const int AnalysisTab = 1;
+    public const int SettingsTab = 2;
 
     private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
@@ -33,7 +34,8 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings = settings;
       Capture = new CaptureViewModel(dialogs, settings);
       Analysis = new AnalysisViewModel(dialogs, settings);
-      SelectedTab = settings.SelectedTab is CaptureTab or AnalysisTab ? settings.SelectedTab : CaptureTab;
+      Settings = new SettingsViewModel(dialogs, Capture, () => ShowSetupAsync(firstRun: false));
+      SelectedTab = settings.SelectedTab is CaptureTab or AnalysisTab or SettingsTab ? settings.SelectedTab : CaptureTab;
       Capture.CaptureCompleted += directory =>
       {
         SelectedTab = AnalysisTab;
@@ -68,6 +70,11 @@ namespace MB.FramePacing.Gui.ViewModels
 
     public AnalysisViewModel Analysis { get; }
 
+    public SettingsViewModel Settings { get; }
+
+    /// <summary>Where captures go unless the configuration file names a folder.</summary>
+    public static string DefaultCaptureDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "mb-framepacing");
+
     public bool FfmpegReady => Capture.FfmpegReady;
 
     public string FfmpegSummary => Capture.FfmpegSummary;
@@ -99,18 +106,19 @@ namespace MB.FramePacing.Gui.ViewModels
         await ShowSetupAsync(firstRun: true);
     }
 
+    /// <summary>The header's Settings button: the Settings page.</summary>
     [RelayCommand]
-    private Task OpenSettingsAsync() => ShowSetupAsync(firstRun: false);
+    private void OpenSettings() => SelectedTab = SettingsTab;
 
     private async Task ShowSetupAsync(bool firstRun)
     {
-      var defaultCaptures = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "mb-framepacing");
-      var setup = new SetupViewModel(m_dialogs, SafeLoadConfig(), defaultCaptures, firstRun);
+      var setup = new SetupViewModel(m_dialogs, SafeLoadConfig(), DefaultCaptureDirectory, firstRun);
       if (await m_dialogs.ShowSetupAsync(setup))
         await Capture.RefreshDevicesAsync();
     }
 
-    private static FramePacingConfig SafeLoadConfig()
+    /// <summary>The configuration file, or the defaults when it can not be read.</summary>
+    public static FramePacingConfig SafeLoadConfig()
     {
       try
       {

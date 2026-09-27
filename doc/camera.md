@@ -85,7 +85,8 @@ GUI share it. Replacing or deleting a saved camera keeps the old file in `camera
 
 ### In the GUI: the camera wizard
 
-On the Capture page, open **Camera (very experimental)** and press **Set up camera...**. The wizard has two paths, so its step
+In the GUI the camera is hidden until you switch on **Settings → Experimental features → Enable experimental features**. Then,
+on the Capture page, open **Camera (very experimental)** and press **Set up camera...**. The wizard has two paths, so its step
 count differs:
 
 - **New camera**, 6 steps: Which camera? → Mount → Source → Calibrate → Save → Done.

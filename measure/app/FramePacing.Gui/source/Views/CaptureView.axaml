@@ -72,8 +72,8 @@
           </StackPanel>
         </Border>
 
-        <!-- VERY EXPERIMENTAL: filming the screen with a calibrated high speed camera -->
-        <Border Classes="card" IsEnabled="{Binding IsIdle}">
+        <!-- VERY EXPERIMENTAL: filming the screen with a calibrated high speed camera (only with the experimental features on) -->
+        <Border Classes="card" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
           <Expander IsExpanded="{Binding Camera.UseCamera, Mode=OneTime}" HorizontalAlignment="Stretch">
             <Expander.Header>
               <TextBlock Classes="cardTitle" Text="Camera (very experimental)" />

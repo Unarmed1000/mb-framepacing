@@ -9,6 +9,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -67,14 +68,42 @@ namespace MB.FramePacing.Gui.ViewModels
       MediaPath = settings.MediaPath ?? string.Empty;
       ImageFpsText = settings.ImageFps ?? "240";
       TimestampFile = settings.TimestampFile ?? string.Empty;
-      foreach (var item in g_otherSources)
+      foreach (var item in OtherSources())
         Devices.Add(item);
       SelectedDevice = Devices.First(d => d.Kind == SourceKind.Synthetic);
+      ExperimentalFeatures = settings.ExperimentalFeatures; // adds the experimental sources
       Camera = new CameraRigViewModel(settings, CameraLibraryDirectory, OpenCameraWizardAsync, token => OpenCameraSource(CurrentChoice(), token));
     }
 
     /// <summary>The camera card (VERY EXPERIMENTAL).</summary>
     public CameraRigViewModel Camera { get; }
+
+    /// <summary>
+    /// Show the experimental features (the Settings page's switch): the camera card and the synthetic camera source. Off, they are hidden and
+    /// a camera chosen earlier is not used.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ExperimentalFeatures { get; set; }
+
+    /// <summary>Film the screen with the camera rig: only when the experimental features are on.</summary>
+    private bool UseCamera => ExperimentalFeatures && Camera.UseCamera;
+
+    partial void OnExperimentalFeaturesChanged(bool value)
+    {
+      m_settings.ExperimentalFeatures = value;
+      var syntheticCamera = g_otherSources.First(s => s.Kind == SourceKind.SyntheticCamera);
+      if (value && !Devices.Contains(syntheticCamera))
+        Devices.Add(syntheticCamera);
+      else if (!value && Devices.Contains(syntheticCamera))
+      {
+        if (SelectedDevice == syntheticCamera)
+          SelectedDevice = Devices.First(d => d.Kind == SourceKind.Synthetic);
+        Devices.Remove(syntheticCamera);
+      }
+    }
+
+    /// <summary>The sources after the capture devices; the synthetic camera only with the experimental features.</summary>
+    private IEnumerable<DeviceItem> OtherSources() => g_otherSources.Where(s => ExperimentalFeatures || s.Kind != SourceKind.SyntheticCamera);
 
     public event Action<string>? CaptureCompleted;
 
@@ -317,7 +346,7 @@ namespace MB.FramePacing.Gui.ViewModels
         Devices.Clear();
         foreach (var device in devices)
           Devices.Add(new DeviceItem(device.Name, device));
-        foreach (var item in g_otherSources)
+        foreach (var item in OtherSources())
           Devices.Add(item);
       }
       catch (Exception)
@@ -327,7 +356,7 @@ namespace MB.FramePacing.Gui.ViewModels
         FfmpegSummary = "ffmpeg not set up";
         FfmpegToolTip = "Open Settings to set up ffmpeg";
         Devices.Clear();
-        foreach (var item in g_otherSources)
+        foreach (var item in OtherSources())
           Devices.Add(item);
       }
       finally
@@ -416,7 +445,7 @@ namespace MB.FramePacing.Gui.ViewModels
     {
       if (device?.Kind == SourceKind.SyntheticCamera)
       {
-        if (!Camera.UseCamera)
+        if (!UseCamera)
           throw new InvalidOperationException("The synthetic camera needs a camera: press Set up camera... in the Camera card first.");
         var syntheticRig = VerifyRig(new SyntheticCameraSource(CreateSyntheticCamera()), cancellationToken);
         runOptions = runOptions with { Camera = syntheticRig };
@@ -424,7 +453,7 @@ namespace MB.FramePacing.Gui.ViewModels
       }
 
       var ffmpegOptions = CreateFfmpegOptions(CurrentChoice() with { Source = device ?? Devices[0] }, runOptions.OutputDirectory);
-      if (ffmpegOptions != null && Camera.UseCamera)
+      if (ffmpegOptions != null && UseCamera)
       {
         // EXPERIMENTAL camera capture: check the camera still sees the markers where it was calibrated, then store the rectified zones
         using (var check = FfmpegCaptureSource.Start(ffmpegOptions, TimeSpan.FromSeconds(30)))
