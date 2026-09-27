@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the C++ marker library with clang-format and clang-tidy (config: marker/cpp/.clang-format, marker/cpp/.clang-tidy).
 
 Only our sources are checked, never third_party/. clang-tidy needs a configured build (GoogleTest headers, the generated

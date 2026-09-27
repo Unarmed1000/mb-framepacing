@@ -5,6 +5,7 @@
 //* in the camera wizard; saved ones are picked from the list, so calibration is skipped and every capture only verifies the camera.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

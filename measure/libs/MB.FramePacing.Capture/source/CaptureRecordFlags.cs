@@ -4,6 +4,7 @@
 //* Flags stored with every record of a .mbfc capture file, for example that the source dropped frames before it.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

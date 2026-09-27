@@ -6,6 +6,7 @@
 //* next time it can be picked from the list and calibration is skipped.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

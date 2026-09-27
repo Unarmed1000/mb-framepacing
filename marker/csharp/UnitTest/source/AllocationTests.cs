@@ -4,6 +4,7 @@
 //* The marker is generated every frame, so nothing on that path may allocate (a Unity game would see it as garbage collector spikes).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;

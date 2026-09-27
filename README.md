@@ -414,8 +414,9 @@ flowchart TB
 Two licenses, by path (see [`LICENSE`](LICENSE)): the frame marker libraries that applications embed (`marker/`), the
 marker format specification, the integration guide and the golden marker images are BSD 3-Clause. Everything else,
 including the measurement tools, is PolyForm Perimeter 1.0.1: free to use, change and share for any purpose, including
-inside companies, but not to provide others a product that competes with it. Third-party components and their licenses
-are listed in [`licenses/README.md`](licenses/README.md).
+inside companies, but not to provide others a product that competes with it. Every source file names its license on an
+`SPDX-License-Identifier` line (`BSD-3-Clause`, or `LicenseRef-PolyForm-Perimeter-1.0.1`). Third-party components and their
+licenses are listed in [`licenses/README.md`](licenses/README.md).
 
 ## Disclaimer
 

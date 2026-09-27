@@ -4,6 +4,7 @@
 //* What the camera rig wizard films: a source from the capture page list, with its clip path, live mode and recorded fps.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Gui.ViewModels

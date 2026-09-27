@@ -4,6 +4,7 @@
 //* A rational frame rate (e.g. 60000/1001).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

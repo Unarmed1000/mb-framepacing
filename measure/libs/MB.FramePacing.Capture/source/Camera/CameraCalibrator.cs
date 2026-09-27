@@ -7,6 +7,7 @@
 //* size, focus, exposure, flicker and stability. Verification only checks that both markers are still where the rig says.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

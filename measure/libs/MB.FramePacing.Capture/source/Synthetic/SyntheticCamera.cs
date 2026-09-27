@@ -6,6 +6,7 @@
 //* exposure blending, blur, noise and a drifting camera clock. It is the ground truth for the camera calibration, rectification and analysis.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

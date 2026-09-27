@@ -5,6 +5,7 @@
 //* Skipped when ffmpeg is not installed (see FfmpegLocator for where it is looked up).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

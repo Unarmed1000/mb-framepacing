@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Measure how precise camera capture is at each camera frame rate, on the simulated camera (VERY EXPERIMENTAL camera support).
 
 Runs `mb-framepacing selftest --camera` once per camera rate against a simulated display and prints a Markdown table: whether every

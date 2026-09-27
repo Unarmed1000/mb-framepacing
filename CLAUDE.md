@@ -161,6 +161,10 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     the CMake install and the Unity package ship), `doc/marker-format.md`, `doc/integrating.md`, `test-data/markers/`.
   - PolyForm Perimeter 1.0.1: everything else (the tools, their libraries, scripts, other docs, build and CI files). The tools ship
     the root `LICENSE`, which holds both texts, since they include the BSD marker library.
+  - Every source file names its license on an `SPDX-License-Identifier` line near its top: `BSD-3-Clause` under `marker/` and
+    `test-data/markers/`, `LicenseRef-PolyForm-Perimeter-1.0.1` elsewhere (inside the boxed C# header, after a shebang, as an XML
+    comment in XAML/MSBuild/solution files). `python tools/check_license_headers.py` checks it (CI `lint`), `--fix` adds missing
+    ones. Third-party code (`third_party/`) keeps its own notices.
   - A new file belongs to the license of its path. Moving code across that line (for example from `measure/` into `marker/`)
     changes its license: only Mana Battery can decide that.
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a

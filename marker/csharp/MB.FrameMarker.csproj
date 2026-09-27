@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The general C# marker library. No dependencies, .NET Standard 2.0 and C# 9 without nullable annotations, so the same sources also
        compile inside Unity (2021.3+). Nothing here may allocate on the per-frame path. -->

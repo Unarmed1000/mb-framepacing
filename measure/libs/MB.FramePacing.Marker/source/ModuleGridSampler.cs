@@ -6,6 +6,7 @@
 //* single modules (camera footage after rectification, MJPEG) and noise in the quiet zone do not throw it off.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

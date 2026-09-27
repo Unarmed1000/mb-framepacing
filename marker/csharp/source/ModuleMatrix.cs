@@ -4,6 +4,7 @@
 //* The QR module matrix of a marker (true = dark module). Allocated once for the largest symbol and reused, so filling it never allocates.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 namespace MB.FrameMarker

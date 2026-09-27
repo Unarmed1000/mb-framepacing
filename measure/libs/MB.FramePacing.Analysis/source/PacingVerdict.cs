@@ -4,6 +4,7 @@
 //* Which cause dominates a run's animation error: uneven display (bad pacing) or uneven animation steps on an even display (delta time jitter).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Analysis

@@ -4,6 +4,7 @@
 //* Camera rig calibration and verification on the synthetic high speed camera, against its ground truth.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

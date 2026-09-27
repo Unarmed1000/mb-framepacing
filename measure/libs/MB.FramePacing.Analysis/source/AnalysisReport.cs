@@ -4,6 +4,7 @@
 //* Everything CaptureAnalyzer produced for one capture: session info, decoded captures, runs and warnings.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

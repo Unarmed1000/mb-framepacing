@@ -5,6 +5,7 @@
 //* module, most significant bit first).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 namespace MB.FrameMarker.UnitTest

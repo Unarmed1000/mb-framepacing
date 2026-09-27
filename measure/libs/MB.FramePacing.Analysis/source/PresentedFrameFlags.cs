@@ -4,6 +4,7 @@
 //* Notes on a presented frame: application frames were skipped before it, its first-seen time is uncertain, it was torn or it was late.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

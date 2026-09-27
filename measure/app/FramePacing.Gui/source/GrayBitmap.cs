@@ -4,6 +4,7 @@
 //* Converts Gray8 capture frames to Avalonia bitmaps for the live preview.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Runtime.InteropServices;

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-3-Clause
 """Create the C++ release archives of mb_framemarker and prove they work on their own.
 
   mb-framemarker-cpp-<version>.tar.gz and .zip, each holding one folder mb-framemarker-cpp-<version>/ with

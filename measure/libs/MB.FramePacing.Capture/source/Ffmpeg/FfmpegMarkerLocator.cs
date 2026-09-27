@@ -5,6 +5,7 @@
 //* region to store. Nothing is recorded; the capture itself starts a new ffmpeg with the crop.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

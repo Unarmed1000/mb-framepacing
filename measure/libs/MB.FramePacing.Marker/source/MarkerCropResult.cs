@@ -4,6 +4,7 @@
 //* The region of the source a fast capture stores (see MarkerCrop) and the integer area downscale applied to it.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Marker

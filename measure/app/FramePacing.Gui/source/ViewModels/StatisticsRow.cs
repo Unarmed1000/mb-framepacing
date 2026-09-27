@@ -4,6 +4,7 @@
 //* One row of the detailed statistics table on the Analysis page (values formatted in milliseconds).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Globalization;

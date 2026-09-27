@@ -4,6 +4,7 @@
 //* A mode a device offers. Fps is the maximum for the size (0 if the platform does not report it).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Globalization;

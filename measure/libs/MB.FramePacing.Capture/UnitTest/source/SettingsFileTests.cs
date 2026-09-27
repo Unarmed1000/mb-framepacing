@@ -5,6 +5,7 @@
 //* <file>.v<N>.bak when a save changes the format, identical saves change nothing and a failed save leaves the file alone.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.IO;

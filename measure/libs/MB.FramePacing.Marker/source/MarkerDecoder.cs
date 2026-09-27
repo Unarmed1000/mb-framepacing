@@ -4,6 +4,7 @@
 //* Finds and decodes frame markers in 8 bit grayscale frames using ZXing. Not thread safe: use one instance per thread.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

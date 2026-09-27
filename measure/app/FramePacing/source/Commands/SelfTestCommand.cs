@@ -5,6 +5,7 @@
 //* recorder into a real capture file and analysed; the result is compared with the synthetic ground truth.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

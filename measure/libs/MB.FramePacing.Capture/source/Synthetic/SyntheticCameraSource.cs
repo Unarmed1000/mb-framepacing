@@ -5,6 +5,7 @@
 //* fast as it can render (not live), like importing a high speed camera clip.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

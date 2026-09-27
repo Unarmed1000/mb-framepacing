@@ -4,6 +4,7 @@
 //* The kinds of source the Capture page offers: a capture card, a video file, an image folder, a network stream or the synthetic test game.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Gui.ViewModels

@@ -4,6 +4,7 @@
 //* One row per capture index: what the capture card delivered at that instant and what marker (if any) was read from it.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using MB.FramePacing.Marker;

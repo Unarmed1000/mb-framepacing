@@ -5,6 +5,7 @@
 //* capture to exactly the measured window. See doc/marker-format.md "Test sequences".
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 namespace MB.FrameMarker

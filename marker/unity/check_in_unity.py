@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-3-Clause
 """Check the Unity package in a real Unity editor (batch mode, no window).
 
 Assembles the package (build_upm.py), creates a throw-away Unity project that references it and runs UnityCheck/FrameMarkerUnityCheck.cs:

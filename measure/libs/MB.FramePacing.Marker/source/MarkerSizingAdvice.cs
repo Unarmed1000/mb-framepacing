@@ -4,6 +4,7 @@
 //* How an application should draw the marker for one capture setup (see MarkerSizing.Advise and doc/marker-format.md "Sizing").
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Marker

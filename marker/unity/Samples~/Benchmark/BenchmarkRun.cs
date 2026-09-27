@@ -5,6 +5,7 @@
 //* measures exactly that part. Needs a FrameMarkerOverlay in the scene.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System.Collections;

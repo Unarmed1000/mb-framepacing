@@ -4,6 +4,7 @@
 //* Histogram binning: bins centred on multiples of the capture period, no gaps, widened when the range is too large.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

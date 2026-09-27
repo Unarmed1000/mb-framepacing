@@ -9,6 +9,7 @@
 //* Exits the editor with 0 when everything passed.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;

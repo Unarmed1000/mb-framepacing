@@ -4,6 +4,7 @@
 //* Recorder behaviour: ordering, drops when the ring is full, late device timestamps and armed pre-roll.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

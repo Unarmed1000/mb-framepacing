@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Build self-contained, single-file standalones of the mb-framepacing tools.
 
 Auto-detects the current OS/CPU into a .NET runtime identifier (RID) and runs

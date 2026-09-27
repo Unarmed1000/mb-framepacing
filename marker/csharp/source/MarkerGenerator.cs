@@ -9,6 +9,7 @@
 //* run of dark modules. Draw it in that order, last in the frame (after post effects and UI), without blending, in pure black and white.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 namespace MB.FrameMarker

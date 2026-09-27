@@ -4,6 +4,7 @@
 //* The frame marker payload. The wire format (doc/marker-format.md) is implemented once in C#, by the marker library (MB.FrameMarker).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

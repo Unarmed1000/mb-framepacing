@@ -5,6 +5,7 @@
 //* Settings button. Everything is stored in mb-framepacing.json, so the command line tool uses the same settings.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

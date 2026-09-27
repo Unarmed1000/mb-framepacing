@@ -4,6 +4,7 @@
 //* Random access reader for .mbfc files. All reads are positional (RandomAccess), so one reader can be shared by parallel decoder threads.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

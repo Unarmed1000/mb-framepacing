@@ -5,6 +5,7 @@
 //* uncertain starts only for gaps longer than the usual scanout transition.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

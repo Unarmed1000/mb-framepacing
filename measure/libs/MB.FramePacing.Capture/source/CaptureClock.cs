@@ -4,6 +4,7 @@
 //* Monotonic capture clock in TimeSpan ticks, shared by a source and the recorder.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Diagnostics;

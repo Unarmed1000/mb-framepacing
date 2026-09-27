@@ -4,6 +4,7 @@
 //* A source ffmpeg can open: a capture card, a video file, an image sequence, a network stream or an ffmpeg test source.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

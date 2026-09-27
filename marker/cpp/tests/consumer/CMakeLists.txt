@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # A minimal project that uses mb_framemarker the ways doc/integrating.md describes. check_consumers.py builds and runs it in CI.
 #   MB_CONSUMER_MODE=fetchcontent  FetchContent with URL + URL_HASH (the release archive); FETCHCONTENT_SOURCE_DIR_MB_FRAMEMARKER may
 #                                  point at a local source tree instead

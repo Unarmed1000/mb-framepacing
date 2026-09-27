@@ -4,6 +4,7 @@
 //* A classified import input, ready for FfmpegCaptureSource: the device, the requested mode and known frame times.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Collections.Generic;

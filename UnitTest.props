@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
 <Project>
   <!-- Imported by every UnitTest csproj -->
   <PropertyGroup>

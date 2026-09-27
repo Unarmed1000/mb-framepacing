@@ -5,6 +5,7 @@
 //* first step of a fast capture, which then only stores that region. A few decodes must agree: a marker that moves can not be cropped.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

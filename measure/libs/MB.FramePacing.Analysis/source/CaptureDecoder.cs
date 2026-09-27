@@ -7,6 +7,7 @@
 //*  3. Fill the capture index gaps left by recorder drops with NotRecorded rows.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

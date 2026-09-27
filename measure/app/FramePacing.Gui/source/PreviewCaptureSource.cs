@@ -5,6 +5,7 @@
 //* it calibrates or checks (VERY EXPERIMENTAL camera support). The callback runs on the source's thread and must not keep the image.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

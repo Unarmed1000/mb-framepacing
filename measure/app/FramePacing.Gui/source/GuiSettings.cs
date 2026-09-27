@@ -5,6 +5,7 @@
 //* shared mb-framepacing.json configuration file instead (see FramePacingConfig), so the command line tool uses them too.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

@@ -4,6 +4,7 @@
 //* Marker decoding per capture: the locked paths the analysis runs on every capture, and the full detector search used when locating.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using BenchmarkDotNet.Attributes;

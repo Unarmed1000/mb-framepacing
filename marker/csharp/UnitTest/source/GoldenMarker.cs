@@ -4,6 +4,7 @@
 //* One golden marker image written by the C++ library (test-data/markers/manifest.csv): the payload, the placement and the image file.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 namespace MB.FrameMarker.UnitTest

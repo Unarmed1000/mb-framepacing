@@ -4,6 +4,7 @@
 //* Options for calibrating and verifying a camera rig (EXPERIMENTAL camera support).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

@@ -5,6 +5,7 @@
 //* aligned modules, pure black/white, drawn last on top of the scene).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

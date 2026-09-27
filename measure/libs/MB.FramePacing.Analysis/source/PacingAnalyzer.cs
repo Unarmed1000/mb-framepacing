@@ -4,6 +4,7 @@
 //* Marks late frames and works out a run's pacing: the target frame time, the late share and which cause dominates the animation error.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

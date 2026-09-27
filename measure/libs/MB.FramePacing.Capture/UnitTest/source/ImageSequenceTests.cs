@@ -4,6 +4,7 @@
 //* Image sequence and media input: ordering, timestamp files, the ffconcat list and the ffmpeg arguments.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

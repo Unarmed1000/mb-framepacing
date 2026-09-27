@@ -4,6 +4,7 @@
 //* Renderer, sizing helpers and multi-marker (tearing) detection.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using NUnit.Framework;

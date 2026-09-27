@@ -6,6 +6,7 @@
 //* applied exactly (ffmpeg crop exact=1: odd offsets on chroma subsampled inputs are fine, only luma is stored).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

@@ -5,6 +5,7 @@
 //* Unity's bottom-left). FrameMarkerOverlay uses it at the end of the frame; call it yourself to draw the marker from your own code.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 #if UNITY_2021_3_OR_NEWER

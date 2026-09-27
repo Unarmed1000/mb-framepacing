@@ -4,6 +4,7 @@
 //* The Avalonia app builder DocImages uses: the real GUI on the headless platform with the Skia renderer.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using Avalonia;

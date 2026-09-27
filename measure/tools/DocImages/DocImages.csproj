@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Developer tool: renders the images used by README.md / doc (GUI screenshots rendered offscreen, marker examples). Not shipped. -->
   <PropertyGroup>

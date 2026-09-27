@@ -4,6 +4,7 @@
 //* Sizing advice for a capture setup (the 'marker-size' command): module size, marker sizes and origin alignment.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

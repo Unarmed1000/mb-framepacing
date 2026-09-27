@@ -5,6 +5,7 @@
 //* The library lives next to the configuration file (camera-rigs/<name>.camera-rig.json), so the command line and the GUI share it.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

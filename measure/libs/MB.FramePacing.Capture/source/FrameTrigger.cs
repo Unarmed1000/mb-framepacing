@@ -4,6 +4,7 @@
 //* What a frame inspector found in one frame: nothing that changes the recording, a start marker or an end marker.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Capture

@@ -5,6 +5,7 @@
 //* analysis, against the synthetic ground truth (presented frames, display times, scanout delay, tears).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

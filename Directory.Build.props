@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
 <Project>
   <!-- Shared settings for every .NET project in the repository (marker/ and measure/). marker/Directory.Build.props and
        measure/Directory.Build.props import this file and add their own target framework and version.

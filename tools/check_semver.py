@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the semantic versions of the two release streams (see doc/releasing.md).
 
 1. marker/VERSION and measure/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their stream

@@ -5,6 +5,7 @@
 //* exactly - at native size and after the capture scaling described in doc/marker-format.md "Sizing".
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

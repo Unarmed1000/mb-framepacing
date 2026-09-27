@@ -5,6 +5,7 @@
 //* from module coordinates to the image, which is how a camera filming the screen is calibrated.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Marker

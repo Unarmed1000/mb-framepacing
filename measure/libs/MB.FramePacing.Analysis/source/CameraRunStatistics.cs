@@ -4,6 +4,7 @@
 //* What an EXPERIMENTAL camera capture adds to a run: how long the scanout takes between the two marker zones, and the tears it saw.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Analysis

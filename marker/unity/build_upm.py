@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-3-Clause
 """Assemble the Unity package com.manabattery.framemarker from the repository.
 
 The package is not kept as one folder on master (its core would duplicate marker/csharp). This script builds it:

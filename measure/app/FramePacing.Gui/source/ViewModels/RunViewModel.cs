@@ -4,6 +4,7 @@
 //* One analysed run on the Analysis page: headline tiles, pacing, statistics rows, warnings and the frames behind the charts.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Collections.Generic;

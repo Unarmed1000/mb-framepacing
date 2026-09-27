@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # Release the marker libraries (C++, C# and the Unity package): push a tag marker-v<version> that matches marker/VERSION.
 #   1. verify   the tag is semantic versioning and matches marker/VERSION, and the version bump covers the API changes since the
 #               previous release (tools/check_semver.py)

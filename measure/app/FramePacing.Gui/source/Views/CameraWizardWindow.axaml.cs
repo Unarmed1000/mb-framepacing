@@ -4,6 +4,7 @@
 //* The camera rig wizard window (VERY EXPERIMENTAL camera support). Closes with true when a camera was set up or chosen.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using Avalonia.Controls;

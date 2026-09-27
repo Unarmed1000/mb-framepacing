@@ -4,6 +4,7 @@
 //* Statistics of one run: display delta, animation delta, animation error (signed and absolute), drift and time on screen.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Analysis

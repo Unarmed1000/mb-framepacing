@@ -4,6 +4,7 @@
 //* Integer pixel rectangle covering [X, X+Width) x [Y, Y+Height).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

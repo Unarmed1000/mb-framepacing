@@ -5,6 +5,7 @@
 //* its first-seen capture time, skipped frame indices and the animation error caused by the injected stalls.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

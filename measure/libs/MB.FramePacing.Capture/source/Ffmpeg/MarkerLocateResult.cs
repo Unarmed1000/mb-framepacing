@@ -4,6 +4,7 @@
 //* Where the marker was found in the source and the region a fast capture stores (FfmpegMarkerLocator).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Globalization;

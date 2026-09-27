@@ -7,6 +7,7 @@
 //*   - Marker examples: how the markers look inside an application frame.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

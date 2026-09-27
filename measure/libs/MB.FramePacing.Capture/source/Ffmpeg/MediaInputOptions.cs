@@ -4,6 +4,7 @@
 //* Options for importing an image sequence: its frame rate or a timestamp file (videos and streams carry their own timestamps).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Capture.Ffmpeg

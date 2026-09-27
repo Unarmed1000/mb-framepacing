@@ -5,6 +5,7 @@
 //* use the marker libraries (marker/cpp/, marker/csharp/); this draws with the C# one. The symbol parameters and sizing rules are defined in doc/marker-format.md.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

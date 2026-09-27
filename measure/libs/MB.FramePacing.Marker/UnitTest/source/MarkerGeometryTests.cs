@@ -4,6 +4,7 @@
 //* A marker filmed at an angle: the detector's finder and alignment points recover the module to camera transform.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using NUnit.Framework;

@@ -5,6 +5,7 @@
 //* transform and calibrating a rig (one-off), and rendering the synthetic camera (tests only).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using BenchmarkDotNet.Attributes;

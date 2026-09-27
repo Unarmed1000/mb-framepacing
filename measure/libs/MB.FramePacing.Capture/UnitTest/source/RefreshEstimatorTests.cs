@@ -4,6 +4,7 @@
 //* EXPERIMENTAL camera captures: the display's refresh period from first-seen intervals quantised to camera periods.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

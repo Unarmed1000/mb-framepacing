@@ -5,6 +5,7 @@
 //* 30 fps), a rig is calibrated from it, and the import stores only the rectified marker zones. Skipped when ffmpeg is not installed.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

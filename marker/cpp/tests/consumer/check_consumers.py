@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-3-Clause
 """Build and run the consumer project (this folder) against mb_framemarker the ways doc/integrating.md documents.
 
 fetchcontent   FetchContent_Declare(URL ... URL_HASH ...), pointed at the source tree with FETCHCONTENT_SOURCE_DIR_MB_FRAMEMARKER

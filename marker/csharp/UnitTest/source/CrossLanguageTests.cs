@@ -5,6 +5,7 @@
 //* (test-data/markers/modules.csv) and byte identical golden images from quads, triangle lists and indexed triangle lists.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System.Collections.Generic;

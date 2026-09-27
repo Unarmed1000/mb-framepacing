@@ -5,6 +5,7 @@
 //* and alignment centres are only good to about a pixel under perspective; the fit uses every module edge and gets well below that.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

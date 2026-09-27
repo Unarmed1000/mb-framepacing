@@ -5,6 +5,7 @@
 //* Order: an explicit path (--ffmpeg / GUI), the MB_FFMPEG environment variable, mb-framepacing.json (ffmpegPath), then PATH.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

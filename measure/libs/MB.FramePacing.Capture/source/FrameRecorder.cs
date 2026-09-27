@@ -9,6 +9,7 @@
 //* order, and the writer only writes or discards frames that were inspected. Nothing is sampled, so a marker in a single frame is enough.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

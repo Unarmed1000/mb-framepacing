@@ -4,6 +4,7 @@
 //* What FrameMarkerOverlay currently draws: frame markers outside a run, the start marker, the run's frame markers or the end marker.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 #if UNITY_2021_3_OR_NEWER

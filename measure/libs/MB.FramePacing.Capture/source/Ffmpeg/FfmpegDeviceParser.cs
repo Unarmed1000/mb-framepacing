@@ -4,6 +4,7 @@
 //* Parses ffmpeg's device and mode listings (dshow -list_devices/-list_options, avfoundation -list_devices, v4l2 -list_formats).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

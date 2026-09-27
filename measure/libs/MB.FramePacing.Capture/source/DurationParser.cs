@@ -4,6 +4,7 @@
 //* Parses capture durations such as "30s", "1500ms", "2m", "1h" or "00:00:30" (shared by the command line tool and the GUI).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

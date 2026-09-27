@@ -4,6 +4,7 @@
 //* The data every marker carries: the application's frame index, its animation time, the test run and the marker kind.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;

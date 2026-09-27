@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # Build and test on every supported platform; on a tools version tag (tools-v*) also build the self-contained tools.
 # GitHub-hosted runners are free for public repositories. For a private repository the minutes come out of the account's
 # monthly free quota (macOS counts 10x, Windows 2x); without a payment method GitHub stops the jobs instead of billing.
@@ -91,6 +92,8 @@ jobs:
       - run: npm run format:check
       - name: One class/struct/enum per file
         run: python3 tools/check_one_type_per_file.py
+      - name: License identifier in every source file
+        run: python3 tools/check_license_headers.py
       - name: Python dev tools (requirements-dev.txt)
         run: |
           python3 -m venv .venv

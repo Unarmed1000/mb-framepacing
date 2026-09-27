@@ -5,6 +5,7 @@
 //* two marker zones it sees. Calibrated once (CameraCalibrator), saved as <name>.camera-rig.json, and verified before every camera capture.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

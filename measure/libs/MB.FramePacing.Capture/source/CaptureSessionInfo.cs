@@ -4,6 +4,7 @@
 //* capture.json - the sidecar written next to frames.mbfc describing how the capture was made and how it went.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

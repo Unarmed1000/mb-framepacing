@@ -4,6 +4,7 @@
 //* Analysis page: pick a capture, analyse it, show warnings, per run statistics and the per-frame data for the charts.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

@@ -4,6 +4,7 @@
 //* Extra data carried by a SequenceStart marker: the wall clock start time and a test name.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;

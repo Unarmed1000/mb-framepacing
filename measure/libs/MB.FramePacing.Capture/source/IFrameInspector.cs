@@ -4,6 +4,7 @@
 //* Looks at every captured frame, in capture order, before the recorder writes or discards it (the start/end marker triggers).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using MB.FramePacing.Marker;

@@ -4,6 +4,7 @@
 //* Minimal 8 bit grayscale image (luma only - all the QR decoder needs) and an integer pixel rectangle.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

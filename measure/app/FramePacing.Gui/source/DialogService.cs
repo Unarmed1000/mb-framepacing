@@ -4,6 +4,7 @@
 //* Folder/file pickers and "show in file manager", behind an interface so the view models stay free of UI types.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System.Diagnostics;

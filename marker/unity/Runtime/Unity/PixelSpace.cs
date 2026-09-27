@@ -4,6 +4,7 @@
 //* Converts the marker's pixel coordinates (origin top-left, +y down) to Unity's screen pixels (origin bottom-left, +y up).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 #if UNITY_2021_3_OR_NEWER

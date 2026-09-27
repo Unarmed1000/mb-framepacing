@@ -4,6 +4,7 @@
 //* What the camera rig wizard set up: the saved camera to capture with and the source it films.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 namespace MB.FramePacing.Gui.ViewModels

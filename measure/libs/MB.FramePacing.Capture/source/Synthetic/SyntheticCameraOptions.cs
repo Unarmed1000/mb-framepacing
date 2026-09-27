@@ -5,6 +5,7 @@
 //* what the display and sensor do to the image (scanout, panel response, exposure, blur, noise, clock drift).
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using MB.FramePacing.Marker;

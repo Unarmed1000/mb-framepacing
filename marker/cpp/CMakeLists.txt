@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 4.0)
 
 # Inside the repository the version and LICENSE live in marker/ (shared with the C# marker library) and the third-party license

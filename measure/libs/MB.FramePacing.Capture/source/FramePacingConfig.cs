@@ -10,6 +10,7 @@
 //*   Linux    $XDG_CONFIG_HOME/mb-framepacing/mb-framepacing.json (default ~/.config/...)
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;

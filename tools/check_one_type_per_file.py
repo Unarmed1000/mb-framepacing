@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the "one class/struct/enum per file" convention (see CLAUDE.md).
 
 - C#: every tracked .cs file declares at most one namespace-level type (nested types are fine).

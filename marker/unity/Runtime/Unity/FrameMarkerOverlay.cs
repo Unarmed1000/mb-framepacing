@@ -7,6 +7,7 @@
 //* part to measure with the start and end markers. Nothing is allocated per frame.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 #if UNITY_2021_3_OR_NEWER

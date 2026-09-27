@@ -5,6 +5,7 @@
 //* whether the card delivers MJPEG. Uses the marker library's own sizing functions, so the advice matches what the libraries compute.
 //*
 //* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;
