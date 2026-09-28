@@ -117,7 +117,7 @@ It writes pixel aligned triangles straight into your vertex buffer, without allo
 #include <mb/framemarker/FrameMarker.hpp>
 namespace FM = MB::FrameMarker;
 
-std::array<FM::Vertex, FM::MaxFrameTriangleVertexCount()> vertices;   // once
+std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 const std::size_t count = FM::GenerateTriangles({frameIndex, animationTicks, runId, FM::MarkerKind::Frame}, options, origin, vertices);
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
@@ -126,8 +126,11 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
 
 - **C++:** see **[Integrating the marker](doc/integrating.md)** for adding the library with CMake (a release archive, git,
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
-- **C#:** the general library [`marker/csharp`](marker/csharp) has the same API (`MarkerGenerator.GenerateTriangles`).
+- **C#:** the general library [`marker/csharp`](marker/csharp/README.md) has the same API (`MarkerGenerator.GenerateTriangles`).
 - **Unity:** the **[Unity package](doc/unity.md)** adds an overlay component that does all of this for you.
+- **Python:** [`marker/python`](marker/python/README.md) (`mb_framemarker`), which also draws into pixel buffers.
+
+[`marker/README.md`](marker/README.md) compares the four libraries; each has its own README with a quick start and its API.
 
 ### 2. Every test: record, run, analyse
 
@@ -452,6 +455,7 @@ flowchart TB
 | `marker/cpp/`             | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check |
 | `marker/csharp/`          | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests      |
 | `marker/unity/`           | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)      |
+| `marker/python/`          | The Python marker library `mb_framemarker` (standard library only) and its unittest tests         |
 | `measure/`                | **Measures it**: the recording and analysis tools and their version                               |
 | `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                                     |
 | `measure/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                               |

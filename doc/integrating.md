@@ -2,12 +2,12 @@
 
 This guide puts the marker into an application. There are four ways in:
 
-| Your application                 | Use                                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| C++ (any engine or graphics API) | The C++20 library [`marker/cpp`](../marker/cpp), this guide                                                   |
-| Unity                            | The Unity package, see **[Unity](unity.md)**                                                                  |
-| Other C# / .NET                  | The general C# library [`marker/csharp`](../marker/csharp): the same API as C++ (`MarkerGenerator`, `Marker`) |
-| Python                           | The Python library [`marker/python`](../marker/python) (`mb_framemarker`), see its README                     |
+| Your application                 | Use                                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| C++ (any engine or graphics API) | The C++20 library [`marker/cpp`](../marker/cpp/README.md), this guide                                                   |
+| Unity                            | The Unity package, see **[Unity](unity.md)**                                                                            |
+| Other C# / .NET                  | The general C# library [`marker/csharp`](../marker/csharp/README.md): the same API as C++ (`MarkerGenerator`, `Marker`) |
+| Python                           | The Python library [`marker/python`](../marker/python/README.md) (`mb_framemarker`)                                     |
 
 All four produce exactly the same pixels. The libraries are renderer independent: they give you pixel aligned geometry to draw with
 whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md).
