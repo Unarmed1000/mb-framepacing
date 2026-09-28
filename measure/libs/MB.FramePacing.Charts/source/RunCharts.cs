@@ -21,7 +21,6 @@ namespace MB.FramePacing.Charts
   public static class RunCharts
   {
     // Legend texts, which also name the series
-    public const string TargetLegend = "target";
     public const string ErrorPercentileLegend = "|animation error|";
 
     // The Timeline plots share this left axis width, so their data areas line up
@@ -58,7 +57,7 @@ namespace MB.FramePacing.Charts
       Reset(
         displayTimeStep,
         theme,
-        "Display time step: how long each frame stayed on screen; red held too long, dotted the target",
+        "Display time step: how long each frame stayed on screen; red held too long (the next frame was late)",
         string.Empty,
         string.Empty
       );
@@ -71,24 +70,7 @@ namespace MB.FramePacing.Charts
       };
       if (steps.StartTicks.Count > 0)
       {
-        // Each frame's target, over the hold it measures (from the previous frame): steps where the pacer changes its rate. Behind the holds,
-        // so it only shows where they differ
-        var targeted = Enumerable
-          .Range(1, frames.Length - 1)
-          .Where(i => frames[i].TargetTicks.HasValue && frames[i].DisplayDeltaTicks.HasValue && frames[i - 1].Segment == frames[i].Segment)
-          .ToArray();
         double topMs = steps.TopMs;
-        if (targeted.Length > 0)
-        {
-          var targetMs = targeted.Select(i => Ms(frames[i].TargetTicks!.Value)).ToArray();
-          var target = displayTimeStep.Add.Scatter(targeted.Select(i => Seconds(frames[i - 1])).ToArray(), targetMs);
-          target.ConnectStyle = ConnectStyle.StepHorizontal;
-          target.MarkerSize = 0;
-          target.LinePattern = LinePattern.Dotted;
-          target.Color = theme.Foreground.WithAlpha(0.6);
-          target.LegendText = TargetLegend;
-          topMs = Math.Max(topMs, targetMs.Max() + (steps.RefreshMs / 2));
-        }
         displayTimeStep.Add.Plottable(steps);
         displayTimeStep.Axes.Left.TickGenerator = ManualTicks(DisplayTimeStepsPlottable.Ticks(steps.RefreshMs, topMs));
         displayTimeStep.Axes.Margins(bottom: 0, top: 0);

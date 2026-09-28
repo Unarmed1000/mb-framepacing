@@ -1,0 +1,216 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* The SVG report: its helpers give exactly what mb-framepacing-explained's Python gives, an hour of frames draws per pixel column and stays
+//* small, a section of it draws every frame, and the PNG comes out of a headless browser at twice the size (skipped without one).
+//*
+//* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//****************************************************************************************************************************************************
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using MB.FramePacing.Analysis;
+using NUnit.Framework;
+
+namespace MB.FramePacing.Charts.UnitTest
+{
+  [TestFixture]
+  public class ReportSvgTests
+  {
+    private const long Refresh = TimeSpan.TicksPerSecond / 240;
+    private const int HitchFrame = 500_000;
+
+    /// <summary>Printed by generate_diagrams.py's ms() and text() and Python's number formatting (half to even, a signed zero).</summary>
+    [TestCase(-2.0, true, "−2")]
+    [TestCase(16.666, false, "16.7")]
+    [TestCase(0.04, false, "0")]
+    [TestCase(2.25, true, "+2.2")]
+    [TestCase(0.25, false, "0.2")]
+    [TestCase(0.15, false, "0.1")]
+    [TestCase(-0.0, false, "0")]
+    [TestCase(13.8888, false, "13.9")]
+    [TestCase(1e-12, true, "0")]
+    public void Ms_IsThePythonOriginal(double value, bool sign, string expected)
+    {
+      Assert.That(SvgMarkup.Ms(value, sign), Is.EqualTo(expected));
+    }
+
+    [TestCase(0.25, 1, "0.2")]
+    [TestCase(0.35, 1, "0.3")]
+    [TestCase(2.5, 0, "2")]
+    [TestCase(3.5, 0, "4")]
+    [TestCase(110.125, 2, "110.12")]
+    [TestCase(-0.04, 1, "-0.0")]
+    [TestCase(-0.04, 0, "-0")]
+    [TestCase(1180.0, 1, "1180.0")]
+    [TestCase(9.96, 1, "10.0")]
+    public void Fixed_IsPythonsFormatting(double value, int decimals, string expected)
+    {
+      Assert.That(SvgMarkup.Fixed(value, decimals), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Text_IsThePythonOriginal()
+    {
+      Assert.That(
+        SvgMarkup.Text(110.25, 30.05, "A & <b> \"q\"", "title", "start"),
+        Is.EqualTo("<text x=\"110.2\" y=\"30.1\" text-anchor=\"start\" class=\"title\">A &amp; &lt;b&gt; \"q\"</text>")
+      );
+      Assert.That(SvgMarkup.Text(0.35, -0.04, "x"), Is.EqualTo("<text x=\"0.3\" y=\"-0.0\" text-anchor=\"middle\">x</text>"));
+    }
+
+    /// <summary>An hour at 240 Hz: every pixel column draws the range of its frames, so the file stays small; the tiles are the whole run's.</summary>
+    [Test]
+    public void OneHour_DrawsPerPixelColumn_AndStaysSmall()
+    {
+      var run = OneHour();
+      string svg = ReportSvg.Render(RunSection.Whole(run));
+
+      Assert.That(svg.Length, Is.LessThan(1_000_000), "an hour of frames in a small file");
+      Assert.That(Count(svg, "<rect class=\"bar\""), Is.Zero, "no bar per frame");
+      Assert.That(Count(svg, "<path class=\"bar-range\""), Is.EqualTo(1), "one path of per column ranges");
+      Assert.That(Count(svg, "<path class=\"bar\""), Is.EqualTo(1), "one path of per column middle 90 %");
+      Assert.That(Count(svg, "<path class=\"held-range-late\""), Is.EqualTo(1));
+      Assert.That(Count(svg, "<path class=\"held\""), Is.EqualTo(1), "the median holds: on time");
+      Assert.That(svg, Does.Contain("render a section of at most"), "no refresh strip for an hour");
+      Assert.That(svg, Does.Contain("class=\"clip-mark\""), "the 700 ms hitch is beyond the scale, marked at the edge");
+      Assert.That(svg, Does.Contain(">−700 ms<"), "... with its value");
+      foreach (var tile in RunHeadline.Tiles(run))
+        Assert.That(svg, Does.Contain(">" + SvgMarkup.Escape(tile.Value) + "<"), tile.Caption);
+      Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), "well formed");
+    }
+
+    /// <summary>Two seconds of the hour (fewer frames than pixels, refreshes of 2 px): every frame drawn, the refresh strip too, and the tiles
+    /// counted over the section only.</summary>
+    [Test]
+    public void OneHour_Section_DrawsEveryFrame()
+    {
+      var run = OneHour();
+      double hitch = run.Run.Frames[HitchFrame].FirstSeenTicks / (double)TimeSpan.TicksPerSecond;
+      var section = RunSection.Create(run, hitch - 1, hitch + 1);
+      string svg = ReportSvg.Render(section);
+
+      var frames = section.Section.Run.Frames;
+      Assert.That(frames, Has.Count.LessThan(1000));
+      int withError = frames.Count(f => f.AnimationErrorTicks is { } e && e != 0);
+      Assert.That(Count(svg, "<rect class=\"bar\""), Is.EqualTo(withError), "a bar per frame with an error");
+      Assert.That(svg, Does.Not.Contain("render a section of at most"));
+      Assert.That(Count(svg, "<rect class=\"strip-late\""), Is.GreaterThanOrEqualTo(frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0)));
+      Assert.That(section.Section.Run.Counts.PresentedFrames, Is.EqualTo(frames.Count));
+      Assert.That(section.Section.Run.Pacing!.LateFrames, Is.EqualTo(frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0)));
+      Assert.That(
+        svg,
+        Does.Contain(">" + frames.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + "<"),
+        "the section's frames"
+      );
+      Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), "well formed");
+    }
+
+    /// <summary>The PNG is the SVG drawn by a headless Edge or Chrome at twice its size; skipped where there is none.</summary>
+    [Test]
+    public void Png_IsTwiceTheSize()
+    {
+      if (HeadlessBrowser.Find() is not { } browser)
+      {
+        Assert.Ignore("No Edge or Chrome on this machine");
+        return;
+      }
+      var run = OneHour();
+      string directory = Path.Combine(Path.GetTempPath(), "mb-framepacing-tests", Guid.NewGuid().ToString("N"));
+      Directory.CreateDirectory(directory);
+      try
+      {
+        var files = ReportFiles.Write(run, "run-1", directory, 100, 104, png: true);
+        Assert.That(files.Select(Path.GetFileName), Is.EqualTo(new[] { "run-1-report-100s-104s.svg", "run-1-report-100s-104s.png" }));
+        var header = new byte[24];
+        using (var stream = File.OpenRead(files[1]))
+          stream.ReadExactly(header);
+        int BigEndian(int offset) => (header[offset] << 24) | (header[offset + 1] << 16) | (header[offset + 2] << 8) | header[offset + 3];
+        Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((2 * ReportSvg.Width, (int)(2 * ReportSvg.Height))), browser);
+      }
+      finally
+      {
+        Directory.Delete(directory, recursive: true);
+      }
+    }
+
+    /// <summary>
+    /// An hour of a 240 Hz game: every 97th frame late (held two refreshes, off by one refresh), every 7th off by half a millisecond either
+    /// way, and one 700 ms hitch.
+    /// </summary>
+    private static ChartRun OneHour()
+    {
+      const int Count = 240 * 3600;
+      var frames = new List<PresentedFrame>(Count);
+      long time = 0;
+      for (int i = 0; i < Count; ++i)
+      {
+        bool hitch = i == HitchFrame;
+        bool late = hitch || (i > 0 && i % 97 == 0);
+        long display =
+          hitch ? 168 * Refresh
+          : late ? 2 * Refresh
+          : Refresh;
+        long error =
+          hitch ? -700 * TimeSpan.TicksPerMillisecond
+          : late ? -Refresh
+          : i % 7 == 0 ? (i % 14 == 0 ? 5000 : -5000)
+          : 0;
+        if (i > 0)
+          time += display;
+        bool first = i == 0;
+        frames.Add(
+          new PresentedFrame(
+            0,
+            (ulong)i,
+            time,
+            i,
+            time,
+            time,
+            1,
+            Refresh,
+            0,
+            first ? null : display,
+            first ? null : display + error,
+            first ? null : error,
+            0,
+            late ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
+            TargetTicks: first ? null : Refresh
+          )
+        );
+      }
+      int lateCount = frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
+      var pacing = new RunPacing(
+        Refresh / (double)TimeSpan.TicksPerMillisecond,
+        false,
+        Refresh / (double)TimeSpan.TicksPerMillisecond,
+        PacingSource.NativeRefresh,
+        lateCount,
+        lateCount / (double)(Count - 1),
+        LateShare.Worst(frames, LateShare.WindowTicks),
+        lateCount,
+        0,
+        PacingVerdict.BadPacing
+      );
+      var analysis = new RunAnalysis(
+        1,
+        "one hour",
+        null,
+        true,
+        true,
+        new RunCounts(Count, Count, 0, 0, 0, 0, Count, 0, 0, 1),
+        RunStatistics.From(frames, TimeSpan.TicksPerMillisecond, Refresh),
+        frames,
+        Array.Empty<string>(),
+        Pacing: pacing
+      );
+      return new ChartRun(analysis, Refresh, TimeSpan.TicksPerMillisecond, false);
+    }
+
+    private static int Count(string text, string part) => Regex.Matches(text, Regex.Escape(part)).Count;
+  }
+}

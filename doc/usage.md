@@ -138,12 +138,23 @@ capture-20260924-153000/          (import-... for imports)
     ├── summary.json              counts, statistics, histograms, warnings per run
     ├── captures.csv              one row per captured frame: its times, what its marker said and the marker's bytes
     ├── run-<id>-frames.csv       one row per application frame shown: display time step, animation error, drift
-    └── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, under the run's
-                                  headline numbers; error-histogram, error-percentiles, display-time-step-histogram, drift)
+    ├── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, under the run's
+    │                             headline numbers; error-histogram, error-percentiles, display-time-step-histogram, drift)
+    └── run-<id>-report*.svg      only on request: the run (or a section of it) as one SVG report card
 ```
 
-The chart images are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the GUI's **Save charts**; both
-write the same files.
+The chart images and the whole run's report are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the
+GUI's **Save charts**; both write the same files. `render` draws reports from an analysis (the capture itself is not needed):
+
+```sh
+mb-framepacing render capture-20260924-153000                      # the whole run: run-<id>-report.svg
+mb-framepacing render capture-20260924-153000 --from 120 --to 125  # 5 s of it, every frame: run-<id>-report-120s-125s.svg
+mb-framepacing render capture-20260924-153000 --details --png      # also the worst moments, and PNGs (needs Edge or Chrome)
+```
+
+Times are seconds since the run's first frame, the Timeline's axis. `--details` adds 2 s either side of the largest animation error
+(`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
+Chrome, found in the usual places or set with `MB_BROWSER`.
 
 The headline numbers on the Analyze page (the timeline image shows the same above its charts):
 

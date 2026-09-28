@@ -43,6 +43,7 @@ namespace MB.FramePacing.App
         CameraRigCommand.Create(),
         ImportCommand.Create(),
         AnalyzeCommand.Create(),
+        RenderCommand.Create(),
         MarkerSizeCommand.Create(),
         SelfTestCommand.Create(),
         ConfigCommand.Create(),

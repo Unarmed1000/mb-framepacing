@@ -327,21 +327,7 @@ namespace MB.FramePacing.Analysis
         TimeBySyncMarker(builders, cameraStatistics);
       var frames = BuildFrames(builders, period);
       var pacing = AnalyzePacing(frames, period, threshold, camera, options, warnings);
-      var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
-      var (errorPerFrameMs, percentError) = RunStatistics.ErrorSummary(
-        withMetrics.Select(f => (f.AnimationErrorTicks!.Value, f.DisplayDeltaTicks!.Value)).ToList()
-      );
-      var statistics = new RunStatistics(
-        Statistics.FromTicks(withMetrics.Select(f => f.DisplayDeltaTicks!.Value)),
-        Statistics.FromTicks(withMetrics.Select(f => f.AnimationDeltaTicks!.Value)),
-        Statistics.FromTicks(withMetrics.Select(f => f.AnimationErrorTicks!.Value)),
-        Statistics.FromTicks(withMetrics.Select(f => Math.Abs(f.AnimationErrorTicks!.Value))),
-        Statistics.FromTicks(frames.Select(f => f.DriftTicks)),
-        Statistics.FromTicks(frames.Select(f => f.OnScreenTicks)),
-        withMetrics.LongCount(f => period > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > threshold),
-        errorPerFrameMs,
-        percentError
-      );
+      var statistics = RunStatistics.From(frames, threshold, period);
       var counts = new RunCounts(
         rows.Count,
         decoded,

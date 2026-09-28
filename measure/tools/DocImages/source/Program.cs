@@ -22,6 +22,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using MB.FramePacing.Capture;
 using MB.FramePacing.Charts;
 using MB.FramePacing.Gui;
 using MB.FramePacing.Gui.ViewModels;
@@ -47,6 +48,7 @@ namespace MB.FramePacing.DocImages
         using var session = HeadlessUnitTestSession.StartNew(typeof(HeadlessApp));
         session.Dispatch(() => RenderGuiAsync(output), CancellationToken.None).GetAwaiter().GetResult();
         Console.WriteLine($"GUI screenshots written to {output}");
+        WriteReportExamples(output, Path.Combine(work, "reports"));
         return 0;
       }
       catch (Exception ex)
@@ -232,6 +234,42 @@ namespace MB.FramePacing.DocImages
         await Task.Delay(50);
         Dispatcher.UIThread.RunJobs();
       }
+    }
+
+    /// <summary>
+    /// The SVG report examples of the README, from test clips made by mb-framepacing-explained (test-data/videos): a game adapting its rate like
+    /// Swappy, a busy stretch at the full rate, and delta time jitter from a naive timer. Imported through ffmpeg; skipped without it.
+    /// </summary>
+    private static void WriteReportExamples(string output, string work)
+    {
+      string ffmpeg;
+      try
+      {
+        ffmpeg = MB.FramePacing.Capture.Ffmpeg.FfmpegLocator.Find(null, MB.FramePacing.Capture.FramePacingConfig.Load());
+      }
+      catch (Exception ex) when (ex is FileNotFoundException or InvalidDataException)
+      {
+        Console.WriteLine("  report-example-*.svg skipped: ffmpeg is not installed");
+        return;
+      }
+      foreach (var (clip, name) in new[] { ("60-busy-swappy", "swappy"), ("60-busy-full-rate", "busy"), ("60-naive-5ms", "jitter") })
+      {
+        string video = Path.Combine(FindRepositoryRoot(), "test-data", "videos", clip, "video.mp4");
+        string imported = Path.Combine(work, clip);
+        var media = MB.FramePacing.Capture.Ffmpeg.MediaInput.Create(video, new MB.FramePacing.Capture.Ffmpeg.MediaInputOptions(), imported);
+        using (var source = MB.FramePacing.Capture.Ffmpeg.FfmpegCaptureSource.Start(media.ToCaptureOptions(ffmpeg), TimeSpan.FromSeconds(30)))
+          CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = imported }, null, CancellationToken.None);
+        WriteReport(imported, Path.Combine(output, $"report-example-{name}.svg"));
+      }
+    }
+
+    /// <summary>Analyse the capture and write its (only) run's report.</summary>
+    private static void WriteReport(string capture, string path)
+    {
+      var report = MB.FramePacing.Analysis.CaptureAnalyzer.Analyze(capture, new MB.FramePacing.Analysis.AnalysisOptions());
+      var chart = ChartRun.From(report, report.Timeline.Runs.Single());
+      File.WriteAllText(path, ReportSvg.Render(RunSection.Whole(chart)), new System.Text.UTF8Encoding(false));
+      Console.WriteLine($"  {Path.GetFileName(path)}");
     }
 
     private static string FindRepositoryRoot()

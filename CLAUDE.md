@@ -79,7 +79,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 - **Docs**
   - Formatting: `npm install && npm run format` (Prettier: Markdown/JSON/YAML; config `.prettierrc.json`, ignores in
     `.prettierignore`).
-  - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. It renders the real GUI **offscreen**
+  - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. The SVG report examples (`report-example-*.svg`) come from test clips
+    imported through ffmpeg (skipped without it): example pictures use the test clips, not the synthetic game. It renders the real GUI **offscreen**
     (Avalonia.Headless) in no-save mode and neutralises machine specific text. Never take desktop screenshots.
 - **Capture data (the default):** a capture decodes every frame's markers live and stores only them, with the timestamps, in
   `captures.mbcd` (`doc/capture-data-format.md`); the frames themselves (`frames.mbfc`) only with `--keep-frames` / the GUI's "Store
@@ -109,6 +110,10 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     (`--charts`, the GUI's "Save charts") `ChartFiles` writes them as `run-<id>-*.png` next to the reports. Test chart changes with
     `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
     with `VideoClipTests` by linked source files).
+    - The SVG report (`ReportSvg`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
+      and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
+      output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
+      (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`).
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the band on top of `run-<id>-timeline.png`
       (`HeadlineBand`) show the same tiles, so add or change a number there, not in the GUI.
     - The error and display time step charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);

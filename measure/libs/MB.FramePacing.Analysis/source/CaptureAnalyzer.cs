@@ -231,7 +231,7 @@ namespace MB.FramePacing.Analysis
       using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
       writer.WriteLine(
         "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags,"
-          + "intendedDisplayMs,markerTargetMs,targetMs,pacingErrorMs,predictionErrorMs,latenessMs"
+          + "intendedDisplayMs,markerTargetMs,targetMs,pacingErrorMs,predictionErrorMs,latenessMs,lastSeenMs"
           + (camera ? ",mainMarkerFirstSeenMs,scanoutDelayMs" : "")
       );
       foreach (var frame in frames)
@@ -257,7 +257,8 @@ namespace MB.FramePacing.Analysis
             frame.TargetTicks is { } target ? Ms(target) : string.Empty,
             frame.PacingErrorTicks is { } pacing ? Ms(pacing) : string.Empty,
             frame.PredictionErrorTicks is { } prediction ? Ms(prediction) : string.Empty,
-            frame.LatenessTicks is { } lateness ? Ms(lateness) : string.Empty
+            frame.LatenessTicks is { } lateness ? Ms(lateness) : string.Empty,
+            Ms(frame.LastSeenTicks)
           )
             + (
               camera

@@ -29,6 +29,30 @@ namespace MB.FramePacing.Analysis
     double PercentError
   )
   {
+    /// <summary>
+    /// The statistics of <paramref name="frames"/> (a run, or a section of one): the frames with an animation error give the display and
+    /// animation time steps and the errors; every frame the drift and time on screen. <paramref name="thresholdTicks"/> is the error
+    /// threshold, <paramref name="capturePeriodTicks"/> the capture period (no frame counts as off without one).
+    /// </summary>
+    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, long thresholdTicks, long capturePeriodTicks)
+    {
+      var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
+      var (errorPerFrameMs, percentError) = ErrorSummary(
+        withMetrics.Select(f => (f.AnimationErrorTicks!.Value, f.DisplayDeltaTicks!.Value)).ToList()
+      );
+      return new RunStatistics(
+        Statistics.FromTicks(withMetrics.Select(f => f.DisplayDeltaTicks!.Value)),
+        Statistics.FromTicks(withMetrics.Select(f => f.AnimationDeltaTicks!.Value)),
+        Statistics.FromTicks(withMetrics.Select(f => f.AnimationErrorTicks!.Value)),
+        Statistics.FromTicks(withMetrics.Select(f => Math.Abs(f.AnimationErrorTicks!.Value))),
+        Statistics.FromTicks(frames.Select(f => f.DriftTicks)),
+        Statistics.FromTicks(frames.Select(f => f.OnScreenTicks)),
+        withMetrics.LongCount(f => capturePeriodTicks > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > thresholdTicks),
+        errorPerFrameMs,
+        percentError
+      );
+    }
+
     /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display time steps, in ticks.</summary>
     public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(IReadOnlyCollection<(long ErrorTicks, long DisplayStepTicks)> frames)
     {

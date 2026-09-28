@@ -234,7 +234,7 @@ double-click on a chart) shows the whole run again:
 - **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
   nothing. Everything inside the shaded band counts as no error.
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
-  when the frame was held too long because the next one was late; the dotted line is the target. An error bar over a red step is
+  when the frame was held too long because the next one was late. An error bar over a red step is
   bad pacing; an error bar while the steps stay flat is delta time jitter.
 - **Share of late frames in the last 2 s:** rare spikes stay low, busy stretches stand out, and they call for different fixes.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
@@ -267,6 +267,28 @@ histograms and the pacing numbers are also in `summary.json` (`runs[].histograms
 percent error in `runs[].statistics`), and late frames carry `Late`
 in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools.
 
+**The report** is the run as one SVG card, in the style of
+[mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained)'s charts: the headline numbers, the animation
+error, the display time step, the late share and the refresh strip. `--charts` and **Save charts** write it for the whole run
+(`run-<id>-report.svg`); `mb-framepacing render` draws it from an analysis (no capture needed) for the whole run or any section
+(`--from`/`--to`, in seconds on the Timeline's axis), the worst moments (`--details`), and as PNG too (`--png`, through Edge or
+Chrome). A section of a few seconds shows every frame and refresh; a long run shows each pixel column's frames, the whole range faint
+and the middle 90 % solid.
+
+The test clips (`test-data/videos`, made by mb-framepacing-explained) as reports. A game that adapts its rate like Android's Swappy:
+a busy stretch with late frames, then 30 fps (two refreshes per frame, as planned) for a while, then 60 again:
+
+![The report of a game adapting its rate like Swappy](doc/images/report-example-swappy.svg)
+
+The same busy stretch at the full rate: the frames that miss a refresh are late, and each is off by a whole refresh:
+
+![The report of a busy stretch at the full rate](doc/images/report-example-busy.svg)
+
+A naive delta time timer: every frame is shown on time, but the timer is off by up to 5 ms either way, so the animation steps
+are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing):
+
+![The report of delta time jitter from a naive timer](doc/images/report-example-jitter.svg)
+
 ### The command line
 
 ```sh
@@ -283,6 +305,7 @@ mb-framepacing import frames/ --timestamps times.csv      # ... or with exact ti
 mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
 mb-framepacing analyze <capture folder>                   # (re)analyse
 mb-framepacing analyze <capture folder> --target-fps 30   # ... measuring late frames against a 30 fps target
+mb-framepacing render <capture folder> --from 120 --to 125 --png  # the report of 5 s of the run, as SVG and PNG
 # VERY EXPERIMENTAL: a high speed camera filming the screen (doc/camera.md)
 mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
 mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --display-hz 60 --analyze  # later: checks the camera and the display rate
@@ -291,7 +314,7 @@ mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline 
 
 `mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
 `captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
-the charts as `run-<id>-*.png`.
+the charts as `run-<id>-*.png` and the report as `run-<id>-report.svg`.
 
 ### What you need
 

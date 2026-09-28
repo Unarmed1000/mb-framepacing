@@ -85,13 +85,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(steps.LevelTicks, Is.EqualTo(holds.Select(i => manifest.DisplayStepTicks(i + 1))), $"{clip}: display time step");
       Assert.That(steps.HeldTooLong, Is.EqualTo(holds.Select(i => manifest.IsLate(i + 1))), $"{clip}: held too long");
       Assert.That(steps.RefreshMs, Is.EqualTo(Ms(refresh)), $"{clip}: refresh grid");
-      AssertSeries(
-        displayTimeStep,
-        RunCharts.TargetLegend,
-        holds.Select(Seconds),
-        measured.Select(i => Ms(manifest.TargetRefreshes(i) * refresh)),
-        clip
-      );
+      Assert.That(displayTimeStep.GetPlottables<Scatter>(), Is.Empty, $"{clip}: the holds only (no target line)");
 
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
       var (shareTimes, shares) = SignalPoints(lateShare);
@@ -180,16 +174,70 @@ namespace MB.FramePacing.Charts.UnitTest
             "run-1-error-percentiles.png",
             "run-1-display-time-step-histogram.png",
             "run-1-drift.png",
+            "run-1-report.svg",
           }
         )
       );
-      foreach (var file in files)
+      foreach (var file in files.Where(f => f.EndsWith(".png", StringComparison.Ordinal)))
       {
         Assert.That(Path.GetDirectoryName(file), Is.EqualTo(report.OutputDirectory), file);
         var (width, height) = PngSize(file);
         Assert.That(width, Is.EqualTo(ChartFiles.Width), file);
         Assert.That(height, Is.GreaterThanOrEqualTo(ChartFiles.DistributionHeight), file);
       }
+    }
+
+    /// <summary>
+    /// The analysis output reads back exactly: every presented frame to the tick, the pacing, statistics and counts, the capture period and the
+    /// error threshold.
+    /// </summary>
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    public void AnalysisOutput_ReadsBackWhatTheAnalysisWrote(string clip)
+    {
+      var (_, report, chart) = Analyze(clip);
+      var read = AnalysisOutput.Read(report.CaptureDirectory).Single();
+      Assert.That(read.FilePrefix, Is.EqualTo("run-1"));
+      var back = read.Chart;
+      Assert.That(
+        (back.CapturePeriodTicks, back.ErrorThresholdTicks, back.Camera),
+        Is.EqualTo((chart.CapturePeriodTicks, chart.ErrorThresholdTicks, chart.Camera))
+      );
+      Assert.That(back.Run.Frames, Is.EqualTo(chart.Run.Frames), $"{clip}: every frame to the tick");
+      Assert.That(back.Run.Pacing, Is.EqualTo(chart.Run.Pacing), $"{clip}: pacing");
+      Assert.That(back.Run.Statistics, Is.EqualTo(chart.Run.Statistics), $"{clip}: statistics");
+      Assert.That(back.Run.Counts, Is.EqualTo(chart.Run.Counts), $"{clip}: counts");
+      Assert.That((back.Run.RunId, back.Run.Name), Is.EqualTo((chart.Run.RunId, chart.Run.Name)));
+    }
+
+    /// <summary>
+    /// The SVG report of each clip, drawn from what the analysis wrote: a bar per frame with an animation error, a held step per frame (red for
+    /// the ones held too long), and the refresh strip's cells, late ones red, as the manifest gives them.
+    /// </summary>
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    public void ReportSvg_MatchesTheManifest(string clip)
+    {
+      var (manifest, report, _) = Analyze(clip);
+      var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
+      string svg = ReportSvg.Render(RunSection.Whole(chart));
+      var document = System.Xml.Linq.XDocument.Parse(svg);
+      IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
+
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
+      Assert.That(Of("bar").Count(), Is.EqualTo(measured.Count(i => manifest.AnimationErrorTicks(i) != 0)), $"{clip}: a bar per frame with an error");
+      int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
+      Assert.That(Segments("held") + Segments("held-late"), Is.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
+      Assert.That(Segments("held-late"), Is.EqualTo(measured.Count(manifest.IsLate)), $"{clip}: held too long when the next frame is late");
+      var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
+      Assert.That(
+        Of("strip-late").Count(),
+        Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(i => (int)manifest.RefreshesOnScreen(i))),
+        $"{clip}: a red cell per refresh of every late frame"
+      );
+      Assert.That(
+        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count(),
+        Is.EqualTo(all.Sum(i => (int)manifest.RefreshesOnScreen(i))),
+        $"{clip}: a cell per refresh"
+      );
     }
 
     /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers, and the report's Timeline image carries them on top.</summary>

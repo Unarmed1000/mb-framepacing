@@ -30,7 +30,7 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// Writes each run's charts into the report directory, named like its frames CSV (<see cref="CaptureAnalyzer.RunFilePrefix"/>):
-    /// -timeline.png (under the run's headline band), -error-histogram.png, -error-percentiles.png, -display-time-step-histogram.png and -drift.png. Returns the files written.
+    /// -timeline.png (under the run's headline band), -report.svg (ReportSvg), -error-histogram.png, -error-percentiles.png, -display-time-step-histogram.png and -drift.png. Returns the files written.
     /// </summary>
     public static IReadOnlyList<string> Write(AnalysisReport report, ChartTheme theme)
     {
@@ -79,6 +79,8 @@ namespace MB.FramePacing.Charts
         plot.SavePng(path, Width, DistributionHeight);
         written.Add(path);
       }
+      // The whole run as an SVG report, in the style of mb-framepacing-explained's charts
+      written.AddRange(ReportFiles.Write(run, Path.GetFileName(prefix), Path.GetDirectoryName(Path.GetFullPath(prefix))!));
       return written;
     }
 
