@@ -20,6 +20,13 @@ namespace MB.FramePacing.Analysis
   /// <param name="PacingErrorTicks">With a schedule: the display time step minus the intended step.</param>
   /// <param name="PredictionErrorTicks">With a schedule: the animation time step minus the intended step.</param>
   /// <param name="LatenessTicks">With a schedule: how long after its intended time the frame appeared, relative to the run's on-time frames.</param>
+  /// <param name="CpuStartTicks">From the marker: the CPU start time, when the CPU started working on the frame (the pacer's clock), 0 = unknown.</param>
+  /// <param name="CpuBusyTicks">From the marker: CPU busy, how long the CPU worked on the frame before presenting it, 0 = unknown.</param>
+  /// <param name="FrameTimeTicks">
+  /// The frametime (PresentMon's MsBetweenAppStart): from this frame's CPU start to the next frame's, when the next frame index was captured
+  /// and both carry a CPU start time.
+  /// </param>
+  /// <param name="CpuWaitTicks">CPU wait (PresentMon's MsCPUWait): the frametime minus CPU busy, when both are known.</param>
   public sealed record PresentedFrame(
     int Segment,
     ulong FrameIndex,
@@ -41,6 +48,10 @@ namespace MB.FramePacing.Analysis
     long? TargetTicks = null,
     long? PacingErrorTicks = null,
     long? PredictionErrorTicks = null,
-    long? LatenessTicks = null
+    long? LatenessTicks = null,
+    long CpuStartTicks = 0,
+    uint CpuBusyTicks = 0,
+    long? FrameTimeTicks = null,
+    long? CpuWaitTicks = null
   );
 }

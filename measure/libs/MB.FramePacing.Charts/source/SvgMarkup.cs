@@ -65,8 +65,8 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// The report's own classes, in the same palette: the error threshold band, the held steps of the display time step (after the web page's
-    /// frame chart: green as planned, red held too long, faint risers), the late share, the late strip cells, the marks of values
-    /// beyond a scale, and warning values.
+    /// frame chart: green as planned, red held too long, faint risers), the frametime (the web page's step-line blue) and CPU busy, the late
+    /// share, the late strip cells, the marks of values beyond a scale, and warning values.
     /// </summary>
     public const string ReportStyle =
       "\n  .band { fill: #ffffff; fill-opacity: 0.06; }\n"
@@ -81,6 +81,10 @@ namespace MB.FramePacing.Charts
       + "  .late-line { stroke: #e5534b; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
       + "  .late-line-adapted { stroke: #d29922; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
       + "  .late-line-none { stroke: #2ea043; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
+      + "  .frametime { stroke: #58a6ff; stroke-width: 2.5; fill: none; }\n"
+      + "  .frametime-range { fill: #58a6ff; fill-opacity: 0.3; }\n"
+      + "  .frametime-fill { fill: #58a6ff; }\n"
+      + "  .cpu-busy { fill: #58a6ff; fill-opacity: 0.22; }\n"
       + "  .strip-late { fill: #e5534b; }\n"
       + "  .clip-mark { fill: #e5534b; }\n"
       + "  .clip-text { font-size: 11px; fill: #e6edf3; }\n"

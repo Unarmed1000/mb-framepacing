@@ -103,6 +103,10 @@ namespace MB.FramePacing.Charts
       int prediction = Column("predictionErrorMs");
       int lateness = Column("latenessMs");
       int lastSeen = Column("lastSeenMs");
+      int cpuStart = Column("cpuStartMs");
+      int cpuBusy = Column("cpuBusyMs");
+      int frameTime = Column("frameTimeMs");
+      int cpuWait = Column("cpuWaitMs");
       int mainSeen = Column("mainMarkerFirstSeenMs");
 
       var frames = new List<PresentedFrame>();
@@ -139,7 +143,11 @@ namespace MB.FramePacing.Charts
             Optional(target),
             Optional(pacing),
             Optional(prediction),
-            Optional(lateness)
+            Optional(lateness),
+            Optional(cpuStart) ?? 0,
+            (uint)(Optional(cpuBusy) ?? 0),
+            Optional(frameTime),
+            Optional(cpuWait)
           )
         );
       }

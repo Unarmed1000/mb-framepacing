@@ -249,6 +249,7 @@ namespace MB.FramePacing.Charts.UnitTest
       (ReportItem.LateFrames, ">LATE FRAMES<"),
       (ReportItem.AnimationError, ">ANIMATION ERROR PER FRAME<"),
       (ReportItem.DisplayTimeStep, ">DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN<"),
+      (ReportItem.FrameTime, ">FRAMETIME AND CPU BUSY: THE APPLICATION SIDE, FROM THE MARKERS<"),
       (ReportItem.LateShare, ">SHARE OF LATE FRAMES IN THE LAST 2 S<"),
       (ReportItem.RefreshStrip, ">REFRESH STRIP<"),
     };

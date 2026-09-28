@@ -229,15 +229,17 @@ steps).
 The **Timeline** tab puts everything on one time axis; zooming or panning one chart moves the others, and **Reset zoom** (or a
 double-click on a chart) shows the whole run again:
 
-The same four panels as a report (below) of a test clip, a busy stretch at the full rate:
+The same panels as a report (below) of a test clip, a busy stretch at the full rate:
 
-![The report of a busy stretch at the full rate: animation error, display time step, late share and refresh strip](doc/images/report-example-busy.svg)
+![The report of a busy stretch at the full rate: animation error, display time step, frametime and CPU busy, late share and refresh strip](doc/images/report-example-busy.svg)
 
 - **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
   nothing. Everything inside the shaded band counts as no error.
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
   when the frame was held too long because the next one was late. An error bar over a red step is
   bad pacing; an error bar while the steps stay flat is delta time jitter.
+- **Frametime and CPU busy** (when the markers carry the CPU start time and CPU busy): the application side on the same grid, each
+  frame's frametime (its CPU start to the next frame's) as a blue step and its CPU busy (until it was presented) as a faint bar.
 - **Share of late frames in the last 2 s:** the late frames among the frames of the 2 s before each frame.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
   Zoom in to see hold patterns such as 3-then-1.

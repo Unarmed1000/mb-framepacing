@@ -157,6 +157,13 @@ namespace MB.FramePacing.App.Commands
         AddRow(table, "|Animation error|", s.AbsoluteAnimationErrorMs);
         AddRow(table, "Drift", s.DriftMs);
         AddRow(table, "On screen", s.OnScreenMs);
+        // The application side, when the markers carry it
+        if (s.FrameTimeMs.Count > 0)
+          AddRow(table, "Frametime", s.FrameTimeMs);
+        if (s.CpuBusyMs.Count > 0)
+          AddRow(table, "CPU busy", s.CpuBusyMs);
+        if (s.CpuWaitMs.Count > 0)
+          AddRow(table, "CPU wait", s.CpuWaitMs);
         AnsiConsole.Write(table);
         AnsiConsole.MarkupLineInterpolated(
           $"{s.FramesWithAnimationError} frame(s) with |animation error| above {report.ErrorThresholdMs:0.###} ms (the error threshold, --error-threshold-ms)."

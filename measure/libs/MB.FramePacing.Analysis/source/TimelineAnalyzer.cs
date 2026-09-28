@@ -197,6 +197,8 @@ namespace MB.FramePacing.Analysis
       public long AnimationTicks;
       public long IntendedDisplayTicks;
       public uint TargetFrameTicks;
+      public long CpuStartTicks;
+      public uint CpuBusyTicks;
       public long FirstCaptureIndex;
       public long FirstSeenTicks;
       public long LastSeenTicks;
@@ -292,6 +294,8 @@ namespace MB.FramePacing.Analysis
           AnimationTicks = payload.AnimationTicks,
           IntendedDisplayTicks = payload.IntendedDisplayTicks,
           TargetFrameTicks = payload.TargetFrameTicks,
+          CpuStartTicks = payload.CpuStartTicks,
+          CpuBusyTicks = payload.CpuBusyTicks,
           FirstCaptureIndex = row.CaptureIndex,
           FirstSeenTicks = row.CaptureTicks,
           LastSeenTicks = row.CaptureTicks,
@@ -579,6 +583,12 @@ namespace MB.FramePacing.Analysis
         long? displayDelta = previous != null ? b.FirstSeenTicks - previous.FirstSeenTicks : null;
         long? animationDelta = previous != null ? b.AnimationTicks - previous.AnimationTicks : null;
         long onScreen = hasNext ? builders[i + 1].FirstSeenTicks - b.FirstSeenTicks : b.LastSeenTicks - b.FirstSeenTicks + period;
+        // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured
+        long? frameTime =
+          i + 1 < builders.Count && builders[i + 1].FrameIndex == b.FrameIndex + 1 && b.CpuStartTicks != 0 && builders[i + 1].CpuStartTicks != 0
+            ? builders[i + 1].CpuStartTicks - b.CpuStartTicks
+            : null;
+        long? cpuWait = frameTime.HasValue && b.CpuBusyTicks != 0 ? frameTime.Value - b.CpuBusyTicks : null;
         var flags = PresentedFrameFlags.None;
         if (b.SkippedBefore > 0)
           flags |= PresentedFrameFlags.SkippedBefore;
@@ -605,7 +615,11 @@ namespace MB.FramePacing.Analysis
             flags,
             b.FirstSeenSecondaryTicks,
             b.IntendedDisplayTicks,
-            b.TargetFrameTicks
+            b.TargetFrameTicks,
+            CpuStartTicks: b.CpuStartTicks,
+            CpuBusyTicks: b.CpuBusyTicks,
+            FrameTimeTicks: frameTime,
+            CpuWaitTicks: cpuWait
           )
         );
       }

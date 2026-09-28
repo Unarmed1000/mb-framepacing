@@ -155,7 +155,7 @@ mb-framepacing render capture-20260924-153000 --details --png      # also the wo
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-off`, `error-p99`, `error-p999`,
-`worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
+`worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
 (`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
 Chrome, found in the usual places or set with `MB_BROWSER`.
 

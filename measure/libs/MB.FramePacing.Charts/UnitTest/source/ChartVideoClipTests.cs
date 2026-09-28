@@ -238,6 +238,10 @@ namespace MB.FramePacing.Charts.UnitTest
         Is.EqualTo(all.Sum(i => (int)manifest.RefreshesOnScreen(i))),
         $"{clip}: a cell per refresh"
       );
+      // The application side: a frametime step per frame whose next frame carries a CPU start too, a CPU busy bar per frame that has one
+      int frameTimes = Enumerable.Range(0, manifest.FrameCount - 1).Count(i => manifest.CpuStartTicks[i] != 0 && manifest.CpuStartTicks[i + 1] != 0);
+      Assert.That(Segments("frametime"), Is.EqualTo(frameTimes), $"{clip}: a frametime step per frame with a frametime");
+      Assert.That(Segments("cpu-busy"), Is.EqualTo(all.Count(i => manifest.CpuBusyTicks[i] != 0)), $"{clip}: a CPU busy bar per frame with CPU busy");
     }
 
     /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers, and the report's Timeline image carries them on top.</summary>

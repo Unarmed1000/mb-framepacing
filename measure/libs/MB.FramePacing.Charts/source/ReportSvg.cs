@@ -33,6 +33,7 @@ namespace MB.FramePacing.Charts
     private const int TilesPerRow = 4;
     private const double ErrorH = 150;
     private const double StepH = 130;
+    private const double FrameTimeH = 130;
     private const double LateH = 80;
     private const double StripH = 28;
 
@@ -104,6 +105,8 @@ namespace MB.FramePacing.Charts
         ErrorPanel(parts, section, frames, Seconds, XOf, perFrame, errorY);
       if (layout.StepY is { } stepY)
         StepPanel(parts, frames, Seconds, XOf, perFrame, refreshMs, from, to, stepY);
+      if (layout.FrameTimeY is { } frameTimeY)
+        FrameTimePanel(parts, frames, Seconds, XOf, perFrame, refreshMs, from, to, frameTimeY);
       if (layout.LateY is { } lateY)
         LatePanel(parts, section, Seconds, XOf, perFrame, lateY);
       if (layout.StripY is { } stripY)
@@ -114,7 +117,7 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
-    private sealed record Layout(double TilesY, double? ErrorY, double? StepY, double? LateY, double? StripY, double Height)
+    private sealed record Layout(double TilesY, double? ErrorY, double? StepY, double? FrameTimeY, double? LateY, double? StripY, double Height)
     {
       public static Layout For(ReportOptions options, int descriptionLines, int tiles)
       {
@@ -157,10 +160,11 @@ namespace MB.FramePacing.Charts
         }
         var errorY = Panel(ReportItem.AnimationError, ErrorH);
         var stepY = Panel(ReportItem.DisplayTimeStep, StepH);
+        var frameTimeY = Panel(ReportItem.FrameTime, FrameTimeH);
         var lateY = Panel(ReportItem.LateShare, LateH);
         var stripY = Panel(ReportItem.RefreshStrip, StripH);
         double height = previous == "panel" ? cursor + BottomAfterPanel : cursor + BottomMargin;
-        return new Layout(tilesY, errorY, stepY, lateY, stripY, height);
+        return new Layout(tilesY, errorY, stepY, frameTimeY, lateY, stripY, height);
       }
     }
 
@@ -419,6 +423,115 @@ namespace MB.FramePacing.Charts
       }
       ClipMarks(parts, clipped, stepY, stepY + StepH, v => $"{Ms(v)} ms");
       TimeTicks(parts, from, to, xOf, stepY + StepH);
+    }
+
+    /// <summary>
+    /// The application side, from the markers, on the display time step's whole-refresh grid: each frame's frametime (from its CPU start to the
+    /// next frame's) as a step, and its CPU busy (from its CPU start until it was presented) as a faint bar, held from the frame's display time
+    /// to the next frame's.
+    /// </summary>
+    private static void FrameTimePanel(
+      List<string> parts,
+      IReadOnlyList<PresentedFrame> frames,
+      Func<PresentedFrame, double> seconds,
+      Func<double, double> xOf,
+      bool perFrame,
+      double refreshMs,
+      double from,
+      double to,
+      double frameTimeY
+    )
+    {
+      parts.Add(Text(20, frameTimeY - 16, "FRAMETIME AND CPU BUSY: THE APPLICATION SIDE, FROM THE MARKERS", "label", "start"));
+      var spans = new List<(double X0, double X1, double FrameTime, double CpuBusy)>();
+      for (int i = 0; i < frames.Count; ++i)
+      {
+        var frame = frames[i];
+        double frameTime = frame.FrameTimeTicks is { } ticks ? ticks / (double)TimeSpan.TicksPerMillisecond : 0;
+        double cpuBusy = frame.CpuBusyTicks / (double)TimeSpan.TicksPerMillisecond;
+        if (frameTime <= 0 && cpuBusy <= 0)
+          continue;
+        double x0 = xOf(seconds(frame));
+        double x1 =
+          i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment
+            ? xOf(seconds(frames[i + 1]))
+            : xOf(seconds(frame) + (frame.OnScreenTicks / (double)TimeSpan.TicksPerSecond));
+        spans.Add((x0, Math.Min(PlotX1, x1), frameTime, cpuBusy));
+      }
+      if (spans.Count == 0)
+      {
+        parts.Add(Text(PlotX0, frameTimeY + (FrameTimeH / 2), "the markers carry no CPU start time or CPU busy", "vsync-n", "start"));
+        return;
+      }
+      parts.Add(Text(PlotX1, frameTimeY - 16, "blue: frametime (CPU start to the next); faint: CPU busy (until presented)", "vsync-n", "end"));
+      double top = DisplayTimeStepsPlottable.Top(spans.SelectMany(s => new[] { s.FrameTime, s.CpuBusy }).Where(v => v > 0).ToArray(), refreshMs);
+      double YOf(double ms) => frameTimeY + FrameTimeH - (Math.Min(ms, top) / top * FrameTimeH);
+      foreach (var (position, _) in DisplayTimeStepsPlottable.Ticks(refreshMs, top).Where(t => t.Position > 0))
+      {
+        double y = YOf(position);
+        parts.Add(GridLine(y));
+        parts.Add(Text(PlotX0 - 10, y + 4, $"{Ms(Math.Round(position, 1))} ms", "vsync-n", "end"));
+      }
+      parts.Add(GridLine(YOf(0)));
+      parts.Add(Text(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
+
+      var clipped = new List<(double X, double Value, bool Top)>();
+      var busy = new StringBuilder();
+      double bottom = YOf(0);
+      if (perFrame)
+      {
+        var steps = new StringBuilder();
+        foreach (var span in spans)
+        {
+          if (span.CpuBusy > 0)
+            busy.Append($"M{Fixed(span.X0, 1)} {Fixed(YOf(span.CpuBusy), 1)}H{Fixed(span.X1, 1)}V{Fixed(bottom, 1)}H{Fixed(span.X0, 1)}Z");
+          if (span.FrameTime > 0)
+            steps.Append($"M{Fixed(span.X0, 1)} {Fixed(YOf(span.FrameTime), 1)}H{Fixed(span.X1, 1)}");
+          double highest = Math.Max(span.FrameTime, span.CpuBusy);
+          if (highest > top)
+            clipped.Add(((span.X0 + span.X1) / 2, highest, true));
+        }
+        AddPath(parts, "cpu-busy", busy);
+        AddPath(parts, "frametime", steps);
+      }
+      else
+      {
+        // Per pixel column: the median CPU busy as a faint bar; the frametimes' range faint and their median solid (all solid when few)
+        var range = new StringBuilder();
+        var median = new StringBuilder();
+        var solid = new StringBuilder();
+        foreach (var column in spans.GroupBy(s => (int)Math.Floor(s.X0)).OrderBy(g => g.Key))
+        {
+          double end = Math.Max(column.Key + 1, column.Max(s => s.X1));
+          var busyLevels = column.Where(s => s.CpuBusy > 0).Select(s => s.CpuBusy).Order().ToArray();
+          if (busyLevels.Length > 0)
+          {
+            double middleBusy = busyLevels[(busyLevels.Length - 1) / 2];
+            busy.Append($"M{Fixed(column.Key, 0)} {Fixed(YOf(middleBusy), 1)}H{Fixed(end, 1)}V{Fixed(bottom, 1)}H{Fixed(column.Key, 0)}Z");
+          }
+          var levels = column.Where(s => s.FrameTime > 0).Select(s => s.FrameTime).Order().ToArray();
+          double highest = Math.Max(levels.Length > 0 ? levels[^1] : 0, busyLevels.Length > 0 ? busyLevels[^1] : 0);
+          if (highest > top)
+            clipped.Add((column.Key + 0.5, highest, true));
+          if (levels.Length == 0)
+            continue;
+          string box =
+            $"M{Fixed(column.Key, 0)} {Fixed(YOf(levels[^1]) - 1.25, 1)}H{Fixed(end, 1)}V{Fixed(YOf(levels[0]) + 1.25, 1)}H{Fixed(column.Key, 0)}Z";
+          if (levels.Length < MinFramesForTypical)
+          {
+            solid.Append(box);
+            continue;
+          }
+          range.Append(box);
+          median.Append($"M{Fixed(column.Key, 0)} {Fixed(YOf(levels[(levels.Length - 1) / 2]), 1)}H{Fixed(end, 1)}");
+        }
+        AddPath(parts, "cpu-busy", busy);
+        AddPath(parts, "frametime-range", range);
+        AddPath(parts, "frametime", median);
+        AddPath(parts, "frametime-fill", solid);
+      }
+      ClipMarks(parts, clipped, frameTimeY, frameTimeY + FrameTimeH, v => $"{Ms(v)} ms");
+      TimeTicks(parts, from, to, xOf, frameTimeY + FrameTimeH);
     }
 
     private static void LatePanel(

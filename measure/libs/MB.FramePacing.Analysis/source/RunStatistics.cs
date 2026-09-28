@@ -33,7 +33,12 @@ namespace MB.FramePacing.Analysis
     // The frame rate at the 99th / 99.9th percentile display time step (nearest rank, so it is a step that happened); null with fewer
     // than MinFramesForOnePercentLow / MinFramesForPointOnePercentLow frames
     double? OnePercentLowFps,
-    double? PointOnePercentLowFps
+    double? PointOnePercentLowFps,
+    // The application side, from the markers (Count 0 when no frame carries them): CPU busy, the frametime (CPU start to the next
+    // frame's) and CPU wait (frametime - CPU busy), named as PresentMon's MsCPUBusy, MsBetweenAppStart and MsCPUWait
+    Statistics CpuBusyMs,
+    Statistics FrameTimeMs,
+    Statistics CpuWaitMs
   )
   {
     /// <summary>
@@ -59,7 +64,10 @@ namespace MB.FramePacing.Analysis
         percentError,
         AverageFpsOf(withMetrics),
         LowFps(withMetrics, 0.99, MinFramesForOnePercentLow),
-        LowFps(withMetrics, 0.999, MinFramesForPointOnePercentLow)
+        LowFps(withMetrics, 0.999, MinFramesForPointOnePercentLow),
+        Statistics.FromTicks(frames.Where(f => f.CpuBusyTicks != 0).Select(f => (long)f.CpuBusyTicks)),
+        Statistics.FromTicks(frames.Where(f => f.FrameTimeTicks.HasValue).Select(f => f.FrameTimeTicks!.Value)),
+        Statistics.FromTicks(frames.Where(f => f.CpuWaitTicks.HasValue).Select(f => f.CpuWaitTicks!.Value))
       );
     }
 

@@ -29,6 +29,7 @@ namespace MB.FramePacing.Charts
     public const string LateFrames = "late-frames";
     public const string AnimationError = "animation-error";
     public const string DisplayTimeStep = "display-time-step";
+    public const string FrameTime = "frametime";
     public const string LateShare = "late-share";
     public const string RefreshStrip = "refresh-strip";
 
@@ -49,6 +50,7 @@ namespace MB.FramePacing.Charts
       (LateFrames, "tile: late frames"),
       (AnimationError, "panel: animation error per frame"),
       (DisplayTimeStep, "panel: display time step"),
+      (FrameTime, "panel: frametime and CPU busy (from the markers)"),
       (LateShare, "panel: share of late frames in the last 2 s"),
       (RefreshStrip, "panel: refresh strip"),
     };

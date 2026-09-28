@@ -85,7 +85,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     /// <summary>
     /// The analysis of the decoded clip, frame by frame and to the tick: display time step, animation time step and error, drift, the late flag and
-    /// how late, the target, and the pacing and prediction errors against the pacer's schedule in the markers.
+    /// how late, the target, the pacing and prediction errors against the pacer's schedule in the markers, and the CPU start time, CPU busy,
+    /// frametime and CPU wait.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
     public void Clip_AnalysisMatchesItsManifest(string clip)
@@ -110,6 +111,16 @@ namespace MB.FramePacing.Analysis.UnitTest
           Is.EqualTo(manifest.IntendedTicks(i) != 0 ? Behind(manifest, i) - onTime : null),
           where + ": how late (0 = unknown intended time)"
         );
+        // The application side: CPU start and CPU busy from the marker; the frametime to the next frame's CPU start (the clip's last frame
+        // is followed by the end marker, not a measured frame) and CPU wait = frametime - CPU busy
+        long cpuStart = manifest.CpuStartTicks[i];
+        long cpuBusy = manifest.CpuBusyTicks[i];
+        long? frameTime =
+          i + 1 < manifest.FrameCount && cpuStart != 0 && manifest.CpuStartTicks[i + 1] != 0 ? manifest.CpuStartTicks[i + 1] - cpuStart : null;
+        Assert.That(frame.CpuStartTicks, Is.EqualTo(cpuStart), where + ": CPU start time");
+        Assert.That(frame.CpuBusyTicks, Is.EqualTo((uint)cpuBusy), where + ": CPU busy");
+        Assert.That(frame.FrameTimeTicks, Is.EqualTo(frameTime), where + ": frametime");
+        Assert.That(frame.CpuWaitTicks, Is.EqualTo(frameTime.HasValue && cpuBusy != 0 ? frameTime - cpuBusy : null), where + ": CPU wait");
         if (i == 0)
         {
           // The manifest measures its first frame against the last frame of the previous loop, which the capture does not hold

@@ -81,6 +81,13 @@ namespace MB.FramePacing.Gui.ViewModels
         statistics.Add(StatisticsRow.From("Pacing error", pacingError));
         statistics.Add(StatisticsRow.From("Prediction error", predictionError));
       }
+      // The application side, when the markers carry it
+      if (s.FrameTimeMs.Count > 0)
+        statistics.Add(StatisticsRow.From("Frametime", s.FrameTimeMs));
+      if (s.CpuBusyMs.Count > 0)
+        statistics.Add(StatisticsRow.From("CPU busy", s.CpuBusyMs));
+      if (s.CpuWaitMs.Count > 0)
+        statistics.Add(StatisticsRow.From("CPU wait", s.CpuWaitMs));
       Statistics = statistics;
     }
 
