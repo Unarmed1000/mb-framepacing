@@ -8,6 +8,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Globalization;
 using System.CommandLine;
 using System.Linq;
 using System.Reflection;
@@ -29,6 +30,9 @@ namespace MB.FramePacing.App
 
     private static int Main(string[] args)
     {
+      // Numbers on the command line and in the output use '.' whatever the machine's culture, as the docs show them (--from 1.9)
+      CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+      CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
       // -v .. -vvvv selects the log level; it is handled here and stripped before parsing
       int verbosity = args.Where(IsVerbosityToken).Select(a => a.Length - 1).DefaultIfEmpty(0).Max();
       ConfigureLogging(verbosity);
