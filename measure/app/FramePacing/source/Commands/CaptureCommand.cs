@@ -222,7 +222,7 @@ namespace MB.FramePacing.App.Commands
       if (session.WaitedForStart)
         table.AddRow("Discarded before start", session.FramesDiscardedBeforeStart.ToString());
       if (session.SequenceRunId.HasValue)
-        table.AddRow("Run", Markup.Escape($"{session.SequenceRunId} '{session.SequenceName}'"));
+        table.AddRow("Run", Markup.Escape($"{session.SequenceRunId} '{session.SequenceId}'"));
       table.AddRow("Stopped by", Markup.Escape(session.StopReason));
       AnsiConsole.Write(table);
     }

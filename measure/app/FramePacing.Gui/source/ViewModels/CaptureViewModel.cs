@@ -499,7 +499,7 @@ namespace MB.FramePacing.Gui.ViewModels
           OriginY = 24,
           StallEvery = 37,
           SkipEvery = 53,
-          RunName = "synthetic test game",
+          SequenceTag = "synthetic game",
         }
       );
       return new SyntheticCaptureSource(scenario, paced: true);
@@ -593,7 +593,7 @@ namespace MB.FramePacing.Gui.ViewModels
             RunSeconds = 3,
             StallEvery = 37,
             SkipEvery = 53,
-            RunName = "synthetic camera",
+            SequenceTag = "synthetic camera",
           }
         ),
         new SyntheticCameraOptions()
@@ -757,7 +757,7 @@ namespace MB.FramePacing.Gui.ViewModels
       if (progress.LastMarker is { } marker)
         MarkerText =
           $"{marker.Payload.Kind} marker, run {marker.Payload.RunId}, frame {marker.Payload.FrameIndex}"
-          + (marker.Start != null ? $"  '{marker.Start.Name}'" : string.Empty);
+          + (marker.Start?.SequenceText != null ? $"  '{marker.Start.SequenceText}'" : string.Empty);
     }
 
     /// <summary>"ffmpeg 7.1" for release builds, "ffmpeg 2026-03-15" for dated snapshot builds.</summary>

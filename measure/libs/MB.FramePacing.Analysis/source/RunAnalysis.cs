@@ -14,7 +14,7 @@ namespace MB.FramePacing.Analysis
 {
   public sealed record RunAnalysis(
     uint RunId,
-    string? Name,
+    string? SequenceId,
     DateTime? StartTimeUtc,
     bool HasStartMarker,
     bool HasEndMarker,

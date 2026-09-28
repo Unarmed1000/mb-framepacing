@@ -60,11 +60,19 @@ public static class FrameMarkerUnityCheck
         uint.Parse(f[1], CultureInfo.InvariantCulture),
         (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture),
         long.Parse(f[4], CultureInfo.InvariantCulture),
-        uint.Parse(f[5], CultureInfo.InvariantCulture)
+        uint.Parse(f[5], CultureInfo.InvariantCulture),
+        long.Parse(f[6], CultureInfo.InvariantCulture),
+        uint.Parse(f[7], CultureInfo.InvariantCulture)
       );
-      // Columns: kind, runId, frameIndex, animationTicks, intendedDisplayTicks, targetFrameTicks, startUtcTicks, startNameHex, size, modulesHex
-      var start = new StartMetadata(long.Parse(f[6], CultureInfo.InvariantCulture), Encoding.UTF8.GetString(FromHex(f[7])));
-      if (!generator.GenerateModules(payload, start, matrix) || matrix.Size != int.Parse(f[8], CultureInfo.InvariantCulture) || Pack(matrix) != f[9])
+      // Columns: kind, runId, frameIndex, animationTicks, intendedDisplayTicks, targetFrameTicks, cpuStartTicks, cpuBusyTicks,
+      // startUtcTicks, sequenceIdHex (empty for other kinds), size, modulesHex
+      var sequenceId = f[9].Length > 0 ? SequenceId.FromBytes(FromHex(f[9])) : default;
+      var start = new StartMetadata(long.Parse(f[8], CultureInfo.InvariantCulture), sequenceId);
+      if (
+        !generator.GenerateModules(payload, start, matrix)
+        || matrix.Size != int.Parse(f[10], CultureInfo.InvariantCulture)
+        || Pack(matrix) != f[11]
+      )
       {
         if (++mismatches <= 5)
           Debug.LogError($"FrameMarkerUnityCheck: module digest line {i + 1} differs ({payload})");

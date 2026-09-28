@@ -19,14 +19,14 @@ namespace MB.FramePacing.Charts
     public const string Description = "description";
     public const string Display = "display";
     public const string Tiles = "tiles";
-    public const string PresentedFrames = "presented-frames";
+    public const string AverageFps = "average-fps";
+    public const string OnePercentLow = "one-percent-low";
+    public const string PointOnePercentLow = "point-one-percent-low";
     public const string FramesOff = "frames-off";
-    public const string ErrorPerFrame = "error-per-frame";
-    public const string TypicalError = "typical-error";
+    public const string ErrorP99 = "error-p99";
+    public const string ErrorP999 = "error-p999";
     public const string WorstError = "worst-error";
     public const string LateFrames = "late-frames";
-    public const string WorstLate = "worst-late";
-    public const string Resolution = "resolution";
     public const string AnimationError = "animation-error";
     public const string DisplayTimeStep = "display-time-step";
     public const string LateShare = "late-share";
@@ -39,14 +39,14 @@ namespace MB.FramePacing.Charts
       (Description, "the lines under the title"),
       (Display, "the display box (refresh rate, time per refresh, target)"),
       (Tiles, "every headline tile"),
-      (PresentedFrames, "tile: presented frames"),
+      (AverageFps, "tile: average fps (and the presented frames)"),
+      (OnePercentLow, "tile: 1 % low"),
+      (PointOnePercentLow, "tile: 0.1 % low"),
       (FramesOff, "tile: frames visibly off"),
-      (ErrorPerFrame, "tile: error per frame and percent error"),
-      (TypicalError, "tile: typical error (p95)"),
+      (ErrorP99, "tile: animation error p99"),
+      (ErrorP999, "tile: animation error p99.9"),
       (WorstError, "tile: worst error"),
       (LateFrames, "tile: late frames"),
-      (WorstLate, "tile: worst 2 s late"),
-      (Resolution, "tile: resolution"),
       (AnimationError, "panel: animation error per frame"),
       (DisplayTimeStep, "panel: display time step"),
       (LateShare, "panel: share of late frames in the last 2 s"),
@@ -56,14 +56,14 @@ namespace MB.FramePacing.Charts
     /// <summary>The ids of the headline tiles, which <see cref="Tiles"/> switches together.</summary>
     public static readonly IReadOnlyList<string> TileIds = new[]
     {
-      PresentedFrames,
+      AverageFps,
+      OnePercentLow,
+      PointOnePercentLow,
       FramesOff,
-      ErrorPerFrame,
-      TypicalError,
+      ErrorP99,
+      ErrorP999,
       WorstError,
       LateFrames,
-      WorstLate,
-      Resolution,
     };
 
     public static bool IsKnown(string id) => All.Any(item => item.Id == id);

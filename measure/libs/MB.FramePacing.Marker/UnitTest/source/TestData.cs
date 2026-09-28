@@ -39,13 +39,15 @@ namespace MB.FramePacing.Marker.UnitTest
           uint.Parse(Field("runId"), CultureInfo.InvariantCulture),
           kind,
           long.Parse(Field("intendedDisplayTicks"), CultureInfo.InvariantCulture),
-          uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture)
+          uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture),
+          long.Parse(Field("cpuStartTicks"), CultureInfo.InvariantCulture),
+          uint.Parse(Field("cpuBusyTicks"), CultureInfo.InvariantCulture)
         );
         StartMetadata? start = null;
         if (kind == MarkerKind.SequenceStart)
         {
-          var name = System.Text.Encoding.UTF8.GetString(Convert.FromHexString(Field("startNameHex")));
-          start = new StartMetadata(long.Parse(Field("startUtcTicks"), CultureInfo.InvariantCulture), name);
+          var sequenceId = MB.FrameMarker.SequenceId.FromBytes(Convert.FromHexString(Field("sequenceIdHex")));
+          start = new StartMetadata(long.Parse(Field("startUtcTicks"), CultureInfo.InvariantCulture), sequenceId);
         }
         result.Add(
           new GoldenMarker(

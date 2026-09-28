@@ -50,7 +50,7 @@ namespace MB.FramePacing.DocImages
     public static void WriteAll(string directory)
     {
       var frameMarker = new MarkerPayload(1234, TimeSpan.FromSeconds(20.567).Ticks, 7, MarkerKind.Frame);
-      var start = new StartMetadata(new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc).Ticks, "menu scroll benchmark");
+      var start = StartMetadata.FromTag(new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc).Ticks, "menu scroll");
 
       // A marker in a 1280x720 frame at the recommended place: top-left, 32 px in
       var scene = CreateScene(1280, 720);

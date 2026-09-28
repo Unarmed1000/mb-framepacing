@@ -58,6 +58,7 @@ target_sources(mb_framemarker
       include/mb/framemarker/Payload.hpp
       include/mb/framemarker/Point.hpp
       include/mb/framemarker/Quad.hpp
+      include/mb/framemarker/SequenceId.hpp
       include/mb/framemarker/StartMetadata.hpp
       include/mb/framemarker/Vertex.hpp
       ${CMAKE_CURRENT_BINARY_DIR}/include/mb/framemarker/Version.hpp)

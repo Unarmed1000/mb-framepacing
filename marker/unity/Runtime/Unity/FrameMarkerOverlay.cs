@@ -3,8 +3,9 @@
 //* ----------------
 //* Add this component to any GameObject and every frame shows the marker: drawn at the end of the frame (after post processing, upscaling
 //* and UI) straight into the output, pixel exact, in pure black and white. The frame index is Time.frameCount and the animation time is
-//* Time.timeAsDouble unless AnimationTimeProvider supplies the game's own clock. BeginRun / EndRun (or the RunFor coroutine) bracket the
-//* part to measure with the start and end markers. Nothing is allocated per frame.
+//* Time.timeAsDouble unless AnimationTimeProvider supplies the game's own clock; the CPU start time and CPU busy come from Unity's clock
+//* unless the game supplies its pacer's. BeginRun / EndRun (or the RunFor coroutine) bracket the part to measure with the
+//* start and end markers. Nothing is allocated per frame.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -13,7 +14,6 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
 using System.Collections;
-using System.Text;
 using UnityEngine;
 
 namespace MB.FrameMarker.Unity
@@ -83,6 +83,19 @@ namespace MB.FrameMarker.Unity
     public Func<uint> TargetFrameTicksProvider { get; set; }
 
     /// <summary>
+    /// CPU start time: when the CPU started working on the frame, in ticks (100 ns) on the same steady clock as
+    /// <see cref="IntendedDisplayTicksProvider"/>. Null = Unity's unscaled time at the beginning of the frame while no
+    /// IntendedDisplayTicksProvider is set (its clock is the game's own), otherwise 0 (unknown).
+    /// </summary>
+    public Func<long> CpuStartTicksProvider { get; set; }
+
+    /// <summary>
+    /// CPU busy: how long the CPU worked on the frame before presenting it, in ticks (100 ns). Null = Unity's real time when the marker
+    /// is drawn (the end of the frame, just before Present) minus the time at the beginning of the frame.
+    /// </summary>
+    public Func<uint> CpuBusyTicksProvider { get; set; }
+
+    /// <summary>
     /// Draw frame markers (run id 0) while no run is active (the Inspector's Draw When Idle). Turn it off to show markers only during
     /// runs, for example while a game is still in its menus. Runs always draw their markers.
     /// </summary>
@@ -97,11 +110,21 @@ namespace MB.FrameMarker.Unity
     /// <summary>The id of the current (or last) run. Every run gets the next id.</summary>
     public uint RunId { get; private set; }
 
-    /// <summary>Start a measured run: the start marker (with the name and the current time) is shown first, then the frame markers.</summary>
-    public void BeginRun(string name)
+    /// <summary>The sequence id of the current (or last) run, as its start marker carries it.</summary>
+    public SequenceId SequenceId => m_start.SequenceId;
+
+    /// <summary>Start a measured run with a new UUID as its sequence id.</summary>
+    public void BeginRun() => BeginRun(SequenceId.FromGuid(Guid.NewGuid()));
+
+    /// <summary>
+    /// Start a measured run: the start marker (with the sequence id and the current time) is shown first, then the frame markers. The
+    /// sequence id is any 16 bytes unique to this run: a UUID (<see cref="SequenceId.FromGuid"/>) or a short text tag
+    /// (<see cref="SequenceId.TryFromText"/>).
+    /// </summary>
+    public void BeginRun(SequenceId sequenceId)
     {
       ++RunId;
-      m_start = StartMetadata.Create(DateTime.UtcNow, FitName(name));
+      m_start = StartMetadata.Create(DateTime.UtcNow, sequenceId);
       EnterPhase(MarkerPhase.Start);
     }
 
@@ -112,10 +135,13 @@ namespace MB.FrameMarker.Unity
         EnterPhase(MarkerPhase.End);
     }
 
-    /// <summary>Measure <paramref name="seconds"/> (real time) as a run named <paramref name="name"/>: start it from a coroutine.</summary>
-    public IEnumerator RunFor(string name, double seconds)
+    /// <summary>Measure <paramref name="seconds"/> (real time) as a run with a new UUID as its sequence id: start it from a coroutine.</summary>
+    public IEnumerator RunFor(double seconds) => RunFor(SequenceId.FromGuid(Guid.NewGuid()), seconds);
+
+    /// <summary>Measure <paramref name="seconds"/> (real time) as a run with <paramref name="sequenceId"/>: start it from a coroutine.</summary>
+    public IEnumerator RunFor(SequenceId sequenceId, double seconds)
     {
-      BeginRun(name);
+      BeginRun(sequenceId);
       while (Phase == MarkerPhase.Start)
         yield return null;
       double end = Time.realtimeSinceStartupAsDouble + seconds;
@@ -179,7 +205,9 @@ namespace MB.FrameMarker.Unity
         Phase == MarkerPhase.Idle ? 0u : RunId,
         Kind(),
         IntendedDisplayTicksProvider != null ? IntendedDisplayTicksProvider() : 0,
-        TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks()
+        TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks(),
+        CpuStartTicks(),
+        CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks()
       );
 
       DrawMarker(material, payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height);
@@ -200,6 +228,24 @@ namespace MB.FrameMarker.Unity
     }
 
     private double AnimationTime() => AnimationTimeProvider != null ? AnimationTimeProvider() : Time.timeAsDouble;
+
+    /// <summary>Unity's real time now (the marker is drawn at the end of the frame) minus the time at the beginning of the frame.</summary>
+    private static uint UnityCpuBusyTicks()
+    {
+      double seconds = Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble;
+      return seconds > 0 ? (uint)Math.Min(uint.MaxValue, Marker.SecondsToTicks(seconds)) : 0u;
+    }
+
+    private long CpuStartTicks()
+    {
+      if (CpuStartTicksProvider != null)
+        return CpuStartTicksProvider();
+      if (IntendedDisplayTicksProvider != null)
+        return 0;
+      // The time at the beginning of this frame; 0 means unknown, so the very first frame reports 1 tick
+      long ticks = Marker.SecondsToTicks(Time.unscaledTimeAsDouble);
+      return ticks > 0 ? ticks : 1;
+    }
 
     /// <summary>The frame rate Unity aims for: Application.targetFrameRate, else the refresh rate divided by the vsync count; 0 if unknown.</summary>
     private static uint DefaultTargetFrameTicks()
@@ -285,19 +331,6 @@ namespace MB.FrameMarker.Unity
           this
         );
 #endif
-    }
-
-    private static string FitName(string name)
-    {
-      // The start marker carries at most MaxStartNameBytes bytes of UTF-8
-      if (string.IsNullOrEmpty(name) || Encoding.UTF8.GetByteCount(name) <= Marker.MaxStartNameBytes)
-        return name;
-      int length = name.Length;
-      while (length > 0 && Encoding.UTF8.GetByteCount(name.Substring(0, length)) > Marker.MaxStartNameBytes)
-        --length;
-      if (length > 0 && char.IsHighSurrogate(name[length - 1]))
-        --length;
-      return name.Substring(0, length);
     }
   }
 }

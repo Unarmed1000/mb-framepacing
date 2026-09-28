@@ -43,7 +43,14 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
 
       public RowBuilder Start(uint runId, int captures = 3, string name = "test") =>
-        Show(0, 0, captures, runId, MarkerKind.SequenceStart, new StartMetadata(new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc).Ticks, name));
+        Show(
+          0,
+          0,
+          captures,
+          runId,
+          MarkerKind.SequenceStart,
+          StartMetadata.FromTag(new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc).Ticks, name)
+        );
 
       public RowBuilder End(uint runId, int captures = 3) => Show(999_999, 0, captures, runId, MarkerKind.SequenceEnd);
 
@@ -68,7 +75,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       Assert.That(result.CapturePeriodTicks, Is.EqualTo(Period));
       var run = result.Runs.Single();
-      Assert.That(run.Name, Is.EqualTo("test"));
+      Assert.That(run.SequenceId, Is.EqualTo("test"));
       Assert.That(run.HasStartMarker && run.HasEndMarker);
       Assert.That(run.Counts.PresentedFrames, Is.EqualTo(20));
       Assert.That(run.Frames.Skip(1).All(f => f.AnimationErrorTicks == 0), Is.True);
@@ -162,7 +169,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       rows.Start(2, name: "second").Show(50, 0, 4, runId: 2).Show(51, 16, 4, runId: 2).Show(52, 32, 4, runId: 2).End(2);
 
       var all = TimelineAnalyzer.Analyze(rows.Rows);
-      Assert.That(all.Runs.Select(r => r.Name), Is.EqualTo(new[] { "first", "second" }));
+      Assert.That(all.Runs.Select(r => r.SequenceId), Is.EqualTo(new[] { "first", "second" }));
       Assert.That(all.Runs[1].Counts.PresentedFrames, Is.EqualTo(3));
 
       var selected = TimelineAnalyzer.Analyze(rows.Rows, new TimelineOptions { RunId = 2 });

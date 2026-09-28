@@ -72,10 +72,12 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(payload.AnimationTicks, Is.EqualTo(expected.AnimationTicks), where + ": animation time");
         Assert.That(payload.IntendedDisplayTicks, Is.EqualTo(expected.IntendedDisplayTicks), where + ": intended display time");
         Assert.That(payload.TargetFrameTicks, Is.EqualTo(expected.TargetFrameTicks), where + ": target frame time");
+        Assert.That(payload.CpuStartTicks, Is.EqualTo(expected.CpuStartTicks), where + ": CPU start time");
+        Assert.That(payload.CpuBusyTicks, Is.EqualTo(expected.CpuBusyTicks), where + ": CPU busy");
         if (expected.Kind == MarkerKind.SequenceStart)
         {
           Assert.That(actual.Start, Is.Not.Null, where + ": start metadata");
-          Assert.That(actual.Start!.Name, Is.EqualTo(manifest.StartName), where + ": name");
+          Assert.That(actual.Start!.SequenceText, Is.EqualTo(manifest.SequenceId), where + ": sequence id");
           Assert.That(actual.Start.UtcTicks, Is.Zero, where + ": start time (the generator writes none)");
         }
       }

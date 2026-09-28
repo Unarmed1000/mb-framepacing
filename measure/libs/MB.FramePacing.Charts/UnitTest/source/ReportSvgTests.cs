@@ -104,8 +104,8 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(section.Section.Run.Pacing!.LateFrames, Is.EqualTo(frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0)));
       Assert.That(
         svg,
-        Does.Contain(">" + frames.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + "<"),
-        "the section's frames"
+        Does.Contain(" " + frames.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " frames<"),
+        "the section's frames, under the average fps"
       );
       Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), "well formed");
     }
@@ -145,14 +145,30 @@ namespace MB.FramePacing.Charts.UnitTest
     /// </summary>
     private static ChartRun OneHour() => Synthetic(240 * 3600);
 
-    private static ChartRun Synthetic(int Count)
+    /// <summary>The late share is green while no frame in the window was late, red where one was.</summary>
+    [Test]
+    public void LateShare_IsGreenWhileNoFrameIsLate()
+    {
+      string none = ReportSvg.Render(RunSection.Whole(Synthetic(240 * 10, lateEvery: 0)));
+      Assert.That(none, Does.Contain("class=\"late-line-none\""));
+      Assert.That(none, Does.Not.Contain("class=\"late-line\""));
+
+      // One late frame 5 s in: green before it, red for the 2 s window after it, green again
+      string one = ReportSvg.Render(RunSection.Whole(Synthetic(240 * 10, lateEvery: 1200)));
+      Assert.That(Count(one, "class=\"late-line-none\""), Is.EqualTo(1));
+      Assert.That(Count(one, "class=\"late-line\""), Is.EqualTo(1));
+      var green = Regex.Match(one, "class=\"late-line-none\" d=\"([^\"]*)\"").Groups[1].Value;
+      Assert.That(Regex.Matches(green, "M").Count, Is.EqualTo(2), "two green stretches, before and after the late window");
+    }
+
+    private static ChartRun Synthetic(int Count, int lateEvery = 97)
     {
       var frames = new List<PresentedFrame>(Count);
       long time = 0;
       for (int i = 0; i < Count; ++i)
       {
         bool hitch = i == HitchFrame;
-        bool late = hitch || (i > 0 && i % 97 == 0);
+        bool late = hitch || (lateEvery > 0 && i > 0 && i % lateEvery == 0);
         long display =
           hitch ? 168 * Refresh
           : late ? 2 * Refresh
@@ -223,14 +239,14 @@ namespace MB.FramePacing.Charts.UnitTest
       (ReportItem.Title, "class=\"title\""),
       (ReportItem.Description, "class=\"sub\""),
       (ReportItem.Display, ">DISPLAY<"),
-      (ReportItem.PresentedFrames, ">PRESENTED FRAMES<"),
+      (ReportItem.AverageFps, ">AVERAGE FPS<"),
+      (ReportItem.OnePercentLow, ">1 % LOW<"),
+      (ReportItem.PointOnePercentLow, ">0.1 % LOW<"),
       (ReportItem.FramesOff, ">FRAMES VISIBLY OFF<"),
-      (ReportItem.ErrorPerFrame, ">ERROR PER FRAME<"),
-      (ReportItem.TypicalError, ">TYPICAL ERROR (P95)<"),
+      (ReportItem.ErrorP99, ">ERROR P99<"),
+      (ReportItem.ErrorP999, ">ERROR P99.9<"),
       (ReportItem.WorstError, ">WORST ERROR<"),
       (ReportItem.LateFrames, ">LATE FRAMES<"),
-      (ReportItem.WorstLate, ">WORST 2 S LATE<"),
-      (ReportItem.Resolution, ">RESOLUTION<"),
       (ReportItem.AnimationError, ">ANIMATION ERROR PER FRAME<"),
       (ReportItem.DisplayTimeStep, ">DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN<"),
       (ReportItem.LateShare, ">SHARE OF LATE FRAMES IN THE LAST 2 S<"),

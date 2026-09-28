@@ -294,7 +294,7 @@ namespace MB.FramePacing.Analysis
             new
             {
               run.RunId,
-              run.Name,
+              run.SequenceId,
               run.StartTimeUtc,
               run.HasStartMarker,
               run.HasEndMarker,

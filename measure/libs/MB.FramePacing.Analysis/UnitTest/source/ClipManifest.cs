@@ -30,11 +30,13 @@ namespace MB.FramePacing.Analysis.UnitTest
     int LeadIn,
     uint RunId,
     ulong FirstFrameIndex,
-    string StartName,
+    string SequenceId,
     long[] Refresh,
     long[] AnimationTicks,
     int[] Late,
-    long[] SwapInterval
+    long[] SwapInterval,
+    long[] CpuStartTicks,
+    long[] CpuBusyTicks
   )
   {
     public int FrameCount => Refresh.Length;
@@ -55,11 +57,13 @@ namespace MB.FramePacing.Analysis.UnitTest
         marker.GetProperty("leadInRefreshes").GetInt32(),
         marker.GetProperty("runId").GetUInt32(),
         video.GetProperty("markerFirstFrameIndex").GetUInt64(),
-        TruncateUtf8(box.GetProperty("label").GetString()!, MarkerPayload.MaxStartNameBytes),
+        video.GetProperty("sequenceId").GetString()!,
         Array("refresh", e => e.GetInt64()),
         Array("animationMs", e => WholeTicks(e.GetDecimal() * TimeSpan.TicksPerMillisecond)),
         Array("late", e => e.GetInt32()),
-        Array("targetFps", e => WholeNumber(video.GetProperty("fps").GetDecimal() / e.GetDecimal(), "swap interval"))
+        Array("targetFps", e => WholeNumber(video.GetProperty("fps").GetDecimal() / e.GetDecimal(), "swap interval")),
+        Array("cpuStartTicks", e => e.GetInt64()),
+        Array("cpuBusyTicks", e => e.GetInt64())
       );
     }
 
@@ -83,7 +87,9 @@ namespace MB.FramePacing.Analysis.UnitTest
         RunId,
         kind,
         RefreshTicks(intendedRefresh),
-        (uint)RefreshTicks(SwapInterval[frame])
+        (uint)RefreshTicks(SwapInterval[frame]),
+        CpuStartTicks[frame] + (loop * DurationTicks),
+        (uint)CpuBusyTicks[frame]
       );
     }
 
@@ -139,19 +145,6 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
       long twice = 2 * remainder;
       return twice > divisor || (twice == divisor && (quotient & 1) != 0) ? quotient + 1 : quotient;
-    }
-
-    /// <summary>The generator cuts the start marker's name to the marker's limit of UTF-8 bytes on a character boundary.</summary>
-    private static string TruncateUtf8(string text, int maxBytes)
-    {
-      var result = new StringBuilder();
-      foreach (var rune in text.EnumerateRunes())
-      {
-        if (Encoding.UTF8.GetByteCount(result.ToString()) + rune.Utf8SequenceLength > maxBytes)
-          break;
-        result.Append(rune.ToString());
-      }
-      return result.ToString();
     }
   }
 }

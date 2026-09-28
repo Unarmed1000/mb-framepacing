@@ -52,11 +52,13 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(() => CaptureDataHeader.Read(bytes), Throws.InstanceOf<InvalidDataException>().With.Message.Contains("update the tools"));
     }
 
-    /// <summary>The largest start marker (a 60 byte name) and a sync marker fit one record; a record without markers keeps none.</summary>
+    /// <summary>The largest marker (a start marker) and a sync marker fit one record; a record without markers keeps none.</summary>
     [Test]
     public void Records_RoundTrip_WithTheLargestMarkers()
     {
-      var start = new MarkerPayload(1, 2, 3, MarkerKind.SequenceStart).Encode(new StartMetadata(123, new string('x', 60)));
+      var start = new MarkerPayload(1, 2, 3, MarkerKind.SequenceStart).Encode(
+        new StartMetadata(123, new MB.FrameMarker.SequenceId(ulong.MaxValue, ulong.MaxValue))
+      );
       Assert.That(start, Has.Length.EqualTo(MarkerPayload.MaxEncodedByteCount));
       var sync = new byte[12];
       sync.AsSpan().Fill(7);
@@ -105,7 +107,10 @@ namespace MB.FramePacing.Capture.UnitTest
       }
       Assert.That(read[1].HasDeviceTicks, Is.False);
       Assert.That(MarkerPayload.TryDecode(read[0].MainBytes, out var payload, out var metadata), Is.True);
-      Assert.That((payload.Kind, metadata!.Name.Length), Is.EqualTo((MarkerKind.SequenceStart, 60)));
+      Assert.That(
+        (payload.Kind, metadata!.SequenceId),
+        Is.EqualTo((MarkerKind.SequenceStart, new MB.FrameMarker.SequenceId(ulong.MaxValue, ulong.MaxValue)))
+      );
     }
 
     [Test]

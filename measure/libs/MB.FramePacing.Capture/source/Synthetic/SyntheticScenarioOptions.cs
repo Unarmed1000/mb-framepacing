@@ -42,11 +42,14 @@ namespace MB.FramePacing.Capture.Synthetic
     public double TailSeconds { get; init; }
 
     public uint RunId { get; init; } = 1;
-    public string RunName { get; init; } = "synthetic";
+
+    /// <summary>The start marker's sequence id: a text tag of at most 16 printable ASCII characters.</summary>
+    public string SequenceTag { get; init; } = "synthetic";
     public long RunStartUtcTicks { get; init; } = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc).Ticks;
 
     /// <summary>
-    /// Write the pacer's intended display time (the vsync each frame is rendered for) and target frame time (one refresh) into the markers.
+    /// Write the pacer's intended display time (the vsync each frame is rendered for), target frame time (one refresh), CPU start time
+    /// (one refresh before the intended display time) and CPU busy (60 % of a refresh, longer when stalled) into the markers.
     /// </summary>
     public bool PacingInformation { get; init; } = true;
 

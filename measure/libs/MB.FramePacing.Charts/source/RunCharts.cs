@@ -76,13 +76,7 @@ namespace MB.FramePacing.Charts
         displayTimeStep.Axes.Margins(bottom: 0, top: 0);
       }
 
-      Reset(
-        lateShare,
-        theme,
-        $"Share of late frames in the last {LateShare.WindowSeconds:0} s: rare spikes or busy stretches?",
-        "late (%)",
-        string.Empty
-      );
+      Reset(lateShare, theme, $"Share of late frames in the last {LateShare.WindowSeconds:0} s", "late (%)", string.Empty);
       double maxShare = 0;
       if (frames.Length > 0 && pacing != null)
       {

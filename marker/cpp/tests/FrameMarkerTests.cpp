@@ -17,7 +17,17 @@ namespace MB::FrameMarker
   void PrintTo(const Payload& value, std::ostream* os)
   {
     *os << "{frame " << value.FrameIndex << ", ticks " << value.AnimationTicks << ", run " << value.RunId << ", kind "
-        << static_cast<uint32_t>(value.Kind) << ", intended " << value.IntendedDisplayTicks << ", target " << value.TargetFrameTicks << "}";
+        << static_cast<uint32_t>(value.Kind) << ", intended " << value.IntendedDisplayTicks << ", target " << value.TargetFrameTicks << ", cpu start "
+        << value.CpuStartTicks << ", cpu busy " << value.CpuBusyTicks << "}";
+  }
+
+  void PrintTo(const SequenceId& value, std::ostream* os)
+  {
+    constexpr std::string_view Digits = "0123456789abcdef";
+    for (const uint8_t byte : value.Bytes)
+    {
+      *os << Digits[byte >> 4u] << Digits[byte & 0xFu];
+    }
   }
 
   void PrintTo(const Quad& value, std::ostream* os)
@@ -74,12 +84,38 @@ namespace
 
 TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
 {
-  const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::SequenceEnd, 0x3132333435363738, 0x41424344u};
+  const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u,        FM::MarkerKind::SequenceEnd,
+                            0x3132333435363738,  0x41424344u,        0x5152535455565758, 0x61626364u};
   const auto bytes = FM::EncodePayload(payload);
   const std::array<uint8_t, FM::PayloadByteCount> expected{'M',   'F',   1u,    2u,    0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u,
                                                            0x18u, 0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x24u, 0x23u, 0x22u, 0x21u,
-                                                           0x38u, 0x37u, 0x36u, 0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x44u, 0x43u, 0x42u, 0x41u};
+                                                           0x38u, 0x37u, 0x36u, 0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x44u, 0x43u, 0x42u, 0x41u,
+                                                           0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u};
+  EXPECT_EQ(FM::PayloadByteCount, 48u);
   EXPECT_EQ(bytes, expected);
+}
+
+TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
+{
+  const FM::Payload payload{1u, 2, 3u, FM::MarkerKind::SequenceStart, 4, 5u, 6, 7u};
+  FM::StartMetadata metadata{0x6162636465666768, {}};
+  for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
+  {
+    metadata.Id.Bytes[i] = static_cast<uint8_t>(0xA0u + i);
+  }
+  std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
+  ASSERT_EQ(FM::EncodePayload(payload, metadata, buffer), FM::StartPayloadByteCount);
+  EXPECT_EQ(FM::StartPayloadByteCount, 72u);
+  EXPECT_EQ(FM::MaxEncodedPayloadByteCount, FM::StartPayloadByteCount);
+
+  const auto header = FM::EncodePayload(payload);
+  EXPECT_TRUE(std::equal(header.begin(), header.end(), buffer.begin()));
+  const std::array<uint8_t, 8> utcTicks{0x68u, 0x67u, 0x66u, 0x65u, 0x64u, 0x63u, 0x62u, 0x61u};
+  EXPECT_TRUE(std::equal(utcTicks.begin(), utcTicks.end(), buffer.begin() + 48));
+  for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
+  {
+    EXPECT_EQ(buffer[56u + i], 0xA0u + i) << "byte " << (56u + i);
+  }
 }
 
 TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
@@ -93,12 +129,18 @@ TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
 
 TEST(Payload, RoundTrips)
 {
-  const std::array<FM::Payload, 7> payloads{{
+  constexpr uint32_t U32Max = std::numeric_limits<uint32_t>::max();
+  const std::array<FM::Payload, 12> payloads{{
     {0u, 0, 0u, FM::MarkerKind::Frame},
     {1u, 166'667, 7u, FM::MarkerKind::Frame},
     {2u, 333'334, 7u, FM::MarkerKind::Frame, 1'234'567'890'123, 166'667u},
-    {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
-     std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max()},
+    {3u, 500'001, 7u, FM::MarkerKind::Frame, 1'234'568'056'790, 166'667u, 1'234'567'723'456},
+    {3u, 500'001, 7u, FM::MarkerKind::Frame, 1'234'568'056'790, 166'667u, 1'234'567'723'456, 80'000u},
+    {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), U32Max, FM::MarkerKind::Frame, std::numeric_limits<int64_t>::min(),
+     U32Max, std::numeric_limits<int64_t>::max(), U32Max},
+    {8u, 1, 2u, FM::MarkerKind::Frame, 3, 4u, 5, U32Max},
+    {4u, 1, 2u, FM::MarkerKind::SequenceEnd, 3, 4u, std::numeric_limits<int64_t>::min(), U32Max},
+    {5u, 1, 2u, FM::MarkerKind::SequenceStart, 3, 4u, -5, 80'000u},
     {7u, std::numeric_limits<int64_t>::min(), 1u, FM::MarkerKind::SequenceStart},
     {42u, -1, 3u, FM::MarkerKind::SequenceEnd},
     {0u, 0, 0u, FM::MarkerKind::SequenceStart},
@@ -139,26 +181,111 @@ TEST(Payload, TryDecodeRejectsBadInput)
   EXPECT_TRUE(FM::TryDecodePayload(bytes, decoded));
 }
 
+TEST(Payload, TryDecodeRejectsWrongLengths)
+{
+  std::array<uint8_t, FM::MaxEncodedPayloadByteCount + 1> buffer{};
+  FM::Payload decoded{};
+  for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::SequenceEnd})
+  {
+    ASSERT_EQ(FM::EncodePayload({1u, 2, 3u, kind, 4, 5u, 6, 7u}, {}, buffer), 48u);
+    EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(48), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(47), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(49), decoded));
+  }
+  ASSERT_EQ(FM::EncodePayload({1u, 2, 3u, FM::MarkerKind::SequenceStart, 4, 5u, 6, 7u}, {9, {}}, buffer), 72u);
+  EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(72), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(71), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(73), decoded));
+}
+
 TEST(Payload, StartMetadataRoundTrips)
 {
+  FM::SequenceId textId;
+  ASSERT_TRUE(FM::SequenceId::TryFromText("Benchmark run 42", textId));
+  FM::SequenceId byteId;
+  for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
+  {
+    byteId.Bytes[i] = static_cast<uint8_t>(0xFFu - (i * 17u));
+  }
+  const std::array<FM::StartMetadata, 4> cases{{
+    {638'000'000'000'000'000, textId},
+    {-1, byteId},
+    {0, {}},
+    {std::numeric_limits<int64_t>::max(), byteId},
+  }};
+  const FM::Payload payload{10u, 20, 30u, FM::MarkerKind::SequenceStart, 40, 50u, 60, 70u};
+  for (const FM::StartMetadata& expected : cases)
+  {
+    SCOPED_TRACE(testing::PrintToString(expected.Id));
+    std::array<uint8_t, FM::MaxEncodedPayloadByteCount + 1> buffer{};
+    const std::size_t byteCount = FM::EncodePayload(payload, expected, buffer);
+    ASSERT_EQ(byteCount, FM::StartPayloadByteCount);
+
+    FM::Payload decoded{};
+    FM::StartMetadata metadata{1, byteId};
+    ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded, &metadata));
+    EXPECT_EQ(decoded, payload);
+    EXPECT_EQ(metadata, expected);
+
+    // A start payload must be exactly StartPayloadByteCount bytes
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded, &metadata));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded, &metadata));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::PayloadByteCount), decoded, &metadata));
+  }
+
+  // Frame and end payloads ignore the metadata and stay PayloadByteCount bytes, and decoding them resets the metadata
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
-  const std::string_view name = "Benchmark \xC3\xA6\xC3\xB8\xC3\xA5 run";
-  const FM::Payload payload{10u, 20, 30u, FM::MarkerKind::SequenceStart};
-  const std::size_t byteCount = FM::EncodePayload(payload, {638'000'000'000'000'000, name}, buffer);
-  ASSERT_EQ(byteCount, FM::StartPayloadFixedByteCount + name.size());
-
+  EXPECT_EQ(FM::EncodePayload({1u, 2, 3u, FM::MarkerKind::Frame}, {5, textId}, buffer), FM::PayloadByteCount);
+  EXPECT_EQ(FM::EncodePayload({1u, 2, 3u, FM::MarkerKind::SequenceEnd}, {5, textId}, buffer), FM::PayloadByteCount);
   FM::Payload decoded{};
-  FM::StartMetadata metadata{};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded, &metadata));
-  EXPECT_EQ(decoded, payload);
-  EXPECT_EQ(metadata.UtcTicks, 638'000'000'000'000'000);
-  EXPECT_EQ(metadata.Name, name);
+  FM::StartMetadata metadata{5, textId};
+  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::PayloadByteCount), decoded, &metadata));
+  EXPECT_EQ(metadata, FM::StartMetadata{});
 
-  // A start payload with a truncated name is rejected
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded, &metadata));
+  // The start payload does not fit a smaller destination
+  std::array<uint8_t, FM::StartPayloadByteCount - 1> small{};
+  EXPECT_EQ(FM::EncodePayload(payload, {5, textId}, small), 0u);
+}
 
-  // Frame payloads ignore the metadata and stay 36 bytes
-  EXPECT_EQ(FM::EncodePayload({1u, 2, 3u, FM::MarkerKind::Frame}, {5, name}, buffer), FM::PayloadByteCount);
+TEST(SequenceId, TryFromTextPadsWithZeros)
+{
+  FM::SequenceId id;
+  ASSERT_TRUE(FM::SequenceId::TryFromText("golden-run", id));
+  const std::array<uint8_t, FM::SequenceId::ByteCount> expected{'g', 'o', 'l', 'd', 'e', 'n', '-', 'r', 'u', 'n', 0u, 0u, 0u, 0u, 0u, 0u};
+  EXPECT_EQ(id.Bytes, expected);
+  EXPECT_FALSE(id.IsEmpty());
+  EXPECT_TRUE(FM::SequenceId{}.IsEmpty());
+
+  // 1 to 16 printable ASCII characters, space and tilde included
+  ASSERT_TRUE(FM::SequenceId::TryFromText("x", id));
+  EXPECT_EQ(id.Bytes[0], 'x');
+  EXPECT_EQ(id.Bytes[1], 0u);
+  ASSERT_TRUE(FM::SequenceId::TryFromText(" ~0123456789abcd", id));
+  EXPECT_EQ(id.Bytes[0], ' ');
+  EXPECT_EQ(id.Bytes[1], '~');
+  EXPECT_EQ(id.Bytes[15], 'd');
+
+  // Constant evaluation works too
+  static_assert(
+    []
+    {
+      FM::SequenceId value;
+      return FM::SequenceId::TryFromText("constexpr", value) && value.Bytes[8] == 'r' && value.Bytes[9] == 0u;
+    }());
+}
+
+TEST(SequenceId, TryFromTextRejectsOtherText)
+{
+  FM::SequenceId id;
+  ASSERT_TRUE(FM::SequenceId::TryFromText("keep", id));
+  const FM::SequenceId kept = id;
+  EXPECT_FALSE(FM::SequenceId::TryFromText("", id));
+  EXPECT_FALSE(FM::SequenceId::TryFromText("0123456789abcdefg", id));
+  EXPECT_FALSE(FM::SequenceId::TryFromText("tab\there", id));
+  EXPECT_FALSE(FM::SequenceId::TryFromText("del\x7F", id));
+  EXPECT_FALSE(FM::SequenceId::TryFromText("\xC3\xA6", id));
+  EXPECT_FALSE(FM::SequenceId::TryFromText(std::string_view("nul\0", 4), id));
+  EXPECT_EQ(id, kept);
 }
 
 TEST(Payload, ToDateTimeTicksMatchesCSharpDateTimeTicks)
@@ -212,7 +339,7 @@ TEST(Symbol, SyncMarkersAreVersion2)
 TEST(Payload, SyncMarkerCarriesOnlyTheFrameIndex)
 {
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
-  const FM::Payload payload{0x0102030405060708u, 123, 4u, FM::MarkerKind::Sync, 5, 6u};
+  const FM::Payload payload{0x0102030405060708u, 123, 4u, FM::MarkerKind::Sync, 5, 6u, 7, 8u};
   const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
   ASSERT_EQ(byteCount, FM::SyncPayloadByteCount);
   const std::array<uint8_t, FM::SyncPayloadByteCount> expected{'M', 'F', 1u, 3u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
@@ -221,6 +348,8 @@ TEST(Payload, SyncMarkerCarriesOnlyTheFrameIndex)
   FM::Payload decoded{};
   ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
   EXPECT_EQ(decoded, (FM::Payload{payload.FrameIndex, 0, 0u, FM::MarkerKind::Sync}));
+  EXPECT_EQ(decoded.CpuStartTicks, 0);
+  EXPECT_EQ(decoded.CpuBusyTicks, 0u);
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));
 }
 
@@ -234,23 +363,24 @@ TEST(Symbol, EveryMarkerIsVersion6)
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {}));
   EXPECT_EQ(matrix.Size, 41);
 
-  // The longest name fills version 6-M (106 bytes) up to one byte
-  const std::string maxName(FM::MaxStartNameBytes, 'x');
-  ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {123, maxName}));
+  FM::SequenceId id;
+  ASSERT_TRUE(FM::SequenceId::TryFromText("0123456789abcdef", id));
+  ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart, 4, 5u, 6, 7u}, matrix, {123, id}));
   EXPECT_EQ(matrix.Size, FM::QrModuleCount);
-  EXPECT_EQ(FM::MaxEncodedPayloadByteCount, 105u);
 
-  const std::string tooLong(FM::MaxStartNameBytes + 1, 'x');
-  EXPECT_FALSE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {123, tooLong}));
+  // Version 6-M holds 106 bytes: the start marker leaves room for future fields
+  EXPECT_EQ(FM::MaxEncodedPayloadByteCount, 72u);
+  EXPECT_LT(FM::MaxEncodedPayloadByteCount, FM::QrCapacityBytes);
 }
 
 TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
 {
-  const std::string maxName(FM::MaxStartNameBytes, 'y');
+  FM::SequenceId id;
+  id.Bytes.fill(0xFFu);
   const FM::Options options{};
   const FM::Point origin{32, 32};
   std::vector<FM::Quad> quads(FM::MaxQuadCount());
-  const std::size_t count = FM::GenerateStartQuads({5u, 6, 7u, FM::MarkerKind::Frame}, {99, maxName}, options, origin, quads);
+  const std::size_t count = FM::GenerateStartQuads({5u, 6, 7u, FM::MarkerKind::Frame}, {99, id}, options, origin, quads);
   ASSERT_GT(count, 0u);
   ASSERT_LE(count, FM::MaxQuadCount());
   const FM::Quad& background = quads.front();
@@ -420,7 +550,7 @@ namespace
   struct TriangleCase
   {
     FM::Payload Payload;
-    std::string StartName;
+    FM::SequenceId StartId;
     FM::Options Options;
     FM::Point Origin;
   };
@@ -433,11 +563,15 @@ namespace
       for (const int32_t quietZone : {0, 4})
       {
         const FM::Options options{moduleSize, quietZone};
-        cases.push_back({{42u, 1'234'567, 3u, FM::MarkerKind::Frame, 987'654'321, 166'667u}, {}, options, {5, 7}});
+        cases.push_back({{42u, 1'234'567, 3u, FM::MarkerKind::Frame, 987'654'321, 166'667u, 987'487'654}, {}, options, {5, 7}});
         cases.push_back({{43u, 1'400'234, 3u, FM::MarkerKind::SequenceEnd}, {}, options, {0, 0}});
-        for (const std::size_t nameLength : {std::size_t{0}, std::size_t{17}, FM::MaxStartNameBytes})
+        FM::SequenceId textId;
+        FM::SequenceId::TryFromText("triangle-case", textId);
+        FM::SequenceId fullId;
+        fullId.Bytes.fill(0xFFu);
+        for (const FM::SequenceId& id : {FM::SequenceId{}, textId, fullId})
         {
-          cases.push_back({{41u, 1'067'890, 3u, FM::MarkerKind::SequenceStart}, std::string(nameLength, 'n'), options, {32, 64}});
+          cases.push_back({{41u, 1'067'890, 3u, FM::MarkerKind::SequenceStart}, id, options, {32, 64}});
         }
       }
     }
@@ -448,7 +582,7 @@ namespace
   {
     std::vector<FM::Quad> quads(FM::MaxQuadCount());
     const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-                                ? FM::GenerateStartQuads(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, quads)
+                                ? FM::GenerateStartQuads(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, quads)
                                 : FM::GenerateQuads(testCase.Payload, testCase.Options, testCase.Origin, quads);
     quads.resize(count);
     return quads;
@@ -458,7 +592,7 @@ namespace
   {
     std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
     const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-                                ? FM::GenerateStartTriangles(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, vertices)
+                                ? FM::GenerateStartTriangles(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices)
                                 : FM::GenerateTriangles(testCase.Payload, testCase.Options, testCase.Origin, vertices);
     vertices.resize(count);
     return vertices;
@@ -529,7 +663,7 @@ TEST(Triangles, DirectOutputEqualsTheConvertedQuads)
   for (const TriangleCase& testCase : TriangleCases())
   {
     SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
-                                    << ", quiet " << testCase.Options.QuietZoneModules << ", name " << testCase.StartName.size());
+                                    << ", quiet " << testCase.Options.QuietZoneModules << ", id " << testing::PrintToString(testCase.StartId));
     const std::vector<FM::Quad> quads = GenerateCase(testCase);
     ASSERT_FALSE(quads.empty());
 
@@ -547,7 +681,7 @@ TEST(Triangles, DirectOutputEqualsTheConvertedQuads)
     std::vector<uint32_t> indices(FM::MaxIndexCount());
     const FM::IndexedCount count =
       testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, vertices, indices, BaseVertex)
+        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices, indices, BaseVertex)
         : FM::GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices, BaseVertex);
     vertices.resize(count.VertexCount);
     indices.resize(count.IndexCount);
@@ -574,7 +708,7 @@ TEST(Triangles, RasterizedTrianglesReproduceTheQuads)
     std::vector<uint32_t> indices(FM::MaxIndexCount());
     const FM::IndexedCount count =
       testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartName}, testCase.Options, testCase.Origin, vertices, indices)
+        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices, indices)
         : FM::GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices);
     vertices.resize(count.VertexCount);
     indices.resize(count.IndexCount);

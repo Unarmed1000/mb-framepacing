@@ -124,7 +124,7 @@ namespace MB.FramePacing.Capture
         if (options.WaitForStart && recordingStartTicks < 0 && !recorder.IsArmed)
         {
           var start = monitor.Start;
-          g_logger.Info("Start marker seen (run {0} '{1}'), recording", start?.Payload.RunId, start?.Start?.Name);
+          g_logger.Info("Start marker seen (run {0} '{1}'), recording", start?.Payload.RunId, start?.Start?.SequenceText);
           recordingStartTicks = now;
         }
         // ... and the end marker plus its end tail
@@ -186,7 +186,7 @@ namespace MB.FramePacing.Capture
         FramesDiscardedBeforeStart = stats.FramesDiscardedWhileArmed,
         StopReason = stopReason,
         SequenceRunId = monitor.Start?.Payload.RunId,
-        SequenceName = monitor.Start?.Start?.Name,
+        SequenceId = monitor.Start?.Start?.SequenceText,
         FramesStored = options.KeepFrames,
         RecordedFps = options.RecordedFps,
         TargetFps = options.TargetFps,

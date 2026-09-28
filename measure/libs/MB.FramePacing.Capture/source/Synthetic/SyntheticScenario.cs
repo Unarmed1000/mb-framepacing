@@ -23,7 +23,7 @@ namespace MB.FramePacing.Capture.Synthetic
       Options = options ?? throw new ArgumentNullException(nameof(options));
       if (options.CaptureFps <= 0 || options.RefreshHz <= 0)
         throw new ArgumentOutOfRangeException(nameof(options), "Rates must be positive");
-      StartMetadata = new StartMetadata(options.RunStartUtcTicks, options.RunName);
+      StartMetadata = StartMetadata.FromTag(options.RunStartUtcTicks, options.SequenceTag);
       BuildTimeline();
       CaptureCount = (long)Math.Floor(options.TotalSeconds * options.CaptureFps);
     }
@@ -99,10 +99,16 @@ namespace MB.FramePacing.Capture.Synthetic
           planned = slot;
           replan = false;
         }
+        // The CPU starts each frame one refresh before the vsync it is rendered for and is busy for 60 % of a refresh; a stalled frame
+        // is busy that many refreshes longer, so it is shown late and the next frame starts late
+        long intendedTicks = PacerEpochTicks + (intendedSlot * refresh);
+        long cpuStartTicks = intendedTicks - refresh;
+        long cpuBusyTicks = refresh * 6 / 10;
         if (k > 0 && o.StallEvery > 0 && k % o.StallEvery == 0)
         {
           slot += o.StallSlots;
           planned += o.StallSlots;
+          cpuBusyTicks += o.StallSlots * refresh;
         }
         long displayTicks = slot * refresh;
         if (displayTicks >= totalEnd)
@@ -129,7 +135,7 @@ namespace MB.FramePacing.Capture.Synthetic
           : MarkerKind.SequenceEnd;
         // The pacer's clock has its own epoch: intended display times never start at 0 (which means unknown)
         var payload = o.PacingInformation
-          ? new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind, PacerEpochTicks + (intendedSlot * refresh), (uint)refresh)
+          ? new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind, intendedTicks, (uint)refresh, cpuStartTicks, (uint)cpuBusyTicks)
           : new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
       }

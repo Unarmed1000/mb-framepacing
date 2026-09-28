@@ -130,7 +130,7 @@ namespace MB.FramePacing.App.Commands
         AnsiConsole.WriteLine();
         var title =
           $"Run {run.RunId}"
-          + (run.Name != null ? $" '{run.Name}'" : string.Empty)
+          + (run.SequenceId != null ? $" '{run.SequenceId}'" : string.Empty)
           + (run.StartTimeUtc is { } start ? $" started {start:yyyy-MM-dd HH:mm:ss} UTC" : string.Empty);
         AnsiConsole.Write(new Rule(Markup.Escape(title)).LeftJustified());
         foreach (var warning in run.Warnings)

@@ -112,7 +112,7 @@ namespace MB.FramePacing.App.Commands
                 StallEvery = parseResult.GetValue(stallOption),
                 SkipEvery = parseResult.GetValue(skipOption),
                 TearEvery = parseResult.GetValue(tearOption),
-                RunName = "selftest",
+                SequenceTag = "selftest",
                 RunId = 1,
               }
             );

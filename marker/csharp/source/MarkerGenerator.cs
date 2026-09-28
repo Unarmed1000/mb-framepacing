@@ -22,7 +22,7 @@ namespace MB.FrameMarker
 
     /// <summary>
     /// Build the QR module matrix for the payload into <paramref name="matrix"/>. The metadata is only used by start markers. Returns false if
-    /// the start name is too long.
+    /// the payload does not fit the QR symbol (which no valid payload does).
     /// </summary>
     public bool GenerateModules(in Payload payload, in StartMetadata metadata, ModuleMatrix matrix)
     {

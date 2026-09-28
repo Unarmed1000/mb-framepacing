@@ -140,7 +140,7 @@ sequenceDiagram
     participant Tool as mb-framepacing
     You->>Tool: start recording (waits for the START marker)
     You->>App: start the test (benchmark path, camera pan, ...)
-    App->>Card: START marker: run id, test name, date (a few capture frames)
+    App->>Card: START marker: run id, sequence id, date (a few capture frames)
     Card->>Tool: START seen, keep recording
     loop every frame of the test
         App->>Card: frame + marker (frame index, animation time)
@@ -160,17 +160,17 @@ sequenceDiagram
    a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. Filming the screen
    with a calibrated high speed camera is **very experimental**: see [doc/camera.md](doc/camera.md).
 
-The start and end markers bracket exactly the part you want measured. The start marker also carries a test name and the wall
-clock time, so every report knows what it measured:
+The start and end markers bracket exactly the part you want measured. The start marker also carries a sequence id (a UUID, or a
+short text tag) and the wall clock time, so every report knows what it measured:
 
 ```mermaid
 flowchart LR
-    S["START marker<br/>run 7, name, date<br/>(a few capture frames)"] --> F1[frame marker] --> F2[frame marker] --> F3[" … "] --> E["END marker<br/>run 7<br/>(a few capture frames)"]
+    S["START marker<br/>run 7, sequence id, date<br/>(a few capture frames)"] --> F1[frame marker] --> F2[frame marker] --> F3[" … "] --> E["END marker<br/>run 7<br/>(a few capture frames)"]
     style S fill:#1a7f37,color:#fff
     style E fill:#c62828,color:#fff
 ```
 
-| Start (with name and time)                   | Frame                                        | End                                      |
+| Start (with sequence id and time)            | Frame                                        | End                                      |
 | -------------------------------------------- | -------------------------------------------- | ---------------------------------------- |
 | ![Start marker](doc/images/marker-start.png) | ![Frame marker](doc/images/marker-frame.png) | ![End marker](doc/images/marker-end.png) |
 
@@ -238,7 +238,7 @@ The same four panels as a report (below) of a test clip, a busy stretch at the f
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
   when the frame was held too long because the next one was late. An error bar over a red step is
   bad pacing; an error bar while the steps stay flat is delta time jitter.
-- **Share of late frames in the last 2 s:** rare spikes stay low, busy stretches stand out, and they call for different fixes.
+- **Share of late frames in the last 2 s:** the late frames among the frames of the 2 s before each frame.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
   Zoom in to see hold patterns such as 3-then-1.
 

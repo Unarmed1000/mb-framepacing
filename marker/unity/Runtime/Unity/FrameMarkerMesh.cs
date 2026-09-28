@@ -34,7 +34,7 @@ namespace MB.FrameMarker.Unity
 
     /// <summary>
     /// Fill the mesh with the marker for an output of <paramref name="outputHeight"/> pixels. <paramref name="start"/> is only used by start
-    /// markers. Returns false (and leaves the mesh unchanged) if the options are invalid or the start name is too long.
+    /// markers. Returns false (and leaves the mesh unchanged) if the options are invalid.
     /// </summary>
     public bool Update(in Payload payload, in StartMetadata start, in Options options, Point origin, int outputHeight)
     {

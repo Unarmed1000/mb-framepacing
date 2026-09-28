@@ -22,6 +22,13 @@ namespace MB::FrameMarker
     int64_t IntendedDisplayTicks{0};
     //! The interval the frame pacer aims for between the previous frame and this one, in ticks (100ns): 166'667 for 60 fps. 0 = unknown.
     uint32_t TargetFrameTicks{0};
+    //! CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in ticks (100ns) on the same steady
+    //! clock as IntendedDisplayTicks. Anywhere inside a refresh; frames can overlap. 0 = unknown.
+    int64_t CpuStartTicks{0};
+    //! CPU busy: how long the CPU worked on this frame before presenting it (PresentMon's MsCPUBusy), from CpuStartTicks until Present
+    //! is called, in ticks (100ns). The marker is drawn last, so the application measures it as it draws the marker. It does not
+    //! include the GPU's work. May span several refreshes. 0 = unknown.
+    uint32_t CpuBusyTicks{0};
 
     constexpr bool operator==(const Payload&) const noexcept = default;
   };

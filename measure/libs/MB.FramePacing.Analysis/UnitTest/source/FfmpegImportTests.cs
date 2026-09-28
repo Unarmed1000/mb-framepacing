@@ -67,7 +67,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           StallEvery = 11,
           SkipEvery = 13,
           RunId = 5,
-          RunName = "ffmpeg import",
+          SequenceTag = "ffmpeg import",
         }
       );
 
@@ -153,7 +153,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     {
       var run = report.Timeline.Runs.Single();
       Assert.That(run.RunId, Is.EqualTo(5));
-      Assert.That(run.Name, Is.EqualTo("ffmpeg import"));
+      Assert.That(run.SequenceId, Is.EqualTo("ffmpeg import"));
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
       Assert.That(report.CapturePeriodMs, Is.EqualTo(capturePeriodMs).Within(0.01));
       var expected = ExpectedFrames(scenario);

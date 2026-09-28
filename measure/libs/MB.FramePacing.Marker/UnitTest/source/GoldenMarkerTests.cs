@@ -137,7 +137,7 @@ namespace MB.FramePacing.Marker.UnitTest
     public void DecodeLocked_FindsStartMarkerDrawnAtTheSameOrigin()
     {
       var frameLock = new MarkerLock(new PixelRect(32, 32, MarkerRenderer.MarkerSizePx(6), MarkerRenderer.MarkerSizePx(6)), 6);
-      var start = new StartMetadata(639_257_616_000_000_000, new string('n', MarkerPayload.MaxStartNameBytes));
+      var start = new StartMetadata(639_257_616_000_000_000, new MB.FrameMarker.SequenceId(0xFEDC_BA98_7654_3210, 0x0123_4567_89AB_CDEF));
       var payload = new MarkerPayload(5, 6, 7, MarkerKind.SequenceStart);
       var image = new GrayImage(400, 400, 128);
       MarkerRenderer.Render(image, payload, 32, 32, 6, metadata: start);

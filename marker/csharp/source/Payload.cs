@@ -20,7 +20,9 @@ namespace MB.FrameMarker
       uint runId = 0,
       MarkerKind kind = MarkerKind.Frame,
       long intendedDisplayTicks = 0,
-      uint targetFrameTicks = 0
+      uint targetFrameTicks = 0,
+      long cpuStartTicks = 0,
+      uint cpuBusyTicks = 0
     )
     {
       FrameIndex = frameIndex;
@@ -29,6 +31,8 @@ namespace MB.FrameMarker
       Kind = kind;
       IntendedDisplayTicks = intendedDisplayTicks;
       TargetFrameTicks = targetFrameTicks;
+      CpuStartTicks = cpuStartTicks;
+      CpuBusyTicks = cpuBusyTicks;
     }
 
     /// <summary>The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</summary>
@@ -51,8 +55,22 @@ namespace MB.FrameMarker
     /// <summary>The interval the frame pacer aims for between the previous frame and this one, in ticks (100 ns): 166 667 for 60 fps. 0 = unknown.</summary>
     public uint TargetFrameTicks { get; }
 
+    /// <summary>
+    /// CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in ticks (100 ns) on the same steady clock
+    /// as <see cref="IntendedDisplayTicks"/>. Anywhere inside a refresh; frames can overlap. 0 = unknown.
+    /// </summary>
+    public long CpuStartTicks { get; }
+
+    /// <summary>
+    /// CPU busy: how long the CPU worked on this frame before presenting it (PresentMon's MsCPUBusy), from <see cref="CpuStartTicks"/> until
+    /// Present is called, in ticks (100 ns). The marker is drawn last, so the application measures it as it draws the marker. It does not
+    /// include the GPU's work. May span several refreshes. 0 = unknown.
+    /// </summary>
+    public uint CpuBusyTicks { get; }
+
     /// <summary>The same payload with another kind.</summary>
-    public Payload WithKind(MarkerKind kind) => new Payload(FrameIndex, AnimationTicks, RunId, kind, IntendedDisplayTicks, TargetFrameTicks);
+    public Payload WithKind(MarkerKind kind) =>
+      new Payload(FrameIndex, AnimationTicks, RunId, kind, IntendedDisplayTicks, TargetFrameTicks, CpuStartTicks, CpuBusyTicks);
 
     public bool Equals(Payload other) =>
       FrameIndex == other.FrameIndex
@@ -60,7 +78,9 @@ namespace MB.FrameMarker
       && RunId == other.RunId
       && Kind == other.Kind
       && IntendedDisplayTicks == other.IntendedDisplayTicks
-      && TargetFrameTicks == other.TargetFrameTicks;
+      && TargetFrameTicks == other.TargetFrameTicks
+      && CpuStartTicks == other.CpuStartTicks
+      && CpuBusyTicks == other.CpuBusyTicks;
 
     public override bool Equals(object obj) => obj is Payload other && Equals(other);
 
@@ -69,7 +89,9 @@ namespace MB.FrameMarker
       unchecked
       {
         int hash = (((((FrameIndex.GetHashCode() * 397) ^ AnimationTicks.GetHashCode()) * 397) ^ (int)RunId) * 397) ^ (int)Kind;
-        return (((hash * 397) ^ IntendedDisplayTicks.GetHashCode()) * 397) ^ (int)TargetFrameTicks;
+        hash = (((hash * 397) ^ IntendedDisplayTicks.GetHashCode()) * 397) ^ (int)TargetFrameTicks;
+        hash = (hash * 397) ^ CpuStartTicks.GetHashCode();
+        return (hash * 397) ^ (int)CpuBusyTicks;
       }
     }
 
@@ -78,6 +100,6 @@ namespace MB.FrameMarker
     public static bool operator !=(Payload left, Payload right) => !left.Equals(right);
 
     public override string ToString() =>
-      $"{{frame {FrameIndex}, ticks {AnimationTicks}, run {RunId}, {Kind}, intended {IntendedDisplayTicks}, target {TargetFrameTicks}}}";
+      $"{{frame {FrameIndex}, ticks {AnimationTicks}, run {RunId}, {Kind}, intended {IntendedDisplayTicks}, target {TargetFrameTicks}, cpu start {CpuStartTicks}, cpu busy {CpuBusyTicks}}}";
   }
 }

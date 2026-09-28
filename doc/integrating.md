@@ -114,10 +114,15 @@ marker kind.
 **Frame pacing (recommended).** If your game paces its frames, put what the pacer aims for into the payload: the time it intends the
 frame to become visible (steady clock ticks, any epoch) and its target frame time. The analysis then measures every frame against
 your plan, separates pacing errors from animation timing errors, and does not count a rate you chose (30 fps for a busy stretch) as
-late:
+late.
+
+**CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
+worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the
+application side, including frames that took several refreshes or overlap the next one:
 
 ```cpp
-const FM::Payload payload{frameIndex, ticks, runId, FM::MarkerKind::Frame, intendedDisplayTicks, targetFrameTicks};
+const FM::Payload payload{frameIndex, ticks, runId, FM::MarkerKind::Frame, intendedDisplayTicks, targetFrameTicks,
+                          cpuStartTicks, cpuBusyTicks};
 ```
 
 **The sync marker (optional; required for camera capture).** Draw the small sync marker bottom-left as well, with the same frame
@@ -147,13 +152,14 @@ enum class Phase { Start, Measure, End, Done };
 void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
 {
   static const int64_t startUtc = FM::ToDateTimeTicks(std::chrono::system_clock::now());
+  static const FM::SequenceId sequenceId = NewUuidBytes();   // any 16 bytes unique to this run, or FM::SequenceId::TryFromText("camera pan", id)
   static std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
   const FM::Payload payload{frameIndex, static_cast<int64_t>(animationSeconds * FM::TicksPerSecond), /*runId*/ 7};
   std::size_t count = 0;
   switch (phase)
   {
   case Phase::Start:   // one captured frame is enough; ~3 capture frames (e.g. 100 ms) for slack
-    count = FM::GenerateStartTriangles(payload, {startUtc, "camera pan benchmark"}, options, origin, vertices);
+    count = FM::GenerateStartTriangles(payload, {startUtc, sequenceId}, options, origin, vertices);
     break;
   case Phase::Measure:
     count = FM::GenerateTriangles(payload, options, origin, vertices);

@@ -1,8 +1,9 @@
 # Frame marker format (version 1)
 
 The frame marker is a QR code that the application under test draws into every frame. It carries the application's **frame
-index**, the **animation time** the frame was rendered for, a **run id** and, when the application paces its frames, **when it
-intends the frame to be shown** and its **target frame time**. `mb-framepacing` captures the display output with an
+index**, the **animation time** the frame was rendered for, a **run id**, when the application paces its frames **when it intends
+the frame to be shown** and its **target frame time**, and optionally the frame's **CPU start time** and **CPU busy**: when the CPU
+started working on the frame and how long it worked on it before presenting it. `mb-framepacing` captures the display output with an
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
@@ -18,7 +19,7 @@ Both implement this document; if they disagree, this document is the reference.
 
 ## Payload
 
-Every marker starts with the same 36 byte header, little endian:
+Frame, start and end markers start with the same 48 byte header, little endian:
 
 | Offset | Size | Field                 | Notes                                                                                                                                                                                 |
 | ------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,14 +31,20 @@ Every marker starts with the same 36 byte header, little endian:
 | 20     | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                   |
 | 24     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below). |
 | 32     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                             |
+| 36     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                    |
+| 44     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                     |
 
-Frame and end markers are exactly these 36 bytes. A **start marker** appends its metadata:
+Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
+carries the same frame index. Frame and end markers are exactly these 48 bytes. A **start marker** appends its metadata, 72 bytes
+in all:
 
 | Offset | Size | Field       | Notes                                                                                                                                                     |
 | ------ | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 36     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
-| 44     | 1    | Name length | `0`..`60`                                                                                                                                                 |
-| 45     | n    | Name        | UTF-8 test name, at most 60 bytes, no terminator                                                                                                          |
+| 48     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
+| 56     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).   |
+
+The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
+8-4-4-4-12 form of a UUID.
 
 A **sync marker** (kind `3`) is a small second marker for tearing checks and camera timing. It carries only what those need:
 
@@ -48,7 +55,7 @@ A **sync marker** (kind `3`) is a small second marker for tearing checks and cam
 | 3      | 1    | Kind           | `3` = Sync                                 |
 | 4      | 8    | Frame index    | `u64`, the same as the frame's main marker |
 
-Decoders reject a payload with the wrong length, magic, format version, an unknown kind or (for start markers) invalid UTF-8.
+Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, or an unknown kind.
 
 `AnimationTicks` must come from the same clock the application's animation uses (its "game time"), not from a separate
 wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `static_cast<int64_t>(t * 10'000'000.0)` in C++, or
@@ -73,12 +80,31 @@ a hitch stays a refresh late in a full frame queue. The two pacing fields tell t
   minus the intended step: the frame was shown off the plan) and **prediction error** (the animation time step minus the intended step:
   the frame was animated for another moment than planned). The animation error is prediction minus pacing error.
 
+### CPU start time and CPU busy
+
+A capture sees only the display side: when frames appear, not how the application made them. The two optional fields are the
+application side, named as in [PresentMon](https://github.com/GameTechDev/PresentMon) (`CPUStartTime`, `MsCPUBusy`) and read from
+the same steady clock as the intended display time:
+
+- **CPU start time:** when the CPU started working on this frame (input, simulation, building the render commands). It can be
+  anywhere inside a refresh.
+- **CPU busy:** how long the CPU worked on this frame before presenting it, from the CPU start time until Present is called. The
+  marker is drawn last, just before Present, so the application measures it as it draws the marker. It can span several refreshes.
+  It does not include the GPU's work, which usually finishes after Present and is only known later, nor the time spent blocked
+  inside Present when the queue is full.
+
+A frame's work does not follow the refresh grid. With more than one frame in flight (triple buffering, a deeper present queue, or
+an engine that pipelines across threads) the next frame can start before this one is presented, and two frames can start within one
+refresh. The CPU start time places the frame on the timeline, CPU busy gives its length. The step from one frame's CPU start time to
+the next frame's is the **frametime** (PresentMon's `MsBetweenAppStart`), which the analysis derives from the markers; it is known
+where the next frame index was captured too. Leave the fields `0` when the application does not measure them.
+
 ## Symbol
 
 - QR code, **ECC level M**, **byte mode**, mask chosen automatically.
 - **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
-  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 36 of them, which leaves room for future fields, and
-  a start marker with a 60 byte name uses 105.
+  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 48 of them and a start marker 72, which leaves room
+  for future fields.
 - **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 12.
 - The Reed-Solomon error correction is the integrity check. A capture that mixes two frames (tearing, or a capture taken
   while the display changed frame) either fails ECC or decodes one of the two frames. The analyzer reports what it saw and never
@@ -120,13 +146,14 @@ The capture pipeline only works if the marker reaches the display output unmodif
 A test run is bracketed by a start and an end marker:
 
 ```
-... frame markers | START (run R, name, UTC time) | frame markers (run R) | END (run R) | ...
+... frame markers | START (run R, sequence id, UTC time) | frame markers (run R) | END (run R) | ...
                   |<-- >= 1 captured frame ------>|<-- measured window -->|<-- >= 1 ---->|
                   |    (guidance: ~3 capture frames = 6 ms at 500 fps, 50 ms at 60 fps, 100 ms at 30 fps)
 ```
 
 1. Pick a run id for the run (a counter or a random `u32`). Every marker of the run carries it.
-2. Show the **start marker** before the measured part. Put the test name and the wall clock start time in its metadata.
+2. Show the **start marker** before the measured part. Put a sequence id unique to this run (a new UUID, or a text tag) and the wall
+   clock start time in its metadata.
    The tools check every captured frame, so **one complete captured frame** of the marker is enough. With vsync and a capture card
    that records every refresh, one rendered frame gives exactly that. As guidance, so that a dropped capture or a
    capture that skips refreshes (a 30 fps screen recording) cannot lose it, show it for about **three frames of the slowest
@@ -242,12 +269,15 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, after all post-processing and UI
 std::size_t quadCount = 0;
-// Pacing: when the pacer intends this frame to be shown (steady clock ticks) and its target frame time; 0 = unknown
-const FM::Payload payload{frameIndex, animationTicks, runId, kind, intendedDisplayTicks, targetFrameTicks};
+// Pacing: when the pacer intends this frame to be shown (steady clock ticks) and its target frame time. When the CPU started this
+// frame (the same clock) and how long it has worked on it until now (the marker is drawn last, just before Present). 0 = unknown
+const FM::Payload payload{frameIndex, animationTicks, runId, kind, intendedDisplayTicks, targetFrameTicks,
+                          cpuStartTicks, cpuBusyTicks};
 if (kind == FM::MarkerKind::SequenceStart)
 {
-  // startUtcTicks captured once when the run started: FM::ToDateTimeTicks(std::chrono::system_clock::now())
-  quadCount = FM::GenerateStartQuads(payload, {startUtcTicks, "menu-scroll benchmark"}, options, origin, quads);
+  // Captured once when the run started: startUtcTicks = FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id
+  // unique to the run (a UUID's 16 bytes, or a text tag: FM::SequenceId::TryFromText("menu-scroll", sequenceId))
+  quadCount = FM::GenerateStartQuads(payload, {startUtcTicks, sequenceId}, options, origin, quads);
 }
 else
 {

@@ -47,7 +47,9 @@ namespace MB.FramePacing.Capture
 
     /// <summary>The frames themselves were stored (frames.mbfc) next to the capture data.</summary>
     public bool FramesStored { get; init; }
-    public string? SequenceName { get; init; }
+
+    /// <summary>The start marker's sequence id as text (or in the hex form of a UUID).</summary>
+    public string? SequenceId { get; init; }
 
     /// <summary>The real recording rate of a slow motion clip, when the timestamps were generated from it.</summary>
     public double? RecordedFps { get; init; }

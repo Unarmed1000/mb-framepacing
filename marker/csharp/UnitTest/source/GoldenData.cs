@@ -24,52 +24,24 @@ namespace MB.FrameMarker.UnitTest
 
     public static IEnumerable<GoldenMarker> Markers()
     {
-      foreach (var line in File.ReadLines(Path.Combine(MarkerDirectory, "manifest.csv")).Skip(1))
+      foreach (var row in Rows("manifest.csv"))
       {
-        var f = line.Split(',');
-        var payload = new Payload(
-          ulong.Parse(f[3], CultureInfo.InvariantCulture),
-          long.Parse(f[4], CultureInfo.InvariantCulture),
-          uint.Parse(f[2], CultureInfo.InvariantCulture),
-          (MarkerKind)byte.Parse(f[1], CultureInfo.InvariantCulture),
-          long.Parse(f[5], CultureInfo.InvariantCulture),
-          uint.Parse(f[6], CultureInfo.InvariantCulture)
-        );
         yield return new GoldenMarker(
-          f[0],
-          payload,
-          new StartMetadata(long.Parse(f[7], CultureInfo.InvariantCulture), FromHex(f[8])),
-          new Options(int.Parse(f[9], CultureInfo.InvariantCulture), int.Parse(f[10], CultureInfo.InvariantCulture)),
-          new Point(int.Parse(f[11], CultureInfo.InvariantCulture), int.Parse(f[12], CultureInfo.InvariantCulture)),
-          int.Parse(f[13], CultureInfo.InvariantCulture),
-          int.Parse(f[14], CultureInfo.InvariantCulture)
+          row.Text("file"),
+          Payload(row),
+          Start(row),
+          new Options(row.Int("moduleSizePx"), row.Int("quietZoneModules")),
+          new Point(row.Int("originX"), row.Int("originY")),
+          row.Int("width"),
+          row.Int("height")
         );
       }
     }
 
     public static IEnumerable<ModuleDigestRow> ModuleDigest()
     {
-      int line = 1;
-      foreach (var text in File.ReadLines(Path.Combine(MarkerDirectory, "modules.csv")).Skip(1))
-      {
-        ++line;
-        var f = text.Split(',');
-        var payload = new Payload(
-          ulong.Parse(f[2], CultureInfo.InvariantCulture),
-          long.Parse(f[3], CultureInfo.InvariantCulture),
-          uint.Parse(f[1], CultureInfo.InvariantCulture),
-          (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture),
-          long.Parse(f[4], CultureInfo.InvariantCulture),
-          uint.Parse(f[5], CultureInfo.InvariantCulture)
-        );
-        yield return new ModuleDigestRow(
-          line,
-          payload,
-          new StartMetadata(long.Parse(f[6], CultureInfo.InvariantCulture), FromHex(f[7])),
-          int.Parse(f[8], CultureInfo.InvariantCulture),
-          f[9]
-        );
-      }
+      foreach (var row in Rows("modules.csv"))
+        yield return new ModuleDigestRow(row.Line, Payload(row), Start(row), row.Int("size"), row.Text("modulesHex"));
     }
 
     /// <summary>Read a binary PGM (P5, 8 bit): the pixel bytes.</summary>
@@ -94,7 +66,44 @@ namespace MB.FrameMarker.UnitTest
       return bytes.AsSpan(position, width * height).ToArray();
     }
 
-    private static string FromHex(string hex) => Encoding.UTF8.GetString(Convert.FromHexString(hex));
+    /// <summary>A CSV row of the golden data, its cells by column name.</summary>
+    private sealed record Row(int Line, IReadOnlyDictionary<string, string> Cells)
+    {
+      public string Text(string column) => Cells[column];
+
+      public int Int(string column) => int.Parse(Cells[column], CultureInfo.InvariantCulture);
+
+      public long Long(string column) => long.Parse(Cells[column], CultureInfo.InvariantCulture);
+    }
+
+    private static IEnumerable<Row> Rows(string file)
+    {
+      var lines = File.ReadAllLines(Path.Combine(MarkerDirectory, file));
+      var header = lines[0].Split(',');
+      for (int i = 1; i < lines.Length; ++i)
+      {
+        var cells = lines[i].Split(',');
+        yield return new Row(i + 1, header.Select((name, column) => (name, column)).ToDictionary(c => c.name, c => cells[c.column]));
+      }
+    }
+
+    private static Payload Payload(Row row) =>
+      new Payload(
+        ulong.Parse(row.Text("frameIndex"), CultureInfo.InvariantCulture),
+        row.Long("animationTicks"),
+        uint.Parse(row.Text("runId"), CultureInfo.InvariantCulture),
+        (MarkerKind)byte.Parse(row.Text("kind"), CultureInfo.InvariantCulture),
+        row.Long("intendedDisplayTicks"),
+        uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture),
+        row.Long("cpuStartTicks"),
+        uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture)
+      );
+
+    private static StartMetadata Start(Row row) =>
+      new StartMetadata(
+        row.Long("startUtcTicks"),
+        row.Text("sequenceIdHex") is { Length: > 0 } hex ? SequenceId.FromBytes(Convert.FromHexString(hex)) : default
+      );
 
     private static string FindRepositoryRoot()
     {

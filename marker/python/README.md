@@ -26,8 +26,15 @@ fill_quads(rgb24_frame, width, height, quads, channels=3)
 - **Frame pacing (optional):** when the application paces its frames, `Payload(..., intended_display_ticks=..., target_frame_ticks=...)`
   carries when the pacer intends the frame to be shown (100 ns ticks on its steady clock, any epoch) and the interval it aims for
   (`166_667` for 60 fps). Both default to `0` (unknown).
-- **Start and end:** bracket the part to measure with `generate_start_quads(payload, StartMetadata(utc_ticks, name), options,
-origin)` (a name of at most 60 bytes as UTF-8) and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few frames.
+- **CPU start time and CPU busy (optional):** `Payload(..., cpu_start_ticks=..., cpu_busy_ticks=...)` carries when the CPU started
+  working on the frame (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on
+  it before presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's
+  `MsCPUBusy`; it may span several refreshes and does not include the GPU's work), in 100 ns ticks. CPU busy is `u32`; both default
+  to `0` (unknown).
+- **Start and end:** bracket the part to measure with `generate_start_quads(payload, StartMetadata(utc_ticks, sequence_id), options,
+origin)` and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few frames. The sequence id is 16 opaque bytes unique to
+  the run: `SequenceId.from_uuid(uuid.uuid4())` or a text tag of up to 16 printable ASCII characters, `SequenceId.from_text("run-42")`.
+  `str(sequence_id)` shows it as the text, or as the UUID's 8-4-4-4-12 form.
 - **Size:** every main marker (frame, start and end) is QR version 6, 41×41 modules, so it never changes size:
   `marker_size_px(options)` is `49 × module_size_px` with the default quiet zone (294 px for the default 6 px modules).
 - **Sync marker (optional; required for camera capture):** a small second marker that carries only the frame index, drawn every frame
@@ -50,7 +57,7 @@ The same API as the C# library (`MB.FrameMarker`), in Python's naming:
 
 | Python                                                                           | What it does                                                                     |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `Payload`, `StartMetadata`, `MarkerKind`                                         | What a marker carries                                                            |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                           | What a marker carries                                                            |
 | `Options`, `Point`                                                               | Size and place                                                                   |
 | `generate_quads`, `generate_start_quads`                                         | The marker as quads: the light background, then one dark quad per run of modules |
 | `generate_triangles`, `generate_indexed` (and `generate_start_…`)                | The marker as a triangle list or indexed triangles, for a GPU                    |

@@ -170,7 +170,7 @@ namespace MB.FramePacing.Capture.UnitTest
 
       Assert.That(result.Session.StopReason, Is.EqualTo("end marker"));
       Assert.That(result.Session.SequenceRunId, Is.EqualTo(scenario.Options.RunId));
-      Assert.That(result.Session.SequenceName, Is.EqualTo(scenario.Options.RunName));
+      Assert.That(result.Session.SequenceId, Is.EqualTo(scenario.Options.SequenceTag));
       Assert.That(result.Session.FramesDroppedByRecorder, Is.Zero);
 
       // The recording must contain the whole measured run: some start frames, every run frame and some end frames

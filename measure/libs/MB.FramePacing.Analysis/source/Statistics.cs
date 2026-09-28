@@ -13,9 +13,9 @@ using System.Linq;
 
 namespace MB.FramePacing.Analysis
 {
-  public sealed record Statistics(int Count, double Min, double Mean, double StdDev, double P50, double P95, double P99, double Max)
+  public sealed record Statistics(int Count, double Min, double Mean, double StdDev, double P50, double P95, double P99, double P999, double Max)
   {
-    public static readonly Statistics Empty = new Statistics(0, 0, 0, 0, 0, 0, 0, 0);
+    public static readonly Statistics Empty = new Statistics(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     public static Statistics FromTicks(IEnumerable<long> ticks) => From(ticks.Select(t => t / (double)TimeSpan.TicksPerMillisecond));
 
@@ -35,6 +35,7 @@ namespace MB.FramePacing.Analysis
         Percentile(sorted, 0.50),
         Percentile(sorted, 0.95),
         Percentile(sorted, 0.99),
+        Percentile(sorted, 0.999),
         sorted[^1]
       );
     }

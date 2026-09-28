@@ -10,7 +10,8 @@
 namespace MB::FrameMarker
 {
   //! Every marker (frame, start and end) is QR version 6 (41x41 modules), ECC level M, byte mode, so the marker never changes size.
-  //! Version 6-M holds 106 bytes: a frame or end marker uses PayloadByteCount of them, the rest is room for future fields.
+  //! Version 6-M holds 106 bytes: a frame or end marker uses PayloadByteCount of them, a start marker StartPayloadByteCount; the rest is
+  //! room for future fields.
   inline constexpr int32_t QrVersion = 6;
   inline constexpr int32_t QrModuleCount = (4 * QrVersion) + 17;
   inline constexpr std::size_t QrCapacityBytes = 106;
@@ -22,16 +23,21 @@ namespace MB::FrameMarker
 
   //! Payload header, shared by every marker kind (little endian):
   //! magic "MF" (2) | format version (1) | kind (1) | frame index u64 (8) | animation ticks i64 (8) | run id u32 (4) |
-  //! intended display ticks i64 (8) | target frame ticks u32 (4)
-  inline constexpr std::size_t PayloadByteCount = 36;
+  //! intended display ticks i64 (8) | target frame ticks u32 (4) | cpu start ticks i64 (8) | cpu busy ticks u32 (4)
+  //! Start and end markers carry the values of the frame that shows them.
+  inline constexpr std::size_t PayloadByteCount = 48;
   inline constexpr uint8_t PayloadMagic0 = 'M';
   inline constexpr uint8_t PayloadMagic1 = 'F';
   inline constexpr uint8_t PayloadFormatVersion = 1;
 
-  //! Start marker payload: header (24) | start time UTC i64 (8) | name length u8 (1) | name UTF-8 (0..MaxStartNameBytes)
-  inline constexpr std::size_t MaxStartNameBytes = 60;
-  inline constexpr std::size_t StartPayloadFixedByteCount = PayloadByteCount + 8u + 1u;
-  inline constexpr std::size_t MaxEncodedPayloadByteCount = StartPayloadFixedByteCount + MaxStartNameBytes;
+  //! The start marker's sequence id: 16 opaque bytes (see SequenceId).
+  inline constexpr std::size_t SequenceIdByteCount = 16;
+
+  //! Start marker payload: header (48) | start time UTC i64 (8) | sequence id (16)
+  inline constexpr std::size_t StartPayloadByteCount = PayloadByteCount + 8u + SequenceIdByteCount;
+
+  //! The longest payload of any kind: the start marker's.
+  inline constexpr std::size_t MaxEncodedPayloadByteCount = StartPayloadByteCount;
   static_assert(MaxEncodedPayloadByteCount <= QrCapacityBytes);
 
   //! C# TimeSpan / DateTime resolution

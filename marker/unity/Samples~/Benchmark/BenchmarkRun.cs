@@ -19,8 +19,9 @@ namespace MB.FrameMarker.Samples
     [SerializeField]
     private FrameMarkerOverlay m_overlay;
 
+    [Tooltip("The run's sequence id as a text tag of at most 16 ASCII characters; empty = a new UUID for every run")]
     [SerializeField]
-    private string m_runName = "camera pan";
+    private string m_sequenceTag = "camera pan";
 
     [Tooltip("Wait this long before the run so the capture tool is recording")]
     [SerializeField]
@@ -37,7 +38,9 @@ namespace MB.FrameMarker.Samples
       if (m_overlay == null)
         m_overlay = FindAnyObjectByType<FrameMarkerOverlay>();
       yield return new WaitForSecondsRealtime(m_delaySeconds);
-      yield return m_overlay.RunFor(m_runName, m_runSeconds);
+      yield return SequenceId.TryFromText(m_sequenceTag, out var sequenceId)
+        ? m_overlay.RunFor(sequenceId, m_runSeconds)
+        : m_overlay.RunFor(m_runSeconds);
     }
 
     private void Update()

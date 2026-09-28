@@ -131,9 +131,12 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     lateness against the schedule, and the animation error split into pacing and prediction error), its target frame time in the
     markers, the target frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time),
     and otherwise one refresh (the native rate). The synthetic game writes a schedule; its prediction error is 0 by construction.
-- **Markers (format version 1, `doc/marker-format.md`):** a 36 byte header (with the intended display time and target frame time)
-  on every kind; every main marker (frame, start, end) is QR version 6 (41×41), so it never changes size and has room for future
-  fields; the start name is at most 60 bytes. The sync marker (kind 3, 12 bytes: frame index only) is QR version 2 (25×25), drawn
+- **Markers (format version 1, `doc/marker-format.md`):** a 48 byte header shared by frame, start and end (intended display time,
+  target frame time, CPU start time and CPU busy, named as PresentMon's CPUStartTime and MsCPUBusy; start/end carry the values of
+  the frame that shows them, and the tearing check compares their frame index with the sync marker's); every main marker (frame, start, end) is QR version 6 (41×41), so it never changes size and has
+  room for future fields. The start marker (72 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
+  most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
+  captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 12 bytes: frame index only) is QR version 2 (25×25), drawn
   bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `RecommendedOrigin(kind, …)`
   places both; there are no other slots.
 - **Camera capture (VERY EXPERIMENTAL, `doc/camera.md`):**

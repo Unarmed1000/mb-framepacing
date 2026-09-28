@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Statistics of one run: display delta, animation delta, animation error (signed and absolute), drift and time on screen, and the
-//* animation error summarised the way Gamers Nexus do: error per frame and percent error.
+//* Statistics of one run: display delta, animation delta, animation error (signed and absolute), drift and time on screen, the
+//* animation error summarised the way Gamers Nexus do (error per frame and percent error), and the frame rate the way benchmarks report
+//* it: average fps and the 1 % / 0.1 % lows.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -26,7 +27,13 @@ namespace MB.FramePacing.Analysis
     // Gamers Nexus's "error per frame": the mean |animation error| of the frames with one
     double ErrorPerFrameMs,
     // Gamers Nexus's "percent error": the sum of |animation error| as a percentage of the time those frames measure (their display time steps)
-    double PercentError
+    double PercentError,
+    // Frames with a display time step over the time those steps cover
+    double AverageFps,
+    // The frame rate at the 99th / 99.9th percentile display time step (nearest rank, so it is a step that happened); null with fewer
+    // than MinFramesForOnePercentLow / MinFramesForPointOnePercentLow frames
+    double? OnePercentLowFps,
+    double? PointOnePercentLowFps
   )
   {
     /// <summary>
@@ -49,8 +56,32 @@ namespace MB.FramePacing.Analysis
         Statistics.FromTicks(frames.Select(f => f.OnScreenTicks)),
         withMetrics.LongCount(f => capturePeriodTicks > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > thresholdTicks),
         errorPerFrameMs,
-        percentError
+        percentError,
+        AverageFpsOf(withMetrics),
+        LowFps(withMetrics, 0.99, MinFramesForOnePercentLow),
+        LowFps(withMetrics, 0.999, MinFramesForPointOnePercentLow)
       );
+    }
+
+    /// <summary>A 1 % low needs at least this many frames to rest on more than the single slowest one.</summary>
+    public const int MinFramesForOnePercentLow = 100;
+
+    /// <summary>A 0.1 % low needs at least this many frames.</summary>
+    public const int MinFramesForPointOnePercentLow = 1000;
+
+    private static double AverageFpsOf(IReadOnlyCollection<PresentedFrame> frames)
+    {
+      long ticks = frames.Sum(f => f.DisplayDeltaTicks!.Value);
+      return ticks > 0 ? frames.Count * (double)TimeSpan.TicksPerSecond / ticks : 0;
+    }
+
+    private static double? LowFps(IReadOnlyCollection<PresentedFrame> frames, double fraction, int minFrames)
+    {
+      if (frames.Count < minFrames)
+        return null;
+      var steps = frames.Select(f => f.DisplayDeltaTicks!.Value).OrderBy(t => t).ToArray();
+      long step = steps[Math.Max(0, (int)Math.Ceiling(fraction * steps.Length) - 1)];
+      return step > 0 ? TimeSpan.TicksPerSecond / (double)step : null;
     }
 
     /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display time steps, in ticks.</summary>

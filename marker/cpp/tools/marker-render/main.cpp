@@ -3,8 +3,10 @@
 // marker-render: payload -> quads -> software rasterizer -> binary PGM (P5).
 // Used to produce the golden images the C# decoder tests consume (test-data/markers).
 //
-//   marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync] [--name <utf8>] [--utc-ticks <i64>]
-//                 [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>] [--background <0-255>] -o <file.pgm>
+//   marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync] [--intended-ticks <i64>]
+//                 [--target-ticks <u32>] [--cpu-start-ticks <i64>] [--cpu-busy-ticks <u32>] [--utc-ticks <i64>]
+//                 [--sequence-id <text> | --sequence-id-hex <hex>] [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]
+//                 [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>
 #include <mb/framemarker/FrameMarker.hpp>
 #include <algorithm>
@@ -15,6 +17,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -29,8 +32,7 @@ namespace
   struct RenderRequest
   {
     FM::Payload Payload;
-    std::string StartName;
-    int64_t StartUtcTicks{0};
+    FM::StartMetadata Start;
     FM::Options Options;
     int32_t CanvasWidth{0};
     int32_t CanvasHeight{0};
@@ -54,10 +56,9 @@ namespace
     image.Pixels.assign(static_cast<std::size_t>(image.Width) * static_cast<std::size_t>(image.Height), request.Background);
 
     std::vector<FM::Quad> quads(FM::MaxQuadCount());
-    const std::size_t quadCount =
-      request.Payload.Kind == FM::MarkerKind::SequenceStart
-        ? FM::GenerateStartQuads(request.Payload, {request.StartUtcTicks, request.StartName}, request.Options, request.Origin, quads)
-        : FM::GenerateQuads(request.Payload, request.Options, request.Origin, quads);
+    const std::size_t quadCount = request.Payload.Kind == FM::MarkerKind::SequenceStart
+                                    ? FM::GenerateStartQuads(request.Payload, request.Start, request.Options, request.Origin, quads)
+                                    : FM::GenerateQuads(request.Payload, request.Options, request.Origin, quads);
     if (quadCount == 0)
     {
       throw std::runtime_error("GenerateQuads failed (invalid options?)");
@@ -117,17 +118,63 @@ namespace
     return {ParseNumber<int32_t>(text.substr(0, split), name), ParseNumber<int32_t>(text.substr(split + 1), name)};
   }
 
-  std::string ToHex(const std::string_view text)
+  std::string ToHex(const std::span<const uint8_t> bytes)
   {
     constexpr std::string_view Digits = "0123456789abcdef";
     std::string hex;
-    for (const char ch : text)
+    for (const uint8_t value : bytes)
     {
-      const auto value = static_cast<uint8_t>(ch);
       hex += Digits[value >> 4u];
       hex += Digits[value & 0xFu];
     }
     return hex;
+  }
+
+  //! The sequence id column of the CSV files: 32 lowercase hex digits for a start marker, empty for every other kind.
+  std::string SequenceIdHex(const FM::MarkerKind kind, const FM::SequenceId& id)
+  {
+    return kind == FM::MarkerKind::SequenceStart ? ToHex(id.Bytes) : std::string();
+  }
+
+  FM::SequenceId ParseSequenceIdHex(const std::string_view text, const std::string_view name)
+  {
+    const auto digit = [&](const char ch) -> uint32_t
+    {
+      if (ch >= '0' && ch <= '9')
+      {
+        return static_cast<uint32_t>(ch - '0');
+      }
+      if (ch >= 'a' && ch <= 'f')
+      {
+        return static_cast<uint32_t>(ch - 'a') + 10u;
+      }
+      if (ch >= 'A' && ch <= 'F')
+      {
+        return static_cast<uint32_t>(ch - 'A') + 10u;
+      }
+      throw std::invalid_argument("Invalid hex digit in '" + std::string(text) + "' for " + std::string(name));
+    };
+    if (text.size() != FM::SequenceId::ByteCount * 2u)
+    {
+      throw std::invalid_argument(std::string(name) + " needs exactly 32 hex digits");
+    }
+    FM::SequenceId id;
+    for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
+    {
+      id.Bytes[i] = static_cast<uint8_t>((digit(text[2u * i]) << 4u) | digit(text[(2u * i) + 1u]));
+    }
+    return id;
+  }
+
+  //! A text tag sequence id for the golden cases (1 to 16 printable ASCII characters).
+  constexpr FM::SequenceId TextSequenceId(const std::string_view text)
+  {
+    FM::SequenceId id;
+    if (!FM::SequenceId::TryFromText(text, id))
+    {
+      throw std::invalid_argument("A text sequence id is 1 to 16 printable ASCII characters");
+    }
+    return id;
   }
 
   //! splitmix64: a tiny deterministic generator, so every platform writes the same digest
@@ -140,10 +187,12 @@ namespace
     return value ^ (value >> 31u);
   }
 
-  //! modules.csv: the QR module matrix of many pseudo random payloads (frame, end and start markers with 0-60 byte names, so every mask
-  //! occurs). Other implementations of the marker (C#, Python) must reproduce every row exactly.
-  //! Columns: kind, run id, frame index, animation ticks, intended display ticks, target frame ticks, start UTC ticks, start name (hex),
-  //! symbol size, modules (hex): row major, one bit per module (1 = dark), most significant bit first, the last byte zero padded.
+  //! modules.csv: the QR module matrix of many pseudo random payloads (frame, start, end and sync markers; the start markers carry random,
+  //! text, empty and all 0xFF sequence ids; both symbol versions use every mask). Other implementations of the marker (C#, Python) must
+  //! reproduce every row exactly.
+  //! Columns: kind, run id, frame index, animation ticks, intended display ticks, target frame ticks, CPU start ticks, CPU busy ticks,
+  //! start UTC ticks, sequence id (32 hex digits, start markers only), symbol size, modules (hex): row major, one bit
+  //! per module (1 = dark), most significant bit first, the last byte zero padded.
   void WriteModuleDigest(const std::filesystem::path& directory)
   {
     constexpr int32_t RowCount = 512;
@@ -152,9 +201,11 @@ namespace
     {
       throw std::runtime_error("Failed to create modules.csv in '" + directory.string() + "'");
     }
-    digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,startUtcTicks,startNameHex,size,modulesHex\n";
+    digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,startUtcTicks,"
+              "sequenceIdHex,size,modulesHex\n";
 
-    uint64_t state = 0x6D622D6672616D65u;
+    // "mb-frame" + 4: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
+    uint64_t state = 0x6D622D6672616D69u;
     for (int32_t row = 0; row < RowCount; ++row)
     {
       FM::Payload payload;
@@ -164,33 +215,44 @@ namespace
       payload.RunId = static_cast<uint32_t>(NextRandom(state));
       payload.IntendedDisplayTicks = static_cast<int64_t>(NextRandom(state));
       payload.TargetFrameTicks = static_cast<uint32_t>(NextRandom(state));
-      int64_t startUtcTicks = 0;
-      std::string name;
+      payload.CpuStartTicks = static_cast<int64_t>(NextRandom(state));
+      payload.CpuBusyTicks = static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu);
+      FM::StartMetadata start;
       if (payload.Kind == FM::MarkerKind::SequenceStart)
       {
-        startUtcTicks = static_cast<int64_t>(NextRandom(state) >> 1u);
-        // Every length 0..60, with an occasional two byte UTF-8 character
-        const auto length = static_cast<std::size_t>((row / 4) % static_cast<int32_t>(FM::MaxStartNameBytes + 1u));
-        while (name.size() < length)
+        start.UtcTicks = static_cast<int64_t>(NextRandom(state) >> 1u);
+        // Cycle through random bytes, a text tag of every length 1..16, no id (all zero) and all 0xFF
+        switch ((row / 4) % 4)
         {
-          const uint64_t pick = NextRandom(state);
-          if (pick % 7u == 0u && name.size() + 2u <= length)
+        case 0:
+          for (uint8_t& value : start.Id.Bytes)
           {
-            name += "\xC3\xA6";
+            value = static_cast<uint8_t>(NextRandom(state) & 0xFFu);
           }
-          else
+          break;
+        case 1:
           {
-            name += static_cast<char>(' ' + static_cast<char>(pick % 95u));
+            const auto length = static_cast<std::size_t>(((row / 16) % 16) + 1);
+            for (std::size_t i = 0; i < length; ++i)
+            {
+              start.Id.Bytes[i] = static_cast<uint8_t>(0x20u + (NextRandom(state) % 95u));
+            }
+            break;
           }
+        case 2:
+          break;
+        default:
+          start.Id.Bytes.fill(0xFFu);
+          break;
         }
       }
 
       FM::ModuleMatrix matrix;
-      if (!FM::GenerateModules(payload, matrix, {startUtcTicks, name}))
+      if (!FM::GenerateModules(payload, matrix, start))
       {
         throw std::runtime_error("GenerateModules failed for digest row " + std::to_string(row));
       }
-      std::string bits;
+      std::vector<uint8_t> bits;
       uint8_t current = 0;
       int32_t bitCount = 0;
       for (int32_t y = 0; y < matrix.Size; ++y)
@@ -200,7 +262,7 @@ namespace
           current = static_cast<uint8_t>((static_cast<uint32_t>(current) << 1u) | (matrix.IsDark(x, y) ? 1u : 0u));
           if (++bitCount == 8)
           {
-            bits += static_cast<char>(current);
+            bits.push_back(current);
             current = 0;
             bitCount = 0;
           }
@@ -208,11 +270,11 @@ namespace
       }
       if (bitCount > 0)
       {
-        bits += static_cast<char>(static_cast<uint8_t>(static_cast<uint32_t>(current) << static_cast<uint32_t>(8 - bitCount)));
+        bits.push_back(static_cast<uint8_t>(static_cast<uint32_t>(current) << static_cast<uint32_t>(8 - bitCount)));
       }
       digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
-             << payload.IntendedDisplayTicks << ',' << payload.TargetFrameTicks << ',' << startUtcTicks << ',' << ToHex(name) << ',' << matrix.Size
-             << ',' << ToHex(bits) << '\n';
+             << payload.IntendedDisplayTicks << ',' << payload.TargetFrameTicks << ',' << payload.CpuStartTicks << ',' << payload.CpuBusyTicks << ','
+             << start.UtcTicks << ',' << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size << ',' << ToHex(bits) << '\n';
     }
   }
 
@@ -220,19 +282,34 @@ namespace
   {
     WriteModuleDigest(directory);
 
-    constexpr std::array<FM::Payload, 11> Payloads{{
-      {0u, 0, 0u, FM::MarkerKind::Frame},
-      {1u, 166'667, 1u, FM::MarkerKind::Frame},
-      {123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame, 987'654'321'000, 166'667u},
-      {42u, -1, 2u, FM::MarkerKind::Frame},
-      {7u, std::numeric_limits<int64_t>::min(), 3u, FM::MarkerKind::Frame},
-      {std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
-       std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max()},
-      {0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u},
-      {600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart},
-      {601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart},
-      {900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd},
-      {0x0102030405060708u, 0, 0u, FM::MarkerKind::Sync},
+    struct GoldenCase
+    {
+      FM::Payload Payload;
+      FM::StartMetadata Start;
+    };
+    // 2026-09-23T12:00:00Z
+    constexpr int64_t GoldenStartUtcTicks = 639'257'616'000'000'000;
+    // Arbitrary bytes that are not text: a zero byte in the middle, 0xFF, and a last byte that is not zero
+    constexpr FM::SequenceId GoldenBytesId{
+      {0x6Fu, 0x9Du, 0x2Cu, 0x41u, 0x8Bu, 0x3Eu, 0x4Au, 0x7Fu, 0x95u, 0xD0u, 0x1Cu, 0x00u, 0xE2u, 0xFFu, 0x80u, 0x7Au}};
+    constexpr std::array<GoldenCase, 11> Cases{{
+      {{0u, 0, 0u, FM::MarkerKind::Frame}, {}},
+      {{1u, 166'667, 1u, FM::MarkerKind::Frame}, {}},
+      {{123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame, 987'654'321'000, 166'667u, 987'653'987'666, 123'456u}, {}},
+      {{42u, -1, 2u, FM::MarkerKind::Frame}, {}},
+      {{7u, std::numeric_limits<int64_t>::min(), 3u, FM::MarkerKind::Frame}, {}},
+      {{std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
+        std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max(), std::numeric_limits<int64_t>::max(),
+        std::numeric_limits<uint32_t>::max()},
+       {}},
+      {{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u, 0x5152535455565758,
+        0x61626364u},
+       {}},
+      // Start and end markers carry the frame's values too
+      {{600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 80'000u}, {0, TextSequenceId("golden-run")}},
+      {{601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 120'000u}, {GoldenStartUtcTicks, GoldenBytesId}},
+      {{900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd, 0, 0u, 0, 80'000u}, {}},
+      {{0x0102030405060708u, 0, 0u, FM::MarkerKind::Sync}, {}},
     }};
     constexpr std::array<int32_t, 4> ModuleSizes{2, 3, 4, 6};
 
@@ -241,21 +318,16 @@ namespace
     {
       throw std::runtime_error("Failed to create manifest in '" + directory.string() + "'");
     }
-    manifest << "file,kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,startUtcTicks,startNameHex,moduleSizePx,"
-                "quietZoneModules,originX,originY,width,height\n";
+    manifest << "file,kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,startUtcTicks,"
+                "sequenceIdHex,moduleSizePx,quietZoneModules,originX,originY,width,height\n";
 
-    for (std::size_t payloadIndex = 0; payloadIndex < Payloads.size(); ++payloadIndex)
+    for (std::size_t payloadIndex = 0; payloadIndex < Cases.size(); ++payloadIndex)
     {
       for (const int32_t moduleSize : ModuleSizes)
       {
         RenderRequest request;
-        request.Payload = Payloads[payloadIndex];
-        if (request.Payload.Kind == FM::MarkerKind::SequenceStart && request.Payload.RunId == 6u)
-        {
-          // 2026-09-23T12:00:00Z and a 60 byte UTF-8 name (the limit)
-          request.StartUtcTicks = 639'257'616'000'000'000;
-          request.StartName = "golden-run \xC3\xA6\xC3\xB8\xC3\xA5 012345678901234567890123456789012345678901";
-        }
+        request.Payload = Cases[payloadIndex].Payload;
+        request.Start = Cases[payloadIndex].Start;
         request.Options.ModuleSizePx = moduleSize;
         // Origin and canvas are multiples of 12 (lcm of 2,3,4,6) so every integer downscale test keeps module edges pixel aligned.
         request.Origin = {36, 36};
@@ -272,9 +344,10 @@ namespace
         WritePgm(directory / fileName, image);
         manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind) << ',' << request.Payload.RunId << ','
                  << request.Payload.FrameIndex << ',' << request.Payload.AnimationTicks << ',' << request.Payload.IntendedDisplayTicks << ','
-                 << request.Payload.TargetFrameTicks << ',' << request.StartUtcTicks << ',' << ToHex(request.StartName) << ','
-                 << request.Options.ModuleSizePx << ',' << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y
-                 << ',' << image.Width << ',' << image.Height << '\n';
+                 << request.Payload.TargetFrameTicks << ',' << request.Payload.CpuStartTicks << ',' << request.Payload.CpuBusyTicks << ','
+                 << request.Start.UtcTicks << ',' << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx
+                 << ',' << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
+                 << image.Height << '\n';
       }
     }
   }
@@ -282,9 +355,10 @@ namespace
   void PrintUsage()
   {
     std::cout << "Usage:\n"
-                 "  marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync] [--name <utf8>]\n"
-                 "                [--intended-ticks <i64>] [--target-ticks <u32>]\n"
-                 "                [--utc-ticks <i64>] [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]\n"
+                 "  marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync]\n"
+                 "                [--intended-ticks <i64>] [--target-ticks <u32>] [--cpu-start-ticks <i64>] [--cpu-busy-ticks <u32>]\n"
+                 "                [--utc-ticks <i64>] [--sequence-id <text, 1-16 printable ASCII> | --sequence-id-hex <32 hex digits>]\n"
+                 "                [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]\n"
                  "                [--background <0-255>] -o <file.pgm>\n"
                  "  marker-render --golden <directory>\n";
   }
@@ -331,13 +405,29 @@ int main(int argc, char* argv[])
       {
         request.Payload.TargetFrameTicks = ParseNumber<uint32_t>(next(), arg);
       }
-      else if (arg == "--name")
+      else if (arg == "--cpu-start-ticks")
       {
-        request.StartName = next();
+        request.Payload.CpuStartTicks = ParseNumber<int64_t>(next(), arg);
+      }
+      else if (arg == "--cpu-busy-ticks")
+      {
+        request.Payload.CpuBusyTicks = ParseNumber<uint32_t>(next(), arg);
+      }
+      else if (arg == "--sequence-id")
+      {
+        const std::string_view text = next();
+        if (!FM::SequenceId::TryFromText(text, request.Start.Id))
+        {
+          throw std::invalid_argument("--sequence-id takes 1 to 16 printable ASCII characters (--sequence-id-hex takes any 16 bytes)");
+        }
+      }
+      else if (arg == "--sequence-id-hex")
+      {
+        request.Start.Id = ParseSequenceIdHex(next(), arg);
       }
       else if (arg == "--utc-ticks")
       {
-        request.StartUtcTicks = ParseNumber<int64_t>(next(), arg);
+        request.Start.UtcTicks = ParseNumber<int64_t>(next(), arg);
       }
       else if (arg == "--run")
       {

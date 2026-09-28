@@ -206,7 +206,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(back.Run.Pacing, Is.EqualTo(chart.Run.Pacing), $"{clip}: pacing");
       Assert.That(back.Run.Statistics, Is.EqualTo(chart.Run.Statistics), $"{clip}: statistics");
       Assert.That(back.Run.Counts, Is.EqualTo(chart.Run.Counts), $"{clip}: counts");
-      Assert.That((back.Run.RunId, back.Run.Name), Is.EqualTo((chart.Run.RunId, chart.Run.Name)));
+      Assert.That((back.Run.RunId, back.Run.SequenceId), Is.EqualTo((chart.Run.RunId, chart.Run.SequenceId)));
     }
 
     /// <summary>
@@ -248,25 +248,23 @@ namespace MB.FramePacing.Charts.UnitTest
       var tiles = RunHeadline.Tiles(chart);
       Assert.That(
         tiles.Select(t => t.Caption),
-        Is.EqualTo(
-          new[]
-          {
-            "Presented frames",
-            "Frames visibly off",
-            "Error per frame",
-            "Typical error (p95)",
-            "Worst error",
-            "Late frames",
-            "Worst 2 s late",
-            "Resolution",
-          }
-        )
+        Is.EqualTo(new[] { "Average fps", "1 % low", "0.1 % low", "Frames visibly off", "Error p99", "Error p99.9", "Worst error", "Late frames" })
       );
       var s = chart.Run.Statistics;
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
-      var errorPerFrame = tiles.Single(t => t.Caption == "Error per frame");
-      Assert.That(errorPerFrame.Value, Is.EqualTo(s.ErrorPerFrameMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms"));
-      Assert.That(errorPerFrame.Detail, Is.EqualTo(s.PercentError.ToString("0.0", CultureInfo.InvariantCulture) + " %"));
+      // Every presented frame after the first has a display time step; the clip's refreshes give the fps and the nearest-rank lows
+      var steps = measured.Select(manifest.DisplayStepTicks).OrderBy(t => t).ToArray();
+      double averageFps = steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum();
+      Assert.That(tiles.Single(t => t.Caption == "Average fps").Value, Is.EqualTo(averageFps.ToString("0.0", CultureInfo.InvariantCulture)));
+      long p99 = steps[(int)Math.Ceiling(0.99 * steps.Length) - 1];
+      Assert.That(
+        tiles.Single(t => t.Caption == "1 % low").Value,
+        Is.EqualTo((TimeSpan.TicksPerSecond / (double)p99).ToString("0.0", CultureInfo.InvariantCulture))
+      );
+      Assert.That(
+        tiles.Single(t => t.Caption == "Error p99").Value,
+        Is.EqualTo(s.AbsoluteAnimationErrorMs.P99.ToString("0.0", CultureInfo.InvariantCulture) + " ms")
+      );
       var late = tiles.Single(t => t.Caption == "Late frames");
       Assert.That(late.Value, Is.EqualTo(measured.Count(manifest.IsLate).ToString(CultureInfo.InvariantCulture)));
       Assert.That(late.Warning, Is.EqualTo(measured.Any(manifest.IsLate)));

@@ -448,7 +448,7 @@ namespace MB.FramePacing.Charts
         if (t >= section.FromSeconds && t <= section.ToSeconds)
           points.Add((xOf(t), shares[i] * 100, adapted[i]));
       }
-      string note = $"rare spikes or busy stretches? whole run {Percent(pacing.LateShare)}";
+      string note = $"whole run {Percent(pacing.LateShare)}";
       if (points.Any(p => p.Adapted))
         note =
           $"amber: the frames' marker target frame time is above the run's usual {Ms1(usualTicks / (double)TimeSpan.TicksPerMillisecond)} ms; "
@@ -462,19 +462,23 @@ namespace MB.FramePacing.Charts
         parts.Add(GridLine(YOf(tick)));
         parts.Add(Text(PlotX0 - 10, YOf(tick) + 4, tick == 0 ? "0" : $"{tick.ToString("0.##", CultureInfo.InvariantCulture)} %", "vsync-n", "end"));
       }
-      // Red, or amber where the markers' target frame time is above the run's usual one; each stretch starts where the previous one ended, so
-      // the line is whole
-      var line = new StringBuilder();
-      var adaptedLine = new StringBuilder();
-      (double X, double Y)? last = null;
-      bool? lastAdapted = null;
-      void Point(double x, double y, bool isAdapted)
+      // Green where no frame in the window was late, red where some were, amber where the markers' target frame time is above the run's
+      // usual one; each stretch starts where the previous one ended, so the line is whole
+      var paths = new Dictionary<string, StringBuilder>
       {
-        var path = isAdapted ? adaptedLine : line;
-        if (lastAdapted != isAdapted)
+        ["late-line-none"] = new StringBuilder(),
+        ["late-line"] = new StringBuilder(),
+        ["late-line-adapted"] = new StringBuilder(),
+      };
+      (double X, double Y)? last = null;
+      string? lastStyle = null;
+      void Point(double x, double y, string style)
+      {
+        var path = paths[style];
+        if (lastStyle != style)
         {
           path.Append(last is { } previous ? $"M{Fixed(previous.X, 1)} {Fixed(previous.Y, 1)}L" : "M");
-          lastAdapted = isAdapted;
+          lastStyle = style;
         }
         else
         {
@@ -483,10 +487,14 @@ namespace MB.FramePacing.Charts
         path.Append($"{Fixed(x, 1)} {Fixed(y, 1)}");
         last = (x, y);
       }
+      static string Style(double share, bool isAdapted) =>
+        share <= 0 ? "late-line-none"
+        : isAdapted ? "late-line-adapted"
+        : "late-line";
       if (perFrame)
       {
         foreach (var (x, share, isAdapted) in points)
-          Point(x, YOf(share), isAdapted);
+          Point(x, YOf(share), Style(share, isAdapted));
       }
       else
       {
@@ -495,13 +503,13 @@ namespace MB.FramePacing.Charts
           bool isAdapted = column.Count(p => p.Adapted) * 2 > column.Count();
           double low = column.Min(p => p.Share);
           double high = column.Max(p => p.Share);
-          Point(column.Key + 0.5, YOf(low), isAdapted);
+          Point(column.Key + 0.5, YOf(low), Style(high, isAdapted));
           if (high > low)
-            Point(column.Key + 0.5, YOf(high), isAdapted);
+            Point(column.Key + 0.5, YOf(high), Style(high, isAdapted));
         }
       }
-      AddPath(parts, "late-line", line);
-      AddPath(parts, "late-line-adapted", adaptedLine);
+      foreach (var (style, path) in paths)
+        AddPath(parts, style, path);
       TimeTicks(parts, section.FromSeconds, section.ToSeconds, xOf, lateY + LateH);
     }
 

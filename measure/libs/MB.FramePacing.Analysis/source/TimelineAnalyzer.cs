@@ -79,7 +79,7 @@ namespace MB.FramePacing.Analysis
     private sealed class RunRows
     {
       public uint RunId;
-      public string? Name;
+      public string? SequenceId;
       public DateTime? StartTimeUtc;
       public bool HasStart;
       public bool HasEnd;
@@ -142,7 +142,7 @@ namespace MB.FramePacing.Analysis
                 current = new RunRows
                 {
                   RunId = payload.RunId,
-                  Name = row.Start?.Name,
+                  SequenceId = row.Start?.SequenceText,
                   StartTimeUtc = row.Start?.StartTimeUtc,
                   HasStart = true,
                 };
@@ -346,7 +346,7 @@ namespace MB.FramePacing.Analysis
         warnings.Add(slowCapture);
       return new RunAnalysis(
         run.RunId,
-        run.Name,
+        run.SequenceId,
         run.StartTimeUtc,
         run.HasStart,
         run.HasEnd,

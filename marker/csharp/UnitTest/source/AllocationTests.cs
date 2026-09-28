@@ -23,17 +23,13 @@ namespace MB.FrameMarker.UnitTest
     private readonly int[] m_indices = new int[Marker.MaxIndexCount];
     private readonly byte[] m_payloadBytes = new byte[Marker.MaxEncodedPayloadByteCount];
 
-    // The longest name (60 bytes as UTF-8, including two byte characters)
+    private static readonly Guid g_guid = new Guid("0f8fad5b-d9cb-469f-a165-70867728950e");
+
+    // A start marker with every byte of its sequence id in use
     private readonly StartMetadata m_metadata = new StartMetadata(
       638_000_000_000_000_000,
-      "allocation-test æøå 0123456789012345678901234567890123456"
+      new SequenceId(0x0123_4567_89AB_CDEF, 0xFEDC_BA98_7654_3210)
     );
-
-    [Test]
-    public void TheMetadataNameIsTheLongestAllowed()
-    {
-      Assert.That(System.Text.Encoding.UTF8.GetByteCount(m_metadata.Name), Is.EqualTo(Marker.MaxStartNameBytes));
-    }
 
     [Test]
     public void GeneratingMarkers_DoesNotAllocate()
@@ -53,7 +49,7 @@ namespace MB.FrameMarker.UnitTest
       var origin = Marker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 2);
       for (int frame = 0; frame < frames; ++frame)
       {
-        var payload = new Payload((ulong)frame, Marker.SecondsToTicks(frame / 60.0), 7);
+        var payload = new Payload((ulong)frame, Marker.SecondsToTicks(frame / 60.0), 7, MarkerKind.Frame, 1000 + frame, 166_667, 900 + frame, 80_000);
         written += m_generator.GenerateTriangles(payload, options, origin, m_triangles);
         written += m_generator.GenerateStartTriangles(payload, m_metadata, options, origin, m_triangles);
         written += m_generator.GenerateIndexed(payload, options, origin, m_indexedVertices, m_indices, 16).IndexCount;
@@ -62,6 +58,8 @@ namespace MB.FrameMarker.UnitTest
         written += m_generator.GenerateStartQuads(payload, m_metadata, options, origin, m_quads);
         written += m_generator.GenerateModules(payload, m_matrix) ? 1 : 0;
         written += Marker.EncodePayload(payload, m_metadata, m_payloadBytes);
+        written += SequenceId.FromGuid(g_guid).IsEmpty ? 0 : 1;
+        written += SequenceId.TryFromText("camera pan", out var tag) && !tag.IsEmpty ? 1 : 0;
         int quadCount = m_generator.GenerateQuads(payload, options, origin, m_quads);
         written += Marker.QuadsToTriangles(m_quads, quadCount, m_triangles);
         written += Marker.QuadsToIndexed(m_quads, quadCount, m_indexedVertices, m_indices).IndexCount;

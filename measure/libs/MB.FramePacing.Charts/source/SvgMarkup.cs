@@ -80,6 +80,7 @@ namespace MB.FramePacing.Charts
       + "  .riser { stroke: #ffffff; stroke-opacity: 0.3; stroke-width: 1; fill: none; }\n"
       + "  .late-line { stroke: #e5534b; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
       + "  .late-line-adapted { stroke: #d29922; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
+      + "  .late-line-none { stroke: #2ea043; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
       + "  .strip-late { fill: #e5534b; }\n"
       + "  .clip-mark { fill: #e5534b; }\n"
       + "  .clip-text { font-size: 11px; fill: #e6edf3; }\n"

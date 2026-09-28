@@ -40,7 +40,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         rows.Add(new CaptureRow(rows.Count, rows.Count * refresh, CaptureStatus.Decoded, payload, start));
 
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(0, 0, 1, MarkerKind.SequenceStart), new StartMetadata(0, "pacing"));
+        Add(new MarkerPayload(0, 0, 1, MarkerKind.SequenceStart), StartMetadata.FromTag(0, "pacing"));
       ulong index = 100;
       long animationMs = 0;
       foreach (var (refreshes, step, intendedMs, target) in frames)

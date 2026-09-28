@@ -74,7 +74,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           RunSeconds = 2,
           StallEvery = stallEvery,
           SkipEvery = skipEvery,
-          RunName = "e2e",
+          SequenceTag = "e2e",
           RunId = 42,
         }
       );
@@ -87,7 +87,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(report.Capture.Layout.ModuleSizePx, Is.EqualTo(scenario.Options.ModuleSizePx).Within(0.2));
       var run = report.Timeline.Runs.Single();
       Assert.That(run.RunId, Is.EqualTo(42));
-      Assert.That(run.Name, Is.EqualTo("e2e"));
+      Assert.That(run.SequenceId, Is.EqualTo("e2e"));
       Assert.That(run.StartTimeUtc, Is.EqualTo(scenario.StartMetadata.StartTimeUtc));
       Assert.That(run.HasStartMarker && run.HasEndMarker);
       Assert.That(run.Counts.Undecodable + run.Counts.Torn + run.Counts.NotRecorded, Is.Zero);
@@ -170,7 +170,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           ulong top = (ulong)(i / 4);
           ulong bottom = i % 4 == 3 ? top + 1 : top;
           var kind = i < 4 ? MarkerKind.SequenceStart : MarkerKind.Frame;
-          StartMetadata? start = kind == MarkerKind.SequenceStart ? new StartMetadata(0, "tear") : null;
+          StartMetadata? start = kind == MarkerKind.SequenceStart ? StartMetadata.FromTag(0, "tear") : null;
           Array.Fill(frame.Pixels, (byte)96);
           MarkerRenderer.Render(frame, new MarkerPayload(top, (long)top * 166_667, 1, kind), 12, 12, 3, metadata: start);
           if (kind == MarkerKind.Frame)

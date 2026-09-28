@@ -20,6 +20,7 @@
 #include <mb/framemarker/Payload.hpp>
 #include <mb/framemarker/Point.hpp>
 #include <mb/framemarker/Quad.hpp>
+#include <mb/framemarker/SequenceId.hpp>
 #include <mb/framemarker/StartMetadata.hpp>
 #include <mb/framemarker/Version.hpp>
 #include <mb/framemarker/Vertex.hpp>
@@ -134,20 +135,20 @@ namespace MB::FrameMarker
     return {inset, inset};
   }
 
-  //! Serialize the 36 byte payload header (the complete payload of frame and end markers; a sync marker uses its first 12 bytes).
+  //! Serialize the 48 byte payload header (the complete payload of frame and end markers; a sync marker uses its first 12 bytes).
   std::array<uint8_t, PayloadByteCount> EncodePayload(const Payload& payload) noexcept;
 
   //! Serialize a complete payload into dst (MaxEncodedPayloadByteCount bytes is always enough). Start markers append the metadata, other
-  //! kinds ignore it; a sync marker is SyncPayloadByteCount bytes. Returns the number of bytes written, or 0 if dst is too small or the name is
-  //! longer than MaxStartNameBytes.
+  //! kinds ignore it. A frame or end marker is PayloadByteCount bytes, a start marker StartPayloadByteCount, a sync marker
+  //! SyncPayloadByteCount. Returns the number of bytes written, or 0 if dst is too small.
   std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, std::span<uint8_t> dst) noexcept;
 
   //! Parse the wire format. Returns false on a wrong length, magic, format version or an unknown kind.
-  //! For a start marker pMetadata (optional) receives the metadata; its Name points into bytes.
+  //! For a start marker pMetadata (optional) receives the metadata; other kinds reset it.
   bool TryDecodePayload(std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* pMetadata = nullptr) noexcept;
 
   //! Build the QR module matrix for the payload (metadata is only used by start markers).
-  //! Returns false if the metadata is invalid or the QR encoder fails.
+  //! Returns false if the QR encoder fails.
   bool GenerateModules(const Payload& payload, ModuleMatrix& rMatrix, const StartMetadata& metadata = {}) noexcept;
 
   //! Generate the marker as quads. The first quad is the light background (symbol + quiet zone), followed by one dark quad per

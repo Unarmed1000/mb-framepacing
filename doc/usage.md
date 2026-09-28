@@ -154,23 +154,26 @@ mb-framepacing render capture-20260924-153000 --details --png      # also the wo
 
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
-(all tiles) or one tile (`presented-frames`, `frames-off`, `error-per-frame`, `typical-error`, `worst-error`, `late-frames`,
-`worst-late`, `resolution`), and the panels `animation-error`, `display-time-step`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
+(all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-off`, `error-p99`, `error-p999`,
+`worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
 (`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
 Chrome, found in the usual places or set with `MB_BROWSER`.
 
 The headline numbers on the Analyze page (the timeline image shows the same above its charts):
 
-| Tile                | Meaning                                                                                                                       |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Presented frames    | Application frames that reached the display during the run                                                                    |
-| Frames visibly off  | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share       |
-| Error per frame     | Mean \|animation error\|; next to it the percent error, the errors' share of the time on screen (as Gamers Nexus report runs) |
-| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                                                    |
-| Worst error         | The largest absolute animation error, and whether that frame was shown too soon or too late                                   |
-| Late frames         | Frames shown later than planned (see below), and their share of the run                                                       |
-| Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches                                     |
-| Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                                             |
+| Tile               | Meaning                                                                                                                 |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Average fps        | Presented frames per second of the time their display time steps cover; underneath the mean step and the frame count    |
+| 1 % low            | The frame rate at the 99th percentile display time step (nearest rank), the step underneath; needs 100 frames           |
+| 0.1 % low          | The same at the 99.9th percentile; needs 1000 frames                                                                    |
+| Frames visibly off | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share |
+| Error p99          | 99 % of the frames have a smaller \|animation error\|; needs 100 frames                                                 |
+| Error p99.9        | 99.9 % of the frames have a smaller \|animation error\|; needs 1000 frames                                              |
+| Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                             |
+| Late frames        | Frames shown later than planned (see below), and their share of the run                                                 |
+
+Gamers Nexus's error per frame and percent error stay in `summary.json` (`statistics.errorPerFrameMs`, `statistics.percentError`)
+for comparisons with their numbers.
 
 Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
 early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it

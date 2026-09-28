@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <new>
 #include <span>
-#include <string_view>
 
 namespace
 {
@@ -128,10 +127,6 @@ namespace
   std::array<uint32_t, FM::MaxIndexCount()> g_indices{};
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> g_payloadBytes{};
   FM::ModuleMatrix g_matrix{};
-
-  // 60 bytes, the longest start marker name
-  constexpr std::string_view LongestName = "allocation-test 01234567890123456789012345678901234567890123";
-  static_assert(LongestName.size() == FM::MaxStartNameBytes);
 }
 
 TEST(Allocations, CountingWorks)
@@ -147,7 +142,7 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
 {
   const FM::Options options{};
   const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 2);
-  const FM::StartMetadata metadata{FM::UnixEpochDateTimeTicks, LongestName};
+  FM::StartMetadata metadata{FM::UnixEpochDateTimeTicks, {}};
 
   std::size_t written = 0;
   {
@@ -155,8 +150,10 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
     for (uint64_t frame = 0; frame < 200u; ++frame)
     {
       const auto ticks = static_cast<int64_t>(frame) * (FM::TicksPerSecond / 60);
-      const FM::Payload framePayload{frame, ticks, 7u, FM::MarkerKind::Frame};
+      const FM::Payload framePayload{frame, ticks, 7u, FM::MarkerKind::Frame, ticks + 50'000, 166'667u, ticks - 10'000, 80'000u};
       const FM::Payload endPayload{frame, ticks, 7u, FM::MarkerKind::SequenceEnd};
+      const FM::Payload startPayload{frame, ticks, 7u, FM::MarkerKind::SequenceStart};
+      written += FM::SequenceId::TryFromText("allocation-test", metadata.Id) ? 1u : 0u;
 
       written += FM::GenerateQuads(framePayload, options, origin, g_quads);
       written += FM::GenerateQuads(endPayload, options, origin, g_quads);
@@ -178,6 +175,8 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       FM::StartMetadata decodedMetadata;
       const std::size_t byteCount = FM::EncodePayload(framePayload, metadata, g_payloadBytes);
       written += FM::TryDecodePayload(std::span<const uint8_t>(g_payloadBytes.data(), byteCount), decoded, &decodedMetadata) ? 1u : 0u;
+      const std::size_t startByteCount = FM::EncodePayload(startPayload, metadata, g_payloadBytes);
+      written += FM::TryDecodePayload(std::span<const uint8_t>(g_payloadBytes.data(), startByteCount), decoded, &decodedMetadata) ? 1u : 0u;
     }
     EXPECT_EQ(AllocationCounter::Count(), 0u);
   }

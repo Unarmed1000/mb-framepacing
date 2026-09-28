@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The headline of one run, the same in the GUI and the report files: its title, the headline tiles (frames, frames off, error per frame
-//* and percent error, typical and worst error, late frames, the worst 2 s, the resolution) and which cause of animation error dominates.
+//* The headline of one run, the same in the GUI and the report files: its title, the headline tiles (average fps, 1 % and 0.1 % low,
+//* frames visibly off, animation error p99 and p99.9, worst error, late frames) and which cause of animation error dominates.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -18,7 +18,7 @@ namespace MB.FramePacing.Charts
   public static class RunHeadline
   {
     /// <summary>"Run 1  'name'".</summary>
-    public static string Title(RunAnalysis run) => $"Run {run.RunId}" + (run.Name != null ? $"  '{run.Name}'" : string.Empty);
+    public static string Title(RunAnalysis run) => $"Run {run.RunId}" + (run.SequenceId != null ? $"  '{run.SequenceId}'" : string.Empty);
 
     /// <summary>The headline tiles, in the order the GUI and the report show them.</summary>
     public static IReadOnlyList<HeadlineTile> Tiles(ChartRun chart)
@@ -27,7 +27,6 @@ namespace MB.FramePacing.Charts
       var s = run.Statistics;
       var pacing = run.Pacing;
       double thresholdMs = chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
-      double capturePeriodMs = chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond;
       int measured = s.AbsoluteAnimationErrorMs.Count;
       // The largest error either way: shown too soon (positive) or too late (negative)
       double worst = Math.Max(s.AnimationErrorMs.Max, -s.AnimationErrorMs.Min);
@@ -38,13 +37,16 @@ namespace MB.FramePacing.Charts
       return new[]
       {
         new HeadlineTile(
-          ReportItem.PresentedFrames,
-          "Presented frames",
-          Number(run.Counts.PresentedFrames),
-          string.Empty,
+          ReportItem.AverageFps,
+          "Average fps",
+          s.AverageFps > 0 ? Invariant(s.AverageFps, "0.0") : "-",
+          (s.AverageFps > 0 ? Invariant(1000 / s.AverageFps, "0.00") + " ms · " : string.Empty) + Number(run.Counts.PresentedFrames) + " frames",
           false,
-          "Frames of the application seen on the display."
+          "Presented frames per second: the frames with a display time step over the time those steps cover (what the display showed); "
+            + "underneath, the mean display time step and the number of presented frames."
         ),
+        Low(ReportItem.OnePercentLow, "1 % low", s.OnePercentLowFps, "99", RunStatistics.MinFramesForOnePercentLow),
+        Low(ReportItem.PointOnePercentLow, "0.1 % low", s.PointOnePercentLowFps, "99.9", RunStatistics.MinFramesForPointOnePercentLow),
         new HeadlineTile(
           ReportItem.FramesOff,
           "Frames visibly off",
@@ -53,22 +55,14 @@ namespace MB.FramePacing.Charts
           s.FramesWithAnimationError > 0,
           $"Frames whose animation time is off by more than the error threshold ({Invariant(thresholdMs, "0.###")} ms)."
         ),
-        new HeadlineTile(
-          ReportItem.ErrorPerFrame,
-          "Error per frame",
-          Invariant(s.ErrorPerFrameMs, "0.00") + " ms",
-          Invariant(s.PercentError, "0.0") + " %",
-          false,
-          "The mean |animation error| (Gamers Nexus's error per frame); next to it the percent error: all |animation error| as a share of the "
-            + "time on screen. A healthy game stays well under 1 ms and a few %."
-        ),
-        new HeadlineTile(
-          ReportItem.TypicalError,
-          "Typical error (p95)",
-          Invariant(s.AbsoluteAnimationErrorMs.P95, "0.0") + " ms",
-          string.Empty,
-          false,
-          "95 % of the frames have an animation error below this."
+        ErrorPercentile(ReportItem.ErrorP99, "Error p99", s.AbsoluteAnimationErrorMs.P99, measured, "99", RunStatistics.MinFramesForOnePercentLow),
+        ErrorPercentile(
+          ReportItem.ErrorP999,
+          "Error p99.9",
+          s.AbsoluteAnimationErrorMs.P999,
+          measured,
+          "99.9",
+          RunStatistics.MinFramesForPointOnePercentLow
         ),
         new HeadlineTile(
           ReportItem.WorstError,
@@ -86,24 +80,31 @@ namespace MB.FramePacing.Charts
           pacing?.LateFrames > 0,
           "Frames shown at least one refresh later than the target frame time after the previous frame."
         ),
-        new HeadlineTile(
-          ReportItem.WorstLate,
-          "Worst 2 s late",
-          pacing != null ? Percent(pacing.WorstLateShare) : "-",
-          string.Empty,
-          false,
-          "The highest share of late frames in any 2 s stretch: rare spikes stay low, busy stretches stand out."
-        ),
-        new HeadlineTile(
-          ReportItem.Resolution,
-          "Resolution",
-          Invariant(capturePeriodMs, "0.0") + " ms",
-          string.Empty,
-          false,
-          "One capture period: the capture card's refresh (it captures at the display's refresh rate), or the camera's frame time."
-        ),
       };
     }
+
+    /// <summary>A 1 % or 0.1 % low: the frame rate at that percentile of the display time steps, with the step itself underneath.</summary>
+    private static HeadlineTile Low(string id, string caption, double? fps, string percentile, int minFrames) =>
+      new HeadlineTile(
+        id,
+        caption,
+        fps is { } value ? Invariant(value, "0.0") : "-",
+        fps is { } shown ? Invariant(1000 / shown, "0.0") + " ms" : $"needs {Number(minFrames)} frames",
+        false,
+        $"The frame rate at the {percentile}th percentile display time step (nearest rank): {percentile} % of the frames stayed on screen "
+          + "no longer than the step underneath."
+      );
+
+    /// <summary>A tail percentile of the |animation error|: the rare frames a player notices, which an average or the p95 hides.</summary>
+    private static HeadlineTile ErrorPercentile(string id, string caption, double valueMs, int measured, string percentile, int minFrames) =>
+      new HeadlineTile(
+        id,
+        caption,
+        measured >= minFrames ? Invariant(valueMs, "0.0") + " ms" : "-",
+        measured >= minFrames ? string.Empty : $"needs {Number(minFrames)} frames",
+        false,
+        $"{percentile} % of the frames have an |animation error| below this."
+      );
 
     /// <summary>Which cause of animation error dominates, with the counts behind it ("mostly bad pacing: ... (3 error frame(s) ...).").</summary>
     public static string Cause(RunPacing pacing)

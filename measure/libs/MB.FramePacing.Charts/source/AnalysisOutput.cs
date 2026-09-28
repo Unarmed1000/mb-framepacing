@@ -60,7 +60,7 @@ namespace MB.FramePacing.Charts
         var frames = ReadFrames(Path.Combine(directory, framesFile), capturePeriod);
         var analysis = new RunAnalysis(
           run.GetProperty("runId").GetUInt32(),
-          run.TryGetProperty("name", out var name) ? name.GetString() : null,
+          run.TryGetProperty("sequenceId", out var sequenceId) ? sequenceId.GetString() : null,
           run.TryGetProperty("startTimeUtc", out var start) ? start.GetDateTime() : null,
           run.GetProperty("hasStartMarker").GetBoolean(),
           run.GetProperty("hasEndMarker").GetBoolean(),

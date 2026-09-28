@@ -35,9 +35,13 @@ python marker/unity/build_upm.py --output ../mb-framemarker-upm
    using MB.FrameMarker.Unity;
 
    var overlay = FindAnyObjectByType<FrameMarkerOverlay>();
-   StartCoroutine(overlay.RunFor("camera pan", 10.0)); // start marker, 10 s of frame markers, end marker
-   // or overlay.BeginRun("camera pan"); ... overlay.EndRun();
+   StartCoroutine(overlay.RunFor(10.0)); // start marker, 10 s of frame markers, end marker
+   // or overlay.BeginRun(); ... overlay.EndRun();
    ```
+
+   Every run gets a new UUID as its **sequence id**, which the reports show; `overlay.SequenceId` tells you which one. To pick it
+   yourself, pass any 16 bytes unique to the run: `SequenceId.FromGuid(...)`, or a text tag of at most 16 ASCII characters
+   (`SequenceId.TryFromText("camera pan", out var id)`).
 
 5. Record with `mb-framepacing capture --wait-for-start --stop-at-end --analyze` (see [Using mb-framepacing](usage.md)).
 
@@ -64,6 +68,20 @@ overlay.AnimationTimeProvider = () => Time.unscaledTimeAsDouble; // animations t
 
 A simulation that only advances in fixed steps and renders without interpolation shows `Time.fixedTimeAsDouble` rather than
 `Time.timeAsDouble`.
+
+The **CPU start time** and **CPU busy** come from Unity's clock: the start is `Time.unscaledTimeAsDouble` (the time at the
+beginning of the frame), and CPU busy runs from there until the overlay draws the marker at the end of the frame, just before Present.
+A game with its own frame pacer gives the pacer's clock for the CPU start time and the intended display time, since both share one
+steady clock, and may give its own CPU busy:
+
+```csharp
+overlay.IntendedDisplayTicksProvider = () => pacer.IntendedDisplayTicks;
+overlay.CpuStartTicksProvider = () => pacer.CpuStartTicks;
+overlay.CpuBusyTicksProvider = () => pacer.CpuBusyTicks; // optional
+```
+
+With only an `IntendedDisplayTicksProvider`, the CPU start time is left unknown (0) rather than mixing two clocks; CPU busy still
+comes from Unity.
 
 ## Settings
 
@@ -127,7 +145,7 @@ int count = generator.GenerateTriangles(payload, options, origin, vertices); // 
 ```
 
 `GenerateIndexed` (vertices and indices) and `GenerateQuads` (rectangles) are the alternatives; start markers use the `GenerateStart…`
-variants with a `StartMetadata` (test name and time).
+variants with a `StartMetadata` (sequence id and time).
 
 ## What is verified
 

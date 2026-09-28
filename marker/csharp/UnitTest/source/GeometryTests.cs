@@ -21,7 +21,7 @@ namespace MB.FrameMarker.UnitTest
       Assert.That(Marker.MaxQuadCount, Is.EqualTo(862));
       Assert.That(Marker.MaxTriangleVertexCount, Is.EqualTo(862 * 6));
       Assert.That(Marker.MaxIndexCount, Is.EqualTo(862 * 6));
-      Assert.That(Marker.MaxEncodedPayloadByteCount, Is.EqualTo(105));
+      Assert.That(Marker.MaxEncodedPayloadByteCount, Is.EqualTo(72));
       Assert.That(Marker.MaxEncodedPayloadByteCount, Is.LessThanOrEqualTo(Marker.QrCapacityBytes));
     }
 
@@ -91,11 +91,9 @@ namespace MB.FrameMarker.UnitTest
       Assert.That(matrix.Size, Is.EqualTo(41));
       Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), default, matrix), Is.True);
       Assert.That(matrix.Size, Is.EqualTo(41));
-      var maxName = new StartMetadata(123, new string('x', Marker.MaxStartNameBytes));
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), maxName, matrix), Is.True);
+      var full = new StartMetadata(123, new SequenceId(ulong.MaxValue, ulong.MaxValue));
+      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), full, matrix), Is.True);
       Assert.That(matrix.Size, Is.EqualTo(Marker.QrModuleCount));
-      var tooLong = new StartMetadata(123, new string('x', Marker.MaxStartNameBytes + 1));
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), tooLong, matrix), Is.False);
     }
 
     [Test]

@@ -2,8 +2,7 @@
 //* File Description
 //* ----------------
 //* The marker format and geometry: constants, sizing and placement, the payload wire format and quad to vertex conversion. The same API as
-//* the C++ library (MB::FrameMarker); the specification is doc/marker-format.md. Nothing here allocates, except TryDecodePayload (it
-//* returns the start marker's name), which is not meant for the per-frame path.
+//* the C++ library (MB::FrameMarker); the specification is doc/marker-format.md. Nothing here allocates.
 //*
 //* Coordinates are pixels with the origin at the top-left corner, +x to the right and +y down. Every quad edge and every vertex lies on
 //* an integer pixel edge.
@@ -13,7 +12,6 @@
 //****************************************************************************************************************************************************
 
 using System;
-using System.Text;
 
 namespace MB.FrameMarker
 {
@@ -21,8 +19,8 @@ namespace MB.FrameMarker
   {
     /// <summary>
     /// Every marker (frame, start and end) is QR version 6 (41x41 modules), error correction level M, byte mode, so the marker never changes
-    /// size. Version 6-M holds <see cref="QrCapacityBytes"/> bytes: a frame or end marker uses <see cref="PayloadByteCount"/> of them, the rest
-    /// is room for future fields.
+    /// size. Version 6-M holds <see cref="QrCapacityBytes"/> bytes: a frame or end marker uses <see cref="PayloadByteCount"/> of them, a start
+    /// marker <see cref="StartPayloadByteCount"/>; the rest is room for future fields.
     /// </summary>
     public const int QrVersion = 6;
 
@@ -36,16 +34,18 @@ namespace MB.FrameMarker
     public const int SyncPayloadByteCount = 12;
 
     /// <summary>Payload header, shared by every marker kind (little endian): magic "MF" | format version | kind | frame index u64 |
-    /// animation ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32.</summary>
-    public const int PayloadByteCount = 36;
+    /// animation ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32 | CPU start ticks i64 | CPU busy ticks u32.
+    /// Start and end markers carry the values of the frame that shows them.</summary>
+    public const int PayloadByteCount = 48;
     public const byte PayloadMagic0 = (byte)'M';
     public const byte PayloadMagic1 = (byte)'F';
     public const byte PayloadFormatVersion = 1;
 
-    /// <summary>Start marker payload: header | start time UTC i64 | name length u8 | name UTF-8 (0..MaxStartNameBytes).</summary>
-    public const int MaxStartNameBytes = 60;
-    public const int StartPayloadFixedByteCount = PayloadByteCount + 8 + 1;
-    public const int MaxEncodedPayloadByteCount = StartPayloadFixedByteCount + MaxStartNameBytes;
+    /// <summary>Start marker payload: header | start time UTC i64 | sequence id (16 bytes).</summary>
+    public const int StartPayloadByteCount = PayloadByteCount + 8 + SequenceId.ByteCount;
+
+    /// <summary>The longest payload of any kind: the start marker's.</summary>
+    public const int MaxEncodedPayloadByteCount = StartPayloadByteCount;
 
     /// <summary>TimeSpan / DateTime resolution.</summary>
     public const long TicksPerSecond = TimeSpan.TicksPerSecond;
@@ -74,12 +74,10 @@ namespace MB.FrameMarker
     private const int OffsetRunId = 20;
     private const int OffsetIntendedDisplayTicks = 24;
     private const int OffsetTargetFrameTicks = 32;
+    private const int OffsetCpuStartTicks = 36;
+    private const int OffsetCpuBusyTicks = 44;
     private const int OffsetStartUtcTicks = PayloadByteCount;
-    private const int OffsetStartNameLength = OffsetStartUtcTicks + 8;
-    private const int OffsetStartName = OffsetStartNameLength + 1;
-
-    // Decoding rejects names that are not valid UTF-8, like the analysis tools
-    private static readonly UTF8Encoding g_strictUtf8 = new UTF8Encoding(false, true);
+    private const int OffsetSequenceId = OffsetStartUtcTicks + 8;
 
     public static bool IsValid(in Options options) =>
       options.ModuleSizePx >= MinModuleSizePx
@@ -125,17 +123,13 @@ namespace MB.FrameMarker
     /// <summary>
     /// Serialize the payload into <paramref name="destination"/> at <paramref name="offset"/>. Start markers append the metadata, other kinds
     /// ignore it. <see cref="MaxEncodedPayloadByteCount"/> bytes are always enough. Returns the number of bytes written, or 0 if the
-    /// destination is too small or the name is longer than <see cref="MaxStartNameBytes"/> bytes as UTF-8.
+    /// destination is too small.
     /// </summary>
     public static int EncodePayload(in Payload payload, in StartMetadata metadata, byte[] destination, int offset = 0)
     {
       bool isStart = payload.Kind == MarkerKind.SequenceStart;
-      string name = metadata.Name ?? string.Empty;
-      int nameBytes = isStart ? Encoding.UTF8.GetByteCount(name) : 0;
-      if (nameBytes > MaxStartNameBytes)
-        return 0;
       int byteCount =
-        isStart ? StartPayloadFixedByteCount + nameBytes
+        isStart ? StartPayloadByteCount
         : payload.Kind == MarkerKind.Sync ? SyncPayloadByteCount
         : PayloadByteCount;
       if (destination == null || offset < 0 || destination.Length - offset < byteCount)
@@ -153,11 +147,12 @@ namespace MB.FrameMarker
       WriteLittleEndian(destination, offset + OffsetRunId, payload.RunId, 4);
       WriteLittleEndian(destination, offset + OffsetIntendedDisplayTicks, unchecked((ulong)payload.IntendedDisplayTicks), 8);
       WriteLittleEndian(destination, offset + OffsetTargetFrameTicks, payload.TargetFrameTicks, 4);
+      WriteLittleEndian(destination, offset + OffsetCpuStartTicks, unchecked((ulong)payload.CpuStartTicks), 8);
+      WriteLittleEndian(destination, offset + OffsetCpuBusyTicks, payload.CpuBusyTicks, 4);
       if (isStart)
       {
         WriteLittleEndian(destination, offset + OffsetStartUtcTicks, unchecked((ulong)metadata.UtcTicks), 8);
-        destination[offset + OffsetStartNameLength] = (byte)nameBytes;
-        Encoding.UTF8.GetBytes(name, 0, name.Length, destination, offset + OffsetStartName);
+        metadata.SequenceId.TryCopyTo(destination, offset + OffsetSequenceId);
       }
       return byteCount;
     }
@@ -165,10 +160,7 @@ namespace MB.FrameMarker
     /// <summary>Serialize a frame or end marker payload (start markers need <see cref="EncodePayload(in Payload, in StartMetadata, byte[], int)"/>).</summary>
     public static int EncodePayload(in Payload payload, byte[] destination, int offset = 0) => EncodePayload(payload, default, destination, offset);
 
-    /// <summary>
-    /// Parse the wire format. Returns false on a wrong length, magic, format version, an unknown kind or (start markers) a name that is not
-    /// valid UTF-8. Allocates the name string, so it is not meant for the per-frame path.
-    /// </summary>
+    /// <summary>Parse the wire format. Returns false on a wrong length, magic, format version or an unknown kind.</summary>
     public static bool TryDecodePayload(byte[] source, int offset, int count, out Payload payload, out StartMetadata metadata)
     {
       payload = default;
@@ -197,21 +189,12 @@ namespace MB.FrameMarker
         return false;
       if (kind == MarkerKind.SequenceStart)
       {
-        if (count < StartPayloadFixedByteCount)
+        if (count != StartPayloadByteCount)
           return false;
-        int nameLength = source[offset + OffsetStartNameLength];
-        if (nameLength > MaxStartNameBytes || count != StartPayloadFixedByteCount + nameLength)
-          return false;
-        string name;
-        try
-        {
-          name = g_strictUtf8.GetString(source, offset + OffsetStartName, nameLength);
-        }
-        catch (DecoderFallbackException)
-        {
-          return false;
-        }
-        metadata = new StartMetadata(unchecked((long)ReadLittleEndian(source, offset + OffsetStartUtcTicks, 8)), name);
+        metadata = new StartMetadata(
+          unchecked((long)ReadLittleEndian(source, offset + OffsetStartUtcTicks, 8)),
+          SequenceId.FromBytes(source, offset + OffsetSequenceId)
+        );
       }
       else if (count != PayloadByteCount)
       {
@@ -224,7 +207,9 @@ namespace MB.FrameMarker
         (uint)ReadLittleEndian(source, offset + OffsetRunId, 4),
         kind,
         unchecked((long)ReadLittleEndian(source, offset + OffsetIntendedDisplayTicks, 8)),
-        (uint)ReadLittleEndian(source, offset + OffsetTargetFrameTicks, 4)
+        (uint)ReadLittleEndian(source, offset + OffsetTargetFrameTicks, 4),
+        unchecked((long)ReadLittleEndian(source, offset + OffsetCpuStartTicks, 8)),
+        (uint)ReadLittleEndian(source, offset + OffsetCpuBusyTicks, 4)
       );
       return true;
     }

@@ -53,7 +53,7 @@ namespace MB.FramePacing.Marker
       var generator = g_generator ??= new FM.MarkerGenerator();
       var matrix = g_matrix ??= new FM.ModuleMatrix();
       if (!generator.GenerateModules(payload.ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), matrix))
-        throw new ArgumentException($"The start name is longer than {MarkerPayload.MaxStartNameBytes} bytes as UTF-8", nameof(metadata));
+        throw new InvalidOperationException("The marker payload does not fit its QR code");
 
       var modules = new ModuleMatrix(matrix.Size);
       for (int y = 0; y < matrix.Size; ++y)

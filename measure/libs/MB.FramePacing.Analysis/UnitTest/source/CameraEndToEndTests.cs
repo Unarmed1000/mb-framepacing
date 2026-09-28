@@ -57,7 +57,7 @@ namespace MB.FramePacing.Analysis.UnitTest
             StallEvery = 7,
             TearEvery = tearEvery,
             RunId = 3,
-            RunName = "camera",
+            SequenceTag = "camera",
           }
         ),
         new SyntheticCameraOptions()

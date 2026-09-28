@@ -21,7 +21,10 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3, MarkerKind.SequenceEnd)).Size, Is.EqualTo(41));
       var start = new MarkerPayload(1, 2, 3, MarkerKind.SequenceStart);
       Assert.That(MarkerRenderer.GenerateModules(start).Size, Is.EqualTo(41));
-      var full = MarkerRenderer.GenerateModules(start, new StartMetadata(1, new string('x', MarkerPayload.MaxStartNameBytes)));
+      var full = MarkerRenderer.GenerateModules(
+        start,
+        new StartMetadata(1, new MB.FrameMarker.SequenceId(0xFEDC_BA98_7654_3210, 0x0123_4567_89AB_CDEF))
+      );
       Assert.That(full.Size, Is.EqualTo(MarkerRenderer.QrModuleCount));
     }
 

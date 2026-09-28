@@ -2,8 +2,8 @@
 #define MB_FRAMEMARKER_STARTMETADATA_HPP
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framemarker/SequenceId.hpp>
 #include <cstdint>
-#include <string_view>
 
 namespace MB::FrameMarker
 {
@@ -12,8 +12,10 @@ namespace MB::FrameMarker
   {
     //! Wall clock start time as C# DateTime UTC ticks (100ns since 0001-01-01), 0 = unknown. See ToDateTimeTicks.
     int64_t UtcTicks{0};
-    //! Test name, UTF-8, at most MaxStartNameBytes bytes. Not copied: must stay valid while encoding.
-    std::string_view Name;
+    //! Identifies the capture sequence: 16 opaque bytes, any content as long as it is unique to it.
+    SequenceId Id{};
+
+    constexpr bool operator==(const StartMetadata&) const noexcept = default;
   };
 }
 
