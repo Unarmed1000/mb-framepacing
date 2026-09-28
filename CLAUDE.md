@@ -185,13 +185,15 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
   - Its other jobs: `lint` (Prettier, one type per file, ruff, basedpyright, actionlint, the Unity package assembly),
     `dotnet-lint` (dotnet format as mb-quality applies it, CSharpier, vulnerable packages), `cpp-analysis` (sanitizer tests,
     clang-format, clang-tidy) and `semver` (`tools/check_semver.py`).
-  - `.github/workflows/release-marker.yml` releases the marker libraries on a `marker-v*` tag (see `doc/releasing.md`). A
-    `tools-v*` tag (which must match `measure/VERSION`) also builds the self-contained tools.
+  - `.github/workflows/release-marker.yml` releases the marker libraries on a `marker-v*` tag, `release-data.yml` the data libraries
+    on a `data-v*` tag (`data/cpp/package_release.py --verify` installs the marker library and builds the archive against it; see
+    `doc/releasing.md`). A `tools-v*` tag (which must match `measure/VERSION`) also builds the self-contained tools.
   - `.github/dependabot.yml` opens weekly grouped updates for GitHub Actions, NuGet (packages and dotnet tools), npm and pip.
-    GoogleTest (FetchContent URL) and qrcodegen (vendored) are updated by hand.
-- **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks both VERSION files and compares the
-  public API of `MB.FrameMarker` with the last `marker-v*` release using ApiCompat. `marker/VERSION` is the next release's version:
-  raise it in the change that alters the API (0.x: minor for any API change; from 1.0: major for breaking changes).
+    GoogleTest and nlohmann/json (FetchContent URLs) and qrcodegen (vendored) are updated by hand.
+- **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks the three VERSION files and compares the
+  public API of `MB.FrameMarker` with the last `marker-v*` release and of `MB.FramePacing.Data` with the last `data-v*` release using
+  ApiCompat. `marker/VERSION` and `data/VERSION` are the next releases' versions: raise them in the change that alters the API (0.x:
+  minor for any API change; from 1.0: major for breaking changes).
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `marker/cpp/build/<preset>/Release/marker-render --golden test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
   the C# tests and the Python tests (`python -m unittest discover -s marker/python -t marker/python`).

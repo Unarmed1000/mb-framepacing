@@ -4,14 +4,15 @@
 
 1. marker/VERSION, measure/VERSION and data/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their
    stream (marker-v*, tools-v*, data-v*).
-2. The public API of the C# marker library MB.FrameMarker is compared with the newest marker-v* release (Microsoft's ApiCompat,
-   from the local tool manifest: dotnet tool restore). The C++ API mirrors it, so this also guards the C++ library.
+2. The public API of the C# marker library MB.FrameMarker is compared with the newest marker-v* release, and that of the C# data
+   library MB.FramePacing.Data with the newest data-v* release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool
+   restore). The C++ marker API mirrors the C# one, so this also guards the C++ marker library.
    - A breaking change needs a new major version (a new minor version while the major version is 0).
    - Any other API change (an addition) needs at least a new minor version.
-   Without a marker-v* tag there is nothing to compare with, and the API check is skipped. A tag on the checked out commit itself
+   Without a release tag of the stream there is nothing to compare with, and its API check is skipped. A tag on the checked out commit itself
    (the release run of that tag) is not a baseline; the release before it is.
 
-marker/VERSION is the version of the next release, so raise it in the same change that alters the API.
+marker/VERSION and data/VERSION are the versions of the next releases, so raise them in the same change that alters the API.
 
 Run from anywhere inside the repository (needs the release tags: git fetch --tags):
   python tools/check_semver.py
@@ -23,11 +24,30 @@ import re
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-MARKER_PROJECT = Path("marker/csharp/MB.FrameMarker.csproj")
-MARKER_ASSEMBLY = "MB.FrameMarker.dll"
+
+
+@dataclass(frozen=True)
+class ApiStream:
+    """A release stream whose C# library's public API is compared with its last release."""
+
+    library: str
+    project: Path
+    version_file: str
+    tag_prefix: str
+
+    @property
+    def assembly(self) -> str:
+        return self.library + ".dll"
+
+
+API_STREAMS = (
+    ApiStream("MB.FrameMarker", Path("marker/csharp/MB.FrameMarker.csproj"), "marker/VERSION", "marker-v"),
+    ApiStream("MB.FramePacing.Data", Path("data/csharp/MB.FramePacing.Data.csproj"), "data/VERSION", "data-v"),
+)
 
 Version = tuple[int, int, int]
 
@@ -82,13 +102,13 @@ def check_stream(root: Path, version_file: str, prefix: str) -> Version | None:
     return version
 
 
-def build_marker_library(source_root: Path, output: Path) -> Path | None:
-    project = source_root / MARKER_PROJECT
+def build_library(stream: ApiStream, source_root: Path, output: Path) -> Path | None:
+    project = source_root / stream.project
     result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "-o", str(output), "--nologo", "-v", "quiet"], cwd=source_root)
     if result.returncode != 0:
         error(f"building {project} failed")
         return None
-    return output / MARKER_ASSEMBLY
+    return output / stream.assembly
 
 
 def api_compat(root: Path, baseline: Path, current: Path, strict: bool) -> tuple[bool, str] | None:
@@ -107,12 +127,12 @@ def api_compat(root: Path, baseline: Path, current: Path, strict: bool) -> tuple
     return (result.returncode == 0, report)
 
 
-def check_marker_api(root: Path, version: Version) -> bool:
+def check_api(root: Path, stream: ApiStream, version: Version) -> bool:
     # The release run checks out the new tag itself; compare with the release before it
     at_head = frozenset(git(root, "tag", "--points-at", "HEAD").splitlines())
-    newest = newest_tag(root, "marker-v", at_head)
+    newest = newest_tag(root, stream.tag_prefix, at_head)
     if newest is None:
-        notice("No marker-v* release yet, so there is no API to compare with")
+        notice(f"No {stream.tag_prefix}* release yet, so there is no {stream.library} API to compare with")
         return True
     tag, released = newest
 
@@ -120,10 +140,10 @@ def check_marker_api(root: Path, version: Version) -> bool:
         worktree = Path(temp) / "baseline"
         _ = git(root, "worktree", "add", "--detach", str(worktree), tag)
         try:
-            baseline = build_marker_library(worktree, Path(temp) / "baseline-bin")
+            baseline = build_library(stream, worktree, Path(temp) / "baseline-bin")
         finally:
             _ = git(root, "worktree", "remove", "--force", str(worktree))
-        current = build_marker_library(root, Path(temp) / "current-bin")
+        current = build_library(stream, root, Path(temp) / "current-bin")
         if baseline is None or current is None:
             return False
 
@@ -142,18 +162,18 @@ def check_marker_api(root: Path, version: Version) -> bool:
         if not allowed:
             needed = f"{released[0]}.{released[1] + 1}.0" if released[0] == 0 else f"{released[0] + 1}.0.0"
             print(breaking_report)
-            error(f"MB.FrameMarker has breaking API changes since {tag}: raise marker/VERSION to at least {needed}")
+            error(f"{stream.library} has breaking API changes since {tag}: raise {stream.version_file} to at least {needed}")
             return False
-        notice(f"MB.FrameMarker has breaking API changes since {tag}, covered by marker/VERSION {show(version)}")
+        notice(f"{stream.library} has breaking API changes since {tag}, covered by {stream.version_file} {show(version)}")
         return True
     if not unchanged:
         if not raised_minor:
             print(changes_report)
-            error(f"MB.FrameMarker has API additions since {tag}: raise marker/VERSION to at least {released[0]}.{released[1] + 1}.0")
+            error(f"{stream.library} has API additions since {tag}: raise {stream.version_file} to at least {released[0]}.{released[1] + 1}.0")
             return False
-        notice(f"MB.FrameMarker has API additions since {tag}, covered by marker/VERSION {show(version)}")
+        notice(f"{stream.library} has API additions since {tag}, covered by {stream.version_file} {show(version)}")
         return True
-    print(f"MB.FrameMarker: public API unchanged since {tag}")
+    print(f"{stream.library}: public API unchanged since {tag}")
     return True
 
 
@@ -164,7 +184,8 @@ def main() -> int:
     data = check_stream(root, "data/VERSION", "data-v")
     if marker is None or tools is None or data is None:
         return 1
-    return 0 if check_marker_api(root, marker) else 1
+    results = [check_api(root, stream, version) for stream, version in zip(API_STREAMS, (marker, data), strict=True)]
+    return 0 if all(results) else 1
 
 
 if __name__ == "__main__":

@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 4.0)
 
-# Inside the repository the version and LICENSE live in data/ (shared with the C# and Python data libraries). A standalone copy carries them
-# next to this file instead.
+# Inside the repository the version and LICENSE live in data/ (shared with the C# and Python data libraries) and the third-party license
+# texts in the repository root's licenses/. A standalone release archive carries them all next to this file instead.
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/VERSION")
   set(MB_FRAMEPACINGDATA_META_DIR "${CMAKE_CURRENT_LIST_DIR}")
+  set(MB_FRAMEPACINGDATA_LEGAL_DIR "${CMAKE_CURRENT_LIST_DIR}")
 else()
   set(MB_FRAMEPACINGDATA_META_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
+  set(MB_FRAMEPACINGDATA_LEGAL_DIR "${CMAKE_CURRENT_LIST_DIR}/../..")
 endif()
 
 # Edit data/VERSION to bump the data libraries, or override with -DMB_FRAMEPACINGDATA_VERSION=x.y.z.
@@ -26,6 +28,10 @@ set(MB_FRAMEPACINGDATA_CXX_WARNINGS
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Wconversion -Wshadow $<$<BOOL:${MB_FRAMEPACINGDATA_WARNINGS_AS_ERRORS}>:-Werror>>)
 
 include(FetchContent)
+include(GNUInstallDirs)
+
+# The marker library version this one needs (0.x: the same minor version)
+set(MB_FRAMEPACINGDATA_MARKER_VERSION 0.1)
 
 # The marker library decodes the markers' payloads. A project that already has it (add_subdirectory, FetchContent) keeps its copy; inside
 # the repository it is marker/cpp, otherwise an installed one.
@@ -33,7 +39,7 @@ if(NOT TARGET mb::framemarker)
   if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../../marker/cpp/CMakeLists.txt")
     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../marker/cpp" "${CMAKE_CURRENT_BINARY_DIR}/mb_framemarker" EXCLUDE_FROM_ALL)
   else()
-    find_package(mb_framemarker 0.1 CONFIG REQUIRED)
+    find_package(mb_framemarker ${MB_FRAMEPACINGDATA_MARKER_VERSION} CONFIG REQUIRED)
   endif()
 endif()
 
@@ -109,3 +115,27 @@ if(MB_FRAMEPACINGDATA_BUILD_TESTS)
   include(GoogleTest)
   gtest_discover_tests(mb_framepacingdata_tests)
 endif()
+
+# Install + export so tools can use find_package(mb_framepacingdata CONFIG); it finds the marker library the same way.
+include(CMakePackageConfigHelpers)
+install(TARGETS mb_framepacingdata EXPORT mb_framepacingdataTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# The library's own license and the one third-party component compiled into it (nlohmann/json)
+install(FILES ${MB_FRAMEPACINGDATA_META_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacingdata)
+install(FILES ${MB_FRAMEPACINGDATA_LEGAL_DIR}/licenses/nlohmann-json-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacingdata/licenses)
+install(EXPORT mb_framepacingdataTargets NAMESPACE mb:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacingdata)
+configure_package_config_file(cmake/mb_framepacingdataConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingdataConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacingdata)
+# Semantic versioning: in 0.x a minor release may break the API, from 1.0 only a major release may.
+if(PROJECT_VERSION_MAJOR EQUAL 0)
+  set(MB_FRAMEPACINGDATA_COMPATIBILITY SameMinorVersion)
+else()
+  set(MB_FRAMEPACINGDATA_COMPATIBILITY SameMajorVersion)
+endif()
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingdataConfigVersion.cmake COMPATIBILITY ${MB_FRAMEPACINGDATA_COMPATIBILITY})
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingdataConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingdataConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacingdata)

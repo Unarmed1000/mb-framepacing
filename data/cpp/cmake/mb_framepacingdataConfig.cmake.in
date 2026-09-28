@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: BSD-3-Clause
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(mb_framemarker @MB_FRAMEPACINGDATA_MARKER_VERSION@ CONFIG)
+include("${CMAKE_CURRENT_LIST_DIR}/mb_framepacingdataTargets.cmake")
+check_required_components(mb_framepacingdata)
