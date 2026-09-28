@@ -115,6 +115,9 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
       (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`).
+    - The frame timeline (`FrameTimelineSvg`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
+      boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
+      - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the band on top of `run-<id>-timeline.png`
       (`HeadlineBand`) show the same tiles, so add or change a number there, not in the GUI.
     - The error and display time step charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);

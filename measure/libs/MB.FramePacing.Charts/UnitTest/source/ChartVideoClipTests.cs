@@ -244,6 +244,56 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Segments("cpu-busy"), Is.EqualTo(all.Count(i => manifest.CpuBusyTicks[i] != 0)), $"{clip}: a CPU busy bar per frame with CPU busy");
     }
 
+    /// <summary>
+    /// The frame timeline places the CPU boxes on the capture's clock through the markers' intended display times: in the busy clips a frame
+    /// starts when the previous one is shown, so every CPU start lands on the previous frame's display time.
+    /// </summary>
+    [TestCase("60-busy-full-rate")]
+    [TestCase("60-busy-swappy")]
+    public void FrameTimeline_BusyFramesStartWhenThePreviousOneIsShown(string clip)
+    {
+      var (_, report, _) = Analyze(clip);
+      var frames = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart.Run.Frames;
+      var (offset, bySchedule) = FrameTimelineSvg.PacerToCapture(frames);
+      Assert.That((offset.HasValue, bySchedule), Is.EqualTo((true, true)), $"{clip}: aligned by the schedule");
+      int checkedFrames = 0;
+      for (int i = 1; i < frames.Count; ++i)
+      {
+        if (frames[i].CpuStartTicks == 0)
+          continue;
+        // Within a tick: the manifest and the capture round 1/60 s to ticks independently
+        Assert.That(frames[i].CpuStartTicks + offset!.Value, Is.EqualTo(frames[i - 1].FirstSeenTicks).Within(1), $"{clip}: frame {i}");
+        ++checkedFrames;
+      }
+      Assert.That(checkedFrames, Is.GreaterThan(frames.Count - 3), $"{clip}: nearly every frame has a CPU start");
+    }
+
+    /// <summary>The frame timeline card of a busy stretch: a CPU box per frame, a first refresh per frame, and a section too long refused.</summary>
+    [Test]
+    public void FrameTimeline_DrawsEveryFrameOfTheSection()
+    {
+      var (_, report, _) = Analyze("60-busy-full-rate");
+      var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
+      var section = RunSection.Create(chart, 1.9, 2.25);
+      var frames = section.Section.Run.Frames;
+      string svg = FrameTimelineSvg.Render(section);
+      var document = System.Xml.Linq.XDocument.Parse(svg);
+      IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
+      // The key's box sits at x 20; every other box is a frame's CPU work
+      int boxes = Of("box").Count(e => (string?)e.Attribute("x") != "20");
+      Assert.That(boxes, Is.EqualTo(frames.Count(f => f.CpuStartTicks != 0 && f.CpuBusyTicks != 0)), "a CPU box per frame with CPU times");
+      Assert.That(Of("arrow").Count(), Is.EqualTo(boxes + 1), "a present arrow per box, and the key's");
+      // Every frame's first refresh is ok or off (the key adds one swatch of each kind it uses)
+      int firstRefreshes = Of("ok").Count() + Of("off").Count() - (Of("ok").Any() ? 1 : 0) - (Of("off").Any() ? 1 : 0);
+      Assert.That(firstRefreshes, Is.EqualTo(frames.Count), "a first refresh per frame");
+      Assert.That(
+        Of("err-pill").Count(),
+        Is.EqualTo(frames.Count(f => f.AnimationErrorTicks is { } e && Math.Abs(e) > chart.ErrorThresholdTicks)),
+        "an error pill per frame off by more than the threshold"
+      );
+      Assert.That(() => FrameTimelineSvg.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
+    }
+
     /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers, and the report's Timeline image carries them on top.</summary>
     [Test]
     public void Headline_ShowsTheRunsNumbers()

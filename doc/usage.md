@@ -150,7 +150,16 @@ GUI's **Save charts**; both write the same files. `render` draws reports from an
 mb-framepacing render capture-20260924-153000                      # the whole run: run-<id>-report.svg
 mb-framepacing render capture-20260924-153000 --from 120 --to 125  # 5 s of it, every frame: run-<id>-report-120s-125s.svg
 mb-framepacing render capture-20260924-153000 --details --png      # also the worst moments, and PNGs (needs Edge or Chrome)
+mb-framepacing render capture-20260924-153000 --timeline --from 12.5 --to 12.8  # the frame timeline: run-<id>-timeline-12.5s-12.8s.svg
 ```
+
+The **frame timeline** (`--timeline`, at most 40 frames) draws a short stretch as a timing diagram: every refresh (bright where a frame
+could be aimed at its target, faint where not), each frame's CPU work from its CPU start time for its CPU busy (boxes that overlap go to
+further lanes), its present arrow, what every refresh showed (green: the frame's first refresh within the error threshold, red: off by
+more, dark green: held as its successor's target intends, amber: held longer because the next frame is late) and each frame's
+animation time step, display time step and animation error. The CPU times are on the pacer's clock; the markers' intended display
+times place them on the capture's clock (on-time frames appear at their intended vsync), otherwise they are placed so that no frame
+is presented after it first appears.
 
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`

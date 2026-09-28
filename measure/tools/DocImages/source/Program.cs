@@ -250,17 +250,25 @@ namespace MB.FramePacing.DocImages
         var media = MB.FramePacing.Capture.Ffmpeg.MediaInput.Create(video, new MB.FramePacing.Capture.Ffmpeg.MediaInputOptions(), imported);
         using (var source = MB.FramePacing.Capture.Ffmpeg.FfmpegCaptureSource.Start(media.ToCaptureOptions(ffmpeg), TimeSpan.FromSeconds(30)))
           CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = imported }, null, CancellationToken.None);
-        WriteReport(imported, Path.Combine(output, $"report-example-{name}.svg"));
+        WriteReport(
+          imported,
+          Path.Combine(output, $"report-example-{name}.svg"),
+          name == "busy" ? Path.Combine(output, "timeline-example-busy.svg") : null
+        );
       }
     }
 
-    /// <summary>Analyse the capture and write its (only) run's report.</summary>
-    private static void WriteReport(string capture, string path)
+    /// <summary>Analyse the capture and write its (only) run's report, and the frame timeline of the start of its busy stretch if asked.</summary>
+    private static void WriteReport(string capture, string path, string? timelinePath = null)
     {
       var report = MB.FramePacing.Analysis.CaptureAnalyzer.Analyze(capture, new MB.FramePacing.Analysis.AnalysisOptions());
       var chart = ChartRun.From(report, report.Timeline.Runs.Single());
       File.WriteAllText(path, ReportSvg.Render(RunSection.Whole(chart)), new System.Text.UTF8Encoding(false));
       Console.WriteLine($"  {Path.GetFileName(path)}");
+      if (timelinePath == null)
+        return;
+      File.WriteAllText(timelinePath, FrameTimelineSvg.Render(RunSection.Create(chart, 1.9, 2.25)), new System.Text.UTF8Encoding(false));
+      Console.WriteLine($"  {Path.GetFileName(timelinePath)}");
     }
 
     private static string FindRepositoryRoot()

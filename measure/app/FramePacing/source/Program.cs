@@ -8,8 +8,8 @@
 //****************************************************************************************************************************************************
 
 using System;
-using System.Globalization;
 using System.CommandLine;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using MB.FramePacing.App.Commands;

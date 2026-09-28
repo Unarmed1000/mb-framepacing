@@ -38,6 +38,11 @@ namespace MB.FramePacing.App.Commands
         Description =
           $"Also save each report as a PNG at twice its size, through a headless Edge or Chrome ({HeadlessBrowser.EnvironmentVariable}, or found).",
       };
+      var timelineOption = new Option<bool>("--timeline")
+      {
+        Description =
+          $"Draw the frame timeline of --from to --to instead (default --to: {ReportFiles.TimelineSeconds} s later): every frame's CPU start and CPU busy, its present, what each refresh showed, at most {FrameTimelineSvg.MaxFrames} frames.",
+      };
       var outputOption = new Option<string?>("--output", "-o") { Description = "Where the reports go (default: the analysis folder)." };
       string items = string.Join(", ", ReportItem.All.Select(i => i.Id));
       var hideOption = new Option<string?>("--hide") { Description = $"Leave these items out of the card, comma separated: {items}." };
@@ -54,6 +59,7 @@ namespace MB.FramePacing.App.Commands
         toOption,
         detailsOption,
         pngOption,
+        timelineOption,
         outputOption,
         hideOption,
         onlyOption,
@@ -74,6 +80,16 @@ namespace MB.FramePacing.App.Commands
           Directory.CreateDirectory(output);
           foreach (var run in runs)
           {
+            if (parseResult.GetValue(timelineOption))
+            {
+              double from =
+                parseResult.GetValue(fromOption)
+                ?? throw new InvalidOperationException("--timeline needs --from (seconds since the run's first frame)");
+              double to = parseResult.GetValue(toOption) ?? from + ReportFiles.TimelineSeconds;
+              foreach (var file in ReportFiles.WriteTimeline(run.Chart, run.FilePrefix, output, from, to, parseResult.GetValue(pngOption)))
+                AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");
+              continue;
+            }
             var files = ReportFiles.Write(
               run.Chart,
               run.FilePrefix,

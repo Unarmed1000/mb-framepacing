@@ -84,6 +84,35 @@ namespace MB.FramePacing.Charts
       }
     }
 
+    /// <summary>The seconds the frame timeline shows when only its start is given.</summary>
+    public const double TimelineSeconds = 0.25;
+
+    /// <summary>
+    /// Write the frame timeline card (<see cref="FrameTimelineSvg"/>) of <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of
+    /// <paramref name="run"/> as &lt;prefix&gt;-timeline-&lt;from&gt;s-&lt;to&gt;s.svg (and .png). Returns the files written.
+    /// </summary>
+    public static IReadOnlyList<string> WriteTimeline(
+      ChartRun run,
+      string prefix,
+      string directory,
+      double fromSeconds,
+      double toSeconds,
+      bool png = false
+    )
+    {
+      var section = RunSection.Create(run, fromSeconds, toSeconds);
+      string path = Path.Combine(directory, prefix + "-timeline" + SectionSuffix(section));
+      string svg = path + ".svg";
+      File.WriteAllText(svg, FrameTimelineSvg.Render(section), new UTF8Encoding(false));
+      var written = new List<string> { svg };
+      if (png)
+      {
+        HeadlessBrowser.SavePng(svg, path + ".png");
+        written.Add(path + ".png");
+      }
+      return written;
+    }
+
     private static IEnumerable<string> WriteOne(RunSection section, string pathWithoutExtension, bool png, ReportOptions? options)
     {
       string svg = pathWithoutExtension + ".svg";

@@ -244,6 +244,11 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
   Zoom in to see hold patterns such as 3-then-1.
 
+The start of its busy stretch as a frame timeline (`render --timeline`): each frame's CPU work from its CPU start time for its CPU
+busy, when it was presented, and what every refresh showed:
+
+![The frame timeline of the busy stretch: CPU boxes, present arrows, display cells and each frame's values](doc/images/timeline-example-busy.svg)
+
 When a few frames are far off everything else (a hitch of hundreds of milliseconds among errors of a few), the error and display
 time step scales cover the rest, and each frame beyond the scale gets a mark at the edge with its value; zoom out to see it whole.
 
