@@ -169,6 +169,9 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
 
 ## Conventions
 
+- **Vocabulary:** use the terms of `doc/vocabulary.md` in code, UI text and docs. **Display time** is the moment a frame was first
+  seen on screen; **display time step** is how long it stayed (the time to the next frame). Animation error = animation time step -
+  display time step.
 - **Versions:** there are two version files.
   - `marker/VERSION`: the marker libraries. CMake reads it into `Version.hpp`.
   - `measure/VERSION`: the tools. `measure/Directory.Build.props` reads it.
