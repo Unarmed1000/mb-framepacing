@@ -195,7 +195,7 @@ The exact format, sizing rules and placement are in [`doc/marker-format.md`](doc
 | 3. Take a measurement and read it  | **[Using mb-framepacing](doc/usage.md)** (test game, capture card, video/image import, results, troubleshooting)           |
 
 The platform guides cover ffmpeg, building the tools and putting them on your PATH, capture card devices and permissions, and
-building the C++ library. The short version is below.
+building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).
 
 ### The GUI
 
