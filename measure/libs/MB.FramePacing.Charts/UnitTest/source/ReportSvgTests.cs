@@ -200,55 +200,73 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// Where the markers' target frame time is above the run's usual one (a pacer that lowered its rate), the late share is amber while
-    /// no frame is late, and red where one is: a frame late against the lowered target missed it too.
+    /// Frames on screen longer than one refresh as the pacer intended count in the late share and make it amber; a frame later than its
+    /// target makes it red for the window, then amber again; where every frame takes one refresh it is green.
     /// </summary>
     [Test]
-    public void LateShare_IsAmberAtALoweredRate_AndRedWhenItIsMissed()
+    public void LateShare_IsAmberWhenHeldLongerAsIntended_AndRedWhenLate()
     {
-      var run = Synthetic(240 * 10, lateEvery: 0);
-      var frames = run
-        .Run.Frames.Select(
-          (f, i) =>
-            f with
-            {
-              MarkerTargetFrameTicks = (uint)(i < 1400 ? Refresh : 2 * Refresh),
-              Flags = i == 1800 ? PresentedFrameFlags.Late : f.Flags,
-            }
-        )
-        .ToList();
+      var run = Synthetic(2400, lateEvery: 0);
+      var frames = new List<PresentedFrame>();
+      long time = 0;
+      foreach (var (f, i) in run.Run.Frames.Select((f, i) => (f, i)))
+      {
+        // From frame 1400 the markers ask for two refreshes per frame, and the frames stay two; frame 1800 stays three
+        long display =
+          i < 1400 ? Refresh
+          : i == 1800 ? 3 * Refresh
+          : 2 * Refresh;
+        if (i > 0)
+          time += display;
+        frames.Add(
+          f with
+          {
+            FirstSeenTicks = time,
+            LastSeenTicks = time,
+            DisplayDeltaTicks = i > 0 ? display : null,
+            MarkerTargetFrameTicks = (uint)(i < 1400 ? Refresh : 2 * Refresh),
+            Flags = i == 1800 ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
+          }
+        );
+      }
       var drawing = ReportCard.Build(
         RunSection.Whole(run with { Run = run.Run with { Frames = frames } }),
         ReportOptions.ShowOnly(new[] { ReportItem.LateShare })
       );
       var plot = drawing.Plots.Single();
       double Seconds(int i) => (frames[i].FirstSeenTicks - frames[0].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
-      (double From, double To) Span(string cls)
-      {
-        var xs = drawing
+      (double X, double Y)[] Points(string cls) =>
+        drawing
           .Shapes.OfType<PathShape>()
           .Where(p => p.Class == cls)
-          .SelectMany(p =>
-            Regex
-              .Matches(p.Data, "[ML](-?[0-9.]+) ")
-              .Select(m => plot.ValueX(double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)))
+          .SelectMany(p => Regex.Matches(p.Data, "[ML](-?[0-9.]+) (-?[0-9.]+)"))
+          .Select(m =>
+            (
+              plot.ValueX(double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)),
+              plot.ValueY(double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture))
+            )
           )
           .ToArray();
-        return (xs.Min(), xs.Max());
-      }
       // More frames than pixels: the line is drawn per pixel column, its points at the columns' centres
       double tolerance = 1.5 * (plot.XTo - plot.XFrom) / (plot.Right - plot.Left);
-      Assert.That(Span("late-line-none").To, Is.EqualTo(Seconds(1399)).Within(tolerance), "green at the usual target, until it is raised");
+      var green = Points("late-line-none");
+      var red = Points("late-line");
+      var amber = Points("late-line-adapted");
+      Assert.That(green.Max(p => p.X), Is.EqualTo(Seconds(1400)).Within(tolerance), "green while every frame takes one refresh");
+      Assert.That(green.Max(p => p.Y), Is.Zero);
+      Assert.That(red.Min(p => p.X), Is.EqualTo(Seconds(1800)).Within(tolerance), "red from the frame that missed the raised target");
+      Assert.That(red.Max(p => p.X), Is.EqualTo(Seconds(1800) + 2).Within(tolerance + 0.01), "red for the 2 s window");
       Assert.That(
-        Span("late-line").From,
-        Is.EqualTo(Seconds(1799)).Within(tolerance),
-        "red from the late frame (the stretch starts at the point before)"
+        amber.Where(p => p.X < Seconds(1800)).Max(p => p.Y),
+        Is.GreaterThan(99),
+        "frames held longer as intended count: the line rises in amber"
       );
-      Assert.That(Span("late-line").To, Is.GreaterThanOrEqualTo(Seconds(1800) + 1.9), "red for the 2 s window");
-      var amber = drawing.Shapes.OfType<PathShape>().Where(p => p.Class == "late-line-adapted").Select(p => p.Data).ToArray();
-      Assert.That(amber, Has.Length.EqualTo(1), "amber before and after the late frame's window");
-      Assert.That(Regex.Matches(amber[0], "M").Count, Is.EqualTo(2), "two amber stretches");
-      Assert.That(drawing.Shapes.OfType<TextShape>().Any(t => t.Content.StartsWith("red: late frames; amber: none late", StringComparison.Ordinal)));
+      Assert.That(amber.Max(p => p.X), Is.EqualTo(Seconds(2399)).Within(tolerance), "amber again after the late frame's window");
+      Assert.That(
+        drawing
+          .Shapes.OfType<TextShape>()
+          .Any(t => t.Content.StartsWith("amber: on screen longer than a refresh (4.2 ms) as the pacer intended", StringComparison.Ordinal))
+      );
     }
 
     private static ChartRun Synthetic(int Count, int lateEvery = 97)

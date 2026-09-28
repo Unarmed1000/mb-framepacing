@@ -584,20 +584,20 @@ namespace MB.FramePacing.Charts
         return;
       }
       // The window reaches back before the section's start, so the share is the run's own
-      var shares = LateShare.Rolling(whole, LateShare.WindowTicks);
-      var (adapted, usualTicks) = Adapted(whole);
-      var points = new List<(double X, double Share, bool Adapted)>();
+      var held = HeldLonger(whole, pacing);
+      var (shares, anyLate, anyHeld) = RollingLate(whole, held, LateShare.WindowTicks);
+      var points = new List<(double X, double Share, string Style)>();
       for (int i = 0; i < whole.Count; ++i)
       {
         double t = seconds(whole[i]);
         if (t >= section.FromSeconds && t <= section.ToSeconds)
-          points.Add((xOf(t), shares[i] * 100, adapted[i]));
+          points.Add((xOf(t), shares[i] * 100, Style(anyLate[i], anyHeld[i])));
       }
       string note = $"whole run {Percent(pacing.LateShare)}";
-      if (points.Any(p => p.Adapted))
+      if (held.Any(h => h))
         note =
-          $"red: late frames; amber: none late while the markers' target frame time is above the run's usual "
-          + $"{Ms1(usualTicks / (double)TimeSpan.TicksPerMillisecond)} ms; whole run {Percent(pacing.LateShare)}";
+          $"amber: on screen longer than a refresh ({Ms1(pacing.RefreshPeriodMs)} ms) as the pacer intended; red: longer than it intended; "
+          + $"whole run {Percent(pacing.LateShare)}";
       parts.Add(new TextShape(PlotX1, lateY - 16, note, "vsync-n", "end"));
       double max = points.Count > 0 ? points.Max(p => p.Share) : 0;
       double topShare = NiceCeiling(Math.Max(5, max * 1.25));
@@ -610,9 +610,9 @@ namespace MB.FramePacing.Charts
           new TextShape(PlotX0 - 10, YOf(tick) + 4, tick == 0 ? "0" : $"{tick.ToString("0.##", CultureInfo.InvariantCulture)} %", "vsync-n", "end")
         );
       }
-      // Red where frames in the window were late (each against its own target, so also when the pacer lowered its rate and still missed
-      // it), amber where none was late while the markers' target frame time is above the run's usual one, green where none was late at
-      // the usual target; each stretch starts where the previous one ended, so the line is whole
+      // Red where a frame in the window was late (later than its target: the pacer's intent in the markers, else one refresh), amber
+      // where frames were only on screen longer than a refresh as the pacer intended, green where every frame took one refresh; each
+      // stretch starts where the previous one ended, so the line is whole
       var paths = new Dictionary<string, StringBuilder>
       {
         ["late-line-none"] = new StringBuilder(),
@@ -636,34 +636,31 @@ namespace MB.FramePacing.Charts
         path.Append($"{Fixed(x, 1)} {Fixed(y, 1)}");
         last = (x, y);
       }
-      static string Style(double share, bool isAdapted) =>
-        share > 0 ? "late-line"
-        : isAdapted ? "late-line-adapted"
-        : "late-line-none";
       if (perFrame)
       {
-        foreach (var (x, share, isAdapted) in points)
-          Point(x, YOf(share), Style(share, isAdapted));
+        foreach (var (x, share, style) in points)
+          Point(x, YOf(share), style);
       }
       else
       {
         var (order, columns) = PixelColumns.Of(points.Select(p => p.X).ToArray());
         foreach (var (key, start, count) in columns)
         {
-          int adaptedCount = 0;
+          // The column's worst: red if any of its frames' windows held a late frame, else amber if any held one on screen longer than a refresh
           double low = double.MaxValue;
           double high = double.MinValue;
+          string style = "late-line-none";
           foreach (int index in order.AsSpan(start, count))
           {
             var point = points[index];
-            adaptedCount += point.Adapted ? 1 : 0;
             low = Math.Min(low, point.Share);
             high = Math.Max(high, point.Share);
+            if (point.Style == "late-line" || (point.Style == "late-line-adapted" && style == "late-line-none"))
+              style = point.Style;
           }
-          bool isAdapted = adaptedCount * 2 > count;
-          Point(key + 0.5, YOf(low), Style(high, isAdapted));
+          Point(key + 0.5, YOf(low), style);
           if (high > low)
-            Point(key + 0.5, YOf(high), Style(high, isAdapted));
+            Point(key + 0.5, YOf(high), style);
         }
       }
       foreach (var (style, path) in paths)
@@ -759,18 +756,57 @@ namespace MB.FramePacing.Charts
     // ------------------------------------------------------------------------------------------------------------------------------------------
 
     /// <summary>
-    /// Per frame: the target frame time in its marker is longer than the run's usual one (its most common), and that usual target. Only what
-    /// the markers say; a run that always carries the same target has no such frames.
+    /// Per frame, whether it stayed on screen longer than one refresh of the display (half a refresh or more beyond it) without being late:
+    /// the pacer intended it (its target is longer than a refresh). Late frames are later than their target and count as late.
     /// </summary>
-    private static (bool[] Adapted, uint UsualTicks) Adapted(IReadOnlyList<PresentedFrame> frames)
+    private static bool[] HeldLonger(IReadOnlyList<PresentedFrame> frames, RunPacing pacing)
     {
-      var targets = frames.Where(f => f.MarkerTargetFrameTicks > 0).Select(f => f.MarkerTargetFrameTicks).ToArray();
-      if (targets.Length == 0)
-        return (new bool[frames.Count], 0);
-      uint usual = targets.GroupBy(t => t).MaxBy(g => g.Count())!.Key;
-      // Half a percent of slack: targets are whole ticks of the pacer's clock
-      return (frames.Select(f => f.MarkerTargetFrameTicks > usual * 1.005).ToArray(), usual);
+      double longer = pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond * 1.5;
+      var held = new bool[frames.Count];
+      for (int i = 0; i < frames.Count; ++i)
+        held[i] = (frames[i].Flags & PresentedFrameFlags.Late) == 0 && frames[i].DisplayDeltaTicks is { } display && display >= longer;
+      return held;
     }
+
+    /// <summary>
+    /// Per frame, over the frames with a display time step in the window that ends at it (as <see cref="LateShare.Rolling"/>): the share
+    /// of frames late or held longer than a refresh, and whether any was late and any held longer.
+    /// </summary>
+    private static (double[] Shares, bool[] AnyLate, bool[] AnyHeld) RollingLate(IReadOnlyList<PresentedFrame> frames, bool[] held, long windowTicks)
+    {
+      var shares = new double[frames.Count];
+      var anyLate = new bool[frames.Count];
+      var anyHeld = new bool[frames.Count];
+      int start = 0;
+      int counted = 0;
+      int late = 0;
+      int heldCount = 0;
+      void Add(int index, int sign)
+      {
+        if (!frames[index].DisplayDeltaTicks.HasValue)
+          return;
+        counted += sign;
+        if ((frames[index].Flags & PresentedFrameFlags.Late) != 0)
+          late += sign;
+        else if (held[index])
+          heldCount += sign;
+      }
+      for (int i = 0; i < frames.Count; ++i)
+      {
+        Add(i, 1);
+        while (frames[i].FirstSeenTicks - frames[start].FirstSeenTicks >= windowTicks)
+          Add(start++, -1);
+        shares[i] = counted > 0 ? (late + heldCount) / (double)counted : 0;
+        anyLate[i] = late > 0;
+        anyHeld[i] = heldCount > 0;
+      }
+      return (shares, anyLate, anyHeld);
+    }
+
+    private static string Style(bool anyLate, bool anyHeld) =>
+      anyLate ? "late-line"
+      : anyHeld ? "late-line-adapted"
+      : "late-line-none";
 
     /// <summary>The values of each pixel column the points fall in: the lowest and highest, and the 5th and 95th percentile.</summary>
     private static List<(int Column, int Count, double Min, double P05, double P95, double Max)> ColumnValues(double[] xs, double[] values)

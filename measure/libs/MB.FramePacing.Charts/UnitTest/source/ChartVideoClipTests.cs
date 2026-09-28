@@ -353,9 +353,13 @@ namespace MB.FramePacing.Charts.UnitTest
       return refresh;
     }
 
-    /// <summary>The share of late frames (%) among the frames with a display time step first shown in the 2 s up to each frame.</summary>
+    /// <summary>
+    /// The share (%) of frames late or on screen longer than one refresh among the frames with a display time step first shown in the 2 s
+    /// up to each frame.
+    /// </summary>
     private static double[] ExpectedLateShare(ClipManifest manifest)
     {
+      bool Longer(int frame) => manifest.Refresh[frame] - manifest.Refresh[frame - 1] > 1;
       var shares = new double[manifest.FrameCount];
       int start = 0;
       for (int i = 0; i < manifest.FrameCount; ++i)
@@ -363,7 +367,7 @@ namespace MB.FramePacing.Charts.UnitTest
         while (manifest.ShownTicks(i) - manifest.ShownTicks(start) >= LateShare.WindowTicks)
           ++start;
         var window = Enumerable.Range(start, i - start + 1).Where(j => j > 0).ToArray();
-        int late = window.Count(manifest.IsLate);
+        int late = window.Count(j => manifest.IsLate(j) || Longer(j));
         shares[i] = window.Length > 0 ? late / (double)window.Length * 100 : 0;
       }
       return shares;
