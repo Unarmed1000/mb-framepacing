@@ -3,7 +3,7 @@
 //* ----------------
 //* The SVG building blocks of the reports, ported from mb-framepacing-explained's timing diagrams (tools/timing_diagrams/generate_diagrams.py
 //* and generate_charts.py): their style sheet verbatim (a translucent dark grey card that reads the same on a white and on a dark page), the
-//* text() and ms() helpers with Python's number formatting, and the card with its title and description.
+//* text() and ms() helpers with Python's number formatting, and the card's title and description.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -113,34 +113,22 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// The SVG element, its style, its card and its title and description lines (generate_diagrams.py's _svg_start). Without
-    /// <paramref name="showTitle"/> the title only names the SVG, and the description lines take its place.
+    /// The card's title and description lines (generate_diagrams.py's _svg_start). Without <paramref name="showTitle"/> the description lines
+    /// take the title's place.
     /// </summary>
-    public static List<string> Start(
-      string title,
-      double width,
-      double height,
-      IEnumerable<string> description,
-      string? background = null,
-      bool showTitle = true
-    )
+    public static List<CardShape> Header(string title, IEnumerable<string> description, bool showTitle = true)
     {
-      var parts = new List<string>
-      {
-        $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{Fixed(width, 0)}\" height=\"{Fixed(height, 0)}\" viewBox=\"0 0 {Fixed(width, 0)} {Fixed(height, 0)}\" role=\"img\" aria-label=\"{Escape(title)}\">",
-        $"<title>{Escape(title)}</title>",
-        $"<style>{DiagramStyle}{ChartStyle}{ReportStyle}</style>",
-      };
-      if (background != null)
-        parts.Add($"<rect width=\"100%\" height=\"100%\" fill=\"{Escape(background)}\"/>");
-      parts.Add($"<rect class=\"card\" x=\"0.5\" y=\"0.5\" width=\"{Fixed(width - 1, 0)}\" height=\"{Fixed(height - 1, 0)}\" rx=\"14\"/>");
+      var shapes = new List<CardShape>();
       if (showTitle)
-        parts.Add(Text(20, 30, title, "title", "start"));
+        shapes.Add(new TextShape(20, 30, title, "title", "start"));
       int line = 0;
       foreach (var text in description)
-        parts.Add(Text(20, (showTitle ? 54 : 30) + (line++ * 19), text, "sub", "start"));
-      return parts;
+        shapes.Add(new TextShape(20, (showTitle ? 54 : 30) + (line++ * 19), text, "sub", "start"));
+      return shapes;
     }
+
+    /// <summary>A card number written with <paramref name="decimals"/> decimals.</summary>
+    public static SvgNumber N(double value, int decimals) => new SvgNumber(value, decimals);
 
     /// <summary>
     /// Python's f"{value:.{decimals}f}": the double's exact decimal value rounded half to even (.NET's "F" rounds an exact tie away from zero,

@@ -54,6 +54,30 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
+    public void PixelColumns_GroupLikeGroupByAndOrderBy()
+    {
+      var random = new Random(7);
+      foreach (bool ordered in new[] { true, false })
+      {
+        var xs = Enumerable.Range(0, 500).Select(i => ordered ? i * 0.37 : random.NextDouble() * 40).ToArray();
+        var (order, columns) = PixelColumns.Of(xs);
+        var expected = xs.Select((x, i) => (x, i)).GroupBy(p => (int)Math.Floor(p.x)).OrderBy(g => g.Key).ToList();
+        Assert.That(columns.Select(c => (c.Column, c.Count)), Is.EqualTo(expected.Select(g => (g.Key, g.Count()))), $"ordered {ordered}");
+        Assert.That(order, Is.EqualTo(expected.SelectMany(g => g.Select(p => p.i))), $"ordered {ordered}");
+      }
+    }
+
+    [Test]
+    public void Build_WritesTheSameSvgAsRender()
+    {
+      var section = RunSection.Whole(Synthetic(2400));
+      var drawing = ReportCard.Build(section);
+      Assert.That(drawing.Shapes, Is.Not.Empty);
+      Assert.That(SvgCardWriter.Write(drawing, "#fff"), Is.EqualTo(ReportCard.Render(section, background: "#fff")));
+      Assert.That(drawing.Shapes.OfType<TextShape>().First().Content, Is.EqualTo(drawing.Title), "the title comes first");
+    }
+
+    [Test]
     public void Text_IsThePythonOriginal()
     {
       Assert.That(
@@ -68,7 +92,7 @@ namespace MB.FramePacing.Charts.UnitTest
     public void OneHour_DrawsPerPixelColumn_AndStaysSmall()
     {
       var run = OneHour();
-      string svg = ReportSvg.Render(RunSection.Whole(run));
+      string svg = ReportCard.Render(RunSection.Whole(run));
 
       Assert.That(svg.Length, Is.LessThan(1_000_000), "an hour of frames in a small file");
       Assert.That(Count(svg, "<rect class=\"bar\""), Is.Zero, "no bar per frame");
@@ -92,7 +116,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var run = OneHour();
       double hitch = run.Run.Frames[HitchFrame].FirstSeenTicks / (double)TimeSpan.TicksPerSecond;
       var section = RunSection.Create(run, hitch - 1, hitch + 1);
-      string svg = ReportSvg.Render(section);
+      string svg = ReportCard.Render(section);
 
       var frames = section.Section.Run.Frames;
       Assert.That(frames, Has.Count.LessThan(1000));
@@ -131,7 +155,7 @@ namespace MB.FramePacing.Charts.UnitTest
           stream.ReadExactly(header);
         int BigEndian(int offset) => (header[offset] << 24) | (header[offset + 1] << 16) | (header[offset + 2] << 8) | header[offset + 3];
         int svgHeight = int.Parse(Regex.Match(File.ReadAllText(files[0]), "height=\"(\\d+)\"").Groups[1].Value);
-        Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((2 * ReportSvg.Width, 2 * svgHeight)), browser);
+        Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((2 * ReportCard.Width, 2 * svgHeight)), browser);
       }
       finally
       {
@@ -154,7 +178,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(RunHeadline.SequenceLine(run.Run), Is.Null);
       var named = run with { Run = run.Run with { Name = "menu scroll" } };
       Assert.That(RunHeadline.Title(named.Run), Is.EqualTo("Run 1  'menu scroll'"));
-      string svg = ReportSvg.Render(RunSection.Whole(named));
+      string svg = ReportCard.Render(RunSection.Whole(named));
       Assert.That(svg, Does.Contain(">Run 1  'menu scroll'<"));
       Assert.That(svg, Does.Contain(">Sequence id one hour.<"));
     }
@@ -163,12 +187,12 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public void LateShare_IsGreenWhileNoFrameIsLate()
     {
-      string none = ReportSvg.Render(RunSection.Whole(Synthetic(240 * 10, lateEvery: 0)));
+      string none = ReportCard.Render(RunSection.Whole(Synthetic(240 * 10, lateEvery: 0)));
       Assert.That(none, Does.Contain("class=\"late-line-none\""));
       Assert.That(none, Does.Not.Contain("class=\"late-line\""));
 
       // One late frame 5 s in: green before it, red for the 2 s window after it, green again
-      string one = ReportSvg.Render(RunSection.Whole(Synthetic(240 * 10, lateEvery: 1200)));
+      string one = ReportCard.Render(RunSection.Whole(Synthetic(240 * 10, lateEvery: 1200)));
       Assert.That(Count(one, "class=\"late-line-none\""), Is.EqualTo(1));
       Assert.That(Count(one, "class=\"late-line\""), Is.EqualTo(1));
       var green = Regex.Match(one, "class=\"late-line-none\" d=\"([^\"]*)\"").Groups[1].Value;
@@ -273,12 +297,12 @@ namespace MB.FramePacing.Charts.UnitTest
     public void Options_HidingAnItem_RemovesExactlyIt()
     {
       var section = RunSection.Whole(Synthetic(2400));
-      string all = ReportSvg.Render(section);
-      Assert.That(ReportSvg.Render(section, ReportOptions.Default), Is.EqualTo(all), "the default options draw everything");
+      string all = ReportCard.Render(section);
+      Assert.That(ReportCard.Render(section, ReportOptions.Default), Is.EqualTo(all), "the default options draw everything");
       Assert.That(g_marks.All(m => all.Contains(m.Mark, StringComparison.Ordinal)), "every item is in the full card");
       foreach (var (id, mark) in g_marks.Append((ReportItem.Tiles, ">PRESENTED FRAMES<")))
       {
-        string svg = ReportSvg.Render(section, ReportOptions.Default.Hide(new[] { id }));
+        string svg = ReportCard.Render(section, ReportOptions.Default.Hide(new[] { id }));
         Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), id);
         Assert.That(svg, Does.Not.Contain(mark), id + ": gone");
         foreach (var (other, otherMark) in g_marks.Where(m => m.Id != id && !(id == ReportItem.Tiles && ReportItem.TileIds.Contains(m.Id))))
@@ -293,16 +317,16 @@ namespace MB.FramePacing.Charts.UnitTest
     public void Options_ShowOnly_KeepsJustThoseItems()
     {
       var section = RunSection.Whole(Synthetic(2400));
-      string panel = ReportSvg.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.AnimationError }));
+      string panel = ReportCard.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.AnimationError }));
       Assert.That(g_marks.Where(m => m.Id != ReportItem.AnimationError).Any(m => panel.Contains(m.Mark, StringComparison.Ordinal)), Is.False);
       Assert.That(panel, Does.Contain(">ANIMATION ERROR PER FRAME<"));
       Assert.That(HeightOf(panel), Is.EqualTo(20 + 36 + 150 + 64), "margin and label, the panel, its time axis");
 
-      string tile = ReportSvg.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.FramesOff }));
+      string tile = ReportCard.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.FramesOff }));
       Assert.That(Count(tile, "class=\"tile\""), Is.EqualTo(1), "one tile");
       Assert.That(tile, Does.Contain(">FRAMES VISIBLY OFF<"));
 
-      string tiles = ReportSvg.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.Tiles }));
+      string tiles = ReportCard.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.Tiles }));
       Assert.That(Count(tiles, "class=\"tile\""), Is.EqualTo(ReportItem.TileIds.Count), "every tile");
     }
 

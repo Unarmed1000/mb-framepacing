@@ -125,11 +125,11 @@ glcore|vulkan|d3d12` forces another graphics API); Unity editors are installed o
     (`--charts`, the GUI's "Save charts") `ChartFiles` writes them as `run-<id>-*.png` next to the reports. Test chart changes with
     `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
     with `VideoClipTests` by linked source files).
-    - The SVG report (`ReportSvg`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
+    - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
       (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`).
-    - The frame timeline (`FrameTimelineSvg`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
+    - The frame timeline (`FrameTimelineCard`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the band on top of `run-<id>-timeline.png`

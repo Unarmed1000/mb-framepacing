@@ -218,7 +218,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (manifest, report, _) = Analyze(clip);
       var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
-      string svg = ReportSvg.Render(RunSection.Whole(chart));
+      string svg = ReportCard.Render(RunSection.Whole(chart));
       var document = System.Xml.Linq.XDocument.Parse(svg);
       IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
 
@@ -254,7 +254,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (_, report, _) = Analyze(clip);
       var frames = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart.Run.Frames;
-      var (offset, bySchedule) = FrameTimelineSvg.PacerToCapture(frames);
+      var (offset, bySchedule) = FrameTimelineCard.PacerToCapture(frames);
       Assert.That((offset.HasValue, bySchedule), Is.EqualTo((true, true)), $"{clip}: aligned by the schedule");
       int checkedFrames = 0;
       for (int i = 1; i < frames.Count; ++i)
@@ -276,7 +276,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
       var section = RunSection.Create(chart, 1.9, 2.25);
       var frames = section.Section.Run.Frames;
-      string svg = FrameTimelineSvg.Render(section);
+      string svg = FrameTimelineCard.Render(section);
       var document = System.Xml.Linq.XDocument.Parse(svg);
       IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
       // The key's box sits at x 20; every other box is a frame's CPU work
@@ -302,7 +302,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Is.EqualTo(frames.Count(f => f.AnimationErrorTicks is { } e && Math.Abs(e) > chart.ErrorThresholdTicks)),
         "an error pill per frame off by more than the threshold"
       );
-      Assert.That(() => FrameTimelineSvg.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
+      Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
     }
 
     /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers, and the report's Timeline image carries them on top.</summary>

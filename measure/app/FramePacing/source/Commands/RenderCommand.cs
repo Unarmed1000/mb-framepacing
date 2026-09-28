@@ -41,7 +41,7 @@ namespace MB.FramePacing.App.Commands
       var timelineOption = new Option<bool>("--timeline")
       {
         Description =
-          $"Draw the frame timeline of --from to --to instead (default --to: {ReportFiles.TimelineSeconds} s later): every frame's CPU start and CPU busy, its present, what each refresh showed, at most {FrameTimelineSvg.MaxFrames} frames.",
+          $"Draw the frame timeline of --from to --to instead (default --to: {ReportFiles.TimelineSeconds} s later): every frame's CPU start and CPU busy, its present, what each refresh showed, at most {FrameTimelineCard.MaxFrames} frames.",
       };
       var nameOption = new Option<string?>("--name") { Description = "A name for the runs in these reports, instead of the analysis's." };
       var outputOption = new Option<string?>("--output", "-o") { Description = "Where the reports go (default: the analysis folder)." };

@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Writes a run's SVG reports (ReportSvg) next to its other reports: the whole run or a section (<prefix>-report.svg,
+//* Writes a run's SVG reports (ReportCard) next to its other reports: the whole run or a section (<prefix>-report.svg,
 //* <prefix>-report-<from>s-<to>s.svg), optionally the detail sections around the worst animation error and the worst 2 s of late frames, and
 //* optionally each as a PNG through a headless browser.
 //*
@@ -88,7 +88,7 @@ namespace MB.FramePacing.Charts
     public const double TimelineSeconds = 0.25;
 
     /// <summary>
-    /// Write the frame timeline card (<see cref="FrameTimelineSvg"/>) of <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of
+    /// Write the frame timeline card (<see cref="FrameTimelineCard"/>) of <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of
     /// <paramref name="run"/> as &lt;prefix&gt;-timeline-&lt;from&gt;s-&lt;to&gt;s.svg (and .png). Returns the files written.
     /// </summary>
     public static IReadOnlyList<string> WriteTimeline(
@@ -103,7 +103,7 @@ namespace MB.FramePacing.Charts
       var section = RunSection.Create(run, fromSeconds, toSeconds);
       string path = Path.Combine(directory, prefix + "-timeline" + SectionSuffix(section));
       string svg = path + ".svg";
-      File.WriteAllText(svg, FrameTimelineSvg.Render(section), new UTF8Encoding(false));
+      File.WriteAllText(svg, FrameTimelineCard.Render(section), new UTF8Encoding(false));
       var written = new List<string> { svg };
       if (png)
       {
@@ -116,7 +116,7 @@ namespace MB.FramePacing.Charts
     private static IEnumerable<string> WriteOne(RunSection section, string pathWithoutExtension, bool png, ReportOptions? options)
     {
       string svg = pathWithoutExtension + ".svg";
-      File.WriteAllText(svg, ReportSvg.Render(section, options), new UTF8Encoding(false));
+      File.WriteAllText(svg, ReportCard.Render(section, options), new UTF8Encoding(false));
       yield return svg;
       if (png)
       {

@@ -263,11 +263,11 @@ namespace MB.FramePacing.DocImages
     {
       var report = MB.FramePacing.Analysis.CaptureAnalyzer.Analyze(capture, new MB.FramePacing.Analysis.AnalysisOptions());
       var chart = ChartRun.From(report, report.Timeline.Runs.Single());
-      File.WriteAllText(path, ReportSvg.Render(RunSection.Whole(chart)), new System.Text.UTF8Encoding(false));
+      File.WriteAllText(path, ReportCard.Render(RunSection.Whole(chart)), new System.Text.UTF8Encoding(false));
       Console.WriteLine($"  {Path.GetFileName(path)}");
       if (timelinePath == null)
         return;
-      File.WriteAllText(timelinePath, FrameTimelineSvg.Render(RunSection.Create(chart, 1.9, 2.25)), new System.Text.UTF8Encoding(false));
+      File.WriteAllText(timelinePath, FrameTimelineCard.Render(RunSection.Create(chart, 1.9, 2.25)), new System.Text.UTF8Encoding(false));
       Console.WriteLine($"  {Path.GetFileName(timelinePath)}");
     }
 

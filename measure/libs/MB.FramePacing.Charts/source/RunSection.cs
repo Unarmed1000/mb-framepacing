@@ -47,7 +47,7 @@ namespace MB.FramePacing.Charts
         return whole;
 
       long origin = whole.OriginTicks;
-      var frames = run.Run.Frames.Where(f => Seconds(f.FirstSeenTicks - origin) is var t && t >= from && t <= to).ToList();
+      var frames = FramesBetween(run.Run.Frames, origin, from, to);
       var analysis = run.Run with
       {
         Frames = frames,
@@ -69,6 +69,43 @@ namespace MB.FramePacing.Charts
         LateShare = measured > 0 ? late / (double)measured : 0,
         WorstLateShare = LateShare.Worst(frames, LateShare.WindowTicks),
       };
+    }
+
+    /// <summary>
+    /// The frames first seen from <paramref name="from"/> to <paramref name="to"/> seconds after <paramref name="origin"/>: found by binary
+    /// search in display order (a run's frames are), else by looking at every frame.
+    /// </summary>
+    private static List<PresentedFrame> FramesBetween(IReadOnlyList<PresentedFrame> all, long origin, double from, double to)
+    {
+      bool Before(PresentedFrame f) => Seconds(f.FirstSeenTicks - origin) < from;
+      bool After(PresentedFrame f) => Seconds(f.FirstSeenTicks - origin) > to;
+      for (int i = 1; i < all.Count; ++i)
+      {
+        if (all[i].FirstSeenTicks < all[i - 1].FirstSeenTicks)
+          return all.Where(f => !Before(f) && !After(f)).ToList();
+      }
+      int first = LowerBound(all, f => !Before(f));
+      int end = LowerBound(all, After);
+      var frames = new List<PresentedFrame>(Math.Max(0, end - first));
+      for (int i = first; i < end; ++i)
+        frames.Add(all[i]);
+      return frames;
+    }
+
+    /// <summary>The first index where <paramref name="reached"/> holds (it holds from some index on), or the count.</summary>
+    private static int LowerBound(IReadOnlyList<PresentedFrame> frames, Func<PresentedFrame, bool> reached)
+    {
+      int low = 0;
+      int high = frames.Count;
+      while (low < high)
+      {
+        int middle = low + ((high - low) / 2);
+        if (reached(frames[middle]))
+          high = middle;
+        else
+          low = middle + 1;
+      }
+      return low;
     }
 
     private static double Seconds(long ticks) => ticks / (double)TimeSpan.TicksPerSecond;

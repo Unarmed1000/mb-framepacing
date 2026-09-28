@@ -41,7 +41,7 @@ namespace MB.FramePacing.Analysis
     }
 
     /// <summary>Linear interpolation between closest ranks.</summary>
-    public static double Percentile(double[] sorted, double fraction)
+    public static double Percentile(ReadOnlySpan<double> sorted, double fraction)
     {
       if (sorted.Length == 1)
         return sorted[0];

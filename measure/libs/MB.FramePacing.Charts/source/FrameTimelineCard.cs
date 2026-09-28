@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* A stretch of a run as mb-framepacing-explained's timing diagram (tools/timing_diagrams/generate_diagrams.py), drawn from the data: the
+//* A stretch of a run as one card (shapes: CardDrawing) in the style of mb-framepacing-explained's timing diagram (tools/timing_diagrams/generate_diagrams.py), drawn from the data: the
 //* refreshes (bright where a frame could be aimed at its target rate), each frame's CPU work as a box from its CPU start time for its CPU busy
 //* (boxes that overlap go to further lanes), its present arrow, what every refresh showed, and each frame's animation time step, display
 //* time step and animation error. The CPU times are on the pacer's clock; they are placed on the capture's clock with the markers' intended
@@ -20,7 +20,7 @@ using static MB.FramePacing.Charts.SvgMarkup;
 
 namespace MB.FramePacing.Charts
 {
-  public static class FrameTimelineSvg
+  public static class FrameTimelineCard
   {
     /// <summary>The most frames one card draws; a longer section asks for a shorter one.</summary>
     public const int MaxFrames = 40;
@@ -36,8 +36,11 @@ namespace MB.FramePacing.Charts
     private const double RowStep = 26;
     private const double DisplayH = 40;
 
-    /// <summary>The card of <paramref name="section"/>: at most <see cref="MaxFrames"/> frames.</summary>
-    public static string Render(RunSection section, string? background = null)
+    /// <summary>The SVG of <paramref name="section"/>: at most <see cref="MaxFrames"/> frames.</summary>
+    public static string Render(RunSection section, string? background = null) => SvgCardWriter.Write(Build(section), background);
+
+    /// <summary>The card of <paramref name="section"/> as shapes: at most <see cref="MaxFrames"/> frames.</summary>
+    public static CardDrawing Build(RunSection section)
     {
       var chart = section.Run;
       var run = chart.Run;
@@ -120,8 +123,8 @@ namespace MB.FramePacing.Charts
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
       double headerExtra = description.Count > 2 ? 19 * (description.Count - 2) : 0;
-      var parts = Start(title, width, height + headerExtra, description, background);
-      parts.Add($"<g transform=\"translate(0 {Fixed(headerExtra, 0)})\">");
+      var header = Header(title, description);
+      var parts = new List<CardShape>();
 
       // Refresh lines: bright where a frame could be aimed at its target rate (whole targets after the previous frame appeared), faint
       // where it could not; a vsync where a frame appeared is always bright (a frame shown sooner than its target appears on one its target
@@ -138,21 +141,19 @@ namespace MB.FramePacing.Charts
         long at = first + (k * refresh);
         double x = XOf(at);
         bool target = targetable.Contains(k);
-        parts.Add(
-          $"<line class=\"{(target ? "vsync" : "vsync-skip")}\" x1=\"{Fixed(x, 1)}\" y1=\"{Fixed(VsyncY + 6, 0)}\" x2=\"{Fixed(x, 1)}\" y2=\"{Fixed(displayY + DisplayH + 5, 1)}\"/>"
-        );
-        parts.Add(Text(x, axisY, $"{Ms(k * refreshMs)} ms", target || k < 0 ? "axis" : "vsync-n-skip"));
+        parts.Add(new LineShape(target ? "vsync" : "vsync-skip", N(x, 1), N(VsyncY + 6, 0), N(x, 1), N(displayY + DisplayH + 5, 1)));
+        parts.Add(new TextShape(x, axisY, $"{Ms(k * refreshMs)} ms", target || k < 0 ? "axis" : "vsync-n-skip"));
         if (k >= 0 && k < endRefresh)
-          parts.Add(Text(x, VsyncY, $"vsync {k + 1}", target ? "vsync-target" : "vsync-n-skip"));
+          parts.Add(new TextShape(x, VsyncY, $"vsync {k + 1}", target ? "vsync-target" : "vsync-n-skip"));
       }
 
       // Row labels
-      parts.Add(Text(20, LaneTop + (LaneH / 2) - 3, "CPU", "label", "start"));
-      parts.Add(Text(20, LaneTop + (LaneH / 2) + 13, "start + CPU busy", "vsync-n", "start"));
-      parts.Add(Text(20, displayY + (DisplayH / 2) + 4, "DISPLAY", "label", "start"));
+      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) - 3, "CPU", "label", "start"));
+      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) + 13, "start + CPU busy", "vsync-n", "start"));
+      parts.Add(new TextShape(20, displayY + (DisplayH / 2) + 4, "DISPLAY", "label", "start"));
       string[] rowLabels = { "ANIMATION TIME STEP", "DISPLAY TIME STEP", "ANIMATION ERROR" };
       for (int i = 0; i < rowLabels.Length; ++i)
-        parts.Add(Text(20, rowsY + (i * RowStep), rowLabels[i], "label", "start"));
+        parts.Add(new TextShape(20, rowsY + (i * RowStep), rowLabels[i], "label", "start"));
 
       // CPU boxes and present arrows
       long firstAnimation = frames[0].AnimationTicks;
@@ -162,25 +163,28 @@ namespace MB.FramePacing.Charts
         double x1 = XOf(stop);
         double inset = Math.Min(6, (x1 - x0) / 4);
         double y = LaneTop + (lane * (LaneH + LaneGap));
-        parts.Add(
-          $"<rect class=\"box\" x=\"{Fixed(x0 + inset, 1)}\" y=\"{Fixed(y, 1)}\" width=\"{Fixed(Math.Max(1, x1 - x0 - (2 * inset)), 1)}\" height=\"{Fixed(LaneH, 0)}\" rx=\"8\"/>"
-        );
+        parts.Add(new RectShape("box", N(x0 + inset, 1), N(y, 1), N(Math.Max(1, x1 - x0 - (2 * inset)), 1), N(LaneH, 0), "8"));
         // The label as far as the box holds it: the frame and its animation time, the frame alone, or the frame in the smaller font
         double cx = (x0 + x1) / 2;
         double boxWidth = x1 - x0 - (2 * inset);
         if (boxWidth >= 60)
         {
-          parts.Add(Text(cx, y + 19, Label(frames[index]), "frame"));
-          parts.Add(Text(cx, y + 36, $"{Ms((frames[index].AnimationTicks - firstAnimation) / (double)TimeSpan.TicksPerMillisecond)} ms", "box-time"));
+          parts.Add(new TextShape(cx, y + 19, Label(frames[index]), "frame"));
+          parts.Add(
+            new TextShape(cx, y + 36, $"{Ms((frames[index].AnimationTicks - firstAnimation) / (double)TimeSpan.TicksPerMillisecond)} ms", "box-time")
+          );
         }
         else if (boxWidth >= 38)
-          parts.Add(Text(cx, y + 27, Label(frames[index]), "frame"));
+          parts.Add(new TextShape(cx, y + 27, Label(frames[index]), "frame"));
         else if (boxWidth >= 26)
-          parts.Add(Text(cx, y + 26, Label(frames[index]), "box-time"));
+          parts.Add(new TextShape(cx, y + 26, Label(frames[index]), "box-time"));
         double tip = displayY - 4;
-        parts.Add($"<line class=\"arrow\" x1=\"{Fixed(x1, 1)}\" y1=\"{Fixed(y + LaneH + 8, 1)}\" x2=\"{Fixed(x1, 1)}\" y2=\"{Fixed(tip - 8, 1)}\"/>");
+        parts.Add(new LineShape("arrow", N(x1, 1), N(y + LaneH + 8, 1), N(x1, 1), N(tip - 8, 1)));
         parts.Add(
-          $"<path class=\"arrowhead\" d=\"M{Fixed(x1 - 5, 1)},{Fixed(tip - 9, 1)} L{Fixed(x1 + 5, 1)},{Fixed(tip - 9, 1)} L{Fixed(x1, 1)},{Fixed(tip, 1)} z\"/>"
+          new PathShape(
+            "arrowhead",
+            $"M{Fixed(x1 - 5, 1)},{Fixed(tip - 9, 1)} L{Fixed(x1 + 5, 1)},{Fixed(tip - 9, 1)} L{Fixed(x1, 1)},{Fixed(tip, 1)} z"
+          )
         );
       }
 
@@ -204,10 +208,8 @@ namespace MB.FramePacing.Charts
           used.Add(kind);
           double x0 = XOf(first + (k * refresh));
           double x1 = XOf(first + ((k + 1) * refresh));
-          parts.Add(
-            $"<rect class=\"{kind}\" x=\"{Fixed(x0 + 2, 1)}\" y=\"{Fixed(displayY, 1)}\" width=\"{Fixed(x1 - x0 - 4, 1)}\" height=\"{Fixed(DisplayH, 0)}\" rx=\"6\"/>"
-          );
-          parts.Add(Text((x0 + x1) / 2, displayY + (DisplayH / 2) + 5, Label(frame), kind == "again" ? "cell-text dark-text" : "cell-text"));
+          parts.Add(new RectShape(kind, N(x0 + 2, 1), N(displayY, 1), N(x1 - x0 - 4, 1), N(DisplayH, 0), "6"));
+          parts.Add(new TextShape((x0 + x1) / 2, displayY + (DisplayH / 2) + 5, Label(frame), kind == "again" ? "cell-text dark-text" : "cell-text"));
         }
 
         double cx = (XOf(first + (from * refresh)) + XOf(first + ((from + 1) * refresh))) / 2;
@@ -218,30 +220,27 @@ namespace MB.FramePacing.Charts
         )
         {
           for (int row = 0; row < 3; ++row)
-            parts.Add(Text(cx, rowsY + (row * RowStep), "–", row == 2 ? "zero" : ""));
+            parts.Add(new TextShape(cx, rowsY + (row * RowStep), "–", row == 2 ? "zero" : ""));
           continue;
         }
-        parts.Add(Text(cx, rowsY, $"{Ms(animation / (double)TimeSpan.TicksPerMillisecond)} ms"));
-        parts.Add(Text(cx, rowsY + RowStep, $"{Ms(display / (double)TimeSpan.TicksPerMillisecond)} ms"));
+        parts.Add(new TextShape(cx, rowsY, $"{Ms(animation / (double)TimeSpan.TicksPerMillisecond)} ms"));
+        parts.Add(new TextShape(cx, rowsY + RowStep, $"{Ms(display / (double)TimeSpan.TicksPerMillisecond)} ms"));
         // Rounded first, so an error of a tick of rounding reads 0, not +0
         string value = $"{Ms(Math.Round(error / (double)TimeSpan.TicksPerMillisecond, 1), sign: true)} ms";
         double errorY = rowsY + (2 * RowStep);
         if (Math.Abs(error) > threshold)
         {
           double pill = (value.Length * 7.4) + 18;
-          parts.Add(
-            $"<rect class=\"err-pill\" x=\"{Fixed(cx - (pill / 2), 1)}\" y=\"{Fixed(errorY - 15, 1)}\" width=\"{Fixed(pill, 1)}\" height=\"21\" rx=\"10.5\"/>"
-          );
-          parts.Add(Text(cx, errorY, value, "err"));
+          parts.Add(new RectShape("err-pill", N(cx - (pill / 2), 1), N(errorY - 15, 1), N(pill, 1), N(21, 0), "10.5"));
+          parts.Add(new TextShape(cx, errorY, value, "err"));
         }
         else
-          parts.Add(Text(cx, errorY, value, "zero"));
+          parts.Add(new TextShape(cx, errorY, value, "zero"));
       }
 
       Key(parts, used, legendY, threshold);
-      parts.Add("</g>");
-      parts.Add("</svg>");
-      return string.Join("\n", parts) + "\n";
+      header.Add(new GroupShape(headerExtra, parts));
+      return new CardDrawing(title, width, height + headerExtra, header);
     }
 
     /// <summary>
@@ -273,11 +272,11 @@ namespace MB.FramePacing.Charts
       ("again", "held longer: the next frame is late"),
     };
 
-    private static void Key(List<string> parts, HashSet<string> used, double legendY, long thresholdTicks)
+    private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, long thresholdTicks)
     {
-      parts.Add($"<rect class=\"box\" x=\"20\" y=\"{Fixed(legendY - 12, 1)}\" width=\"30\" height=\"16\" rx=\"4\"/>");
+      parts.Add(new RectShape("box", N(20, 0), N(legendY - 12, 1), N(30, 0), N(16, 0), "4"));
       parts.Add(
-        Text(
+        new TextShape(
           58,
           legendY + 1,
           "CPU: from the CPU start time for CPU busy, labelled with the frame (#last digits of its index) and its animation time",
@@ -287,32 +286,29 @@ namespace MB.FramePacing.Charts
       );
       double arrowX = 35;
       double arrowY = legendY + 26;
+      parts.Add(new LineShape("arrow", N(arrowX, 1), N(arrowY - 13, 1), N(arrowX, 1), N(arrowY - 2, 1)));
       parts.Add(
-        $"<line class=\"arrow\" x1=\"{Fixed(arrowX, 1)}\" y1=\"{Fixed(arrowY - 13, 1)}\" x2=\"{Fixed(arrowX, 1)}\" y2=\"{Fixed(arrowY - 2, 1)}\"/>"
-      );
-      parts.Add(
-        $"<path class=\"arrowhead\" d=\"M{Fixed(arrowX - 4, 1)},{Fixed(arrowY - 3, 1)} L{Fixed(arrowX + 4, 1)},{Fixed(arrowY - 3, 1)} L{Fixed(arrowX, 1)},{Fixed(arrowY + 4, 1)} z\"/>"
+        new PathShape(
+          "arrowhead",
+          $"M{Fixed(arrowX - 4, 1)},{Fixed(arrowY - 3, 1)} L{Fixed(arrowX + 4, 1)},{Fixed(arrowY - 3, 1)} L{Fixed(arrowX, 1)},{Fixed(arrowY + 4, 1)} z"
+        )
       );
       const string present = "present: the frame is handed over and waits for its vsync";
-      parts.Add(Text(58, arrowY + 1, present, "sub", "start"));
+      parts.Add(new TextShape(58, arrowY + 1, present, "sub", "start"));
       double keyX = 58 + (present.Length * 6.9) + 36;
-      parts.Add(
-        $"<line class=\"vsync\" x1=\"{Fixed(keyX, 1)}\" y1=\"{Fixed(arrowY - 13, 1)}\" x2=\"{Fixed(keyX, 1)}\" y2=\"{Fixed(arrowY + 4, 1)}\"/>"
-      );
-      parts.Add(
-        $"<line class=\"vsync-skip\" x1=\"{Fixed(keyX + 8, 1)}\" y1=\"{Fixed(arrowY - 13, 1)}\" x2=\"{Fixed(keyX + 8, 1)}\" y2=\"{Fixed(arrowY + 4, 1)}\"/>"
-      );
-      parts.Add(Text(keyX + 22, arrowY + 1, "vsync: bright can be aimed at the frame's target, faint is skipped", "sub", "start"));
+      parts.Add(new LineShape("vsync", N(keyX, 1), N(arrowY - 13, 1), N(keyX, 1), N(arrowY + 4, 1)));
+      parts.Add(new LineShape("vsync-skip", N(keyX + 8, 1), N(arrowY - 13, 1), N(keyX + 8, 1), N(arrowY + 4, 1)));
+      parts.Add(new TextShape(keyX + 22, arrowY + 1, "vsync: bright can be aimed at the frame's target, faint is skipped", "sub", "start"));
       double coloursY = legendY + 52;
       double x = 20;
       foreach (var (kind, label) in g_colours.Where(c => used.Contains(c.Kind)))
       {
-        parts.Add($"<rect class=\"{kind}\" x=\"{Fixed(x, 1)}\" y=\"{Fixed(coloursY - 11, 1)}\" width=\"14\" height=\"14\" rx=\"4\"/>");
-        parts.Add(Text(x + 22, coloursY + 1, label, "sub", "start"));
+        parts.Add(new RectShape(kind, N(x, 1), N(coloursY - 11, 1), N(14, 0), N(14, 0), "4"));
+        parts.Add(new TextShape(x + 22, coloursY + 1, label, "sub", "start"));
         x += 22 + (label.Length * 6.9) + 28;
       }
       parts.Add(
-        Text(
+        new TextShape(
           20,
           coloursY + 26,
           $"Animation error = animation time step − display time step: + shown too soon, − shown too late; error threshold {Ms(thresholdTicks / (double)TimeSpan.TicksPerMillisecond)} ms",
