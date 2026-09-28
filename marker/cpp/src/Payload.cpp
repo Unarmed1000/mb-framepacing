@@ -48,24 +48,25 @@ namespace MB::FrameMarker
       }
       return value;
     }
-  }
 
-  std::array<uint8_t, PayloadByteCount> EncodePayload(const Payload& payload) noexcept
-  {
-    std::array<uint8_t, PayloadByteCount> bytes{};
-    bytes[OffsetMagic0] = PayloadMagic0;
-    bytes[OffsetMagic1] = PayloadMagic1;
-    bytes[OffsetVersion] = PayloadFormatVersion;
-    bytes[OffsetKind] = static_cast<uint8_t>(payload.Kind);
-    WriteLE<8>(bytes, OffsetFrameIndex, payload.FrameIndex);
-    // Two's complement, identical to C# BinaryPrimitives.WriteInt64LittleEndian
-    WriteLE<8>(bytes, OffsetAnimationTicks, static_cast<uint64_t>(payload.AnimationTicks));
-    WriteLE<4>(bytes, OffsetRunId, payload.RunId);
-    WriteLE<8>(bytes, OffsetIntendedDisplayTicks, static_cast<uint64_t>(payload.IntendedDisplayTicks));
-    WriteLE<4>(bytes, OffsetTargetFrameTicks, payload.TargetFrameTicks);
-    WriteLE<8>(bytes, OffsetCpuStartTicks, static_cast<uint64_t>(payload.CpuStartTicks));
-    WriteLE<4>(bytes, OffsetCpuBusyTicks, payload.CpuBusyTicks);
-    return bytes;
+    //! The 48 byte header every kind starts with (a sync marker is its first 12 bytes).
+    std::array<uint8_t, PayloadByteCount> EncodeHeader(const Payload& payload) noexcept
+    {
+      std::array<uint8_t, PayloadByteCount> bytes{};
+      bytes[OffsetMagic0] = PayloadMagic0;
+      bytes[OffsetMagic1] = PayloadMagic1;
+      bytes[OffsetVersion] = PayloadFormatVersion;
+      bytes[OffsetKind] = static_cast<uint8_t>(payload.Kind);
+      WriteLE<8>(bytes, OffsetFrameIndex, payload.FrameIndex);
+      // Two's complement, identical to C# BinaryPrimitives.WriteInt64LittleEndian
+      WriteLE<8>(bytes, OffsetAnimationTicks, static_cast<uint64_t>(payload.AnimationTicks));
+      WriteLE<4>(bytes, OffsetRunId, payload.RunId);
+      WriteLE<8>(bytes, OffsetIntendedDisplayTicks, static_cast<uint64_t>(payload.IntendedDisplayTicks));
+      WriteLE<4>(bytes, OffsetTargetFrameTicks, payload.TargetFrameTicks);
+      WriteLE<8>(bytes, OffsetCpuStartTicks, static_cast<uint64_t>(payload.CpuStartTicks));
+      WriteLE<4>(bytes, OffsetCpuBusyTicks, payload.CpuBusyTicks);
+      return bytes;
+    }
   }
 
   std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, const std::span<uint8_t> dst) noexcept
@@ -78,7 +79,7 @@ namespace MB::FrameMarker
     }
 
     // A sync marker is the start of the header: magic, format version, kind and frame index
-    const std::array<uint8_t, PayloadByteCount> header = EncodePayload(payload);
+    const std::array<uint8_t, PayloadByteCount> header = EncodeHeader(payload);
     std::copy_n(header.begin(), std::min(byteCount, PayloadByteCount), dst.begin());
     if (isStart)
     {

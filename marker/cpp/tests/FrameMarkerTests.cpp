@@ -5,6 +5,7 @@
 #include <array>
 #include <chrono>
 #include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,10 +49,98 @@ namespace MB::FrameMarker
 
 namespace
 {
+  //! The payload's bytes (the header for frame, end and sync markers), through the one EncodePayload.
+  std::vector<uint8_t> PayloadBytes(const FM::Payload& payload)
+  {
+    std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
+    const std::size_t count = FM::EncodePayload(payload, {}, buffer);
+    return {buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(count)};
+  }
+
+  //! The documented vertex order of a quad: (TL, TR, BL) (BL, TR, BR), written independently of the library.
+  std::vector<FM::Vertex> ToTriangles(const std::vector<FM::Quad>& quads)
+  {
+    std::vector<FM::Vertex> vertices;
+    for (const FM::Quad& quad : quads)
+    {
+      const uint8_t luma = quad.Dark ? 0u : 255u;
+      vertices.insert(vertices.end(), {{quad.Left, quad.Top, luma},
+                                       {quad.Right, quad.Top, luma},
+                                       {quad.Left, quad.Bottom, luma},
+                                       {quad.Left, quad.Bottom, luma},
+                                       {quad.Right, quad.Top, luma},
+                                       {quad.Right, quad.Bottom, luma}});
+    }
+    return vertices;
+  }
+
+  //! The documented indexed order: 4 vertices (TL, TR, BR, BL) and indices (0,1,3)(3,1,2) per quad, plus baseVertex.
+  void ToIndexed(const std::vector<FM::Quad>& quads, const uint32_t baseVertex, std::vector<FM::Vertex>& rVertices, std::vector<uint32_t>& rIndices)
+  {
+    for (const FM::Quad& quad : quads)
+    {
+      const uint8_t luma = quad.Dark ? 0u : 255u;
+      const auto first = baseVertex + static_cast<uint32_t>(rVertices.size());
+      rVertices.insert(rVertices.end(),
+                       {{quad.Left, quad.Top, luma}, {quad.Right, quad.Top, luma}, {quad.Right, quad.Bottom, luma}, {quad.Left, quad.Bottom, luma}});
+      rIndices.insert(rIndices.end(), {first, first + 1u, first + 3u, first + 3u, first + 1u, first + 2u});
+    }
+  }
+
+  //! Encode a marker (a start marker when the payload's kind says so). The tests below draw from it.
+  FM::ModuleMatrix Encode(const FM::Payload& payload, const FM::StartMetadata& metadata = {})
+  {
+    FM::ModuleMatrix matrix;
+    EXPECT_TRUE(FM::GenerateModules(payload, matrix, metadata));
+    return matrix;
+  }
+
+  FM::ModuleMatrix EncodeStart(const FM::Payload& payload, const FM::StartMetadata& metadata)
+  {
+    FM::Payload start = payload;
+    start.Kind = FM::MarkerKind::SequenceStart;
+    return Encode(start, metadata);
+  }
+
+  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FM::Point origin, const std::span<FM::Quad> dst)
+  {
+    return FM::ModulesToQuads(Encode(payload), options, origin, dst);
+  }
+
+  std::size_t GenerateStartQuads(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options, const FM::Point origin,
+                                 const std::span<FM::Quad> dst)
+  {
+    return FM::ModulesToQuads(EncodeStart(payload, metadata), options, origin, dst);
+  }
+
+  std::size_t GenerateTriangles(const FM::Payload& payload, const FM::Options& options, const FM::Point origin, const std::span<FM::Vertex> dst)
+  {
+    return FM::ModulesToTriangles(Encode(payload), options, origin, dst);
+  }
+
+  std::size_t GenerateStartTriangles(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options,
+                                     const FM::Point origin, const std::span<FM::Vertex> dst)
+  {
+    return FM::ModulesToTriangles(EncodeStart(payload, metadata), options, origin, dst);
+  }
+
+  FM::IndexedCount GenerateIndexed(const FM::Payload& payload, const FM::Options& options, const FM::Point origin,
+                                   const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices, const uint32_t baseVertex = 0)
+  {
+    return FM::ModulesToIndexed(Encode(payload), options, origin, dstVertices, dstIndices, baseVertex);
+  }
+
+  FM::IndexedCount GenerateStartIndexed(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options,
+                                        const FM::Point origin, const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices,
+                                        const uint32_t baseVertex = 0)
+  {
+    return FM::ModulesToIndexed(EncodeStart(payload, metadata), options, origin, dstVertices, dstIndices, baseVertex);
+  }
+
   std::vector<FM::Quad> Generate(const FM::Payload& payload, const FM::Options& options, const FM::Point origin)
   {
     std::vector<FM::Quad> quads(FM::MaxQuadCount());
-    const std::size_t count = FM::GenerateQuads(payload, options, origin, quads);
+    const std::size_t count = GenerateQuads(payload, options, origin, quads);
     quads.resize(count);
     return quads;
   }
@@ -86,13 +175,13 @@ TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
 {
   const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u,        FM::MarkerKind::SequenceEnd,
                             0x3132333435363738,  0x41424344u,        0x5152535455565758, 0x61626364u};
-  const auto bytes = FM::EncodePayload(payload);
+  const auto bytes = PayloadBytes(payload);
   const std::array<uint8_t, FM::PayloadByteCount> expected{'M',   'F',   1u,    2u,    0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u,
                                                            0x18u, 0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x24u, 0x23u, 0x22u, 0x21u,
                                                            0x38u, 0x37u, 0x36u, 0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x44u, 0x43u, 0x42u, 0x41u,
                                                            0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u};
   EXPECT_EQ(FM::PayloadByteCount, 48u);
-  EXPECT_EQ(bytes, expected);
+  EXPECT_TRUE(std::equal(bytes.begin(), bytes.end(), expected.begin(), expected.end()));
 }
 
 TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
@@ -108,8 +197,8 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
   EXPECT_EQ(FM::StartPayloadByteCount, 72u);
   EXPECT_EQ(FM::MaxEncodedPayloadByteCount, FM::StartPayloadByteCount);
 
-  const auto header = FM::EncodePayload(payload);
-  EXPECT_TRUE(std::equal(header.begin(), header.end(), buffer.begin()));
+  const auto header = PayloadBytes(payload);
+  EXPECT_TRUE(std::equal(header.begin(), header.begin() + FM::PayloadByteCount, buffer.begin())) << "the header comes first";
   const std::array<uint8_t, 8> utcTicks{0x68u, 0x67u, 0x66u, 0x65u, 0x64u, 0x63u, 0x62u, 0x61u};
   EXPECT_TRUE(std::equal(utcTicks.begin(), utcTicks.end(), buffer.begin() + 48));
   for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
@@ -120,7 +209,7 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
 
 TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
 {
-  const auto bytes = FM::EncodePayload({0u, -1, 0u});
+  const auto bytes = PayloadBytes({0u, -1, 0u});
   for (std::size_t i = 12; i < 20; ++i)
   {
     EXPECT_EQ(bytes[i], 0xFFu) << "byte " << i;
@@ -159,14 +248,15 @@ TEST(Payload, RoundTrips)
 
 TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 {
-  const auto header = FM::EncodePayload({1u, 2, 3u, FM::MarkerKind::SequenceStart});
+  auto header = PayloadBytes({1u, 2, 3u, FM::MarkerKind::SequenceStart});
+  header.resize(FM::PayloadByteCount);
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(header, decoded));
 }
 
 TEST(Payload, TryDecodeRejectsBadInput)
 {
-  auto bytes = FM::EncodePayload({1u, 2, 0u});
+  auto bytes = PayloadBytes({1u, 2, 0u});
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::PayloadByteCount - 1), decoded));
   bytes[0] = 'X';
@@ -311,27 +401,27 @@ TEST(Geometry, MarkerSize)
 TEST(Geometry, InvalidOptionsGenerateNothing)
 {
   std::vector<FM::Quad> quads(FM::MaxQuadCount());
-  EXPECT_EQ(FM::GenerateQuads({}, FM::Options{0, 4}, {}, quads), 0u);
-  EXPECT_EQ(FM::GenerateQuads({}, FM::Options{6, -1}, {}, quads), 0u);
-  EXPECT_EQ(FM::GenerateQuads({}, FM::Options{6, FM::MaxQuietZoneModules + 1}, {}, quads), 0u);
+  EXPECT_EQ(GenerateQuads({}, FM::Options{0, 4}, {}, quads), 0u);
+  EXPECT_EQ(GenerateQuads({}, FM::Options{6, -1}, {}, quads), 0u);
+  EXPECT_EQ(GenerateQuads({}, FM::Options{6, FM::MaxQuietZoneModules + 1}, {}, quads), 0u);
 }
 
 TEST(Geometry, TooSmallDestinationGeneratesNothing)
 {
   std::vector<FM::Quad> quads(10);
-  EXPECT_EQ(FM::GenerateQuads({}, FM::Options{}, {}, quads), 0u);
+  EXPECT_EQ(GenerateQuads({}, FM::Options{}, {}, quads), 0u);
 }
 
 TEST(Symbol, SyncMarkersAreVersion2)
 {
   FM::ModuleMatrix matrix;
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::Sync, 4, 5u}, matrix));
-  EXPECT_EQ(matrix.Size, FM::SyncQrModuleCount);
-  EXPECT_EQ(matrix.Size, 25);
+  EXPECT_EQ(matrix.Size(), FM::SyncQrModuleCount);
+  EXPECT_EQ(matrix.Size(), 25);
 
   const FM::Options options{3, 4};
   std::vector<FM::Quad> quads(FM::MaxQuadCount());
-  const std::size_t count = FM::GenerateQuads({7u, 0, 0u, FM::MarkerKind::Sync}, options, {10, 20}, quads);
+  const std::size_t count = GenerateQuads({7u, 0, 0u, FM::MarkerKind::Sync}, options, {10, 20}, quads);
   ASSERT_GT(count, 0u);
   EXPECT_EQ(quads.front(), (FM::Quad{10, 20, 10 + 99, 20 + 99, false}));
 }
@@ -357,16 +447,16 @@ TEST(Symbol, EveryMarkerIsVersion6)
 {
   FM::ModuleMatrix matrix;
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::Frame}, matrix));
-  EXPECT_EQ(matrix.Size, 41);
+  EXPECT_EQ(matrix.Size(), 41);
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceEnd}, matrix));
-  EXPECT_EQ(matrix.Size, 41);
+  EXPECT_EQ(matrix.Size(), 41);
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart}, matrix, {}));
-  EXPECT_EQ(matrix.Size, 41);
+  EXPECT_EQ(matrix.Size(), 41);
 
   FM::SequenceId id;
   ASSERT_TRUE(FM::SequenceId::TryFromText("0123456789abcdef", id));
   ASSERT_TRUE(FM::GenerateModules({1u, 2, 3u, FM::MarkerKind::SequenceStart, 4, 5u, 6, 7u}, matrix, {123, id}));
-  EXPECT_EQ(matrix.Size, FM::QrModuleCount);
+  EXPECT_EQ(matrix.Size(), FM::QrModuleCount);
 
   // Version 6-M holds 106 bytes: the start marker leaves room for future fields
   EXPECT_EQ(FM::MaxEncodedPayloadByteCount, 72u);
@@ -380,7 +470,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
   const FM::Options options{};
   const FM::Point origin{32, 32};
   std::vector<FM::Quad> quads(FM::MaxQuadCount());
-  const std::size_t count = FM::GenerateStartQuads({5u, 6, 7u, FM::MarkerKind::Frame}, {99, id}, options, origin, quads);
+  const std::size_t count = GenerateStartQuads({5u, 6, 7u, FM::MarkerKind::Frame}, {99, id}, options, origin, quads);
   ASSERT_GT(count, 0u);
   ASSERT_LE(count, FM::MaxQuadCount());
   const FM::Quad& background = quads.front();
@@ -451,7 +541,7 @@ TEST(Geometry, QuadsArePixelAlignedAndReproduceTheModuleMatrix)
           {
             const int32_t moduleX = (mx / moduleSize) - quiet;
             const int32_t moduleY = (my / moduleSize) - quiet;
-            const bool inSymbol = moduleX >= 0 && moduleY >= 0 && moduleX < matrix.Size && moduleY < matrix.Size;
+            const bool inSymbol = moduleX >= 0 && moduleY >= 0 && moduleX < matrix.Size() && moduleY < matrix.Size();
             expected = inSymbol && matrix.IsDark(moduleX, moduleY) ? 0u : 255u;
           }
           if (pixel != expected)
@@ -476,7 +566,7 @@ TEST(Symbol, DifferentPayloadsGiveDifferentSymbols)
   FM::ModuleMatrix b;
   ASSERT_TRUE(FM::GenerateModules({1u, 0, 0u}, a));
   ASSERT_TRUE(FM::GenerateModules({2u, 0, 0u}, b));
-  EXPECT_NE(a.Modules, b.Modules);
+  EXPECT_NE(a, b);
 }
 
 TEST(Symbol, FinderPatternsArePresent)
@@ -498,50 +588,31 @@ TEST(Symbol, FinderPatternsArePresent)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
-// Vertex conversion
+// Vertex order
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
-TEST(Vertices, QuadsToTriangles)
+TEST(Vertices, TheBackgroundQuadIsDrawnInTheDocumentedOrder)
 {
-  const std::array<FM::Quad, 2> quads{{{0, 0, 10, 10, false}, {2, 3, 4, 5, true}}};
-  std::array<FM::Vertex, 12> vertices{};
-  ASSERT_EQ(FM::QuadsToTriangles(quads, vertices), 12u);
-  EXPECT_EQ(vertices[0], (FM::Vertex{0, 0, 255u}));
-  EXPECT_EQ(vertices[1], (FM::Vertex{10, 0, 255u}));
-  EXPECT_EQ(vertices[2], (FM::Vertex{0, 10, 255u}));
-  EXPECT_EQ(vertices[3], (FM::Vertex{0, 10, 255u}));
-  EXPECT_EQ(vertices[4], (FM::Vertex{10, 0, 255u}));
-  EXPECT_EQ(vertices[5], (FM::Vertex{10, 10, 255u}));
-  EXPECT_EQ(vertices[6], (FM::Vertex{2, 3, 0u}));
-  EXPECT_EQ(vertices[11], (FM::Vertex{4, 5, 0u}));
+  const FM::ModuleMatrix matrix = Encode({1u, 2, 3u});
+  const FM::Options options{2, 4};
+  const int32_t size = FM::MarkerSizePx(options);
+  std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
+  ASSERT_GT(FM::ModulesToTriangles(matrix, options, {10, 20}, vertices), 6u);
+  const std::array<FM::Vertex, 6> expected{
+    {{10, 20, 255u}, {10 + size, 20, 255u}, {10, 20 + size, 255u}, {10, 20 + size, 255u}, {10 + size, 20, 255u}, {10 + size, 20 + size, 255u}}};
+  EXPECT_TRUE(std::equal(expected.begin(), expected.end(), vertices.begin()));
 
-  std::array<FM::Vertex, 11> tooSmall{};
-  EXPECT_EQ(FM::QuadsToTriangles(quads, tooSmall), 0u);
-}
-
-TEST(Vertices, QuadsToIndexed)
-{
-  const std::array<FM::Quad, 2> quads{{{0, 0, 10, 10, false}, {2, 3, 4, 5, true}}};
-  std::array<FM::Vertex, 8> vertices{};
-  std::array<uint32_t, 12> indices{};
-  const FM::IndexedCount count = FM::QuadsToIndexed(quads, vertices, indices, 100u);
-  EXPECT_EQ(count.VertexCount, 8u);
-  EXPECT_EQ(count.IndexCount, 12u);
-  EXPECT_EQ(vertices[4], (FM::Vertex{2, 3, 0u}));
-  EXPECT_EQ(vertices[5], (FM::Vertex{4, 3, 0u}));
-  EXPECT_EQ(vertices[6], (FM::Vertex{4, 5, 0u}));
-  EXPECT_EQ(vertices[7], (FM::Vertex{2, 5, 0u}));
+  std::vector<FM::Vertex> indexedVertices(FM::MaxIndexedVertexCount());
+  std::vector<uint32_t> indices(FM::MaxIndexCount());
+  ASSERT_GT(FM::ModulesToIndexed(matrix, options, {10, 20}, indexedVertices, indices, 100u).IndexCount, 6u);
+  const std::array<FM::Vertex, 4> corners{{{10, 20, 255u}, {10 + size, 20, 255u}, {10 + size, 20 + size, 255u}, {10, 20 + size, 255u}}};
+  EXPECT_TRUE(std::equal(corners.begin(), corners.end(), indexedVertices.begin()));
   const std::array<uint32_t, 12> expectedIndices{100u, 101u, 103u, 103u, 101u, 102u, 104u, 105u, 107u, 107u, 105u, 106u};
-  EXPECT_EQ(indices, expectedIndices);
-
-  std::array<uint32_t, 11> tooFewIndices{};
-  const FM::IndexedCount failed = FM::QuadsToIndexed(quads, vertices, tooFewIndices);
-  EXPECT_EQ(failed.VertexCount, 0u);
-  EXPECT_EQ(failed.IndexCount, 0u);
+  EXPECT_TRUE(std::equal(expectedIndices.begin(), expectedIndices.end(), indices.begin()));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
-// Direct triangle output (GenerateTriangles / GenerateIndexed)
+// Triangle output (ModulesToTriangles / ModulesToIndexed)
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
 namespace
@@ -582,8 +653,8 @@ namespace
   {
     std::vector<FM::Quad> quads(FM::MaxQuadCount());
     const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-                                ? FM::GenerateStartQuads(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, quads)
-                                : FM::GenerateQuads(testCase.Payload, testCase.Options, testCase.Origin, quads);
+                                ? GenerateStartQuads(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, quads)
+                                : GenerateQuads(testCase.Payload, testCase.Options, testCase.Origin, quads);
     quads.resize(count);
     return quads;
   }
@@ -592,8 +663,8 @@ namespace
   {
     std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
     const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-                                ? FM::GenerateStartTriangles(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices)
-                                : FM::GenerateTriangles(testCase.Payload, testCase.Options, testCase.Origin, vertices);
+                                ? GenerateStartTriangles(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices)
+                                : GenerateTriangles(testCase.Payload, testCase.Options, testCase.Origin, vertices);
     vertices.resize(count);
     return vertices;
   }
@@ -667,22 +738,19 @@ TEST(Triangles, DirectOutputEqualsTheConvertedQuads)
     const std::vector<FM::Quad> quads = GenerateCase(testCase);
     ASSERT_FALSE(quads.empty());
 
-    std::vector<FM::Vertex> converted(quads.size() * 6u);
-    ASSERT_EQ(FM::QuadsToTriangles(quads, converted), converted.size());
-    EXPECT_EQ(GenerateCaseTriangles(testCase), converted);
+    EXPECT_EQ(GenerateCaseTriangles(testCase), ToTriangles(quads));
 
     constexpr uint32_t BaseVertex = 1000u;
-    std::vector<FM::Vertex> convertedVertices(quads.size() * 4u);
-    std::vector<uint32_t> convertedIndices(quads.size() * 6u);
-    const FM::IndexedCount convertedCount = FM::QuadsToIndexed(quads, convertedVertices, convertedIndices, BaseVertex);
-    ASSERT_EQ(convertedCount.IndexCount, convertedIndices.size());
+    std::vector<FM::Vertex> convertedVertices;
+    std::vector<uint32_t> convertedIndices;
+    ToIndexed(quads, BaseVertex, convertedVertices, convertedIndices);
 
     std::vector<FM::Vertex> vertices(FM::MaxIndexedVertexCount());
     std::vector<uint32_t> indices(FM::MaxIndexCount());
     const FM::IndexedCount count =
       testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices, indices, BaseVertex)
-        : FM::GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices, BaseVertex);
+        ? GenerateStartIndexed(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices, indices, BaseVertex)
+        : GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices, BaseVertex);
     vertices.resize(count.VertexCount);
     indices.resize(count.IndexCount);
     EXPECT_EQ(vertices, convertedVertices);
@@ -708,8 +776,8 @@ TEST(Triangles, RasterizedTrianglesReproduceTheQuads)
     std::vector<uint32_t> indices(FM::MaxIndexCount());
     const FM::IndexedCount count =
       testCase.Payload.Kind == FM::MarkerKind::SequenceStart
-        ? FM::GenerateStartIndexed(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices, indices)
-        : FM::GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices);
+        ? GenerateStartIndexed(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, vertices, indices)
+        : GenerateIndexed(testCase.Payload, testCase.Options, testCase.Origin, vertices, indices);
     vertices.resize(count.VertexCount);
     indices.resize(count.IndexCount);
     std::vector<uint8_t> fromIndexed;
@@ -726,8 +794,8 @@ TEST(Triangles, FrameMarkersFitTheBufferSizes)
   for (uint64_t frame = 0; frame < 500u; ++frame)
   {
     const FM::Payload payload{frame * 7919u, static_cast<int64_t>(frame) * 166'667, 9u, FM::MarkerKind::Frame};
-    EXPECT_GT(FM::GenerateTriangles(payload, {}, {0, 0}, vertices), 0u) << "frame " << frame;
-    EXPECT_GT(FM::GenerateIndexed(payload, {}, {0, 0}, indexedVertices, indices).IndexCount, 0u) << "frame " << frame;
+    EXPECT_GT(GenerateTriangles(payload, {}, {0, 0}, vertices), 0u) << "frame " << frame;
+    EXPECT_GT(GenerateIndexed(payload, {}, {0, 0}, indexedVertices, indices).IndexCount, 0u) << "frame " << frame;
   }
 }
 
@@ -736,13 +804,13 @@ TEST(Triangles, InvalidOptionsOrSmallBuffersGenerateNothing)
   const FM::Payload payload{1u, 2, 3u};
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
   std::vector<uint32_t> indices(FM::MaxIndexCount());
-  EXPECT_EQ(FM::GenerateTriangles(payload, {0, 4}, {0, 0}, vertices), 0u);
-  EXPECT_EQ(FM::GenerateIndexed(payload, {6, -1}, {0, 0}, vertices, indices).VertexCount, 0u);
+  EXPECT_EQ(GenerateTriangles(payload, {0, 4}, {0, 0}, vertices), 0u);
+  EXPECT_EQ(GenerateIndexed(payload, {6, -1}, {0, 0}, vertices, indices).VertexCount, 0u);
 
   std::vector<FM::Vertex> tooFew(12);
-  EXPECT_EQ(FM::GenerateTriangles(payload, {}, {0, 0}, tooFew), 0u);
+  EXPECT_EQ(GenerateTriangles(payload, {}, {0, 0}, tooFew), 0u);
   std::vector<uint32_t> tooFewIndices(12);
-  const FM::IndexedCount failed = FM::GenerateIndexed(payload, {}, {0, 0}, vertices, tooFewIndices);
+  const FM::IndexedCount failed = GenerateIndexed(payload, {}, {0, 0}, vertices, tooFewIndices);
   EXPECT_EQ(failed.VertexCount, 0u);
   EXPECT_EQ(failed.IndexCount, 0u);
 }
@@ -795,4 +863,170 @@ TEST(Version, MatchesTheVersionFile)
   EXPECT_EQ(FM::VersionString, std::string_view(MB_FRAMEMARKER_EXPECTED_VERSION));
   EXPECT_EQ(std::to_string(FM::VersionMajor) + "." + std::to_string(FM::VersionMinor) + "." + std::to_string(FM::VersionPatch),
             std::string(FM::VersionString));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// The encoded marker (ModuleMatrix) and the bitmap drawn from it
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
+{
+  for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::Sync})
+  {
+    const FM::ModuleMatrix matrix = Encode({12345u, 678, 9u, kind});
+    const int32_t size = matrix.Size();
+    const auto bits = matrix.Bits();
+    ASSERT_EQ(bits.size(), FM::PackedModuleByteCount(size));
+    for (int32_t y = 0; y < size; ++y)
+    {
+      for (int32_t x = 0; x < size; ++x)
+      {
+        const auto index = (static_cast<std::size_t>(y) * static_cast<std::size_t>(size)) + static_cast<std::size_t>(x);
+        const bool bit = ((static_cast<uint32_t>(bits[index / 8u]) >> (7u - (index % 8u))) & 1u) != 0u;
+        ASSERT_EQ(matrix.IsDark(x, y), bit) << x << "," << y;
+      }
+    }
+  }
+  EXPECT_EQ(FM::PackedModuleByteCount(FM::QrModuleCount), 211u);
+  EXPECT_EQ(FM::PackedModuleByteCount(FM::SyncQrModuleCount), 79u);
+}
+
+TEST(ModuleMatrix, TryFromBitsTakesQrSizesAndIgnoresThePadding)
+{
+  const FM::ModuleMatrix matrix = Encode({1u, 2, 3u, FM::MarkerKind::Sync});
+  std::array<uint8_t, FM::MaxPackedModuleByteCount> bits{};
+  std::copy(matrix.Bits().begin(), matrix.Bits().end(), bits.begin());
+  bits[FM::PackedModuleByteCount(25) - 1u] |= 0x7Fu;    // 625 modules: the last byte uses 1 bit
+
+  FM::ModuleMatrix copy;
+  ASSERT_TRUE(FM::ModuleMatrix::TryFromBits(25, bits, copy));
+  EXPECT_EQ(copy, matrix);
+  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(24, bits, copy));
+  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(45, bits, copy));
+  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(25, std::span<const uint8_t>(bits).first(78), copy));
+  EXPECT_EQ(copy, matrix) << "a refused call leaves the matrix unchanged";
+}
+
+TEST(ModuleMatrix, AnEmptyMatrixDrawsNothing)
+{
+  const FM::ModuleMatrix empty;
+  std::array<FM::Quad, 4> quads{};
+  std::array<uint8_t, 16> pixels{};
+  EXPECT_EQ(empty.Size(), 0);
+  EXPECT_EQ(FM::ModulesToQuads(empty, {}, {}, quads), 0u);
+  EXPECT_FALSE(FM::ModulesToBitmap(empty, {1, 0}, {}, pixels, 4, 4, FM::PixelFormat::Gray8));
+}
+
+namespace
+{
+  struct BitmapCase
+  {
+    FM::Payload Payload;
+    FM::Options Options;
+    FM::Point Origin;
+  };
+
+  const std::array<BitmapCase, 5> g_bitmapCases{{
+    {{1u, 2, 3u, FM::MarkerKind::Frame}, {3, 4}, {5, 7}},
+    {{99u, -5, 1u, FM::MarkerKind::SequenceEnd}, {1, 0}, {0, 0}},
+    {{7u, 0, 0u, FM::MarkerKind::Sync}, {2, 4}, {3, 1}},
+    {{0xFFFFFFFFFFFFFFFFu, 1, 2u, FM::MarkerKind::Frame, 3, 4u, 5, 6u}, {2, 1}, {-9, -4}},
+    {{5u, 6, 7u, FM::MarkerKind::Frame}, {4, 2}, {100, 60}},
+  }};
+}
+
+TEST(Bitmap, EqualsTheRasterizedQuadsInEveryPixelFormat)
+{
+  constexpr int32_t Width = 173;
+  constexpr int32_t Height = 131;
+  for (const BitmapCase& testCase : g_bitmapCases)
+  {
+    SCOPED_TRACE(testing::PrintToString(testCase.Payload));
+    const FM::ModuleMatrix matrix = Encode(testCase.Payload);
+    std::vector<FM::Quad> quads(FM::MaxQuadCount());
+    quads.resize(FM::ModulesToQuads(matrix, testCase.Options, testCase.Origin, quads));
+
+    // The expected pixels: every quad clipped to the canvas, over untouched pixels of 128
+    std::vector<uint8_t> expected(static_cast<std::size_t>(Width) * static_cast<std::size_t>(Height), 128u);
+    for (const FM::Quad& quad : quads)
+    {
+      for (int32_t y = std::max(quad.Top, 0); y < std::min(quad.Bottom, Height); ++y)
+      {
+        for (int32_t x = std::max(quad.Left, 0); x < std::min(quad.Right, Width); ++x)
+        {
+          expected[(static_cast<std::size_t>(y) * Width) + static_cast<std::size_t>(x)] = quad.Dark ? 0u : 255u;
+        }
+      }
+    }
+
+    for (const FM::PixelFormat format : {FM::PixelFormat::Gray8, FM::PixelFormat::Rgb24, FM::PixelFormat::Rgba32})
+    {
+      const auto bytesPerPixel = static_cast<std::size_t>(FM::BytesPerPixel(format));
+      const std::size_t stride = (static_cast<std::size_t>(Width) * bytesPerPixel) + 5u;    // padded rows
+      std::vector<uint8_t> pixels(stride * static_cast<std::size_t>(Height), 128u);
+      ASSERT_TRUE(FM::ModulesToBitmap(matrix, testCase.Options, testCase.Origin, pixels, Width, Height, format, stride));
+      for (int32_t y = 0; y < Height; ++y)
+      {
+        for (int32_t x = 0; x < Width; ++x)
+        {
+          const uint8_t luma = expected[(static_cast<std::size_t>(y) * Width) + static_cast<std::size_t>(x)];
+          const std::size_t at = (static_cast<std::size_t>(y) * stride) + (static_cast<std::size_t>(x) * bytesPerPixel);
+          for (std::size_t channel = 0; channel < bytesPerPixel; ++channel)
+          {
+            const uint8_t wanted = channel == 3u && luma != 128u ? 255u : luma;
+            ASSERT_EQ(pixels[at + channel], wanted) << "pixel " << x << "," << y << " channel " << channel;
+          }
+        }
+        // The row padding is never written
+        for (std::size_t pad = static_cast<std::size_t>(Width) * bytesPerPixel; pad < stride; ++pad)
+        {
+          ASSERT_EQ(pixels[(static_cast<std::size_t>(y) * stride) + pad], 128u);
+        }
+      }
+    }
+  }
+}
+
+TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
+{
+  const FM::ModuleMatrix matrix = Encode({31u, 41, 59u, FM::MarkerKind::Frame});
+  constexpr int32_t ModuleSize = 3;
+  const FM::Options small{1, 4};
+  const FM::Options large{ModuleSize, 4};
+  const int32_t smallSize = FM::MarkerSizePx(small);
+  const int32_t largeSize = FM::MarkerSizePx(large);
+  std::vector<uint8_t> modules(static_cast<std::size_t>(smallSize) * static_cast<std::size_t>(smallSize));
+  std::vector<uint8_t> pixels(static_cast<std::size_t>(largeSize) * static_cast<std::size_t>(largeSize));
+  ASSERT_TRUE(FM::ModulesToBitmap(matrix, small, {0, 0}, modules, smallSize, smallSize, FM::PixelFormat::Gray8));
+  ASSERT_TRUE(FM::ModulesToBitmap(matrix, large, {0, 0}, pixels, largeSize, largeSize, FM::PixelFormat::Gray8));
+  for (int32_t y = 0; y < largeSize; ++y)
+  {
+    for (int32_t x = 0; x < largeSize; ++x)
+    {
+      ASSERT_EQ(pixels[(static_cast<std::size_t>(y) * largeSize) + static_cast<std::size_t>(x)],
+                modules[(static_cast<std::size_t>(y / ModuleSize) * smallSize) + static_cast<std::size_t>(x / ModuleSize)])
+        << x << "," << y;
+    }
+  }
+}
+
+TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
+{
+  const FM::ModuleMatrix matrix = Encode({1u, 2, 3u});
+  std::vector<uint8_t> pixels(64u * 64u * 4u, 128u);
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {0, 4}, {}, pixels, 64, 64, FM::PixelFormat::Gray8)) << "invalid options";
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, pixels, 64, 64, FM::PixelFormat::Rgb24, 64u * 3u - 1u)) << "short stride";
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, std::span<uint8_t>(pixels).first((64u * 64u * 4u) - 1u), 64, 64, FM::PixelFormat::Rgba32))
+    << "too small";
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, pixels, -1, 64, FM::PixelFormat::Gray8)) << "negative width";
+  EXPECT_TRUE(std::all_of(pixels.begin(), pixels.end(), [](const uint8_t value) { return value == 128u; }));
+  EXPECT_TRUE(FM::ModulesToBitmap(matrix, {1, 4}, {500, 500}, pixels, 64, 64, FM::PixelFormat::Gray8)) << "outside the buffer: nothing to draw";
+  EXPECT_TRUE(std::all_of(pixels.begin(), pixels.end(), [](const uint8_t value) { return value == 128u; }));
+}
+
+TEST(Bitmap, BytesPerPixel)
+{
+  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Gray8), 1);
+  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Rgb24), 3);
+  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Rgba32), 4);
 }

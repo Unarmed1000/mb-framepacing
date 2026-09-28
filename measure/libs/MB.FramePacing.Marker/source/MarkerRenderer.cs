@@ -29,9 +29,6 @@ namespace MB.FramePacing.Marker
     [ThreadStatic]
     private static FM.MarkerGenerator? g_generator;
 
-    [ThreadStatic]
-    private static FM.ModuleMatrix? g_matrix;
-
     /// <summary>Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.</summary>
     public static int QrModuleCountFor(MarkerKind kind) => FM.Marker.QrModuleCountFor((FM.MarkerKind)kind);
 
@@ -51,8 +48,8 @@ namespace MB.FramePacing.Marker
     {
       // The same encoder applications use (MB.FrameMarker), so the synthetic capture shows exactly what a game draws
       var generator = g_generator ??= new FM.MarkerGenerator();
-      var matrix = g_matrix ??= new FM.ModuleMatrix();
-      if (!generator.GenerateModules(payload.ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), matrix))
+      Span<byte> bits = stackalloc byte[FM.Marker.MaxPackedModuleByteCount];
+      if (!generator.TryGenerateModules(payload.ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), bits, out var matrix))
         throw new InvalidOperationException("The marker payload does not fit its QR code");
 
       var modules = new ModuleMatrix(matrix.Size);

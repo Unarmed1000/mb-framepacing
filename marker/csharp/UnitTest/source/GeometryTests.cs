@@ -72,11 +72,12 @@ namespace MB.FrameMarker.UnitTest
     public void Symbols_SyncMarkersAreVersion2()
     {
       var generator = new MarkerGenerator();
-      var matrix = new ModuleMatrix();
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.Sync, 4, 5), matrix), Is.True);
+      Span<byte> bits = stackalloc byte[Marker.MaxPackedModuleByteCount];
+      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.Sync, 4, 5), bits, out var matrix), Is.True);
       Assert.That(matrix.Size, Is.EqualTo(Marker.SyncQrModuleCount));
+      Assert.That(matrix.Bits.Length, Is.EqualTo(79));
       var quads = new Quad[Marker.MaxQuadCount];
-      int count = generator.GenerateQuads(new Payload(7, 0, 0, MarkerKind.Sync), new Options(3, 4), new Point(10, 20), quads);
+      int count = TestMarkers.GenerateQuads(new Payload(7, 0, 0, MarkerKind.Sync), new Options(3, 4), new Point(10, 20), quads);
       Assert.That(count, Is.GreaterThan(1));
       Assert.That(quads[0], Is.EqualTo(new Quad(10, 20, 10 + 99, 20 + 99, false)));
     }
@@ -85,23 +86,24 @@ namespace MB.FrameMarker.UnitTest
     public void Symbols_EveryMarkerIsVersion6()
     {
       var generator = new MarkerGenerator();
-      var matrix = new ModuleMatrix();
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3), matrix), Is.True);
-      Assert.That(matrix.Size, Is.EqualTo(41));
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceEnd), matrix), Is.True);
-      Assert.That(matrix.Size, Is.EqualTo(41));
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), default, matrix), Is.True);
-      Assert.That(matrix.Size, Is.EqualTo(41));
+      var bits = new byte[Marker.MaxPackedModuleByteCount];
+      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3), bits, out var frame) && frame.Size == 41, Is.True);
+      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceEnd), bits, out var end) && end.Size == 41, Is.True);
+      Assert.That(
+        generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), default, bits, out var start) && start.Size == 41,
+        Is.True
+      );
       var full = new StartMetadata(123, new SequenceId(ulong.MaxValue, ulong.MaxValue));
-      Assert.That(generator.GenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), full, matrix), Is.True);
+      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), full, bits, out var matrix), Is.True);
       Assert.That(matrix.Size, Is.EqualTo(Marker.QrModuleCount));
+      Assert.That(matrix.Bits.Length, Is.EqualTo(Marker.MaxPackedModuleByteCount));
     }
 
     [Test]
     public void Quads_ArePixelAligned_BackgroundFirst()
     {
       var quads = new Quad[Marker.MaxQuadCount];
-      int count = new MarkerGenerator().GenerateQuads(new Payload(5, 6, 7), new Options(3, 4), new Point(10, 20), quads);
+      int count = TestMarkers.GenerateQuads(new Payload(5, 6, 7), new Options(3, 4), new Point(10, 20), quads);
       Assert.That(count, Is.InRange(2, Marker.MaxQuadCount));
       Assert.That(quads[0], Is.EqualTo(new Quad(10, 20, 10 + 147, 20 + 147, false)));
       foreach (var quad in quads.Skip(1).Take(count - 1))
@@ -114,27 +116,23 @@ namespace MB.FrameMarker.UnitTest
     }
 
     [Test]
-    public void Triangles_AndIndexed_EqualTheConvertedQuads()
+    public void Triangles_AndIndexed_FollowTheQuadsInTheDocumentedOrder()
     {
-      var generator = new MarkerGenerator();
       var payload = new Payload(42, 1_234_567, 3);
       var options = new Options(2, 4);
       var origin = new Point(7, 9);
       var quads = new Quad[Marker.MaxQuadCount];
-      int quadCount = generator.GenerateQuads(payload, options, origin, quads);
+      int quadCount = TestMarkers.GenerateQuads(payload, options, origin, quads);
 
-      var converted = new Vertex[quadCount * 6];
-      Assert.That(Marker.QuadsToTriangles(quads.AsSpan(0, quadCount), converted), Is.EqualTo(quadCount * 6));
+      var converted = TestMarkers.ToTriangles(quads.Take(quadCount));
       var direct = new Vertex[Marker.MaxTriangleVertexCount];
-      int vertexCount = generator.GenerateTriangles(payload, options, origin, direct);
+      int vertexCount = TestMarkers.GenerateTriangles(payload, options, origin, direct);
       Assert.That(direct.Take(vertexCount), Is.EqualTo(converted));
 
-      var convertedVertices = new Vertex[quadCount * 4];
-      var convertedIndices = new int[quadCount * 6];
-      Marker.QuadsToIndexed(quads.AsSpan(0, quadCount), convertedVertices, convertedIndices, 50);
+      var (convertedVertices, convertedIndices) = TestMarkers.ToIndexed(quads.Take(quadCount), 50);
       var vertices = new Vertex[Marker.MaxIndexedVertexCount];
       var indices = new int[Marker.MaxIndexCount];
-      var count = generator.GenerateIndexed(payload, options, origin, vertices, indices, 50);
+      var count = TestMarkers.GenerateIndexed(payload, options, origin, vertices, indices, 50);
       Assert.That(vertices.Take(count.VertexCount), Is.EqualTo(convertedVertices));
       Assert.That(indices.Take(count.IndexCount), Is.EqualTo(convertedIndices));
     }
@@ -142,59 +140,216 @@ namespace MB.FrameMarker.UnitTest
     [Test]
     public void VertexOrder_MatchesTheCppLibrary()
     {
-      var quads = new[] { new Quad(0, 0, 10, 10, false), new Quad(2, 3, 4, 5, true) };
-      var triangles = new Vertex[12];
-      Assert.That(Marker.QuadsToTriangles(quads.AsSpan(0, 2), triangles), Is.EqualTo(12));
+      // The background quad comes first: its vertices in the documented order
+      var matrix = TestMarkers.Encode(new Payload(1, 2, 3));
+      var options = new Options(2, 4);
+      int size = Marker.MarkerSizePx(options);
+      var triangles = new Vertex[Marker.MaxTriangleVertexCount];
+      Assert.That(Marker.ModulesToTriangles(matrix, options, new Point(10, 20), triangles), Is.GreaterThan(6));
       Assert.That(
         triangles.Take(6),
         Is.EqualTo(
           new[]
           {
-            new Vertex(0, 0, 255),
-            new Vertex(10, 0, 255),
-            new Vertex(0, 10, 255),
-            new Vertex(0, 10, 255),
-            new Vertex(10, 0, 255),
-            new Vertex(10, 10, 255),
+            new Vertex(10, 20, 255),
+            new Vertex(10 + size, 20, 255),
+            new Vertex(10, 20 + size, 255),
+            new Vertex(10, 20 + size, 255),
+            new Vertex(10 + size, 20, 255),
+            new Vertex(10 + size, 20 + size, 255),
           }
         )
       );
-      Assert.That(triangles[6], Is.EqualTo(new Vertex(2, 3, 0)));
-      Assert.That(triangles[11], Is.EqualTo(new Vertex(4, 5, 0)));
 
-      var vertices = new Vertex[8];
-      var indices = new int[12];
-      var count = Marker.QuadsToIndexed(quads.AsSpan(0, 2), vertices, indices, 100);
-      Assert.That((count.VertexCount, count.IndexCount), Is.EqualTo((8, 12)));
-      Assert.That(vertices.Skip(4), Is.EqualTo(new[] { new Vertex(2, 3, 0), new Vertex(4, 3, 0), new Vertex(4, 5, 0), new Vertex(2, 5, 0) }));
-      Assert.That(indices, Is.EqualTo(new[] { 100, 101, 103, 103, 101, 102, 104, 105, 107, 107, 105, 106 }));
+      var vertices = new Vertex[Marker.MaxIndexedVertexCount];
+      var indices = new int[Marker.MaxIndexCount];
+      Assert.That(
+        Marker.ModulesToIndexed(TestMarkers.Encode(new Payload(1, 2, 3)), options, new Point(10, 20), vertices, indices, 100).IndexCount,
+        Is.GreaterThan(6)
+      );
+      Assert.That(
+        vertices.Take(4),
+        Is.EqualTo(
+          new[] { new Vertex(10, 20, 255), new Vertex(10 + size, 20, 255), new Vertex(10 + size, 20 + size, 255), new Vertex(10, 20 + size, 255) }
+        )
+      );
+      Assert.That(indices.Take(12), Is.EqualTo(new[] { 100, 101, 103, 103, 101, 102, 104, 105, 107, 107, 105, 106 }));
     }
 
     [Test]
     public void InvalidOptions_OrSmallBuffers_GenerateNothing()
     {
-      var generator = new MarkerGenerator();
       var payload = new Payload(1, 2, 3);
-      Assert.That(generator.GenerateQuads(payload, new Options(0), default, new Quad[Marker.MaxQuadCount]), Is.Zero);
-      Assert.That(generator.GenerateTriangles(payload, new Options(6, -1), default, new Vertex[Marker.MaxTriangleVertexCount]), Is.Zero);
-      Assert.That(generator.GenerateQuads(payload, new Options(6, Marker.MaxQuietZoneModules + 1), default, new Quad[Marker.MaxQuadCount]), Is.Zero);
-      Assert.That(generator.GenerateQuads(payload, Options.Default, default, new Quad[10]), Is.Zero);
-      Assert.That(generator.GenerateTriangles(payload, Options.Default, default, new Vertex[12]), Is.Zero);
-      var failed = generator.GenerateIndexed(payload, Options.Default, default, new Vertex[Marker.MaxIndexedVertexCount], new int[12]);
+      Assert.That(TestMarkers.GenerateQuads(payload, new Options(0), default, new Quad[Marker.MaxQuadCount]), Is.Zero);
+      Assert.That(TestMarkers.GenerateTriangles(payload, new Options(6, -1), default, new Vertex[Marker.MaxTriangleVertexCount]), Is.Zero);
+      Assert.That(
+        TestMarkers.GenerateQuads(payload, new Options(6, Marker.MaxQuietZoneModules + 1), default, new Quad[Marker.MaxQuadCount]),
+        Is.Zero
+      );
+      Assert.That(TestMarkers.GenerateQuads(payload, Options.Default, default, new Quad[10]), Is.Zero);
+      Assert.That(TestMarkers.GenerateTriangles(payload, Options.Default, default, new Vertex[12]), Is.Zero);
+      var failed = TestMarkers.GenerateIndexed(payload, Options.Default, default, new Vertex[Marker.MaxIndexedVertexCount], new int[12]);
       Assert.That((failed.VertexCount, failed.IndexCount), Is.EqualTo((0, 0)));
-      Assert.That(Marker.QuadsToTriangles(new Quad[2].AsSpan(0, 2), new Vertex[11]), Is.Zero);
     }
 
     [Test]
     public void FrameMarkers_FitTheFrameBufferSizes()
     {
-      var generator = new MarkerGenerator();
       var vertices = new Vertex[Marker.MaxTriangleVertexCount];
       for (ulong frame = 0; frame < 500; ++frame)
         Assert.That(
-          generator.GenerateTriangles(new Payload(frame * 7919, (long)frame * 166_667, 9), Options.Default, default, vertices),
+          TestMarkers.GenerateTriangles(new Payload(frame * 7919, (long)frame * 166_667, 9), Options.Default, default, vertices),
           Is.Positive
         );
+    }
+
+    [Test]
+    public void ModuleMatrix_IsPackedRowMajorMostSignificantBitFirst()
+    {
+      var generator = new MarkerGenerator();
+      var bits = new byte[Marker.MaxPackedModuleByteCount];
+      foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.Sync })
+      {
+        Assert.That(generator.TryGenerateModules(new Payload(12345, 678, 9, kind), bits, out var matrix), Is.True);
+        Assert.That(matrix.Bits.Length, Is.EqualTo(Marker.PackedModuleByteCount(matrix.Size)));
+        for (int y = 0; y < matrix.Size; ++y)
+        {
+          for (int x = 0; x < matrix.Size; ++x)
+          {
+            int index = (y * matrix.Size) + x;
+            Assert.That(matrix.IsDark(x, y), Is.EqualTo(((bits[index / 8] >> (7 - (index % 8))) & 1) == 1), $"{x},{y}");
+          }
+        }
+      }
+      Assert.That(Marker.PackedModuleByteCount(Marker.QrModuleCount), Is.EqualTo(211));
+      Assert.That(Marker.PackedModuleByteCount(Marker.SyncQrModuleCount), Is.EqualTo(79));
+    }
+
+    [Test]
+    public void ModuleMatrix_TryFromBits_TakesQrSizesAndIgnoresThePadding()
+    {
+      var bits = new byte[Marker.MaxPackedModuleByteCount];
+      Assert.That(new MarkerGenerator().TryGenerateModules(new Payload(1, 2, 3, MarkerKind.Sync), bits, out var matrix), Is.True);
+      var copy = (byte[])bits.Clone();
+      copy[78] |= 0x7F; // 625 modules: the last byte uses 1 bit
+      Assert.That(ModuleMatrix.TryFromBits(25, copy, out var fromBits), Is.True);
+      Assert.That(fromBits.SequenceEqual(matrix), Is.True);
+      Assert.That(ModuleMatrix.TryFromBits(24, copy, out _), Is.False);
+      Assert.That(ModuleMatrix.TryFromBits(45, copy, out _), Is.False);
+      Assert.That(ModuleMatrix.TryFromBits(25, copy.AsSpan(0, 78), out _), Is.False);
+      Assert.That(new MarkerGenerator().TryGenerateModules(new Payload(1, 2, 3, MarkerKind.Sync), new byte[78], out _), Is.False, "too small");
+    }
+
+    [Test]
+    public void EmptyMatrix_DrawsNothing()
+    {
+      Assert.That(Marker.ModulesToQuads(default, Options.Default, default, new Quad[4]), Is.Zero);
+      Assert.That(Marker.ModulesToBitmap(default, new Options(1, 0), default, new byte[16], 4, 4, PixelFormat.Gray8), Is.False);
+    }
+
+    [TestCase(PixelFormat.Gray8)]
+    [TestCase(PixelFormat.Rgb24)]
+    [TestCase(PixelFormat.Rgba32)]
+    public void Bitmap_EqualsTheRasterizedQuads(PixelFormat format)
+    {
+      const int Width = 173;
+      const int Height = 131;
+      var cases = new[]
+      {
+        (new Payload(1, 2, 3), new Options(3, 4), new Point(5, 7)),
+        (new Payload(99, -5, 1, MarkerKind.SequenceEnd), new Options(1, 0), new Point(0, 0)),
+        (new Payload(7, 0, 0, MarkerKind.Sync), new Options(2, 4), new Point(3, 1)),
+        (new Payload(ulong.MaxValue, 1, 2, MarkerKind.Frame, 3, 4, 5, 6), new Options(2, 1), new Point(-9, -4)),
+        (new Payload(5, 6, 7), new Options(4, 2), new Point(100, 60)),
+      };
+      int bytesPerPixel = Marker.BytesPerPixel(format);
+      int stride = (Width * bytesPerPixel) + 5; // padded rows
+      foreach (var (payload, options, origin) in cases)
+      {
+        var quads = new Quad[Marker.MaxQuadCount];
+        var matrix = TestMarkers.Encode(payload);
+        int count = Marker.ModulesToQuads(matrix, options, origin, quads);
+        var expected = SoftwareRaster.Quads(quads.Take(count).ToList(), Width, Height);
+        var pixels = new byte[stride * Height];
+        Array.Fill(pixels, (byte)128);
+        Assert.That(Marker.ModulesToBitmap(TestMarkers.Encode(payload), options, origin, pixels, Width, Height, format, stride), Is.True);
+        for (int y = 0; y < Height; ++y)
+        {
+          for (int x = 0; x < Width; ++x)
+          {
+            byte luma = expected[(y * Width) + x];
+            for (int channel = 0; channel < bytesPerPixel; ++channel)
+            {
+              byte wanted = channel == 3 && luma != 128 ? (byte)255 : luma;
+              Assert.That(pixels[(y * stride) + (x * bytesPerPixel) + channel], Is.EqualTo(wanted), $"{payload}: pixel {x},{y} channel {channel}");
+            }
+          }
+          for (int pad = Width * bytesPerPixel; pad < stride; ++pad)
+            Assert.That(pixels[(y * stride) + pad], Is.EqualTo(128), "the row padding is never written");
+        }
+      }
+    }
+
+    [Test]
+    public void Bitmap_ModuleResolutionScaledUp_EqualsTheFullSizeOne()
+    {
+      const int ModuleSize = 3;
+      var small = new Options(1, 4);
+      var large = new Options(ModuleSize, 4);
+      int smallSize = Marker.MarkerSizePx(small);
+      int largeSize = Marker.MarkerSizePx(large);
+      var modules = new byte[smallSize * smallSize];
+      var pixels = new byte[largeSize * largeSize];
+      Assert.That(
+        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(31, 41, 59)), small, default, modules, smallSize, smallSize, PixelFormat.Gray8)
+      );
+      Assert.That(
+        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(31, 41, 59)), large, default, pixels, largeSize, largeSize, PixelFormat.Gray8)
+      );
+      for (int y = 0; y < largeSize; ++y)
+      {
+        for (int x = 0; x < largeSize; ++x)
+          Assert.That(pixels[(y * largeSize) + x], Is.EqualTo(modules[(y / ModuleSize * smallSize) + (x / ModuleSize)]), $"{x},{y}");
+      }
+    }
+
+    [Test]
+    public void Bitmap_RefusesInvalidArguments_WithoutWriting()
+    {
+      var pixels = new byte[64 * 64 * 4];
+      Array.Fill(pixels, (byte)128);
+      var options = new Options(1, 4);
+      Assert.That(
+        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), new Options(0), default, pixels, 64, 64, PixelFormat.Gray8),
+        Is.False
+      );
+      Assert.That(
+        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), options, default, pixels, 64, 64, PixelFormat.Rgb24, (64 * 3) - 1),
+        Is.False
+      );
+      Assert.That(
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(1, 2, 3)),
+          options,
+          default,
+          pixels.AsSpan(0, pixels.Length - 1),
+          64,
+          64,
+          PixelFormat.Rgba32
+        ),
+        Is.False
+      );
+      Assert.That(Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), options, default, pixels, -1, 64, PixelFormat.Gray8), Is.False);
+      Assert.That(pixels.All(p => p == 128), Is.True);
+      Assert.That(
+        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), options, new Point(500, 500), pixels, 64, 64, PixelFormat.Gray8),
+        Is.True
+      );
+      Assert.That(pixels.All(p => p == 128), Is.True, "outside the buffer: nothing to draw");
+      Assert.That(
+        (Marker.BytesPerPixel(PixelFormat.Gray8), Marker.BytesPerPixel(PixelFormat.Rgb24), Marker.BytesPerPixel(PixelFormat.Rgba32)),
+        Is.EqualTo((1, 3, 4))
+      );
     }
   }
 }

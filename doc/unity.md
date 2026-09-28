@@ -111,41 +111,52 @@ Nothing is allocated per frame: the generator, the quad buffer and the material 
 
 ## Drawing it from your own pipeline code
 
-To draw the marker yourself (a URP renderer feature, an HDRP custom pass, a `CommandBuffer`), use `FrameMarkerMesh`. It keeps a
-`Mesh` with the current marker in Unity screen pixels:
+To draw the marker yourself (a URP renderer feature, an HDRP custom pass, a `CommandBuffer`), encode it with a `MarkerGenerator` and
+give the matrix to `FrameMarkerMesh`. It keeps a `Mesh` with the current marker in Unity screen pixels:
 
 ```csharp
 using MB.FrameMarker;
 using MB.FrameMarker.Unity;
 
-var markerMesh = new FrameMarkerMesh();                 // once
-var material = FrameMarkerGL.CreateMaterial();           // once, or your own unlit vertex color material
+var generator = new MarkerGenerator();                   // once
+var modules = new byte[Marker.MaxPackedModuleByteCount]; // once: the encoded marker lives here
+var markerMesh = new FrameMarkerMesh();                  // once
+var material = FrameMarkerGL.CreateMaterial();            // once, or your own unlit vertex color material
 
 // every frame, as the last thing drawn into the output
 var options = new Options(Marker.RecommendModuleSizePx(Screen.height, 540));
 var origin = Marker.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height, options);
 var payload = new Payload((ulong)Time.frameCount, Marker.SecondsToTicks(Time.timeAsDouble), runId);
-markerMesh.Update(payload, default, options, origin, Screen.height);
+if (generator.TryGenerateModules(payload, modules, out var matrix))
+  markerMesh.Update(matrix, options, origin, Screen.height);
 commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Screen.width, Screen.height));
 commands.DrawMesh(markerMesh.Mesh, Matrix4x4.identity, material);
 ```
 
 `FrameMarkerGL.DrawQuads` draws marker quads with GL immediate mode into the current render target, the way the overlay does.
 
+`FrameMarkerTexture` keeps a `Texture2D` with the marker at module resolution (one texel per module, quiet zone included) for UI or
+anything that shows an image (`RawImage`, `Graphics.DrawTexture`, a material): `texture.Update(matrix)`. Draw it scaled up by a whole
+number with point filtering, on whole pixels, so every module covers exactly the pixels the geometry would.
+
 ## Using the general library directly
 
-The core library works without the helpers (and outside Unity). Create one `MarkerGenerator` and reuse it; it writes the marker
-straight into your arrays:
+The core library works without the helpers (and outside Unity). Create one `MarkerGenerator` and reuse it: it encodes the marker into
+bytes you own (the `ModuleMatrix`), and `Marker` draws it straight into your arrays:
 
 ```csharp
 var generator = new MarkerGenerator();
+var modules = new byte[Marker.MaxPackedModuleByteCount];
 var vertices = new Vertex[Marker.MaxTriangleVertexCount];
 
-int count = generator.GenerateTriangles(payload, options, origin, vertices); // 6 vertices per quad, pixel coordinates, top-left origin
+if (generator.TryGenerateModules(payload, metadata, modules, out var matrix))  // the metadata only goes into start markers
+{
+  int count = Marker.ModulesToTriangles(matrix, options, origin, vertices);      // 6 vertices per quad, pixel coordinates, top-left origin
+}
 ```
 
-`GenerateIndexed` (vertices and indices) and `GenerateQuads` (rectangles) are the alternatives; start markers use the `GenerateStart…`
-variants with a `StartMetadata` (sequence id and time).
+`ModulesToIndexed` (vertices and indices), `ModulesToQuads` (rectangles) and `ModulesToBitmap` (pixels) are the alternatives; one
+matrix can feed several.
 
 ## What is verified
 

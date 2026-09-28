@@ -56,6 +56,7 @@ target_sources(mb_framemarker
       include/mb/framemarker/ModuleMatrix.hpp
       include/mb/framemarker/Options.hpp
       include/mb/framemarker/Payload.hpp
+      include/mb/framemarker/PixelFormat.hpp
       include/mb/framemarker/Point.hpp
       include/mb/framemarker/Quad.hpp
       include/mb/framemarker/SequenceId.hpp

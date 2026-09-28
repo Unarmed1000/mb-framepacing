@@ -89,24 +89,30 @@ const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080
 
 ## 3. Draw it every frame
 
-Generate the marker straight into your vertex buffer. Nothing is allocated, and every vertex lies on a pixel corner (top-left origin,
-+y down):
+Encode the marker once (`GenerateModules`: its QR symbol as a packed module matrix), then draw it straight into your vertex buffer.
+Nothing is allocated, and every vertex lies on a pixel corner (top-left origin, +y down):
 
 ```cpp
+FM::ModuleMatrix matrix;                                          // once
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
   const auto ticks = static_cast<int64_t>(animationSeconds * FM::TicksPerSecond); // the time your animation used
-  const std::size_t count = FM::GenerateTriangles({frameIndex, ticks, runId, FM::MarkerKind::Frame}, options, origin, vertices);
+  FM::GenerateModules({frameIndex, ticks, runId, FM::MarkerKind::Frame}, matrix);
+  const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 }
 ```
 
-The same geometry comes in other forms:
+The same matrix draws in other forms; one encode can feed several:
 
-- **`GenerateIndexed`:** 4 vertices and 6 indices per quad, for index buffers.
-- **`GenerateQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs.
+- **`ModulesToIndexed`:** 4 vertices and 6 indices per quad, for index buffers.
+- **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs.
+- **`ModulesToBitmap`:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA buffers take
+  the same bytes, since the marker is black and white). With `ModuleSizePx` 1 and origin (0, 0) it is a module-resolution image: a
+  texture to draw scaled up by a whole number with point filtering.
+- **`ModuleMatrix::Bits()`:** the packed bits themselves (1 bit per module, row-major, most significant bit first).
 
 Triangles are `(TL, TR, BL) (BL, TR, BR)`, clockwise on screen. Size your buffers with the `Max…Count()` functions; they fit every
 marker kind.
@@ -130,7 +136,9 @@ index. The analysis flags tearing when the two disagree, and a camera filming th
 
 ```cpp
 const FM::Point syncOrigin = FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 2);
-const std::size_t syncCount = FM::GenerateTriangles({frameIndex, 0, 0u, FM::MarkerKind::Sync}, options, syncOrigin, vertices);
+FM::ModuleMatrix sync;
+FM::GenerateModules({frameIndex, 0, 0u, FM::MarkerKind::Sync}, sync);
+const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);
 ```
 
 **Rules that matter** (the capture can only read an unmodified marker):
@@ -154,23 +162,18 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   static const int64_t startUtc = FM::ToDateTimeTicks(std::chrono::system_clock::now());
   static const FM::SequenceId sequenceId = NewUuidBytes();   // any 16 bytes unique to this run, or FM::SequenceId::TryFromText("camera pan", id)
   static std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
-  const FM::Payload payload{frameIndex, static_cast<int64_t>(animationSeconds * FM::TicksPerSecond), /*runId*/ 7};
-  std::size_t count = 0;
-  switch (phase)
+  static FM::ModuleMatrix matrix;
+  if (phase == Phase::Done)
   {
-  case Phase::Start:   // one captured frame is enough; ~3 capture frames (e.g. 100 ms) for slack
-    count = FM::GenerateStartTriangles(payload, {startUtc, sequenceId}, options, origin, vertices);
-    break;
-  case Phase::Measure:
-    count = FM::GenerateTriangles(payload, options, origin, vertices);
-    break;
-  case Phase::End:     // the same
-    count = FM::GenerateTriangles({payload.FrameIndex, payload.AnimationTicks, payload.RunId, FM::MarkerKind::SequenceEnd}, options, origin, vertices);
-    break;
-  case Phase::Done:
-    break;
+    return;
   }
-  DrawTriangles(vertices.data(), count);
+  // Start: one captured frame is enough; ~3 capture frames (e.g. 100 ms) for slack. End: the same.
+  const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
+                              : phase == Phase::End ? FM::MarkerKind::SequenceEnd
+                                                    : FM::MarkerKind::Frame;
+  const FM::Payload payload{frameIndex, static_cast<int64_t>(animationSeconds * FM::TicksPerSecond), /*runId*/ 7, kind};
+  FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
+  DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }
 ```
 

@@ -118,7 +118,9 @@ It writes pixel aligned triangles straight into your vertex buffer, without allo
 namespace FM = MB::FrameMarker;
 
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
-const std::size_t count = FM::GenerateTriangles({frameIndex, animationTicks, runId, FM::MarkerKind::Frame}, options, origin, vertices);
+FM::ModuleMatrix matrix;
+FM::GenerateModules({frameIndex, animationTicks, runId, FM::MarkerKind::Frame}, matrix);   // encode once
+const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);        // draw it
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
 
@@ -126,7 +128,7 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
 
 - **C++:** see **[Integrating the marker](doc/integrating.md)** for adding the library with CMake (a release archive, git,
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
-- **C#:** the general library [`marker/csharp`](marker/csharp/README.md) has the same API (`MarkerGenerator.GenerateTriangles`).
+- **C#:** the general library [`marker/csharp`](marker/csharp/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `Marker.ModulesToTriangles`).
 - **Unity:** the **[Unity package](doc/unity.md)** adds an overlay component that does all of this for you.
 - **Python:** [`marker/python`](marker/python/README.md) (`mb_framemarker`), which also draws into pixel buffers.
 

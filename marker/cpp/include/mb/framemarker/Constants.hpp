@@ -52,6 +52,16 @@ namespace MB::FrameMarker
   inline constexpr int32_t MaxModuleSizePx = 1024;
   inline constexpr int32_t MaxQuietZoneModules = 16;
   inline constexpr int32_t RecommendedQuietZoneModules = 4;
+
+  //! The packed module matrix (ModuleMatrix::Bits): 1 bit per module, row-major, most significant bit first, continuous across rows, the
+  //! last byte zero padded. 211 bytes for a main marker (41x41), 79 for the sync marker (25x25).
+  constexpr std::size_t PackedModuleByteCount(const int32_t size) noexcept
+  {
+    return size <= 0 ? 0u : ((static_cast<std::size_t>(size) * static_cast<std::size_t>(size)) + 7u) / 8u;
+  }
+
+  inline constexpr std::size_t MaxPackedModuleByteCount = PackedModuleByteCount(QrModuleCount);
+  static_assert(MaxPackedModuleByteCount == 211u);
 }
 
 #endif

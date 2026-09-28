@@ -5,7 +5,8 @@
 //*   - the package compiles in Unity (the C# version and API level Unity uses),
 //*   - the core library produces the C++ module matrices (test-data/markers/modules.csv) on Unity's scripting runtime,
 //*   - FrameMarkerGL (the overlay's drawing) and FrameMarkerMesh (command buffer drawing) render pixel exact: the pixels read back from a
-//*     render texture must equal the marker's quads, including the y flip.
+//*     render texture must equal the marker's quads, including the y flip;
+//*   - FrameMarkerTexture holds the module-resolution bitmap, bottom row first as Unity textures are.
 //* Exits the editor with 0 when everything passed.
 //*
 //* (c) 2026 Mana Battery
@@ -35,6 +36,7 @@ public static class FrameMarkerUnityCheck
       failures += CheckModuleDigest(Environment.GetEnvironmentVariable("MB_FRAMEMARKER_TEST_DATA"));
       failures += CheckRendering(useMesh: false);
       failures += CheckRendering(useMesh: true);
+      failures += CheckTexture();
     }
     catch (Exception ex)
     {
@@ -49,7 +51,7 @@ public static class FrameMarkerUnityCheck
   {
     var lines = File.ReadAllLines(Path.Combine(testData, "modules.csv"));
     var generator = new MarkerGenerator();
-    var matrix = new ModuleMatrix();
+    var bits = new byte[Marker.MaxPackedModuleByteCount];
     int mismatches = 0;
     for (int i = 1; i < lines.Length; ++i)
     {
@@ -69,9 +71,9 @@ public static class FrameMarkerUnityCheck
       var sequenceId = f[9].Length > 0 ? SequenceId.FromBytes(FromHex(f[9])) : default;
       var start = new StartMetadata(long.Parse(f[8], CultureInfo.InvariantCulture), sequenceId);
       if (
-        !generator.GenerateModules(payload, start, matrix)
+        !generator.TryGenerateModules(payload, start, bits, out var matrix)
         || matrix.Size != int.Parse(f[10], CultureInfo.InvariantCulture)
-        || Pack(matrix) != f[11]
+        || Hex(matrix.Bits) != f[11]
       )
       {
         if (++mismatches <= 5)
@@ -89,7 +91,10 @@ public static class FrameMarkerUnityCheck
     var options = new Options(3, 4);
     var origin = new Point(17, 23);
     var quads = new Quad[Marker.MaxQuadCount];
-    int quadCount = new MarkerGenerator().GenerateQuads(payload, options, origin, quads);
+    var bits = new byte[Marker.MaxPackedModuleByteCount];
+    if (!new MarkerGenerator().TryGenerateModules(payload, bits, out var matrix))
+      throw new InvalidOperationException("TryGenerateModules failed");
+    int quadCount = Marker.ModulesToQuads(matrix, options, origin, quads);
 
     var material = FrameMarkerGL.CreateMaterial();
     var target = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
@@ -102,7 +107,7 @@ public static class FrameMarkerUnityCheck
       if (useMesh)
       {
         mesh = new FrameMarkerMesh();
-        if (!mesh.Update(payload, default, options, origin, Height))
+        if (!mesh.Update(matrix, options, origin, Height))
           throw new InvalidOperationException("FrameMarkerMesh.Update failed");
         var commands = new CommandBuffer { name = "FrameMarkerUnityCheck" };
         commands.SetRenderTarget(target);
@@ -167,26 +172,46 @@ public static class FrameMarkerUnityCheck
     return differences == 0 ? 0 : 1;
   }
 
-  private static string Pack(ModuleMatrix matrix)
+  private static int CheckTexture()
   {
-    var hex = new StringBuilder();
-    int current = 0;
-    int bits = 0;
-    for (int y = 0; y < matrix.Size; ++y)
+    var bits = new byte[Marker.MaxPackedModuleByteCount];
+    var texture = new FrameMarkerTexture();
+    int differences = 0;
+    try
     {
-      for (int x = 0; x < matrix.Size; ++x)
+      foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.Sync })
       {
-        current = (current << 1) | (matrix.IsDark(x, y) ? 1 : 0);
-        if (++bits == 8)
+        if (!new MarkerGenerator().TryGenerateModules(new Payload(99, 1234, 5, kind), bits, out var matrix) || !texture.Update(matrix, 4))
+          throw new InvalidOperationException("FrameMarkerTexture.Update failed");
+        int size = matrix.Size + 8;
+        var pixels = texture.Texture.GetPixels32();
+        for (int y = 0; y < size; ++y)
         {
-          hex.Append(current.ToString("x2", CultureInfo.InvariantCulture));
-          current = 0;
-          bits = 0;
+          for (int x = 0; x < size; ++x)
+          {
+            bool inSymbol = x >= 4 && y >= 4 && x < size - 4 && y < size - 4;
+            int want = inSymbol && matrix.IsDark(x - 4, y - 4) ? 0 : 255;
+            // Texture rows start at the bottom
+            var got = pixels[((size - 1 - y) * size) + x];
+            if ((got.r != want || got.g != want || got.b != want || got.a != 255) && ++differences <= 5)
+              Debug.LogError($"FrameMarkerUnityCheck: FrameMarkerTexture {kind} texel ({x}, {y}) is {got}, expected {want}");
+          }
         }
       }
     }
-    if (bits > 0)
-      hex.Append((current << (8 - bits)).ToString("x2", CultureInfo.InvariantCulture));
+    finally
+    {
+      texture.Dispose();
+    }
+    Debug.Log($"FrameMarkerUnityCheck: FrameMarkerTexture {(differences == 0 ? "exact" : $"{differences} texels differ")}");
+    return differences == 0 ? 0 : 1;
+  }
+
+  private static string Hex(ReadOnlySpan<byte> bytes)
+  {
+    var hex = new StringBuilder(bytes.Length * 2);
+    foreach (byte value in bytes)
+      hex.Append(value.ToString("x2", CultureInfo.InvariantCulture));
     return hex.ToString();
   }
 

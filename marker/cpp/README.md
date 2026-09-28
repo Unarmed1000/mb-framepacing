@@ -37,11 +37,13 @@ namespace FM = MB::FrameMarker;
 // Once: output 1920x1080, capture stored at 960x540 (2:1)
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};
 const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, /*alignPx*/ 2);
+FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, last (after post effects and UI), without blending:
 const FM::Payload payload{frameIndex, animationTicks, /*runId*/ 1};
-const std::size_t count = FM::GenerateTriangles(payload, options, origin, vertices);
+FM::GenerateModules(payload, matrix);                                               // encode once
+const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);  // draw it
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
 
@@ -51,8 +53,8 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
   clock, any epoch) and `TargetFrameTicks` (the interval it aims for: `166'667` for 60 fps). `0` = unknown.
 - **CPU start time and CPU busy (optional):** `CpuStartTicks` (when the CPU started working on the frame, on the same clock,
   PresentMon's `CPUStartTime`) and `CpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
-- **Start and end:** bracket the part to measure with `GenerateStartTriangles(payload, {utcTicks, sequenceId}, …)` and a payload
-  of kind `MarkerKind::SequenceEnd`, each shown for a few frames. The sequence id is 16 opaque bytes unique to the run: a UUID's
+- **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
+  (`GenerateModules(payload, matrix, {utcTicks, sequenceId})`), and a payload of kind `MarkerKind::SequenceEnd`, each shown for a few frames. The sequence id is 16 opaque bytes unique to the run: a UUID's
   bytes, or a text tag of up to 16 printable ASCII characters (`SequenceId::TryFromText`).
 - **Sync marker (optional; required for camera capture):** a small second marker with only the frame index, drawn bottom-left
   (`RecommendedOrigin(MarkerKind::Sync, …)`) with a payload of kind `MarkerKind::Sync`.
@@ -63,19 +65,20 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
 
 Everything is declared by `<mb/framemarker/FrameMarker.hpp>` in `MB::FrameMarker`, one header per type.
 
-| Function or type                                                                   | What it does                                                                 |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                             | What a marker carries                                                        |
-| `Options`, `Point`                                                                 | Size and place                                                               |
-| `GenerateTriangles`, `GenerateIndexed`, `GenerateQuads` (+ `GenerateStart…`)       | The marker as a triangle list, indexed triangles or quads, into your buffers |
-| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount` | Buffer sizes that fit every marker kind                                      |
-| `QuadsToTriangles`, `QuadsToIndexed`                                               | Convert quads                                                                |
-| `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                            | Sizing and placement                                                         |
-| `MinimumModuleSizePx`, `RecommendModuleSizePx`                                     | Module size for a capture's scaling                                          |
-| `EncodePayload`, `TryDecodePayload`, `ToDateTimeTicks`                             | The wire format and its time units                                           |
-| `GenerateModules`, `ModuleMatrix`                                                  | The QR module matrix                                                         |
+| Function or type                                                                                               | What it does                                                                         |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                         | What a marker carries                                                                |
+| `Options`, `Point`                                                                                             | Size and place                                                                       |
+| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
+| `ModulesToTriangles`, `ModulesToIndexed`, `ModulesToQuads`                                                     | Draw it as a triangle list, indexed triangles or quads, into your buffers            |
+| `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
+| `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |
+| `MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                 | Module size for a capture's scaling                                                  |
+| `EncodePayload`, `TryDecodePayload`, `ToDateTimeTicks`                                                         | The wire format and its time units                                                   |
 
-Every function is `noexcept` and returns 0 (or `{0, 0}`) when the options are invalid or a buffer is too small.
+Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the options are invalid, the matrix is empty or a
+buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
 
 ## Build and test
 

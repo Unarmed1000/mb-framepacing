@@ -2,7 +2,7 @@
 #define MB_FRAMEMARKER_FRAMEMARKER_HPP
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// MB::FrameMarker - renders a machine readable frame marker (QR code) as pixel aligned geometry.
+// MB::FrameMarker - renders a machine readable frame marker (QR code) as pixel aligned geometry or a bitmap.
 //
 // The marker encodes a frame index and the animation time (C# TimeSpan ticks, 100ns) so a capture of the display output
 // can be compared against the capture timeline. See doc/marker-format.md for the full specification.
@@ -18,6 +18,7 @@
 #include <mb/framemarker/ModuleMatrix.hpp>
 #include <mb/framemarker/Options.hpp>
 #include <mb/framemarker/Payload.hpp>
+#include <mb/framemarker/PixelFormat.hpp>
 #include <mb/framemarker/Point.hpp>
 #include <mb/framemarker/Quad.hpp>
 #include <mb/framemarker/SequenceId.hpp>
@@ -135,9 +136,6 @@ namespace MB::FrameMarker
     return {inset, inset};
   }
 
-  //! Serialize the 48 byte payload header (the complete payload of frame and end markers; a sync marker uses its first 12 bytes).
-  std::array<uint8_t, PayloadByteCount> EncodePayload(const Payload& payload) noexcept;
-
   //! Serialize a complete payload into dst (MaxEncodedPayloadByteCount bytes is always enough). Start markers append the metadata, other
   //! kinds ignore it. A frame or end marker is PayloadByteCount bytes, a start marker StartPayloadByteCount, a sync marker
   //! SyncPayloadByteCount. Returns the number of bytes written, or 0 if dst is too small.
@@ -147,50 +145,49 @@ namespace MB::FrameMarker
   //! For a start marker pMetadata (optional) receives the metadata; other kinds reset it.
   bool TryDecodePayload(std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* pMetadata = nullptr) noexcept;
 
-  //! Build the QR module matrix for the payload (metadata is only used by start markers).
-  //! Returns false if the QR encoder fails.
+  //! Encode a marker: the payload's QR symbol as a module matrix, the one step every drawing output starts from (metadata is only used by
+  //! start markers). Draw it with ModulesToQuads, ModulesToTriangles, ModulesToIndexed or ModulesToBitmap; one matrix can feed several.
+  //! Does not allocate. Returns false (rMatrix unchanged) if the payload cannot be encoded.
   bool GenerateModules(const Payload& payload, ModuleMatrix& rMatrix, const StartMetadata& metadata = {}) noexcept;
 
-  //! Generate the marker as quads. The first quad is the light background (symbol + quiet zone), followed by one dark quad per
-  //! horizontal run of dark modules. Draw them in order. Does not allocate.
-  //! Frame, end and sync markers (by payload.Kind). Every marker produces at most MaxQuadCount() quads. A start marker generated here
-  //! carries empty metadata.
-  //! Returns the number of quads written, or 0 if the options are invalid or dst is smaller than the generated quad count.
-  std::size_t GenerateQuads(const Payload& payload, const Options& options, Point origin, std::span<Quad> dst) noexcept;
+  //! The marker as quads: the light background (symbol + quiet zone) first, then one dark quad per horizontal run of dark modules. Draw
+  //! them in order. Every marker produces at most MaxQuadCount() quads. Does not allocate.
+  //! Returns the number of quads written, or 0 if the options are invalid, the matrix is empty or dst is too small.
+  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<Quad> dst) noexcept;
 
-  //! Generate a start marker carrying metadata (payload.Kind is forced to SequenceStart). Same rules as GenerateQuads.
-  std::size_t GenerateStartQuads(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
-                                 std::span<Quad> dst) noexcept;
+  //! The marker as a triangle list, written straight into dst: 6 vertices per quad (see ModulesToQuads for the quad order), (TL, TR, BL)
+  //! (BL, TR, BR), clockwise on screen. Every vertex lies on a pixel corner. Every marker needs at most MaxTriangleVertexCount() vertices.
+  //! Returns the number of vertices written, or 0 if the options are invalid, the matrix is empty or dst is too small.
+  std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
 
-  //! Generate the marker as a triangle list, written straight into dst: 6 vertices per quad (see GenerateQuads for the quad order),
-  //! (TL, TR, BL) (BL, TR, BR), clockwise on screen. Every vertex lies on a pixel corner. Does not allocate.
-  //! Every marker needs at most MaxTriangleVertexCount() vertices.
-  //! Returns the number of vertices written, or 0 if the options are invalid or dst is too small.
-  std::size_t GenerateTriangles(const Payload& payload, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
+  //! The marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on screen.
+  //! baseVertex is added to every index. Every marker needs at most MaxIndexedVertexCount() vertices and MaxIndexCount() indices.
+  //! Returns {0,0} if the options are invalid, the matrix is empty or a destination is too small.
+  IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<Vertex> dstVertices,
+                                std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
 
-  //! GenerateTriangles for a start marker carrying metadata (payload.Kind is forced to SequenceStart).
-  std::size_t GenerateStartTriangles(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
-                                     std::span<Vertex> dst) noexcept;
+  //! Bytes per pixel of a PixelFormat.
+  constexpr int32_t BytesPerPixel(const PixelFormat format) noexcept
+  {
+    switch (format)
+    {
+    case PixelFormat::Rgb24:
+      return 3;
+    case PixelFormat::Rgba32:
+      return 4;
+    case PixelFormat::Gray8:
+      break;
+    }
+    return 1;
+  }
 
-  //! Generate the marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on
-  //! screen. baseVertex is added to every index. Does not allocate.
-  //! Every marker needs at most MaxIndexedVertexCount() vertices and MaxIndexCount() indices.
-  //! Returns {0,0} if the options are invalid or a destination is too small.
-  IndexedCount GenerateIndexed(const Payload& payload, const Options& options, Point origin, std::span<Vertex> dstVertices,
-                               std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
-
-  //! GenerateIndexed for a start marker carrying metadata (payload.Kind is forced to SequenceStart).
-  IndexedCount GenerateStartIndexed(const Payload& payload, const StartMetadata& metadata, const Options& options, Point origin,
-                                    std::span<Vertex> dstVertices, std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
-
-  //! Convert quads to a triangle list: 6 vertices per quad, (TL, TR, BL) (BL, TR, BR), clockwise on screen (+y down).
-  //! Returns the number of vertices written, or 0 if dst is too small.
-  std::size_t QuadsToTriangles(std::span<const Quad> quads, std::span<Vertex> dst) noexcept;
-
-  //! Convert quads to an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on screen.
-  //! baseVertex is added to every index. Returns {0,0} if a destination is too small.
-  IndexedCount QuadsToIndexed(std::span<const Quad> quads, std::span<Vertex> dstVertices, std::span<uint32_t> dstIndices,
-                              uint32_t baseVertex = 0) noexcept;
+  //! Draw the marker into a width x height pixel buffer, rows stride bytes apart (0 = width x BytesPerPixel(format)): the light background
+  //! (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in every colour channel and alpha 255. The marker is clipped to
+  //! the buffer; other pixels are left as they are. With ModuleSizePx 1 and origin (0,0) this is a module-resolution image (a texture to
+  //! scale up with point filtering). Does not allocate.
+  //! Returns false, writing nothing, if the options are invalid, the matrix is empty, the stride is shorter than a row or dst is too small.
+  bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<uint8_t> dst, int32_t width, int32_t height,
+                       PixelFormat format, std::size_t stride = 0) noexcept;
 }
 
 #endif

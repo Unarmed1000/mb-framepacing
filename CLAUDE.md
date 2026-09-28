@@ -213,6 +213,10 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
 - **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested). The C++ public API
   has one header per type; `FrameMarker.hpp` includes them all and declares the functions. CI runs `tools/check_one_type_per_file.py`.
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
+- **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
+  `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
+  `ModulesToIndexed` or `ModulesToBitmap`. C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
+  value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**
   - hand-maintained SDK csproj files (no FslBuild or MB.gen);
   - package versions only in the root `Directory.Packages.props`;

@@ -119,12 +119,14 @@ Marker size in source pixels = `(modules + 2 × QuietZoneModules) × ModuleSizeP
 
 - Pixel coordinates with the **origin at the top-left**, **+x right**, **+y down**.
 - Every vertex lies on an integer **pixel edge**. A quad covers exactly the pixels `[Left, Right) × [Top, Bottom)`.
-- `GenerateQuads` (frame, end and sync markers, chosen by the payload's kind) and `GenerateStartQuads` (start marker with metadata) return the light background
-  quad first (symbol plus quiet zone), then one dark quad per horizontal run of dark modules. Draw them in that order.
-  Every marker produces at most 862 quads (`MaxQuadCount()`); size caller buffers with `MaxQuadCount()` /
-  `MaxTriangleVertexCount()`.
-- `QuadsToTriangles` produces 6 vertices per quad. `QuadsToIndexed` produces 4 vertices and 6 indices per quad. Both wind clockwise on screen
-  (+y down). Disable back-face culling for the marker draw, or pick the cull mode that matches.
+- A marker is **encoded once** (`GenerateModules`: the payload's QR symbol as a module matrix, 1 bit per module, packed row-major,
+  most significant bit first, 211 bytes for 41×41, 79 for the sync marker's 25×25) and **drawn from the matrix**, in any of these forms:
+  - `ModulesToQuads`: the light background quad first (symbol plus quiet zone), then one dark quad per horizontal run of dark modules.
+    Draw them in that order. Every marker produces at most 862 quads (`MaxQuadCount()`).
+  - `ModulesToTriangles`: 6 vertices per quad, (TL, TR, BL) (BL, TR, BR). `ModulesToIndexed`: 4 vertices (TL, TR, BR, BL) and 6
+    indices (0,1,3)(3,1,2) per quad. Both wind clockwise on screen (+y down): disable back-face culling for the marker draw, or pick the
+    cull mode that matches. Size caller buffers with `MaxTriangleVertexCount()`, `MaxIndexedVertexCount()` and `MaxIndexCount()`.
+  - `ModulesToBitmap`: the same pixels, drawn into a grey, RGB or RGBA pixel buffer (0 or 255 in every colour channel, alpha 255).
 
 ### Renderer rules
 
@@ -264,26 +266,19 @@ namespace FM = MB::FrameMarker;
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};   // 6 px
 const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 2);
 
-std::array<FM::Quad, FM::MaxQuadCount()> quads;
+FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, after all post-processing and UI
-std::size_t quadCount = 0;
 // Pacing: when the pacer intends this frame to be shown (steady clock ticks) and its target frame time. When the CPU started this
 // frame (the same clock) and how long it has worked on it until now (the marker is drawn last, just before Present). 0 = unknown
 const FM::Payload payload{frameIndex, animationTicks, runId, kind, intendedDisplayTicks, targetFrameTicks,
                           cpuStartTicks, cpuBusyTicks};
-if (kind == FM::MarkerKind::SequenceStart)
-{
-  // Captured once when the run started: startUtcTicks = FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id
-  // unique to the run (a UUID's 16 bytes, or a text tag: FM::SequenceId::TryFromText("menu-scroll", sequenceId))
-  quadCount = FM::GenerateStartQuads(payload, {startUtcTicks, sequenceId}, options, origin, quads);
-}
-else
-{
-  quadCount = FM::GenerateQuads(payload, options, origin, quads);
-}
-const std::size_t vertexCount = FM::QuadsToTriangles(std::span(quads).first(quadCount), vertices);
+// A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
+// FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
+// FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.
+FM::GenerateModules(payload, matrix, {startUtcTicks, sequenceId});                       // encode once
+const std::size_t vertexCount = FM::ModulesToTriangles(matrix, options, origin, vertices); // draw it
 // upload vertices[0..vertexCount) and draw them as a triangle list with color (Luma, Luma, Luma)
 ```
 

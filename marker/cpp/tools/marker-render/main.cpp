@@ -55,27 +55,12 @@ namespace
     image.Height = request.CanvasHeight > 0 ? request.CanvasHeight : request.Origin.Y + markerSize + FM::RecommendedInsetPx;
     image.Pixels.assign(static_cast<std::size_t>(image.Width) * static_cast<std::size_t>(image.Height), request.Background);
 
-    std::vector<FM::Quad> quads(FM::MaxQuadCount());
-    const std::size_t quadCount = request.Payload.Kind == FM::MarkerKind::SequenceStart
-                                    ? FM::GenerateStartQuads(request.Payload, request.Start, request.Options, request.Origin, quads)
-                                    : FM::GenerateQuads(request.Payload, request.Options, request.Origin, quads);
-    if (quadCount == 0)
+    // The library draws it: pixel (x,y) is covered when Left <= x < Right, exactly as a GPU rasterizes pixel-edge geometry
+    FM::ModuleMatrix matrix;
+    if (!FM::GenerateModules(request.Payload, matrix, request.Start) ||
+        !FM::ModulesToBitmap(matrix, request.Options, request.Origin, image.Pixels, image.Width, image.Height, FM::PixelFormat::Gray8))
     {
-      throw std::runtime_error("GenerateQuads failed (invalid options?)");
-    }
-
-    // Rasterize exactly like a GPU with top-left fill rules and pixel-edge vertices: pixel (x,y) is covered when Left <= x < Right.
-    for (std::size_t i = 0; i < quadCount; ++i)
-    {
-      const FM::Quad& quad = quads[i];
-      const uint8_t luma = quad.Dark ? 0u : 255u;
-      for (int32_t y = std::max(quad.Top, 0); y < std::min(quad.Bottom, image.Height); ++y)
-      {
-        for (int32_t x = std::max(quad.Left, 0); x < std::min(quad.Right, image.Width); ++x)
-        {
-          image.Pixels[(static_cast<std::size_t>(y) * static_cast<std::size_t>(image.Width)) + static_cast<std::size_t>(x)] = luma;
-        }
-      }
+      throw std::runtime_error("Drawing the marker failed (invalid options?)");
     }
     return image;
   }
@@ -252,29 +237,11 @@ namespace
       {
         throw std::runtime_error("GenerateModules failed for digest row " + std::to_string(row));
       }
-      std::vector<uint8_t> bits;
-      uint8_t current = 0;
-      int32_t bitCount = 0;
-      for (int32_t y = 0; y < matrix.Size; ++y)
-      {
-        for (int32_t x = 0; x < matrix.Size; ++x)
-        {
-          current = static_cast<uint8_t>((static_cast<uint32_t>(current) << 1u) | (matrix.IsDark(x, y) ? 1u : 0u));
-          if (++bitCount == 8)
-          {
-            bits.push_back(current);
-            current = 0;
-            bitCount = 0;
-          }
-        }
-      }
-      if (bitCount > 0)
-      {
-        bits.push_back(static_cast<uint8_t>(static_cast<uint32_t>(current) << static_cast<uint32_t>(8 - bitCount)));
-      }
+      // The matrix is stored packed exactly as the digest writes it
+      const std::vector<uint8_t> bits(matrix.Bits().begin(), matrix.Bits().end());
       digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
              << payload.IntendedDisplayTicks << ',' << payload.TargetFrameTicks << ',' << payload.CpuStartTicks << ',' << payload.CpuBusyTicks << ','
-             << start.UtcTicks << ',' << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size << ',' << ToHex(bits) << '\n';
+             << start.UtcTicks << ',' << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
     }
   }
 

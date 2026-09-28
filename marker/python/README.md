@@ -11,14 +11,14 @@ It draws exactly the same pixels as the C++ and C# libraries: the tests check it
 ## Quick start
 
 ```python
-from mb_framemarker import MarkerKind, Options, Payload, fill_quads, generate_quads, recommended_origin, seconds_to_ticks
+from mb_framemarker import MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, recommended_origin, seconds_to_ticks
 
 options = Options(module_size_px=3)
 origin = recommended_origin(MarkerKind.FRAME, width, height, options)
 
 # Every frame, last (after post effects and UI), without blending:
-quads = generate_quads(Payload(frame_index, seconds_to_ticks(animation_seconds), run_id=1), options, origin)
-fill_quads(rgb24_frame, width, height, quads, channels=3)
+matrix = generate_modules(Payload(frame_index, seconds_to_ticks(animation_seconds), run_id=1))  # encode once
+modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelFormat.RGB24)  # draw it
 ```
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
@@ -31,8 +31,8 @@ fill_quads(rgb24_frame, width, height, quads, channels=3)
   it before presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's
   `MsCPUBusy`; it may span several refreshes and does not include the GPU's work), in 100 ns ticks. CPU busy is `u32`; both default
   to `0` (unknown).
-- **Start and end:** bracket the part to measure with `generate_start_quads(payload, StartMetadata(utc_ticks, sequence_id), options,
-origin)` and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few frames. The sequence id is 16 opaque bytes unique to
+- **Start and end:** bracket the part to measure with a payload of kind `MarkerKind.SEQUENCE_START`, encoded with its metadata
+  (`generate_modules(payload, StartMetadata(utc_ticks, sequence_id))`), and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few frames. The sequence id is 16 opaque bytes unique to
   the run: `SequenceId.from_uuid(uuid.uuid4())` or a text tag of up to 16 printable ASCII characters, `SequenceId.from_text("run-42")`.
   `str(sequence_id)` shows it as the text, or as the UUID's 8-4-4-4-12 form.
 - **Size:** every main marker (frame, start and end) is QR version 6, 41×41 modules, so it never changes size:
@@ -43,8 +43,8 @@ origin)` and a payload of kind `MarkerKind.SEQUENCE_END`, each shown for a few f
 
 ```python
 sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)  # bottom-left
-sync_quads = generate_quads(Payload(frame_index, 0, kind=MarkerKind.SYNC), options, sync_origin)
-fill_quads(rgb24_frame, width, height, sync_quads, channels=3)
+sync = generate_modules(Payload(frame_index, 0, kind=MarkerKind.SYNC))
+modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelFormat.RGB24)
 ```
 
 `recommended_origin(kind, ...)` places the main marker top-left and the sync marker bottom-left, both inset 32 px (rounded up to the
@@ -55,19 +55,21 @@ and decode as `0`.
 
 The same API as the C# library (`MB.FrameMarker`), in Python's naming:
 
-| Python                                                                           | What it does                                                                     |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                           | What a marker carries                                                            |
-| `Options`, `Point`                                                               | Size and place                                                                   |
-| `generate_quads`, `generate_start_quads`                                         | The marker as quads: the light background, then one dark quad per run of modules |
-| `generate_triangles`, `generate_indexed` (and `generate_start_…`)                | The marker as a triangle list or indexed triangles, for a GPU                    |
-| `fill_quads`                                                                     | Draws quads into a pixel buffer (grey or rgb24, any stride)                      |
-| `marker_size_px`, `qr_module_count_for`, `recommended_origin`                    | Sizing and placement                                                             |
-| `minimum_module_size_px`, `recommend_module_size_px`                             | Module size for a capture's scaling                                              |
-| `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks` | The wire format and its time units                                               |
-| `generate_modules`                                                               | The QR module matrix                                                             |
+| Python                                                                           | What it does                                                                  |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                           | What a marker carries                                                         |
+| `Options`, `Point`                                                               | Size and place                                                                |
+| `generate_modules`, `ModuleMatrix` (`size`, `is_dark`, `bits`)                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes)                |
+| `modules_to_bitmap`, `PixelFormat`                                               | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                   |
+| `modules_to_quads`                                                               | Draw it as quads: the light background, then one dark quad per run of modules |
+| `modules_to_triangles`, `modules_to_indexed`                                     | Draw it as a triangle list or indexed triangles, for a GPU                    |
+| `marker_size_px`, `qr_module_count_for`, `recommended_origin`                    | Sizing and placement                                                          |
+| `minimum_module_size_px`, `recommend_module_size_px`                             | Module size for a capture's scaling                                           |
+| `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks` | The wire format and its time units                                            |
 
-`fill_quads` is the one addition: the C# and C++ libraries leave drawing to the GPU, a Python caller usually has a pixel buffer.
+A Python caller usually has a pixel buffer: `modules_to_bitmap` draws into it (a `bytearray`, PIL's `Image.tobytes`, a numpy array's
+memory). `PixelFormat` gives the byte layout: `RGB24` is `[R, G, B]`, `RGBA32` `[R, G, B, A]` with A 255; the marker is black and white,
+so BGR and BGRA buffers take the same bytes.
 
 ## Tests
 

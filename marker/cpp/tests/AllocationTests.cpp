@@ -126,7 +126,9 @@ namespace
   std::array<FM::Vertex, FM::MaxIndexedVertexCount()> g_indexedVertices{};
   std::array<uint32_t, FM::MaxIndexCount()> g_indices{};
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> g_payloadBytes{};
+  std::array<uint8_t, 294u * 294u * 4u> g_pixels{};
   FM::ModuleMatrix g_matrix{};
+  FM::ModuleMatrix g_startMatrix{};
 }
 
 TEST(Allocations, CountingWorks)
@@ -155,21 +157,18 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       const FM::Payload startPayload{frame, ticks, 7u, FM::MarkerKind::SequenceStart};
       written += FM::SequenceId::TryFromText("allocation-test", metadata.Id) ? 1u : 0u;
 
-      written += FM::GenerateQuads(framePayload, options, origin, g_quads);
-      written += FM::GenerateQuads(endPayload, options, origin, g_quads);
-      written += FM::GenerateStartQuads(framePayload, metadata, options, origin, g_quads);
-      written += FM::GenerateTriangles(framePayload, options, origin, g_triangleVertices);
-      written += FM::GenerateStartTriangles(framePayload, metadata, options, origin, g_triangleVertices);
-      written += FM::GenerateIndexed(framePayload, options, origin, g_indexedVertices, g_indices).IndexCount;
-      written += FM::GenerateStartIndexed(framePayload, metadata, options, origin, g_indexedVertices, g_indices, 16u).IndexCount;
       written += FM::GenerateModules(framePayload, g_matrix) ? 1u : 0u;
+      written += FM::GenerateModules(startPayload, g_startMatrix, metadata) ? 1u : 0u;
+      written += FM::ModulesToQuads(g_matrix, options, origin, g_quads);
+      written += FM::ModulesToQuads(g_startMatrix, options, origin, g_quads);
+      written += FM::ModulesToTriangles(g_matrix, options, origin, g_triangleVertices);
+      written += FM::ModulesToIndexed(g_matrix, options, origin, g_indexedVertices, g_indices, 16u).IndexCount;
+      written += FM::ModulesToBitmap(g_matrix, options, {0, 0}, g_pixels, 294, 294, FM::PixelFormat::Rgba32) ? 1u : 0u;
+      written += FM::ModulesToBitmap(g_startMatrix, {1, 0}, {0, 0}, g_pixels, 41, 41, FM::PixelFormat::Gray8) ? 1u : 0u;
+      written += g_matrix.Bits().size();
+      written += FM::GenerateModules(endPayload, g_matrix) ? 1u : 0u;
       written += FM::EncodePayload(framePayload, metadata, g_payloadBytes);
-      written += FM::EncodePayload(framePayload).size();
 
-      const std::size_t quadCount = FM::GenerateQuads(framePayload, options, origin, g_quads);
-      const std::span<const FM::Quad> quads(g_quads.data(), quadCount);
-      written += FM::QuadsToTriangles(quads, g_triangleVertices);
-      written += FM::QuadsToIndexed(quads, g_indexedVertices, g_indices).IndexCount;
 
       FM::Payload decoded;
       FM::StartMetadata decodedMetadata;

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <mb/framemarker/FrameMarker.hpp>
 #include <algorithm>
+#include <array>
+#include <bit>
 #include "qrcodegen.h"
 
 namespace MB::FrameMarker
@@ -14,40 +16,59 @@ namespace MB::FrameMarker
     static_assert(MaxQuadCount() == 862u);
     static_assert(MaxTriangleVertexCount() == 862u * 6u);
 
+    //! The first module at or after column from of a row (whose first module is bit rowStart) that is dark (or light), or size when there
+    //! is none. Reads whole bytes: a byte without such a module is skipped at once.
+    int32_t FindModule(const std::span<const uint8_t> bits, const std::size_t rowStart, const int32_t from, const int32_t size,
+                       const bool dark) noexcept
+    {
+      int32_t x = from;
+      while (x < size)
+      {
+        const std::size_t index = rowStart + static_cast<std::size_t>(x);
+        const auto offset = static_cast<uint32_t>(index % 8u);
+        const uint32_t byte = dark ? static_cast<uint32_t>(bits[index / 8u]) : (~static_cast<uint32_t>(bits[index / 8u]) & 0xFFu);
+        const auto remaining = static_cast<uint8_t>(byte & (0xFFu >> offset));
+        if (remaining == 0u)
+        {
+          x += static_cast<int32_t>(8u - offset);
+          continue;
+        }
+        // The most significant bit is the first module
+        x += static_cast<int32_t>(static_cast<uint32_t>(std::countl_zero(remaining)) - offset);
+        return std::min(x, size);
+      }
+      return size;
+    }
+
     //! Walk the marker in draw order: the light background (symbol + quiet zone), then one dark quad per horizontal run of dark modules.
     //! Every quad goes straight to emit, which writes it in its output format and returns false when the output is full.
     template <typename TEmit>
     bool WalkQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, TEmit&& emit) noexcept
     {
+      const int32_t size = matrix.Size();
       const int32_t moduleSize = options.ModuleSizePx;
-      const int32_t markerSize = (matrix.Size + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
+      const int32_t markerSize = (size + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
       const int32_t symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
       const int32_t symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
+      const std::span<const uint8_t> bits = matrix.Bits();
 
       if (!emit(Quad{origin.X, origin.Y, origin.X + markerSize, origin.Y + markerSize, false}))
       {
         return false;
       }
-      for (int32_t y = 0; y < matrix.Size; ++y)
+      for (int32_t y = 0; y < size; ++y)
       {
         const int32_t top = symbolTop + (y * moduleSize);
-        int32_t x = 0;
-        while (x < matrix.Size)
+        const std::size_t rowStart = static_cast<std::size_t>(y) * static_cast<std::size_t>(size);
+        int32_t x = FindModule(bits, rowStart, 0, size, true);
+        while (x < size)
         {
-          if (!matrix.IsDark(x, y))
-          {
-            ++x;
-            continue;
-          }
-          const int32_t runStart = x;
-          while (x < matrix.Size && matrix.IsDark(x, y))
-          {
-            ++x;
-          }
-          if (!emit(Quad{symbolLeft + (runStart * moduleSize), top, symbolLeft + (x * moduleSize), top + moduleSize, true}))
+          const int32_t runEnd = FindModule(bits, rowStart, x, size, false);
+          if (!emit(Quad{symbolLeft + (x * moduleSize), top, symbolLeft + (runEnd * moduleSize), top + moduleSize, true}))
           {
             return false;
           }
+          x = FindModule(bits, rowStart, runEnd, size, true);
         }
       }
       return true;
@@ -140,21 +161,39 @@ namespace MB::FrameMarker
       return complete ? count : IndexedCount{};
     }
 
-    //! The module matrix for a marker; forceStart makes it a start marker carrying the metadata.
-    bool BuildMatrix(const Payload& payload, const StartMetadata& metadata, const bool forceStart, const Options& options,
-                     ModuleMatrix& rMatrix) noexcept
+    //! Fill a quad, clipped to the buffer, with its luma in every colour channel (alpha 255).
+    void FillQuad(const Quad& quad, const std::span<uint8_t> dst, const int32_t width, const int32_t height, const std::size_t bytesPerPixel,
+                  const std::size_t stride) noexcept
     {
-      if (!IsValid(options))
+      const int32_t left = std::max(quad.Left, 0);
+      const int32_t right = std::min(quad.Right, width);
+      const int32_t top = std::max(quad.Top, 0);
+      const int32_t bottom = std::min(quad.Bottom, height);
+      if (left >= right || top >= bottom)
       {
-        return false;
+        return;
       }
-      if (!forceStart)
+      const uint8_t luma = quad.Dark ? 0u : 255u;
+      const auto columns = static_cast<std::size_t>(right - left);
+      for (int32_t y = top; y < bottom; ++y)
       {
-        return GenerateModules(payload, rMatrix);
+        const std::span<uint8_t> row =
+          dst.subspan((static_cast<std::size_t>(y) * stride) + (static_cast<std::size_t>(left) * bytesPerPixel), columns * bytesPerPixel);
+        if (bytesPerPixel == 4u)
+        {
+          for (std::size_t x = 0; x < row.size(); x += 4u)
+          {
+            row[x] = luma;
+            row[x + 1u] = luma;
+            row[x + 2u] = luma;
+            row[x + 3u] = 255u;
+          }
+        }
+        else
+        {
+          std::fill(row.begin(), row.end(), luma);
+        }
       }
-      Payload startPayload = payload;
-      startPayload.Kind = MarkerKind::SequenceStart;
-      return GenerateModules(startPayload, rMatrix, metadata);
     }
   }
 
@@ -175,89 +214,60 @@ namespace MB::FrameMarker
       return false;
     }
 
-    rMatrix.Size = qrcodegen_getSize(qrCode.data());
-    rMatrix.Modules.fill(0u);
-    for (int32_t y = 0; y < rMatrix.Size; ++y)
+    // Pack the symbol: row-major, most significant bit first, continuous across rows
+    const int32_t size = qrcodegen_getSize(qrCode.data());
+    std::array<uint8_t, MaxPackedModuleByteCount> bits{};
+    std::size_t index = 0;
+    for (int32_t y = 0; y < size; ++y)
     {
-      for (int32_t x = 0; x < rMatrix.Size; ++x)
+      for (int32_t x = 0; x < size; ++x, ++index)
       {
-        rMatrix.Modules[(static_cast<std::size_t>(y) * QrModuleCount) + static_cast<std::size_t>(x)] =
-          qrcodegen_getModule(qrCode.data(), x, y) ? 1u : 0u;
+        if (qrcodegen_getModule(qrCode.data(), x, y))
+        {
+          bits[index / 8u] = static_cast<uint8_t>(bits[index / 8u] | (0x80u >> (index % 8u)));
+        }
       }
     }
-    return true;
+    return ModuleMatrix::TryFromBits(size, bits, rMatrix);
   }
 
-  std::size_t GenerateQuads(const Payload& payload, const Options& options, const Point origin, const std::span<Quad> dst) noexcept
+  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Quad> dst) noexcept
   {
-    ModuleMatrix matrix;
-    return BuildMatrix(payload, {}, false, options, matrix) ? BuildQuads(matrix, options, origin, dst) : 0u;
+    return IsValid(options) && matrix.Size() > 0 ? BuildQuads(matrix, options, origin, dst) : 0u;
   }
 
-  std::size_t GenerateStartQuads(const Payload& payload, const StartMetadata& metadata, const Options& options, const Point origin,
-                                 const std::span<Quad> dst) noexcept
+  std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
   {
-    ModuleMatrix matrix;
-    return BuildMatrix(payload, metadata, true, options, matrix) ? BuildQuads(matrix, options, origin, dst) : 0u;
+    return IsValid(options) && matrix.Size() > 0 ? BuildTriangles(matrix, options, origin, dst) : 0u;
   }
 
-  std::size_t GenerateTriangles(const Payload& payload, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
+  IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
+                                const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
   {
-    ModuleMatrix matrix;
-    return BuildMatrix(payload, {}, false, options, matrix) ? BuildTriangles(matrix, options, origin, dst) : 0u;
+    return IsValid(options) && matrix.Size() > 0 ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex) : IndexedCount{};
   }
 
-  std::size_t GenerateStartTriangles(const Payload& payload, const StartMetadata& metadata, const Options& options, const Point origin,
-                                     const std::span<Vertex> dst) noexcept
+  bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<uint8_t> dst, const int32_t width,
+                       const int32_t height, const PixelFormat format, const std::size_t stride) noexcept
   {
-    ModuleMatrix matrix;
-    return BuildMatrix(payload, metadata, true, options, matrix) ? BuildTriangles(matrix, options, origin, dst) : 0u;
-  }
-
-  IndexedCount GenerateIndexed(const Payload& payload, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
-                               const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
-  {
-    ModuleMatrix matrix;
-    return BuildMatrix(payload, {}, false, options, matrix) ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex)
-                                                            : IndexedCount{};
-  }
-
-  IndexedCount GenerateStartIndexed(const Payload& payload, const StartMetadata& metadata, const Options& options, const Point origin,
-                                    const std::span<Vertex> dstVertices, const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
-  {
-    ModuleMatrix matrix;
-    return BuildMatrix(payload, metadata, true, options, matrix) ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex)
-                                                                 : IndexedCount{};
-  }
-
-  std::size_t QuadsToTriangles(const std::span<const Quad> quads, const std::span<Vertex> dst) noexcept
-  {
-    const std::size_t required = quads.size() * 6u;
-    if (dst.size() < required)
+    if (!IsValid(options) || matrix.Size() == 0 || width < 0 || height < 0)
     {
-      return 0;
+      return false;
     }
-    for (std::size_t i = 0; i < quads.size(); ++i)
+    const auto bytesPerPixel = static_cast<std::size_t>(BytesPerPixel(format));
+    const std::size_t rowBytes = static_cast<std::size_t>(width) * bytesPerPixel;
+    const std::size_t rowStride = stride == 0 ? rowBytes : stride;
+    const std::size_t required = height == 0 ? 0u : (rowStride * static_cast<std::size_t>(height - 1)) + rowBytes;
+    if (rowStride < rowBytes || dst.size() < required)
     {
-      WriteTriangles(quads[i], dst.subspan(i * 6u).first<6>());
+      return false;
     }
-    return required;
+    return WalkQuads(matrix, options, origin,
+                     [&](const Quad& quad) noexcept
+                     {
+                       FillQuad(quad, dst, width, height, bytesPerPixel, rowStride);
+                       return true;
+                     });
   }
 
-  IndexedCount QuadsToIndexed(const std::span<const Quad> quads, const std::span<Vertex> dstVertices, const std::span<uint32_t> dstIndices,
-                              const uint32_t baseVertex) noexcept
-  {
-    const std::size_t requiredVertices = quads.size() * 4u;
-    const std::size_t requiredIndices = quads.size() * 6u;
-    if (dstVertices.size() < requiredVertices || dstIndices.size() < requiredIndices)
-    {
-      return {};
-    }
-    for (std::size_t i = 0; i < quads.size(); ++i)
-    {
-      WriteIndexed(quads[i], dstVertices.subspan(i * 4u).first<4>(), dstIndices.subspan(i * 6u).first<6>(),
-                   baseVertex + static_cast<uint32_t>(i * 4u));
-    }
-    return {requiredVertices, requiredIndices};
-  }
 }

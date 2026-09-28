@@ -59,6 +59,7 @@ namespace MB.FrameMarker.Unity
     private Material m_material;
 
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
+    private readonly byte[] m_modules = new byte[Marker.MaxPackedModuleByteCount];
     private readonly Quad[] m_quads = new Quad[Marker.MaxQuadCount];
     private WaitForEndOfFrame m_endOfFrame;
     private Coroutine m_drawing;
@@ -220,10 +221,10 @@ namespace MB.FrameMarker.Unity
 
     private void DrawMarker(Material material, in Payload payload, in Options options, Point origin, int width, int height)
     {
-      int count =
-        payload.Kind == MarkerKind.SequenceStart
-          ? m_generator.GenerateStartQuads(payload, m_start, options, origin, m_quads)
-          : m_generator.GenerateQuads(payload, options, origin, m_quads);
+      // Encode once (a start marker carries the run's metadata), then draw from the modules
+      if (!m_generator.TryGenerateModules(payload, m_start, m_modules, out var matrix))
+        return;
+      int count = Marker.ModulesToQuads(matrix, options, origin, m_quads);
       FrameMarkerGL.DrawQuads(material, m_quads.AsSpan(0, count), width, height);
     }
 

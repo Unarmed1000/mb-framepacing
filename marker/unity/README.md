@@ -11,6 +11,7 @@ shows the **animation error**: how far what the game animated is from what was a
   - `FrameMarkerOverlay`: add it to a GameObject and the marker is drawn at the end of every frame, on top of everything.
   - `BeginRun` / `EndRun` / `RunFor`: bracket the part to measure with start and end markers.
   - `FrameMarkerMesh` and `PixelSpace`: draw the marker from your own render pipeline code.
+  - `FrameMarkerTexture`: the marker as a `Texture2D` at module resolution, for UI or anything that shows an image.
 - **Samples:** Benchmark (a camera pan measured as one run).
 
 ## Quick start

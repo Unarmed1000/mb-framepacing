@@ -16,7 +16,8 @@ namespace MB.FrameMarker.UnitTest
   public class AllocationTests
   {
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
-    private readonly ModuleMatrix m_matrix = new ModuleMatrix();
+    private readonly byte[] m_bits = new byte[Marker.MaxPackedModuleByteCount];
+    private readonly byte[] m_pixels = new byte[294 * 294 * 4];
     private readonly Quad[] m_quads = new Quad[Marker.MaxQuadCount];
     private readonly Vertex[] m_triangles = new Vertex[Marker.MaxTriangleVertexCount];
     private readonly Vertex[] m_indexedVertices = new Vertex[Marker.MaxIndexedVertexCount];
@@ -50,23 +51,27 @@ namespace MB.FrameMarker.UnitTest
       // The span path with stack buffers, as a caller without arrays uses it
       Span<Quad> stackQuads = stackalloc Quad[Marker.MaxQuadCount];
       Span<byte> stackBytes = stackalloc byte[Marker.MaxEncodedPayloadByteCount];
+      Span<byte> stackBits = stackalloc byte[Marker.MaxPackedModuleByteCount];
       for (int frame = 0; frame < frames; ++frame)
       {
         var payload = new Payload((ulong)frame, Marker.SecondsToTicks(frame / 60.0), 7, MarkerKind.Frame, 1000 + frame, 166_667, 900 + frame, 80_000);
-        written += m_generator.GenerateTriangles(payload, options, origin, m_triangles);
-        written += m_generator.GenerateStartTriangles(payload, m_metadata, options, origin, m_triangles);
-        written += m_generator.GenerateIndexed(payload, options, origin, m_indexedVertices, m_indices, 16).IndexCount;
-        written += m_generator.GenerateStartIndexed(payload, m_metadata, options, origin, m_indexedVertices, m_indices).IndexCount;
-        written += m_generator.GenerateQuads(payload.WithKind(MarkerKind.SequenceEnd), options, origin, m_quads);
-        written += m_generator.GenerateStartQuads(payload, m_metadata, options, origin, m_quads);
-        written += m_generator.GenerateModules(payload, m_matrix) ? 1 : 0;
+        if (m_generator.TryGenerateModules(payload, m_bits, out var matrix))
+        {
+          written += Marker.ModulesToTriangles(matrix, options, origin, m_triangles);
+          written += Marker.ModulesToIndexed(matrix, options, origin, m_indexedVertices, m_indices, 16).IndexCount;
+          written += Marker.ModulesToQuads(matrix, options, origin, m_quads);
+          written += Marker.ModulesToBitmap(matrix, options, default, m_pixels, 294, 294, PixelFormat.Rgba32) ? 1 : 0;
+        }
+        if (m_generator.TryGenerateModules(payload.WithKind(MarkerKind.SequenceStart), m_metadata, stackBits, out var start))
+        {
+          written += Marker.ModulesToTriangles(start, options, origin, m_triangles);
+          written += Marker.ModulesToQuads(start, options, origin, stackQuads);
+          written += Marker.ModulesToBitmap(start, new Options(1, 0), default, m_pixels, 41, 41, PixelFormat.Gray8) ? 1 : 0;
+        }
+        written += m_generator.TryGenerateModules(payload.WithKind(MarkerKind.Sync), stackBits, out var sync) ? sync.Bits.Length : 0;
         written += Marker.EncodePayload(payload, m_metadata, m_payloadBytes);
         written += SequenceId.FromGuid(g_guid).IsEmpty ? 0 : 1;
         written += SequenceId.TryFromText("camera pan", out var tag) && !tag.IsEmpty ? 1 : 0;
-        int quadCount = m_generator.GenerateQuads(payload, options, origin, m_quads);
-        written += Marker.QuadsToTriangles(m_quads.AsSpan(0, quadCount), m_triangles);
-        written += Marker.QuadsToIndexed(m_quads.AsSpan(0, quadCount), m_indexedVertices, m_indices).IndexCount;
-        written += m_generator.GenerateStartQuads(payload, m_metadata, options, origin, stackQuads);
         int byteCount = Marker.EncodePayload(payload.WithKind(MarkerKind.SequenceStart), m_metadata, stackBytes);
         written += Marker.TryDecodePayload(stackBytes.Slice(0, byteCount), out _, out var decoded) && !decoded.SequenceId.IsEmpty ? 1 : 0;
       }

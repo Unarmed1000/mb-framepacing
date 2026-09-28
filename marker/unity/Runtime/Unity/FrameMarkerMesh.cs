@@ -2,8 +2,9 @@
 //* File Description
 //* ----------------
 //* Keeps a Mesh with the current frame's marker, for drawing it through your own render pipeline code (a URP renderer feature, an HDRP
-//* custom pass or a CommandBuffer) instead of FrameMarkerOverlay. Draw the mesh last, with PixelSpace.Projection, an unlit vertex color
-//* material without blending, depth test or culling. Update never allocates.
+//* custom pass or a CommandBuffer) instead of FrameMarkerOverlay. Encode the marker with MarkerGenerator.TryGenerateModules and pass the
+//* matrix to Update. Draw the mesh last, with PixelSpace.Projection, an unlit vertex color material without blending, depth test or culling.
+//* Update never allocates.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -17,7 +18,6 @@ namespace MB.FrameMarker.Unity
 {
   public sealed class FrameMarkerMesh : IDisposable
   {
-    private readonly MarkerGenerator m_generator = new MarkerGenerator();
     private readonly Vertex[] m_vertices = new Vertex[Marker.MaxIndexedVertexCount];
     private readonly int[] m_indices = new int[Marker.MaxIndexCount];
     private readonly Vector3[] m_positions = new Vector3[Marker.MaxIndexedVertexCount];
@@ -33,15 +33,13 @@ namespace MB.FrameMarker.Unity
     public Mesh Mesh { get; private set; }
 
     /// <summary>
-    /// Fill the mesh with the marker for an output of <paramref name="outputHeight"/> pixels. <paramref name="start"/> is only used by start
-    /// markers. Returns false (and leaves the mesh unchanged) if the options are invalid.
+    /// Fill the mesh with the encoded marker (<see cref="MarkerGenerator.TryGenerateModules(in Payload, in StartMetadata, Span{byte}, out ModuleMatrix)"/>)
+    /// for an output of <paramref name="outputHeight"/> pixels. Returns false (and leaves the mesh unchanged) if the options are invalid or the
+    /// matrix is empty.
     /// </summary>
-    public bool Update(in Payload payload, in StartMetadata start, in Options options, Point origin, int outputHeight)
+    public bool Update(ModuleMatrix matrix, in Options options, Point origin, int outputHeight)
     {
-      var count =
-        payload.Kind == MarkerKind.SequenceStart
-          ? m_generator.GenerateStartIndexed(payload, start, options, origin, m_vertices, m_indices)
-          : m_generator.GenerateIndexed(payload, options, origin, m_vertices, m_indices);
+      var count = Marker.ModulesToIndexed(matrix, options, origin, m_vertices, m_indices);
       if (count.IndexCount == 0 || Mesh == null)
         return false;
 

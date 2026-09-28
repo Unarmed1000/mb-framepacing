@@ -8,6 +8,7 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,19 +25,20 @@ namespace MB.FrameMarker.UnitTest
     public void ModuleMatrices_MatchTheCppLibrary()
     {
       var generator = new MarkerGenerator();
-      var matrix = new ModuleMatrix();
+      var bits = new byte[Marker.MaxPackedModuleByteCount];
       var rows = GoldenData.ModuleDigest().ToList();
       Assert.That(rows, Has.Count.EqualTo(512));
 
       var mismatches = new List<string>();
       foreach (var row in rows)
       {
-        if (!generator.GenerateModules(row.Payload, row.Start, matrix))
+        if (!generator.TryGenerateModules(row.Payload, row.Start, bits, out var matrix))
         {
-          mismatches.Add($"{row}: GenerateModules failed");
+          mismatches.Add($"{row}: TryGenerateModules failed");
           continue;
         }
-        if (matrix.Size != row.Size || Pack(matrix) != row.ModulesHex)
+        // The matrix is stored packed exactly as the digest writes it; IsDark reads the same bits
+        if (matrix.Size != row.Size || Hex(matrix.Bits) != row.ModulesHex || Pack(matrix) != row.ModulesHex)
           mismatches.Add($"{row}: {row.Payload} size {matrix.Size} (expected {row.Size})");
       }
       Assert.That(mismatches, Is.Empty, string.Join("\n", mismatches.Take(10)));
@@ -50,11 +52,10 @@ namespace MB.FrameMarker.UnitTest
     public void GoldenImage_FromQuads(GoldenMarker golden)
     {
       var quads = new Quad[Marker.MaxQuadCount];
-      var generator = new MarkerGenerator();
       int count =
         golden.Payload.Kind == MarkerKind.SequenceStart
-          ? generator.GenerateStartQuads(golden.Payload, golden.Start, golden.Options, golden.Origin, quads)
-          : generator.GenerateQuads(golden.Payload, golden.Options, golden.Origin, quads);
+          ? TestMarkers.GenerateStartQuads(golden.Payload, golden.Start, golden.Options, golden.Origin, quads)
+          : TestMarkers.GenerateQuads(golden.Payload, golden.Options, golden.Origin, quads);
       Assert.That(count, Is.GreaterThan(0));
       AssertMatchesGolden(golden, SoftwareRaster.Quads(quads.Take(count).ToList(), golden.Width, golden.Height));
     }
@@ -63,11 +64,10 @@ namespace MB.FrameMarker.UnitTest
     public void GoldenImage_FromTriangles(GoldenMarker golden)
     {
       var vertices = new Vertex[Marker.MaxTriangleVertexCount];
-      var generator = new MarkerGenerator();
       int count =
         golden.Payload.Kind == MarkerKind.SequenceStart
-          ? generator.GenerateStartTriangles(golden.Payload, golden.Start, golden.Options, golden.Origin, vertices)
-          : generator.GenerateTriangles(golden.Payload, golden.Options, golden.Origin, vertices);
+          ? TestMarkers.GenerateStartTriangles(golden.Payload, golden.Start, golden.Options, golden.Origin, vertices)
+          : TestMarkers.GenerateTriangles(golden.Payload, golden.Options, golden.Origin, vertices);
       Assert.That(count, Is.GreaterThan(0));
       AssertMatchesGolden(golden, SoftwareRaster.Triangles(vertices.Take(count).ToList(), golden.Width, golden.Height));
     }
@@ -78,15 +78,26 @@ namespace MB.FrameMarker.UnitTest
       const int BaseVertex = 100;
       var vertices = new Vertex[Marker.MaxIndexedVertexCount];
       var indices = new int[Marker.MaxIndexCount];
-      var generator = new MarkerGenerator();
       var count =
         golden.Payload.Kind == MarkerKind.SequenceStart
-          ? generator.GenerateStartIndexed(golden.Payload, golden.Start, golden.Options, golden.Origin, vertices, indices, BaseVertex)
-          : generator.GenerateIndexed(golden.Payload, golden.Options, golden.Origin, vertices, indices, BaseVertex);
+          ? TestMarkers.GenerateStartIndexed(golden.Payload, golden.Start, golden.Options, golden.Origin, vertices, indices, BaseVertex)
+          : TestMarkers.GenerateIndexed(golden.Payload, golden.Options, golden.Origin, vertices, indices, BaseVertex);
       Assert.That(count.IndexCount, Is.GreaterThan(0));
       var expanded = SoftwareRaster.Expand(vertices, indices, count.IndexCount, BaseVertex);
       AssertMatchesGolden(golden, SoftwareRaster.Triangles(expanded, golden.Width, golden.Height));
     }
+
+    [TestCaseSource(nameof(Golden))]
+    public void GoldenImage_FromTheBitmap(GoldenMarker golden)
+    {
+      var pixels = new byte[golden.Width * golden.Height];
+      Array.Fill(pixels, (byte)128);
+      var matrix = TestMarkers.Encode(golden.Payload, golden.Start);
+      Assert.That(Marker.ModulesToBitmap(matrix, golden.Options, golden.Origin, pixels, golden.Width, golden.Height, PixelFormat.Gray8), Is.True);
+      AssertMatchesGolden(golden, pixels);
+    }
+
+    private static string Hex(ReadOnlySpan<byte> bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
 
     private static void AssertMatchesGolden(GoldenMarker golden, byte[] pixels)
     {
