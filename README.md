@@ -226,13 +226,16 @@ of the two causes of animation error dominates: frames with an error where the d
 early or dropped frames); frames with an error while the display time stays even are **delta time jitter** (uneven animation
 steps).
 
-The **Timeline** tab puts everything on one time axis; zooming or panning one chart moves the others:
+The **Timeline** tab puts everything on one time axis; zooming or panning one chart moves the others, and **Reset zoom** (or a
+double-click on a chart) shows the whole run again:
 
-![The Timeline tab: animation error, display time and animation time step, late share and refresh strip](doc/images/chart-timeline.png)
+![The Timeline tab: animation error, display time, late share and refresh strip](doc/images/chart-timeline.png)
 
-- **Animation error per presented frame**, with late frames in red. Everything between the dashed lines counts as no error.
-- **Display time and animation time step:** their difference is the error. An error where the display time (blue) jumps is bad
-  pacing; an error while it stays flat and the animation time step (orange) jumps is delta time jitter.
+- **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
+  nothing. Everything inside the shaded band counts as no error.
+- **Display time:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
+  when the frame was held too long because the next one was late; the dotted line is the target. An error bar over a red step is
+  bad pacing; an error bar while the steps stay flat is delta time jitter.
 - **Share of late frames in the last 2 s:** rare spikes stay low, busy stretches stand out, and they call for different fixes.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
   Zoom in to see hold patterns such as 3-then-1.

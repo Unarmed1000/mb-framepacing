@@ -111,7 +111,7 @@ namespace MB.FramePacing.DocImages
         Path.Combine(output, "chart-timeline.png"),
         900,
         (analysisView.FindControl<AvaPlot>("ErrorPlot")!.Plot, 300),
-        (analysisView.FindControl<AvaPlot>("DisplayAnimationPlot")!.Plot, 300),
+        (analysisView.FindControl<AvaPlot>("DisplayTimePlot")!.Plot, 300),
         (analysisView.FindControl<AvaPlot>("LateSharePlot")!.Plot, 200),
         (analysisView.FindControl<AvaPlot>("RefreshStripPlot")!.Plot, 150)
       );

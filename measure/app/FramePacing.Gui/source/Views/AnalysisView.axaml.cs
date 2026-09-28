@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* Analysis page view. The charts are ScottPlot controls, drawn by the shared RunCharts (the same charts the report files hold) whenever the
-//* selected run or the theme changes (ScottPlot is not bindable). The Timeline plots are linked on their time axis.
+//* selected run or the theme changes (ScottPlot is not bindable). The Timeline plots are linked on their time axis. Reset zoom, or a
+//* double-click on a chart, draws them again for the whole run.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -11,10 +12,13 @@
 using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Styling;
 using MB.FramePacing.Charts;
 using MB.FramePacing.Gui.ViewModels;
 using ScottPlot.Avalonia;
+using ScottPlot.Interactivity;
+using ScottPlot.Interactivity.UserActionResponses;
 
 namespace MB.FramePacing.Gui.Views
 {
@@ -26,11 +30,28 @@ namespace MB.FramePacing.Gui.Views
     {
       InitializeComponent();
       LinkTimeline();
+      ResetOnDoubleClick();
       DataContextChanged += (_, _) => Attach(DataContext as AnalysisViewModel);
       ActualThemeVariantChanged += (_, _) => Redraw();
     }
 
-    private AvaPlot[] TimelinePlots => new[] { ErrorPlot, DisplayAnimationPlot, LateSharePlot, RefreshStripPlot };
+    private AvaPlot[] TimelinePlots => new[] { ErrorPlot, DisplayTimePlot, LateSharePlot, RefreshStripPlot };
+
+    private AvaPlot[] AllPlots =>
+      TimelinePlots.Concat(new[] { ErrorHistogramPlot, ErrorPercentilePlot, DisplayTimeHistogramPlot, DriftPlot }).ToArray();
+
+    /// <summary>Double-clicking a chart resets the zoom (instead of ScottPlot's benchmark overlay), like the Reset zoom button.</summary>
+    private void ResetOnDoubleClick()
+    {
+      foreach (var plot in AllPlots)
+      {
+        plot.UserInputProcessor.DoubleLeftClickBenchmark(false);
+        plot.UserInputProcessor.UserActionResponses.Add(new DoubleClickResponse(StandardMouseButtons.Left, (_, _) => Redraw()));
+      }
+    }
+
+    /// <summary>Back to the whole run: every chart is drawn again with its own limits.</summary>
+    private void OnResetZoom(object? sender, RoutedEventArgs e) => Redraw();
 
     /// <summary>Panning or zooming one Timeline plot moves the others along the time axis.</summary>
     private void LinkTimeline()
@@ -63,12 +84,12 @@ namespace MB.FramePacing.Gui.Views
     {
       var run = m_viewModel?.SelectedRun?.Chart;
       var theme = ActualThemeVariant == ThemeVariant.Dark ? ChartTheme.Dark : ChartTheme.Light;
-      RunCharts.Timeline(run, theme, ErrorPlot.Plot, DisplayAnimationPlot.Plot, LateSharePlot.Plot, RefreshStripPlot.Plot);
+      RunCharts.Timeline(run, theme, ErrorPlot.Plot, DisplayTimePlot.Plot, LateSharePlot.Plot, RefreshStripPlot.Plot);
       RunCharts.ErrorHistogram(run, theme, ErrorHistogramPlot.Plot);
       RunCharts.ErrorPercentiles(run, theme, ErrorPercentilePlot.Plot);
       RunCharts.DisplayTimeHistogram(run, theme, DisplayTimeHistogramPlot.Plot);
       RunCharts.Drift(run, theme, DriftPlot.Plot);
-      foreach (var plot in TimelinePlots.Concat(new[] { ErrorHistogramPlot, ErrorPercentilePlot, DisplayTimeHistogramPlot, DriftPlot }))
+      foreach (var plot in AllPlots)
         plot.Refresh();
     }
   }

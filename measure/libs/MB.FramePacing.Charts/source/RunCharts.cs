@@ -2,14 +2,15 @@
 //* File Description
 //* ----------------
 //* The charts of one analysed run, drawn into ScottPlot plots: the GUI passes its controls' plots, the report files new ones. The Timeline
-//* stacks the animation error, its causes (display time and animation time step), the late share and the refresh strip on one time axis
-//* (seconds since the run's first frame); the distributions are the error and display time histograms, the error percentiles and the drift.
+//* stacks the animation error, the display time, the late share and the refresh strip on one time axis (seconds since the run's first
+//* frame); the distributions are the error and display time histograms, the error percentiles and the drift.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using MB.FramePacing.Analysis;
@@ -20,10 +21,6 @@ namespace MB.FramePacing.Charts
   public static class RunCharts
   {
     // Legend texts, which also name the series
-    public const string AnimationErrorLegend = "animation error";
-    public const string LateFrameLegend = "late frame";
-    public const string DisplayTimeLegend = "display time";
-    public const string AnimationStepLegend = "animation time step";
     public const string TargetLegend = "target";
     public const string ErrorPercentileLegend = "|animation error|";
 
@@ -31,56 +28,68 @@ namespace MB.FramePacing.Charts
     private const float TimelineLeftAxisPixels = 70;
 
     /// <summary>
-    /// The Timeline: the animation error on top, the display time and animation time step that cause it below (error while the display time
-    /// stays flat is delta time jitter, error where it jumps is bad pacing), the share of late frames over the last seconds, and the refresh
-    /// strip. Late frames are red throughout. All four share the x range.
+    /// The Timeline (after mb-framepacing-explained's charts): the animation error per frame as signed bars on top, right below it the display
+    /// time as held steps (an error while the steps stay flat is delta time jitter, an error at a red step is bad pacing), the share of late
+    /// frames over the last seconds, and the refresh strip. Late frames and frames held too long are red throughout. All four share the x range.
     /// </summary>
-    public static void Timeline(ChartRun? run, ChartTheme theme, Plot error, Plot displayAnimation, Plot lateShare, Plot strip)
+    public static void Timeline(ChartRun? run, ChartTheme theme, Plot error, Plot displayTime, Plot lateShare, Plot strip)
     {
       var frames = run?.Run.Frames.ToArray() ?? Array.Empty<PresentedFrame>();
       long origin = frames.Length > 0 ? frames[0].FirstSeenTicks : 0;
       double Seconds(PresentedFrame f) => (f.FirstSeenTicks - origin) / (double)TimeSpan.TicksPerSecond;
-      static bool IsLate(PresentedFrame f) => f.Flags.HasFlag(PresentedFrameFlags.Late);
-      var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToArray();
-      double[] times = withMetrics.Select(Seconds).ToArray();
-      var late = withMetrics.Where(IsLate).ToArray();
-      double[] lateTimes = late.Select(Seconds).ToArray();
       var pacing = run?.Run.Pacing;
+      long refresh = pacing != null ? Ticks(pacing.RefreshPeriodMs) : run?.CapturePeriodTicks ?? 0;
 
-      Reset(error, theme, "Animation error per presented frame", "error (ms)", string.Empty);
-      if (withMetrics.Length > 0)
+      Reset(error, theme, "Animation error: + shown too soon, - shown too late (the band is within the threshold)", string.Empty, string.Empty);
+      if (frames.Any(f => f.AnimationErrorTicks.HasValue))
       {
-        var errors = error.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationErrorTicks!.Value)).ToArray());
-        errors.LineWidth = 0;
-        errors.MarkerSize = 4;
-        errors.LegendText = AnimationErrorLegend;
-        AddLateMarkers(error, lateTimes, late.Select(f => Ms(f.AnimationErrorTicks!.Value)).ToArray());
-        AddThresholdLines(error, run!, vertical: false, symmetric: true);
-        TimelineLegend(error);
+        var bars = new AnimationErrorBarsPlottable(frames, origin, refresh, run!.ErrorThresholdTicks)
+        {
+          BarColor = ChartTheme.Late,
+          BandColor = theme.Foreground.WithAlpha(0.08),
+          ZeroLineColor = theme.Foreground.WithAlpha(0.45),
+        };
+        error.Add.Plottable(bars);
+        error.Axes.Left.TickGenerator = ManualTicks(AnimationErrorBarsPlottable.Ticks(bars.LimitMs));
+        error.Axes.Margins(bottom: 0, top: 0);
       }
 
-      Reset(displayAnimation, theme, "Display time and animation time step (their difference is the error)", "ms", string.Empty);
-      if (withMetrics.Length > 0)
+      Reset(
+        displayTime,
+        theme,
+        "Display time: how long each frame stayed on screen; red held too long, dotted the target",
+        string.Empty,
+        string.Empty
+      );
+      var steps = new DisplayTimeStepsPlottable(frames, origin, refresh)
       {
-        var display = displayAnimation.Add.Scatter(times, withMetrics.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
-        display.LegendText = DisplayTimeLegend;
-        display.MarkerSize = 3;
-        var animation = displayAnimation.Add.Scatter(times, withMetrics.Select(f => Ms(f.AnimationDeltaTicks!.Value)).ToArray());
-        animation.LegendText = AnimationStepLegend;
-        animation.MarkerSize = 3;
-        AddLateMarkers(displayAnimation, lateTimes, late.Select(f => Ms(f.DisplayDeltaTicks!.Value)).ToArray());
-        // Every frame's target: steps where the pacer changes its rate (or follows its schedule)
-        var targeted = withMetrics.Where(f => f.TargetTicks.HasValue).ToArray();
+        OnTimeColor = theme.OnTime,
+        HeldTooLongColor = ChartTheme.Late,
+        RiserColor = theme.Foreground.WithAlpha(0.3),
+      };
+      if (steps.StartTicks.Count > 0)
+      {
+        // Each frame's target, over the hold it measures (from the previous frame): steps where the pacer changes its rate. Behind the holds,
+        // so it only shows where they differ
+        var targeted = Enumerable
+          .Range(1, frames.Length - 1)
+          .Where(i => frames[i].TargetTicks.HasValue && frames[i].DisplayDeltaTicks.HasValue && frames[i - 1].Segment == frames[i].Segment)
+          .ToArray();
+        double topMs = steps.TopMs;
         if (targeted.Length > 0)
         {
-          var target = displayAnimation.Add.Scatter(targeted.Select(Seconds).ToArray(), targeted.Select(f => Ms(f.TargetTicks!.Value)).ToArray());
+          var targetMs = targeted.Select(i => Ms(frames[i].TargetTicks!.Value)).ToArray();
+          var target = displayTime.Add.Scatter(targeted.Select(i => Seconds(frames[i - 1])).ToArray(), targetMs);
           target.ConnectStyle = ConnectStyle.StepHorizontal;
           target.MarkerSize = 0;
           target.LinePattern = LinePattern.Dotted;
-          target.Color = Colors.Gray;
+          target.Color = theme.Foreground.WithAlpha(0.6);
           target.LegendText = TargetLegend;
+          topMs = Math.Max(topMs, targetMs.Max() + (steps.RefreshMs / 2));
         }
-        TimelineLegend(displayAnimation);
+        displayTime.Add.Plottable(steps);
+        displayTime.Axes.Left.TickGenerator = ManualTicks(DisplayTimeStepsPlottable.Ticks(steps.RefreshMs, topMs));
+        displayTime.Axes.Margins(bottom: 0, top: 0);
       }
 
       Reset(
@@ -122,7 +131,7 @@ namespace MB.FramePacing.Charts
 
       double start = frames.Length > 0 ? Seconds(frames[0]) : 0;
       double end = frames.Length > 0 ? Math.Max(start + 0.001, Seconds(frames[^1]) + (run!.CapturePeriodTicks / (double)TimeSpan.TicksPerSecond)) : 1;
-      foreach (var plot in new[] { error, displayAnimation, lateShare, strip })
+      foreach (var plot in new[] { error, displayTime, lateShare, strip })
       {
         plot.Axes.Left.MinimumSize = TimelineLeftAxisPixels;
         Finish(plot, p => p.Axes.SetLimitsX(start, end));
@@ -217,15 +226,12 @@ namespace MB.FramePacing.Charts
       plot.Axes.Margins(bottom: 0.08, top: 0.3);
     }
 
-    private static void AddLateMarkers(Plot plot, double[] times, double[] values)
+    private static ScottPlot.TickGenerators.NumericManual ManualTicks(IEnumerable<(double Position, string Label)> ticks)
     {
-      if (times.Length == 0)
-        return;
-      var markers = plot.Add.Scatter(times, values);
-      markers.LineWidth = 0;
-      markers.MarkerSize = 6;
-      markers.Color = ChartTheme.Late;
-      markers.LegendText = LateFrameLegend;
+      var generator = new ScottPlot.TickGenerators.NumericManual();
+      foreach (var (position, label) in ticks)
+        generator.AddMajor(position, label);
+      return generator;
     }
 
     /// <summary>
@@ -288,6 +294,8 @@ namespace MB.FramePacing.Charts
       plot.Legend.BackgroundColor = theme.Background;
       plot.Legend.FontColor = theme.Foreground;
       plot.Legend.OutlineColor = theme.Grid;
+      // Shown again by the charts that have one: a plot redrawn for another run or theme keeps no legend it no longer has
+      plot.Legend.IsVisible = false;
       plot.Title(title);
       plot.XLabel(xLabel);
       plot.YLabel(yLabel);

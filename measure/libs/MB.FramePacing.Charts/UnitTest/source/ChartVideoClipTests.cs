@@ -48,44 +48,43 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// The Timeline: the animation error of every frame and the late ones, the display time and animation time step with the late frames
-    /// and every frame's target, the 2 s late share at every frame, and the refresh strip's span, refreshes and late flag of every frame.
+    /// The Timeline: the animation error bar of every frame and the scale, every frame's hold on the display time chart (until the next frame,
+    /// at its display time, held too long when the next frame is late) and every frame's target over it, the 2 s late share at every frame,
+    /// and the refresh strip's span, refreshes and late flag of every frame.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
     public void Timeline_MatchesTheManifest(string clip)
     {
       var (manifest, report, chart) = Analyze(clip);
       using var error = new Plot();
-      using var displayAnimation = new Plot();
+      using var displayTime = new Plot();
       using var lateShare = new Plot();
       using var strip = new Plot();
-      RunCharts.Timeline(chart, ChartTheme.Light, error, displayAnimation, lateShare, strip);
+      RunCharts.Timeline(chart, ChartTheme.Light, error, displayTime, lateShare, strip);
 
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
-      var late = measured.Where(manifest.IsLate).ToArray();
       double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
+      long Origin(int i) => manifest.ShownTicks(i) - manifest.ShownTicks(0);
       long refresh = RefreshTicks(chart);
 
-      AssertSeries(error, RunCharts.AnimationErrorLegend, measured.Select(Seconds), measured.Select(i => Ms(manifest.AnimationErrorTicks(i))), clip);
-      AssertSeries(error, RunCharts.LateFrameLegend, late.Select(Seconds), late.Select(i => Ms(manifest.AnimationErrorTicks(i))), clip);
-      Assert.That(error.GetPlottables<HorizontalLine>().Select(l => l.Y), Is.EquivalentTo(new[] { 1.0, -1.0 }), $"{clip}: ±1 ms threshold");
+      var bars = error.GetPlottables<AnimationErrorBarsPlottable>().Single();
+      Assert.That(bars.TimeTicks, Is.EqualTo(measured.Select(Origin)), $"{clip}: error bar times");
+      Assert.That(bars.ErrorTicks, Is.EqualTo(measured.Select(manifest.AnimationErrorTicks)), $"{clip}: animation error");
+      double largest = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
+      Assert.That(bars.LimitMs, Is.EqualTo(Math.Max(2, largest * 1.15)), $"{clip}: symmetric scale");
+      Assert.That(bars.ThresholdTicks, Is.EqualTo(TimeSpan.TicksPerMillisecond), $"{clip}: 1 ms threshold band");
+      Assert.That(error.Axes.GetLimits().Bottom, Is.EqualTo(-bars.LimitMs), $"{clip}: centred on zero");
+      Assert.That(error.Axes.GetLimits().Top, Is.EqualTo(bars.LimitMs), $"{clip}: centred on zero");
 
-      AssertSeries(displayAnimation, RunCharts.DisplayTimeLegend, measured.Select(Seconds), measured.Select(i => Ms(manifest.DisplayTicks(i))), clip);
-      AssertSeries(
-        displayAnimation,
-        RunCharts.AnimationStepLegend,
-        measured.Select(Seconds),
-        measured.Select(i => Ms(manifest.AnimationStepTicks(i))),
-        clip
-      );
-      AssertSeries(displayAnimation, RunCharts.LateFrameLegend, late.Select(Seconds), late.Select(i => Ms(manifest.DisplayTicks(i))), clip);
-      AssertSeries(
-        displayAnimation,
-        RunCharts.TargetLegend,
-        measured.Select(Seconds),
-        measured.Select(i => Ms(manifest.TargetRefreshes(i) * refresh)),
-        clip
-      );
+      // Frame i is held until frame i + 1: its display time is the hold's length, and it is held too long when frame i + 1 is late
+      var holds = measured.Select(i => i - 1).ToArray();
+      var steps = displayTime.GetPlottables<DisplayTimeStepsPlottable>().Single();
+      Assert.That(steps.StartTicks, Is.EqualTo(holds.Select(Origin)), $"{clip}: holds start");
+      Assert.That(steps.EndTicks, Is.EqualTo(holds.Select(i => Origin(i + 1))), $"{clip}: holds end at the next frame");
+      Assert.That(steps.LevelTicks, Is.EqualTo(holds.Select(i => manifest.DisplayTicks(i + 1))), $"{clip}: display time");
+      Assert.That(steps.HeldTooLong, Is.EqualTo(holds.Select(i => manifest.IsLate(i + 1))), $"{clip}: held too long");
+      Assert.That(steps.RefreshMs, Is.EqualTo(Ms(refresh)), $"{clip}: refresh grid");
+      AssertSeries(displayTime, RunCharts.TargetLegend, holds.Select(Seconds), measured.Select(i => Ms(manifest.TargetRefreshes(i) * refresh)), clip);
 
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
       var share = lateShare.GetPlottables<Scatter>().Single();
@@ -94,7 +93,6 @@ namespace MB.FramePacing.Charts.UnitTest
 
       var cells = strip.GetPlottables<RefreshStripPlottable>().Single();
       long capturePeriod = report.Timeline.CapturePeriodTicks;
-      long Origin(int i) => manifest.ShownTicks(i) - manifest.ShownTicks(0);
       Assert.That(cells.StartTicks, Is.EqualTo(all.Select(Origin)), $"{clip}: strip, first shown");
       Assert.That(
         cells.EndTicks,

@@ -172,31 +172,43 @@
 
     <!-- Charts -->
     <Border Grid.Row="3" Classes="card" Padding="4" IsVisible="{Binding HasRun}">
-      <TabControl>
-        <TabItem Header="Timeline">
-          <!-- Four plots on one linked time axis need more height than the other tabs: the tab scrolls, the plots zoom -->
-          <ScrollViewer>
-            <Grid x:Name="TimelinePanel" RowDefinitions="240,240,160,110">
-              <scottplot:AvaPlot x:Name="ErrorPlot" />
-              <scottplot:AvaPlot Grid.Row="1" x:Name="DisplayAnimationPlot" />
-              <scottplot:AvaPlot Grid.Row="2" x:Name="LateSharePlot" />
-              <scottplot:AvaPlot Grid.Row="3" x:Name="RefreshStripPlot" />
-            </Grid>
-          </ScrollViewer>
-        </TabItem>
-        <TabItem Header="Error histogram">
-          <scottplot:AvaPlot x:Name="ErrorHistogramPlot" />
-        </TabItem>
-        <TabItem Header="Error percentiles">
-          <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
-        </TabItem>
-        <TabItem Header="Display time histogram">
-          <scottplot:AvaPlot x:Name="DisplayTimeHistogramPlot" />
-        </TabItem>
-        <TabItem Header="Drift">
-          <scottplot:AvaPlot x:Name="DriftPlot" />
-        </TabItem>
-      </TabControl>
+      <Grid>
+        <TabControl>
+          <TabItem Header="Timeline">
+            <!-- Four plots on one linked time axis need more height than the other tabs: the tab scrolls, the plots zoom -->
+            <ScrollViewer>
+              <Grid x:Name="TimelinePanel" RowDefinitions="240,240,160,110">
+                <scottplot:AvaPlot x:Name="ErrorPlot" />
+                <scottplot:AvaPlot Grid.Row="1" x:Name="DisplayTimePlot" />
+                <scottplot:AvaPlot Grid.Row="2" x:Name="LateSharePlot" />
+                <scottplot:AvaPlot Grid.Row="3" x:Name="RefreshStripPlot" />
+              </Grid>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="Error histogram">
+            <scottplot:AvaPlot x:Name="ErrorHistogramPlot" />
+          </TabItem>
+          <TabItem Header="Error percentiles">
+            <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
+          </TabItem>
+          <TabItem Header="Display time histogram">
+            <scottplot:AvaPlot x:Name="DisplayTimeHistogramPlot" />
+          </TabItem>
+          <TabItem Header="Drift">
+            <scottplot:AvaPlot x:Name="DriftPlot" />
+          </TabItem>
+        </TabControl>
+        <!-- Next to the tab headers: back to the whole run after zooming or panning (double-clicking a chart does the same) -->
+        <Button
+          x:Name="ResetZoomButton"
+          Content="Reset zoom"
+          HorizontalAlignment="Right"
+          VerticalAlignment="Top"
+          Margin="0,8,8,0"
+          Click="OnResetZoom"
+          ToolTip.Tip="Show every chart for the whole run again. Double-clicking a chart does the same."
+        />
+      </Grid>
     </Border>
   </Grid>
 </UserControl>
