@@ -21,6 +21,7 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 | `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                           |
 | `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests                   |
 | `data/VERSION`                                    | Version of the data libraries (released with `data-v*` tags)                                            |
+| `data/python/`                                    | Python data library `mb_framepacing_data` (reads; standard library, Python 3.11) + unittest tests       |
 | `data/csharp/`                                    | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                    |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks      |
@@ -39,6 +40,7 @@ dotnet build mb-framepacing.slnx                 # warnings are errors (Director
 dotnet test  mb-framepacing.slnx
 cd marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # linux / linux-clang / macos too
 dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fps 500  # end to end without hardware
+python -m unittest discover -s data/python -t data/python    # the Python data library against test-data/data
 ```
 
 - **mb-quality**

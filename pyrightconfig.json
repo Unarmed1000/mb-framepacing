@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/DetachHead/basedpyright/main/packages/vscode-pyright/schemas/pyrightconfig.schema.json",
-  "include": ["marker", "measure/build_standalone.py", "tools"],
+  "include": ["marker", "data", "measure/build_standalone.py", "tools"],
+  "extraPaths": ["marker/python"],
   "exclude": ["**/node_modules", "**/__pycache__", "**/build", "**/publish"],
   "pythonVersion": "3.11",
   "typeCheckingMode": "recommended"

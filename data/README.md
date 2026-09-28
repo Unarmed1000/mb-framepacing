@@ -11,7 +11,7 @@ The data libraries of [mb-framepacing](https://github.com/Unarmed1000/mb-framepa
 | Language | Library                                             | Reads | Writes |
 | -------- | --------------------------------------------------- | ----- | ------ |
 | C#       | [`MB.FramePacing.Data`](csharp/README.md) (.NET 10) | yes   | yes    |
-| Python   | Planned                                             |       |        |
+| Python   | [`mb_framepacing_data`](python/README.md) (3.11+)   | yes   | no     |
 | C++      | Planned                                             |       |        |
 
 The C# library is the reference: the tools write every file through it. A marker payload inside the capture data is decoded with the

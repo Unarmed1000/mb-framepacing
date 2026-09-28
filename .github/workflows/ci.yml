@@ -106,6 +106,8 @@ jobs:
           basedpyright
       - name: Python marker library (against the golden set)
         run: python3 -m unittest discover -s marker/python -t marker/python
+      - name: Python data library (against the golden data)
+        run: python3 -m unittest discover -s data/python -t data/python
       - name: Workflows (actionlint)
         run: actionlint
       - name: Unity package (assemble and validate; Unity itself is not available in CI)

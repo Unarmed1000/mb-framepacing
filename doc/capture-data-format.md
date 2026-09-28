@@ -26,6 +26,7 @@ write through it.
 | 24     | 8    | Nominal frame rate: numerator, denominator (`u32` each; 0/0 = unknown)                                    |
 | 32     | 8    | Source width, height (`i32` each), before scaling and cropping                                            |
 | 40     | 16   | Region of the source that was stored: x, y, width, height (`i32` each; all 0 = the whole frame)           |
+| 56     | 8    | Reserved (0)                                                                                              |
 | 64     | 4    | Marker lock count (`u32`, at most 4; 0 = no marker was found)                                             |
 | 68     | 4    | Reserved (0)                                                                                              |
 | 72     | 96   | Up to 4 locks of 24 bytes: bounds x, y, width, height (`i32` each, stored pixels) and module size (`f64`) |
