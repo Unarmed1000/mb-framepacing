@@ -81,7 +81,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// The analysis of the decoded clip, frame by frame and to the tick: display time, animation time step and error, drift, the late flag and
+    /// The analysis of the decoded clip, frame by frame and to the tick: display time step, animation time step and error, drift, the late flag and
     /// how late, the target, and the pacing and prediction errors against the pacer's schedule in the markers.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
@@ -110,16 +110,16 @@ namespace MB.FramePacing.Analysis.UnitTest
         if (i == 0)
         {
           // The manifest measures its first frame against the last frame of the previous loop, which the capture does not hold
-          Assert.That(frame.DisplayDeltaTicks, Is.Null, where + ": no display time");
+          Assert.That(frame.DisplayDeltaTicks, Is.Null, where + ": no display time step");
           continue;
         }
-        Assert.That(frame.DisplayDeltaTicks, Is.EqualTo(manifest.DisplayTicks(i)), where + ": display time");
+        Assert.That(frame.DisplayDeltaTicks, Is.EqualTo(manifest.DisplayStepTicks(i)), where + ": display time step");
         Assert.That(frame.AnimationDeltaTicks, Is.EqualTo(manifest.AnimationStepTicks(i)), where + ": animation time step");
         Assert.That(frame.AnimationErrorTicks, Is.EqualTo(manifest.AnimationErrorTicks(i)), where + ": animation error");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Late), Is.EqualTo(manifest.IsLate(i)), where + ": late");
         Assert.That(frame.TargetTicks, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
         long? intended = manifest.IntendedStepTicks(i);
-        Assert.That(frame.PacingErrorTicks, Is.EqualTo(manifest.DisplayTicks(i) - intended), where + ": pacing error");
+        Assert.That(frame.PacingErrorTicks, Is.EqualTo(manifest.DisplayStepTicks(i) - intended), where + ": pacing error");
         Assert.That(frame.PredictionErrorTicks, Is.EqualTo(manifest.AnimationStepTicks(i) - intended), where + ": prediction error");
       }
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(Enumerable.Range(1, manifest.FrameCount - 1).Count(manifest.IsLate)), $"{clip}: late frames");
@@ -128,7 +128,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
       long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorTicks(i)));
       double errorPerFrameMs = absolute / (double)measured.Length / TimeSpan.TicksPerMillisecond;
-      double percentError = absolute * 100.0 / measured.Sum(manifest.DisplayTicks);
+      double percentError = absolute * 100.0 / measured.Sum(manifest.DisplayStepTicks);
       Assert.That(run.Statistics.ErrorPerFrameMs, Is.EqualTo(errorPerFrameMs).Within(1e-9), $"{clip}: error per frame");
       Assert.That(run.Statistics.PercentError, Is.EqualTo(percentError).Within(1e-9), $"{clip}: percent error");
       TestContext.Out.WriteLine($"{clip}: error per frame {errorPerFrameMs:0.00} ms, percent error {percentError:0.0} %");

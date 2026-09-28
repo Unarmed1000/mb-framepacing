@@ -95,7 +95,7 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures.
 - **Refresh rate and pacing:**
   - A capture card captures at the display's native refresh rate: that is a fundamental assumption, not a setting. The analysis
-    takes the capture period as the refresh period; display times are whole refreshes. `SyntheticCaptureSource` refuses a capture rate that differs
+    takes the capture period as the refresh period; display time steps are whole refreshes. `SyntheticCaptureSource` refuses a capture rate that differs
     from the refresh; `selftest --fps N` simulates an N Hz display.
   - **Charts** live in `MB.FramePacing.Charts` (`RunCharts`, ScottPlot core, no GUI): the GUI draws them into its controls, and on request
     (`--charts`, the GUI's "Save charts") `ChartFiles` writes them as `run-<id>-*.png` next to the reports. Test chart changes with
@@ -103,11 +103,11 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     with `VideoClipTests` by linked source files).
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the band on top of `run-<id>-timeline.png`
       (`HeadlineBand`) show the same tiles, so add or change a number there, not in the GUI.
-    - The error and display time charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);
+    - The error and display time step charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);
       those get a mark with their value at the edge (`ClippedValueMarks`).
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
     0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
-    `TimelineOptions.ErrorThresholdTicks`), and a display time is off its target from half a refresh on. A source's precision (a
+    `TimelineOptions.ErrorThresholdTicks`), and a display time step is off its target from half a refresh on. A source's precision (a
     camera's period) goes into warnings, never into the binning or the thresholds.
   - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`, also used
     by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous

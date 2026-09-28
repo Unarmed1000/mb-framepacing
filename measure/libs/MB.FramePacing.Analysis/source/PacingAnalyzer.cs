@@ -25,10 +25,10 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>
     /// Measures the frames (replacing them in <paramref name="frames"/> with their targets, errors and <see cref="PresentedFrameFlags.Late"/>)
-    /// and returns the run's pacing. Display times are whole refreshes, so everything is compared with half a refresh of slack.
+    /// and returns the run's pacing. Display time steps are whole refreshes, so everything is compared with half a refresh of slack.
     /// <list type="bullet">
     /// <item>
-    /// With intended display times (<see cref="PacingSource.Schedule"/>) every frame gets a pacing error (display step minus intended step) and a
+    /// With intended display times (<see cref="PacingSource.Schedule"/>) every frame gets a pacing error (display time step minus intended step) and a
     /// prediction error (animation step minus intended step); the animation error is prediction minus pacing error. A frame is late when it is
     /// shown at least half a refresh after its intended time, measured from the run's on-time frames: that also finds frames that stay late
     /// after a hitch.
@@ -157,7 +157,7 @@ namespace MB.FramePacing.Analysis
     /// <item>With the pacer's schedule the animation error splits exactly: the frame counts for the larger of its pacing and prediction error.</item>
     /// <item>
     /// Otherwise (no schedule, or a frame without a split) it is bad pacing when this or the previous frame was shown off its target (or
-    /// after skipped frames, or torn), else delta time jitter. A display changes frames on refreshes, so a display time counts as off its
+    /// after skipped frames, or torn), else delta time jitter. A display changes frames on refreshes, so a display time step counts as off its
     /// target from half a refresh on, whatever captured it.
     /// </item>
     /// </list>

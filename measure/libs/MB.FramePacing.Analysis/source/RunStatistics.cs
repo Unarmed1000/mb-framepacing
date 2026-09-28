@@ -25,17 +25,17 @@ namespace MB.FramePacing.Analysis
     long FramesWithAnimationError,
     // Gamers Nexus's "error per frame": the mean |animation error| of the frames with one
     double ErrorPerFrameMs,
-    // Gamers Nexus's "percent error": the sum of |animation error| as a percentage of the time those frames measure (their display times)
+    // Gamers Nexus's "percent error": the sum of |animation error| as a percentage of the time those frames measure (their display time steps)
     double PercentError
   )
   {
-    /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display times, in ticks.</summary>
-    public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(IReadOnlyCollection<(long ErrorTicks, long DisplayTicks)> frames)
+    /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display time steps, in ticks.</summary>
+    public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(IReadOnlyCollection<(long ErrorTicks, long DisplayStepTicks)> frames)
     {
       if (frames.Count == 0)
         return (0, 0);
       long absolute = frames.Sum(f => Math.Abs(f.ErrorTicks));
-      long display = frames.Sum(f => f.DisplayTicks);
+      long display = frames.Sum(f => f.DisplayStepTicks);
       return (absolute / (double)frames.Count / TimeSpan.TicksPerMillisecond, display > 0 ? absolute * 100.0 / display : 0);
     }
   }

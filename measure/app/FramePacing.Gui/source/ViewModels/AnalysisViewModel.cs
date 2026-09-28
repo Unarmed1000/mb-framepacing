@@ -60,7 +60,7 @@ namespace MB.FramePacing.Gui.ViewModels
     [ObservableProperty]
     public partial TimeSource SelectedTimeSource { get; set; } = TimeSource.Auto;
 
-    /// <summary>Overrides the capture's target frame rate (empty = the capture's own, or each run's median display time).</summary>
+    /// <summary>Overrides the capture's target frame rate (empty = the capture's own, or each run's median display time step).</summary>
     [ObservableProperty]
     public partial string TargetFpsText { get; set; }
 

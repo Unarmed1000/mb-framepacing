@@ -2,8 +2,8 @@
 //* File Description
 //* ----------------
 //* The charts of one analysed run, drawn into ScottPlot plots: the GUI passes its controls' plots, the report files new ones. The Timeline
-//* stacks the animation error, the display time, the late share and the refresh strip on one time axis (seconds since the run's first
-//* frame); the distributions are the error and display time histograms, the error percentiles and the drift.
+//* stacks the animation error, the display time step, the late share and the refresh strip on one time axis (seconds since the run's first
+//* frame); the distributions are the error and display time step histograms, the error percentiles and the drift.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -32,7 +32,7 @@ namespace MB.FramePacing.Charts
     /// time as held steps (an error while the steps stay flat is delta time jitter, an error at a red step is bad pacing), the share of late
     /// frames over the last seconds, and the refresh strip. Late frames and frames held too long are red throughout. All four share the x range.
     /// </summary>
-    public static void Timeline(ChartRun? run, ChartTheme theme, Plot error, Plot displayTime, Plot lateShare, Plot strip)
+    public static void Timeline(ChartRun? run, ChartTheme theme, Plot error, Plot displayTimeStep, Plot lateShare, Plot strip)
     {
       var frames = run?.Run.Frames.ToArray() ?? Array.Empty<PresentedFrame>();
       long origin = frames.Length > 0 ? frames[0].FirstSeenTicks : 0;
@@ -56,9 +56,9 @@ namespace MB.FramePacing.Charts
       }
 
       Reset(
-        displayTime,
+        displayTimeStep,
         theme,
-        "Display time: how long each frame stayed on screen; red held too long, dotted the target",
+        "Display time step: how long each frame stayed on screen; red held too long, dotted the target",
         string.Empty,
         string.Empty
       );
@@ -81,7 +81,7 @@ namespace MB.FramePacing.Charts
         if (targeted.Length > 0)
         {
           var targetMs = targeted.Select(i => Ms(frames[i].TargetTicks!.Value)).ToArray();
-          var target = displayTime.Add.Scatter(targeted.Select(i => Seconds(frames[i - 1])).ToArray(), targetMs);
+          var target = displayTimeStep.Add.Scatter(targeted.Select(i => Seconds(frames[i - 1])).ToArray(), targetMs);
           target.ConnectStyle = ConnectStyle.StepHorizontal;
           target.MarkerSize = 0;
           target.LinePattern = LinePattern.Dotted;
@@ -89,9 +89,9 @@ namespace MB.FramePacing.Charts
           target.LegendText = TargetLegend;
           topMs = Math.Max(topMs, targetMs.Max() + (steps.RefreshMs / 2));
         }
-        displayTime.Add.Plottable(steps);
-        displayTime.Axes.Left.TickGenerator = ManualTicks(DisplayTimeStepsPlottable.Ticks(steps.RefreshMs, topMs));
-        displayTime.Axes.Margins(bottom: 0, top: 0);
+        displayTimeStep.Add.Plottable(steps);
+        displayTimeStep.Axes.Left.TickGenerator = ManualTicks(DisplayTimeStepsPlottable.Ticks(steps.RefreshMs, topMs));
+        displayTimeStep.Axes.Margins(bottom: 0, top: 0);
       }
 
       Reset(
@@ -133,7 +133,7 @@ namespace MB.FramePacing.Charts
 
       double start = frames.Length > 0 ? Seconds(frames[0]) : 0;
       double end = frames.Length > 0 ? Math.Max(start + 0.001, Seconds(frames[^1]) + (run!.CapturePeriodTicks / (double)TimeSpan.TicksPerSecond)) : 1;
-      foreach (var plot in new[] { error, displayTime, lateShare, strip })
+      foreach (var plot in new[] { error, displayTimeStep, lateShare, strip })
       {
         plot.Axes.Left.MinimumSize = TimelineLeftAxisPixels;
         Finish(plot, p => p.Axes.SetLimitsX(start, end));
@@ -189,9 +189,15 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>How long frames stayed on screen: steady pacing is one tall bar, stutter shows up as bars at multiples of it.</summary>
-    public static void DisplayTimeHistogram(ChartRun? run, ChartTheme theme, Plot plot)
+    public static void DisplayTimeStepHistogram(ChartRun? run, ChartTheme theme, Plot plot)
     {
-      Reset(plot, theme, "Display time distribution (how long each frame stayed on screen)", "presented frames (log scale)", "display time (ms)");
+      Reset(
+        plot,
+        theme,
+        "Display time step distribution (how long each frame stayed on screen)",
+        "presented frames (log scale)",
+        "display time step (ms)"
+      );
       var histogram = run != null ? RunHistograms.Create(run.Run).DisplayDeltaMs : Histogram.Empty;
       if (histogram.Total > 0)
       {

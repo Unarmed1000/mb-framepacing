@@ -19,8 +19,8 @@ namespace MB.FramePacing.Analysis
     public static readonly long WindowTicks = (long)(WindowSeconds * TimeSpan.TicksPerSecond);
 
     /// <summary>
-    /// Per presented frame: the share of late frames (0..1) among the frames with a display time first seen in the window that ends at this
-    /// frame. Frames without a display time (the first of a segment) count in neither.
+    /// Per presented frame: the share of late frames (0..1) among the frames with a display time step first seen in the window that ends at this
+    /// frame. Frames without a display time step (the first of a segment) count in neither.
     /// </summary>
     public static double[] Rolling(IReadOnlyList<PresentedFrame> frames, long windowTicks)
     {

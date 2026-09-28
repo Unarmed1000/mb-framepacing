@@ -226,7 +226,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.GivenTarget));
       Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(16));
-      Assert.That(run.Pacing.LateFrames, Is.EqualTo(19), "all but the first frame, which has no display time");
+      Assert.That(run.Pacing.LateFrames, Is.EqualTo(19), "all but the first frame, which has no display time step");
     }
 
     [Test]

@@ -25,7 +25,7 @@ namespace MB.FramePacing.Analysis
   /// Presented frames shown late: at least half a refresh after their intended time with a schedule, otherwise at least one refresh later than
   /// their target frame time after the previous frame.
   /// </param>
-  /// <param name="LateShare">Late frames as a share of the presented frames with a display time (0..1).</param>
+  /// <param name="LateShare">Late frames as a share of the presented frames with a display time step (0..1).</param>
   /// <param name="WorstLateShare">The highest share of late frames in any <see cref="LateShare.WindowSeconds"/> window (0..1).</param>
   /// <param name="ErrorFramesWithUnevenDisplay">
   /// Frames with animation error where this or the previous frame was shown late or early, or that follow skipped frames: bad pacing.
@@ -47,7 +47,7 @@ namespace MB.FramePacing.Analysis
     double? ExpectedRefreshHz = null
   )
   {
-    /// <summary>With a schedule: every frame's display step minus its intended step (ms). Late or early frames, as the pacer sees them.</summary>
+    /// <summary>With a schedule: every frame's display time step minus its intended step (ms). Late or early frames, as the pacer sees them.</summary>
     public Statistics? PacingErrorMs { get; init; }
 
     /// <summary>

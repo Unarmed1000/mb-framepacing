@@ -49,8 +49,8 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// The Timeline: the animation error bar of every frame and the scale, every frame's hold on the display time chart (until the next frame,
-    /// at its display time, held too long when the next frame is late) and every frame's target over it, the 2 s late share at every frame,
+    /// The Timeline: the animation error bar of every frame and the scale, every frame's hold on the display time step chart (until the next
+    /// frame, at its display time step, held too long when the next frame is late) and every frame's target over it, the 2 s late share at every frame,
     /// and the refresh strip's span, refreshes and late flag of every frame.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
@@ -58,10 +58,10 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (manifest, report, chart) = Analyze(clip);
       using var error = new Plot();
-      using var displayTime = new Plot();
+      using var displayTimeStep = new Plot();
       using var lateShare = new Plot();
       using var strip = new Plot();
-      RunCharts.Timeline(chart, ChartTheme.Light, error, displayTime, lateShare, strip);
+      RunCharts.Timeline(chart, ChartTheme.Light, error, displayTimeStep, lateShare, strip);
 
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
       double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
@@ -77,15 +77,21 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(error.Axes.GetLimits().Bottom, Is.EqualTo(-bars.LimitMs), $"{clip}: centred on zero");
       Assert.That(error.Axes.GetLimits().Top, Is.EqualTo(bars.LimitMs), $"{clip}: centred on zero");
 
-      // Frame i is held until frame i + 1: its display time is the hold's length, and it is held too long when frame i + 1 is late
+      // Frame i is held until frame i + 1: its display time step is the hold's length, and it is held too long when frame i + 1 is late
       var holds = measured.Select(i => i - 1).ToArray();
-      var steps = displayTime.GetPlottables<DisplayTimeStepsPlottable>().Single();
+      var steps = displayTimeStep.GetPlottables<DisplayTimeStepsPlottable>().Single();
       Assert.That(steps.StartTicks, Is.EqualTo(holds.Select(Origin)), $"{clip}: holds start");
       Assert.That(steps.EndTicks, Is.EqualTo(holds.Select(i => Origin(i + 1))), $"{clip}: holds end at the next frame");
-      Assert.That(steps.LevelTicks, Is.EqualTo(holds.Select(i => manifest.DisplayTicks(i + 1))), $"{clip}: display time");
+      Assert.That(steps.LevelTicks, Is.EqualTo(holds.Select(i => manifest.DisplayStepTicks(i + 1))), $"{clip}: display time step");
       Assert.That(steps.HeldTooLong, Is.EqualTo(holds.Select(i => manifest.IsLate(i + 1))), $"{clip}: held too long");
       Assert.That(steps.RefreshMs, Is.EqualTo(Ms(refresh)), $"{clip}: refresh grid");
-      AssertSeries(displayTime, RunCharts.TargetLegend, holds.Select(Seconds), measured.Select(i => Ms(manifest.TargetRefreshes(i) * refresh)), clip);
+      AssertSeries(
+        displayTimeStep,
+        RunCharts.TargetLegend,
+        holds.Select(Seconds),
+        measured.Select(i => Ms(manifest.TargetRefreshes(i) * refresh)),
+        clip
+      );
 
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
       var share = lateShare.GetPlottables<Scatter>().Single();
@@ -127,10 +133,10 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(errors.GetPlottables<VerticalLine>().Select(l => l.X), Is.EquivalentTo(new[] { 1.0, -1.0 }), $"{clip}: ±1 ms threshold");
 
       using var display = new Plot();
-      RunCharts.DisplayTimeHistogram(chart, ChartTheme.Light, display);
-      AssertBars(display, measured.Select(manifest.DisplayTicks), clip + ": display time histogram");
-      double median = Analysis.Statistics.FromTicks(measured.Select(manifest.DisplayTicks)).P50;
-      Assert.That(display.GetPlottables<VerticalLine>().Single().X, Is.EqualTo(median), $"{clip}: median display time");
+      RunCharts.DisplayTimeStepHistogram(chart, ChartTheme.Light, display);
+      AssertBars(display, measured.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
+      double median = Analysis.Statistics.FromTicks(measured.Select(manifest.DisplayStepTicks)).P50;
+      Assert.That(display.GetPlottables<VerticalLine>().Single().X, Is.EqualTo(median), $"{clip}: median display time step");
     }
 
     /// <summary>The percentile curve (|animation error| at every 0.1 percentile) and the drift of every frame.</summary>
@@ -172,7 +178,7 @@ namespace MB.FramePacing.Charts.UnitTest
             "run-1-timeline.png",
             "run-1-error-histogram.png",
             "run-1-error-percentiles.png",
-            "run-1-display-time-histogram.png",
+            "run-1-display-time-step-histogram.png",
             "run-1-drift.png",
           }
         )
@@ -244,7 +250,7 @@ namespace MB.FramePacing.Charts.UnitTest
       return refresh;
     }
 
-    /// <summary>The share of late frames (%) among the frames with a display time first shown in the 2 s up to each frame.</summary>
+    /// <summary>The share of late frames (%) among the frames with a display time step first shown in the 2 s up to each frame.</summary>
     private static double[] ExpectedLateShare(ClipManifest manifest)
     {
       var shares = new double[manifest.FrameCount];

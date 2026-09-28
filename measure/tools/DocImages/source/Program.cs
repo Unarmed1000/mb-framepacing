@@ -100,7 +100,7 @@ namespace MB.FramePacing.DocImages
         {
           ("ErrorHistogramPlot", "chart-error-histogram.png"),
           ("ErrorPercentilePlot", "chart-error-percentiles.png"),
-          ("DisplayTimeHistogramPlot", "chart-display-time-histogram.png"),
+          ("DisplayTimeStepHistogramPlot", "chart-display-time-step-histogram.png"),
         }
       )
       {
@@ -111,7 +111,7 @@ namespace MB.FramePacing.DocImages
         Path.Combine(output, "chart-timeline.png"),
         900,
         (analysisView.FindControl<AvaPlot>("ErrorPlot")!.Plot, 300),
-        (analysisView.FindControl<AvaPlot>("DisplayTimePlot")!.Plot, 300),
+        (analysisView.FindControl<AvaPlot>("DisplayTimeStepPlot")!.Plot, 300),
         (analysisView.FindControl<AvaPlot>("LateSharePlot")!.Plot, 200),
         (analysisView.FindControl<AvaPlot>("RefreshStripPlot")!.Plot, 150)
       );

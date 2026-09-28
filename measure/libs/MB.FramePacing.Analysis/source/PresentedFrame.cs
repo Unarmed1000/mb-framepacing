@@ -17,7 +17,7 @@ namespace MB.FramePacing.Analysis
   /// <param name="IntendedDisplayTicks">From the marker: when the pacer intended the frame to be shown (its steady clock), 0 = unknown.</param>
   /// <param name="MarkerTargetFrameTicks">From the marker: the pacer's target frame time, 0 = unknown.</param>
   /// <param name="TargetTicks">The frame time this frame is measured against, in whole refreshes (<see cref="RunPacing.Source"/>).</param>
-  /// <param name="PacingErrorTicks">With a schedule: the display step minus the intended step.</param>
+  /// <param name="PacingErrorTicks">With a schedule: the display time step minus the intended step.</param>
   /// <param name="PredictionErrorTicks">With a schedule: the animation time step minus the intended step.</param>
   /// <param name="LatenessTicks">With a schedule: how long after its intended time the frame appeared, relative to the run's on-time frames.</param>
   public sealed record PresentedFrame(

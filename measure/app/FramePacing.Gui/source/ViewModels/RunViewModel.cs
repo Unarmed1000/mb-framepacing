@@ -68,7 +68,7 @@ namespace MB.FramePacing.Gui.ViewModels
       }
       var statistics = new List<StatisticsRow>
       {
-        StatisticsRow.From("Display time", s.DisplayDeltaMs),
+        StatisticsRow.From("Display time step", s.DisplayDeltaMs),
         StatisticsRow.From("Animation time step", s.AnimationDeltaMs),
         StatisticsRow.From("Animation error", s.AnimationErrorMs),
         StatisticsRow.From("|Animation error|", s.AbsoluteAnimationErrorMs),

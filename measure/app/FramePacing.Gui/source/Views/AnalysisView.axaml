@@ -143,7 +143,7 @@
             <ScrollViewer>
               <Grid x:Name="TimelinePanel" RowDefinitions="240,240,160,110">
                 <scottplot:AvaPlot x:Name="ErrorPlot" />
-                <scottplot:AvaPlot Grid.Row="1" x:Name="DisplayTimePlot" />
+                <scottplot:AvaPlot Grid.Row="1" x:Name="DisplayTimeStepPlot" />
                 <scottplot:AvaPlot Grid.Row="2" x:Name="LateSharePlot" />
                 <scottplot:AvaPlot Grid.Row="3" x:Name="RefreshStripPlot" />
               </Grid>
@@ -155,8 +155,8 @@
           <TabItem Header="Error percentiles">
             <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
           </TabItem>
-          <TabItem Header="Display time histogram">
-            <scottplot:AvaPlot x:Name="DisplayTimeHistogramPlot" />
+          <TabItem Header="Display time step histogram">
+            <scottplot:AvaPlot x:Name="DisplayTimeStepHistogramPlot" />
           </TabItem>
           <TabItem Header="Drift">
             <scottplot:AvaPlot x:Name="DriftPlot" />

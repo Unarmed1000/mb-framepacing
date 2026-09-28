@@ -3,7 +3,7 @@
 """Measure how precise camera capture is at each camera frame rate, on the simulated camera (VERY EXPERIMENTAL camera support).
 
 Runs `mb-framepacing selftest --camera` once per camera rate against a simulated display and prints a Markdown table: whether every
-presented frame was found and how far the measured display times are from the simulation. The simulated camera uses a fixed seed, so
+presented frame was found and how far the measured display time steps are from the simulation. The simulated camera uses a fixed seed, so
 the numbers are the same on every run. They come from the simulation only, not from real cameras.
 
     python tools/camera_rate_table.py                      # 60 Hz display, the default rates
@@ -29,7 +29,7 @@ END = "<!-- /camera-rate-table -->"
 DEFAULT_RATES = "100,130,250,330,500,1000"
 
 ERROR_LINE = re.compile(
-    r"Display time error against the simulation: mean (?P<mean>[\d.]+) ms, p95 (?P<p95>[\d.]+) ms, max (?P<max>[\d.]+) ms "
+    r"Display time step error against the simulation: mean (?P<mean>[\d.]+) ms, p95 (?P<p95>[\d.]+) ms, max (?P<max>[\d.]+) ms "
     + r"\(camera period (?P<period>[\d.]+) ms, (?P<frames>\d+) frames\)"
 )
 

@@ -13,27 +13,28 @@ clocks behind animation error, and pages on
 
 This page only lists where each term appears in mb-framepacing.
 
-| Term                    | In mb-framepacing                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------- |
-| **Animation error**     | `animationErrorMs` (CSV), the Analyze page's error charts. Same formula and sign as PresentMon |
-| **Animation time**      | Written into the marker by the application (`animationTicks`); `animationMs` (CSV)             |
-| **Animation time step** | `animationDeltaMs` (CSV)                                                                       |
-| **Display time**        | `displayDeltaMs` (CSV), the display time histogram                                             |
-| **On-screen time**      | `onScreenMs` (CSV)                                                                             |
-| **Frametime**           | Not measured: the capture sees the display side; the animation time step stands in             |
-| **Frame pacing**        | The display time histogram, late frames and the refresh strip (Timeline tab)                   |
-| **Late frame**          | Shown after its intended time, or a refresh after its target: `Late` in the CSV `flags`, red   |
-| **Target frame time**   | The marker's target, the pacer's schedule, `--target-fps`, else one refresh: `targetMs` (CSV)  |
-| **Pacing error**        | With the pacer's schedule: display step minus intended step, `pacingErrorMs` (CSV)             |
-| **Prediction error**    | With the pacer's schedule: animation time step minus intended step, `predictionErrorMs` (CSV)  |
-| **Stutter**             | Large animation errors                                                                         |
-| **Hitch**               | A frame with a long display time and a large negative animation error                          |
-| **Short / long frame**  | Positive / negative animation error                                                            |
-| **Delta time jitter**   | Animation errors while the display time is even: the **Cause** line                            |
-| **Microstutter**        | Display time spread plus alternating animation errors                                          |
-| **Runt frame**          | Torn frames (the tearing check)                                                                |
-| **Judder**              | Shows as a display time spread and in the refresh strip                                        |
-| **Dropped frame**       | `skippedBefore` (CSV), counted in the report                                                   |
-| **Drift**               | `driftMs` (CSV), the Drift chart                                                               |
-| **Tearing**             | Torn frames (the tearing check)                                                                |
-| **Input lag**           | Not measured                                                                                   |
+| Term                    | In mb-framepacing                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Animation error**     | `animationErrorMs` (CSV), the Analyze page's error charts. Same formula and sign as PresentMon             |
+| **Animation time**      | Written into the marker by the application (`animationTicks`); `animationMs` (CSV)                         |
+| **Animation time step** | `animationDeltaMs` (CSV)                                                                                   |
+| **Display time**        | When a frame was first seen on screen: `firstSeenMs` (CSV); the pacer's plan for it is `intendedDisplayMs` |
+| **Display time step**   | `displayDeltaMs` (CSV), the display time step histogram                                                    |
+| **On-screen time**      | `onScreenMs` (CSV)                                                                                         |
+| **Frametime**           | Not measured: the capture sees the display side; the animation time step stands in                         |
+| **Frame pacing**        | The display time step histogram, late frames and the refresh strip (Timeline tab)                          |
+| **Late frame**          | Shown after its intended time, or a refresh after its target: `Late` in the CSV `flags`, red               |
+| **Target frame time**   | The marker's target, the pacer's schedule, `--target-fps`, else one refresh: `targetMs` (CSV)              |
+| **Pacing error**        | With the pacer's schedule: display time step minus intended step, `pacingErrorMs` (CSV)                    |
+| **Prediction error**    | With the pacer's schedule: animation time step minus intended step, `predictionErrorMs` (CSV)              |
+| **Stutter**             | Large animation errors                                                                                     |
+| **Hitch**               | A frame with a long display time step and a large negative animation error                                 |
+| **Short / long frame**  | Positive / negative animation error                                                                        |
+| **Delta time jitter**   | Animation errors while the display time step is even: the **Cause** line                                   |
+| **Microstutter**        | Display time step spread plus alternating animation errors                                                 |
+| **Runt frame**          | Torn frames (the tearing check)                                                                            |
+| **Judder**              | Shows as a display time step spread and in the refresh strip                                               |
+| **Dropped frame**       | `skippedBefore` (CSV), counted in the report                                                               |
+| **Drift**               | `driftMs` (CSV), the Drift chart                                                                           |
+| **Tearing**             | Torn frames (the tearing check)                                                                            |
+| **Input lag**           | Not measured                                                                                               |

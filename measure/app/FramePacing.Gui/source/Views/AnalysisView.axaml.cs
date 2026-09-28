@@ -35,10 +35,10 @@ namespace MB.FramePacing.Gui.Views
       ActualThemeVariantChanged += (_, _) => Redraw();
     }
 
-    private AvaPlot[] TimelinePlots => new[] { ErrorPlot, DisplayTimePlot, LateSharePlot, RefreshStripPlot };
+    private AvaPlot[] TimelinePlots => new[] { ErrorPlot, DisplayTimeStepPlot, LateSharePlot, RefreshStripPlot };
 
     private AvaPlot[] AllPlots =>
-      TimelinePlots.Concat(new[] { ErrorHistogramPlot, ErrorPercentilePlot, DisplayTimeHistogramPlot, DriftPlot }).ToArray();
+      TimelinePlots.Concat(new[] { ErrorHistogramPlot, ErrorPercentilePlot, DisplayTimeStepHistogramPlot, DriftPlot }).ToArray();
 
     /// <summary>Double-clicking a chart resets the zoom (instead of ScottPlot's benchmark overlay), like the Reset zoom button.</summary>
     private void ResetOnDoubleClick()
@@ -84,10 +84,10 @@ namespace MB.FramePacing.Gui.Views
     {
       var run = m_viewModel?.SelectedRun?.Chart;
       var theme = ActualThemeVariant == ThemeVariant.Dark ? ChartTheme.Dark : ChartTheme.Light;
-      RunCharts.Timeline(run, theme, ErrorPlot.Plot, DisplayTimePlot.Plot, LateSharePlot.Plot, RefreshStripPlot.Plot);
+      RunCharts.Timeline(run, theme, ErrorPlot.Plot, DisplayTimeStepPlot.Plot, LateSharePlot.Plot, RefreshStripPlot.Plot);
       RunCharts.ErrorHistogram(run, theme, ErrorHistogramPlot.Plot);
       RunCharts.ErrorPercentiles(run, theme, ErrorPercentilePlot.Plot);
-      RunCharts.DisplayTimeHistogram(run, theme, DisplayTimeHistogramPlot.Plot);
+      RunCharts.DisplayTimeStepHistogram(run, theme, DisplayTimeStepHistogramPlot.Plot);
       RunCharts.Drift(run, theme, DriftPlot.Plot);
       foreach (var plot in AllPlots)
         plot.Refresh();

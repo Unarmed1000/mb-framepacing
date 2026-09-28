@@ -17,7 +17,7 @@ namespace MB.FramePacing.Charts
   /// <param name="StripEven">Refresh strip: every other frame.</param>
   /// <param name="StripOdd">Refresh strip: the frames between.</param>
   /// <param name="StripUnknown">Refresh strip: captures between frames that could not be decoded.</param>
-  /// <param name="OnTime">Display time: a frame held as planned (the next frame is not late).</param>
+  /// <param name="OnTime">Display time step: a frame held as planned (the next frame is not late).</param>
   /// <param name="Warning">Headline numbers that are a problem (frames off, late frames), as the GUI's tiles show them.</param>
   public sealed record ChartTheme(
     Color Background,

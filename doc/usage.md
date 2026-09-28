@@ -41,7 +41,7 @@ Settings that matter:
 
 - **Capture at the same rate the display runs at.** Set the application's output to a mode the card captures natively, and capture
   it at that refresh rate: a 240 Hz output in the card's 240 fps mode. Every refresh is then exactly one captured frame, and the
-  analysis relies on it: the refresh period is the capture period. Display times are then whole refreshes, measured exactly, and
+  analysis relies on it: the refresh period is the capture period. Display time steps are then whole refreshes, measured exactly, and
   so is the animation error. A slower capture never sees some of the displayed frames (they
   are reported as frame indices never seen).
 - Turn **G-Sync/FreeSync off**. Capture cards only pass variable refresh through to the monitor; they record at a constant rate, so
@@ -128,9 +128,9 @@ capture-20260924-153000/          (import-... for imports)
 └── analysis/
     ├── summary.json              counts, statistics, histograms, warnings per run
     ├── captures.csv              one row per recorded frame: capture time and what its marker said
-    ├── run-<id>-frames.csv       one row per application frame shown: display time, animation error, drift
+    ├── run-<id>-frames.csv       one row per application frame shown: display time step, animation error, drift
     └── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, under the run's
-                                  headline numbers; error-histogram, error-percentiles, display-time-histogram, drift)
+                                  headline numbers; error-histogram, error-percentiles, display-time-step-histogram, drift)
 ```
 
 The chart images are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the GUI's **Save charts**; both

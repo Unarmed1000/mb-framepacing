@@ -150,7 +150,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(bottom, Is.GreaterThan(140), "down (shown too late) at its full height, near the bottom of the scale");
     }
 
-    /// <summary>The same for the display time: the one frame held too long is drawn in red.</summary>
+    /// <summary>The same for the display time step: the one frame held too long is drawn in red.</summary>
     [Test]
     public void DisplaySteps_ZoomedOut_KeepASingleHoldTooLong()
     {

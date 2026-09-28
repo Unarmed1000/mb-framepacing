@@ -52,7 +52,7 @@ of C# rectification, well above 1000 fps on one core.
 - Only tears **between** the two zones are detectable, and only when the zones are at least 4 camera frames apart in the scanout.
 - **The main marker is version 6 (41×41 modules), the sync marker version 2 (25×25).** The camera times the frames by the sync
   marker: timing by the taller main marker scattered "first seen" by 2 to 3 camera frames (the scanout needs longer to cross it,
-  and when a half switched row still decodes depends on the payload), which doubled the display time error. With the sync marker
+  and when a half switched row still decodes depends on the payload), which doubled the display time step error. With the sync marker
   the synthetic camera is back to a mean error of 0.62 ms at 1000 fps.
 - **Steep angles:** ZXing's finder search estimates the symbol size from the finder distances and gives up when that estimate is
   off by about a module, which happens across 41 modules at an angle. Calibration (which searches) works at about 20 degrees off
@@ -87,7 +87,7 @@ In priority order:
 1. **First real footage.** Film the C++ `marker-render` output or the Unity sample, with both markers and vsync on, at a fixed
    refresh rate. A phone's 240 fps slow motion is enough to start. Then run `camera-rig calibrate clip.mp4 --recorded-fps 240
 --name phone` and `import --camera phone --analyze`. Record which checks warn, and why.
-2. **Validate against a capture card** on the same display (vsync on, fixed refresh). The frame-to-frame display times of the
+2. **Validate against a capture card** on the same display (vsync on, fixed refresh). The display time steps of the
    camera and the card must agree within the camera's resolution. Document the result here.
 3. **Live UVC camera:** run `capture -d <camera> --camera <name>` with a 240–330 fps MJPEG webcam class camera on Windows, and
    on Linux (v4l2) if available. Check the source's frame drops and device timestamps.

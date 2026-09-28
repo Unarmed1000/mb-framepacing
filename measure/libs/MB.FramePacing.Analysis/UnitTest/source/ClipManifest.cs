@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* What a test clip's manifest (test-data/videos/<clip>/manifest.json, written by mb-framepacing-explained) says, and the exact values that
-//* follow from it: every video frame's marker, and per frame of the clip its display time, animation time step, animation error, lateness,
+//* follow from it: every video frame's marker, and per frame of the clip its display time step, animation time step, animation error, lateness,
 //* target and drift, all in whole ticks. The VideoClip tests of the analysis and of the charts compare with it.
 //*
 //* (c) 2026 Mana Battery
@@ -94,11 +94,11 @@ namespace MB.FramePacing.Analysis.UnitTest
     public long ShownTicks(int frame) => VideoFrameTicks(Refresh[frame]);
 
     /// <summary>How long the previous frame was on screen (frame 1 on: frame 0 follows the previous loop, which the capture does not hold).</summary>
-    public long DisplayTicks(int frame) => ShownTicks(frame) - ShownTicks(frame - 1);
+    public long DisplayStepTicks(int frame) => ShownTicks(frame) - ShownTicks(frame - 1);
 
     public long AnimationStepTicks(int frame) => AnimationTicks[frame] - AnimationTicks[frame - 1];
 
-    public long AnimationErrorTicks(int frame) => AnimationStepTicks(frame) - DisplayTicks(frame);
+    public long AnimationErrorTicks(int frame) => AnimationStepTicks(frame) - DisplayStepTicks(frame);
 
     public bool IsLate(int frame) => Late[frame] > 0;
 

@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The display time as held steps (after mb-framepacing-explained's frame chart): each frame is a horizontal step from when it was first seen
-//* until the next frame, at how long it stayed on screen (the next frame's display time), in green, or in red when it was held too long
+//* The display time steps as held levels (after mb-framepacing-explained's frame chart): each frame is a horizontal step from when it was first seen
+//* until the next frame, at how long it stayed on screen (the next frame's display time step), in green, or in red when it was held too long
 //* because the next frame was late. Faint risers join the steps where the level changes. Zoomed out, when holds get narrower than a pixel or
 //* two, each pixel column draws the range of its holds, red if any of them was held too long. The scale covers every hold, unless a few are
 //* far longer than the rest (a hitch): then it covers the 99th percentile, and the holds it cuts off get a mark at the top with their
@@ -48,7 +48,7 @@ namespace MB.FramePacing.Charts
     /// <param name="refreshTicks">The display's refresh period: the grid and the scale.</param>
     public DisplayTimeStepsPlottable(IReadOnlyList<PresentedFrame> frames, long originTicks, long refreshTicks)
     {
-      // A frame's hold is known from the next frame of its segment: its display time and whether it came late
+      // A frame's hold is known from the next frame of its segment: its display time step and whether it came late
       for (int i = 0; i + 1 < frames.Count; ++i)
       {
         var next = frames[i + 1];

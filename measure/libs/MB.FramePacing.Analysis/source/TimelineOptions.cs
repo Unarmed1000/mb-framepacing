@@ -23,7 +23,7 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>
     /// The |animation error| above which a frame counts as off, the same for every capture source. The animation error is measured exactly
-    /// (the marker's animation time against the display time), so the default is small: 1 ms.
+    /// (the marker's animation time step against the display time step), so the default is small: 1 ms.
     /// </summary>
     public long ErrorThresholdTicks { get; init; } = TimelineAnalyzer.DefaultErrorThresholdTicks;
 

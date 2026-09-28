@@ -69,8 +69,8 @@ a hitch stays a refresh late in a full frame queue. The two pacing fields tell t
   intended display time, for example from a frame limiter. It changes on the frame where the pacer changes its rate.
 - Leave both `0` when the application does not pace its frames. The analysis then measures against a target frame rate given to
   the tools, or against the display's native refresh rate (one frame per refresh).
-- With intended display times the analysis splits every frame's animation error exactly: **pacing error** (the display step minus
-  the intended step: the frame was shown off the plan) and **prediction error** (the animation time step minus the intended step:
+- With intended display times the analysis splits every frame's animation error exactly: **pacing error** (the display time step
+  minus the intended step: the frame was shown off the plan) and **prediction error** (the animation time step minus the intended step:
   the frame was animated for another moment than planned). The animation error is prediction minus pacing error.
 
 ## Symbol

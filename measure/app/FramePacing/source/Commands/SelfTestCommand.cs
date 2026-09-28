@@ -265,7 +265,7 @@ namespace MB.FramePacing.App.Commands
         Console.WriteLine(
           string.Create(
             CultureInfo.InvariantCulture,
-            $"Display time error against the simulation: mean {errorsMs.Average():0.00} ms, p95 {p95:0.00} ms, max {errorsMs[^1]:0.00} ms (camera period {period / TimeSpan.TicksPerMillisecond:0.00} ms, {errorsMs.Count} frames)."
+            $"Display time step error against the simulation: mean {errorsMs.Average():0.00} ms, p95 {p95:0.00} ms, max {errorsMs[^1]:0.00} ms (camera period {period / TimeSpan.TicksPerMillisecond:0.00} ms, {errorsMs.Count} frames)."
           )
         );
       }
