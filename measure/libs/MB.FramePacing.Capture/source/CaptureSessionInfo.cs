@@ -51,6 +51,9 @@ namespace MB.FramePacing.Capture
     /// <summary>The start marker's sequence id as text (or in the hex form of a UUID).</summary>
     public string? SequenceId { get; init; }
 
+    /// <summary>The capture's name, given by the user: reports show it instead of the sequence id. Null = none.</summary>
+    public string? Name { get; init; }
+
     /// <summary>The real recording rate of a slow motion clip, when the timestamps were generated from it.</summary>
     public double? RecordedFps { get; init; }
 

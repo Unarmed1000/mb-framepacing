@@ -51,6 +51,7 @@ namespace MB.FramePacing.App
         MarkerSizeCommand.Create(),
         SelfTestCommand.Create(),
         ConfigCommand.Create(),
+        NameCommand.Create(),
       };
       root.Options.Add(CommonOptions.Config);
       root.Options.Add(new Option<bool>("-v") { Description = "Verbose logging, repeat for more detail (-vv, -vvv, -vvvv)." });

@@ -190,6 +190,7 @@ namespace MB.FramePacing.Capture
         FramesStored = options.KeepFrames,
         RecordedFps = options.RecordedFps,
         TargetFps = options.TargetFps,
+        Name = options.Name,
         ExpectedRefreshHz = options.ExpectedRefreshHz,
         Camera = options.Camera,
       };

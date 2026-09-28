@@ -68,7 +68,8 @@ namespace MB.FramePacing.Charts
           run.GetProperty("statistics").Deserialize<RunStatistics>(g_jsonOptions)!,
           frames,
           run.TryGetProperty("warnings", out var warnings) ? warnings.Deserialize<string[]>(g_jsonOptions)! : Array.Empty<string>(),
-          Pacing: run.TryGetProperty("pacing", out var pacing) ? pacing.Deserialize<RunPacing>(g_jsonOptions) : null
+          Pacing: run.TryGetProperty("pacing", out var pacing) ? pacing.Deserialize<RunPacing>(g_jsonOptions) : null,
+          Name: run.TryGetProperty("name", out var name) ? name.GetString() : null
         );
         string prefix = framesFile.EndsWith("-frames.csv", StringComparison.Ordinal) ? framesFile[..^"-frames.csv".Length] : $"run-{analysis.RunId}";
         runs.Add(new AnalysisOutputRun(new ChartRun(analysis, capturePeriod, threshold, camera), prefix));

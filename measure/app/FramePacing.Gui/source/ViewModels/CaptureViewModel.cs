@@ -235,6 +235,10 @@ namespace MB.FramePacing.Gui.ViewModels
     [ObservableProperty]
     public partial string TargetFpsText { get; set; }
 
+    /// <summary>A name for the capture, stored in capture.json; the reports show it instead of the runs' sequence id (empty = none).</summary>
+    [ObservableProperty]
+    public partial string CaptureName { get; set; } = string.Empty;
+
     /// <summary>
     /// The display refresh rate the user expects: a camera capture compares it with the refresh rate calculated from the frames, a capture
     /// card with its capture rate (empty = no comparison).
@@ -413,6 +417,7 @@ namespace MB.FramePacing.Gui.ViewModels
           KeepFrames = KeepFrames,
           TargetFps = FrameRateText.ParseOptional(TargetFpsText),
           ExpectedRefreshHz = FrameRateText.ParseOptional(DisplayHzText),
+          Name = string.IsNullOrWhiteSpace(CaptureName) ? null : CaptureName.Trim(),
           ToolVersion = MainWindowViewModel.Version,
           Preview = OnPreview,
         };

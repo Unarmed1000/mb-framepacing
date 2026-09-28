@@ -73,8 +73,9 @@ mb-framepacing capture -d "<device>" --mode 1920x1080@240 --scale 960x540 --wait
 ```
 
 Add `--module-px 6` (the module size your application draws) to have the size checked before recording, `-t 2m` as a safety
-limit, `--target-fps 30` when the application aims for less than the refresh rate, and `--display-hz 240` to have the display
-rate you expect checked against the capture.
+limit, `--target-fps 30` when the application aims for less than the refresh rate, `--display-hz 240` to have the display
+rate you expect checked against the capture, and `--name "menu scroll"` to give the capture a name the reports show instead of the
+runs' sequence id (the GUI's **Name** field; `import` takes it too).
 
 **What is stored**
 
@@ -197,7 +198,12 @@ example with a different clock or only one run:
 ```sh
 mb-framepacing analyze capture-20260924-153000 --time host --run 7
 mb-framepacing analyze capture-20260924-153000 --target-fps 30        # late frames against a 30 fps target
+mb-framepacing analyze capture-20260924-153000 --name "menu scroll"   # this analysis's name for the runs
+mb-framepacing name capture-20260924-153000 "menu scroll"             # store (or with no name, clear) the capture's name
 ```
+
+The name stored in `capture.json` names the runs in every analysis; `analyze --name` and `render --name` override it for their
+output. Reports then show the name in the title and the sequence id below it.
 
 or use **Browse...**, **Target fps** and **Analyze** on the Analyze page.
 

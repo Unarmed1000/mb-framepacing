@@ -59,6 +59,29 @@ namespace MB.FramePacing.Analysis.UnitTest
       return expected;
     }
 
+    /// <summary>The name given at capture is stored in capture.json and names the runs; an analysis can override it.</summary>
+    [Test]
+    public void Analyzer_NamesTheRunsAsTheCaptureSays()
+    {
+      var scenario = new SyntheticScenario(
+        new SyntheticScenarioOptions
+        {
+          CaptureFps = 60,
+          RefreshHz = 60,
+          RunSeconds = 1,
+          SequenceTag = "named",
+        }
+      );
+      using (var source = new SyntheticCaptureSource(scenario, paced: false))
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = m_directory, Name = "menu scroll" }, null, CancellationToken.None);
+
+      Assert.That(CaptureSessionInfo.TryLoad(m_directory)!.Name, Is.EqualTo("menu scroll"));
+      var run = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions()).Timeline.Runs.Single();
+      Assert.That((run.Name, run.SequenceId), Is.EqualTo(("menu scroll", "named")));
+      var overridden = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions { Name = "busy menu" }).Timeline.Runs.Single();
+      Assert.That(overridden.Name, Is.EqualTo("busy menu"));
+    }
+
     // A capture card captures at the display's refresh rate
     [TestCase(60.0, 10, 0)]
     [TestCase(144.0, 13, 29)]

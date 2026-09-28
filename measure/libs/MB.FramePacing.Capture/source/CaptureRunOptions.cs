@@ -53,6 +53,9 @@ namespace MB.FramePacing.Capture
     /// <summary>The frame rate the application aims for, stored in capture.json for the analysis (null = judged from the frames).</summary>
     public double? TargetFps { get; init; }
 
+    /// <summary>The capture's name, stored in capture.json; reports show it instead of the sequence id (null = none).</summary>
+    public string? Name { get; init; }
+
     /// <summary>The display refresh rate the user expects, stored in capture.json for the analysis to compare with (null = none).</summary>
     public double? ExpectedRefreshHz { get; init; }
 

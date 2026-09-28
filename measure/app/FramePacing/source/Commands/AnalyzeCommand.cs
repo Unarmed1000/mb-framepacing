@@ -37,6 +37,7 @@ namespace MB.FramePacing.App.Commands
       };
       var outputOption = new Option<string?>("--output", "-o") { Description = "Report directory (default: <capture>/analysis)." };
       var targetOption = CommonOptions.TargetFps("overrides the one stored in capture.json");
+      var nameOption = CommonOptions.Name("overrides the one stored in capture.json");
       var displayOption = CommonOptions.DisplayHz("overrides the one stored in capture.json");
       var chartsOption = CommonOptions.Charts();
       var thresholdOption = new Option<double?>("--error-threshold-ms")
@@ -61,6 +62,7 @@ namespace MB.FramePacing.App.Commands
         timeOption,
         outputOption,
         targetOption,
+        nameOption,
         displayOption,
         thresholdOption,
         chartsOption,
@@ -71,6 +73,7 @@ namespace MB.FramePacing.App.Commands
         {
           TimeSource = parseResult.GetValue(timeOption),
           Redecode = parseResult.GetValue(redecodeOption),
+          Name = parseResult.GetValue(nameOption),
           Timeline = new TimelineOptions
           {
             RunId = parseResult.GetValue(runOption),
@@ -130,7 +133,8 @@ namespace MB.FramePacing.App.Commands
         AnsiConsole.WriteLine();
         var title =
           $"Run {run.RunId}"
-          + (run.SequenceId != null ? $" '{run.SequenceId}'" : string.Empty)
+          + ((run.Name ?? run.SequenceId) is { } shown ? $" '{shown}'" : string.Empty)
+          + (run.Name != null && run.SequenceId != null ? $" (sequence id {run.SequenceId})" : string.Empty)
           + (run.StartTimeUtc is { } start ? $" started {start:yyyy-MM-dd HH:mm:ss} UTC" : string.Empty);
         AnsiConsole.Write(new Rule(Markup.Escape(title)).LeftJustified());
         foreach (var warning in run.Warnings)

@@ -64,6 +64,9 @@ namespace MB.FramePacing.Analysis
           CalibratedRefreshHz = session?.Camera?.RefreshHz,
         }
       );
+      // The name the user gave: this analysis's, else the capture's
+      if ((options.Name ?? session?.Name) is { } name)
+        timeline = timeline with { Runs = timeline.Runs.Select(r => r with { Name = name }).ToList() };
       var warnings = new List<string>(capture.Layout.Warnings);
       warnings.AddRange(timeline.Warnings);
       if (MarkerMayHaveMoved(capture))
@@ -298,6 +301,7 @@ namespace MB.FramePacing.Analysis
             new
             {
               run.RunId,
+              run.Name,
               run.SequenceId,
               run.StartTimeUtc,
               run.HasStartMarker,

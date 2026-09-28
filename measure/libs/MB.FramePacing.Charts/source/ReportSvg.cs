@@ -87,6 +87,8 @@ namespace MB.FramePacing.Charts
           + $"{Ms(chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
+      if (RunHeadline.SequenceLine(run) is { } sequence)
+        description.Add(sequence);
       var tiles = RunHeadline.Tiles(section.Section).Where(t => options.IsShown(t.Id)).ToList();
       var layout = Layout.For(options, description.Count, tiles.Count);
       var parts = Start(

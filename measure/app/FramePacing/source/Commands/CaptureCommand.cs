@@ -62,6 +62,7 @@ namespace MB.FramePacing.App.Commands
           "Output directory (must not contain a capture yet). Default: a new capture-<date>-<time> folder in the configured capture directory.",
       };
       var targetOption = CommonOptions.TargetFps("stored in capture.json");
+      var nameOption = CommonOptions.Name("stored in capture.json");
       var displayOption = CommonOptions.DisplayHz("stored in capture.json");
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the capture afterwards." };
       var chartsOption = CommonOptions.Charts();
@@ -88,6 +89,7 @@ namespace MB.FramePacing.App.Commands
         ringOption,
         outputOption,
         targetOption,
+        nameOption,
         displayOption,
         analyzeOption,
         chartsOption,
@@ -128,6 +130,7 @@ namespace MB.FramePacing.App.Commands
               StopAtEnd = parseResult.GetValue(stopOption),
               KeepFrames = parseResult.GetValue(keepFramesOption),
               TargetFps = parseResult.GetValue(targetOption),
+              Name = parseResult.GetValue(nameOption),
               ExpectedRefreshHz = parseResult.GetValue(displayOption),
               RingFrames = parseResult.GetValue(ringOption),
               ToolVersion = Program.VersionString,

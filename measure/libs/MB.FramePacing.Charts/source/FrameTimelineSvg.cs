@@ -117,7 +117,11 @@ namespace MB.FramePacing.Charts
           ? "The CPU times are on the pacer's clock, placed on the capture's with the markers' intended display times: on-time frames appear at their intended vsync."
         : "The CPU times are on the pacer's clock; without intended display times they are placed so that no frame is presented after it first appears.",
       };
-      var parts = Start(title, width, height, description, background);
+      if (RunHeadline.SequenceLine(run) is { } sequence)
+        description.Add(sequence);
+      double headerExtra = description.Count > 2 ? 19 * (description.Count - 2) : 0;
+      var parts = Start(title, width, height + headerExtra, description, background);
+      parts.Add($"<g transform=\"translate(0 {Fixed(headerExtra, 0)})\">");
 
       // Refresh lines: bright where a frame could be aimed at its target rate (whole targets after the previous frame appeared), faint
       // where it could not
@@ -234,6 +238,7 @@ namespace MB.FramePacing.Charts
       }
 
       Key(parts, used, legendY, threshold);
+      parts.Add("</g>");
       parts.Add("</svg>");
       return string.Join("\n", parts) + "\n";
     }

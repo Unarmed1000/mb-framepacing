@@ -23,6 +23,7 @@ namespace MB.FramePacing.Analysis
     IReadOnlyList<PresentedFrame> Frames,
     IReadOnlyList<string> Warnings,
     CameraRunStatistics? Camera = null,
-    RunPacing? Pacing = null
+    RunPacing? Pacing = null,
+    string? Name = null
   );
 }

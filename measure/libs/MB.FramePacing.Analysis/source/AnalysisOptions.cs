@@ -21,5 +21,8 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>Decode the stored frames (frames.mbfc) again even when the capture data (captures.mbcd) exists, and replace the data.</summary>
     public bool Redecode { get; init; }
+
+    /// <summary>The runs' name for this analysis, instead of the one in capture.json (null = capture.json's).</summary>
+    public string? Name { get; init; }
   }
 }

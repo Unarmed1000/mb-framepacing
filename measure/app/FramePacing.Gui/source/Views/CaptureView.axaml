@@ -175,6 +175,14 @@
               <TextBlock Text="Display refresh rate" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding DisplayHzText}" PlaceholderText="Hz, empty = no check" />
             </Grid>
+            <Grid
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="10"
+              ToolTip.Tip="A name for this capture: the reports show it instead of the runs' sequence id. Stored with the capture."
+            >
+              <TextBlock Text="Name" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding CaptureName}" PlaceholderText="empty = the run's sequence id" />
+            </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding OutputRoot, StringFormat='Saved in {0}'}" />
           </StackPanel>
         </Border>

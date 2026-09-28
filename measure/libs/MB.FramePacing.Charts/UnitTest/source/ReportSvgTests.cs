@@ -145,6 +145,20 @@ namespace MB.FramePacing.Charts.UnitTest
     /// </summary>
     private static ChartRun OneHour() => Synthetic(240 * 3600);
 
+    /// <summary>A run's name replaces its sequence id in the title, and the sequence id moves to the description.</summary>
+    [Test]
+    public void Title_ShowsTheNameAndKeepsTheSequenceId()
+    {
+      var run = Synthetic(240 * 2, lateEvery: 0);
+      Assert.That(RunHeadline.Title(run.Run), Is.EqualTo("Run 1  'one hour'"));
+      Assert.That(RunHeadline.SequenceLine(run.Run), Is.Null);
+      var named = run with { Run = run.Run with { Name = "menu scroll" } };
+      Assert.That(RunHeadline.Title(named.Run), Is.EqualTo("Run 1  'menu scroll'"));
+      string svg = ReportSvg.Render(RunSection.Whole(named));
+      Assert.That(svg, Does.Contain(">Run 1  'menu scroll'<"));
+      Assert.That(svg, Does.Contain(">Sequence id one hour.<"));
+    }
+
     /// <summary>The late share is green while no frame in the window was late, red where one was.</summary>
     [Test]
     public void LateShare_IsGreenWhileNoFrameIsLate()

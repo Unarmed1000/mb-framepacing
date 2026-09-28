@@ -68,6 +68,7 @@
 <text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a', frames 493–505 (1.90–2.25 s)</text>
 <text x="20.0" y="54.0" text-anchor="start" class="sub">13 presented frames on a 60.00 Hz display (16.7 ms per refresh), one capture per refresh.</text>
 <text x="20.0" y="73.0" text-anchor="start" class="sub">The CPU times are on the pacer's clock, placed on the capture's with the markers' intended display times: on-time frames appear at their intended vsync.</text>
+<g transform="translate(0 0)">
 <line class="vsync-skip" x1="180.0" y1="104" x2="180.0" y2="243.0"/>
 <text x="180.0" y="258.0" text-anchor="middle" class="axis">−33.3 ms</text>
 <line class="vsync-skip" x1="244.0" y1="104" x2="244.0" y2="243.0"/>
@@ -308,4 +309,5 @@
 <rect class="again" x="1260.2" y="435.0" width="14" height="14" rx="4"/>
 <text x="1282.2" y="447.0" text-anchor="start" class="sub">held longer: the next frame is late</text>
 <text x="20.0" y="472.0" text-anchor="start" class="sub">Animation error = animation time step − display time step: + shown too soon, − shown too late; error threshold 1 ms</text>
+</g>
 </svg>

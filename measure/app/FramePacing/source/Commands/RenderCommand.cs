@@ -43,6 +43,7 @@ namespace MB.FramePacing.App.Commands
         Description =
           $"Draw the frame timeline of --from to --to instead (default --to: {ReportFiles.TimelineSeconds} s later): every frame's CPU start and CPU busy, its present, what each refresh showed, at most {FrameTimelineSvg.MaxFrames} frames.",
       };
+      var nameOption = new Option<string?>("--name") { Description = "A name for the runs in these reports, instead of the analysis's." };
       var outputOption = new Option<string?>("--output", "-o") { Description = "Where the reports go (default: the analysis folder)." };
       string items = string.Join(", ", ReportItem.All.Select(i => i.Id));
       var hideOption = new Option<string?>("--hide") { Description = $"Leave these items out of the card, comma separated: {items}." };
@@ -60,6 +61,7 @@ namespace MB.FramePacing.App.Commands
         detailsOption,
         pngOption,
         timelineOption,
+        nameOption,
         outputOption,
         hideOption,
         onlyOption,
@@ -70,7 +72,12 @@ namespace MB.FramePacing.App.Commands
         {
           string folder = Path.GetFullPath(parseResult.GetValue(folderArgument)!);
           uint? runId = parseResult.GetValue(runOption);
-          var runs = AnalysisOutput.Read(folder).Where(r => runId == null || r.Chart.Run.RunId == runId).ToList();
+          string? name = parseResult.GetValue(nameOption);
+          var runs = AnalysisOutput
+            .Read(folder)
+            .Where(r => runId == null || r.Chart.Run.RunId == runId)
+            .Select(r => name == null ? r : r with { Chart = r.Chart with { Run = r.Chart.Run with { Name = name } } })
+            .ToList();
           if (runs.Count == 0)
             throw new InvalidOperationException(runId != null ? $"The analysis has no run {runId}" : "The analysis has no runs");
           string output = parseResult.GetValue(outputOption) is { } path ? Path.GetFullPath(path) : AnalysisOutput.Directory(folder);

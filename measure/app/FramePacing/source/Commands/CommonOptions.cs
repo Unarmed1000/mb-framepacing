@@ -63,6 +63,10 @@ namespace MB.FramePacing.App.Commands
         },
       };
 
+    /// <summary>--name: a name for the capture's runs, shown in the reports instead of the sequence id.</summary>
+    public static Option<string?> Name(string where) =>
+      new Option<string?>("--name") { Description = $"A name for the runs, shown in the reports instead of the sequence id ({where})." };
+
     /// <summary>--target-fps: the frame rate the application aims for; late frames are measured against it.</summary>
     public static Option<double?> TargetFps(string where) =>
       new Option<double?>("--target-fps")

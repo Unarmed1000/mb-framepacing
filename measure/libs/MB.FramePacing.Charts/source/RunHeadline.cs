@@ -17,8 +17,11 @@ namespace MB.FramePacing.Charts
 {
   public static class RunHeadline
   {
-    /// <summary>"Run 1  'name'".</summary>
-    public static string Title(RunAnalysis run) => $"Run {run.RunId}" + (run.SequenceId != null ? $"  '{run.SequenceId}'" : string.Empty);
+    /// <summary>"Run 1  'name'": the name the user gave, else the sequence id.</summary>
+    public static string Title(RunAnalysis run) => $"Run {run.RunId}" + ((run.Name ?? run.SequenceId) is { } shown ? $"  '{shown}'" : string.Empty);
+
+    /// <summary>"Sequence id 46521e10-…." when the title shows a name instead, else null.</summary>
+    public static string? SequenceLine(RunAnalysis run) => run.Name != null && run.SequenceId != null ? $"Sequence id {run.SequenceId}." : null;
 
     /// <summary>The headline tiles, in the order the GUI and the report show them.</summary>
     public static IReadOnlyList<HeadlineTile> Tiles(ChartRun chart)
