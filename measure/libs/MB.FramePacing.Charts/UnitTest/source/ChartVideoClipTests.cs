@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Analysis;
@@ -183,6 +184,47 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(width, Is.EqualTo(ChartFiles.Width), file);
         Assert.That(height, Is.GreaterThanOrEqualTo(ChartFiles.DistributionHeight), file);
       }
+    }
+
+    /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers, and the report's Timeline image carries them on top.</summary>
+    [Test]
+    public void Headline_ShowsTheRunsNumbers()
+    {
+      var (manifest, report, chart) = Analyze("60-busy-swappy");
+      var tiles = RunHeadline.Tiles(chart);
+      Assert.That(
+        tiles.Select(t => t.Caption),
+        Is.EqualTo(
+          new[]
+          {
+            "Presented frames",
+            "Frames visibly off",
+            "Error per frame",
+            "Typical error (p95)",
+            "Worst error",
+            "Late frames",
+            "Worst 2 s late",
+            "Resolution",
+          }
+        )
+      );
+      var s = chart.Run.Statistics;
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
+      var errorPerFrame = tiles.Single(t => t.Caption == "Error per frame");
+      Assert.That(errorPerFrame.Value, Is.EqualTo(s.ErrorPerFrameMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms"));
+      Assert.That(errorPerFrame.Detail, Is.EqualTo(s.PercentError.ToString("0.0", CultureInfo.InvariantCulture) + " %"));
+      var late = tiles.Single(t => t.Caption == "Late frames");
+      Assert.That(late.Value, Is.EqualTo(measured.Count(manifest.IsLate).ToString(CultureInfo.InvariantCulture)));
+      Assert.That(late.Warning, Is.EqualTo(measured.Any(manifest.IsLate)));
+      double worst = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
+      Assert.That(tiles.Single(t => t.Caption == "Worst error").Value, Is.EqualTo(worst.ToString("0.0", CultureInfo.InvariantCulture) + " ms"));
+
+      // The band is as wide as the image and holds every tile in one row at the report's width
+      Assert.That(HeadlineBand.Columns(tiles.Count, ChartFiles.Width), Is.EqualTo(tiles.Count));
+      using var band = HeadlineBand.Render(chart, ChartTheme.Light, ChartFiles.Width);
+      Assert.That(band.Width, Is.EqualTo(ChartFiles.Width));
+      var files = ChartFiles.Write(report, ChartTheme.Light);
+      Assert.That(PngSize(files[0]).Height, Is.EqualTo(band.Height + ChartFiles.TimelinePlotsHeight), "the band above the Timeline's plots");
     }
 
     private (ClipManifest Manifest, AnalysisReport Report, ChartRun Chart) Analyze(string clip)

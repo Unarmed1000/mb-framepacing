@@ -48,6 +48,7 @@ namespace MB.FramePacing.Charts
           BarColor = ChartTheme.Late,
           BandColor = theme.Foreground.WithAlpha(0.08),
           ZeroLineColor = theme.Foreground.WithAlpha(0.45),
+          LabelColor = theme.Foreground,
         };
         error.Add.Plottable(bars);
         error.Axes.Left.TickGenerator = ManualTicks(AnimationErrorBarsPlottable.Ticks(bars.LimitMs));
@@ -66,6 +67,7 @@ namespace MB.FramePacing.Charts
         OnTimeColor = theme.OnTime,
         HeldTooLongColor = ChartTheme.Late,
         RiserColor = theme.Foreground.WithAlpha(0.3),
+        LabelColor = theme.Foreground,
       };
       if (steps.StartTicks.Count > 0)
       {

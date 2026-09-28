@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The Timeline's animation error bars and display time steps on synthetic frames: their scales and grids, which holds they draw, and that
-//* zoomed out (many frames per pixel) a single bad frame still shows.
+//* The Timeline's animation error bars and display time steps on synthetic frames: their scales and grids (and when they leave out a hitch
+//* far larger than everything else, marked at the edge), which holds they draw, and that zoomed out (many frames per pixel) a single bad
+//* frame still shows.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -30,6 +31,38 @@ namespace MB.FramePacing.Charts.UnitTest
     public void ErrorLimit_IsSymmetricWithRoomAboveTheLargestError(double[] errorsMs, double expected)
     {
       Assert.That(AnimationErrorBarsPlottable.Limit(errorsMs), Is.EqualTo(expected));
+    }
+
+    /// <summary>A hitch far above every other error (more than 8 times the room of the 99th percentile) is left out of the scale.</summary>
+    [Test]
+    public void ErrorLimit_LeavesOutAHitchFarAboveEverythingElse()
+    {
+      var errors = Enumerable.Repeat(7.0, 200).Concat(Enumerable.Repeat(0.0, 800)).Append(-700).ToArray();
+      Assert.That(AnimationErrorBarsPlottable.Limit(errors), Is.EqualTo(7 * 1.15), "the 99th percentile's room");
+      var spike = Enumerable.Repeat(0.0, 1000).Append(-10).ToArray();
+      Assert.That(AnimationErrorBarsPlottable.Limit(spike), Is.EqualTo(10 * 1.15), "a spike within 8 times the minimum scale stays in");
+    }
+
+    [Test]
+    public void DisplayTop_LeavesOutAHitchFarAboveEverythingElse()
+    {
+      var holds = Enumerable.Repeat(10.0, 1000).Append(1000).ToArray();
+      Assert.That(DisplayTimeStepsPlottable.Top(holds, 10), Is.EqualTo(25), "two refreshes and a half: the hitch is marked");
+      Assert.That(DisplayTimeStepsPlottable.Top(new[] { 10.0, 10, 100 }, 10), Is.EqualTo(105), "a hold of 10 refreshes stays in");
+    }
+
+    /// <summary>The hitch the scale leaves out is marked at the bottom edge (shown too late).</summary>
+    [Test]
+    public void ErrorBars_MarkAHitchBeyondTheScale()
+    {
+      var frames = Steady(1000, spike: 500, spikeErrorTicks: -700 * TimeSpan.TicksPerMillisecond, jitterTicks: 5 * TimeSpan.TicksPerMillisecond);
+      var bars = new AnimationErrorBarsPlottable(frames, 0, Refresh, TimeSpan.TicksPerMillisecond) { BarColor = ChartTheme.Late };
+      Assert.That(bars.LimitMs, Is.LessThan(10), "the hitch is left out of the scale");
+      using var plot = new Plot();
+      plot.Add.Plottable(bars);
+      plot.Axes.Margins(bottom: 0, top: 0);
+      plot.Axes.AutoScale();
+      Assert.That(RedPixels(plot, 400, 200).Bottom, Is.GreaterThan(150), "the bar and its mark reach the bottom edge");
     }
 
     [TestCase(2.0, 1.0)]
@@ -129,8 +162,11 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(count, Is.GreaterThan(0));
     }
 
-    /// <summary>Steady frames, one per refresh, except that frame <paramref name="spike"/> comes a refresh late: held, off by 10 ms.</summary>
-    private static PresentedFrame[] Steady(int count, int spike)
+    /// <summary>
+    /// Steady frames, one per refresh, except that frame <paramref name="spike"/> comes a refresh late: held, off by 10 ms (or
+    /// <paramref name="spikeErrorTicks"/>). Every 5th other frame is off by <paramref name="jitterTicks"/>, alternating up and down.
+    /// </summary>
+    private static PresentedFrame[] Steady(int count, int spike, long spikeErrorTicks = -10 * TimeSpan.TicksPerMillisecond, long jitterTicks = 0)
     {
       var frames = new List<PresentedFrame> { Frame(0, 0, null) };
       long time = 0;
@@ -139,7 +175,8 @@ namespace MB.FramePacing.Charts.UnitTest
         bool late = i == spike;
         long display = late ? 2 * Refresh : Refresh;
         time += display;
-        frames.Add(Frame(0, time, display, late, late ? -10 * TimeSpan.TicksPerMillisecond : 0));
+        long jitter = i % 5 == 0 ? (i % 10 == 0 ? jitterTicks : -jitterTicks) : 0;
+        frames.Add(Frame(0, time, display, late, late ? spikeErrorTicks : jitter));
       }
       return frames.ToArray();
     }

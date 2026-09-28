@@ -25,9 +25,12 @@ namespace MB.FramePacing.Charts
     // The Timeline's four plots, top to bottom
     private static readonly int[] g_timelineHeights = { 450, 450, 300, 180 };
 
+    /// <summary>The Timeline image's plots, under the headline band.</summary>
+    internal static int TimelinePlotsHeight => g_timelineHeights.Sum();
+
     /// <summary>
     /// Writes each run's charts into the report directory, named like its frames CSV (<see cref="CaptureAnalyzer.RunFilePrefix"/>):
-    /// -timeline.png, -error-histogram.png, -error-percentiles.png, -display-time-histogram.png and -drift.png. Returns the files written.
+    /// -timeline.png (under the run's headline band), -error-histogram.png, -error-percentiles.png, -display-time-histogram.png and -drift.png. Returns the files written.
     /// </summary>
     public static IReadOnlyList<string> Write(AnalysisReport report, ChartTheme theme)
     {
@@ -51,7 +54,8 @@ namespace MB.FramePacing.Charts
       try
       {
         RunCharts.Timeline(run, theme, timeline[0], timeline[1], timeline[2], timeline[3]);
-        written.Add(SaveStacked(prefix + "-timeline.png", Width, timeline.Zip(g_timelineHeights).ToArray()));
+        using var headline = HeadlineBand.Render(run, theme, Width);
+        written.Add(Stack(prefix + "-timeline.png", Width, headline, timeline.Zip(g_timelineHeights).ToArray()));
       }
       finally
       {
@@ -79,11 +83,19 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>Renders the plots one below the other, each at its height, into one PNG file; returns its path.</summary>
-    public static string SaveStacked(string path, int width, params (Plot Plot, int Height)[] parts)
+    public static string SaveStacked(string path, int width, params (Plot Plot, int Height)[] parts) => Stack(path, width, null, parts);
+
+    /// <summary>The plots one below the other, under <paramref name="header"/> when there is one.</summary>
+    private static string Stack(string path, int width, SKImage? header, (Plot Plot, int Height)[] parts)
     {
-      int height = parts.Sum(p => p.Height);
+      int height = (header?.Height ?? 0) + parts.Sum(p => p.Height);
       using var surface = SKSurface.Create(new SKImageInfo(width, height));
       int y = 0;
+      if (header != null)
+      {
+        surface.Canvas.DrawImage(header, 0, 0);
+        y = header.Height;
+      }
       foreach (var (plot, partHeight) in parts)
       {
         using var image = SKImage.FromEncodedData(plot.GetImage(width, partHeight).GetImageBytes());

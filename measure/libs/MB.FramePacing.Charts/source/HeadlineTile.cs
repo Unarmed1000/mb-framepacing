@@ -1,0 +1,18 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* One headline number of a run: the GUI shows it as a tile on the Analysis page, the report draws it above the Timeline.
+//*
+//* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//****************************************************************************************************************************************************
+
+namespace MB.FramePacing.Charts
+{
+  /// <param name="Caption">What the number is ("Late frames").</param>
+  /// <param name="Value">The number, formatted ("11").</param>
+  /// <param name="Detail">A smaller second number or word next to it ("2.6 %"), or empty.</param>
+  /// <param name="Warning">The value is a problem (frames off, late frames): shown in the warning colour.</param>
+  /// <param name="Explanation">What it means, for a tooltip.</param>
+  public sealed record HeadlineTile(string Caption, string Value, string Detail, bool Warning, string Explanation);
+}

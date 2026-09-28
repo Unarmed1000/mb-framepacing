@@ -4,7 +4,9 @@
 //* The display time as held steps (after mb-framepacing-explained's frame chart): each frame is a horizontal step from when it was first seen
 //* until the next frame, at how long it stayed on screen (the next frame's display time), in green, or in red when it was held too long
 //* because the next frame was late. Faint risers join the steps where the level changes. Zoomed out, when holds get narrower than a pixel or
-//* two, each pixel column draws the range of its holds, red if any of them was held too long. Draws only the visible holds.
+//* two, each pixel column draws the range of its holds, red if any of them was held too long. The scale covers every hold, unless a few are
+//* far longer than the rest (a hitch): then it covers the 99th percentile, and the holds it cuts off get a mark at the top with their
+//* length. Draws only the visible holds.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -24,6 +26,10 @@ namespace MB.FramePacing.Charts
   {
     // At most this many grid lines above the first refresh
     private const int MaxTicks = 8;
+
+    // The scale only leaves out the longest holds when they need more than this many times the room the 99th percentile needs
+    internal const double ClipFactor = 8;
+    internal const double BulkPercentile = 0.99;
 
     // Holds narrower than this are merged per pixel column; the step's line width
     private const float MinHoldPixels = 2;
@@ -71,12 +77,13 @@ namespace MB.FramePacing.Charts
 
     internal double RefreshMs { get; }
 
-    /// <summary>The top of the scale: half a refresh above the longest hold (at least two refreshes).</summary>
+    /// <summary>The top of the scale: half a refresh above the longest hold (at least two refreshes), or above the 99th percentile (see <see cref="Top"/>).</summary>
     internal double TopMs { get; }
 
     public Color OnTimeColor { get; set; } = Colors.Green;
     public Color HeldTooLongColor { get; set; } = Colors.Red;
     public Color RiserColor { get; set; } = Colors.Black.WithAlpha(0.3);
+    public Color LabelColor { get; set; } = Colors.Black;
 
     public bool IsVisible { get; set; } = true;
 
@@ -84,8 +91,19 @@ namespace MB.FramePacing.Charts
 
     public IEnumerable<LegendItem> LegendItems => Array.Empty<LegendItem>();
 
-    internal static double Top(IReadOnlyCollection<double> levelsMs, double refreshMs) =>
-      Math.Max(2 * refreshMs, levelsMs.Count > 0 ? levelsMs.Max() : 0) + (refreshMs / 2);
+    /// <summary>
+    /// Half a refresh above the longest hold, at least two refreshes. When that needs more than <see cref="ClipFactor"/> times the room of the
+    /// 99th percentile (a few hitches far longer than everything else), half a refresh above the 99th percentile.
+    /// </summary>
+    internal static double Top(IReadOnlyCollection<double> levelsMs, double refreshMs)
+    {
+      if (levelsMs.Count == 0)
+        return (2 * refreshMs) + (refreshMs / 2);
+      var sorted = levelsMs.Order().ToArray();
+      double all = Math.Max(2 * refreshMs, sorted[^1]) + (refreshMs / 2);
+      double bulk = Math.Max(2 * refreshMs, Statistics.Percentile(sorted, BulkPercentile)) + (refreshMs / 2);
+      return all <= ClipFactor * bulk ? all : bulk;
+    }
 
     /// <summary>
     /// The y axis ticks: a line at every whole number of refreshes (16.7, 33.3, 50 ms at 60 Hz), the grid a display shows frames on. When more
@@ -136,16 +154,23 @@ namespace MB.FramePacing.Charts
       using var fill = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
       SKColor Color(bool heldTooLong) => (heldTooLong ? HeldTooLongColor : OnTimeColor).ToSKColor();
 
+      // Holds beyond the visible scale: a mark at the top
+      double visibleTop = Axes.YAxis.Max;
+      var clipped = new ClippedValueMarks();
+
       // Zoomed out: the pixel column's holds, from the shortest to the longest
       int column = int.MinValue;
       float columnEnd = 0;
       float top = 0;
       float bottom = 0;
       bool late = false;
+      double longest = 0;
       void Flush()
       {
         if (column == int.MinValue)
           return;
+        if (longest > visibleTop)
+          clipped.Add(column + 0.5f, longest, top: true);
         fill.Color = Color(late);
         canvas.DrawRect(new SKRect(column, top - (StepWidth / 2), Math.Max(column + 1, columnEnd), bottom + (StepWidth / 2)), fill);
         column = int.MinValue;
@@ -166,6 +191,8 @@ namespace MB.FramePacing.Charts
             canvas.DrawLine(x0, Axes.GetPixelY(m_levelMs[i - 1]), x0, y, riser);
           step.Color = Color(m_heldTooLong[i]);
           canvas.DrawLine(x0, y, x1, y, step);
+          if (m_levelMs[i] > visibleTop)
+            clipped.Add((x0 + x1) / 2, m_levelMs[i], top: true);
           continue;
         }
         int x = (int)Math.Floor(x0);
@@ -177,14 +204,23 @@ namespace MB.FramePacing.Charts
           top = y;
           bottom = y;
           late = false;
+          longest = 0;
         }
         // Up to where its last hold ends, so the columns join into a line
         columnEnd = Math.Max(columnEnd, x1);
         top = Math.Min(top, y);
         bottom = Math.Max(bottom, y);
         late |= m_heldTooLong[i];
+        longest = Math.Max(longest, m_levelMs[i]);
       }
       Flush();
+      clipped.Draw(
+        canvas,
+        rp.DataRect,
+        HeldTooLongColor.ToSKColor(),
+        LabelColor.ToSKColor(),
+        ms => ms.ToString("0.#", CultureInfo.CurrentCulture) + " ms"
+      );
     }
 
     private static double Seconds(long ticks) => ticks / (double)TimeSpan.TicksPerSecond;

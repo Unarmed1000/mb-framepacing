@@ -152,6 +152,9 @@ namespace MB.FramePacing.App.Commands
         AnsiConsole.MarkupLineInterpolated(
           $"{s.FramesWithAnimationError} frame(s) with |animation error| above {report.ErrorThresholdMs:0.###} ms (the error threshold, --error-threshold-ms)."
         );
+        AnsiConsole.MarkupLineInterpolated(
+          $"Error per frame {s.ErrorPerFrameMs:0.00} ms (the mean |animation error|), percent error {s.PercentError:0.0} % (all |animation error| over the time on screen), as Gamers Nexus report them."
+        );
         if (run.Pacing is { } pacing)
         {
           AnsiConsole.MarkupLineInterpolated(
@@ -162,7 +165,7 @@ namespace MB.FramePacing.App.Commands
             AnsiConsole.MarkupLineInterpolated(
               $"Against the pacer's schedule: pacing error p95 {pacingError.P95:0.##} ms (max {pacingError.Max:0.##}), prediction error p95 {predictionError.P95:0.##} ms (max {predictionError.Max:0.##}); animation error = prediction - pacing error."
             );
-          AnsiConsole.MarkupLineInterpolated($"Cause: {VerdictText(pacing)}");
+          AnsiConsole.MarkupLineInterpolated($"Cause: {RunHeadline.Cause(pacing)}");
         }
       }
       AnsiConsole.MarkupLineInterpolated($"[grey]Reports written to {report.OutputDirectory}[/]");
@@ -191,20 +194,6 @@ namespace MB.FramePacing.App.Commands
         PacingSource.GivenTarget => "the given target frame rate",
         _ => "no pacing information: the display's native refresh rate",
       };
-
-    /// <summary>One line on which cause dominates the animation error, with the counts behind it.</summary>
-    public static string VerdictText(RunPacing pacing)
-    {
-      string counts =
-        $"{pacing.ErrorFramesWithUnevenDisplay} error frame(s) at uneven display, {pacing.ErrorFramesWithEvenDisplay} on an even display";
-      return pacing.Verdict switch
-      {
-        PacingVerdict.BadPacing => $"mostly bad pacing: frames shown late or early, or dropped ({counts}).",
-        PacingVerdict.DeltaTimeJitter => $"mostly delta time jitter: an even display with uneven animation steps ({counts}).",
-        PacingVerdict.Both => $"both bad pacing and delta time jitter ({counts}).",
-        _ => "no animation error above the threshold.",
-      };
-    }
 
     private static void AddRow(Table table, string name, Statistics stats)
     {

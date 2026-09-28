@@ -129,24 +129,25 @@ capture-20260924-153000/          (import-... for imports)
     ├── summary.json              counts, statistics, histograms, warnings per run
     ├── captures.csv              one row per recorded frame: capture time and what its marker said
     ├── run-<id>-frames.csv       one row per application frame shown: display time, animation error, drift
-    └── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, error-histogram,
-                                  error-percentiles, display-time-histogram, drift)
+    └── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, under the run's
+                                  headline numbers; error-histogram, error-percentiles, display-time-histogram, drift)
 ```
 
 The chart images are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the GUI's **Save charts**; both
 write the same files.
 
-The headline numbers on the Analyze page:
+The headline numbers on the Analyze page (the timeline image shows the same above its charts):
 
-| Tile                | Meaning                                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| Presented frames    | Application frames that reached the display during the run                                             |
-| Frames visibly off  | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms` |
-| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                             |
-| Worst error         | The largest absolute animation error                                                                   |
-| Late frames         | Frames shown later than planned (see below), and their share of the run                                |
-| Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches              |
-| Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                      |
+| Tile                | Meaning                                                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Presented frames    | Application frames that reached the display during the run                                                                    |
+| Frames visibly off  | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share       |
+| Error per frame     | Mean \|animation error\|; next to it the percent error, the errors' share of the time on screen (as Gamers Nexus report runs) |
+| Typical error (p95) | 95 % of the frames have a smaller absolute animation error                                                                    |
+| Worst error         | The largest absolute animation error, and whether that frame was shown too soon or too late                                   |
+| Late frames         | Frames shown later than planned (see below), and their share of the run                                                       |
+| Worst 2 s late      | The highest share of late frames in any 2 s: low for rare spikes, high for busy stretches                                     |
+| Resolution          | One capture period: one refresh for a capture card, one camera frame for a camera                                             |
 
 Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
 early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it

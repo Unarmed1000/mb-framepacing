@@ -240,6 +240,9 @@ double-click on a chart) shows the whole run again:
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
   Zoom in to see hold patterns such as 3-then-1.
 
+When a few frames are far off everything else (a hitch of hundreds of milliseconds among errors of a few), the error and display
+time scales cover the rest, and each frame beyond the scale gets a mark at the edge with its value; zoom out to see it whole.
+
 The other tabs show how the values are distributed. The count axes are logarithmic, so a handful of bad frames stays visible next
 to hundreds of good ones.
 
@@ -260,7 +263,8 @@ to hundreds of good ones.
 
 The charts can also be written as PNG files next to the reports (`run-<id>-timeline.png`, `-error-histogram.png`,
 `-error-percentiles.png`, `-display-time-histogram.png`, `-drift.png`): `--charts` on the command line, **Save charts** in the GUI. The
-histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`), and late frames carry `Late`
+histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`; the error per frame and
+percent error in `runs[].statistics`), and late frames carry `Late`
 in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools.
 
 ### The command line

@@ -3,6 +3,7 @@
   xmlns="https://github.com/avaloniaui"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  xmlns:charts="using:MB.FramePacing.Charts"
   xmlns:scottplot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
   x:Class="MB.FramePacing.Gui.Views.AnalysisView"
   x:DataType="vm:AnalysisViewModel"
@@ -65,64 +66,27 @@
         <ComboBox ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="260" />
         <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding SelectedRun.StartText, FallbackValue=''}" />
       </Grid>
-      <WrapPanel ItemSpacing="10" LineSpacing="10">
-        <Border Classes="tile">
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Presented frames" />
-            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.PresentedFramesText, FallbackValue='-'}" />
-          </StackPanel>
-        </Border>
-        <Border Classes="tile" ToolTip.Tip="Frames whose animation time is off by more than the error threshold (1 ms unless changed)">
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Frames visibly off" />
-            <TextBlock
-              Classes="tileValue"
-              Classes.warning="{Binding SelectedRun.HasErrorFrames, FallbackValue=False}"
-              Text="{Binding SelectedRun.ErrorFramesTile, FallbackValue='-'}"
-            />
-          </StackPanel>
-        </Border>
-        <Border Classes="tile" ToolTip.Tip="95% of the frames have an animation error below this">
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Typical error (p95)" />
-            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.TypicalErrorText, FallbackValue='-'}" />
-          </StackPanel>
-        </Border>
-        <Border Classes="tile">
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Worst error" />
-            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.WorstErrorText, FallbackValue='-'}" />
-          </StackPanel>
-        </Border>
-        <Border Classes="tile" ToolTip.Tip="Frames shown at least one refresh later than the target frame time after the previous frame">
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Late frames" />
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock
-                Classes="tileValue"
-                Classes.warning="{Binding SelectedRun.HasLateFrames, FallbackValue=False}"
-                Text="{Binding SelectedRun.LateFramesText, FallbackValue='-'}"
-              />
-              <TextBlock Classes="caption" VerticalAlignment="Bottom" Text="{Binding SelectedRun.LateShareText, FallbackValue=''}" />
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="tile" ToolTip.Tip="The highest share of late frames in any 2 s stretch: rare spikes stay low, busy stretches stand out">
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Worst 2 s late" />
-            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.WorstLateShareText, FallbackValue='-'}" />
-          </StackPanel>
-        </Border>
-        <Border
-          Classes="tile"
-          ToolTip.Tip="One capture period: the capture card's refresh (it captures at the display's refresh rate), or the camera's frame time"
-        >
-          <StackPanel>
-            <TextBlock Classes="caption" Text="Resolution" />
-            <TextBlock Classes="tileValue" Text="{Binding SelectedRun.ResolutionText, FallbackValue='-'}" />
-          </StackPanel>
-        </Border>
-      </WrapPanel>
+      <!-- The headline tiles: RunHeadline builds them, the same the report's Timeline image shows -->
+      <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel ItemSpacing="10" LineSpacing="10" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="charts:HeadlineTile">
+            <Border Classes="tile" ToolTip.Tip="{Binding Explanation}">
+              <StackPanel>
+                <TextBlock Classes="caption" Text="{Binding Caption}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Classes="tileValue" Classes.warning="{Binding Warning}" Text="{Binding Value}" />
+                  <TextBlock Classes="caption" VerticalAlignment="Bottom" Text="{Binding Detail}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
       <TextBlock Text="{Binding SelectedRun.VerdictText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.TargetText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock

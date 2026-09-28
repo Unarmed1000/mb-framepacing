@@ -101,6 +101,10 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     (`--charts`, the GUI's "Save charts") `ChartFiles` writes them as `run-<id>-*.png` next to the reports. Test chart changes with
     `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
     with `VideoClipTests` by linked source files).
+    - The headline numbers come from `RunHeadline` only: the GUI's tiles and the band on top of `run-<id>-timeline.png`
+      (`HeadlineBand`) show the same tiles, so add or change a number there, not in the GUI.
+    - The error and display time charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);
+      those get a mark with their value at the edge (`ClippedValueMarks`).
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
     0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
     `TimelineOptions.ErrorThresholdTicks`), and a display time is off its target from half a refresh on. A source's precision (a

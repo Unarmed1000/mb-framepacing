@@ -3,8 +3,10 @@
 //* ----------------
 //* The animation error per frame as signed bars around zero (after Gamers Nexus and mb-framepacing-explained's charts): up is shown too soon,
 //* down shown too late, and a frame without error draws nothing, so the frames that are off stand out. Behind the bars a faint band marks the
-//* error threshold. The scale is symmetric around zero. Each bar is one refresh wide; zoomed out, when bars get narrower than a pixel or two,
-//* each pixel column draws the most negative to the most positive error in it, so no spike is lost. Draws only the visible frames.
+//* error threshold. The scale is symmetric around zero and covers every error, unless a few are far larger than the rest (a hitch among
+//* small errors): then it covers the 99th percentile, and the bars it cuts off get a mark at the edge with their value. Each bar is one
+//* refresh wide; zoomed out, when bars get narrower than a pixel or two, each pixel column draws the most negative to the most positive error
+//* in it, so no spike is lost. Draws only the visible frames.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -25,6 +27,10 @@ namespace MB.FramePacing.Charts
     // The smallest scale (ms either way) and the room above the largest error
     internal const double MinLimitMs = 2;
     internal const double Headroom = 1.15;
+
+    // The scale only leaves out the largest errors when they need more than this many times the room the 99th percentile needs
+    internal const double ClipFactor = 8;
+    internal const double BulkPercentile = 0.99;
 
     // At most this many grid lines on each side of zero
     private const int MaxTicksPerSide = 4;
@@ -73,6 +79,7 @@ namespace MB.FramePacing.Charts
     public Color BarColor { get; set; } = Colors.Red;
     public Color BandColor { get; set; } = Colors.Black.WithAlpha(0.08);
     public Color ZeroLineColor { get; set; } = Colors.Black.WithAlpha(0.45);
+    public Color LabelColor { get; set; } = Colors.Black;
 
     public bool IsVisible { get; set; } = true;
 
@@ -80,9 +87,19 @@ namespace MB.FramePacing.Charts
 
     public IEnumerable<LegendItem> LegendItems => Array.Empty<LegendItem>();
 
-    /// <summary>The symmetric scale: the largest error with some room above it, at least <see cref="MinLimitMs"/>.</summary>
-    internal static double Limit(IReadOnlyCollection<double> errorsMs) =>
-      Math.Max(MinLimitMs, errorsMs.Count > 0 ? errorsMs.Max(Math.Abs) * Headroom : 0);
+    /// <summary>
+    /// The symmetric scale: the largest error with some room above it, at least <see cref="MinLimitMs"/>. When that needs more than
+    /// <see cref="ClipFactor"/> times the room of the 99th percentile (a few hitches far above everything else), the 99th percentile's.
+    /// </summary>
+    internal static double Limit(IReadOnlyCollection<double> errorsMs)
+    {
+      if (errorsMs.Count == 0)
+        return MinLimitMs;
+      var sorted = errorsMs.Select(Math.Abs).Order().ToArray();
+      double all = Math.Max(MinLimitMs, sorted[^1] * Headroom);
+      double bulk = Math.Max(MinLimitMs, Statistics.Percentile(sorted, BulkPercentile) * Headroom);
+      return all <= ClipFactor * bulk ? all : bulk;
+    }
 
     /// <summary>The grid step: 1 ms, doubled until at most <see cref="MaxTicksPerSide"/> lines fit on each side of zero.</summary>
     internal static double TickStep(double limitMs)
@@ -132,6 +149,18 @@ namespace MB.FramePacing.Charts
         return ms > 0 ? Math.Min(y, zero - MinBarHeightPixels) : Math.Max(y, zero + MinBarHeightPixels);
       }
 
+      // Errors beyond the visible scale: a mark at the edge
+      double top = Axes.YAxis.Max;
+      double bottom = Axes.YAxis.Min;
+      var clipped = new ClippedValueMarks();
+      void Clip(float x, double ms)
+      {
+        if (ms > top)
+          clipped.Add(x, ms, top: true);
+        else if (ms < bottom)
+          clipped.Add(x, ms, top: false);
+      }
+
       paint.Color = BarColor.ToSKColor();
       float barPixels = Axes.GetPixelX(left + m_barSeconds) - Axes.GetPixelX(left);
       int first = Array.BinarySearch(m_time, left - m_barSeconds);
@@ -145,18 +174,23 @@ namespace MB.FramePacing.Charts
           float x = Axes.GetPixelX(m_time[i]);
           float tip = Tip(m_errorMs[i]);
           canvas.DrawRect(new SKRect(x, Math.Min(zero, tip), x + barPixels - BarGapPixels, Math.Max(zero, tip)), paint);
+          Clip(x + ((barPixels - BarGapPixels) / 2), m_errorMs[i]);
         }
       }
       else
       {
         // Zoomed out: one bar per pixel column, from its most negative to its most positive error
         int column = int.MinValue;
-        float top = zero;
-        float bottom = zero;
+        float up = zero;
+        float down = zero;
+        double most = 0;
+        double least = 0;
         void Flush()
         {
-          if (top < bottom)
-            canvas.DrawRect(new SKRect(column, top, column + 1, bottom), paint);
+          if (up < down)
+            canvas.DrawRect(new SKRect(column, up, column + 1, down), paint);
+          Clip(column + 0.5f, most);
+          Clip(column + 0.5f, least);
         }
         for (int i = first; i < m_time.Length && m_time[i] <= right; ++i)
         {
@@ -165,14 +199,18 @@ namespace MB.FramePacing.Charts
           {
             Flush();
             column = x;
-            top = zero;
-            bottom = zero;
+            up = zero;
+            down = zero;
+            most = 0;
+            least = 0;
           }
           if (m_errorTicks[i] == 0)
             continue;
           float tip = Tip(m_errorMs[i]);
-          top = Math.Min(top, tip);
-          bottom = Math.Max(bottom, tip);
+          up = Math.Min(up, tip);
+          down = Math.Max(down, tip);
+          most = Math.Max(most, m_errorMs[i]);
+          least = Math.Min(least, m_errorMs[i]);
         }
         Flush();
       }
@@ -186,6 +224,7 @@ namespace MB.FramePacing.Charts
         Color = ZeroLineColor.ToSKColor(),
       };
       canvas.DrawLine(data.Left, zero, data.Right, zero, line);
+      clipped.Draw(canvas, data, BarColor.ToSKColor(), LabelColor.ToSKColor(), ms => ms.ToString("+0.#;-0.#", CultureInfo.CurrentCulture) + " ms");
     }
 
     private static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;

@@ -123,6 +123,15 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.PredictionErrorTicks, Is.EqualTo(manifest.AnimationStepTicks(i) - intended), where + ": prediction error");
       }
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(Enumerable.Range(1, manifest.FrameCount - 1).Count(manifest.IsLate)), $"{clip}: late frames");
+
+      // Gamers Nexus's summaries, as mb-framepacing-explained's doc/measured-errors.md lists them for its modes
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
+      long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorTicks(i)));
+      double errorPerFrameMs = absolute / (double)measured.Length / TimeSpan.TicksPerMillisecond;
+      double percentError = absolute * 100.0 / measured.Sum(manifest.DisplayTicks);
+      Assert.That(run.Statistics.ErrorPerFrameMs, Is.EqualTo(errorPerFrameMs).Within(1e-9), $"{clip}: error per frame");
+      Assert.That(run.Statistics.PercentError, Is.EqualTo(percentError).Within(1e-9), $"{clip}: percent error");
+      TestContext.Out.WriteLine($"{clip}: error per frame {errorPerFrameMs:0.00} ms, percent error {percentError:0.0} %");
     }
 
     /// <summary>How long after its intended display time the frame is first shown (the pacer's and the video's clocks differ by a constant).</summary>
