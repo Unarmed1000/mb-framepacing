@@ -105,18 +105,23 @@ void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runI
 }
 ```
 
-The same matrix draws in other forms; one encode can feed several:
+That is the simplest to add. The same matrix draws in other forms, and one encode can feed several; **most efficient first**, per
+frame for the 41×41 main marker (about 440 dark runs):
 
-- **`ModulesToIndexed`:** 4 vertices and 6 indices per quad, for index buffers.
-- **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs.
-- **`GridVertices` + `ModulesToGridIndices`:** a static grid of vertices (every module corner; 1768 for the main marker, 680 for the
-  sync marker) that you upload once, and per frame only the indices of the dark runs (about 5 KB instead of about 40 KB of vertices).
-  The grid stays valid while the kind's symbol size, the options and the origin do.
-- **`ModulesToBitmap`:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA buffers take
-  the same bytes, since the marker is black and white). With `ModuleSizePx` 1 and origin (0, 0) it is a module-resolution image: a
-  texture to draw scaled up by a whole number with point filtering.
-- **`ModuleMatrix::Bits()`:** the packed bits themselves (1 bit per module, row-major, most significant bit first).
-- **A dedicated shader:** one opaque quad whose fragment shader looks its module up in a 41×41 texture; below.
+1. **A dedicated shader:** one opaque quad whose fragment shader looks its module up in a 41×41 texture; per frame only the texture's
+   1,681 bytes change. Below.
+2. **`GridVertices` + `ModulesToGridIndices`:** a static grid of vertices (every module corner; 1768 for the main marker, 680 for the
+   sync marker) that you upload once, and per frame only the indices of the dark runs: about 2,600 (10 KB as 32 bit, 5 KB as 16 bit;
+   the grid fits 16 bit indices). The grid stays valid while the kind's symbol size, the options and the origin do.
+3. **`ModulesToBitmap` at module resolution:** with `ModuleSizePx` 1 and origin (0, 0), a 41×41 image to draw as a texture scaled up
+   by a whole number with point filtering (1,681 pixels per frame).
+4. **`ModulesToIndexed`** (4 vertices and 6 indices per quad, for index buffers) or **`ModulesToTriangles`** (above): about 1,750
+   vertices and 2,600 indices, or 2,600 vertices, rebuilt every frame.
+5. **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs (about 440).
+6. **`ModulesToBitmap` at full size:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA
+   buffers take the same bytes, since the marker is black and white), for software rendering, video frames and images.
+
+`ModuleMatrix::Bits()` gives the packed bits themselves (1 bit per module, row-major, most significant bit first).
 
 ### A dedicated shader
 

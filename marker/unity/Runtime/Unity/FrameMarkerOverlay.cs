@@ -59,10 +59,14 @@ namespace MB.FrameMarker.Unity
     private Material m_material;
 
     [Tooltip(
-      "How the marker is drawn: Geometry (pixel aligned quads, works everywhere), Bitmap (a module texture scaled up) or Shader (one quad with a dedicated shader, shader model 3.5). All draw the same pixels."
+      "How the marker is drawn: Shader (one quad with a dedicated shader, the fastest; needs shader model 3.5, else it draws Geometry), Bitmap (a module texture scaled up) or Geometry (pixel aligned quads, works everywhere). All draw the same pixels."
     )]
     [SerializeField]
-    private FrameMarkerRenderMode m_renderMode = FrameMarkerRenderMode.Geometry;
+    private FrameMarkerRenderMode m_renderMode = FrameMarkerRenderMode.Shader;
+
+    [Tooltip("The Shader render mode's shader (Hidden/MB/FrameMarkerQuad, set when the component is added): referencing it keeps it in player builds.")]
+    [SerializeField]
+    private Shader m_quadShader;
 
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
     private readonly byte[] m_modules = new byte[Marker.MaxPackedModuleByteCount];
@@ -251,7 +255,7 @@ namespace MB.FrameMarker.Unity
       }
       if (m_renderMode == FrameMarkerRenderMode.Shader)
       {
-        var quad = sync ? m_syncQuad ??= new FrameMarkerQuad() : m_mainQuad ??= new FrameMarkerQuad();
+        var quad = sync ? m_syncQuad ??= new FrameMarkerQuad(m_quadShader) : m_mainQuad ??= new FrameMarkerQuad(m_quadShader);
         if (quad.Update(matrix, options, origin, height))
         {
           quad.DrawNow(width);
@@ -260,7 +264,7 @@ namespace MB.FrameMarker.Unity
         if (!m_shaderWarned)
         {
           Debug.LogWarning(
-            $"FrameMarkerOverlay: shader {FrameMarkerQuad.ShaderName} is not available (it needs shader model 3.5; in player builds add it to 'Always Included Shaders'). Drawing geometry instead.",
+            $"FrameMarkerOverlay: shader {FrameMarkerQuad.ShaderName} is not available (it needs shader model 3.5, and in player builds the component's Quad Shader or 'Always Included Shaders'). Drawing geometry instead.",
             this
           );
           m_shaderWarned = true;

@@ -51,6 +51,21 @@ modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelF
 `align_px` downscale ratio). A sync payload is 12 bytes (magic, format version, kind, frame index); its other fields are not encoded
 and decode as `0`.
 
+## Ways to draw it, most efficient first
+
+| #   | Option                                                                | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                      |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| 1   | **Dedicated shader**: one quad and a 41×41 module texture             | 1,681 bytes (the texture), 2 triangles                       | A fragment shader that reads whole texels (HLSL `Load`, GLSL `texelFetch`) |
+| 2   | **Static grid**: `grid_vertices` once, then `modules_to_grid_indices` | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                  |
+| 3   | **Module texture scaled up**: `modules_to_bitmap` at 1 px per module  | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact |
+| 4   | **Triangles**: `modules_to_indexed` or `modules_to_triangles`         | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                     |
+| 5   | **Rectangles**: `modules_to_quads`                                    | About 440 filled rectangles                                  | A 2D fill-rectangle API                                                    |
+| 6   | **Full-size bitmap**: `modules_to_bitmap`                             | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images               |
+
+Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shader's code (HLSL and
+GLSL) and the exact rules are in [Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/integrating.md#3-draw-it-every-frame). A Python caller usually holds a pixel buffer (a video
+frame, an image), so the quick start uses 6; for a GPU, 1 and 2 cost the least per frame.
+
 ## API
 
 The same API as the C# library (`MB.FrameMarker`), in Python's naming:
@@ -60,10 +75,10 @@ The same API as the C# library (`MB.FrameMarker`), in Python's naming:
 | `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                           | What a marker carries                                                         |
 | `Options`, `Point`                                                               | Size and place                                                                |
 | `generate_modules`, `ModuleMatrix` (`size`, `is_dark`, `bits`)                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes)                |
-| `modules_to_bitmap`, `PixelFormat`                                               | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                   |
-| `modules_to_quads`                                                               | Draw it as quads: the light background, then one dark quad per run of modules |
-| `modules_to_triangles`, `modules_to_indexed`                                     | Draw it as a triangle list or indexed triangles, for a GPU                    |
 | `grid_vertices`, `grid_vertex_count`, `modules_to_grid_indices`                  | A static grid uploaded once, and per frame only the indices                   |
+| `modules_to_bitmap`, `PixelFormat`                                               | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                   |
+| `modules_to_indexed`, `modules_to_triangles`                                     | Draw it as indexed triangles or a triangle list, for a GPU                    |
+| `modules_to_quads`                                                               | Draw it as quads: the light background, then one dark quad per run of modules |
 | `marker_size_px`, `qr_module_count_for`, `recommended_origin`                    | Sizing and placement                                                          |
 | `minimum_module_size_px`, `recommend_module_size_px`                             | Module size for a capture's scaling                                           |
 | `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks` | The wire format and its time units                                            |

@@ -37,15 +37,20 @@ namespace FM = MB::FrameMarker;
 // Once: output 1920x1080, capture stored at 960x540 (2:1)
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};
 const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, /*alignPx*/ 2);
+std::array<FM::Vertex, FM::MaxGridVertexCount()> grid;
+const std::size_t gridCount = FM::GridVertices(FM::MarkerKind::Frame, options, origin, grid);
+UploadVertices(grid.data(), gridCount);   // your renderer: a static vertex buffer, (X, Y) in pixels, color (Luma, Luma, Luma)
 FM::ModuleMatrix matrix;
-std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
+std::array<uint32_t, FM::MaxIndexCount()> indices;
 
 // Every frame, last (after post effects and UI), without blending:
 const FM::Payload payload{frameIndex, animationTicks, /*runId*/ 1};
-FM::GenerateModules(payload, matrix);                                               // encode once
-const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);  // draw it
-DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
+FM::GenerateModules(payload, matrix);                                      // encode once
+const std::size_t count = FM::ModulesToGridIndices(matrix, indices);       // only the indices change
+DrawIndexed(indices.data(), count);      // triangles over the static vertices
 ```
+
+This is the most efficient way that needs no shader of your own; see [the options](#ways-to-draw-it-most-efficient-first).
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`FM::TicksPerSecond`).
@@ -61,6 +66,20 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
 - **Size:** every main marker (frame, start, end) is QR version 6, 41×41 modules, so it never changes size:
   `MarkerSizePx(options)`. The sync marker is QR version 2, 25×25 modules.
 
+## Ways to draw it, most efficient first
+
+| #   | Option                                                             | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                      |
+| --- | ------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| 1   | **Dedicated shader**: one quad and a 41×41 module texture          | 1,681 bytes (the texture), 2 triangles                       | A fragment shader that reads whole texels (HLSL `Load`, GLSL `texelFetch`) |
+| 2   | **Static grid**: `GridVertices` once, then `ModulesToGridIndices`  | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                  |
+| 3   | **Module texture scaled up**: `ModulesToBitmap` at 1 px per module | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact |
+| 4   | **Triangles**: `ModulesToIndexed` or `ModulesToTriangles`          | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                     |
+| 5   | **Rectangles**: `ModulesToQuads`                                   | About 440 filled rectangles                                  | A 2D fill-rectangle API                                                    |
+| 6   | **Full-size bitmap**: `ModulesToBitmap`                            | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images               |
+
+Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shader's code (HLSL and
+GLSL) and the exact rules are in [Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/integrating.md#3-draw-it-every-frame).
+
 ## API
 
 Everything is declared by `<mb/framemarker/FrameMarker.hpp>` in `MB::FrameMarker`, one header per type.
@@ -70,9 +89,9 @@ Everything is declared by `<mb/framemarker/FrameMarker.hpp>` in `MB::FrameMarker
 | `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                         | What a marker carries                                                                |
 | `Options`, `Point`                                                                                             | Size and place                                                                       |
 | `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
-| `ModulesToTriangles`, `ModulesToIndexed`, `ModulesToQuads`                                                     | Draw it as a triangle list, indexed triangles or quads, into your buffers            |
-| `GridVertices`, `GridVertexCount`, `ModulesToGridIndices`                                                      | A static grid uploaded once, and per frame only the indices                          |
+| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                | A static grid uploaded once, and per frame only the indices                          |
 | `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads`                                                     | Draw it as indexed triangles, a triangle list or quads, into your buffers            |
 | `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
 | `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |
 | `MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                 | Module size for a capture's scaling                                                  |

@@ -43,6 +43,12 @@ META_IMPORTERS = {
 }
 META_FOOTER = "  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
 
+# A script's default references are assigned when its component is added: the overlay references its shader, so builds keep it
+DEFAULT_REFERENCES = {
+    "Runtime/Unity/FrameMarkerOverlay.cs": {"m_quadShader": "Runtime/Unity/FrameMarkerQuad.shader"},
+}
+SHADER_FILE_ID = 4800000
+
 
 class Arguments(argparse.Namespace):
     """The parsed command line."""
@@ -71,6 +77,9 @@ def meta_text(path: Path, relative_path: str) -> str:
     if path.is_dir():
         return header + "folderAsset: yes\nDefaultImporter:\n  externalObjects: {}\n" + META_FOOTER
     importer = META_IMPORTERS.get(path.suffix, "DefaultImporter:\n  externalObjects: {}\n")
+    if references := DEFAULT_REFERENCES.get(relative_path):
+        lines = "".join(f"  - {field}: {{fileID: {SHADER_FILE_ID}, guid: {guid_for(target)}, type: 3}}\n" for field, target in references.items())
+        importer = importer.replace("  defaultReferences: []\n", "  defaultReferences:\n" + lines)
     return header + importer + META_FOOTER
 
 

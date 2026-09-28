@@ -10,11 +10,21 @@ shows the **animation error**: how far what the game animated is from what was a
 - **`MB.FrameMarker.Unity`** (`Runtime/Unity`):
   - `FrameMarkerOverlay`: add it to a GameObject and the marker is drawn at the end of every frame, on top of everything.
   - `BeginRun` / `EndRun` / `RunFor`: bracket the part to measure with start and end markers.
-  - `FrameMarkerMesh` and `PixelSpace`: draw the marker from your own render pipeline code.
-  - `FrameMarkerTexture`: the marker as a `Texture2D` at module resolution, for UI or anything that shows an image.
   - `FrameMarkerQuad`: the marker as one quad with a dedicated shader (`Hidden/MB/FrameMarkerQuad`, shader model 3.5).
-  - The overlay's **Render Mode** picks one of them: Geometry (the default), Bitmap or Shader; all draw the same pixels.
+  - `FrameMarkerMesh` and `PixelSpace`: the marker as a static grid with per-frame indices, drawn from your own render pipeline code.
+  - `FrameMarkerTexture`: the marker as a `Texture2D` at module resolution, for UI or anything that shows an image.
 - **Samples:** Benchmark (a camera pan measured as one run).
+
+## Ways to draw it, most efficient first
+
+All draw exactly the same pixels; per frame, for the 41×41 main marker:
+
+| #   | Way                                                    | Per frame                                     | Needs                                        |
+| --- | ------------------------------------------------------ | --------------------------------------------- | -------------------------------------------- |
+| 1   | Overlay **Render Mode: Shader** (the default)          | A 1,681 byte module texture and one quad      | Shader model 3.5 (it falls back to Geometry) |
+| 2   | `FrameMarkerMesh` in your command buffer               | About 2,600 indices; the grid's vertices stay | Your own render pipeline code                |
+| 3   | Overlay **Render Mode: Bitmap** (`FrameMarkerTexture`) | A 41×41 RGBA texture drawn scaled up          | Nothing                                      |
+| 4   | Overlay **Render Mode: Geometry**                      | About 440 rectangles in GL immediate mode     | Nothing: works on every graphics API         |
 
 ## Quick start
 

@@ -23,8 +23,24 @@ The Unity package contains the C# library plus Unity helpers (an overlay compone
 - **One format.** The payload and geometry are specified in [marker-format.md](../doc/marker-format.md), the reference all four
   follow byte for byte.
 - **No allocations per frame** (C++ and C#): you give the buffers, the libraries fill them. Zero-allocation tests prove it.
-- **Renderer independent.** They give you pixel aligned geometry (quads, triangles or indexed triangles) to draw with whatever you
-  already use: Direct3D, Vulkan, Metal, OpenGL, a 2D API or a pixel buffer.
+- **Renderer independent.** They encode the marker once per frame and draw it in the form your renderer takes: Direct3D, Vulkan,
+  Metal, OpenGL, a 2D API or a pixel buffer.
+
+## Ways to draw it, most efficient first
+
+| #   | Option                                                             | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                      |
+| --- | ------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| 1   | **Dedicated shader**: one quad and a 41×41 module texture          | 1,681 bytes (the texture), 2 triangles                       | A fragment shader that reads whole texels (HLSL `Load`, GLSL `texelFetch`) |
+| 2   | **Static grid**: `GridVertices` once, then `ModulesToGridIndices`  | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                  |
+| 3   | **Module texture scaled up**: `ModulesToBitmap` at 1 px per module | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact |
+| 4   | **Triangles**: `ModulesToIndexed` or `ModulesToTriangles`          | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                     |
+| 5   | **Rectangles**: `ModulesToQuads`                                   | About 440 filled rectangles                                  | A 2D fill-rectangle API                                                    |
+| 6   | **Full-size bitmap**: `ModulesToBitmap`                            | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images               |
+
+Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shader's code (HLSL and
+GLSL) and the exact rules are in [Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/integrating.md#3-draw-it-every-frame). The names above are C++ and C#; Python's are
+the same in snake case. Unity's overlay draws 1 (Render Mode **Shader**, the default), 3 (**Bitmap**) or 5 (**Geometry**, which works
+everywhere and is the fallback without shader model 3.5), and `FrameMarkerMesh` draws 2 from your own command buffers.
 
 How to put the marker into an application (size, place, start and end markers, the rules that keep it readable) is in
 [Integrating the marker](../doc/integrating.md); Unity has its own [guide](../doc/unity.md).

@@ -22,16 +22,21 @@ using MB.FrameMarker;
 // Once: output 1920x1080, capture stored at 960x540 (2:1)
 var options = new Options(Marker.RecommendModuleSizePx(1080, 540));
 Point origin = Marker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, alignPx: 2);
+var grid = new Vertex[Marker.MaxGridVertexCount];
+int gridCount = Marker.GridVertices(MarkerKind.Frame, options, origin, grid);
+UploadVertices(grid.AsSpan(0, gridCount));                  // your renderer: a static vertex buffer, (X, Y) in pixels, color (Luma, Luma, Luma)
 var generator = new MarkerGenerator();                      // owns the QR encoder's buffers; reuse it
 var modules = new byte[Marker.MaxPackedModuleByteCount];    // the encoded marker (or a stackalloc)
-var vertices = new Vertex[Marker.MaxTriangleVertexCount];
+var indices = new int[Marker.MaxIndexCount];
 
 // Every frame, last (after post effects and UI), without blending:
 var payload = new Payload(frameIndex, Marker.SecondsToTicks(animationSeconds), runId: 1);
-generator.TryGenerateModules(payload, modules, out var matrix);            // encode once
-int count = Marker.ModulesToTriangles(matrix, options, origin, vertices);   // draw it
-DrawTriangles(vertices.AsSpan(0, count));                   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
+generator.TryGenerateModules(payload, modules, out var matrix);   // encode once
+int count = Marker.ModulesToGridIndices(matrix, indices);         // only the indices change
+DrawIndexed(indices.AsSpan(0, count));                            // triangles over the static vertices
 ```
+
+This is the most efficient way that needs no shader of your own; see [the options](#ways-to-draw-it-most-efficient-first).
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`Marker.SecondsToTicks`).
@@ -48,6 +53,20 @@ DrawTriangles(vertices.AsSpan(0, count));                   // your renderer: (X
 - **Size:** every main marker (frame, start, end) is QR version 6, 41×41 modules, so it never changes size:
   `Marker.MarkerSizePx(options)`. The sync marker is QR version 2, 25×25 modules.
 
+## Ways to draw it, most efficient first
+
+| #   | Option                                                             | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                      |
+| --- | ------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| 1   | **Dedicated shader**: one quad and a 41×41 module texture          | 1,681 bytes (the texture), 2 triangles                       | A fragment shader that reads whole texels (HLSL `Load`, GLSL `texelFetch`) |
+| 2   | **Static grid**: `GridVertices` once, then `ModulesToGridIndices`  | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                  |
+| 3   | **Module texture scaled up**: `ModulesToBitmap` at 1 px per module | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact |
+| 4   | **Triangles**: `ModulesToIndexed` or `ModulesToTriangles`          | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                     |
+| 5   | **Rectangles**: `ModulesToQuads`                                   | About 440 filled rectangles                                  | A 2D fill-rectangle API                                                    |
+| 6   | **Full-size bitmap**: `ModulesToBitmap`                            | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images               |
+
+Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shader's code (HLSL and
+GLSL) and the exact rules are in [Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/integrating.md#3-draw-it-every-frame). In Unity, the [Unity package](../unity/README.md)'s overlay does it for you.
+
 ## API
 
 Buffers are spans: `ReadOnlySpan<T>` in, `Span<T>` out; an array or a `stackalloc` passes straight in. Nothing allocates per frame.
@@ -57,9 +76,9 @@ Buffers are spans: `ReadOnlySpan<T>` in, `Span<T>` out; an array or a `stackallo
 | `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                | What a marker carries                                                                |
 | `Options`, `Point`                                                                                                    | Size and place                                                                       |
 | `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                       | Encode the marker into your bytes: its QR symbol, 1 bit per module                   |
-| `Marker.ModulesToTriangles`, `ModulesToIndexed`, `ModulesToQuads`                                                     | Draw it as a triangle list, indexed triangles or quads                               |
-| `Marker.GridVertices`, `GridVertexCount`, `ModulesToGridIndices`                                                      | A static grid uploaded once, and per frame only the indices                          |
+| `Marker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                | A static grid uploaded once, and per frame only the indices                          |
 | `Marker.ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `Marker.ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads`                                                     | Draw it as indexed triangles, a triangle list or quads                               |
 | `Marker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
 | `Marker.MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |
 | `Marker.MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                 | Module size for a capture's scaling                                                  |

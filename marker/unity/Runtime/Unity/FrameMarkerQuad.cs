@@ -35,10 +35,14 @@ namespace MB.FrameMarker.Unity
     private int m_markerSize = -1;
     private int m_outputHeight = -1;
 
-    /// <summary>A quad with the shader, or an instance whose <see cref="Material"/> is null when the shader is not available.</summary>
-    public FrameMarkerQuad()
+    /// <summary>
+    /// A quad with <paramref name="shader"/> (null: found by <see cref="ShaderName"/>), or an instance whose <see cref="Material"/> is null
+    /// when the shader is not available. A shader a component references is kept in player builds; one only found by name must be in
+    /// 'Always Included Shaders'.
+    /// </summary>
+    public FrameMarkerQuad(Shader shader = null)
     {
-      var shader = Shader.Find(ShaderName);
+      shader = shader != null ? shader : Shader.Find(ShaderName);
       if (shader == null || !shader.isSupported)
         return;
       Material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
