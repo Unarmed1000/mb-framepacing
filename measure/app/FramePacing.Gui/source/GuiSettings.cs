@@ -41,8 +41,10 @@ namespace MB.FramePacing.Gui
     public string? Scale { get; set; }
     public string? Roi { get; set; }
     public string? Duration { get; set; }
-    public bool WaitForStart { get; set; }
-    public bool StopAtEnd { get; set; }
+
+    /// <summary>Record the run between its start and end markers (the defaults; a saved choice is kept).</summary>
+    public bool WaitForStart { get; set; } = true;
+    public bool StopAtEnd { get; set; } = true;
     public string? LastCaptureDirectory { get; set; }
     public string? MediaPath { get; set; }
     public string? ImageFps { get; set; }

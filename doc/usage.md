@@ -55,7 +55,9 @@ Settings that matter:
 **GUI**
 
 1. **Source:** pick the card, then its **mode** (highest frame rate). Under **Advanced**, set **Scale** (for example 960x540).
-2. Tick **Start at the start marker** and **Stop at the end marker**. If the application aims for a frame rate below the
+2. **Start at the start marker** and **Stop at the end marker** are ticked by default, and **Stop after** is empty: the capture
+   records the run between its markers. A **Stop after** time (30s, 2m) is only a limit, counted from the start marker; untick
+   the marker boxes for an application without start and end markers. If the application aims for a frame rate below the
    refresh rate (30 fps on 60 Hz), enter it as **Target frame rate**; it is stored with the capture. **Display refresh rate** is
    the rate you expect the display to run at: the analysis checks it against the capture rate (and, for a camera, against the
    rate it calculates from the frames).

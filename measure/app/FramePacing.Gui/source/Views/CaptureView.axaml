@@ -137,10 +137,23 @@
             <TextBlock Classes="cardTitle" Text="Recording" />
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
               <TextBlock Text="Stop after" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding DurationText}" PlaceholderText="empty = until you press Stop" />
+              <TextBox
+                Grid.Column="1"
+                Text="{Binding DurationText}"
+                PlaceholderText="empty = no limit"
+                ToolTip.Tip="An optional limit, e.g. 30s or 2m, counted from the start (marker): the capture stops then even before the end marker."
+              />
             </Grid>
-            <CheckBox Content="Start at the start marker" IsChecked="{Binding WaitForStart}" />
-            <CheckBox Content="Stop at the end marker" IsChecked="{Binding StopAtEnd}" />
+            <CheckBox
+              Content="Start at the start marker"
+              IsChecked="{Binding WaitForStart}"
+              ToolTip.Tip="Record from the application's start marker (with a short pre-roll). Untick for an application without start and end markers."
+            />
+            <CheckBox
+              Content="Stop at the end marker"
+              IsChecked="{Binding StopAtEnd}"
+              ToolTip.Tip="Stop once the run's end marker has been seen. Otherwise the capture runs until Stop (or the limit)."
+            />
             <Grid
               ColumnDefinitions="Auto,*"
               ColumnSpacing="10"

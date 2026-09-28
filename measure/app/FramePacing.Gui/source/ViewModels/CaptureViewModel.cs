@@ -59,7 +59,8 @@ namespace MB.FramePacing.Gui.ViewModels
       InputFormat = settings.InputFormat ?? string.Empty;
       ScaleText = settings.Scale ?? string.Empty;
       RoiText = settings.Roi ?? string.Empty;
-      DurationText = settings.Duration ?? "30s";
+      // No duration by default: the end marker (or Stop) ends the capture; a duration is only an optional cap
+      DurationText = settings.Duration ?? string.Empty;
       TargetFpsText = settings.TargetFps ?? string.Empty;
       DisplayHzText = settings.DisplayHz ?? string.Empty;
       WaitForStart = settings.WaitForStart;
