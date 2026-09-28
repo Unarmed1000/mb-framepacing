@@ -15,5 +15,5 @@ against its manifest, frame by frame (skipped without ffmpeg).
 `marker/python`. Regenerate them there when the marker format changes, and copy the folders here unchanged.
 
 **License:** PolyForm Perimeter License 1.0.1, (c) 2026 Mana Battery ApS, like the rest of the tools' test data (the root
-[`LICENSE`](../../LICENSE)). mb-framepacing-explained publishes its own copies under CC BY-NC-ND 4.0; the copies here are licensed
+[`LICENSE`](../../LICENSE)). mb-framepacing-explained publishes its own copies under CC BY-NC-SA 4.0; the copies here are licensed
 for this repository. The manifests' `license` field says so.
