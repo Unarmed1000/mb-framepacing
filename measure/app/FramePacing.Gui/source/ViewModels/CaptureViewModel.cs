@@ -65,6 +65,7 @@ namespace MB.FramePacing.Gui.ViewModels
       DisplayHzText = settings.DisplayHz ?? string.Empty;
       WaitForStart = settings.WaitForStart;
       StopAtEnd = settings.StopAtEnd;
+      KeepFrames = settings.KeepFrames;
       OutputRoot = DefaultOutputRoot();
       MediaPath = settings.MediaPath ?? string.Empty;
       ImageFpsText = settings.ImageFps ?? "240";
@@ -225,6 +226,10 @@ namespace MB.FramePacing.Gui.ViewModels
 
     [ObservableProperty]
     public partial bool StopAtEnd { get; set; }
+
+    /// <summary>Also store the captured frames (frames.mbfc); the capture data (captures.mbcd) is always stored.</summary>
+    [ObservableProperty]
+    public partial bool KeepFrames { get; set; }
 
     /// <summary>The frame rate the application aims for; late frames are measured against it (empty = judged from the frames).</summary>
     [ObservableProperty]
@@ -405,6 +410,7 @@ namespace MB.FramePacing.Gui.ViewModels
           Duration = DurationParser.ParseOptional(DurationText),
           WaitForStart = WaitForStart,
           StopAtEnd = StopAtEnd,
+          KeepFrames = KeepFrames,
           TargetFps = FrameRateText.ParseOptional(TargetFpsText),
           ExpectedRefreshHz = FrameRateText.ParseOptional(DisplayHzText),
           ToolVersion = MainWindowViewModel.Version,
@@ -738,7 +744,12 @@ namespace MB.FramePacing.Gui.ViewModels
       ElapsedText = seconds.ToString("0.0 's'", CultureInfo.InvariantCulture);
       FpsText = (r.FramesCaptured / seconds).ToString("0", CultureInfo.InvariantCulture);
       FramesText = r.FramesWritten.ToString("N0", CultureInfo.InvariantCulture);
-      BandwidthText = (r.BytesWritten / seconds / (1024 * 1024)).ToString("0 'MiB/s'", CultureInfo.InvariantCulture);
+      // The capture data alone is a few hundred KiB a second; stored frames are hundreds of MiB
+      double megabytesPerSecond = r.BytesWritten / seconds / (1024 * 1024);
+      BandwidthText =
+        megabytesPerSecond < 1
+          ? (megabytesPerSecond * 1024).ToString("0 'KiB/s'", CultureInfo.InvariantCulture)
+          : megabytesPerSecond.ToString(megabytesPerSecond < 10 ? "0.0 'MiB/s'" : "0 'MiB/s'", CultureInfo.InvariantCulture);
       long drops = r.FramesDropped + progress.SourceDroppedFrames;
       DropsText = drops.ToString(CultureInfo.InvariantCulture);
       HasDrops = drops > 0;
@@ -784,6 +795,7 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings.Duration = DurationText;
       m_settings.WaitForStart = WaitForStart;
       m_settings.StopAtEnd = StopAtEnd;
+      m_settings.KeepFrames = KeepFrames;
       m_settings.TargetFps = TargetFpsText;
       m_settings.DisplayHz = DisplayHzText;
       m_settings.MediaPath = MediaPath;

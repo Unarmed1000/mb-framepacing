@@ -12,7 +12,7 @@
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
-        <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains frames.mbfc)" />
+        <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
         <ComboBox
           Grid.Column="2"

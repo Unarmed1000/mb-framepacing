@@ -113,6 +113,7 @@ namespace MB.FramePacing.Analysis.UnitTest
             OutputDirectory = output,
             Camera = rig,
             RecordedFps = CameraFps,
+            KeepFrames = true,
           },
           null,
           CancellationToken.None

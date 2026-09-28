@@ -81,6 +81,14 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
     `.prettierignore`).
   - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. It renders the real GUI **offscreen**
     (Avalonia.Headless) in no-save mode and neutralises machine specific text. Never take desktop screenshots.
+- **Capture data (the default):** a capture decodes every frame's markers live and stores only them, with the timestamps, in
+  `captures.mbcd` (`doc/capture-data-format.md`); the frames themselves (`frames.mbfc`) only with `--keep-frames` / the GUI's "Store
+  video frames".
+  - The recorder's inspection thread runs `LiveFrameDecoder` (search until `MarkerLocator` locks, then `FrameMarkerDecoder`); the
+    start/end triggers (`SequenceMonitor`) use that decode instead of decoding again.
+  - The analysis starts from `captures.mbcd` (`CaptureDecoder.FromData`). A capture with only `frames.mbfc` is decoded with the same
+    steps (`CaptureDecoder.DecodeFrames`) and gets `captures.mbcd`; `analyze --redecode` redoes that. `VideoClipTests` checks that
+    live and afterwards give identical records, so keep the two paths on the shared decoder.
 - **Media sources**
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file / Image folder / Network stream") go through
     `MediaInput` -> ffmpeg.

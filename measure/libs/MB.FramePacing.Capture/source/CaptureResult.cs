@@ -9,5 +9,7 @@
 
 namespace MB.FramePacing.Capture
 {
-  public sealed record CaptureResult(string Directory, string FramesPath, CaptureSessionInfo Session);
+  /// <param name="DataPath">captures.mbcd: every captured frame's decoded markers.</param>
+  /// <param name="FramesPath">frames.mbfc, when the frames themselves were stored (<see cref="CaptureRunOptions.KeepFrames"/>), else null.</param>
+  public sealed record CaptureResult(string Directory, string DataPath, string? FramesPath, CaptureSessionInfo Session);
 }

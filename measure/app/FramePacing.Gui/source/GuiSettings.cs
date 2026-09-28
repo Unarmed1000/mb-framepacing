@@ -45,6 +45,9 @@ namespace MB.FramePacing.Gui
     /// <summary>Record the run between its start and end markers (the defaults; a saved choice is kept).</summary>
     public bool WaitForStart { get; set; } = true;
     public bool StopAtEnd { get; set; } = true;
+
+    /// <summary>Also store the captured frames (frames.mbfc). Off by default: the capture data is all the analysis needs.</summary>
+    public bool KeepFrames { get; set; }
     public string? LastCaptureDirectory { get; set; }
     public string? MediaPath { get; set; }
     public string? ImageFps { get; set; }

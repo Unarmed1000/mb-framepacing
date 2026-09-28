@@ -99,7 +99,7 @@ flowchart LR
     B -->|split / passthrough| D["Capture card<br/>at the display's refresh rate"]
     V["Video file / image folder / stream<br/>(high speed camera, recorder, ...)"] --> E
     D --> E["mb-framepacing<br/>capture / import"]
-    E --> F[("frames.mbfc<br/>every captured frame + its time")]
+    E --> F[("captures.mbcd<br/>every captured frame's markers + its time")]
     F --> G["mb-framepacing analyze"]
     G --> H["Animation error, display time steps,<br/>drops, tearing: GUI, CSV, JSON"]
 ```
@@ -295,35 +295,38 @@ the charts as `run-<id>-*.png`.
 
 ### What you need
 
-| For              | You need                                                                                                                          |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream                                    |
-| Live capture     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common) |
-| Disk             | A fast SSD: 960×540 writes about 0.5 MB per frame (`--roi auto` stores only the marker: about 27 KB)                              |
-| Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                                                  |
+| For              | You need                                                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream                                                                              |
+| Live capture     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common)                                           |
+| Disk             | Little: the capture data is 192 bytes per captured frame (about 170 MB for an hour at 240 Hz). Stored frames (`--keep-frames`) need a fast SSD: 0.5 MB per frame at 960×540 |
+| Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                                                                                            |
 
 ### How fast can it record?
 
 There is no built-in frame rate limit: mb-framepacing records whatever the source delivers.
 
 - **Capture cards:** the card's own modes decide (`mb-framepacing devices --modes`). 1080p at 240 fps is common, some cards go
-  higher at lower resolutions. The live path is then limited by the card's USB/PCIe link, ffmpeg's decoding and scaling, and the
-  disk: every stored frame is width × height bytes (grey), so 960×540 at 500 fps is about 250 MiB/s. When the disk falls behind,
-  frames are counted as dropped, never silently lost.
+  higher at lower resolutions. The live path is then limited by the card's USB/PCIe link, ffmpeg's decoding and scaling, and
+  decoding the markers of every frame as it arrives (a locked marker decodes in well under a millisecond). Only the decoded
+  markers and timestamps are stored (the capture data, [doc/capture-data-format.md](doc/capture-data-format.md)); with
+  `--keep-frames` the frames are stored too, width × height bytes (grey) each, so 960×540 at 500 fps is about 250 MiB/s. When
+  decoding or the disk falls behind, frames are counted as dropped, never silently lost.
 - **Video files and image folders:** any rate. They are read as fast as the disk allows and nothing is dropped; the times come
   from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works. Footage of a
   camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [doc/camera.md](doc/camera.md)).
 - **Precision:** a capture card captures at the display's refresh rate, so display time steps are whole refreshes and exact; a camera
   filming the screen is good to about one camera period (1 ms at 1000 fps), which shows as noise in its errors.
 
-**Fast capture** (`--roi auto`, or **Locate marker** in the GUI) stores only the marker instead of whole frames. It first reads
-the source for a moment to find the marker, then has ffmpeg crop to that region and downscale it to 3 stored pixels per module.
-A 1080p source with 6 px modules then writes about 27 KB per captured frame instead of 2 MB (0.5 MB at 960×540): about 6 MiB/s at
-240 fps. The marker must stay at a fixed position, and only the top marker is stored, so tearing is not checked. `locate` prints
-the region as `--roi … --scale …`, to reuse it without searching again.
+**Fast capture** (`--roi auto`, or **Locate marker** in the GUI) has ffmpeg deliver only the marker instead of whole frames. It
+first reads the source for a moment to find the marker, then has ffmpeg crop to that region and downscale it to 3 stored pixels per
+module: about 27 KB per captured frame instead of 2 MB from a 1080p source, which lowers what ffmpeg passes on (and stores, with
+`--keep-frames`). The marker must stay at a fixed position, and only the top marker is kept, so tearing is not checked. `locate`
+prints the region as `--roi … --scale …`, to reuse it without searching again.
 
-`mb-framepacing selftest --fps <rate>` checks what this machine sustains. On the development PC (NVMe SSD), 960×540 at
-2000 fps (about 980 MiB/s) ran with no drops and every frame matched.
+`mb-framepacing selftest --fps <rate>` checks what this machine sustains (add `--keep-frames` to include storing the frames). On
+the development PC, 1000 fps ran with the recorder's ring nearly empty; with stored frames (NVMe SSD), 960×540 at 2000 fps (about
+980 MiB/s) ran with no drops and every frame matched.
 
 ## Configuration
 

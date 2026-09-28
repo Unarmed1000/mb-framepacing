@@ -15,22 +15,23 @@ labelled "very experimental" until the validation below has been done.
 
 ## What exists and how it was checked
 
-| Area                                                               | State                                    | Checked by                                                         |
-| ------------------------------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------ |
-| Rig calibration (`camera-rig calibrate`, GUI wizard)               | Implemented                              | Synthetic camera unit tests, `selftest --camera`, real ffmpeg test |
-| Homography refinement (Gauss-Newton on the module pattern)         | Implemented                              | Unit tests: ~1 px detector error down to 0.1–0.2 px                |
-| Rig verification before every capture                              | Implemented                              | Unit tests (moved camera fails, start markers accepted)            |
-| Saved cameras (`camera-rigs/` library, `--name`, `list`, `delete`) | Implemented                              | Unit tests, DocImages                                              |
-| Import of recorded clips (`import --camera`, `--recorded-fps`)     | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)           |
-| Rectification in ffmpeg (`crop,perspective,scale,vstack`)          | Implemented                              | End to end through a real ffmpeg                                   |
-| Rectification in C# (`CameraRectifier`, sources without ffmpeg)    | Implemented                              | `selftest --camera`, benchmarks (no allocations)                   |
-| Camera decoding (module grid sampler, camera captures only)        | Implemented                              | Unit tests; capture cards keep the pure barcode path               |
-| Camera analysis (scanout delay, camera tears, second zone only)    | Implemented                              | Unit tests against the synthetic ground truth                      |
-| Refresh rate calculated per run (`RefreshEstimator`), late frames  | Implemented                              | Unit tests, `selftest --camera` (60 Hz found as 16.67 ms)          |
-| GUI camera wizard (shows the camera frames), camera card           | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
-| GUI: hidden unless Settings → Experimental features is on          | Implemented                              | DocImages (headless: off for the capture page, on for the camera)  |
-| Live UVC cameras (`capture -d <camera> --camera`)                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                |
-| Real cameras and displays                                          | **Not validated**                        | Nothing yet                                                        |
+| Area                                                                               | State                                    | Checked by                                                         |
+| ---------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| Rig calibration (`camera-rig calibrate`, GUI wizard)                               | Implemented                              | Synthetic camera unit tests, `selftest --camera`, real ffmpeg test |
+| Homography refinement (Gauss-Newton on the module pattern)                         | Implemented                              | Unit tests: ~1 px detector error down to 0.1–0.2 px                |
+| Rig verification before every capture                                              | Implemented                              | Unit tests (moved camera fails, start markers accepted)            |
+| Saved cameras (`camera-rigs/` library, `--name`, `list`, `delete`)                 | Implemented                              | Unit tests, DocImages                                              |
+| Import of recorded clips (`import --camera`, `--recorded-fps`)                     | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)           |
+| Rectification in ffmpeg (`crop,perspective,scale,vstack`)                          | Implemented                              | End to end through a real ffmpeg                                   |
+| Rectification in C# (`CameraRectifier`, sources without ffmpeg)                    | Implemented                              | `selftest --camera`, benchmarks (no allocations)                   |
+| Camera decoding (module grid sampler, camera captures only)                        | Implemented                              | Unit tests; capture cards keep the pure barcode path               |
+| Camera analysis (scanout delay, camera tears, second zone only)                    | Implemented                              | Unit tests against the synthetic ground truth                      |
+| Zones decoded live, only the capture data stored (`--keep-frames` keeps the zones) | Implemented                              | `selftest --camera --fps 1000` (no drops), `FfmpegCameraTests`     |
+| Refresh rate calculated per run (`RefreshEstimator`), late frames                  | Implemented                              | Unit tests, `selftest --camera` (60 Hz found as 16.67 ms)          |
+| GUI camera wizard (shows the camera frames), camera card                           | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
+| GUI: hidden unless Settings → Experimental features is on                          | Implemented                              | DocImages (headless: off for the capture page, on for the camera)  |
+| Live UVC cameras (`capture -d <camera> --camera`)                                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                |
+| Real cameras and displays                                                          | **Not validated**                        | Nothing yet                                                        |
 
 Results on the synthetic camera (`selftest --camera --fps 1000 --refresh 60`):
 

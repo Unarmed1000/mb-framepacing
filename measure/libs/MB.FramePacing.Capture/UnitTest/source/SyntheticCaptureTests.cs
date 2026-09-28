@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* End to end through the real recorder and file: the synthetic source's frames must come back out of frames.mbfc with the ground truth
-//* marker in every record.
+//* End to end through the real recorder and files: the capture data (captures.mbcd) must hold the ground truth marker of every captured frame,
+//* decoded live, and the frames themselves (frames.mbfc) are only stored when asked for.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -69,23 +69,73 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(result.Session.FramesDroppedByRecorder, Is.Zero);
       Assert.That(result.Session.FramesWritten, Is.EqualTo(scenario.CaptureCount));
       Assert.That(CaptureSessionInfo.TryLoad(temp.Path)!.FramesWritten, Is.EqualTo(scenario.CaptureCount));
+      Assert.That(result.FramesPath, Is.Null, "no frames stored unless asked for");
+      Assert.That(System.IO.File.Exists(System.IO.Path.Combine(temp.Path, CaptureSessionInfo.FramesFileName)), Is.False);
+      Assert.That(result.Session.FramesStored, Is.False);
 
-      using var reader = new CaptureFileReader(result.FramesPath);
-      var image = reader.CreateFrameImage();
-      var decoder = new MarkerDecoder();
+      using var reader = new CaptureDataReader(result.DataPath);
       var o = scenario.Options;
-      int size = MarkerRenderer.MarkerSizePx(o.ModuleSizePx);
-      var markerLock = new MarkerLock(new PixelRect(o.OriginX, o.OriginY, size, size), o.ModuleSizePx);
-      for (long i = 0; i < reader.RecordCount; ++i)
+      Assert.That(reader.Header.FramesStored, Is.False);
+      Assert.That(reader.Header.Locks, Has.Count.EqualTo(1), "the synthetic source draws the main marker only");
+      Assert.That(reader.Header.Locks[0].Bounds.X, Is.EqualTo(o.OriginX));
+      Assert.That(reader.Header.Locks[0].Bounds.Y, Is.EqualTo(o.OriginY));
+      Assert.That(reader.Header.Locks[0].ModuleSizePx, Is.EqualTo(o.ModuleSizePx));
+      Assert.That(reader.RecordCount, Is.EqualTo(scenario.CaptureCount));
+      var records = reader.ReadAll();
+      for (int i = 0; i < records.Length; ++i)
       {
-        var header = reader.ReadRecord(i, image);
-        Assert.That(header.CaptureIndex, Is.EqualTo(i));
-        Assert.That(header.DeviceTicks, Is.EqualTo(scenario.CaptureTicks(i)));
+        var record = records[i];
+        Assert.That(record.CaptureIndex, Is.EqualTo(i));
+        Assert.That(record.DeviceTicks, Is.EqualTo(scenario.CaptureTicks(i)), "the display timer");
+        Assert.That(record.Status, Is.EqualTo(CaptureDataStatus.Decoded), $"record {i}");
         var expected = scenario.PresentedFrames[scenario.PresentedIndexAt(i)].Payload;
-        var decoded = decoder.DecodeLocked(image, markerLock);
-        Assert.That(decoded.Payload, Is.EqualTo(expected), $"record {i}");
-        if (expected.Kind == MarkerKind.SequenceStart)
-          Assert.That(decoded.Start, Is.EqualTo(scenario.StartMetadata));
+        var expectedStart = expected.Kind == MarkerKind.SequenceStart ? scenario.StartMetadata : null;
+        Assert.That(record.MainBytes, Is.EqualTo(expected.Encode(expectedStart)), $"record {i}: the encoded QR bytes as read");
+        Assert.That(MarkerPayload.TryDecode(record.MainBytes, out var payload, out var start), Is.True);
+        Assert.That(payload, Is.EqualTo(expected), $"record {i}");
+        Assert.That(start, Is.EqualTo(expectedStart));
+      }
+    }
+
+    /// <summary>With KeepFrames the frames are stored too, one per capture data record.</summary>
+    [Test]
+    public void CaptureRunner_KeepFrames_StoresTheFramesOfEveryRecord()
+    {
+      using var temp = new TempDirectory();
+      var scenario = new SyntheticScenario(
+        new SyntheticScenarioOptions
+        {
+          CaptureFps = 240,
+          RefreshHz = 240,
+          RunSeconds = 0.5,
+        }
+      );
+      using var source = new SyntheticCaptureSource(scenario, paced: false);
+
+      var result = CaptureRunner.Run(
+        source,
+        new CaptureRunOptions
+        {
+          OutputDirectory = temp.Path,
+          RingFrames = 4096,
+          KeepFrames = true,
+        },
+        null,
+        CancellationToken.None
+      );
+
+      Assert.That(result.Session.FramesStored, Is.True);
+      using var data = new CaptureDataReader(result.DataPath);
+      using var frames = new CaptureFileReader(result.FramesPath!);
+      Assert.That(data.Header.FramesStored, Is.True);
+      Assert.That(frames.RecordCount, Is.EqualTo(data.RecordCount));
+      for (long i = 0; i < data.RecordCount; ++i)
+      {
+        var header = frames.ReadRecordHeader(i);
+        var record = data.ReadRecord(i);
+        Assert.That(record.CaptureIndex, Is.EqualTo(header.CaptureIndex));
+        Assert.That(record.HostTicks, Is.EqualTo(header.HostTicks));
+        Assert.That(record.DeviceTicks, Is.EqualTo(header.DeviceTicks));
       }
     }
 
@@ -124,9 +174,9 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(result.Session.FramesDroppedByRecorder, Is.Zero);
 
       // The recording must contain the whole measured run: some start frames, every run frame and some end frames
-      using var reader = new CaptureFileReader(result.FramesPath);
-      long first = reader.ReadRecordHeader(0).CaptureIndex;
-      long last = reader.ReadRecordHeader(reader.RecordCount - 1).CaptureIndex;
+      using var reader = new CaptureDataReader(result.DataPath);
+      long first = reader.ReadRecord(0).CaptureIndex;
+      long last = reader.ReadRecord(reader.RecordCount - 1).CaptureIndex;
       Assert.That(scenario.PresentedFrames[scenario.PresentedIndexAt(first)].Payload.Kind, Is.EqualTo(MarkerKind.SequenceStart));
       Assert.That(scenario.PresentedFrames[scenario.PresentedIndexAt(last)].Payload.Kind, Is.EqualTo(MarkerKind.SequenceEnd));
       Assert.That(last, Is.LessThan(scenario.CaptureCount - 1), "stopped at the end marker, before the source ran out");
@@ -180,9 +230,9 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(result.Session.SequenceRunId, Is.EqualTo(scenario.Options.RunId));
       Assert.That(result.Session.FramesDroppedByRecorder, Is.Zero);
 
-      using var reader = new CaptureFileReader(result.FramesPath);
-      long first = reader.ReadRecordHeader(0).CaptureIndex;
-      long last = reader.ReadRecordHeader(reader.RecordCount - 1).CaptureIndex;
+      using var reader = new CaptureDataReader(result.DataPath);
+      long first = reader.ReadRecord(0).CaptureIndex;
+      long last = reader.ReadRecord(reader.RecordCount - 1).CaptureIndex;
       Assert.That(first, Is.EqualTo(startCapture - 16), "16 frames of pre-roll before the start marker");
       Assert.That(last, Is.EqualTo(endCapture + 6), "100 ms of end tail at 60 fps, nothing after it");
       Assert.That(reader.RecordCount, Is.EqualTo(last - first + 1), "no frame of the run is missing");

@@ -106,7 +106,8 @@ namespace MB.FramePacing.Charts
       {
         var shares = LateShare.Rolling(frames, LateShare.WindowTicks).Select(s => s * 100).ToArray();
         maxShare = shares.Max();
-        var line = lateShare.Add.Scatter(frames.Select(Seconds).ToArray(), shares);
+        // A signal (sorted by time) draws only a pixel column's range, so an hour of frames stays fast
+        var line = lateShare.Add.SignalXY(Signal(frames.Select(Seconds).ToArray(), shares));
         line.MarkerSize = 0;
         line.LineWidth = 2;
         line.Color = ChartTheme.Late;
@@ -218,9 +219,12 @@ namespace MB.FramePacing.Charts
       if (frames.Count > 0)
       {
         long origin = frames[0].FirstSeenTicks;
-        var drift = plot.Add.Scatter(
-          frames.Select(f => (f.FirstSeenTicks - origin) / (double)TimeSpan.TicksPerSecond).ToArray(),
-          frames.Select(f => Ms(f.DriftTicks)).ToArray()
+        // A signal (sorted by time) draws only a pixel column's range, so an hour of frames stays fast
+        var drift = plot.Add.SignalXY(
+          Signal(
+            frames.Select(f => (f.FirstSeenTicks - origin) / (double)TimeSpan.TicksPerSecond).ToArray(),
+            frames.Select(f => Ms(f.DriftTicks)).ToArray()
+          )
         );
         drift.MarkerSize = 2;
       }
@@ -315,6 +319,9 @@ namespace MB.FramePacing.Charts
       if (plot.PlottableList.Count > 0)
         adjustLimits?.Invoke(plot);
     }
+
+    /// <summary>A signal's points, kept readable (<see cref="ScottPlot.DataSources.SignalXYSourceGenericArray{TX, TY}"/> exposes them).</summary>
+    private static ScottPlot.DataSources.SignalXYSourceGenericArray<double, double> Signal(double[] xs, double[] ys) => new(xs, ys);
 
     private static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
 

@@ -1,9 +1,10 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Runs one capture: source thread -> FrameRecorder -> frames.mbfc, optional start/end marker triggering, duration limit, progress reporting
-//* and the capture.json sidecar. Shared by the CLI and the GUI. The start/end triggers inspect every captured frame (the recorder's
-//* inspector); only the live preview image is sampled.
+//* Runs one capture: source thread -> FrameRecorder -> captures.mbcd (every frame's decoded markers, the capture data) and, only when asked
+//* for, frames.mbfc (the frames themselves); optional start/end marker triggering, duration limit, progress reporting and the capture.json
+//* sidecar. Shared by the CLI and the GUI. The recorder decodes every captured frame and the start/end triggers use that decode; only the
+//* live preview image is sampled.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -29,9 +30,13 @@ namespace MB.FramePacing.Capture
     )
     {
       Directory.CreateDirectory(options.OutputDirectory);
+      var dataPath = Path.Combine(options.OutputDirectory, CaptureSessionInfo.DataFileName);
       var framesPath = Path.Combine(options.OutputDirectory, CaptureSessionInfo.FramesFileName);
-      if (File.Exists(framesPath))
-        throw new IOException($"'{framesPath}' already exists; choose a new output directory");
+      foreach (var path in new[] { dataPath, framesPath })
+      {
+        if (File.Exists(path))
+          throw new IOException($"'{path}' already exists; choose a new output directory");
+      }
 
       var format = source.Format;
       var header = format.ToFileHeader();
@@ -40,17 +45,17 @@ namespace MB.FramePacing.Capture
           ? (long)Math.Ceiling(duration.TotalSeconds * format.FrameRate.FramesPerSecond * 1.05) + 16
           : 0;
       double fps = format.FrameRate.IsKnown ? format.FrameRate.FramesPerSecond : 240;
-      // The triggers look at every frame; without them the current marker for the progress display comes from the sampled preview
-      // Camera captures store the timing zone's marker at a fixed place: no search (it would see two markers)
-      MarkerLock? knownLock = options.Camera != null ? Camera.CameraZone.StoredLock(0) : null;
+      // The decoder reads every frame's markers (camera captures store them at fixed places); the monitor finds the start and end markers in
+      // that decode, and knows the current marker for the progress display
       bool camera = options.Camera != null;
-      var triggers = options.WaitForStart || options.StopAtEnd ? new SequenceMonitor(knownLock, camera) : null;
-      var previewMonitor = triggers == null && options.Preview != null ? new SequenceMonitor(knownLock, camera) : null;
+      var decoder = new LiveFrameDecoder(header, camera);
+      var monitor = new SequenceMonitor();
       var recorderOptions = new FrameRecorderOptions
       {
         RingFrames = options.RingFrames ?? FrameRecorderOptions.RingFramesFor(format),
         StartArmed = options.WaitForStart,
-        Inspector = triggers,
+        Inspector = monitor,
+        Decoder = decoder,
         StopAtEnd = options.StopAtEnd,
         EndTailFrames = (int)Math.Ceiling(options.EndTail.TotalSeconds * fps),
         WaitWhenFull = !source.IsLive,
@@ -60,8 +65,9 @@ namespace MB.FramePacing.Capture
 
       var clock = new CaptureClock();
       var startedUtc = DateTime.UtcNow;
-      using var writer = new CaptureFileWriter(framesPath, header, expectedRecords);
-      using var recorder = new FrameRecorder(writer, recorderOptions, clock, source.DeviceTimestamps);
+      using var data = new CaptureDataWriter(dataPath, new CaptureDataHeader(header, Array.Empty<MarkerLock>(), options.KeepFrames, camera));
+      using var frames = options.KeepFrames ? new CaptureFileWriter(framesPath, header, expectedRecords) : null;
+      using var recorder = new FrameRecorder(header, frames, data, recorderOptions, clock, source.DeviceTimestamps);
       using var stopSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
       Exception? sourceError = null;
@@ -85,14 +91,13 @@ namespace MB.FramePacing.Capture
       g_logger.Info(
         "Capturing {0} -> {1} ({2}x{3}, ring {4} frames)",
         source.Description,
-        framesPath,
+        options.KeepFrames ? $"{dataPath} + {framesPath}" : dataPath,
         format.Width,
         format.Height,
         recorderOptions.RingFrames
       );
       sourceThread.Start();
 
-      var monitor = triggers ?? previewMonitor;
       var preview = options.Preview != null ? new GrayImage(format.Width, format.Height) : null;
       long lastPreviewIndex = -1;
       long recordingStartTicks = options.WaitForStart ? -1 : 0;
@@ -112,14 +117,13 @@ namespace MB.FramePacing.Capture
           {
             lastPreviewIndex = previewIndex;
             options.Preview?.Invoke(preview, previewIndex);
-            previewMonitor?.Inspect(preview, previewIndex);
           }
         }
 
         // The recorder's inspector saw the start marker (in any frame) and started writing
-        if (triggers != null && recordingStartTicks < 0 && !recorder.IsArmed)
+        if (options.WaitForStart && recordingStartTicks < 0 && !recorder.IsArmed)
         {
-          var start = triggers.Start;
+          var start = monitor.Start;
           g_logger.Info("Start marker seen (run {0} '{1}'), recording", start?.Payload.RunId, start?.Start?.Name);
           recordingStartTicks = now;
         }
@@ -146,7 +150,7 @@ namespace MB.FramePacing.Capture
             stopSource.IsCancellationRequested ? CapturePhase.Stopping
             : recorder.IsArmed ? CapturePhase.WaitingForStart
             : CapturePhase.Recording;
-          progress(new CaptureProgress(phase, TimeSpan.FromTicks(now), recorder.Stats, source.SourceDroppedFrames, monitor?.Last));
+          progress(new CaptureProgress(phase, TimeSpan.FromTicks(now), recorder.Stats, source.SourceDroppedFrames, monitor.Last));
         }
       }
 
@@ -154,6 +158,8 @@ namespace MB.FramePacing.Capture
         stopReason = sourceError != null ? "source error" : "source ended";
       // Completing inspects the frames still in the ring; a file can end before its end marker was inspected
       recorder.Complete();
+      // The header now gets where the decoder found the markers
+      data.Complete(data.Header with { Locks = decoder.Finish()?.Locks ?? Array.Empty<MarkerLock>() });
       if (recorder.StopRequested && sourceError == null)
         stopReason = "end marker";
       var stats = recorder.Stats;
@@ -179,8 +185,9 @@ namespace MB.FramePacing.Capture
         FramesDroppedBySource = source.SourceDroppedFrames,
         FramesDiscardedBeforeStart = stats.FramesDiscardedWhileArmed,
         StopReason = stopReason,
-        SequenceRunId = monitor?.Start?.Payload.RunId,
-        SequenceName = monitor?.Start?.Start?.Name,
+        SequenceRunId = monitor.Start?.Payload.RunId,
+        SequenceName = monitor.Start?.Start?.Name,
+        FramesStored = options.KeepFrames,
         RecordedFps = options.RecordedFps,
         TargetFps = options.TargetFps,
         ExpectedRefreshHz = options.ExpectedRefreshHz,
@@ -188,12 +195,12 @@ namespace MB.FramePacing.Capture
       };
       session.Save(options.OutputDirectory);
       progress?.Invoke(
-        new CaptureProgress(CapturePhase.Finished, TimeSpan.FromTicks(clock.NowTicks), stats, source.SourceDroppedFrames, monitor?.Last)
+        new CaptureProgress(CapturePhase.Finished, TimeSpan.FromTicks(clock.NowTicks), stats, source.SourceDroppedFrames, monitor.Last)
       );
 
       if (sourceError != null)
         throw new InvalidOperationException("Capture source failed: " + sourceError.Message, sourceError);
-      return new CaptureResult(options.OutputDirectory, framesPath, session);
+      return new CaptureResult(options.OutputDirectory, dataPath, options.KeepFrames ? framesPath : null, session);
     }
   }
 }

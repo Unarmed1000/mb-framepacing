@@ -205,7 +205,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(located.Crop.Factor, Is.EqualTo(2), "6 px modules are stored at 3 px");
       Assert.That(located.Scale, Is.EqualTo((located.Crop.StoredWidth, located.Crop.StoredHeight)));
       using (var source = FfmpegCaptureSource.Start(located.Apply(options), TimeSpan.FromSeconds(30)))
-        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output }, null, CancellationToken.None);
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output, KeepFrames = true }, null, CancellationToken.None);
       var report = CaptureAnalyzer.Analyze(output, new AnalysisOptions());
 
       var header = report.Capture.Header;

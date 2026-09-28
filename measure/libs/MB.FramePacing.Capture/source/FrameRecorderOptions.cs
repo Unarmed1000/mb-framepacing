@@ -29,6 +29,12 @@ namespace MB.FramePacing.Capture
     /// </summary>
     public IFrameInspector? Inspector { get; init; }
 
+    /// <summary>
+    /// Reads every frame's markers, in order, before the frame is written or discarded: the capture data (captures.mbcd), and what the
+    /// <see cref="Inspector"/> gets. Needed to record the capture data. Null = no decoding.
+    /// </summary>
+    public LiveFrameDecoder? Decoder { get; init; }
+
     /// <summary>Stop writing <see cref="EndTailFrames"/> frames after the frame in which the inspector found the end marker.</summary>
     public bool StopAtEnd { get; init; }
 

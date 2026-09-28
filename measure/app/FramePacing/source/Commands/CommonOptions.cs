@@ -29,6 +29,16 @@ namespace MB.FramePacing.App.Commands
         Description = "Path to the ffmpeg executable (default: $MB_FFMPEG, then ffmpegPath in the configuration file, then PATH). Needs FFmpeg 5.1+.",
       };
 
+    /// <summary>--keep-frames: also store the captured frames (frames.mbfc) next to the capture data.</summary>
+    public static Option<bool> KeepFrames() =>
+      new Option<bool>("--keep-frames")
+      {
+        Description =
+          "Also store the captured frames (frames.mbfc, width x height bytes each: about 0.5 MB per frame at 960x540). By default only the "
+          + "capture data is stored (captures.mbcd: every frame's decoded markers and timestamps, 192 bytes per frame), which is all the "
+          + "analysis needs.",
+      };
+
     /// <summary>--charts: also write the Analyze page's charts as PNG images next to the reports.</summary>
     public static Option<bool> Charts() =>
       new Option<bool>("--charts")

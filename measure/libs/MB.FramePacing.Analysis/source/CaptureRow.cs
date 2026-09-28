@@ -25,5 +25,14 @@ namespace MB.FramePacing.Analysis
   )
   {
     public bool IsDecoded => Status == CaptureStatus.Decoded;
+
+    /// <summary>The capture data's host clock timestamp (TimeSpan ticks), when the row came from it.</summary>
+    public long? HostTicks { get; init; }
+
+    /// <summary>The capture data's device clock timestamp (TimeSpan ticks), when the row came from it and the device gave one.</summary>
+    public long? DeviceTicks { get; init; }
+
+    /// <summary>The main marker's encoded bytes as read, when the row came from the capture data.</summary>
+    public byte[]? MarkerBytes { get; init; }
   }
 }

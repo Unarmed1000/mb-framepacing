@@ -1,7 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Analyse a capture directory (frames.mbfc + capture.json) and write the reports to <capture>/analysis:
+//* Analyse a capture directory (captures.mbcd, the capture data, + capture.json) and write the reports to <capture>/analysis. A capture that
+//* only has its frames (frames.mbfc) is decoded into captures.mbcd first, so the next analysis starts from the data:
 //*   captures.csv                - one row per capture index
 //*   run-<id>[-<n>]-frames.csv   - one row per presented application frame
 //*   summary.json                - everything else (layout, counts, statistics, histograms, warnings)
@@ -48,15 +49,10 @@ namespace MB.FramePacing.Analysis
       CancellationToken cancellationToken = default
     )
     {
-      var framesPath = Path.Combine(captureDirectory, CaptureSessionInfo.FramesFileName);
-      if (!File.Exists(framesPath))
-        throw new FileNotFoundException($"'{captureDirectory}' does not contain a capture ({CaptureSessionInfo.FramesFileName})", framesPath);
-
       var session = CaptureSessionInfo.TryLoad(captureDirectory);
       var scanout = session?.Camera != null ? ScanoutModel.Camera : ScanoutModel.SingleScanout;
-      DecodedCapture capture;
-      using (var reader = new CaptureFileReader(framesPath))
-        capture = CaptureDecoder.Decode(reader, options.TimeSource, progress, cancellationToken, scanout);
+      var (dataHeader, records) = LoadData(captureDirectory, scanout == ScanoutModel.Camera, options.Redecode, progress, cancellationToken);
+      var capture = CaptureDecoder.FromData(dataHeader, records, options.TimeSource);
 
       var timeline = TimelineAnalyzer.Analyze(
         capture.Rows,
@@ -83,7 +79,10 @@ namespace MB.FramePacing.Analysis
       if (capture.TimeSource == TimeSource.Host)
         warnings.Add("Host timestamps are used (the capture has no device timestamps): expect extra jitter from process scheduling.");
       if (session is { FramesDroppedByRecorder: > 0 })
-        warnings.Add($"The recorder dropped {session.FramesDroppedByRecorder} frames (disk too slow?); they appear as NotRecorded captures.");
+        warnings.Add(
+          $"The recorder dropped {session.FramesDroppedByRecorder} frames (decoding or, with stored frames, the disk too slow?); they appear as "
+            + "NotRecorded captures."
+        );
       if (session is { FramesDroppedBySource: > 0 })
         warnings.Add($"The capture device/ffmpeg reported {session.FramesDroppedBySource} dropped frames.");
 
@@ -92,6 +91,66 @@ namespace MB.FramePacing.Analysis
       var report = new AnalysisReport(captureDirectory, outputDirectory, session, capture, timeline, warnings);
       WriteReports(report, options);
       return report;
+    }
+
+    /// <summary>
+    /// The capture data of <paramref name="captureDirectory"/>: captures.mbcd, or its frames.mbfc decoded (and the result saved as captures.mbcd,
+    /// so the next analysis starts from it). <paramref name="redecode"/> decodes the frames again even when the data exists.
+    /// </summary>
+    public static (CaptureDataHeader Header, CaptureDataRecord[] Records) LoadData(
+      string captureDirectory,
+      bool camera,
+      bool redecode = false,
+      IProgress<double>? progress = null,
+      CancellationToken cancellationToken = default
+    )
+    {
+      var dataPath = Path.Combine(captureDirectory, CaptureSessionInfo.DataFileName);
+      var framesPath = Path.Combine(captureDirectory, CaptureSessionInfo.FramesFileName);
+      bool hasFrames = File.Exists(framesPath);
+      if (File.Exists(dataPath) && !(redecode && hasFrames))
+      {
+        using var reader = new CaptureDataReader(dataPath);
+        progress?.Report(1.0);
+        return (reader.Header, reader.ReadAll());
+      }
+      if (!hasFrames)
+        throw new FileNotFoundException(
+          $"'{captureDirectory}' does not contain a capture ({CaptureSessionInfo.DataFileName} or {CaptureSessionInfo.FramesFileName})",
+          dataPath
+        );
+
+      (CaptureDataHeader Header, CaptureDataRecord[] Records) data;
+      using (var frames = new CaptureFileReader(framesPath))
+        data = CaptureDecoder.DecodeFrames(frames, camera, progress, cancellationToken);
+      WriteData(dataPath, data.Header, data.Records);
+      return data;
+    }
+
+    /// <summary>Write captures.mbcd next to the frames it was decoded from (to a temporary file first, then over the old one).</summary>
+    private static void WriteData(string path, CaptureDataHeader header, IReadOnlyList<CaptureDataRecord> records)
+    {
+      string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+      try
+      {
+        using (var writer = new CaptureDataWriter(temporary, header))
+        {
+          var buffer = new byte[4096 * CaptureDataRecord.Size];
+          for (int first = 0; first < records.Count; first += 4096)
+          {
+            int count = Math.Min(4096, records.Count - first);
+            for (int i = 0; i < count; ++i)
+              records[first + i].Write(buffer.AsSpan(i * CaptureDataRecord.Size, CaptureDataRecord.Size));
+            writer.WriteRecords(buffer.AsSpan(0, count * CaptureDataRecord.Size));
+          }
+        }
+        File.Move(temporary, path, overwrite: true);
+      }
+      finally
+      {
+        if (File.Exists(temporary))
+          File.Delete(temporary);
+      }
     }
 
     /// <summary>
@@ -141,7 +200,10 @@ namespace MB.FramePacing.Analysis
     private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows, bool camera)
     {
       using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-      writer.WriteLine("captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropBefore" + (camera ? ",secondZoneFrameIndex" : ""));
+      writer.WriteLine(
+        "captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropBefore,hostMs,deviceMs,payloadHex"
+          + (camera ? ",secondZoneFrameIndex" : "")
+      );
       foreach (var row in rows)
       {
         bool hasMarker = row.Status is CaptureStatus.Decoded or CaptureStatus.Torn && row.Payload != default;
@@ -155,7 +217,10 @@ namespace MB.FramePacing.Analysis
             hasMarker ? row.Payload.RunId.ToString(CultureInfo.InvariantCulture) : string.Empty,
             hasMarker ? row.Payload.FrameIndex.ToString(CultureInfo.InvariantCulture) : string.Empty,
             hasMarker ? Ms(row.Payload.AnimationTicks) : string.Empty,
-            row.SourceDropBefore ? "1" : "0"
+            row.SourceDropBefore ? "1" : "0",
+            row.HostTicks is { } host ? Ms(host) : string.Empty,
+            row.DeviceTicks is { } device ? Ms(device) : string.Empty,
+            row.MarkerBytes != null ? Convert.ToHexString(row.MarkerBytes) : string.Empty
           ) + (camera ? "," + (row.SecondaryFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty) : string.Empty)
         );
       }

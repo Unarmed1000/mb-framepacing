@@ -53,9 +53,10 @@ namespace MB.FramePacing.Analysis.UnitTest
     public void Clip_EveryVideoFrameDecodesToItsMarker(string clip)
     {
       var manifest = VideoClips.Manifest(clip);
+      // The capture data, decoded live during the import
       DecodedCapture capture;
-      using (var reader = new CaptureFileReader(Path.Combine(Import(clip), CaptureSessionInfo.FramesFileName)))
-        capture = CaptureDecoder.Decode(reader);
+      using (var reader = new CaptureDataReader(Path.Combine(Import(clip), CaptureSessionInfo.DataFileName)))
+        capture = CaptureDecoder.FromData(reader.Header, reader.ReadAll());
 
       Assert.That(capture.Rows, Has.Count.EqualTo(manifest.VideoFrameCount), $"{clip}: one capture per video frame");
       for (int row = 0; row < capture.Rows.Count; ++row)
@@ -132,6 +133,35 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Statistics.ErrorPerFrameMs, Is.EqualTo(errorPerFrameMs).Within(1e-9), $"{clip}: error per frame");
       Assert.That(run.Statistics.PercentError, Is.EqualTo(percentError).Within(1e-9), $"{clip}: percent error");
       TestContext.Out.WriteLine($"{clip}: error per frame {errorPerFrameMs:0.00} ms, percent error {percentError:0.0} %");
+    }
+
+    /// <summary>
+    /// The capture data decoded live during the import is exactly what decoding the stored frames afterwards gives: the same layout, and for
+    /// every captured frame the same capture index, timestamps, flags, status and encoded marker bytes.
+    /// </summary>
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    public void Clip_LiveDataEqualsTheDataDecodedFromTheFrames(string clip)
+    {
+      string output = VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, "capture"), keepFrames: true);
+      using var live = new CaptureDataReader(Path.Combine(output, CaptureSessionInfo.DataFileName));
+      using var frames = new CaptureFileReader(Path.Combine(output, CaptureSessionInfo.FramesFileName));
+      var (header, records) = CaptureDecoder.DecodeFrames(frames, camera: false);
+
+      Assert.That(live.Header.Locks, Is.EqualTo(header.Locks), $"{clip}: the same marker layout");
+      var liveRecords = live.ReadAll();
+      Assert.That(liveRecords, Has.Length.EqualTo(records.Length), $"{clip}: one record per stored frame");
+      for (int i = 0; i < records.Length; ++i)
+      {
+        var (a, b) = (liveRecords[i], records[i]);
+        string where = $"{clip}: record {i}";
+        Assert.That(
+          (a.CaptureIndex, a.HostTicks, a.DeviceTicks, a.Flags, a.Status),
+          Is.EqualTo((b.CaptureIndex, b.HostTicks, b.DeviceTicks, b.Flags, b.Status)),
+          where
+        );
+        Assert.That(a.MainBytes, Is.EqualTo(b.MainBytes), where + ": main marker bytes");
+        Assert.That(a.SecondBytes, Is.EqualTo(b.SecondBytes), where + ": second marker bytes");
+      }
     }
 
     /// <summary>How long after its intended display time the frame is first shown (the pacer's and the video's clocks differ by a constant).</summary>

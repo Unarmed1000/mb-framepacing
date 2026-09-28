@@ -111,8 +111,9 @@ The steps:
    anyway. Its frame shows where the saved calibration expects the markers, so a camera that moved is easy to spot.
 
 5. **Save** (new camera): give it a name.
-6. **Done**: the capture page now films with that camera. **Start capture** verifies it, then stores only the two straightened
-   marker zones. The camera card also lets you switch between saved cameras and verify one.
+6. **Done**: the capture page now films with that camera. **Start capture** verifies it, then straightens only the two marker
+   zones and stores what their markers say (tick **Store video frames** to keep the straightened zones too, useful while
+   setting up a rig). The camera card also lets you switch between saved cameras and verify one.
 
 ### On the command line
 
@@ -126,7 +127,8 @@ The steps:
    mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk   # a slow motion clip
    ```
 
-4. **Capture** with the saved camera. Every capture verifies it first, then stores only the two straightened marker zones:
+4. **Capture** with the saved camera. Every capture verifies it first, then straightens only the two marker zones and stores what
+   their markers say (add `--keep-frames` to keep the straightened zones too, useful while setting up a rig):
 
    ```sh
    mb-framepacing capture -d "<camera>" --mode 640x360@330 --input-format mjpeg --camera desk --wait-for-start --stop-at-end --analyze

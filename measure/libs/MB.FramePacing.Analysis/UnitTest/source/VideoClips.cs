@@ -51,12 +51,15 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
     }
 
-    /// <summary>Imports the clip's video as a capture into <paramref name="output"/> and returns it.</summary>
-    public static string Import(string clip, string ffmpeg, string output)
+    /// <summary>
+    /// Imports the clip's video as a capture into <paramref name="output"/> (the capture data, and the frames too with
+    /// <paramref name="keepFrames"/>) and returns it.
+    /// </summary>
+    public static string Import(string clip, string ffmpeg, string output, bool keepFrames = false)
     {
       var media = MediaInput.Create(Path.Combine(Directory(), clip, "video.mp4"), new MediaInputOptions(), output);
       using (var source = FfmpegCaptureSource.Start(media.ToCaptureOptions(ffmpeg), TimeSpan.FromSeconds(30)))
-        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output }, null, CancellationToken.None);
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output, KeepFrames = keepFrames }, null, CancellationToken.None);
       return output;
     }
   }

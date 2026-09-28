@@ -23,12 +23,12 @@ below use `mb-framepacing` / `mb-framepacing-gui`; when running from source, use
 - **GUI:** start `mb-framepacing-gui`, choose **Synthetic test game** as the source and press **Start capture**. It records a
   simulated game with stalls and skipped frames for a few seconds; the Analyze page opens by itself.
 - **Command line:** `mb-framepacing selftest` does the same and checks the result against the known answer. It prints `PASS`,
-  or explains what went wrong (usually a disk that is too slow: try `--size 480x270`).
+  or explains what went wrong (usually a machine too slow for the rate: try a lower `--fps`, or `--size 480x270`).
 
 ## 2. Measure with a capture card
 
 Connect the capture card between the application's PC and its monitor. The card passes the picture on unchanged and sends a copy
-to the recording PC (the same PC works too, if it has the spare CPU and disk speed).
+to the recording PC (the same PC works too, if it has the spare CPU).
 
 ```mermaid
 flowchart LR
@@ -76,9 +76,17 @@ Add `--module-px 6` (the module size your application draws) to have the size ch
 limit, `--target-fps 30` when the application aims for less than the refresh rate, and `--display-hz 240` to have the display
 rate you expect checked against the capture.
 
-**Fast capture: store only the marker**
+**What is stored**
 
-When the disk is the limit (high frame rates, long runs, a laptop), store only the marker instead of whole frames:
+A capture decodes every frame's markers as it records and stores only them with the frame's timestamps: the capture data
+(`captures.mbcd`, 192 bytes per captured frame, about 170 MB for an hour at 240 Hz; [format](capture-data-format.md)). That is all
+the analysis needs. To also store the frames themselves (to look at them, or decode them again later with `analyze --redecode`),
+add `--keep-frames`, or tick **Store video frames** in the GUI: 0.5 MB per frame at 960×540.
+
+**Fast capture: read only the marker**
+
+When ffmpeg or, with `--keep-frames`, the disk is the limit (high frame rates, long runs, a laptop), have ffmpeg deliver only the
+marker instead of whole frames:
 
 ```sh
 mb-framepacing locate -d "<device>" --mode 1920x1080@240     # optional: shows where the marker is and what would be stored
@@ -92,7 +100,7 @@ stored size now.
 
 - The application must already draw the marker when the capture starts (idle frame markers are enough), and the marker must
   **not move**: a marker that leaves the region shows as undecodable captures, and the analysis warns about it.
-- Only the top marker is stored, so tearing is not checked.
+- Only the top marker is kept, so tearing is not checked.
 - `--roi auto` chooses the stored size itself; leave out `--scale`. `locate` prints the region as `--roi … --scale …` to reuse it
   without searching again.
 
@@ -123,11 +131,12 @@ Each recording gets its own folder under the capture folder (set in the GUI's se
 
 ```text
 capture-20260924-153000/          (import-... for imports)
-├── frames.mbfc                   every recorded frame with its capture time (binary)
+├── captures.mbcd                 every captured frame's decoded markers and timestamps (binary, the capture data)
+├── frames.mbfc                   only with --keep-frames: every captured frame itself (binary)
 ├── capture.json                  source, mode, scale, tool version, drop counts
 └── analysis/
     ├── summary.json              counts, statistics, histograms, warnings per run
-    ├── captures.csv              one row per recorded frame: capture time and what its marker said
+    ├── captures.csv              one row per captured frame: its times, what its marker said and the marker's bytes
     ├── run-<id>-frames.csv       one row per application frame shown: display time step, animation error, drift
     └── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, under the run's
                                   headline numbers; error-histogram, error-percentiles, display-time-step-histogram, drift)
@@ -173,7 +182,7 @@ or use **Browse...**, **Target fps** and **Analyze** on the Analyze page.
 | "ffmpeg not found"                               | Install it (platform guide, step 1). If it is not on PATH, point to it: GUI **Settings → Set up...**, `mb-framepacing config --set-ffmpeg <path>`, or `--ffmpeg <path>`.                                                                                    |
 | "No marker seen yet" / many undecodable captures | The marker must be drawn **last** (after post effects, UI and upscaling), unblended, pure black and white, with HDR off. Check it is at least 3 stored pixels per module after `--scale`; avoid MJPEG if the card has another format.                       |
 | Recording never starts with the start marker     | The start marker must appear whole in at least one captured frame (every frame is checked). Show it for about three capture frames (100 ms at 30 fps) so a dropped or torn capture cannot lose it, and check that the preview shows "SequenceStart marker". |
-| Frames dropped by the recorder                   | The disk is too slow: store only the marker (`--roi auto`), use a smaller `--scale`, or a faster SSD. `selftest --fps <rate> --size <size>` shows what this machine sustains.                                                                               |
+| Frames dropped by the recorder                   | Decoding (or, with `--keep-frames`, the disk) falls behind: lower the rate or `--scale`, read only the marker (`--roi auto`), or a faster SSD for stored frames. `selftest --fps <rate> --size <size>` shows what this machine sustains.                    |
 | Frames dropped by the device / ffmpeg            | The card or its USB link cannot keep up in that format: try an uncompressed format (`--input-format nv12` or `yuyv422`) or a lower mode.                                                                                                                    |
 | Warning about host timestamps                    | The source gives no per-frame timestamps, so the recording PC's clock is used and has more jitter. Prefer device timestamps (v4l2 and most DirectShow cards provide them).                                                                                  |
 | macOS: no frames arrive                          | Allow camera access: **System Settings → Privacy & Security → Camera**.                                                                                                                                                                                     |

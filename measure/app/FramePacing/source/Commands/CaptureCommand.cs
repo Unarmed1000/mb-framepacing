@@ -1,7 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* 'capture': record a capture card through ffmpeg into <dir>/frames.mbfc (+ capture.json), with a live status line. Ctrl+C stops.
+//* 'capture': record a capture card through ffmpeg into <dir>/captures.mbcd (every frame's decoded markers; + frames.mbfc with --keep-frames,
+//* + capture.json), with a live status line. Ctrl+C stops.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -64,11 +65,16 @@ namespace MB.FramePacing.App.Commands
       var displayOption = CommonOptions.DisplayHz("stored in capture.json");
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the capture afterwards." };
       var chartsOption = CommonOptions.Charts();
+      var keepFramesOption = CommonOptions.KeepFrames();
       var ffmpegOption = CommonOptions.Ffmpeg();
       var cameraOption = CameraRigCommand.CameraOption();
 
-      var command = new Command("capture", "Record a capture device to disk.")
+      var command = new Command(
+        "capture",
+        "Record a capture device: every frame's decoded markers and timestamps (and the frames with --keep-frames)."
+      )
       {
+        keepFramesOption,
         cameraOption,
         deviceOption,
         modeOption,
@@ -120,6 +126,7 @@ namespace MB.FramePacing.App.Commands
               Duration = DurationParser.ParseOptional(durationText),
               WaitForStart = parseResult.GetValue(waitOption),
               StopAtEnd = parseResult.GetValue(stopOption),
+              KeepFrames = parseResult.GetValue(keepFramesOption),
               TargetFps = parseResult.GetValue(targetOption),
               ExpectedRefreshHz = parseResult.GetValue(displayOption),
               RingFrames = parseResult.GetValue(ringOption),
@@ -209,6 +216,7 @@ namespace MB.FramePacing.App.Commands
       table.AddRow("Duration", $"{session.DurationSeconds:0.00} s");
       table.AddRow("Frames captured", session.FramesCaptured.ToString());
       table.AddRow("Frames written", session.FramesWritten.ToString());
+      table.AddRow("Stored", session.FramesStored ? "capture data + frames" : "capture data (no frames)");
       table.AddRow("Dropped by recorder", Highlight(session.FramesDroppedByRecorder));
       table.AddRow("Dropped by device/ffmpeg", Highlight(session.FramesDroppedBySource));
       if (session.WaitedForStart)
@@ -225,6 +233,11 @@ namespace MB.FramePacing.App.Commands
       double seconds = progress.Elapsed.TotalSeconds;
       double fps = seconds > 0 ? r.FramesCaptured / seconds : 0;
       double megabytesPerSecond = seconds > 0 ? r.BytesWritten / seconds / (1024 * 1024) : 0;
+      // The capture data alone is a few hundred KiB a second; stored frames are hundreds of MiB
+      string rate =
+        megabytesPerSecond < 1 ? $"{megabytesPerSecond * 1024:0} KiB/s"
+        : megabytesPerSecond < 10 ? $"{megabytesPerSecond:0.0} MiB/s"
+        : $"{megabytesPerSecond:0} MiB/s";
       var phase = progress.Phase switch
       {
         CapturePhase.WaitingForStart => "[yellow]waiting for start marker[/]",
@@ -235,7 +248,7 @@ namespace MB.FramePacing.App.Commands
       var marker = progress.LastMarker is { } m
         ? Markup.Escape($" | marker {m.Payload.Kind} run {m.Payload.RunId} frame {m.Payload.FrameIndex}")
         : string.Empty;
-      return $"{phase} {seconds:0.0}s | {fps:0} fps | written {r.FramesWritten} ({megabytesPerSecond:0} MiB/s) | ring {r.RingFill}/{r.RingCapacity} | "
+      return $"{phase} {seconds:0.0}s | {fps:0} fps | written {r.FramesWritten} ({rate}) | ring {r.RingFill}/{r.RingCapacity} | "
         + $"drops {Highlight(r.FramesDropped)}/{Highlight(progress.SourceDroppedFrames)}{marker}";
     }
 

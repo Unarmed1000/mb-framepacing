@@ -1,7 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* capture.json - the sidecar written next to frames.mbfc describing how the capture was made and how it went.
+//* capture.json - the sidecar written next to captures.mbcd (and frames.mbfc, when the frames were stored) describing how the capture was made
+//* and how it went.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -19,6 +20,7 @@ namespace MB.FramePacing.Capture
   {
     public const string FileName = "capture.json";
     public const string FramesFileName = "frames.mbfc";
+    public const string DataFileName = "captures.mbcd";
 
     public string ToolVersion { get; init; } = string.Empty;
     public DateTime StartedUtc { get; init; }
@@ -42,6 +44,9 @@ namespace MB.FramePacing.Capture
     public long FramesDiscardedBeforeStart { get; init; }
     public string StopReason { get; init; } = string.Empty;
     public uint? SequenceRunId { get; init; }
+
+    /// <summary>The frames themselves were stored (frames.mbfc) next to the capture data.</summary>
+    public bool FramesStored { get; init; }
     public string? SequenceName { get; init; }
 
     /// <summary>The real recording rate of a slow motion clip, when the timestamps were generated from it.</summary>

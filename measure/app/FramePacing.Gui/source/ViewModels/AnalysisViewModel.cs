@@ -106,7 +106,7 @@ namespace MB.FramePacing.Gui.ViewModels
     [RelayCommand]
     private async Task BrowseAsync()
     {
-      var path = await m_dialogs.PickFolderAsync("Select a capture folder (contains frames.mbfc)", CaptureDirectory);
+      var path = await m_dialogs.PickFolderAsync("Select a capture folder (contains captures.mbcd or frames.mbfc)", CaptureDirectory);
       if (path != null)
         CaptureDirectory = path;
     }

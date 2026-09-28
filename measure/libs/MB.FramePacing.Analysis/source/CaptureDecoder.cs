@@ -1,10 +1,11 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Reads a frames.mbfc capture and produces one CaptureRow per capture index:
-//*  1. Locate: search sampled frames for every marker (the top one times the frame, lower ones detect tearing) and lock onto them.
-//*  2. Decode: decode every record in parallel with the locked decoder.
-//*  3. Fill the capture index gaps left by recorder drops with NotRecorded rows.
+//* Turns a capture into one CaptureRow per capture index. The analysis always starts from the capture data (captures.mbcd, every captured
+//* frame's decoded markers): FromData reads it into rows, filling the capture index gaps the recorder's drops left with NotRecorded rows.
+//* Captures that only have their frames (frames.mbfc) are decoded into the same data first (DecodeFrames), with the steps a capture takes
+//* live: search frame by frame in capture order until MarkerLocator knows where the markers are, then decode every remaining frame in parallel
+//* with the locked decoder. So both produce the same records.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -16,15 +17,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MB.FramePacing.Capture;
-using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Analysis
 {
   public static class CaptureDecoder
   {
-    public const int LocateSampleCount = 240;
-
+    /// <summary>Decode the frames of <paramref name="reader"/> and read the result into rows (<see cref="DecodeFrames"/>, <see cref="FromData"/>).</summary>
     public static DecodedCapture Decode(
       CaptureFileReader reader,
       TimeSource timeSource = TimeSource.Auto,
@@ -33,199 +32,130 @@ namespace MB.FramePacing.Analysis
       ScanoutModel scanout = ScanoutModel.SingleScanout
     )
     {
-      var layout = scanout == ScanoutModel.Camera ? CameraLayout(reader.Header) : Locate(reader, cancellationToken);
-      var effectiveTime = timeSource == TimeSource.Auto ? (AllRecordsHaveDeviceTicks(reader) ? TimeSource.Device : TimeSource.Host) : timeSource;
+      var (header, records) = DecodeFrames(reader, scanout == ScanoutModel.Camera, progress, cancellationToken);
+      return FromData(header, records, timeSource);
+    }
 
+    /// <summary>The capture data of a capture's stored frames: the records a live capture would have written, and its header.</summary>
+    public static (CaptureDataHeader Header, CaptureDataRecord[] Records) DecodeFrames(
+      CaptureFileReader reader,
+      bool camera,
+      IProgress<double>? progress = null,
+      CancellationToken cancellationToken = default
+    )
+    {
       long count = reader.RecordCount;
-      var headers = new CaptureRecordHeader[count];
-      var results = new (CaptureStatus Status, MarkerPayload Payload, StartMetadata? Start, ulong? Secondary)[count];
+      var records = new CaptureDataRecord[count];
       long done = 0;
+      void Report()
+      {
+        long finished = Interlocked.Increment(ref done);
+        if (progress != null && finished % 256 == 0)
+          progress.Report((double)finished / count);
+      }
+
+      // In capture order until the markers are located, as the capture does live
+      var live = new LiveFrameDecoder(reader.Header, camera);
+      var image = reader.CreateFrameImage();
+      long next = 0;
+      for (; next < count && live.Layout == null; ++next)
+      {
+        cancellationToken.ThrowIfCancellationRequested();
+        var header = reader.ReadRecord(next, image);
+        records[next] = ToRecord(header, live.Decode(image));
+        Report();
+      }
+      var layout =
+        live.Finish()
+        ?? throw new InvalidOperationException(
+          "No frame markers were found in the capture. Check that the application draws the marker, and see doc/marker-format.md 'Sizing'."
+        );
 
       Parallel.For(
-        0,
+        next,
         count,
         new ParallelOptions { CancellationToken = cancellationToken },
-        () => (Decoder: new MarkerDecoder(sampleModuleGrid: scanout == ScanoutModel.Camera), Image: reader.CreateFrameImage()),
+        () => (Decoder: new MarkerDecoder(sampleModuleGrid: camera), Image: reader.CreateFrameImage()),
         (index, _, local) =>
         {
-          headers[index] = reader.ReadRecord(index, local.Image);
-          results[index] =
-            scanout == ScanoutModel.Camera ? DecodeCameraFrame(local.Decoder, local.Image, layout) : DecodeFrame(local.Decoder, local.Image, layout);
-          long finished = Interlocked.Increment(ref done);
-          if (progress != null && finished % 256 == 0)
-            progress.Report((double)finished / count);
+          var header = reader.ReadRecord(index, local.Image);
+          records[index] = ToRecord(header, FrameMarkerDecoder.DecodeLocked(local.Decoder, local.Image, layout, camera));
+          Report();
           return local;
         },
         _ => { }
       );
       progress?.Report(1.0);
-
-      var rows = new List<CaptureRow>((int)Math.Min(count + 64, int.MaxValue));
-      long expectedIndex = count > 0 ? headers[0].CaptureIndex : 0;
-      for (long i = 0; i < count; ++i)
-      {
-        var header = headers[i];
-        for (; expectedIndex < header.CaptureIndex; ++expectedIndex)
-          rows.Add(new CaptureRow(expectedIndex, 0, CaptureStatus.NotRecorded, default));
-        long ticks = effectiveTime == TimeSource.Device && header.HasDeviceTicks ? header.DeviceTicks : header.HostTicks;
-        var (status, payload, start, secondary) = results[i];
-        rows.Add(
-          new CaptureRow(header.CaptureIndex, ticks, status, payload, start, (header.Flags & CaptureRecordFlags.SourceDropBefore) != 0, secondary)
-        );
-        expectedIndex = header.CaptureIndex + 1;
-      }
-      return new DecodedCapture(reader.Header, layout, effectiveTime, rows);
+      return (new CaptureDataHeader(reader.Header, layout.Locks, FramesStored: true, camera), records);
     }
 
-    /// <summary>Find the markers in a sample of the capture and lock onto them.</summary>
-    public static MarkerLayout Locate(CaptureFileReader reader, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// The rows of the capture data: one per capture index, the ones the recorder dropped as NotRecorded. With <see cref="TimeSource.Auto"/>
+    /// the capture device's clock is used when every record has its timestamp, the host clock otherwise.
+    /// </summary>
+    public static DecodedCapture FromData(CaptureDataHeader header, IReadOnlyList<CaptureDataRecord> records, TimeSource timeSource = TimeSource.Auto)
     {
-      var warnings = new List<string>();
-      var decoder = new MarkerDecoder(tryHarder: true);
-      var image = reader.CreateFrameImage();
-      var found = new List<MarkerDecodeResult>();
-
-      foreach (long index in SampleIndices(reader.RecordCount))
-      {
-        cancellationToken.ThrowIfCancellationRequested();
-        reader.ReadRecord(index, image);
-        var markers = decoder.DecodeAll(image);
-        if (markers.Count == 0)
-        {
-          var single = decoder.Decode(image);
-          if (single.IsDecoded)
-            markers.Add(single);
-        }
-        found.AddRange(markers.Where(m => m.IsDecoded && m.ModuleSizePx > 0));
-        // Enough evidence once several frames agree on the layout
-        if (found.Count >= 24)
-          break;
-      }
-      if (found.Count == 0)
+      if (header.Locks.Count == 0)
         throw new InvalidOperationException(
           "No frame markers were found in the capture. Check that the application draws the marker, and see doc/marker-format.md 'Sizing'."
         );
+      var layout = MarkerLayout.For(header.Locks, header.Camera);
+      var effectiveTime =
+        timeSource == TimeSource.Auto ? (records.Count > 0 && records.All(r => r.HasDeviceTicks) ? TimeSource.Device : TimeSource.Host) : timeSource;
 
-      // Cluster by origin (the main marker's frame, start and end kinds share it; the sync marker has its own)
-      var clusters = new List<List<MarkerDecodeResult>>();
-      foreach (var marker in found)
+      var rows = new List<CaptureRow>(records.Count + 64);
+      long expectedIndex = records.Count > 0 ? records[0].CaptureIndex : 0;
+      foreach (var record in records)
       {
-        var cluster = clusters.FirstOrDefault(c =>
-          Math.Abs(c[0].Bounds.X - marker.Bounds.X) <= 3 * marker.ModuleSizePx && Math.Abs(c[0].Bounds.Y - marker.Bounds.Y) <= 3 * marker.ModuleSizePx
-        );
-        if (cluster == null)
-          clusters.Add(new List<MarkerDecodeResult> { marker });
-        else
-          cluster.Add(marker);
+        for (; expectedIndex < record.CaptureIndex; ++expectedIndex)
+          rows.Add(new CaptureRow(expectedIndex, 0, CaptureStatus.NotRecorded, default));
+        rows.Add(ToRow(record, effectiveTime, header.Camera));
+        expectedIndex = record.CaptureIndex + 1;
       }
-
-      // The main marker first: it carries the payload and the timing; a sync marker only checks tearing
-      var locks = clusters
-        .Where(c => c.Count >= Math.Max(1, found.Count / 10))
-        .Select(c =>
-        {
-          double moduleSize = Median(c.Select(m => m.ModuleSizePx));
-          int x = (int)Math.Round(Median(c.Select(m => (double)m.Bounds.X)));
-          int y = (int)Math.Round(Median(c.Select(m => (double)m.Bounds.Y)));
-          bool sync = c.Count(m => m.Payload.Kind == MarkerKind.Sync) * 2 > c.Count;
-          return (Sync: sync, Lock: MarkerLock.At(x, y, moduleSize, sync ? MarkerKind.Sync : MarkerKind.Frame));
-        })
-        .OrderBy(l => l.Sync)
-        .ThenBy(l => l.Lock.Bounds.Y)
-        .Select(l => l.Lock)
-        .ToList();
-
-      double module = locks[0].ModuleSizePx;
-      if (module < 2)
-        warnings.Add($"The marker is only {module:0.0} stored pixels per module (minimum 2, recommended 3): decoding will be unreliable.");
-      else if (module < 2.75)
-        warnings.Add($"The marker is {module:0.0} stored pixels per module (recommended 3 or more).");
-      return new MarkerLayout(locks, module, warnings);
+      return new DecodedCapture(header.Frames, layout, effectiveTime, rows);
     }
 
-    /// <summary>
-    /// EXPERIMENTAL camera captures store the rig's rectified zones stacked top to bottom in scanout order, each marker at a known origin with
-    /// <see cref="CameraZone.StoredPxPerModule"/> pixel modules: no search needed.
-    /// </summary>
-    public static MarkerLayout CameraLayout(CaptureFileHeader header)
-    {
-      int zones = header.Height / CameraZone.StoredSizePx;
-      if (zones < 1 || header.Width != CameraZone.StoredSizePx)
-        throw new InvalidOperationException(
-          $"A {header.Width}x{header.Height} capture is not a camera capture (expected {CameraZone.StoredSizePx} pixel wide stacked zones)"
-        );
-      var locks = Enumerable.Range(0, zones).Select(CameraZone.StoredLock).ToList();
-      return new MarkerLayout(locks, CameraZone.StoredPxPerModule, new[] { "Camera capture: " + CameraRig.ExperimentalNotice });
-    }
+    private static CaptureDataRecord ToRecord(CaptureRecordHeader header, FrameDecode decode) =>
+      new CaptureDataRecord(
+        header.CaptureIndex,
+        header.HostTicks,
+        header.DeviceTicks,
+        header.Flags,
+        decode.Status,
+        decode.MainBytes,
+        decode.SecondBytes
+      );
 
-    /// <summary>
-    /// Camera: the zones legitimately show different frames while the scanout rolls down the screen, so they are not compared here; the
-    /// timeline uses the second zone's frame index to measure the scanout and find tears.
-    /// </summary>
-    private static (CaptureStatus, MarkerPayload, StartMetadata?, ulong?) DecodeCameraFrame(
-      MarkerDecoder decoder,
-      GrayImage image,
-      MarkerLayout layout
-    )
+    private static CaptureRow ToRow(CaptureDataRecord record, TimeSource time, bool camera)
     {
-      var primary = decoder.DecodeLocked(image, layout.Primary);
-      ulong? secondary = null;
-      if (layout.Locks.Count > 1 && decoder.DecodeLocked(image, layout.Locks[1]) is { IsDecoded: true } other)
-        secondary = other.Payload.FrameIndex;
-      return primary.IsDecoded
-        ? (CaptureStatus.Decoded, primary.Payload, primary.Start, secondary)
-        : (CaptureStatus.Undecodable, default, null, secondary);
-    }
+      long ticks = time == TimeSource.Device && record.HasDeviceTicks ? record.DeviceTicks : record.HostTicks;
+      bool sourceDrop = (record.Flags & CaptureRecordFlags.SourceDropBefore) != 0;
+      // Camera: the second zone's frame index measures the scanout (capture cards: the sync marker only checked tearing, in the status)
+      ulong? secondary =
+        camera && record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second.FrameIndex : null;
 
-    private static (CaptureStatus, MarkerPayload, StartMetadata?, ulong?) DecodeFrame(MarkerDecoder decoder, GrayImage image, MarkerLayout layout)
-    {
-      var primary = decoder.DecodeLocked(image, layout.Primary);
-      bool torn = false;
-      for (int i = 1; i < layout.Locks.Count; ++i)
+      var status = record.Status switch
       {
-        var other = decoder.DecodeLocked(image, layout.Locks[i]);
-        if (other.IsDecoded && primary.IsDecoded && other.Payload.FrameIndex != primary.Payload.FrameIndex)
-          torn = true;
-        if (other.IsDecoded && !primary.IsDecoded)
-          torn = true;
-      }
-      if (!primary.IsDecoded)
-        return (torn ? CaptureStatus.Torn : CaptureStatus.Undecodable, default, null, null);
-      return (torn ? CaptureStatus.Torn : CaptureStatus.Decoded, primary.Payload, primary.Start, null);
-    }
-
-    private static bool AllRecordsHaveDeviceTicks(CaptureFileReader reader)
-    {
-      // A record without a device timestamp is rare but possible (late timestamp); sample the file instead of reading every header twice.
-      foreach (long index in SampleIndices(reader.RecordCount, 512))
+        CaptureDataStatus.Decoded => CaptureStatus.Decoded,
+        CaptureDataStatus.Torn => CaptureStatus.Torn,
+        _ => CaptureStatus.Undecodable,
+      };
+      MarkerPayload payload = default;
+      StartMetadata? start = null;
+      if (record.MainBytes == null || !MarkerPayload.TryDecode(record.MainBytes, out payload, out start))
       {
-        if (!reader.ReadRecordHeader(index).HasDeviceTicks)
-          return false;
+        // No main marker: undecodable, or torn without one
+        payload = default;
+        start = null;
+        if (status == CaptureStatus.Decoded)
+          status = CaptureStatus.Undecodable;
       }
-      return reader.RecordCount > 0;
-    }
-
-    /// <summary>The first frames, then an even spread over the rest of the capture.</summary>
-    private static IEnumerable<long> SampleIndices(long count, int samples = LocateSampleCount)
-    {
-      if (count <= samples)
+      return new CaptureRow(record.CaptureIndex, ticks, status, payload, start, sourceDrop, secondary)
       {
-        for (long i = 0; i < count; ++i)
-          yield return i;
-        yield break;
-      }
-      int head = samples / 4;
-      for (long i = 0; i < head; ++i)
-        yield return i;
-      long step = Math.Max(1, (count - head) / (samples - head));
-      for (long i = head; i < count; i += step)
-        yield return i;
-    }
-
-    private static double Median(IEnumerable<double> values)
-    {
-      var sorted = values.OrderBy(v => v).ToArray();
-      return sorted.Length == 0 ? 0 : sorted[sorted.Length / 2];
+        HostTicks = record.HostTicks,
+        DeviceTicks = record.HasDeviceTicks ? record.DeviceTicks : null,
+        MarkerBytes = record.MainBytes,
+      };
     }
   }
 }

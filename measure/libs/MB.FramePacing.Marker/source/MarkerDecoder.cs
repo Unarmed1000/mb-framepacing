@@ -96,7 +96,7 @@ namespace MB.FramePacing.Marker
       var expected = MarkerRenderer.GenerateModules(payload, start);
       if (m_grid.CountMismatches(expected) > MaxModuleMismatchFraction * expected.Size * expected.Size)
         return MarkerDecodeResult.NotFound;
-      return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, markerLock.Bounds, markerLock.ModuleSizePx);
+      return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, markerLock.Bounds, markerLock.ModuleSizePx, Bytes: bytes);
     }
 
     /// <summary>Decode a single marker, optionally restricted to a region of the image.</summary>
@@ -232,8 +232,8 @@ namespace MB.FramePacing.Marker
       var geometry = ToGeometry(result.ResultPoints, area);
       var bytes = ExtractBytes(result);
       if (bytes == null || !MarkerPayload.TryDecode(bytes, out var payload, out var start))
-        return new MarkerDecodeResult(MarkerDecodeStatus.InvalidPayload, default, null, bounds, moduleSize, geometry);
-      return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, bounds, moduleSize, geometry);
+        return new MarkerDecodeResult(MarkerDecodeStatus.InvalidPayload, default, null, bounds, moduleSize, geometry, bytes);
+      return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, bounds, moduleSize, geometry, bytes);
     }
 
     /// <summary>ZXing reports [bottom-left, top-left, top-right, alignment]; the alignment pattern is missing when the detector did not find it.</summary>

@@ -116,6 +116,72 @@ namespace MB.FramePacing.Capture.UnitTest
       }
     }
 
+    /// <summary>The capture data alone: a record per frame with its index and timestamps (no marker in these frames), and no frames file.</summary>
+    [Test]
+    public void DataOnly_WritesARecordPerFrame()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("captures.mbcd");
+      var options = new FrameRecorderOptions { RingFrames = 8, Decoder = new LiveFrameDecoder(g_header, camera: false) };
+      using (var data = new CaptureDataWriter(path, new CaptureDataHeader(g_header, Array.Empty<Marker.MarkerLock>(), false, false)))
+      using (var recorder = new FrameRecorder(g_header, null, data, options, new CaptureClock()))
+      {
+        for (int i = 0; i < 200; ++i)
+        {
+          while (recorder.Stats.RingFill >= 7)
+            Thread.Sleep(0);
+          var pixels = recorder.BeginFrame();
+          pixels.Fill((byte)i);
+          recorder.EndFrame(i * 100, i * 3, i == 5 ? CaptureRecordFlags.SourceDropBefore : CaptureRecordFlags.None);
+        }
+        recorder.Complete();
+        Assert.That(recorder.Stats.FramesDropped, Is.Zero);
+        Assert.That(recorder.Stats.FramesWritten, Is.EqualTo(200));
+      }
+
+      using var reader = new CaptureDataReader(path);
+      var records = reader.ReadAll();
+      Assert.That(records.Select(r => r.CaptureIndex), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long)i)));
+      Assert.That(records.Select(r => r.HostTicks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
+      Assert.That(records.Select(r => r.DeviceTicks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 3L)));
+      Assert.That(records.Select(r => r.Flags != CaptureRecordFlags.None), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i == 5)));
+      Assert.That(records.All(r => r.Status == CaptureDataStatus.Undecodable && r.MainBytes == null), "no marker in these frames");
+      Assert.That(System.IO.File.Exists(temp.File("frames.mbfc")), Is.False);
+    }
+
+    /// <summary>With the frames kept, a full ring drops the same frames from both files, and the late device timestamps reach both.</summary>
+    [Test]
+    public void DataAndFrames_FullRing_DropTheSameFrames()
+    {
+      using var temp = new TempDirectory();
+      var gate = new GatedTimestamps();
+      const int RingFrames = 16;
+      var options = new FrameRecorderOptions { RingFrames = RingFrames, Decoder = new LiveFrameDecoder(g_header, camera: false) };
+      using (var frames = new CaptureFileWriter(temp.File("frames.mbfc"), g_header))
+      using (
+        var data = new CaptureDataWriter(temp.File("captures.mbcd"), new CaptureDataHeader(g_header, Array.Empty<Marker.MarkerLock>(), true, false))
+      )
+      using (var recorder = new FrameRecorder(g_header, frames, data, options, new CaptureClock(), gate))
+      {
+        Produce(recorder, RingFrames + 5, DeviceTimestamps.PendingTicks);
+        Assert.That(recorder.Stats.FramesDropped, Is.EqualTo(5));
+        gate.Release();
+        recorder.Complete();
+      }
+
+      using var frameReader = new CaptureFileReader(temp.File("frames.mbfc"));
+      using var dataReader = new CaptureDataReader(temp.File("captures.mbcd"));
+      Assert.That(frameReader.RecordCount, Is.EqualTo(RingFrames));
+      Assert.That(dataReader.RecordCount, Is.EqualTo(RingFrames));
+      for (int i = 0; i < RingFrames; ++i)
+      {
+        var header = frameReader.ReadRecordHeader(i);
+        var record = dataReader.ReadRecord(i);
+        Assert.That((record.CaptureIndex, record.DeviceTicks), Is.EqualTo((header.CaptureIndex, header.DeviceTicks)));
+        Assert.That(record.DeviceTicks, Is.EqualTo(i * 10), "the late device timestamp, resolved by the writer");
+      }
+    }
+
     [Test]
     public void LateDeviceTicks_AreFilledIn_OrMarkedUnknownAfterTheWait()
     {
@@ -250,7 +316,7 @@ namespace MB.FramePacing.Capture.UnitTest
         m_endIndex = endIndex;
       }
 
-      public FrameTrigger Inspect(Marker.GrayImage frame, long captureIndex)
+      public FrameTrigger Inspect(Marker.GrayImage frame, long captureIndex, Marker.MarkerDecodeResult? decoded)
       {
         Inspected.Add(captureIndex);
         // The pixels are the frame's own (Produce fills them with the low byte of the index)

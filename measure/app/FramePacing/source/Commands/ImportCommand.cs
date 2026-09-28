@@ -49,12 +49,14 @@ namespace MB.FramePacing.App.Commands
       var displayOption = CommonOptions.DisplayHz("stored in capture.json");
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the result." };
       var chartsOption = CommonOptions.Charts();
+      var keepFramesOption = CommonOptions.KeepFrames();
       var ffmpegOption = CommonOptions.Ffmpeg();
       var cameraOption = CameraRigCommand.CameraOption();
       var recordedFpsOption = CameraRigCommand.RecordedFpsOption();
 
       var command = new Command("import", "Read a video file, an image sequence or a stream instead of a capture card.")
       {
+        keepFramesOption,
         cameraOption,
         recordedFpsOption,
         inputArgument,
@@ -110,6 +112,7 @@ namespace MB.FramePacing.App.Commands
               Duration = DurationParser.ParseOptional(parseResult.GetValue(durationOption)),
               WaitForStart = parseResult.GetValue(waitOption),
               StopAtEnd = parseResult.GetValue(stopOption),
+              KeepFrames = parseResult.GetValue(keepFramesOption),
               TargetFps = parseResult.GetValue(targetOption),
               ExpectedRefreshHz = parseResult.GetValue(displayOption),
               ToolVersion = Program.VersionString,

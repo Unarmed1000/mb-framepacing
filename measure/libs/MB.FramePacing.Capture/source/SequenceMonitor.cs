@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* Finds the start and end markers of a run. As the recorder's inspector it sees every captured frame in order, so a marker in a single
-//* frame is enough. Finds the marker once with a full search, then decodes the locked region, which is cheap enough to keep up.
+//* frame is enough. It uses the recorder's decode of each frame; without one (the sampled preview) it finds the marker once with a full
+//* search, then decodes the locked region, which is cheap enough to keep up.
 //* The results are read from other threads (progress, capture.json), so they are guarded by a lock.
 //*
 //* (c) 2026 Mana Battery
@@ -67,9 +68,9 @@ namespace MB.FramePacing.Capture
     /// Inspect one frame. Returns <see cref="FrameTrigger.Start"/> for the first start marker and <see cref="FrameTrigger.End"/> for the first
     /// end marker of that run (of any run when the capture began after the start marker).
     /// </summary>
-    public FrameTrigger Inspect(GrayImage frame, long captureIndex)
+    public FrameTrigger Inspect(GrayImage frame, long captureIndex, MarkerDecodeResult? decoded)
     {
-      var result = Decode(frame);
+      var result = decoded is { } known ? (known.IsDecoded ? known : null) : Decode(frame);
       if (result == null)
         return FrameTrigger.None;
 

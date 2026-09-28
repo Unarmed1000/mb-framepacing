@@ -2,11 +2,13 @@
 //* File Description
 //* ----------------
 //* The capture hot path. A single producer (the capture source) ring of fixed size record slots in one pinned array. The source reads pixels
-//* straight into a slot, so a frame is copied exactly once (device -> ring) before the writer hands contiguous runs of slots to the file in
+//* straight into a slot, so a frame is copied exactly once (device -> ring) before the writer hands contiguous runs of slots to the files in
 //* large sequential writes.
 //*
-//* With an inspector (the start/end marker triggers) a second consumer sits between the two: the inspection thread looks at every frame in
-//* order, and the writer only writes or discards frames that were inspected. Nothing is sampled, so a marker in a single frame is enough.
+//* With a decoder or an inspector a second consumer sits between the two: the inspection thread looks at every frame in order, and the
+//* writer only writes or discards frames that were inspected. Nothing is sampled, so a marker in a single frame is enough. The decoder
+//* reads every frame's markers into a second ring of captures.mbcd records (the capture data); the inspector (the start/end marker
+//* triggers) gets that decode. The writer writes the data records, and the frames themselves only when they are kept (frames.mbfc).
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -24,7 +26,9 @@ namespace MB.FramePacing.Capture
   {
     private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
 
-    private readonly CaptureFileWriter m_writer;
+    private readonly CaptureFileHeader m_header;
+    private readonly CaptureFileWriter? m_frames;
+    private readonly CaptureDataWriter? m_data;
     private readonly FrameRecorderOptions m_options;
     private readonly IDeviceTimestampSource? m_timestamps;
     private readonly CaptureClock m_clock;
@@ -32,10 +36,13 @@ namespace MB.FramePacing.Capture
     private readonly int m_pixelByteCount;
     private readonly int m_slotCount;
     private readonly byte[] m_ring;
+    private readonly byte[]? m_dataRing;
     private readonly byte[] m_scratch;
     private readonly AutoResetEvent m_dataAvailable = new AutoResetEvent(false);
     private readonly Thread m_writerThread;
     private readonly IFrameInspector? m_inspector;
+    private readonly LiveFrameDecoder? m_decoder;
+    private readonly bool m_inspects;
     private readonly Thread? m_inspectorThread;
     private readonly GrayImage? m_inspectImage;
     private readonly AutoResetEvent m_frameAvailable = new AutoResetEvent(false);
@@ -65,26 +72,51 @@ namespace MB.FramePacing.Capture
     private long m_previewCaptureIndex = -1;
     private bool m_disposed;
 
+    /// <summary>Record the frames themselves into <paramref name="writer"/>.</summary>
     public FrameRecorder(CaptureFileWriter writer, FrameRecorderOptions options, CaptureClock clock, IDeviceTimestampSource? deviceTimestamps = null)
+      : this((writer ?? throw new ArgumentNullException(nameof(writer))).Header, writer, null, options, clock, deviceTimestamps) { }
+
+    /// <summary>
+    /// Record frames of <paramref name="header"/>'s size: the capture data (every frame's decoded markers, needs
+    /// <see cref="FrameRecorderOptions.Decoder"/>) into <paramref name="data"/>, and the frames themselves into <paramref name="frames"/>
+    /// when given. At least one of them is needed.
+    /// </summary>
+    public FrameRecorder(
+      CaptureFileHeader header,
+      CaptureFileWriter? frames,
+      CaptureDataWriter? data,
+      FrameRecorderOptions options,
+      CaptureClock clock,
+      IDeviceTimestampSource? deviceTimestamps = null
+    )
     {
-      m_writer = writer ?? throw new ArgumentNullException(nameof(writer));
+      m_header = header ?? throw new ArgumentNullException(nameof(header));
       m_options = options ?? throw new ArgumentNullException(nameof(options));
       m_clock = clock ?? throw new ArgumentNullException(nameof(clock));
+      if (frames == null && data == null)
+        throw new ArgumentException("Nothing to record into: give the frames writer, the data writer or both");
+      if (data != null && options.Decoder == null)
+        throw new ArgumentException("The capture data needs a decoder (FrameRecorderOptions.Decoder)", nameof(options));
+      m_frames = frames;
+      m_data = data;
       m_timestamps = deviceTimestamps;
-      m_recordSize = writer.Header.RecordSize;
-      m_pixelByteCount = writer.Header.PixelByteCount;
+      m_recordSize = header.RecordSize;
+      m_pixelByteCount = header.PixelByteCount;
       m_slotCount = Math.Max(options.RingFrames, 2);
       if ((long)m_slotCount * m_recordSize > Array.MaxLength)
         throw new ArgumentException($"A ring of {m_slotCount} frames of {m_recordSize} bytes is too large", nameof(options));
 
       m_ring = GC.AllocateUninitializedArray<byte>(m_slotCount * m_recordSize, pinned: true);
+      m_dataRing = data != null ? GC.AllocateUninitializedArray<byte>(m_slotCount * CaptureDataRecord.Size, pinned: true) : null;
       m_scratch = GC.AllocateUninitializedArray<byte>(m_pixelByteCount, pinned: true);
       m_preview = options.PreviewInterval > TimeSpan.Zero ? new byte[m_pixelByteCount] : null;
       m_armed = options.StartArmed;
       m_inspector = options.Inspector;
-      if (m_inspector != null)
+      m_decoder = options.Decoder;
+      m_inspects = m_inspector != null || m_decoder != null;
+      if (m_inspects)
       {
-        m_inspectImage = new GrayImage(writer.Header.Width, writer.Header.Height);
+        m_inspectImage = new GrayImage(header.Width, header.Height);
         m_inspectorThread = new Thread(InspectionLoop)
         {
           Name = "FrameRecorder.Inspector",
@@ -106,8 +138,8 @@ namespace MB.FramePacing.Capture
       m_writerThread.Start();
     }
 
-    public int Width => m_writer.Header.Width;
-    public int Height => m_writer.Header.Height;
+    public int Width => m_header.Width;
+    public int Height => m_header.Height;
 
     public bool IsArmed => m_armed;
 
@@ -122,10 +154,10 @@ namespace MB.FramePacing.Capture
         long tail = Volatile.Read(ref m_tail);
         return new FrameRecorderStats(
           Interlocked.Read(ref m_nextCaptureIndex),
-          m_writer.RecordsWritten,
+          m_data?.RecordsWritten ?? m_frames!.RecordsWritten,
           Interlocked.Read(ref m_framesDropped),
           Interlocked.Read(ref m_framesDiscarded),
-          m_writer.BytesWritten,
+          (m_data?.BytesWritten ?? 0) + (m_frames?.BytesWritten ?? 0),
           (int)(head - tail),
           m_slotCount,
           m_armed
@@ -192,7 +224,7 @@ namespace MB.FramePacing.Capture
         slot.Slice(CaptureFileHeader.RecordHeaderSize + m_pixelByteCount).Clear();
         pixels = slot.Slice(CaptureFileHeader.RecordHeaderSize, m_pixelByteCount);
         Volatile.Write(ref m_head, head + 1);
-        if (m_inspector != null)
+        if (m_inspects)
           m_frameAvailable.Set();
         else
           m_dataAvailable.Set();
@@ -263,8 +295,8 @@ namespace MB.FramePacing.Capture
           // Read completion before the counters: once it is seen, the counters read afterwards are final
           bool completing = m_completing && m_inspectionDone;
           bool armed = m_armed;
-          // Without an inspector every produced frame is ready; with one, only the inspected frames
-          long ready = m_inspector != null ? Volatile.Read(ref m_inspected) : Volatile.Read(ref m_head);
+          // Without inspection every produced frame is ready; with it, only the inspected frames
+          long ready = m_inspects ? Volatile.Read(ref m_inspected) : Volatile.Read(ref m_head);
           long tail = m_tail;
 
           if (armed)
@@ -323,7 +355,17 @@ namespace MB.FramePacing.Capture
             continue;
           }
 
-          m_writer.WriteRecords(m_ring.AsSpan(SlotOffset(tail), resolved * m_recordSize));
+          m_frames?.WriteRecords(m_ring.AsSpan(SlotOffset(tail), resolved * m_recordSize));
+          if (m_data != null)
+          {
+            // The data records get the capture part (with the resolved device timestamps) from the frames' record headers
+            for (int i = 0; i < resolved; ++i)
+            {
+              var header = CaptureRecordHeader.Read(m_ring.AsSpan(SlotOffset(tail + i), CaptureFileHeader.RecordHeaderSize));
+              CaptureDataRecord.WriteCapture(m_dataRing.AsSpan(DataSlotOffset(tail + i), CaptureDataRecord.Size), header);
+            }
+            m_data.WriteRecords(m_dataRing.AsSpan(DataSlotOffset(tail), resolved * CaptureDataRecord.Size));
+          }
           Volatile.Write(ref m_tail, tail + resolved);
         }
       }
@@ -340,7 +382,6 @@ namespace MB.FramePacing.Capture
 
     private void InspectionLoop()
     {
-      var inspector = m_inspector!;
       var image = m_inspectImage!;
       try
       {
@@ -361,7 +402,19 @@ namespace MB.FramePacing.Capture
           long captureIndex = CaptureRecordHeader.Read(m_ring.AsSpan(offset, CaptureFileHeader.RecordHeaderSize)).CaptureIndex;
           m_ring.AsSpan(offset + CaptureFileHeader.RecordHeaderSize, m_pixelByteCount).CopyTo(image.Pixels);
 
-          switch (inspector.Inspect(image, captureIndex))
+          MarkerDecodeResult? decoded = null;
+          if (m_decoder != null)
+          {
+            var decode = m_decoder.Decode(image);
+            decoded = decode.Main;
+            if (m_dataRing != null)
+            {
+              var slot = m_dataRing.AsSpan(DataSlotOffset(next), CaptureDataRecord.Size);
+              CaptureDataRecord.WriteDecoded(slot, decode.Status, decode.MainBytes, decode.SecondBytes);
+            }
+          }
+
+          switch (m_inspector?.Inspect(image, captureIndex, decoded) ?? FrameTrigger.None)
           {
             case FrameTrigger.Start when m_armed:
               // Publish where writing starts before leaving armed mode, so the writer never discards the start frame or its pre-roll
@@ -416,6 +469,8 @@ namespace MB.FramePacing.Capture
     }
 
     private int SlotOffset(long sequence) => (int)(sequence % m_slotCount) * m_recordSize;
+
+    private int DataSlotOffset(long sequence) => (int)(sequence % m_slotCount) * CaptureDataRecord.Size;
 
     private void UpdatePreview(ReadOnlySpan<byte> pixels, long captureIndex, long hostTicks)
     {

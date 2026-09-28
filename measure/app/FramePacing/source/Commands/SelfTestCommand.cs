@@ -64,6 +64,7 @@ namespace MB.FramePacing.App.Commands
           $"({CameraRigCommand.Experimental}) Film the synthetic game with a simulated high speed camera (perspective, rolling scanout, panel "
           + "response, blur, noise) and run the camera pipeline: rig calibration, rectified zones, camera analysis. Try --fps 1000 --refresh 60.",
       };
+      var keepFramesOption = CommonOptions.KeepFrames();
       var tearOption = new Option<int>("--tear-every")
       {
         Description = "--camera: every n-th frame is presented mid-scanout (vsync off; 0 = never).",
@@ -81,6 +82,7 @@ namespace MB.FramePacing.App.Commands
         outputOption,
         cameraOption,
         tearOption,
+        keepFramesOption,
       };
       command.SetAction(
         async (parseResult, cancellationToken) =>
@@ -114,8 +116,9 @@ namespace MB.FramePacing.App.Commands
                 RunId = 1,
               }
             );
+            bool keepFrames = parseResult.GetValue(keepFramesOption);
             if (camera)
-              return await RunCameraAsync(scenario, directory, cancellationToken);
+              return await RunCameraAsync(scenario, directory, keepFrames, cancellationToken);
             bool paced = !parseResult.GetValue(unpacedOption);
             AnsiConsole.MarkupLineInterpolated(
               $"Synthetic {scenario.Options.RefreshHz:0.##} Hz game, captured at {scenario.Options.CaptureFps:0.##} fps, {width}x{height}, {scenario.Options.TotalSeconds:0.##} s {(paced ? "in real time" : "unpaced")} -> {directory}"
@@ -124,7 +127,12 @@ namespace MB.FramePacing.App.Commands
             CaptureResult capture;
             using (var source = new SyntheticCaptureSource(scenario, paced))
             {
-              var runOptions = new CaptureRunOptions { OutputDirectory = directory, ToolVersion = Program.VersionString };
+              var runOptions = new CaptureRunOptions
+              {
+                OutputDirectory = directory,
+                ToolVersion = Program.VersionString,
+                KeepFrames = keepFrames,
+              };
               capture = await Task.Run(() => CaptureCommand.RunWithStatus(source, runOptions, cancellationToken), CancellationToken.None);
             }
             CaptureCommand.PrintResult(capture.Session);
@@ -152,7 +160,7 @@ namespace MB.FramePacing.App.Commands
     /// EXPERIMENTAL: the camera pipeline on the synthetic camera. Checks every presented frame is found, display deltas are within two camera
     /// periods of the truth, the scanout delay is right and tears (--tear-every) are found; prints how long each stage took.
     /// </summary>
-    private static async Task<int> RunCameraAsync(SyntheticScenario scenario, string directory, CancellationToken cancellationToken)
+    private static async Task<int> RunCameraAsync(SyntheticScenario scenario, string directory, bool keepFrames, CancellationToken cancellationToken)
     {
       CameraRigCommand.PrintExperimentalWarning();
       var camera = new SyntheticCamera(scenario, new SyntheticCameraOptions());
@@ -183,6 +191,7 @@ namespace MB.FramePacing.App.Commands
           ToolVersion = Program.VersionString,
           Camera = rig,
           ExpectedRefreshHz = scenario.Options.RefreshHz,
+          KeepFrames = keepFrames,
         };
         capture = await Task.Run(() => CaptureCommand.RunWithStatus(source, runOptions, cancellationToken), CancellationToken.None);
       }

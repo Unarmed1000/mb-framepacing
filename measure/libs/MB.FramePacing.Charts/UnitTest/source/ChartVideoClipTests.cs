@@ -94,9 +94,9 @@ namespace MB.FramePacing.Charts.UnitTest
       );
 
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      var share = lateShare.GetPlottables<Scatter>().Single();
-      Assert.That(share.Data.GetScatterPoints().Select(p => p.X), Is.EqualTo(all.Select(Seconds)), $"{clip}: late share times");
-      Assert.That(share.Data.GetScatterPoints().Select(p => p.Y), Is.EqualTo(ExpectedLateShare(manifest)), $"{clip}: late share (%)");
+      var (shareTimes, shares) = SignalPoints(lateShare);
+      Assert.That(shareTimes, Is.EqualTo(all.Select(Seconds)), $"{clip}: late share times");
+      Assert.That(shares, Is.EqualTo(ExpectedLateShare(manifest)), $"{clip}: late share (%)");
 
       var cells = strip.GetPlottables<RefreshStripPlottable>().Single();
       long capturePeriod = report.Timeline.CapturePeriodTicks;
@@ -155,13 +155,13 @@ namespace MB.FramePacing.Charts.UnitTest
       using var drift = new Plot();
       RunCharts.Drift(chart, ChartTheme.Light, drift);
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      var points = drift.GetPlottables<Scatter>().Single().Data.GetScatterPoints();
+      var (driftTimes, drifts) = SignalPoints(drift);
       Assert.That(
-        points.Select(c => c.X),
+        driftTimes,
         Is.EqualTo(all.Select(i => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond)),
         $"{clip}: drift times"
       );
-      Assert.That(points.Select(c => c.Y), Is.EqualTo(all.Select(i => Ms(manifest.DriftTicks(i)))), $"{clip}: drift");
+      Assert.That(drifts, Is.EqualTo(all.Select(i => Ms(manifest.DriftTicks(i)))), $"{clip}: drift");
     }
 
     /// <summary>The report files: every chart of the run as a PNG of the documented size.</summary>
@@ -264,6 +264,13 @@ namespace MB.FramePacing.Charts.UnitTest
         shares[i] = window.Length > 0 ? late / (double)window.Length * 100 : 0;
       }
       return shares;
+    }
+
+    /// <summary>The points of a plot's one signal (the late share and the drift, drawn as signals so long runs stay fast).</summary>
+    private static (double[] Xs, double[] Ys) SignalPoints(Plot plot)
+    {
+      var source = (ScottPlot.DataSources.SignalXYSourceGenericArray<double, double>)plot.GetPlottables<SignalXY>().Single().Data;
+      return (source.Xs, source.Ys);
     }
 
     private static void AssertSeries(Plot plot, string legend, IEnumerable<double> xs, IEnumerable<double> ys, string clip)

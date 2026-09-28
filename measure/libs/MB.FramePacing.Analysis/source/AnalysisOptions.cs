@@ -18,5 +18,8 @@ namespace MB.FramePacing.Analysis
     public string? OutputDirectory { get; init; }
 
     public string ToolVersion { get; init; } = string.Empty;
+
+    /// <summary>Decode the stored frames (frames.mbfc) again even when the capture data (captures.mbcd) exists, and replace the data.</summary>
+    public bool Redecode { get; init; }
   }
 }

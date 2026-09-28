@@ -154,6 +154,11 @@
               IsChecked="{Binding StopAtEnd}"
               ToolTip.Tip="Stop once the run's end marker has been seen. Otherwise the capture runs until Stop (or the limit)."
             />
+            <CheckBox
+              Content="Store video frames"
+              IsChecked="{Binding KeepFrames}"
+              ToolTip.Tip="Also store every captured frame (about 0.5 MB each at 960x540). Not needed for the analysis: every frame's decoded markers and timestamps are always stored (192 bytes each). Tick it to look at the frames or to decode them again later."
+            />
             <Grid
               ColumnDefinitions="Auto,*"
               ColumnSpacing="10"

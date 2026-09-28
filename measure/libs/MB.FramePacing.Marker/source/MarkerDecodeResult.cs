@@ -16,13 +16,15 @@ namespace MB.FramePacing.Marker
   /// <param name="Geometry">
   /// The finder and alignment pattern centres when the detector found all four (not for the locked fast path, which samples the grid directly).
   /// </param>
+  /// <param name="Bytes">The QR code's bytes exactly as read (the encoded payload), when a QR code was read; null otherwise.</param>
   public readonly record struct MarkerDecodeResult(
     MarkerDecodeStatus Status,
     MarkerPayload Payload,
     StartMetadata? Start,
     PixelRect Bounds,
     double ModuleSizePx,
-    MarkerGeometry? Geometry = null
+    MarkerGeometry? Geometry = null,
+    byte[]? Bytes = null
   )
   {
     public static readonly MarkerDecodeResult NotFound = new MarkerDecodeResult(MarkerDecodeStatus.NotFound, default, null, default, 0);

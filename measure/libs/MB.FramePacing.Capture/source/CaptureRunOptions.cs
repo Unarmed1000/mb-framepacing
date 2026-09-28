@@ -29,6 +29,12 @@ namespace MB.FramePacing.Capture
 
     public TimeSpan EndTail { get; init; } = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>
+    /// Also store the captured frames themselves (frames.mbfc). Off by default: the capture data (captures.mbcd, every frame's decoded markers
+    /// and timestamps) is all the analysis needs, and frames take width x height bytes each.
+    /// </summary>
+    public bool KeepFrames { get; init; }
+
     /// <summary>Ring size in frames; null sizes it for one second of frames (at most 512 MiB).</summary>
     public int? RingFrames { get; init; }
 

@@ -21,7 +21,14 @@ namespace MB.FramePacing.App.Commands
   {
     public static Command Create()
     {
-      var directoryArgument = new Argument<string>("capture") { Description = "The capture directory (contains frames.mbfc)." };
+      var directoryArgument = new Argument<string>("capture")
+      {
+        Description = "The capture directory (contains captures.mbcd, or only frames.mbfc for older captures).",
+      };
+      var redecodeOption = new Option<bool>("--redecode")
+      {
+        Description = "Decode the stored frames (frames.mbfc) again and replace the capture data (captures.mbcd), e.g. after a decoder update.",
+      };
       var runOption = new Option<uint?>("--run") { Description = "Only analyse this run id." };
       var timeOption = new Option<TimeSource>("--time")
       {
@@ -46,9 +53,10 @@ namespace MB.FramePacing.App.Commands
         },
       };
 
-      var command = new Command("analyze", "Decode the markers of a capture and report animation error.")
+      var command = new Command("analyze", "Report the animation error of a capture (decoding its frames first when it only has frames).")
       {
         directoryArgument,
+        redecodeOption,
         runOption,
         timeOption,
         outputOption,
@@ -62,6 +70,7 @@ namespace MB.FramePacing.App.Commands
         var options = new AnalysisOptions
         {
           TimeSource = parseResult.GetValue(timeOption),
+          Redecode = parseResult.GetValue(redecodeOption),
           Timeline = new TimelineOptions
           {
             RunId = parseResult.GetValue(runOption),
