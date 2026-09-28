@@ -64,7 +64,9 @@ namespace MB.FrameMarker.Unity
     [SerializeField]
     private FrameMarkerRenderMode m_renderMode = FrameMarkerRenderMode.ShaderPackedBits;
 
-    [Tooltip("The Shader Packed Bits mode's shader (Hidden/MB/FrameMarkerQuadPacked, set when the component is added): referencing it keeps it in player builds.")]
+    [Tooltip(
+      "The Shader Packed Bits mode's shader (Hidden/MB/FrameMarkerQuadPacked, set when the component is added): referencing it keeps it in player builds."
+    )]
     [SerializeField]
     private Shader m_packedShader;
 
