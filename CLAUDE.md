@@ -13,23 +13,24 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 
 ## Layout
 
-| Path                                              | Contents                                                                                                |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                                        |
-| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                                    |
-| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests            |
-| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                           |
-| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests                   |
-| `data/VERSION`                                    | Version of the data libraries (released with `data-v*` tags)                                            |
-| `data/python/`                                    | Python data library `mb_framepacing_data` (reads; standard library, Python 3.11) + unittest tests       |
-| `data/csharp/`                                    | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output |
-| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                    |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks      |
-| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                      |
-| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                    |
-| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses                        |
-| `test-data/data/`                                 | The data libraries' golden data: a test clip imported and analysed, and `digest.json`                   |
-| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                         |
+| Path                                              | Contents                                                                                                        |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                                                |
+| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                                            |
+| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |
+| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                                   |
+| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests                           |
+| `data/VERSION`                                    | Version of the data libraries (released with `data-v*` tags)                                                    |
+| `data/python/`                                    | Python data library `mb_framepacing_data` (reads; standard library, Python 3.11) + unittest tests               |
+| `data/cpp/`                                       | C++20 data library `mb_framepacingdata` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests |
+| `data/csharp/`                                    | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output         |
+| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                            |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks              |
+| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                              |
+| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                            |
+| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses                                |
+| `test-data/data/`                                 | The data libraries' golden data: a test clip imported and analysed, and `digest.json`                           |
+| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                 |
 
 ## Build and test
 
@@ -39,6 +40,7 @@ mb-quality -r --repair .                         # apply formatting, then build 
 dotnet build mb-framepacing.slnx                 # warnings are errors (Directory.Build.props)
 dotnet test  mb-framepacing.slnx
 cd marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # linux / linux-clang / macos too
+cd data/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows     # the C++ data library, the same way
 dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fps 500  # end to end without hardware
 python -m unittest discover -s data/python -t data/python    # the Python data library against test-data/data
 ```
@@ -56,11 +58,12 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
 - **Every .NET project is pinned to AnyCPU**, because some machines set a `Platform=x64` environment variable. Keep that pin:
   without it, single-project builds go to `bin/x64` and cause MSB3270 warnings.
 - **C++ formatting and linting**
-  - C++ follows `marker/cpp/.clang-format` and `marker/cpp/.clang-tidy` (namespaces are CamelCase: `MB::FrameMarker`).
-  - `python tools/check_cpp.py` runs both on our sources only (never `third_party/`), with the versions CI pins in
-    `requirements-dev.txt`. clang-tidy needs a configured build: the default is `marker/cpp/build/windows` (the VS generator
-    writes no compile database, so the script passes the include paths); `--build-dir` takes another one. To apply formatting:
-    `clang-format -i` on the files the script lists.
+  - C++ follows `marker/cpp/.clang-format` and `marker/cpp/.clang-tidy` (namespaces are CamelCase: `MB::FrameMarker`); `data/cpp`
+    has copies of both.
+  - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of both C++ libraries
+    (`--library marker|data` for one), with the versions CI pins in `requirements-dev.txt`. clang-tidy needs a configured build of
+    each: `<library>/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
+    include paths); `--preset` takes another one. To apply formatting: `clang-format -i` on the files the script lists.
   - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
     pass: shift and combine small unsigned types after casting them to `uint32_t`.
   - The `linux-sanitize` preset (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, compile database) is what CI runs the tests

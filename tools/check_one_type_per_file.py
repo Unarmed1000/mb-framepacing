@@ -3,7 +3,8 @@
 """Check the "one class/struct/enum per file" convention (see CLAUDE.md).
 
 - C#: every tracked .cs file declares at most one namespace-level type (nested types are fine).
-- C++: every public header under marker/cpp/include declares at most one type; FrameMarker.hpp holds only functions.
+- C++: every public header under marker/cpp/include and data/cpp/include declares at most one type; FrameMarker.hpp and
+  FramePacingData.hpp hold only functions.
 
 Run from anywhere inside the repository: python tools/check_one_type_per_file.py
 Exits with 1 and lists the offending files when the convention is broken.
@@ -38,7 +39,7 @@ def main() -> int:
     for path in tracked_files(root, "*.cs"):
         if (n := count_types(path, CS_TYPE)) > 1:
             problems.append(f"{path.relative_to(root)}: {n} namespace-level types")
-    for path in tracked_files(root, "marker/cpp/include/*.hpp"):
+    for path in [*tracked_files(root, "marker/cpp/include/*.hpp"), *tracked_files(root, "data/cpp/include/*.hpp")]:
         if (n := count_types(path, CPP_TYPE)) > 1:
             problems.append(f"{path.relative_to(root)}: {n} types")
     if problems:

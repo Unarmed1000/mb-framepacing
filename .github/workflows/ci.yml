@@ -55,6 +55,13 @@ jobs:
           cmake --build marker/cpp/build/ci --config Release --parallel
           ctest --test-dir marker/cpp/build/ci -C Release --output-on-failure
 
+      - name: C++ data library
+        shell: bash
+        run: |
+          cmake -S data/cpp -B data/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
+          cmake --build data/cpp/build/ci --config Release --parallel
+          ctest --test-dir data/cpp/build/ci -C Release --output-on-failure
+
       - name: CMake consumers (FetchContent, add_subdirectory, find_package)
         shell: bash
         run: |
@@ -157,13 +164,12 @@ jobs:
           .venv/bin/pip install --quiet -r requirements-dev.txt
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Tests with AddressSanitizer and UndefinedBehaviorSanitizer
-        working-directory: marker/cpp
         run: |
-          cmake --preset linux-sanitize
-          cmake --build --preset linux-sanitize --parallel
-          ctest --preset linux-sanitize
+          for library in marker/cpp data/cpp; do
+            (cd "$library" && cmake --preset linux-sanitize && cmake --build --preset linux-sanitize --parallel && ctest --preset linux-sanitize)
+          done
       - name: clang-format and clang-tidy
-        run: python3 tools/check_cpp.py --build-dir marker/cpp/build/linux-sanitize
+        run: python3 tools/check_cpp.py --preset linux-sanitize
 
   semver:
     name: semantic versions (VERSION files, MB.FrameMarker API)

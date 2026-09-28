@@ -1,5 +1,6 @@
 # C++ (CMake presets build into marker/cpp/build/<preset>)
 /marker/cpp/build/
+/data/cpp/build/
 /marker/cpp/out/
 CMakeUserPresets.json
 
