@@ -86,6 +86,7 @@ namespace MB.FramePacing.Capture.Synthetic
       bool replan = false;
       ulong frameIndex = o.FirstFrameIndex;
       long animationTicks = 0;
+      long previousCpuEnd = long.MinValue;
       for (long k = 0; ; ++k, ++frameIndex, animationTicks += refresh)
       {
         if (k > 0)
@@ -99,10 +100,11 @@ namespace MB.FramePacing.Capture.Synthetic
           planned = slot;
           replan = false;
         }
-        // The CPU starts each frame one refresh before the vsync it is rendered for and is busy for 60 % of a refresh; a stalled frame
-        // is busy that many refreshes longer, so it is shown late and the next frame starts late
+        // The CPU starts each frame one refresh before the vsync it is rendered for, but not before it has finished the previous frame (a
+        // skipped frame can leave two frames planned for one vsync), and is busy for 60 % of a refresh; a stalled frame is busy that many
+        // refreshes longer, so it is shown late and the next frame starts late
         long intendedTicks = PacerEpochTicks + (intendedSlot * refresh);
-        long cpuStartTicks = intendedTicks - refresh;
+        long cpuStartTicks = Math.Max(intendedTicks - refresh, previousCpuEnd);
         long cpuBusyTicks = refresh * 6 / 10;
         if (k > 0 && o.StallEvery > 0 && k % o.StallEvery == 0)
         {
@@ -110,6 +112,7 @@ namespace MB.FramePacing.Capture.Synthetic
           planned += o.StallSlots;
           cpuBusyTicks += o.StallSlots * refresh;
         }
+        previousCpuEnd = cpuStartTicks + cpuBusyTicks;
         long displayTicks = slot * refresh;
         if (displayTicks >= totalEnd)
           break;
