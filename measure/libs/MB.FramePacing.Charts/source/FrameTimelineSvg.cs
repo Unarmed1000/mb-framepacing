@@ -124,8 +124,9 @@ namespace MB.FramePacing.Charts
       parts.Add($"<g transform=\"translate(0 {Fixed(headerExtra, 0)})\">");
 
       // Refresh lines: bright where a frame could be aimed at its target rate (whole targets after the previous frame appeared), faint
-      // where it could not
-      var targetable = new HashSet<int> { shownAt[0] };
+      // where it could not; a vsync where a frame appeared is always bright (a frame shown sooner than its target appears on one its target
+      // skips)
+      var targetable = new HashSet<int>(shownAt);
       for (int i = 1; i < frames.Count; ++i)
       {
         int step = Math.Max(1, (int)Math.Round((frames[i].TargetTicks ?? refresh) / (double)refresh));

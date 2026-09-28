@@ -283,6 +283,14 @@ namespace MB.FramePacing.Charts.UnitTest
       int boxes = Of("box").Count(e => (string?)e.Attribute("x") != "20");
       Assert.That(boxes, Is.EqualTo(frames.Count(f => f.CpuStartTicks != 0 && f.CpuBusyTicks != 0)), "a CPU box per frame with CPU times");
       Assert.That(Of("arrow").Count(), Is.EqualTo(boxes + 1), "a present arrow per box, and the key's");
+      // Every frame appears on a bright vsync: the line at the left edge of its first refresh (ok or off cell, 2 px inside it) is not faint
+      var brightX = Of("vsync").Select(e => double.Parse((string)e.Attribute("x1")!, System.Globalization.CultureInfo.InvariantCulture)).ToHashSet();
+      var firstCells = Of("ok").Concat(Of("off")).Where(e => (string?)e.Attribute("height") == "40");
+      foreach (var cell in firstCells)
+      {
+        double x = double.Parse((string)cell.Attribute("x")!, System.Globalization.CultureInfo.InvariantCulture) - 2;
+        Assert.That(brightX.Any(b => Math.Abs(b - x) < 0.11), Is.True, $"a frame switch at x {x} sits on a bright vsync");
+      }
       // Every box is labelled with its frame, however narrow it is (a narrow one in the smaller font)
       int labels = document.Descendants().Count(e => (string?)e.Attribute("class") is "frame" or "box-time" && e.Value.StartsWith('#'));
       Assert.That(labels, Is.EqualTo(boxes), "a frame label per CPU box");
