@@ -39,6 +39,12 @@ namespace MB.FramePacing.App.Commands
           $"Also save each report as a PNG at twice its size, through a headless Edge or Chrome ({HeadlessBrowser.EnvironmentVariable}, or found).",
       };
       var outputOption = new Option<string?>("--output", "-o") { Description = "Where the reports go (default: the analysis folder)." };
+      string items = string.Join(", ", ReportItem.All.Select(i => i.Id));
+      var hideOption = new Option<string?>("--hide") { Description = $"Leave these items out of the card, comma separated: {items}." };
+      var onlyOption = new Option<string?>("--only")
+      {
+        Description = "Show only these items (comma separated, the same ids as --hide; naming a tile keeps the tiles row for it).",
+      };
 
       var command = new Command("render", "Draw an analysed run, or a section of it, as an SVG report (and PNG).")
       {
@@ -49,6 +55,8 @@ namespace MB.FramePacing.App.Commands
         detailsOption,
         pngOption,
         outputOption,
+        hideOption,
+        onlyOption,
       };
       command.SetAction(parseResult =>
       {
@@ -60,6 +68,9 @@ namespace MB.FramePacing.App.Commands
           if (runs.Count == 0)
             throw new InvalidOperationException(runId != null ? $"The analysis has no run {runId}" : "The analysis has no runs");
           string output = parseResult.GetValue(outputOption) is { } path ? Path.GetFullPath(path) : AnalysisOutput.Directory(folder);
+          var options = parseResult.GetValue(onlyOption) is { } only ? ReportOptions.ShowOnly(ReportOptions.ParseIds(only)) : ReportOptions.Default;
+          if (parseResult.GetValue(hideOption) is { } hide)
+            options = options.Hide(ReportOptions.ParseIds(hide));
           Directory.CreateDirectory(output);
           foreach (var run in runs)
           {
@@ -70,7 +81,8 @@ namespace MB.FramePacing.App.Commands
               parseResult.GetValue(fromOption),
               parseResult.GetValue(toOption),
               parseResult.GetValue(detailsOption),
-              parseResult.GetValue(pngOption)
+              parseResult.GetValue(pngOption),
+              options
             );
             foreach (var file in files)
               AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");

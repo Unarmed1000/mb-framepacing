@@ -152,7 +152,10 @@ mb-framepacing render capture-20260924-153000 --from 120 --to 125  # 5 s of it, 
 mb-framepacing render capture-20260924-153000 --details --png      # also the worst moments, and PNGs (needs Edge or Chrome)
 ```
 
-Times are seconds since the run's first frame, the Timeline's axis. `--details` adds 2 s either side of the largest animation error
+Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
+`--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
+(all tiles) or one tile (`presented-frames`, `frames-off`, `error-per-frame`, `typical-error`, `worst-error`, `late-frames`,
+`worst-late`, `resolution`), and the panels `animation-error`, `display-time-step`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
 (`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
 Chrome, found in the usual places or set with `MB_BROWSER`.
 

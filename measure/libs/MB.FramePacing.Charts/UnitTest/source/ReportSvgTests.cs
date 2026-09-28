@@ -130,7 +130,8 @@ namespace MB.FramePacing.Charts.UnitTest
         using (var stream = File.OpenRead(files[1]))
           stream.ReadExactly(header);
         int BigEndian(int offset) => (header[offset] << 24) | (header[offset + 1] << 16) | (header[offset + 2] << 8) | header[offset + 3];
-        Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((2 * ReportSvg.Width, (int)(2 * ReportSvg.Height))), browser);
+        int svgHeight = int.Parse(Regex.Match(File.ReadAllText(files[0]), "height=\"(\\d+)\"").Groups[1].Value);
+        Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((2 * ReportSvg.Width, 2 * svgHeight)), browser);
       }
       finally
       {
@@ -142,9 +143,10 @@ namespace MB.FramePacing.Charts.UnitTest
     /// An hour of a 240 Hz game: every 97th frame late (held two refreshes, off by one refresh), every 7th off by half a millisecond either
     /// way, and one 700 ms hitch.
     /// </summary>
-    private static ChartRun OneHour()
+    private static ChartRun OneHour() => Synthetic(240 * 3600);
+
+    private static ChartRun Synthetic(int Count)
     {
-      const int Count = 240 * 3600;
       var frames = new List<PresentedFrame>(Count);
       long time = 0;
       for (int i = 0; i < Count; ++i)
@@ -212,5 +214,72 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     private static int Count(string text, string part) => Regex.Matches(text, Regex.Escape(part)).Count;
+
+    private static double HeightOf(string svg) => double.Parse(Regex.Match(svg, "height=\"(\\d+)\"").Groups[1].Value);
+
+    /// <summary>What each item draws, to find it in the SVG.</summary>
+    private static readonly (string Id, string Mark)[] g_marks =
+    {
+      (ReportItem.Title, "class=\"title\""),
+      (ReportItem.Description, "class=\"sub\""),
+      (ReportItem.Display, ">DISPLAY<"),
+      (ReportItem.PresentedFrames, ">PRESENTED FRAMES<"),
+      (ReportItem.FramesOff, ">FRAMES VISIBLY OFF<"),
+      (ReportItem.ErrorPerFrame, ">ERROR PER FRAME<"),
+      (ReportItem.TypicalError, ">TYPICAL ERROR (P95)<"),
+      (ReportItem.WorstError, ">WORST ERROR<"),
+      (ReportItem.LateFrames, ">LATE FRAMES<"),
+      (ReportItem.WorstLate, ">WORST 2 S LATE<"),
+      (ReportItem.Resolution, ">RESOLUTION<"),
+      (ReportItem.AnimationError, ">ANIMATION ERROR PER FRAME<"),
+      (ReportItem.DisplayTimeStep, ">DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN<"),
+      (ReportItem.LateShare, ">SHARE OF LATE FRAMES IN THE LAST 2 S<"),
+      (ReportItem.RefreshStrip, ">REFRESH STRIP<"),
+    };
+
+    /// <summary>Hiding an item removes exactly what it draws; the title, description, the tiles and every panel also make the card shorter.</summary>
+    [Test]
+    public void Options_HidingAnItem_RemovesExactlyIt()
+    {
+      var section = RunSection.Whole(Synthetic(2400));
+      string all = ReportSvg.Render(section);
+      Assert.That(ReportSvg.Render(section, ReportOptions.Default), Is.EqualTo(all), "the default options draw everything");
+      Assert.That(g_marks.All(m => all.Contains(m.Mark, StringComparison.Ordinal)), "every item is in the full card");
+      foreach (var (id, mark) in g_marks.Append((ReportItem.Tiles, ">PRESENTED FRAMES<")))
+      {
+        string svg = ReportSvg.Render(section, ReportOptions.Default.Hide(new[] { id }));
+        Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), id);
+        Assert.That(svg, Does.Not.Contain(mark), id + ": gone");
+        foreach (var (other, otherMark) in g_marks.Where(m => m.Id != id && !(id == ReportItem.Tiles && ReportItem.TileIds.Contains(m.Id))))
+          Assert.That(svg, Does.Contain(otherMark), $"{id}: {other} stays");
+        if (!ReportItem.TileIds.Contains(id) && id != ReportItem.Display)
+          Assert.That(HeightOf(svg), Is.LessThan(HeightOf(all)), id + ": the card is shorter");
+      }
+    }
+
+    /// <summary>ShowOnly keeps just the items named: one panel is a card of that panel; one tile is a tiles row of it.</summary>
+    [Test]
+    public void Options_ShowOnly_KeepsJustThoseItems()
+    {
+      var section = RunSection.Whole(Synthetic(2400));
+      string panel = ReportSvg.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.AnimationError }));
+      Assert.That(g_marks.Where(m => m.Id != ReportItem.AnimationError).Any(m => panel.Contains(m.Mark, StringComparison.Ordinal)), Is.False);
+      Assert.That(panel, Does.Contain(">ANIMATION ERROR PER FRAME<"));
+      Assert.That(HeightOf(panel), Is.EqualTo(20 + 36 + 150 + 64), "margin and label, the panel, its time axis");
+
+      string tile = ReportSvg.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.FramesOff }));
+      Assert.That(Count(tile, "class=\"tile\""), Is.EqualTo(1), "one tile");
+      Assert.That(tile, Does.Contain(">FRAMES VISIBLY OFF<"));
+
+      string tiles = ReportSvg.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.Tiles }));
+      Assert.That(Count(tiles, "class=\"tile\""), Is.EqualTo(ReportItem.TileIds.Count), "every tile");
+    }
+
+    [Test]
+    public void Options_UnknownItem_NamesTheKnownOnes()
+    {
+      var error = Assert.Throws<ArgumentException>(() => ReportOptions.ParseIds("late-share,frametimes"));
+      Assert.That(error!.Message, Does.Contain("frametimes").And.Contain("Known:").And.Contain(ReportItem.RefreshStrip));
+    }
   }
 }

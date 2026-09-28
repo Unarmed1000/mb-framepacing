@@ -28,20 +28,21 @@ namespace MB.FramePacing.Charts
     public const double PlotX0 = 110;
     public const double PlotX1 = Width - 40;
 
-    private const double TilesY = 123;
     private const double TileH = 64;
     private const double TileGap = 12;
     private const int TilesPerRow = 4;
-    private const double TilesBottom = TilesY + (2 * TileH) + TileGap;
-    private const double ErrorY = TilesBottom + 52;
     private const double ErrorH = 150;
-    private const double StepY = ErrorY + ErrorH + 70;
     private const double StepH = 130;
-    private const double LateY = StepY + StepH + 70;
     private const double LateH = 80;
-    private const double StripY = LateY + LateH + 70;
     private const double StripH = 28;
-    public const double Height = StripY + StripH + 64;
+
+    // The layout flows: each shown item takes its height. Space above a panel (its label, and the time axis of the panel before), after the
+    // header or the tiles, at the top of a card without either, and below the last item
+    private const double PanelGap = 70;
+    private const double FirstPanelGap = 52;
+    private const double TopPanelGap = 36;
+    private const double BottomAfterPanel = 64;
+    private const double BottomMargin = 20;
 
     // Refresh cells narrower than this are not drawn: the strip then asks for a shorter section
     private const double MinCellPixels = 2;
@@ -51,9 +52,13 @@ namespace MB.FramePacing.Charts
     // fewer frames draws all of them solid
     private const int MinFramesForTypical = 20;
 
-    /// <summary>The SVG of <paramref name="section"/>. <paramref name="background"/> puts a page colour behind the card (for previews).</summary>
-    public static string Render(RunSection section, string? background = null)
+    /// <summary>
+    /// The SVG of <paramref name="section"/>, with the items <paramref name="options"/> shows (all by default). <paramref name="background"/>
+    /// puts a page colour behind the card (for previews).
+    /// </summary>
+    public static string Render(RunSection section, ReportOptions? options = null, string? background = null)
     {
+      options ??= ReportOptions.Default;
       var chart = section.Run;
       var run = chart.Run;
       var pacing = run.Pacing;
@@ -81,17 +86,82 @@ namespace MB.FramePacing.Charts
           + $"{Ms(chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
-      var parts = Start(title, Width, Height, description, background);
-      DisplayBox(parts, chart, frames, refreshMs);
+      var tiles = RunHeadline.Tiles(section.Section).Where(t => options.IsShown(t.Id)).ToList();
+      var layout = Layout.For(options, description.Count, tiles.Count);
+      var parts = Start(
+        title,
+        Width,
+        layout.Height,
+        options.IsShown(ReportItem.Description) ? description : Array.Empty<string>(),
+        background,
+        options.IsShown(ReportItem.Title)
+      );
+      if (options.IsShown(ReportItem.Display))
+        DisplayBox(parts, chart, frames, refreshMs);
 
-      Tiles(parts, RunHeadline.Tiles(section.Section));
-      ErrorPanel(parts, section, frames, Seconds, XOf, perFrame);
-      StepPanel(parts, frames, Seconds, XOf, perFrame, refreshMs, from, to);
-      LatePanel(parts, section, Seconds, XOf, perFrame);
-      StripPanel(parts, frames, Seconds, XOf, refreshMs, from, to, chart.CapturePeriodTicks);
+      Tiles(parts, tiles, layout.TilesY);
+      if (layout.ErrorY is { } errorY)
+        ErrorPanel(parts, section, frames, Seconds, XOf, perFrame, errorY);
+      if (layout.StepY is { } stepY)
+        StepPanel(parts, frames, Seconds, XOf, perFrame, refreshMs, from, to, stepY);
+      if (layout.LateY is { } lateY)
+        LatePanel(parts, section, Seconds, XOf, perFrame, lateY);
+      if (layout.StripY is { } stripY)
+        StripPanel(parts, frames, Seconds, XOf, refreshMs, from, to, chart.CapturePeriodTicks, stripY);
 
       parts.Add("</svg>");
       return string.Join("\n", parts) + "\n";
+    }
+
+    /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
+    private sealed record Layout(double TilesY, double? ErrorY, double? StepY, double? LateY, double? StripY, double Height)
+    {
+      public static Layout For(ReportOptions options, int descriptionLines, int tiles)
+      {
+        bool title = options.IsShown(ReportItem.Title);
+        bool description = options.IsShown(ReportItem.Description) && descriptionLines > 0;
+        bool display = options.IsShown(ReportItem.Display);
+        double cursor = BottomMargin;
+        string previous = "start";
+        if (title || description || display)
+        {
+          // The last text line's baseline (description lines follow the title, or take its place), and the display box
+          double text =
+            description ? (title ? 54 : 30) + ((descriptionLines - 1) * 19)
+            : title ? 30
+            : 0;
+          cursor = Math.Max(text > 0 ? text + 31 : 0, display ? 14 + 68 + 20 : 0);
+          previous = "header";
+        }
+        double tilesY = cursor;
+        if (tiles > 0)
+        {
+          int rows = (tiles + TilesPerRow - 1) / TilesPerRow;
+          cursor = tilesY + (rows * TileH) + ((rows - 1) * TileGap);
+          previous = "tiles";
+        }
+        double? Panel(string id, double height)
+        {
+          if (!options.IsShown(id))
+            return null;
+          double top =
+            cursor
+            + (
+              previous == "panel" ? PanelGap
+              : previous == "start" ? TopPanelGap
+              : FirstPanelGap
+            );
+          cursor = top + height;
+          previous = "panel";
+          return top;
+        }
+        var errorY = Panel(ReportItem.AnimationError, ErrorH);
+        var stepY = Panel(ReportItem.DisplayTimeStep, StepH);
+        var lateY = Panel(ReportItem.LateShare, LateH);
+        var stripY = Panel(ReportItem.RefreshStrip, StripH);
+        double height = previous == "panel" ? cursor + BottomAfterPanel : cursor + BottomMargin;
+        return new Layout(tilesY, errorY, stepY, lateY, stripY, height);
+      }
     }
 
     /// <summary>
@@ -141,14 +211,14 @@ namespace MB.FramePacing.Charts
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
 
-    private static void Tiles(List<string> parts, IReadOnlyList<HeadlineTile> tiles)
+    private static void Tiles(List<string> parts, IReadOnlyList<HeadlineTile> tiles, double tilesY)
     {
       double tileW = (Width - 40 - ((TilesPerRow - 1) * TileGap)) / TilesPerRow;
       for (int i = 0; i < tiles.Count; ++i)
       {
         var tile = tiles[i];
         double x = 20 + ((i % TilesPerRow) * (tileW + TileGap));
-        double y = TilesY + ((i / TilesPerRow) * (TileH + TileGap));
+        double y = tilesY + ((i / TilesPerRow) * (TileH + TileGap));
         parts.Add(
           $"<rect class=\"tile\" x=\"{Fixed(x, 1)}\" y=\"{Fixed(y, 0)}\" width=\"{Fixed(tileW, 1)}\" height=\"{Fixed(TileH, 0)}\" rx=\"10\"/>"
         );
@@ -165,17 +235,18 @@ namespace MB.FramePacing.Charts
       IReadOnlyList<PresentedFrame> frames,
       Func<PresentedFrame, double> seconds,
       Func<double, double> xOf,
-      bool perFrame
+      bool perFrame,
+      double errorY
     )
     {
       var withError = frames.Where(f => f.AnimationErrorTicks.HasValue).ToArray();
       var errorsMs = withError.Select(f => f.AnimationErrorTicks!.Value / (double)TimeSpan.TicksPerMillisecond).ToArray();
       double limit = AnimationErrorBarsPlottable.Limit(errorsMs);
-      double zeroY = ErrorY + (ErrorH / 2);
+      double zeroY = errorY + (ErrorH / 2);
       double YOf(double value) => zeroY - (Math.Clamp(value, -limit, limit) / limit * ErrorH / 2);
 
-      parts.Add(Text(20, ErrorY - 16, "ANIMATION ERROR PER FRAME", "label", "start"));
-      parts.Add(Text(PlotX1, ErrorY - 16, "+ shown too soon, − shown too late; the band is within the error threshold", "vsync-n", "end"));
+      parts.Add(Text(20, errorY - 16, "ANIMATION ERROR PER FRAME", "label", "start"));
+      parts.Add(Text(PlotX1, errorY - 16, "+ shown too soon, − shown too late; the band is within the error threshold", "vsync-n", "end"));
       double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
       parts.Add(
         $"<rect class=\"band\" x=\"{Fixed(PlotX0, 1)}\" y=\"{Fixed(YOf(threshold), 1)}\" width=\"{Fixed(PlotX1 - PlotX0, 1)}\" height=\"{Fixed(YOf(-threshold) - YOf(threshold), 1)}\"/>"
@@ -242,8 +313,8 @@ namespace MB.FramePacing.Charts
       }
       parts.Add($"<line class=\"zero-line\" x1=\"{Fixed(PlotX0, 0)}\" y1=\"{Fixed(zeroY, 0)}\" x2=\"{Fixed(PlotX1, 0)}\" y2=\"{Fixed(zeroY, 0)}\"/>");
       parts.Add(Text(PlotX0 - 10, zeroY + 4, "0", "vsync-n", "end"));
-      ClipMarks(parts, clipped, ErrorY, ErrorY + ErrorH, v => $"{Ms(v, sign: true)} ms");
-      TimeTicks(parts, section.FromSeconds, section.ToSeconds, xOf, ErrorY + ErrorH);
+      ClipMarks(parts, clipped, errorY, errorY + ErrorH, v => $"{Ms(v, sign: true)} ms");
+      TimeTicks(parts, section.FromSeconds, section.ToSeconds, xOf, errorY + ErrorH);
     }
 
     private static void StepPanel(
@@ -254,7 +325,8 @@ namespace MB.FramePacing.Charts
       bool perFrame,
       double refreshMs,
       double from,
-      double to
+      double to,
+      double stepY
     )
     {
       // Each frame's hold: from its first sighting to the next frame of its segment, at the next frame's display time step
@@ -274,10 +346,10 @@ namespace MB.FramePacing.Charts
         );
       }
       double top = DisplayTimeStepsPlottable.Top(holds.Select(h => h.Level).ToArray(), refreshMs);
-      double YOf(double ms) => StepY + StepH - (Math.Min(ms, top) / top * StepH);
+      double YOf(double ms) => stepY + StepH - (Math.Min(ms, top) / top * StepH);
 
-      parts.Add(Text(20, StepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
-      parts.Add(Text(PlotX1, StepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
+      parts.Add(Text(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
+      parts.Add(Text(PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
       foreach (var (position, _) in DisplayTimeStepsPlottable.Ticks(refreshMs, top).Where(t => t.Position > 0))
       {
         double y = YOf(position);
@@ -345,8 +417,8 @@ namespace MB.FramePacing.Charts
         AddPath(parts, "held-fill", solid);
         AddPath(parts, "held-fill-late", solidLate);
       }
-      ClipMarks(parts, clipped, StepY, StepY + StepH, v => $"{Ms(v)} ms");
-      TimeTicks(parts, from, to, xOf, StepY + StepH);
+      ClipMarks(parts, clipped, stepY, stepY + StepH, v => $"{Ms(v)} ms");
+      TimeTicks(parts, from, to, xOf, stepY + StepH);
     }
 
     private static void LatePanel(
@@ -354,15 +426,16 @@ namespace MB.FramePacing.Charts
       RunSection section,
       Func<PresentedFrame, double> seconds,
       Func<double, double> xOf,
-      bool perFrame
+      bool perFrame,
+      double lateY
     )
     {
       var whole = section.Run.Run.Frames;
       var pacing = section.Run.Run.Pacing;
-      parts.Add(Text(20, LateY - 16, $"SHARE OF LATE FRAMES IN THE LAST {LateShare.WindowSeconds:0} S", "label", "start"));
+      parts.Add(Text(20, lateY - 16, $"SHARE OF LATE FRAMES IN THE LAST {LateShare.WindowSeconds:0} S", "label", "start"));
       if (pacing == null || whole.Count == 0)
       {
-        parts.Add(Text(PlotX0, LateY + (LateH / 2), "no pacing information", "vsync-n", "start"));
+        parts.Add(Text(PlotX0, lateY + (LateH / 2), "no pacing information", "vsync-n", "start"));
         return;
       }
       // The window reaches back before the section's start, so the share is the run's own
@@ -380,10 +453,10 @@ namespace MB.FramePacing.Charts
         note =
           $"amber: the frames' marker target frame time is above the run's usual {Ms1(usualTicks / (double)TimeSpan.TicksPerMillisecond)} ms; "
           + $"whole run {Percent(pacing.LateShare)}";
-      parts.Add(Text(PlotX1, LateY - 16, note, "vsync-n", "end"));
+      parts.Add(Text(PlotX1, lateY - 16, note, "vsync-n", "end"));
       double max = points.Count > 0 ? points.Max(p => p.Share) : 0;
       double topShare = NiceCeiling(Math.Max(5, max * 1.25));
-      double YOf(double share) => LateY + LateH - (share / topShare * LateH);
+      double YOf(double share) => lateY + LateH - (share / topShare * LateH);
       foreach (double tick in new[] { 0, topShare / 2, topShare })
       {
         parts.Add(GridLine(YOf(tick)));
@@ -429,7 +502,7 @@ namespace MB.FramePacing.Charts
       }
       AddPath(parts, "late-line", line);
       AddPath(parts, "late-line-adapted", adaptedLine);
-      TimeTicks(parts, section.FromSeconds, section.ToSeconds, xOf, LateY + LateH);
+      TimeTicks(parts, section.FromSeconds, section.ToSeconds, xOf, lateY + LateH);
     }
 
     private static void StripPanel(
@@ -440,19 +513,20 @@ namespace MB.FramePacing.Charts
       double refreshMs,
       double from,
       double to,
-      long capturePeriodTicks
+      long capturePeriodTicks,
+      double stripY
     )
     {
       double cellW = (PlotX1 - PlotX0) * refreshMs / 1000 / (to - from);
-      parts.Add(Text(20, StripY - 16, "REFRESH STRIP", "label", "start"));
+      parts.Add(Text(20, stripY - 16, "REFRESH STRIP", "label", "start"));
       if (cellW < MinCellPixels)
       {
         double longest = (PlotX1 - PlotX0) / MinCellPixels * refreshMs / 1000;
-        parts.Add(Text(PlotX1, StripY - 16, "one cell per refresh, a new shade with every new frame", "vsync-n", "end"));
-        parts.Add(Text(PlotX0, StripY + (StripH / 2) + 4, $"render a section of at most {Ms1(longest)} s to see the refreshes", "vsync-n", "start"));
+        parts.Add(Text(PlotX1, stripY - 16, "one cell per refresh, a new shade with every new frame", "vsync-n", "end"));
+        parts.Add(Text(PlotX0, stripY + (StripH / 2) + 4, $"render a section of at most {Ms1(longest)} s to see the refreshes", "vsync-n", "start"));
         return;
       }
-      parts.Add(Text(PlotX1, StripY - 16, "one cell per refresh, a new shade with every new frame, late frames red", "vsync-n", "end"));
+      parts.Add(Text(PlotX1, stripY - 16, "one cell per refresh, a new shade with every new frame, late frames red", "vsync-n", "end"));
       long refreshTicks = (long)Math.Round(refreshMs * TimeSpan.TicksPerMillisecond);
       for (int i = 0; i < frames.Count; ++i)
       {
@@ -470,11 +544,11 @@ namespace MB.FramePacing.Charts
           if (x >= PlotX1)
             break;
           parts.Add(
-            $"<rect class=\"{cls}\" x=\"{Fixed(x + 0.5, 1)}\" y=\"{Fixed(StripY, 0)}\" width=\"{Fixed(Math.Max(0.5, Math.Min(cellW - 1, PlotX1 - x - 0.5)), 1)}\" height=\"{Fixed(StripH, 0)}\" rx=\"2\"/>"
+            $"<rect class=\"{cls}\" x=\"{Fixed(x + 0.5, 1)}\" y=\"{Fixed(stripY, 0)}\" width=\"{Fixed(Math.Max(0.5, Math.Min(cellW - 1, PlotX1 - x - 0.5)), 1)}\" height=\"{Fixed(StripH, 0)}\" rx=\"2\"/>"
           );
         }
       }
-      TimeTicks(parts, from, to, xOf, StripY + StripH);
+      TimeTicks(parts, from, to, xOf, stripY + StripH);
     }
 
     // ------------------------------------------------------------------------------------------------------------------------------------------

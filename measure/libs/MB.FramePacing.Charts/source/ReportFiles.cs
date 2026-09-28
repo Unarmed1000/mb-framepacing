@@ -27,7 +27,7 @@ namespace MB.FramePacing.Charts
     /// <summary>
     /// Write the report of <paramref name="run"/> (all of it, or <paramref name="fromSeconds"/> to <paramref name="toSeconds"/>) into
     /// <paramref name="directory"/>, named after <paramref name="prefix"/>; with <paramref name="details"/> also the worst moments; with
-    /// <paramref name="png"/> each also as a PNG. Returns the files written.
+    /// <paramref name="png"/> each also as a PNG; <paramref name="options"/> chooses the card's items. Returns the files written.
     /// </summary>
     public static IReadOnlyList<string> Write(
       ChartRun run,
@@ -36,17 +36,18 @@ namespace MB.FramePacing.Charts
       double? fromSeconds = null,
       double? toSeconds = null,
       bool details = false,
-      bool png = false
+      bool png = false,
+      ReportOptions? options = null
     )
     {
       var written = new List<string>();
       var whole = RunSection.Whole(run);
       var section = fromSeconds.HasValue || toSeconds.HasValue ? RunSection.Create(run, fromSeconds ?? 0, toSeconds ?? whole.ToSeconds) : whole;
-      written.AddRange(WriteOne(section, Path.Combine(directory, prefix + "-report" + SectionSuffix(section)), png));
+      written.AddRange(WriteOne(section, Path.Combine(directory, prefix + "-report" + SectionSuffix(section)), png, options));
       if (details)
       {
         foreach (var (name, detail) in Details(run))
-          written.AddRange(WriteOne(detail, Path.Combine(directory, $"{prefix}-report-{name}"), png));
+          written.AddRange(WriteOne(detail, Path.Combine(directory, $"{prefix}-report-{name}"), png, options));
       }
       return written;
     }
@@ -83,10 +84,10 @@ namespace MB.FramePacing.Charts
       }
     }
 
-    private static IEnumerable<string> WriteOne(RunSection section, string pathWithoutExtension, bool png)
+    private static IEnumerable<string> WriteOne(RunSection section, string pathWithoutExtension, bool png, ReportOptions? options)
     {
       string svg = pathWithoutExtension + ".svg";
-      File.WriteAllText(svg, ReportSvg.Render(section), new UTF8Encoding(false));
+      File.WriteAllText(svg, ReportSvg.Render(section, options), new UTF8Encoding(false));
       yield return svg;
       if (png)
       {

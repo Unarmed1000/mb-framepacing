@@ -107,8 +107,18 @@ namespace MB.FramePacing.Charts
       return $"<text x=\"{Fixed(x, 1)}\" y=\"{Fixed(y, 1)}\" text-anchor=\"{anchor}\"{classAttribute}>{Escape(content)}</text>";
     }
 
-    /// <summary>The SVG element, its style, its card and its title and description lines (generate_diagrams.py's _svg_start).</summary>
-    public static List<string> Start(string title, double width, double height, IEnumerable<string> description, string? background = null)
+    /// <summary>
+    /// The SVG element, its style, its card and its title and description lines (generate_diagrams.py's _svg_start). Without
+    /// <paramref name="showTitle"/> the title only names the SVG, and the description lines take its place.
+    /// </summary>
+    public static List<string> Start(
+      string title,
+      double width,
+      double height,
+      IEnumerable<string> description,
+      string? background = null,
+      bool showTitle = true
+    )
     {
       var parts = new List<string>
       {
@@ -119,10 +129,11 @@ namespace MB.FramePacing.Charts
       if (background != null)
         parts.Add($"<rect width=\"100%\" height=\"100%\" fill=\"{Escape(background)}\"/>");
       parts.Add($"<rect class=\"card\" x=\"0.5\" y=\"0.5\" width=\"{Fixed(width - 1, 0)}\" height=\"{Fixed(height - 1, 0)}\" rx=\"14\"/>");
-      parts.Add(Text(20, 30, title, "title", "start"));
+      if (showTitle)
+        parts.Add(Text(20, 30, title, "title", "start"));
       int line = 0;
       foreach (var text in description)
-        parts.Add(Text(20, 54 + (line++ * 19), text, "sub", "start"));
+        parts.Add(Text(20, (showTitle ? 54 : 30) + (line++ * 19), text, "sub", "start"));
       return parts;
     }
 

@@ -109,15 +109,6 @@ namespace MB.FramePacing.DocImages
         analysisView.FindControl<AvaPlot>(name)!.Plot.SavePng(Path.Combine(output, file), 900, 400);
         Console.WriteLine($"  {file} (900x400)");
       }
-      ChartFiles.SaveStacked(
-        Path.Combine(output, "chart-timeline.png"),
-        900,
-        (analysisView.FindControl<AvaPlot>("ErrorPlot")!.Plot, 300),
-        (analysisView.FindControl<AvaPlot>("DisplayTimeStepPlot")!.Plot, 300),
-        (analysisView.FindControl<AvaPlot>("LateSharePlot")!.Plot, 200),
-        (analysisView.FindControl<AvaPlot>("RefreshStripPlot")!.Plot, 150)
-      );
-      Console.WriteLine("  chart-timeline.png (900x950)");
 
       // The setup dialog as a user without ffmpeg sees it after pressing 'Find automatically'
       var setupViewModel = new SetupViewModel(

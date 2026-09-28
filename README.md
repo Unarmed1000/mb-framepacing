@@ -229,7 +229,9 @@ steps).
 The **Timeline** tab puts everything on one time axis; zooming or panning one chart moves the others, and **Reset zoom** (or a
 double-click on a chart) shows the whole run again:
 
-![The Timeline tab: animation error, display time step, late share and refresh strip](doc/images/chart-timeline.png)
+The same four panels as a report (below) of a test clip, a busy stretch at the full rate:
+
+![The report of a busy stretch at the full rate: animation error, display time step, late share and refresh strip](doc/images/report-example-busy.svg)
 
 - **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
   nothing. Everything inside the shaded band counts as no error.
@@ -275,14 +277,15 @@ error, the display time step, the late share and the refresh strip. `--charts` a
 Chrome). A section of a few seconds shows every frame and refresh; a long run shows each pixel column's frames, the whole range faint
 and the middle 90 % solid.
 
-The test clips (`test-data/videos`, made by mb-framepacing-explained) as reports. A game that adapts its rate like Android's Swappy:
-a busy stretch with late frames, then 30 fps (two refreshes per frame, as planned) for a while, then 60 again:
+Every item of the card can be left out (`--hide late-share,refresh-strip`) or kept alone (`--only animation-error`); `--help`
+lists the ids.
+
+The test clips (`test-data/videos`, made by mb-framepacing-explained) as reports. The busy stretch at the full rate is the example
+above: the frames that miss a refresh are late, and each is off by a whole refresh. Its companion adapts its rate like Android's
+Swappy: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says) for a while, then 60
+again:
 
 ![The report of a game adapting its rate like Swappy](doc/images/report-example-swappy.svg)
-
-The same busy stretch at the full rate: the frames that miss a refresh are late, and each is off by a whole refresh:
-
-![The report of a busy stretch at the full rate](doc/images/report-example-busy.svg)
 
 A naive delta time timer: every frame is shown on time, but the timer is off by up to 5 ms either way, so the animation steps
 are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing):

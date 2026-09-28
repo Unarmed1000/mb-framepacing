@@ -9,10 +9,11 @@
 
 namespace MB.FramePacing.Charts
 {
+  /// <param name="Id">The tile's report item id (<see cref="ReportItem"/>), which switches it on or off in a report.</param>
   /// <param name="Caption">What the number is ("Late frames").</param>
   /// <param name="Value">The number, formatted ("11").</param>
   /// <param name="Detail">A smaller second number or word next to it ("2.6 %"), or empty.</param>
   /// <param name="Warning">The value is a problem (frames off, late frames): shown in the warning colour.</param>
   /// <param name="Explanation">What it means, for a tooltip.</param>
-  public sealed record HeadlineTile(string Caption, string Value, string Detail, bool Warning, string Explanation);
+  public sealed record HeadlineTile(string Id, string Caption, string Value, string Detail, bool Warning, string Explanation);
 }

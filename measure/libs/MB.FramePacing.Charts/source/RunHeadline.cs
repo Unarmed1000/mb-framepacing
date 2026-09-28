@@ -38,6 +38,7 @@ namespace MB.FramePacing.Charts
       return new[]
       {
         new HeadlineTile(
+          ReportItem.PresentedFrames,
           "Presented frames",
           Number(run.Counts.PresentedFrames),
           string.Empty,
@@ -45,6 +46,7 @@ namespace MB.FramePacing.Charts
           "Frames of the application seen on the display."
         ),
         new HeadlineTile(
+          ReportItem.FramesOff,
           "Frames visibly off",
           Number(s.FramesWithAnimationError),
           measured > 0 ? Percent(s.FramesWithAnimationError / (double)measured) : string.Empty,
@@ -52,6 +54,7 @@ namespace MB.FramePacing.Charts
           $"Frames whose animation time is off by more than the error threshold ({Invariant(thresholdMs, "0.###")} ms)."
         ),
         new HeadlineTile(
+          ReportItem.ErrorPerFrame,
           "Error per frame",
           Invariant(s.ErrorPerFrameMs, "0.00") + " ms",
           Invariant(s.PercentError, "0.0") + " %",
@@ -60,6 +63,7 @@ namespace MB.FramePacing.Charts
             + "time on screen. A healthy game stays well under 1 ms and a few %."
         ),
         new HeadlineTile(
+          ReportItem.TypicalError,
           "Typical error (p95)",
           Invariant(s.AbsoluteAnimationErrorMs.P95, "0.0") + " ms",
           string.Empty,
@@ -67,6 +71,7 @@ namespace MB.FramePacing.Charts
           "95 % of the frames have an animation error below this."
         ),
         new HeadlineTile(
+          ReportItem.WorstError,
           "Worst error",
           Invariant(worst, "0.0") + " ms",
           worstWay,
@@ -74,6 +79,7 @@ namespace MB.FramePacing.Charts
           "The largest animation error, and which way: shown too soon or too late."
         ),
         new HeadlineTile(
+          ReportItem.LateFrames,
           "Late frames",
           pacing != null ? Number(pacing.LateFrames) : "-",
           pacing != null ? Percent(pacing.LateShare) : string.Empty,
@@ -81,6 +87,7 @@ namespace MB.FramePacing.Charts
           "Frames shown at least one refresh later than the target frame time after the previous frame."
         ),
         new HeadlineTile(
+          ReportItem.WorstLate,
           "Worst 2 s late",
           pacing != null ? Percent(pacing.WorstLateShare) : "-",
           string.Empty,
@@ -88,6 +95,7 @@ namespace MB.FramePacing.Charts
           "The highest share of late frames in any 2 s stretch: rare spikes stay low, busy stretches stand out."
         ),
         new HeadlineTile(
+          ReportItem.Resolution,
           "Resolution",
           Invariant(capturePeriodMs, "0.0") + " ms",
           string.Empty,
