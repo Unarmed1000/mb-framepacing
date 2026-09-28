@@ -283,6 +283,9 @@ namespace MB.FramePacing.Charts.UnitTest
       int boxes = Of("box").Count(e => (string?)e.Attribute("x") != "20");
       Assert.That(boxes, Is.EqualTo(frames.Count(f => f.CpuStartTicks != 0 && f.CpuBusyTicks != 0)), "a CPU box per frame with CPU times");
       Assert.That(Of("arrow").Count(), Is.EqualTo(boxes + 1), "a present arrow per box, and the key's");
+      // Every box is labelled with its frame, however narrow it is (a narrow one in the smaller font)
+      int labels = document.Descendants().Count(e => (string?)e.Attribute("class") is "frame" or "box-time" && e.Value.StartsWith('#'));
+      Assert.That(labels, Is.EqualTo(boxes), "a frame label per CPU box");
       // Every frame's first refresh is ok or off (the key adds one swatch of each kind it uses)
       int firstRefreshes = Of("ok").Count() + Of("off").Count() - (Of("ok").Any() ? 1 : 0) - (Of("off").Any() ? 1 : 0);
       Assert.That(firstRefreshes, Is.EqualTo(frames.Count), "a first refresh per frame");

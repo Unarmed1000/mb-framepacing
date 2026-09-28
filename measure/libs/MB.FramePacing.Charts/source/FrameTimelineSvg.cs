@@ -160,12 +160,18 @@ namespace MB.FramePacing.Charts
         parts.Add(
           $"<rect class=\"box\" x=\"{Fixed(x0 + inset, 1)}\" y=\"{Fixed(y, 1)}\" width=\"{Fixed(Math.Max(1, x1 - x0 - (2 * inset)), 1)}\" height=\"{Fixed(LaneH, 0)}\" rx=\"8\"/>"
         );
-        if (x1 - x0 >= 48)
+        // The label as far as the box holds it: the frame and its animation time, the frame alone, or the frame in the smaller font
+        double cx = (x0 + x1) / 2;
+        double boxWidth = x1 - x0 - (2 * inset);
+        if (boxWidth >= 60)
         {
-          double cx = (x0 + x1) / 2;
           parts.Add(Text(cx, y + 19, Label(frames[index]), "frame"));
           parts.Add(Text(cx, y + 36, $"{Ms((frames[index].AnimationTicks - firstAnimation) / (double)TimeSpan.TicksPerMillisecond)} ms", "box-time"));
         }
+        else if (boxWidth >= 38)
+          parts.Add(Text(cx, y + 27, Label(frames[index]), "frame"));
+        else if (boxWidth >= 26)
+          parts.Add(Text(cx, y + 26, Label(frames[index]), "box-time"));
         double tip = displayY - 4;
         parts.Add($"<line class=\"arrow\" x1=\"{Fixed(x1, 1)}\" y1=\"{Fixed(y + LaneH + 8, 1)}\" x2=\"{Fixed(x1, 1)}\" y2=\"{Fixed(tip - 8, 1)}\"/>");
         parts.Add(

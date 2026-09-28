@@ -149,13 +149,11 @@
 <line class="arrow" x1="262.8" y1="164.0" x2="262.8" y2="186.0"/>
 <path class="arrowhead" d="M257.8,185.0 L267.8,185.0 L262.8,194.0 z"/>
 <rect class="box" x="314.0" y="112.0" width="40.1" height="44" rx="8"/>
-<text x="334.0" y="131.0" text-anchor="middle" class="frame">#494</text>
-<text x="334.0" y="148.0" text-anchor="middle" class="box-time">33.3 ms</text>
+<text x="334.0" y="139.0" text-anchor="middle" class="frame">#494</text>
 <line class="arrow" x1="360.1" y1="164.0" x2="360.1" y2="186.0"/>
 <path class="arrowhead" d="M355.1,185.0 L365.1,185.0 L360.1,194.0 z"/>
 <rect class="box" x="378.0" y="112.0" width="57.4" height="44" rx="8"/>
-<text x="406.7" y="131.0" text-anchor="middle" class="frame">#495</text>
-<text x="406.7" y="148.0" text-anchor="middle" class="box-time">50 ms</text>
+<text x="406.7" y="139.0" text-anchor="middle" class="frame">#495</text>
 <line class="arrow" x1="441.4" y1="164.0" x2="441.4" y2="186.0"/>
 <path class="arrowhead" d="M436.4,185.0 L446.4,185.0 L441.4,194.0 z"/>
 <rect class="box" x="506.0" y="112.0" width="80.1" height="44" rx="8"/>
@@ -164,8 +162,7 @@
 <line class="arrow" x1="592.1" y1="164.0" x2="592.1" y2="186.0"/>
 <path class="arrowhead" d="M587.1,185.0 L597.1,185.0 L592.1,194.0 z"/>
 <rect class="box" x="634.0" y="112.0" width="40.0" height="44" rx="8"/>
-<text x="654.0" y="131.0" text-anchor="middle" class="frame">#497</text>
-<text x="654.0" y="148.0" text-anchor="middle" class="box-time">116.7 ms</text>
+<text x="654.0" y="139.0" text-anchor="middle" class="frame">#497</text>
 <line class="arrow" x1="680.0" y1="164.0" x2="680.0" y2="186.0"/>
 <path class="arrowhead" d="M675.0,185.0 L685.0,185.0 L680.0,194.0 z"/>
 <rect class="box" x="698.0" y="112.0" width="67.7" height="44" rx="8"/>
@@ -174,11 +171,11 @@
 <line class="arrow" x1="771.7" y1="164.0" x2="771.7" y2="186.0"/>
 <path class="arrowhead" d="M766.7,185.0 L776.7,185.0 L771.7,194.0 z"/>
 <rect class="box" x="826.0" y="112.0" width="43.2" height="44" rx="8"/>
-<text x="847.6" y="131.0" text-anchor="middle" class="frame">#499</text>
-<text x="847.6" y="148.0" text-anchor="middle" class="box-time">166.7 ms</text>
+<text x="847.6" y="139.0" text-anchor="middle" class="frame">#499</text>
 <line class="arrow" x1="875.2" y1="164.0" x2="875.2" y2="186.0"/>
 <path class="arrowhead" d="M870.2,185.0 L880.2,185.0 L875.2,194.0 z"/>
 <rect class="box" x="890.0" y="112.0" width="35.6" height="44" rx="8"/>
+<text x="907.8" y="138.0" text-anchor="middle" class="box-time">#500</text>
 <line class="arrow" x1="931.6" y1="164.0" x2="931.6" y2="186.0"/>
 <path class="arrowhead" d="M926.6,185.0 L936.6,185.0 L931.6,194.0 z"/>
 <rect class="box" x="954.0" y="112.0" width="80.1" height="44" rx="8"/>
@@ -187,8 +184,7 @@
 <line class="arrow" x1="1040.1" y1="164.0" x2="1040.1" y2="186.0"/>
 <path class="arrowhead" d="M1035.1,185.0 L1045.1,185.0 L1040.1,194.0 z"/>
 <rect class="box" x="1082.0" y="112.0" width="50.3" height="44" rx="8"/>
-<text x="1107.1" y="131.0" text-anchor="middle" class="frame">#502</text>
-<text x="1107.1" y="148.0" text-anchor="middle" class="box-time">233.3 ms</text>
+<text x="1107.1" y="139.0" text-anchor="middle" class="frame">#502</text>
 <line class="arrow" x1="1138.3" y1="164.0" x2="1138.3" y2="186.0"/>
 <path class="arrowhead" d="M1133.3,185.0 L1143.3,185.0 L1138.3,194.0 z"/>
 <rect class="box" x="1146.0" y="112.0" width="68.8" height="44" rx="8"/>
@@ -202,8 +198,7 @@
 <line class="arrow" x1="1340.4" y1="164.0" x2="1340.4" y2="186.0"/>
 <path class="arrowhead" d="M1335.4,185.0 L1345.4,185.0 L1340.4,194.0 z"/>
 <rect class="box" x="1402.0" y="112.0" width="60.0" height="44" rx="8"/>
-<text x="1432.0" y="131.0" text-anchor="middle" class="frame">#505</text>
-<text x="1432.0" y="148.0" text-anchor="middle" class="box-time">316.7 ms</text>
+<text x="1432.0" y="139.0" text-anchor="middle" class="frame">#505</text>
 <line class="arrow" x1="1468.0" y1="164.0" x2="1468.0" y2="186.0"/>
 <path class="arrowhead" d="M1463.0,185.0 L1473.0,185.0 L1468.0,194.0 z"/>
 <rect class="off" x="310.0" y="198.0" width="60.0" height="40" rx="6"/>
