@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using MB.FramePacing.Data;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Capture.UnitTest
@@ -123,7 +124,7 @@ namespace MB.FramePacing.Capture.UnitTest
       using var temp = new TempDirectory();
       var path = temp.File("captures.mbcd");
       var options = new FrameRecorderOptions { RingFrames = 8, Decoder = new LiveFrameDecoder(g_header, camera: false) };
-      using (var data = new CaptureDataWriter(path, new CaptureDataHeader(g_header, Array.Empty<Marker.MarkerLock>(), false, false)))
+      using (var data = new CaptureDataWriter(path, g_header.ToDataHeader(Array.Empty<Marker.MarkerLock>(), false, false)))
       using (var recorder = new FrameRecorder(g_header, null, data, options, new CaptureClock()))
       {
         for (int i = 0; i < 200; ++i)
@@ -158,9 +159,7 @@ namespace MB.FramePacing.Capture.UnitTest
       const int RingFrames = 16;
       var options = new FrameRecorderOptions { RingFrames = RingFrames, Decoder = new LiveFrameDecoder(g_header, camera: false) };
       using (var frames = new CaptureFileWriter(temp.File("frames.mbfc"), g_header))
-      using (
-        var data = new CaptureDataWriter(temp.File("captures.mbcd"), new CaptureDataHeader(g_header, Array.Empty<Marker.MarkerLock>(), true, false))
-      )
+      using (var data = new CaptureDataWriter(temp.File("captures.mbcd"), g_header.ToDataHeader(Array.Empty<Marker.MarkerLock>(), true, false)))
       using (var recorder = new FrameRecorder(g_header, frames, data, options, new CaptureClock(), gate))
       {
         Produce(recorder, RingFrames + 5, DeviceTimestamps.PendingTicks);

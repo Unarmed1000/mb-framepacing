@@ -1,18 +1,19 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Appends records to captures.mbcd with positional writes. The header is written first with what is known then (no markers located yet)
-//* and rewritten by Complete once the layout is known. Not thread safe: owned by the recorder's writer thread (and Complete by its owner).
+//* Writes captures.mbcd: the header first (rewritten by Complete once the marker locations are known), then whole records as they come. A new
+//* file only: it never replaces an existing one.
 //*
 //* (c) 2026 Mana Battery
-//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Microsoft.Win32.SafeHandles;
 
-namespace MB.FramePacing.Capture
+namespace MB.FramePacing.Data
 {
   public sealed class CaptureDataWriter : IDisposable
   {
@@ -45,7 +46,21 @@ namespace MB.FramePacing.Capture
       RecordsWritten += records.Length / CaptureDataRecord.Size;
     }
 
-    /// <summary>Rewrite the header with what is known at the end of the capture (the marker layout).</summary>
+    /// <summary>Write records, in order.</summary>
+    public void WriteRecords(IReadOnlyList<CaptureDataRecord> records)
+    {
+      const int Batch = 4096;
+      var buffer = new byte[Math.Min(Batch, Math.Max(records.Count, 1)) * CaptureDataRecord.Size];
+      for (int first = 0; first < records.Count; first += Batch)
+      {
+        int count = Math.Min(Batch, records.Count - first);
+        for (int i = 0; i < count; ++i)
+          records[first + i].Write(buffer.AsSpan(i * CaptureDataRecord.Size, CaptureDataRecord.Size));
+        WriteRecords(buffer.AsSpan(0, count * CaptureDataRecord.Size));
+      }
+    }
+
+    /// <summary>Rewrite the header with what is known at the end of the capture (the marker locations).</summary>
     public void Complete(CaptureDataHeader header)
     {
       ObjectDisposedException.ThrowIf(m_disposed, this);

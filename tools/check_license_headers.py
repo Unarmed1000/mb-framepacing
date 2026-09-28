@@ -3,7 +3,7 @@
 """Check that every source file names its license with an SPDX-License-Identifier line (see LICENSE and CLAUDE.md).
 
 The license follows the path:
-- BSD-3-Clause: marker/ (the libraries applications embed) and test-data/markers/.
+- BSD-3-Clause: marker/ (the libraries applications embed), data/ (the data libraries), test-data/markers/ and test-data/data/.
 - LicenseRef-PolyForm-Perimeter-1.0.1: everything else (the PolyForm Perimeter License 1.0.1 is not on the SPDX license list, so it
   has a LicenseRef- identifier; its text is Part 2 of LICENSE).
 
@@ -22,7 +22,7 @@ from pathlib import Path
 
 BSD = "BSD-3-Clause"
 POLYFORM = "LicenseRef-PolyForm-Perimeter-1.0.1"
-BSD_PATHS = ("marker/", "test-data/markers/")
+BSD_PATHS = ("marker/", "data/", "test-data/markers/", "test-data/data/")
 TAG = "SPDX-License-Identifier:"
 # The identifier must be near the top, where readers and tools look for it
 HEADER_LINES = 20

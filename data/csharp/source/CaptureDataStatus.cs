@@ -1,13 +1,13 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* What was read from one captured frame's markers, as stored in captures.mbcd.
+//* What reading a capture's markers gave (captures.mbcd record byte 28).
 //*
 //* (c) 2026 Mana Battery
-//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
-namespace MB.FramePacing.Capture
+namespace MB.FramePacing.Data
 {
   public enum CaptureDataStatus : byte
   {

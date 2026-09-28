@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\data\csharp\MB.FramePacing.Data.csproj" />
     <ProjectReference Include="..\MB.FramePacing.Marker\MB.FramePacing.Marker.csproj" />
   </ItemGroup>
 </Project>

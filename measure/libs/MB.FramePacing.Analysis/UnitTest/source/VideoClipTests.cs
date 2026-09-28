@@ -13,6 +13,7 @@ using System;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Capture;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NUnit.Framework;
 
@@ -160,7 +161,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       using var frames = new CaptureFileReader(Path.Combine(output, CaptureSessionInfo.FramesFileName));
       var (header, records) = CaptureDecoder.DecodeFrames(frames, camera: false);
 
-      Assert.That(live.Header.Locks, Is.EqualTo(header.Locks), $"{clip}: the same marker layout");
+      Assert.That(live.Header.Markers, Is.EqualTo(header.Markers), $"{clip}: the same marker layout");
       var liveRecords = live.ReadAll();
       Assert.That(liveRecords, Has.Length.EqualTo(records.Length), $"{clip}: one record per stored frame");
       for (int i = 0; i < records.Length; ++i)

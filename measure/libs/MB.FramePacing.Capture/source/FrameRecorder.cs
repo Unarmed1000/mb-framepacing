@@ -17,6 +17,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NLog;
 
@@ -362,7 +363,13 @@ namespace MB.FramePacing.Capture
             for (int i = 0; i < resolved; ++i)
             {
               var header = CaptureRecordHeader.Read(m_ring.AsSpan(SlotOffset(tail + i), CaptureFileHeader.RecordHeaderSize));
-              CaptureDataRecord.WriteCapture(m_dataRing.AsSpan(DataSlotOffset(tail + i), CaptureDataRecord.Size), header);
+              CaptureDataRecord.WriteCapture(
+                m_dataRing.AsSpan(DataSlotOffset(tail + i), CaptureDataRecord.Size),
+                header.CaptureIndex,
+                header.HostTicks,
+                header.DeviceTicks,
+                header.Flags
+              );
             }
             m_data.WriteRecords(m_dataRing.AsSpan(DataSlotOffset(tail), resolved * CaptureDataRecord.Size));
           }

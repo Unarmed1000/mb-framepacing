@@ -9,6 +9,7 @@
 
 using System;
 using System.Buffers.Binary;
+using MB.FramePacing.Data;
 
 namespace MB.FramePacing.Capture
 {

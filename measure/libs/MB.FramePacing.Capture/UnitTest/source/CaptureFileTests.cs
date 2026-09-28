@@ -9,6 +9,7 @@
 
 using System;
 using System.IO;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NUnit.Framework;
 

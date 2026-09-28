@@ -11,6 +11,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NUnit.Framework;
 
@@ -33,12 +34,12 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Header_RoundTrips()
     {
-      var header = new CaptureDataHeader(g_frames, g_locks, FramesStored: true, Camera: false);
+      var header = g_frames.ToDataHeader(g_locks, framesStored: true, camera: false);
       var bytes = new byte[CaptureDataHeader.HeaderSize];
       header.Write(bytes);
       var read = CaptureDataHeader.Read(bytes);
-      Assert.That(read.Frames, Is.EqualTo(g_frames));
-      Assert.That(read.Locks, Is.EqualTo(g_locks));
+      Assert.That(read.ToFileHeader(), Is.EqualTo(g_frames));
+      Assert.That(read.ToLocks(), Is.EqualTo(g_locks));
       Assert.That((read.FramesStored, read.Camera), Is.EqualTo((true, false)));
     }
 
@@ -47,7 +48,7 @@ namespace MB.FramePacing.Capture.UnitTest
     {
       Assert.Throws<InvalidDataException>(() => CaptureDataHeader.Read(new byte[CaptureDataHeader.HeaderSize]));
       var bytes = new byte[CaptureDataHeader.HeaderSize];
-      new CaptureDataHeader(g_frames, g_locks, false, false).Write(bytes);
+      g_frames.ToDataHeader(g_locks, false, false).Write(bytes);
       bytes[4] = CaptureDataHeader.FormatVersion + 1;
       Assert.That(() => CaptureDataHeader.Read(bytes), Throws.InstanceOf<InvalidDataException>().With.Message.Contains("update the tools"));
     }
@@ -79,19 +80,19 @@ namespace MB.FramePacing.Capture.UnitTest
 
       using var temp = new TempDirectory();
       var path = temp.File("captures.mbcd");
-      using (var writer = new CaptureDataWriter(path, new CaptureDataHeader(g_frames, Array.Empty<MarkerLock>(), false, false)))
+      using (var writer = new CaptureDataWriter(path, g_frames.ToDataHeader(Array.Empty<MarkerLock>(), false, false)))
       {
         var buffer = new byte[records.Length * CaptureDataRecord.Size];
         for (int i = 0; i < records.Length; ++i)
           records[i].Write(buffer.AsSpan(i * CaptureDataRecord.Size));
         writer.WriteRecords(buffer);
         // The locks are only known at the end of a capture
-        writer.Complete(writer.Header with { Locks = g_locks });
+        writer.Complete(writer.Header with { Markers = g_locks.ToLocations() });
         Assert.That(writer.RecordsWritten, Is.EqualTo(3));
       }
 
       using var reader = new CaptureDataReader(path);
-      Assert.That(reader.Header.Locks, Is.EqualTo(g_locks));
+      Assert.That(reader.Header.ToLocks(), Is.EqualTo(g_locks));
       Assert.That(reader.RecordCount, Is.EqualTo(3));
       var read = reader.ReadAll();
       for (int i = 0; i < records.Length; ++i)
@@ -134,7 +135,7 @@ namespace MB.FramePacing.Capture.UnitTest
     {
       using var temp = new TempDirectory();
       var path = temp.File("captures.mbcd");
-      using (var writer = new CaptureDataWriter(path, new CaptureDataHeader(g_frames, g_locks, false, false)))
+      using (var writer = new CaptureDataWriter(path, g_frames.ToDataHeader(g_locks, false, false)))
       {
         var buffer = new byte[2 * CaptureDataRecord.Size];
         for (int i = 0; i < 2; ++i)

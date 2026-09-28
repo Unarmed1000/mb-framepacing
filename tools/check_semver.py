@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Check the semantic versions of the two release streams (see doc/releasing.md).
+"""Check the semantic versions of the three release streams (see doc/releasing.md).
 
-1. marker/VERSION and measure/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their stream
-   (marker-v*, tools-v*).
+1. marker/VERSION, measure/VERSION and data/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their
+   stream (marker-v*, tools-v*, data-v*).
 2. The public API of the C# marker library MB.FrameMarker is compared with the newest marker-v* release (Microsoft's ApiCompat,
    from the local tool manifest: dotnet tool restore). The C++ API mirrors it, so this also guards the C++ library.
    - A breaking change needs a new major version (a new minor version while the major version is 0).
@@ -161,7 +161,8 @@ def main() -> int:
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
     marker = check_stream(root, "marker/VERSION", "marker-v")
     tools = check_stream(root, "measure/VERSION", "tools-v")
-    if marker is None or tools is None:
+    data = check_stream(root, "data/VERSION", "data-v")
+    if marker is None or tools is None or data is None:
         return 1
     return 0 if check_marker_api(root, marker) else 1
 

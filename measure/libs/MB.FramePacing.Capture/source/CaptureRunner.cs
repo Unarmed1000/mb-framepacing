@@ -13,6 +13,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NLog;
 
@@ -65,7 +66,7 @@ namespace MB.FramePacing.Capture
 
       var clock = new CaptureClock();
       var startedUtc = DateTime.UtcNow;
-      using var data = new CaptureDataWriter(dataPath, new CaptureDataHeader(header, Array.Empty<MarkerLock>(), options.KeepFrames, camera));
+      using var data = new CaptureDataWriter(dataPath, header.ToDataHeader(Array.Empty<MarkerLock>(), options.KeepFrames, camera));
       using var frames = options.KeepFrames ? new CaptureFileWriter(framesPath, header, expectedRecords) : null;
       using var recorder = new FrameRecorder(header, frames, data, recorderOptions, clock, source.DeviceTimestamps);
       using var stopSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -159,7 +160,7 @@ namespace MB.FramePacing.Capture
       // Completing inspects the frames still in the ring; a file can end before its end marker was inspected
       recorder.Complete();
       // The header now gets where the decoder found the markers
-      data.Complete(data.Header with { Locks = decoder.Finish()?.Locks ?? Array.Empty<MarkerLock>() });
+      data.Complete(data.Header with { Markers = (decoder.Finish()?.Locks ?? Array.Empty<MarkerLock>()).ToLocations() });
       if (recorder.StopRequested && sourceError == null)
         stopReason = "end marker";
       var stats = recorder.Stats;

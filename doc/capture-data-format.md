@@ -10,6 +10,9 @@ frame until the markers are located, then the locked decoder), so they give the 
 
 All numbers are little endian. Times are TimeSpan ticks (100 ns).
 
+The data libraries in [`data/`](../data/README.md) read this file in C#, Python and C++; the C# library also writes it, and the tools
+write through it.
+
 ## Header (256 bytes)
 
 | Offset | Size | Field                                                                                                     |
@@ -24,6 +27,7 @@ All numbers are little endian. Times are TimeSpan ticks (100 ns).
 | 32     | 8    | Source width, height (`i32` each), before scaling and cropping                                            |
 | 40     | 16   | Region of the source that was stored: x, y, width, height (`i32` each; all 0 = the whole frame)           |
 | 64     | 4    | Marker lock count (`u32`, at most 4; 0 = no marker was found)                                             |
+| 68     | 4    | Reserved (0)                                                                                              |
 | 72     | 96   | Up to 4 locks of 24 bytes: bounds x, y, width, height (`i32` each, stored pixels) and module size (`f64`) |
 | 168    | 88   | Reserved (0)                                                                                              |
 

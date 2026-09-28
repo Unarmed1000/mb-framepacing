@@ -1,0 +1,24 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* summary.json's runs[].counts: what the run's captures held.
+//*
+//* (c) 2026 Mana Battery
+//* SPDX-License-Identifier: BSD-3-Clause
+//****************************************************************************************************************************************************
+
+namespace MB.FramePacing.Data
+{
+  public sealed record SummaryCounts(
+    long Captures,
+    long Decoded,
+    long Undecodable,
+    long Torn,
+    long NotRecorded,
+    long SourceDropEvents,
+    long PresentedFrames,
+    long SkippedFrameIndices,
+    long OutOfOrderCaptures,
+    int Segments
+  );
+}

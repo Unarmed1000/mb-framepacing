@@ -1,17 +1,17 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Reads captures.mbcd: its header and its fixed size records, one at a time or all of them in large sequential reads.
+//* Reads captures.mbcd: the header, then the records by index or all of them. A partial last record (a capture stopped mid-write) is ignored.
 //*
 //* (c) 2026 Mana Battery
-//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;
 using System.IO;
 using Microsoft.Win32.SafeHandles;
 
-namespace MB.FramePacing.Capture
+namespace MB.FramePacing.Data
 {
   public sealed class CaptureDataReader : IDisposable
   {

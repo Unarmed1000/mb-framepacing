@@ -17,6 +17,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MB.FramePacing.Capture;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Analysis
@@ -86,7 +87,7 @@ namespace MB.FramePacing.Analysis
         _ => { }
       );
       progress?.Report(1.0);
-      return (new CaptureDataHeader(reader.Header, layout.Locks, FramesStored: true, camera), records);
+      return (reader.Header.ToDataHeader(layout.Locks, framesStored: true, camera), records);
     }
 
     /// <summary>
@@ -95,11 +96,12 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     public static DecodedCapture FromData(CaptureDataHeader header, IReadOnlyList<CaptureDataRecord> records, TimeSource timeSource = TimeSource.Auto)
     {
-      if (header.Locks.Count == 0)
+      var locks = header.ToLocks();
+      if (locks.Count == 0)
         throw new InvalidOperationException(
           "No frame markers were found in the capture. Check that the application draws the marker, and see doc/marker-format.md 'Sizing'."
         );
-      var layout = MarkerLayout.For(header.Locks, header.Camera);
+      var layout = MarkerLayout.For(locks, header.Camera);
       var effectiveTime =
         timeSource == TimeSource.Auto ? (records.Count > 0 && records.All(r => r.HasDeviceTicks) ? TimeSource.Device : TimeSource.Host) : timeSource;
 
@@ -112,7 +114,7 @@ namespace MB.FramePacing.Analysis
         rows.Add(ToRow(record, effectiveTime, header.Camera));
         expectedIndex = record.CaptureIndex + 1;
       }
-      return new DecodedCapture(header.Frames, layout, effectiveTime, rows);
+      return new DecodedCapture(header.ToFileHeader(), layout, effectiveTime, rows);
     }
 
     private static CaptureDataRecord ToRecord(CaptureRecordHeader header, FrameDecode decode) =>

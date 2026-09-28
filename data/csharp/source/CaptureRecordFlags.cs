@@ -1,15 +1,15 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Flags stored with every record of a .mbfc capture file, for example that the source dropped frames before it.
+//* What the capture source reported about a capture (captures.mbcd and frames.mbfc record flags).
 //*
 //* (c) 2026 Mana Battery
-//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;
 
-namespace MB.FramePacing.Capture
+namespace MB.FramePacing.Data
 {
   [Flags]
   public enum CaptureRecordFlags : uint

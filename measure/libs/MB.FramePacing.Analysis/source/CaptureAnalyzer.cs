@@ -21,26 +21,19 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using MB.FramePacing.Capture;
+using MB.FramePacing.Data;
 
 namespace MB.FramePacing.Analysis
 {
   public static class CaptureAnalyzer
   {
-    public const string AnalysisDirectoryName = "analysis";
-    public const string SummaryFileName = "summary.json";
-    public const string CapturesFileName = "captures.csv";
+    public const string AnalysisDirectoryName = AnalysisFiles.DirectoryName;
+    public const string SummaryFileName = AnalysisFiles.SummaryFileName;
+    public const string CapturesFileName = AnalysisFiles.CapturesFileName;
     public const double MovedMarkerUndecodableFraction = 0.05;
 
     /// <summary>A camera capture always loses a few captures per frame to the scanout crossing the marker; more than this is a problem.</summary>
     public const double CameraUndecodableFraction = 0.2;
-
-    private static readonly JsonSerializerOptions g_jsonOptions = new JsonSerializerOptions
-    {
-      WriteIndented = true,
-      PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-      Converters = { new JsonStringEnumConverter() },
-    };
 
     public static AnalysisReport Analyze(
       string captureDirectory,
@@ -137,16 +130,7 @@ namespace MB.FramePacing.Analysis
       try
       {
         using (var writer = new CaptureDataWriter(temporary, header))
-        {
-          var buffer = new byte[4096 * CaptureDataRecord.Size];
-          for (int first = 0; first < records.Count; first += 4096)
-          {
-            int count = Math.Min(4096, records.Count - first);
-            for (int i = 0; i < count; ++i)
-              records[first + i].Write(buffer.AsSpan(i * CaptureDataRecord.Size, CaptureDataRecord.Size));
-            writer.WriteRecords(buffer.AsSpan(0, count * CaptureDataRecord.Size));
-          }
-        }
+          writer.WriteRecords(records);
         File.Move(temporary, path, overwrite: true);
       }
       finally
@@ -179,9 +163,9 @@ namespace MB.FramePacing.Analysis
     /// The start of every report file of a run: "run-{id}", and "run-{id}-{n}" for the n-th run with the same id (<paramref name="ordinal"/>
     /// counts from 0 among the runs with that id).
     /// </summary>
-    public static string RunFilePrefix(RunAnalysis run, int ordinal) => ordinal == 0 ? $"run-{run.RunId}" : $"run-{run.RunId}-{ordinal + 1}";
+    public static string RunFilePrefix(RunAnalysis run, int ordinal) => AnalysisFiles.RunFilePrefix(run.RunId, ordinal);
 
-    public static string RunFramesFileName(RunAnalysis run, int ordinal) => RunFilePrefix(run, ordinal) + "-frames.csv";
+    public static string RunFramesFileName(RunAnalysis run, int ordinal) => AnalysisFiles.FramesFileName(run.RunId, ordinal);
 
     private static void WriteReports(AnalysisReport report, AnalysisOptions options)
     {
@@ -200,125 +184,32 @@ namespace MB.FramePacing.Analysis
       WriteSummary(Path.Combine(report.OutputDirectory, SummaryFileName), report, options, runFiles);
     }
 
-    private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows, bool camera)
-    {
-      using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-      writer.WriteLine(
-        "captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropBefore,hostMs,deviceMs,payloadHex"
-          + (camera ? ",secondZoneFrameIndex" : "")
-      );
-      foreach (var row in rows)
-      {
-        bool hasMarker = row.Status is CaptureStatus.Decoded or CaptureStatus.Torn && row.Payload != default;
-        writer.WriteLine(
-          string.Join(
-            ',',
-            row.CaptureIndex.ToString(CultureInfo.InvariantCulture),
-            row.Status == CaptureStatus.NotRecorded ? string.Empty : Ms(row.CaptureTicks),
-            row.Status,
-            hasMarker ? row.Payload.Kind.ToString() : string.Empty,
-            hasMarker ? row.Payload.RunId.ToString(CultureInfo.InvariantCulture) : string.Empty,
-            hasMarker ? row.Payload.FrameIndex.ToString(CultureInfo.InvariantCulture) : string.Empty,
-            hasMarker ? Ms(row.Payload.AnimationTicks) : string.Empty,
-            row.SourceDropBefore ? "1" : "0",
-            row.HostTicks is { } host ? Ms(host) : string.Empty,
-            row.DeviceTicks is { } device ? Ms(device) : string.Empty,
-            row.MarkerBytes != null ? Convert.ToHexString(row.MarkerBytes) : string.Empty
-          ) + (camera ? "," + (row.SecondaryFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty) : string.Empty)
-        );
-      }
-    }
+    private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows, bool camera) =>
+      CapturesCsv.Write(path, rows.Select(r => r.ToCsvRow()), camera);
 
-    private static void WriteFrames(string path, IReadOnlyList<PresentedFrame> frames, bool camera)
-    {
-      using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-      writer.WriteLine(
-        "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags,"
-          + "intendedDisplayMs,markerTargetMs,targetMs,pacingErrorMs,predictionErrorMs,latenessMs,lastSeenMs,cpuStartMs,cpuBusyMs,frameTimeMs,cpuWaitMs"
-          + (camera ? ",mainMarkerFirstSeenMs,scanoutDelayMs" : "")
-      );
-      foreach (var frame in frames)
-      {
-        writer.WriteLine(
-          string.Join(
-            ',',
-            frame.Segment.ToString(CultureInfo.InvariantCulture),
-            frame.FrameIndex.ToString(CultureInfo.InvariantCulture),
-            Ms(frame.AnimationTicks),
-            frame.FirstCaptureIndex.ToString(CultureInfo.InvariantCulture),
-            Ms(frame.FirstSeenTicks),
-            Ms(frame.OnScreenTicks),
-            frame.CaptureCount.ToString(CultureInfo.InvariantCulture),
-            frame.SkippedBefore.ToString(CultureInfo.InvariantCulture),
-            frame.DisplayDeltaTicks is { } display ? Ms(display) : string.Empty,
-            frame.AnimationDeltaTicks is { } animation ? Ms(animation) : string.Empty,
-            frame.AnimationErrorTicks is { } error ? Ms(error) : string.Empty,
-            Ms(frame.DriftTicks),
-            frame.Flags == PresentedFrameFlags.None ? string.Empty : frame.Flags.ToString().Replace(", ", "|", StringComparison.Ordinal),
-            frame.IntendedDisplayTicks != 0 ? Ms(frame.IntendedDisplayTicks) : string.Empty,
-            frame.MarkerTargetFrameTicks != 0 ? Ms(frame.MarkerTargetFrameTicks) : string.Empty,
-            frame.TargetTicks is { } target ? Ms(target) : string.Empty,
-            frame.PacingErrorTicks is { } pacing ? Ms(pacing) : string.Empty,
-            frame.PredictionErrorTicks is { } prediction ? Ms(prediction) : string.Empty,
-            frame.LatenessTicks is { } lateness ? Ms(lateness) : string.Empty,
-            Ms(frame.LastSeenTicks),
-            frame.CpuStartTicks != 0 ? Ms(frame.CpuStartTicks) : string.Empty,
-            frame.CpuBusyTicks != 0 ? Ms(frame.CpuBusyTicks) : string.Empty,
-            frame.FrameTimeTicks is { } frameTime ? Ms(frameTime) : string.Empty,
-            frame.CpuWaitTicks is { } cpuWait ? Ms(cpuWait) : string.Empty
-          )
-            + (
-              camera
-                ? frame.FirstSeenMainTicks is { } main
-                  ? "," + Ms(main) + "," + Ms(frame.FirstSeenTicks - main)
-                  : ",,"
-                : string.Empty
-            )
-        );
-      }
-    }
+    private static void WriteFrames(string path, IReadOnlyList<PresentedFrame> frames, bool camera) =>
+      FramesCsv.Write(path, frames.Select(f => f.ToRow()), camera);
 
     private static void WriteSummary(string path, AnalysisReport report, AnalysisOptions options, List<string> runFiles)
     {
-      var layout = report.Capture.Layout;
-      var summary = new
-      {
-        toolVersion = options.ToolVersion,
-        experimental = report.Session?.Camera != null ? "Camera capture: " + Capture.Camera.CameraRig.ExperimentalNotice : null,
-        scanout = report.Session?.Camera != null ? ScanoutModel.Camera : ScanoutModel.SingleScanout,
-        analysedUtc = DateTime.UtcNow,
-        captureDirectory = Path.GetFullPath(report.CaptureDirectory),
-        capture = report.Session,
-        frameSize = $"{report.Capture.Header.Width}x{report.Capture.Header.Height}",
-        timeSource = report.Capture.TimeSource,
-        capturePeriodMs = report.CapturePeriodMs,
-        measurementResolutionMs = report.CapturePeriodMs,
-        errorThresholdMs = report.ErrorThresholdMs,
-        markers = layout.Locks.Select(l => new { bounds = l.Bounds.ToString(), moduleSizePx = l.ModuleSizePx }),
-        warnings = report.Warnings,
-        runs = report.Timeline.Runs.Select(
-          (run, i) =>
-            new
-            {
-              run.RunId,
-              run.Name,
-              run.SequenceId,
-              run.StartTimeUtc,
-              run.HasStartMarker,
-              run.HasEndMarker,
-              framesFile = runFiles[i],
-              run.Counts,
-              run.Statistics,
-              run.Pacing,
-              histograms = RunHistograms.Create(run),
-              camera = run.Camera,
-              run.Warnings,
-            }
-        ),
-      };
-      File.WriteAllText(path, JsonSerializer.Serialize(summary, g_jsonOptions));
+      bool camera = report.Session?.Camera != null;
+      new AnalysisSummary(
+        AnalysisSummary.CurrentFormatVersion,
+        options.ToolVersion,
+        camera ? "Camera capture: " + Capture.Camera.CameraRig.ExperimentalNotice : null,
+        (camera ? ScanoutModel.Camera : ScanoutModel.SingleScanout).ToString(),
+        DateTime.UtcNow,
+        Path.GetFullPath(report.CaptureDirectory),
+        report.Session != null ? JsonSerializer.SerializeToElement(report.Session, AnalysisSummary.JsonOptions) : null,
+        $"{report.Capture.Header.Width}x{report.Capture.Header.Height}",
+        report.Capture.TimeSource.ToString(),
+        report.CapturePeriodMs,
+        report.CapturePeriodMs,
+        report.ErrorThresholdMs,
+        report.Capture.Layout.Locks.Select(l => new SummaryMarker(l.Bounds.ToString(), l.ModuleSizePx)).ToList(),
+        report.Warnings,
+        report.Timeline.Runs.Select((run, i) => run.ToSummary(runFiles[i])).ToList()
+      ).Write(path);
     }
-
-    private static string Ms(long ticks) => (ticks / (double)TimeSpan.TicksPerMillisecond).ToString("0.####", CultureInfo.InvariantCulture);
   }
 }

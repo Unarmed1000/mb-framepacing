@@ -10,6 +10,7 @@
 
 using System;
 using System.Threading;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture.Camera

@@ -10,6 +10,7 @@
 using System;
 using System.Threading;
 using MB.FramePacing.Capture.Synthetic;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NUnit.Framework;
 

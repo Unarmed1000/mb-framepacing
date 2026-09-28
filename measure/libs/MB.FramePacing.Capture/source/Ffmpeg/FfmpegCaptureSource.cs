@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using MB.FramePacing.Data;
 using NLog;
 
 namespace MB.FramePacing.Capture.Ffmpeg

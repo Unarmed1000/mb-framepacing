@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Capture.Camera;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture
@@ -59,7 +60,10 @@ namespace MB.FramePacing.Capture
         throw new InvalidOperationException(
           $"A {header.Width}x{header.Height} capture is not a camera capture (expected {CameraZone.StoredSizePx} pixel wide stacked zones)"
         );
-      return MarkerLayout.For(Enumerable.Range(0, Math.Min(zones, CaptureDataHeader.MaxLocks)).Select(CameraZone.StoredLock).ToList(), camera: true);
+      return MarkerLayout.For(
+        Enumerable.Range(0, Math.Min(zones, CaptureDataHeader.MaxMarkers)).Select(CameraZone.StoredLock).ToList(),
+        camera: true
+      );
     }
 
     /// <summary>

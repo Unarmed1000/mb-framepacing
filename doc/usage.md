@@ -144,6 +144,9 @@ capture-20260924-153000/          (import-... for imports)
     └── run-<id>-report*.svg      only on request: the run (or a section of it) as one SVG report card
 ```
 
+`summary.json` and the CSV files are specified in [the analysis output format](analysis-output-format.md), `captures.mbcd` in
+[the capture data format](capture-data-format.md); the [data libraries](../data/README.md) read them in your own code.
+
 The chart images and the whole run's report are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the
 GUI's **Save charts**; both write the same files. `render` draws reports from an analysis (the capture itself is not needed):
 

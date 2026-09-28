@@ -12,6 +12,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using MB.FramePacing.Capture.Synthetic;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 using NUnit.Framework;
 
@@ -83,10 +84,10 @@ namespace MB.FramePacing.Capture.UnitTest
       using var reader = new CaptureDataReader(result.DataPath);
       var o = scenario.Options;
       Assert.That(reader.Header.FramesStored, Is.False);
-      Assert.That(reader.Header.Locks, Has.Count.EqualTo(1), "the synthetic source draws the main marker only");
-      Assert.That(reader.Header.Locks[0].Bounds.X, Is.EqualTo(o.OriginX));
-      Assert.That(reader.Header.Locks[0].Bounds.Y, Is.EqualTo(o.OriginY));
-      Assert.That(reader.Header.Locks[0].ModuleSizePx, Is.EqualTo(o.ModuleSizePx));
+      Assert.That(reader.Header.ToLocks(), Has.Count.EqualTo(1), "the synthetic source draws the main marker only");
+      Assert.That(reader.Header.ToLocks()[0].Bounds.X, Is.EqualTo(o.OriginX));
+      Assert.That(reader.Header.ToLocks()[0].Bounds.Y, Is.EqualTo(o.OriginY));
+      Assert.That(reader.Header.ToLocks()[0].ModuleSizePx, Is.EqualTo(o.ModuleSizePx));
       Assert.That(reader.RecordCount, Is.EqualTo(scenario.CaptureCount));
       var records = reader.ReadAll();
       for (int i = 0; i < records.Length; ++i)

@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MB.FramePacing.Data;
 using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Capture
@@ -81,7 +82,7 @@ namespace MB.FramePacing.Capture
         .OrderBy(l => l.Sync)
         .ThenBy(l => l.Lock.Bounds.Y)
         .Select(l => l.Lock)
-        .Take(CaptureDataHeader.MaxLocks)
+        .Take(CaptureDataHeader.MaxMarkers)
         .ToList();
     }
 

@@ -13,19 +13,22 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 
 ## Layout
 
-| Path                                              | Contents                                                                                           |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                                   |
-| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                               |
-| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests       |
-| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                      |
-| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests              |
-| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                               |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks |
-| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                 |
-| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                               |
-| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses                   |
-| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                    |
+| Path                                              | Contents                                                                                                |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                                        |
+| `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                                    |
+| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests            |
+| `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                           |
+| `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests                   |
+| `data/VERSION`                                    | Version of the data libraries (released with `data-v*` tags)                                            |
+| `data/csharp/`                                    | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output |
+| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                    |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks      |
+| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                      |
+| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                    |
+| `doc/`, `test-data/markers/`, `licenses/`         | Docs and images, golden marker images from the C++ library, third-party licenses                        |
+| `test-data/data/`                                 | The data libraries' golden data: a test clip imported and analysed, and `digest.json`                   |
+| `test-data/videos/`                               | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                         |
 
 ## Build and test
 
@@ -83,6 +86,11 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. The SVG report examples (`report-example-*.svg`) come from test clips
     imported through ffmpeg (skipped without it): example pictures use the test clips, not the synthetic game. It renders the real GUI **offscreen**
     (Avalonia.Headless) in no-save mode and neutralises machine specific text. Never take desktop screenshots.
+- **Data libraries (`data/`, BSD 3-Clause):** `MB.FramePacing.Data` reads and writes `captures.mbcd` (`doc/capture-data-format.md`) and
+  the analysis output (`doc/analysis-output-format.md`: `summary.json` with `formatVersion`, which covers the CSVs, and the CSVs). The
+  tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
+  Analysis). Keep the output byte for byte: the golden data (`test-data/data`, `digest.json`) is written back exactly, and every
+  language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
 - **Capture data (the default):** a capture decodes every frame's markers live and stores only them, with the timestamps, in
   `captures.mbcd` (`doc/capture-data-format.md`); the frames themselves (`frames.mbfc`) only with `--keep-frames` / the GUI's "Store
   video frames".
@@ -207,11 +215,13 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):
   - BSD 3-Clause: `marker/` (the libraries applications embed; `marker/LICENSE` holds the text alone and is what the C++ archive,
-    the CMake install and the Unity package ship), `doc/marker-format.md`, `doc/integrating.md`, `test-data/markers/`.
+    the CMake install and the Unity package ship), `doc/marker-format.md`, `doc/integrating.md`, `test-data/markers/`, and the data
+    libraries and their formats: `data/` (`data/LICENSE`), `doc/capture-data-format.md`, `doc/analysis-output-format.md`,
+    `test-data/data/`.
   - PolyForm Perimeter 1.0.1: everything else (the tools, their libraries, scripts, other docs, build and CI files). The tools ship
     the root `LICENSE`, which holds both texts, since they include the BSD marker library.
-  - Every source file names its license on an `SPDX-License-Identifier` line near its top: `BSD-3-Clause` under `marker/` and
-    `test-data/markers/`, `LicenseRef-PolyForm-Perimeter-1.0.1` elsewhere (inside the boxed C# header, after a shebang, as an XML
+  - Every source file names its license on an `SPDX-License-Identifier` line near its top: `BSD-3-Clause` under `marker/`,
+    `test-data/markers/`, `data/` and `test-data/data/`, `LicenseRef-PolyForm-Perimeter-1.0.1` elsewhere (inside the boxed C# header, after a shebang, as an XML
     comment in XAML/MSBuild/solution files). `python tools/check_license_headers.py` checks it (CI `lint`), `--fix` adds missing
     ones. Third-party code (`third_party/`) keeps its own notices; each language's marker library keeps it in a `third_party/`
     folder of its own (`marker/cpp/third_party/`, `marker/python/mb_framemarker/third_party/`), with its license text next to it.

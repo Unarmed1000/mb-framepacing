@@ -277,7 +277,8 @@ The charts can also be written as PNG files next to the reports (`run-<id>-timel
 `-error-percentiles.png`, `-display-time-step-histogram.png`, `-drift.png`): `--charts` on the command line, **Save charts** in the GUI. The
 histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`; the error per frame and
 percent error in `runs[].statistics`), and late frames carry `Late`
-in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools.
+in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools: the files are specified in
+[doc/analysis-output-format.md](doc/analysis-output-format.md), and the [data libraries](data/README.md) read them.
 
 **The report** is the run as one SVG card, in the style of
 [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained)'s charts: the headline numbers, the animation
@@ -456,6 +457,7 @@ flowchart TB
 | `marker/csharp/`          | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests      |
 | `marker/unity/`           | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)      |
 | `marker/python/`          | The Python marker library `mb_framemarker` (standard library only) and its unittest tests         |
+| `data/`                   | **Reads the results**: the data libraries (C#) for the capture data and the analysis output       |
 | `measure/`                | **Measures it**: the recording and analysis tools and their version                               |
 | `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                                     |
 | `measure/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                               |
@@ -467,7 +469,8 @@ flowchart TB
 ## License
 
 Two licenses, by path (see [`LICENSE`](LICENSE)): the frame marker libraries that applications embed (`marker/`), the
-marker format specification, the integration guide and the golden marker images are BSD 3-Clause. Everything else,
+marker format specification, the integration guide and the golden marker images are BSD 3-Clause, and so are the data
+libraries (`data/`), the formats they read and their golden data. Everything else,
 including the measurement tools, is PolyForm Perimeter 1.0.1: free to use, change and share for any purpose, including
 inside companies, but not to provide others a product that competes with it. Every source file names its license on an
 `SPDX-License-Identifier` line (`BSD-3-Clause`, or `LicenseRef-PolyForm-Perimeter-1.0.1`). Third-party components and their

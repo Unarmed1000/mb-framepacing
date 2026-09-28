@@ -10,4 +10,5 @@
 *.png  binary
 *.pgm  binary
 *.mbfc binary
+*.mbcd binary
 *.mp4  binary

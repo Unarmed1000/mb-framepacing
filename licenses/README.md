@@ -1,7 +1,7 @@
 # Third-party licenses
 
 mb-framepacing itself is licensed under two licenses by path, see [`../LICENSE`](../LICENSE) for the exact list: the BSD
-3-Clause License for the frame marker libraries (`marker/`), their documentation and golden marker images, and the
+3-Clause License for the frame marker libraries (`marker/`), the data libraries (`data/`), their formats and golden data, and the
 PolyForm Perimeter License 1.0.1 for everything else.
 
 This directory holds the license text of **every** third-party component the project uses, whether it is vendored, downloaded by a

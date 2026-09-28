@@ -1,10 +1,11 @@
 # Releasing
 
-The repository has two release streams with their own versions ([semantic versioning](https://semver.org)):
+The repository has three release streams with their own versions ([semantic versioning](https://semver.org)):
 
 | Stream           | Version file      | Tag             | What gets published                                                            |
 | ---------------- | ----------------- | --------------- | ------------------------------------------------------------------------------ |
 | Marker libraries | `marker/VERSION`  | `marker-v1.2.3` | C++ source archives on a GitHub Release, the Unity package on the `upm` branch |
+| Data libraries   | `data/VERSION`    | `data-v1.2.3`   | Not released yet (the C#, Python and C++ readers of the tools' data)           |
 | Tools            | `measure/VERSION` | `tools-v1.2.3`  | Self-contained executables as build artifacts of the CI run                    |
 
 The marker libraries (C++, C# and the Unity package) share one version because they implement the same marker format and API.
