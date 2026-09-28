@@ -79,8 +79,9 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
   - It isn't stored as one folder: `marker/unity/build_upm.py` assembles it from `marker/csharp/source` (core) plus
     `marker/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
   - CI runs it with `--check`.
-  - `marker/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode; Unity editors are installed on this machine
-    under `C:/Program Files/Unity/Hub/Editor`. Run it after changing the core or the helpers.
+  - `marker/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode (every drawing method pixel exact; `--graphics
+glcore|vulkan|d3d12` forces another graphics API); Unity editors are installed on this machine under
+    `C:/Program Files/Unity/Hub/Editor`. Run it after changing the core or the helpers.
   - The core must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
     APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
 - **Standalone release archive:** `marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release

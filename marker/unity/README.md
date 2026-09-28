@@ -12,6 +12,8 @@ shows the **animation error**: how far what the game animated is from what was a
   - `BeginRun` / `EndRun` / `RunFor`: bracket the part to measure with start and end markers.
   - `FrameMarkerMesh` and `PixelSpace`: draw the marker from your own render pipeline code.
   - `FrameMarkerTexture`: the marker as a `Texture2D` at module resolution, for UI or anything that shows an image.
+  - `FrameMarkerQuad`: the marker as one quad with a dedicated shader (`Hidden/MB/FrameMarkerQuad`, shader model 3.5).
+  - The overlay's **Render Mode** picks one of them: Geometry (the default), Bitmap or Shader; all draw the same pixels.
 - **Samples:** Benchmark (a camera pan measured as one run).
 
 ## Quick start

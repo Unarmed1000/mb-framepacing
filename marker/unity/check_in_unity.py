@@ -29,12 +29,18 @@ class Arguments(argparse.Namespace):
 
     unity: str | None = None
     keep: bool = False
+    graphics: str | None = None
 
 
 def parse_args() -> Arguments:
     parser = argparse.ArgumentParser(description="Check the Unity package in a real Unity editor (batch mode).")
     _ = parser.add_argument("--unity", help="The Unity editor executable (default: the newest editor installed by Unity Hub).")
     _ = parser.add_argument("--keep", action="store_true", help="Keep the temporary project and log.")
+    _ = parser.add_argument(
+        "--graphics",
+        choices=["d3d11", "d3d12", "glcore", "vulkan", "metal"],
+        help="Force a graphics API (Unity's -force-<api>); default: the platform's. Textures and the y axis differ between them.",
+    )
     return parser.parse_args(namespace=Arguments())
 
 
@@ -92,6 +98,8 @@ def main() -> int:
         "-logFile",
         str(log),
     ]
+    if args.graphics:
+        command.append(f"-force-{args.graphics}")
     print(f"Unity: {unity}")
     print(f"Project: {project}")
     env = {**os.environ, "MB_FRAMEMARKER_TEST_DATA": str(REPOSITORY_ROOT / "test-data" / "markers")}

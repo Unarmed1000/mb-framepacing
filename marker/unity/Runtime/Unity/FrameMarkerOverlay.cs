@@ -58,15 +58,33 @@ namespace MB.FrameMarker.Unity
     [SerializeField]
     private Material m_material;
 
+    [Tooltip(
+      "How the marker is drawn: Geometry (pixel aligned quads, works everywhere), Bitmap (a module texture scaled up) or Shader (one quad with a dedicated shader, shader model 3.5). All draw the same pixels."
+    )]
+    [SerializeField]
+    private FrameMarkerRenderMode m_renderMode = FrameMarkerRenderMode.Geometry;
+
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
     private readonly byte[] m_modules = new byte[Marker.MaxPackedModuleByteCount];
     private readonly Quad[] m_quads = new Quad[Marker.MaxQuadCount];
+    private FrameMarkerTexture m_mainTexture;
+    private FrameMarkerTexture m_syncTexture;
+    private FrameMarkerQuad m_mainQuad;
+    private FrameMarkerQuad m_syncQuad;
+    private bool m_shaderWarned;
     private WaitForEndOfFrame m_endOfFrame;
     private Coroutine m_drawing;
     private Material m_ownedMaterial;
     private StartMetadata m_start;
     private double m_phaseStartTime;
     private bool m_warned;
+
+    /// <summary>How the marker is drawn (the same pixels every way).</summary>
+    public FrameMarkerRenderMode RenderMode
+    {
+      get => m_renderMode;
+      set => m_renderMode = value;
+    }
 
     /// <summary>The game's animation clock in seconds. Null = Time.timeAsDouble.</summary>
     public Func<double> AnimationTimeProvider { get; set; }
@@ -171,6 +189,10 @@ namespace MB.FrameMarker.Unity
     {
       if (m_ownedMaterial != null)
         Destroy(m_ownedMaterial);
+      m_mainTexture?.Dispose();
+      m_syncTexture?.Dispose();
+      m_mainQuad?.Dispose();
+      m_syncQuad?.Dispose();
     }
 
     private IEnumerator DrawAtEndOfFrame()
@@ -187,10 +209,6 @@ namespace MB.FrameMarker.Unity
       UpdatePhase();
       if (Phase == MarkerPhase.Idle && !m_drawWhenIdle)
         return;
-      var material = GetMaterial();
-      if (material == null)
-        return;
-
       int width = Screen.width;
       int height = Screen.height;
       int storedHeight = m_storedHeight > 0 ? m_storedHeight : height;
@@ -211,18 +229,45 @@ namespace MB.FrameMarker.Unity
         CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks()
       );
 
-      DrawMarker(material, payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height);
+      DrawMarker(payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height, sync: false);
       if (m_syncMarker)
       {
         var sync = payload.WithKind(MarkerKind.Sync);
-        DrawMarker(material, sync, options, Marker.RecommendedOrigin(MarkerKind.Sync, width, height, options, align), width, height);
+        DrawMarker(sync, options, Marker.RecommendedOrigin(MarkerKind.Sync, width, height, options, align), width, height, sync: true);
       }
     }
 
-    private void DrawMarker(Material material, in Payload payload, in Options options, Point origin, int width, int height)
+    private void DrawMarker(in Payload payload, in Options options, Point origin, int width, int height, bool sync)
     {
       // Encode once (a start marker carries the run's metadata), then draw from the modules
       if (!m_generator.TryGenerateModules(payload, m_start, m_modules, out var matrix))
+        return;
+      if (m_renderMode == FrameMarkerRenderMode.Bitmap)
+      {
+        var texture = sync ? m_syncTexture ??= new FrameMarkerTexture() : m_mainTexture ??= new FrameMarkerTexture();
+        if (texture.Update(matrix, options.QuietZoneModules))
+          texture.DrawNow(options, origin, width, height);
+        return;
+      }
+      if (m_renderMode == FrameMarkerRenderMode.Shader)
+      {
+        var quad = sync ? m_syncQuad ??= new FrameMarkerQuad() : m_mainQuad ??= new FrameMarkerQuad();
+        if (quad.Update(matrix, options, origin, height))
+        {
+          quad.DrawNow(width);
+          return;
+        }
+        if (!m_shaderWarned)
+        {
+          Debug.LogWarning(
+            $"FrameMarkerOverlay: shader {FrameMarkerQuad.ShaderName} is not available (it needs shader model 3.5; in player builds add it to 'Always Included Shaders'). Drawing geometry instead.",
+            this
+          );
+          m_shaderWarned = true;
+        }
+      }
+      var material = GetMaterial();
+      if (material == null)
         return;
       int count = Marker.ModulesToQuads(matrix, options, origin, m_quads);
       FrameMarkerGL.DrawQuads(material, m_quads.AsSpan(0, count), width, height);

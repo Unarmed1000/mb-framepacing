@@ -4,8 +4,10 @@
 //* Runs inside a real Unity editor (batch mode) on a throw-away project created by marker/unity/check_in_unity.py:
 //*   - the package compiles in Unity (the C# version and API level Unity uses),
 //*   - the core library produces the C++ module matrices (test-data/markers/modules.csv) on Unity's scripting runtime,
-//*   - FrameMarkerGL (the overlay's drawing) and FrameMarkerMesh (command buffer drawing) render pixel exact: the pixels read back from a
-//*     render texture must equal the marker's quads, including the y flip;
+//*   - every drawing method renders pixel exact: FrameMarkerGL (the overlay's geometry), FrameMarkerMesh (the static grid with per-frame
+//*     indices, through a command buffer), FrameMarkerTexture (the module bitmap scaled up) and FrameMarkerQuad (the dedicated shader, with
+//*     GL and through a command buffer). The pixels read back from a render texture must equal the marker's quads, including the y flip,
+//*     for frame, start, end and sync markers at several module sizes and odd origins;
 //*   - FrameMarkerTexture holds the module-resolution bitmap, bottom row first as Unity textures are.
 //* Exits the editor with 0 when everything passed.
 //*
@@ -34,8 +36,8 @@ public static class FrameMarkerUnityCheck
     try
     {
       failures += CheckModuleDigest(Environment.GetEnvironmentVariable("MB_FRAMEMARKER_TEST_DATA"));
-      failures += CheckRendering(useMesh: false);
-      failures += CheckRendering(useMesh: true);
+      foreach (var method in new[] { "FrameMarkerGL", "FrameMarkerMesh", "FrameMarkerTexture", "FrameMarkerQuad GL", "FrameMarkerQuad mesh" })
+        failures += CheckRendering(method);
       failures += CheckTexture();
     }
     catch (Exception ex)
@@ -84,80 +86,157 @@ public static class FrameMarkerUnityCheck
     return mismatches == 0 ? 0 : 1;
   }
 
-  private static int CheckRendering(bool useMesh)
+  private static int CheckRendering(string method)
   {
-    string name = useMesh ? "FrameMarkerMesh" : "FrameMarkerGL";
-    var payload = new Payload(4242, 9_876_543, 7);
-    var options = new Options(3, 4);
-    var origin = new Point(17, 23);
-    var quads = new Quad[Marker.MaxQuadCount];
+    var cases = new[]
+    {
+      (Payload: new Payload(4242, 9_876_543, 7), Start: default(StartMetadata), Options: new Options(3, 4), Origin: new Point(17, 23)),
+      (
+        new Payload(77, 1_234, 7, MarkerKind.SequenceStart),
+        new StartMetadata(638_000_000_000_000_000, new SequenceId(1, 2)),
+        new Options(1, 0),
+        new Point(33, 7)
+      ),
+      (new Payload(99, 5, 7, MarkerKind.SequenceEnd), default(StartMetadata), new Options(2, 2), new Point(151, 41)),
+      (new Payload(4242, 0, 0, MarkerKind.Sync), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
+    };
+    int failures = 0;
+    var generator = new MarkerGenerator();
+    var previous = new byte[Marker.MaxPackedModuleByteCount];
     var bits = new byte[Marker.MaxPackedModuleByteCount];
-    if (!new MarkerGenerator().TryGenerateModules(payload, bits, out var matrix))
-      throw new InvalidOperationException("TryGenerateModules failed");
-    int quadCount = Marker.ModulesToQuads(matrix, options, origin, quads);
-
     var material = FrameMarkerGL.CreateMaterial();
-    var target = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-    target.Create();
-    var readback = new Texture2D(Width, Height, TextureFormat.RGBA32, false, true);
-    var previous = RenderTexture.active;
     FrameMarkerMesh mesh = null;
+    FrameMarkerTexture texture = null;
+    FrameMarkerQuad quad = null;
     try
     {
-      if (useMesh)
+      for (int c = 0; c < cases.Length; ++c)
       {
-        // A first marker sets the static grid; the checked one reuses it and only changes the indices
-        mesh = new FrameMarkerMesh();
-        var first = new byte[Marker.MaxPackedModuleByteCount];
-        if (
-          !new MarkerGenerator().TryGenerateModules(new Payload(1, 2, 3), first, out var firstMatrix)
-          || !mesh.Update(firstMatrix, options, origin, Height)
-        )
-          throw new InvalidOperationException("FrameMarkerMesh.Update failed");
-        if (!mesh.Update(matrix, options, origin, Height))
-          throw new InvalidOperationException("FrameMarkerMesh.Update failed");
-        var commands = new CommandBuffer { name = "FrameMarkerUnityCheck" };
-        commands.SetRenderTarget(target);
-        commands.ClearRenderTarget(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
-        commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Width, Height));
-        commands.DrawMesh(mesh.Mesh, Matrix4x4.identity, material, 0, 0);
-        Graphics.ExecuteCommandBuffer(commands);
-        commands.Release();
-        RenderTexture.active = target;
+        var (payload, start, options, origin) = cases[c];
+        if (!generator.TryGenerateModules(payload, start, bits, out var matrix))
+          throw new InvalidOperationException("TryGenerateModules failed");
+        var quads = new Quad[Marker.MaxQuadCount];
+        int quadCount = Marker.ModulesToQuads(matrix, options, origin, quads);
+        var target = BeginRender();
+        {
+          switch (method)
+          {
+            case "FrameMarkerGL":
+              GL.Clear(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
+              FrameMarkerGL.DrawQuads(material, quads.AsSpan(0, quadCount), Width, Height);
+              break;
+            case "FrameMarkerMesh":
+            {
+              // A first marker sets the static grid; the checked one reuses it and only changes the indices
+              mesh ??= new FrameMarkerMesh();
+              if (
+                !generator.TryGenerateModules(
+                  payload.WithKind(payload.Kind == MarkerKind.Sync ? MarkerKind.Sync : MarkerKind.Frame),
+                  previous,
+                  out var first
+                )
+                || !mesh.Update(first, options, origin, Height)
+                || !mesh.Update(matrix, options, origin, Height)
+              )
+                throw new InvalidOperationException("FrameMarkerMesh.Update failed");
+              DrawWithCommands(target, mesh.Mesh, material);
+              break;
+            }
+            case "FrameMarkerTexture":
+              texture ??= new FrameMarkerTexture();
+              if (!texture.Update(matrix, options.QuietZoneModules))
+                throw new InvalidOperationException("FrameMarkerTexture.Update failed");
+              GL.Clear(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
+              texture.DrawNow(options, origin, Width, Height);
+              break;
+            default:
+              quad ??= new FrameMarkerQuad();
+              if (!quad.Update(matrix, options, origin, Height))
+                throw new InvalidOperationException("FrameMarkerQuad.Update failed (shader not available?)");
+              if (method == "FrameMarkerQuad GL")
+              {
+                GL.Clear(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
+                quad.DrawNow(Width);
+              }
+              else
+              {
+                DrawWithCommands(target, quad.Mesh, quad.Material);
+              }
+              break;
+          }
+        }
+        var pixels = EndRender(target);
+        failures += Compare($"{method} case {c} ({payload.Kind}, {options.ModuleSizePx} px)", quads, quadCount, pixels);
       }
-      else
-      {
-        RenderTexture.active = target;
-        GL.Clear(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
-        FrameMarkerGL.DrawQuads(material, quads.AsSpan(0, quadCount), Width, Height);
-      }
-      readback.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
-      readback.Apply();
     }
     finally
     {
-      RenderTexture.active = previous;
       mesh?.Dispose();
-      target.Release();
-      UnityEngine.Object.DestroyImmediate(target);
+      texture?.Dispose();
+      quad?.Dispose();
       UnityEngine.Object.DestroyImmediate(material);
     }
+    Debug.Log(
+      $"FrameMarkerUnityCheck: {method} rendering {(failures == 0 ? "pixel exact" : $"{failures} cases differ")} ({SystemInfo.graphicsDeviceType})"
+    );
+    return failures == 0 ? 0 : 1;
+  }
 
-    // Expected: the quads painted in order, pixel (x, y) covered when Left <= x < Right and Top <= y < Bottom (top-left origin)
+  private static void DrawWithCommands(RenderTexture target, Mesh mesh, Material material)
+  {
+    var commands = new CommandBuffer { name = "FrameMarkerUnityCheck" };
+    commands.SetRenderTarget(target);
+    commands.ClearRenderTarget(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
+    commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Width, Height));
+    commands.DrawMesh(mesh, Matrix4x4.identity, material, 0, 0);
+    Graphics.ExecuteCommandBuffer(commands);
+    commands.Release();
+  }
+
+  /// <summary>A fresh render texture, made the active one to draw into.</summary>
+  private static RenderTexture BeginRender()
+  {
+    var target = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+    target.Create();
+    RenderTexture.active = target;
+    return target;
+  }
+
+  /// <summary>The render texture's pixels (rows bottom up, as Unity textures are); releases it.</summary>
+  private static Color32[] EndRender(RenderTexture target)
+  {
+    var readback = new Texture2D(Width, Height, TextureFormat.RGBA32, false, true);
+    try
+    {
+      RenderTexture.active = target;
+      readback.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+      readback.Apply();
+      return readback.GetPixels32();
+    }
+    finally
+    {
+      RenderTexture.active = null;
+      target.Release();
+      UnityEngine.Object.DestroyImmediate(target);
+      UnityEngine.Object.DestroyImmediate(readback);
+    }
+  }
+
+  /// <summary>The pixels must equal the quads painted in order, pixel (x, y) covered when Left &lt;= x &lt; Right and Top &lt;= y &lt; Bottom.</summary>
+  private static int Compare(string name, Quad[] quads, int quadCount, Color32[] pixels)
+  {
     var expected = new int[Width * Height];
     for (int i = 0; i < expected.Length; ++i)
       expected[i] = -1;
     for (int q = 0; q < quadCount; ++q)
     {
-      for (int y = quads[q].Top; y < quads[q].Bottom; ++y)
+      for (int y = Math.Max(quads[q].Top, 0); y < Math.Min(quads[q].Bottom, Height); ++y)
       {
-        for (int x = quads[q].Left; x < quads[q].Right; ++x)
+        for (int x = Math.Max(quads[q].Left, 0); x < Math.Min(quads[q].Right, Width); ++x)
           expected[(y * Width) + x] = quads[q].Dark ? 0 : 255;
       }
     }
-
     int differences = 0;
-    var pixels = readback.GetPixels32();
     for (int y = 0; y < Height; ++y)
     {
       for (int x = 0; x < Width; ++x)
@@ -166,16 +245,12 @@ public static class FrameMarkerUnityCheck
         // Texture rows start at the bottom
         int got = pixels[((Height - 1 - y) * Width) + x].r;
         bool ok = want < 0 ? got > 0 && got < 255 : got == want;
-        if (!ok && ++differences <= 5)
+        if (!ok && ++differences <= 3)
           Debug.LogError(
             $"FrameMarkerUnityCheck: {name} pixel ({x}, {y}) is {got}, expected {(want < 0 ? "background" : want.ToString(CultureInfo.InvariantCulture))}"
           );
       }
     }
-    UnityEngine.Object.DestroyImmediate(readback);
-    Debug.Log(
-      $"FrameMarkerUnityCheck: {name} rendering {(differences == 0 ? "pixel exact" : $"{differences} pixels differ")} ({SystemInfo.graphicsDeviceType})"
-    );
     return differences == 0 ? 0 : 1;
   }
 

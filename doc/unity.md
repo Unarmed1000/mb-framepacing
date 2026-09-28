@@ -85,15 +85,16 @@ comes from Unity.
 
 ## Settings
 
-| Setting                 | Meaning                                                                                                                           |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Stored Height           | Height of the frames the capture tool stores; picks the module size. 0 = the output height                                        |
-| MJPEG                   | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                                          |
-| Module Size Px          | Fixed module size in output pixels (overrides Stored Height)                                                                      |
-| Sync Marker             | Also draw the small sync marker at the bottom left: it detects tearing, and camera capture needs it for its timing                |
-| Draw When Idle          | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus                             |
-| Material                | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored                     |
-| Sequence Marker Seconds | How long the start and end markers stay on screen (default 0.1 s: three frames of a 30 fps capture; one captured frame is enough) |
+| Setting                 | Meaning                                                                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stored Height           | Height of the frames the capture tool stores; picks the module size. 0 = the output height                                                                                                          |
+| MJPEG                   | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                                                                                                            |
+| Module Size Px          | Fixed module size in output pixels (overrides Stored Height)                                                                                                                                        |
+| Sync Marker             | Also draw the small sync marker at the bottom left: it detects tearing, and camera capture needs it for its timing                                                                                  |
+| Draw When Idle          | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus                                                                                               |
+| Material                | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored                                                                                       |
+| Render Mode             | How it is drawn, the same pixels every way: Geometry (quads, the default), Bitmap (a module texture scaled up) or Shader (one quad with a dedicated shader, shader model 3.5); `RenderMode` in code |
+| Sequence Marker Seconds | How long the start and end markers stay on screen (default 0.1 s: three frames of a 30 fps capture; one captured frame is enough)                                                                   |
 
 ## How it draws, and the rules
 
@@ -104,10 +105,12 @@ apply:
 - **Last in the frame:** nothing may be drawn over or blended with the marker.
 - **HDR output off:** tone mapping would change its black and white. The overlay warns once when HDR output is active (Unity 2023.1+).
 - **Pixel exact:** vertices lie on pixel corners and map 1:1 to output pixels, no half-pixel offset.
-- **Player builds:** the default material uses the built-in shader `Hidden/Internal-Colored`. If the marker is missing in a build,
-  add the shader under **Project Settings → Graphics → Always Included Shaders**, or assign a material.
+- **Player builds:** the default material uses the built-in shader `Hidden/Internal-Colored`, the Shader render mode
+  `Hidden/MB/FrameMarkerQuad`. If the marker is missing in a build, add the shader under **Project Settings → Graphics → Always
+  Included Shaders**, or assign a material. Without the dedicated shader (or shader model 3.5) the Shader mode warns once and draws
+  geometry.
 
-Nothing is allocated per frame: the generator, the quad buffer and the material are created once.
+Nothing is allocated per frame: the generator, the buffers, the textures and the materials are created once.
 
 ## Drawing it from your own pipeline code
 
@@ -135,6 +138,11 @@ commands.DrawMesh(markerMesh.Mesh, Matrix4x4.identity, material);
 ```
 
 `FrameMarkerGL.DrawQuads` draws marker quads with GL immediate mode into the current render target, the way the overlay does.
+
+`FrameMarkerQuad` draws the marker as one opaque quad with the dedicated shader `Hidden/MB/FrameMarkerQuad`: per frame only a 41×41
+module texture changes. `quad.Update(matrix, options, origin, Screen.height)`, then `quad.DrawNow(Screen.width)` (GL immediate mode) or
+draw `quad.Mesh` with `quad.Material` from a command buffer with `PixelSpace.Projection`. It needs shader model 3.5 (`Material` is null
+without it).
 
 `FrameMarkerTexture` keeps a `Texture2D` with the marker at module resolution (one texel per module, quiet zone included) for UI or
 anything that shows an image (`RawImage`, `Graphics.DrawTexture`, a material): `texture.Update(matrix)`. Draw it scaled up by a whole
@@ -169,10 +177,14 @@ matrix can feed several.
   (no window) on a throw-away project. It checks that:
   - the package compiles, without warnings;
   - the core library reproduces all 512 C++ module matrices on Unity's scripting runtime;
-  - `FrameMarkerGL` (the overlay's drawing) and `FrameMarkerMesh` (command buffer drawing) render pixel exact into a render texture,
-    including the y flip.
+  - every drawing method renders pixel exact into a render texture, including the y flip: `FrameMarkerGL` (the Geometry mode),
+    `FrameMarkerMesh` (the static grid with per-frame indices, through a command buffer), `FrameMarkerTexture` (the Bitmap mode) and
+    `FrameMarkerQuad` (the Shader mode, with GL and through a command buffer), for frame, start, end and sync markers at several module
+    sizes and origins;
+  - `FrameMarkerTexture` holds the module bitmap. `--graphics d3d11|d3d12|glcore|vulkan|metal` forces a graphics API.
 
-  Passed with Unity 6000.3.24f1 and 6000.6.2f1 on Windows (Direct3D 11).
+  Passed with Unity 6000.3.24f1 and 6000.6.2f1 on Windows (Direct3D 11), and 6000.6.3f1 on Windows with Direct3D 11, OpenGL Core and
+  Vulkan.
 
 - **Not verified yet:**
   - the overlay's end-of-frame drawing in a running game and in player builds, with URP and HDRP;

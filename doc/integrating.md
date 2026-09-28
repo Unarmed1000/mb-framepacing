@@ -116,6 +116,50 @@ The same matrix draws in other forms; one encode can feed several:
   the same bytes, since the marker is black and white). With `ModuleSizePx` 1 and origin (0, 0) it is a module-resolution image: a
   texture to draw scaled up by a whole number with point filtering.
 - **`ModuleMatrix::Bits()`:** the packed bits themselves (1 bit per module, row-major, most significant bit first).
+- **A dedicated shader:** one opaque quad whose fragment shader looks its module up in a 41×41 texture; below.
+
+### A dedicated shader
+
+Draw one quad covering the marker (`MarkerSizePx(options, kind)` pixels square at the origin) and give each corner the marker-local pixel
+coordinate as its texture coordinate: (0, 0) top-left, (size, size) bottom-right, +y down, whatever your API's y axis. Every fragment then
+gets `(px + 0.5, py + 0.5)`, and `floor(uv / ModuleSizePx)` is exact on every platform. The module texture is `ModulesToBitmap(matrix,
+{1, 0}, {0, 0}, texels, 41, 41, PixelFormat::Gray8)` uploaded as a 41×41 single channel texture (R8, no filtering, no mip maps), row 0
+the symbol's top row; per frame only these 1681 bytes change. A sync marker uses the top-left 25×25 of it.
+
+```hlsl
+Texture2D<float> Modules;   // 41 x 41, R8
+cbuffer Marker { float ModuleSizePx; float QuietZoneModules; float Size; }   // Size: 41, or 25 for the sync marker
+
+float4 MarkerFragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+{
+  int2 module = int2(floor(uv / ModuleSizePx)) - int(QuietZoneModules);
+  float luma = 1.0;
+  if (all(module >= 0) && all(module < int(Size)))
+    luma = Modules.Load(int3(module, 0)) < 0.5 ? 0.0 : 1.0;
+  return float4(luma, luma, luma, 1.0);
+}
+```
+
+```glsl
+uniform sampler2D modules;   // 41 x 41, R8
+uniform float moduleSizePx;
+uniform float quietZoneModules;
+uniform float size;          // 41, or 25 for the sync marker
+in vec2 uv;
+out vec4 color;
+
+void main()
+{
+  ivec2 module = ivec2(floor(uv / moduleSizePx)) - int(quietZoneModules);
+  float luma = 1.0;
+  if (all(greaterThanEqual(module, ivec2(0))) && all(lessThan(module, ivec2(int(size)))))
+    luma = texelFetch(modules, module, 0).r < 0.5 ? 0.0 : 1.0;
+  color = vec4(luma, luma, luma, 1.0);
+}
+```
+
+Draw it opaque, without blending, depth test or culling. `Load` and `texelFetch` read the texel row as uploaded, so the texture needs no
+flip on any API. Unity's package ships this shader (`Hidden/MB/FrameMarkerQuad`, [Unity](unity.md)).
 
 Triangles are `(TL, TR, BL) (BL, TR, BR)`, clockwise on screen. Size your buffers with the `Max…Count()` functions; they fit every
 marker kind.

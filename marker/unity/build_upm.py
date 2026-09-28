@@ -39,6 +39,7 @@ META_IMPORTERS = {
     ".asmdef": "AssemblyDefinitionImporter:\n  externalObjects: {}\n",
     ".json": "PackageManifestImporter:\n  externalObjects: {}\n",
     ".md": "TextScriptImporter:\n  externalObjects: {}\n",
+    ".shader": "ShaderImporter:\n  externalObjects: {}\n  defaultTextures: []\n  nonModifiableTextures: []\n",
 }
 META_FOOTER = "  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
 

@@ -58,6 +58,21 @@ namespace MB.FrameMarker.Unity
       return true;
     }
 
+    /// <summary>
+    /// Draw the texture now into the current render target (<paramref name="outputWidth"/> x <paramref name="outputHeight"/> pixels), scaled
+    /// by the module size with its top-left corner at <paramref name="origin"/>: exactly the pixels the geometry would cover.
+    /// </summary>
+    public void DrawNow(in Options options, Point origin, int outputWidth, int outputHeight)
+    {
+      if (Texture == null)
+        return;
+      int size = Texture.width * options.ModuleSizePx;
+      GL.PushMatrix();
+      GL.LoadPixelMatrix(0f, outputWidth, outputHeight, 0f);
+      Graphics.DrawTexture(new Rect(origin.X, origin.Y, size, size), Texture);
+      GL.PopMatrix();
+    }
+
     public void Dispose() => DestroyTexture();
 
     private void DestroyTexture()
