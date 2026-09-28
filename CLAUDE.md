@@ -215,7 +215,7 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
-  `ModulesToIndexed` or `ModulesToBitmap`. C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
+  `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
   value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**
   - hand-maintained SDK csproj files (no FslBuild or MB.gen);

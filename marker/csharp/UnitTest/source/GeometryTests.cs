@@ -351,5 +351,58 @@ namespace MB.FrameMarker.UnitTest
         Is.EqualTo((1, 3, 4))
       );
     }
+
+    [Test]
+    public void Grid_VertexCountsFit16BitIndices()
+    {
+      Assert.That(Marker.GridVertexCount(MarkerKind.Frame), Is.EqualTo(1768));
+      Assert.That(Marker.GridVertexCount(MarkerKind.Sync), Is.EqualTo(680));
+      Assert.That(Marker.MaxGridVertexCount, Is.EqualTo(1768));
+    }
+
+    [Test]
+    public void Grid_ResolvedIndices_EqualTheIndexedTrianglesTriangleByTriangle()
+    {
+      const int BaseVertex = 100;
+      var payloads = new[]
+      {
+        new Payload(1, 2, 3),
+        new Payload(99, -5, 1, MarkerKind.SequenceEnd),
+        new Payload(7, 0, 0, MarkerKind.Sync),
+        new Payload(ulong.MaxValue, 1, 2, MarkerKind.Frame, 3, 4, 5, 6),
+        new Payload(5, 6, 7, MarkerKind.SequenceStart),
+      };
+      foreach (var payload in payloads)
+      {
+        foreach (var options in new[] { new Options(1, 0), new Options(3, 4), new Options(6, 2) })
+        {
+          var origin = new Point(17, 23);
+          var grid = new Vertex[Marker.MaxGridVertexCount];
+          Assert.That(Marker.GridVertices(payload.Kind, options, origin, grid), Is.EqualTo(Marker.GridVertexCount(payload.Kind)));
+          var gridIndices = new int[Marker.MaxIndexCount];
+          int gridCount = Marker.ModulesToGridIndices(TestMarkers.Encode(payload), gridIndices, BaseVertex);
+          var vertices = new Vertex[Marker.MaxIndexedVertexCount];
+          var indices = new int[Marker.MaxIndexCount];
+          var count = Marker.ModulesToIndexed(TestMarkers.Encode(payload), options, origin, vertices, indices, BaseVertex);
+          Assert.That(gridCount, Is.EqualTo(count.IndexCount), $"{payload}");
+          for (int i = 0; i < gridCount; ++i)
+            Assert.That(
+              grid[gridIndices[i] - BaseVertex],
+              Is.EqualTo(vertices[indices[i] - BaseVertex]),
+              $"{payload}, module {options.ModuleSizePx}: index {i}"
+            );
+        }
+      }
+    }
+
+    [Test]
+    public void Grid_InvalidOptionsOrSmallBuffers_GiveNothing()
+    {
+      Assert.That(Marker.GridVertices(MarkerKind.Frame, new Options(0), default, new Vertex[Marker.MaxGridVertexCount]), Is.Zero);
+      Assert.That(Marker.GridVertices(MarkerKind.Frame, Options.Default, default, new Vertex[1767]), Is.Zero);
+      Assert.That(Marker.GridVertices(MarkerKind.Sync, Options.Default, default, new Vertex[680]), Is.EqualTo(680));
+      Assert.That(Marker.ModulesToGridIndices(TestMarkers.Encode(new Payload(1, 2, 3)), new int[12]), Is.Zero);
+      Assert.That(Marker.ModulesToGridIndices(default, new int[12]), Is.Zero);
+    }
   }
 }

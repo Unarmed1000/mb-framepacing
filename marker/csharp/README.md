@@ -58,6 +58,7 @@ Buffers are spans: `ReadOnlySpan<T>` in, `Span<T>` out; an array or a `stackallo
 | `Options`, `Point`                                                                                                    | Size and place                                                                       |
 | `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                       | Encode the marker into your bytes: its QR symbol, 1 bit per module                   |
 | `Marker.ModulesToTriangles`, `ModulesToIndexed`, `ModulesToQuads`                                                     | Draw it as a triangle list, indexed triangles or quads                               |
+| `Marker.GridVertices`, `GridVertexCount`, `ModulesToGridIndices`                                                      | A static grid uploaded once, and per frame only the indices                          |
 | `Marker.ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
 | `Marker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
 | `Marker.MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |

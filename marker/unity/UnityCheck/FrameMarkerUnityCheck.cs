@@ -106,7 +106,14 @@ public static class FrameMarkerUnityCheck
     {
       if (useMesh)
       {
+        // A first marker sets the static grid; the checked one reuses it and only changes the indices
         mesh = new FrameMarkerMesh();
+        var first = new byte[Marker.MaxPackedModuleByteCount];
+        if (
+          !new MarkerGenerator().TryGenerateModules(new Payload(1, 2, 3), first, out var firstMatrix)
+          || !mesh.Update(firstMatrix, options, origin, Height)
+        )
+          throw new InvalidOperationException("FrameMarkerMesh.Update failed");
         if (!mesh.Update(matrix, options, origin, Height))
           throw new InvalidOperationException("FrameMarkerMesh.Update failed");
         var commands = new CommandBuffer { name = "FrameMarkerUnityCheck" };

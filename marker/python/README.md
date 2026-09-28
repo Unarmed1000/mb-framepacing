@@ -63,6 +63,7 @@ The same API as the C# library (`MB.FrameMarker`), in Python's naming:
 | `modules_to_bitmap`, `PixelFormat`                                               | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                   |
 | `modules_to_quads`                                                               | Draw it as quads: the light background, then one dark quad per run of modules |
 | `modules_to_triangles`, `modules_to_indexed`                                     | Draw it as a triangle list or indexed triangles, for a GPU                    |
+| `grid_vertices`, `grid_vertex_count`, `modules_to_grid_indices`                  | A static grid uploaded once, and per frame only the indices                   |
 | `marker_size_px`, `qr_module_count_for`, `recommended_origin`                    | Sizing and placement                                                          |
 | `minimum_module_size_px`, `recommend_module_size_px`                             | Module size for a capture's scaling                                           |
 | `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks` | The wire format and its time units                                            |

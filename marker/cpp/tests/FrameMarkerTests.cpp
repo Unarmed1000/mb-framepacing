@@ -1030,3 +1030,63 @@ TEST(Bitmap, BytesPerPixel)
   EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Rgb24), 3);
   EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Rgba32), 4);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// The static grid and the per-frame grid indices
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(Grid, VertexCountsFit16BitIndices)
+{
+  EXPECT_EQ(FM::GridVertexCount(FM::MarkerKind::Frame), 1768u);
+  EXPECT_EQ(FM::GridVertexCount(FM::MarkerKind::SequenceStart), 1768u);
+  EXPECT_EQ(FM::GridVertexCount(FM::MarkerKind::Sync), 680u);
+  EXPECT_EQ(FM::MaxGridVertexCount(), 1768u);
+  EXPECT_LT(FM::MaxGridVertexCount(), 65536u);
+}
+
+TEST(Grid, ResolvedIndicesEqualTheIndexedTrianglesTriangleByTriangle)
+{
+  constexpr uint32_t BaseVertex = 100u;
+  const std::array<FM::Payload, 5> payloads{{
+    {1u, 2, 3u, FM::MarkerKind::Frame},
+    {99u, -5, 1u, FM::MarkerKind::SequenceEnd},
+    {7u, 0, 0u, FM::MarkerKind::Sync},
+    {0xFFFFFFFFFFFFFFFFu, 1, 2u, FM::MarkerKind::Frame, 3, 4u, 5, 6u},
+    {5u, 6, 7u, FM::MarkerKind::SequenceStart},
+  }};
+  for (const FM::Payload& payload : payloads)
+  {
+    for (const FM::Options options : {FM::Options{1, 0}, FM::Options{3, 4}, FM::Options{6, 2}})
+    {
+      SCOPED_TRACE(testing::Message() << testing::PrintToString(payload) << ", module " << options.ModuleSizePx);
+      const FM::Point origin{17, 23};
+      const FM::ModuleMatrix matrix = Encode(payload);
+      std::vector<FM::Vertex> grid(FM::MaxGridVertexCount());
+      ASSERT_EQ(FM::GridVertices(payload.Kind, options, origin, grid), FM::GridVertexCount(payload.Kind));
+      std::vector<uint32_t> gridIndices(FM::MaxIndexCount());
+      gridIndices.resize(FM::ModulesToGridIndices(matrix, gridIndices, BaseVertex));
+      ASSERT_FALSE(gridIndices.empty());
+
+      std::vector<FM::Vertex> vertices(FM::MaxIndexedVertexCount());
+      std::vector<uint32_t> indices(FM::MaxIndexCount());
+      const FM::IndexedCount count = FM::ModulesToIndexed(matrix, options, origin, vertices, indices, BaseVertex);
+      indices.resize(count.IndexCount);
+      ASSERT_EQ(gridIndices.size(), indices.size());
+      for (std::size_t i = 0; i < indices.size(); ++i)
+      {
+        ASSERT_EQ(grid[gridIndices[i] - BaseVertex], vertices[indices[i] - BaseVertex]) << "index " << i;
+      }
+    }
+  }
+}
+
+TEST(Grid, InvalidOptionsOrSmallBuffersGiveNothing)
+{
+  std::vector<FM::Vertex> grid(FM::MaxGridVertexCount());
+  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {0, 4}, {}, grid), 0u);
+  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {}, {}, std::span<FM::Vertex>(grid).first(1767)), 0u);
+  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Sync, {}, {}, std::span<FM::Vertex>(grid).first(680)), 680u);
+  std::array<uint32_t, 12> indices{};
+  EXPECT_EQ(FM::ModulesToGridIndices(Encode({1u, 2, 3u}), indices), 0u);
+  EXPECT_EQ(FM::ModulesToGridIndices(FM::ModuleMatrix{}, indices), 0u);
+}

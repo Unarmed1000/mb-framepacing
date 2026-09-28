@@ -126,6 +126,9 @@ Marker size in source pixels = `(modules + 2 × QuietZoneModules) × ModuleSizeP
   - `ModulesToTriangles`: 6 vertices per quad, (TL, TR, BL) (BL, TR, BR). `ModulesToIndexed`: 4 vertices (TL, TR, BR, BL) and 6
     indices (0,1,3)(3,1,2) per quad. Both wind clockwise on screen (+y down): disable back-face culling for the marker draw, or pick the
     cull mode that matches. Size caller buffers with `MaxTriangleVertexCount()`, `MaxIndexedVertexCount()` and `MaxIndexCount()`.
+  - `GridVertices` and `ModulesToGridIndices`: a static grid of every module corner (vertex 4 + row × (N + 1) + column, after the 4
+    background corners) and, per frame, only the indices: the background (0,1,3)(3,1,2), then (TL, TR, BL) (BL, TR, BR) of each dark
+    run's corners.
   - `ModulesToBitmap`: the same pixels, drawn into a grey, RGB or RGBA pixel buffer (0 or 255 in every colour channel, alpha 255).
 
 ### Renderer rules

@@ -112,7 +112,8 @@ Nothing is allocated per frame: the generator, the quad buffer and the material 
 ## Drawing it from your own pipeline code
 
 To draw the marker yourself (a URP renderer feature, an HDRP custom pass, a `CommandBuffer`), encode it with a `MarkerGenerator` and
-give the matrix to `FrameMarkerMesh`. It keeps a `Mesh` with the current marker in Unity screen pixels:
+give the matrix to `FrameMarkerMesh`. It keeps a `Mesh` with the current marker in Unity screen pixels: a static grid of vertices, set
+again only when the size, options, origin or output height change, and per frame only the indices of the dark modules:
 
 ```csharp
 using MB.FrameMarker;

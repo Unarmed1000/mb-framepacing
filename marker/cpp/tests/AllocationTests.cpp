@@ -125,6 +125,7 @@ namespace
   std::array<FM::Vertex, FM::MaxTriangleVertexCount()> g_triangleVertices{};
   std::array<FM::Vertex, FM::MaxIndexedVertexCount()> g_indexedVertices{};
   std::array<uint32_t, FM::MaxIndexCount()> g_indices{};
+  std::array<FM::Vertex, FM::MaxGridVertexCount()> g_grid{};
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> g_payloadBytes{};
   std::array<uint8_t, 294u * 294u * 4u> g_pixels{};
   FM::ModuleMatrix g_matrix{};
@@ -166,6 +167,8 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       written += FM::ModulesToBitmap(g_matrix, options, {0, 0}, g_pixels, 294, 294, FM::PixelFormat::Rgba32) ? 1u : 0u;
       written += FM::ModulesToBitmap(g_startMatrix, {1, 0}, {0, 0}, g_pixels, 41, 41, FM::PixelFormat::Gray8) ? 1u : 0u;
       written += g_matrix.Bits().size();
+      written += FM::GridVertices(FM::MarkerKind::Frame, options, origin, g_grid);
+      written += FM::ModulesToGridIndices(g_matrix, g_indices, 32u);
       written += FM::GenerateModules(endPayload, g_matrix) ? 1u : 0u;
       written += FM::EncodePayload(framePayload, metadata, g_payloadBytes);
 

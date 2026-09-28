@@ -22,6 +22,7 @@ namespace MB.FrameMarker.UnitTest
     private readonly Vertex[] m_triangles = new Vertex[Marker.MaxTriangleVertexCount];
     private readonly Vertex[] m_indexedVertices = new Vertex[Marker.MaxIndexedVertexCount];
     private readonly int[] m_indices = new int[Marker.MaxIndexCount];
+    private readonly Vertex[] m_grid = new Vertex[Marker.MaxGridVertexCount];
     private readonly byte[] m_payloadBytes = new byte[Marker.MaxEncodedPayloadByteCount];
 
     private static readonly Guid g_guid = new Guid("0f8fad5b-d9cb-469f-a165-70867728950e");
@@ -60,6 +61,8 @@ namespace MB.FrameMarker.UnitTest
           written += Marker.ModulesToTriangles(matrix, options, origin, m_triangles);
           written += Marker.ModulesToIndexed(matrix, options, origin, m_indexedVertices, m_indices, 16).IndexCount;
           written += Marker.ModulesToQuads(matrix, options, origin, m_quads);
+          written += Marker.GridVertices(MarkerKind.Frame, options, origin, m_grid);
+          written += Marker.ModulesToGridIndices(matrix, m_indices, 32);
           written += Marker.ModulesToBitmap(matrix, options, default, m_pixels, 294, 294, PixelFormat.Rgba32) ? 1 : 0;
         }
         if (m_generator.TryGenerateModules(payload.WithKind(MarkerKind.SequenceStart), m_metadata, stackBits, out var start))

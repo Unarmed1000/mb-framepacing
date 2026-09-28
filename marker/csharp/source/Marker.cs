@@ -75,6 +75,9 @@ namespace MB.FrameMarker
     /// </summary>
     public const int MaxPackedModuleByteCount = ((QrModuleCount * QrModuleCount) + 7) / 8;
 
+    /// <summary>Vertices of the main marker's static grid (<see cref="GridVertices"/>): 1768; the sync marker's is 680. Both fit 16-bit indices.</summary>
+    public const int MaxGridVertexCount = 4 + ((QrModuleCount + 1) * (QrModuleCount + 1));
+
     private const int OffsetKind = 3;
     private const int OffsetFrameIndex = 4;
     private const int OffsetAnimationTicks = 12;
@@ -220,6 +223,80 @@ namespace MB.FrameMarker
 
     /// <summary>The bytes of a packed module matrix of <paramref name="size"/> x <paramref name="size"/> modules (79 for the sync marker's 25).</summary>
     public static int PackedModuleByteCount(int size) => size <= 0 ? 0 : ((size * size) + 7) / 8;
+
+    /// <summary>Vertices of a marker kind's static grid: 4 for the light background, then every module corner, (N + 1)².</summary>
+    public static int GridVertexCount(MarkerKind kind)
+    {
+      int corners = QrModuleCountFor(kind) + 1;
+      return 4 + (corners * corners);
+    }
+
+    /// <summary>
+    /// The marker's static grid, for drawing it with per-frame indices only (<see cref="ModulesToGridIndices"/>): the vertices stay the same
+    /// while the kind's symbol size, the options and the origin do. Vertices 0..3 are the light background (TL, TR, BR, BL, luma 255); then
+    /// the corners of the modules, dark (luma 0), row-major: corner (column, row) is vertex 4 + row x (N + 1) + column, N the kind's modules
+    /// per side. Returns the number of vertices written (<see cref="GridVertexCount"/>), or 0 if the options are invalid or
+    /// <paramref name="destination"/> is too small.
+    /// </summary>
+    public static int GridVertices(MarkerKind kind, in Options options, Point origin, Span<Vertex> destination)
+    {
+      int count = GridVertexCount(kind);
+      if (!IsValid(options) || destination.Length < count)
+        return 0;
+      int modules = QrModuleCountFor(kind);
+      int moduleSize = options.ModuleSizePx;
+      int markerSize = MarkerSizePx(options, kind);
+      destination[0] = new Vertex(origin.X, origin.Y, 255);
+      destination[1] = new Vertex(origin.X + markerSize, origin.Y, 255);
+      destination[2] = new Vertex(origin.X + markerSize, origin.Y + markerSize, 255);
+      destination[3] = new Vertex(origin.X, origin.Y + markerSize, 255);
+      int symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
+      int symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
+      int index = 4;
+      for (int row = 0; row <= modules; ++row)
+      {
+        for (int column = 0; column <= modules; ++column)
+          destination[index++] = new Vertex(symbolLeft + (column * moduleSize), symbolTop + (row * moduleSize), 0);
+      }
+      return count;
+    }
+
+    /// <summary>
+    /// The per-frame part of the grid drawing: the indices of the background, (0,1,3)(3,1,2), then 6 per horizontal run of dark modules,
+    /// (TL, TR, BL) (BL, TR, BR) of the run's grid corners, clockwise on screen. Use the grid of the matrix's kind.
+    /// <paramref name="baseVertex"/> is added to every index. Every marker needs at most <see cref="MaxIndexCount"/> indices. Returns the
+    /// number of indices written, or 0 if the matrix is empty or <paramref name="destination"/> is too small.
+    /// </summary>
+    public static int ModulesToGridIndices(ModuleMatrix matrix, Span<int> destination, int baseVertex = 0)
+    {
+      if (matrix.IsEmpty || destination.Length < 6)
+        return 0;
+      destination[0] = baseVertex;
+      destination[1] = baseVertex + 1;
+      destination[2] = baseVertex + 3;
+      destination[3] = baseVertex + 3;
+      destination[4] = baseVertex + 1;
+      destination[5] = baseVertex + 2;
+      int count = 6;
+      int corners = matrix.Size + 1;
+      var walker = new QuadWalker(matrix, new Options(1, 0), default);
+      walker.TryNext(out _); // the background
+      while (walker.TryNext(out var run))
+      {
+        if (destination.Length - count < 6)
+          return 0;
+        // With 1 px modules at the origin, a run's quad is its columns and row
+        int topLeft = baseVertex + 4 + (run.Top * corners) + run.Left;
+        int topRight = baseVertex + 4 + (run.Top * corners) + run.Right;
+        destination[count++] = topLeft;
+        destination[count++] = topRight;
+        destination[count++] = topLeft + corners;
+        destination[count++] = topLeft + corners;
+        destination[count++] = topRight;
+        destination[count++] = topRight + corners;
+      }
+      return count;
+    }
 
     /// <summary>Bytes per pixel of a <see cref="PixelFormat"/>.</summary>
     public static int BytesPerPixel(PixelFormat format) =>

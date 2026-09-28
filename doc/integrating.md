@@ -109,6 +109,9 @@ The same matrix draws in other forms; one encode can feed several:
 
 - **`ModulesToIndexed`:** 4 vertices and 6 indices per quad, for index buffers.
 - **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs.
+- **`GridVertices` + `ModulesToGridIndices`:** a static grid of vertices (every module corner; 1768 for the main marker, 680 for the
+  sync marker) that you upload once, and per frame only the indices of the dark runs (about 5 KB instead of about 40 KB of vertices).
+  The grid stays valid while the kind's symbol size, the options and the origin do.
 - **`ModulesToBitmap`:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA buffers take
   the same bytes, since the marker is black and white). With `ModuleSizePx` 1 and origin (0, 0) it is a module-resolution image: a
   texture to draw scaled up by a whole number with point filtering.

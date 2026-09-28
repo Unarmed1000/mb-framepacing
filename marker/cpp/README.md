@@ -71,6 +71,7 @@ Everything is declared by `<mb/framemarker/FrameMarker.hpp>` in `MB::FrameMarker
 | `Options`, `Point`                                                                                             | Size and place                                                                       |
 | `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
 | `ModulesToTriangles`, `ModulesToIndexed`, `ModulesToQuads`                                                     | Draw it as a triangle list, indexed triangles or quads, into your buffers            |
+| `GridVertices`, `GridVertexCount`, `ModulesToGridIndices`                                                      | A static grid uploaded once, and per frame only the indices                          |
 | `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
 | `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
 | `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |

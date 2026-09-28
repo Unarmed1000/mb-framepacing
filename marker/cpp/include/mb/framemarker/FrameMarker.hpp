@@ -74,6 +74,19 @@ namespace MB::FrameMarker
     return MaxQuadCount() * 6u;
   }
 
+  //! Vertices of a marker kind's static grid (GridVertices): 4 for the light background, then every module corner, (N + 1)^2. 1768 for the
+  //! main marker, 680 for the sync marker; both fit 16-bit indices.
+  constexpr std::size_t GridVertexCount(const MarkerKind kind) noexcept
+  {
+    const auto corners = static_cast<std::size_t>(QrModuleCountFor(kind)) + 1u;
+    return 4u + (corners * corners);
+  }
+
+  constexpr std::size_t MaxGridVertexCount() noexcept
+  {
+    return GridVertexCount(MarkerKind::Frame);
+  }
+
   //! Convert a wall clock time to C# DateTime UTC ticks (the StartMetadata::UtcTicks format).
   constexpr int64_t ToDateTimeTicks(const std::chrono::system_clock::time_point timePoint) noexcept
   {
@@ -165,6 +178,19 @@ namespace MB::FrameMarker
   //! Returns {0,0} if the options are invalid, the matrix is empty or a destination is too small.
   IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<Vertex> dstVertices,
                                 std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
+
+  //! The marker's static grid, for drawing it with per-frame indices only (ModulesToGridIndices): the vertices stay the same while the kind's
+  //! symbol size, the options and the origin do. Vertices 0..3 are the light background (TL, TR, BR, BL, luma 255); then the corners of
+  //! the modules, dark (luma 0), row-major: corner (column, row) is vertex 4 + row x (N + 1) + column, N the kind's modules per side. Every
+  //! vertex lies on a pixel corner. Does not allocate.
+  //! Returns the number of vertices written (GridVertexCount(kind)), or 0 if the options are invalid or dst is too small.
+  std::size_t GridVertices(MarkerKind kind, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
+
+  //! The per-frame part of the grid drawing: the indices of the background, (0,1,3)(3,1,2), then 6 per horizontal run of dark modules,
+  //! (TL, TR, BL) (BL, TR, BR) of the run's grid corners, clockwise on screen. Use the grid of the matrix's kind (a Sync matrix with the
+  //! Sync grid). baseVertex is added to every index. Every marker needs at most MaxIndexCount() indices. Does not allocate.
+  //! Returns the number of indices written, or 0 if the matrix is empty or dst is too small.
+  std::size_t ModulesToGridIndices(const ModuleMatrix& matrix, std::span<uint32_t> dst, uint32_t baseVertex = 0) noexcept;
 
   //! Bytes per pixel of a PixelFormat.
   constexpr int32_t BytesPerPixel(const PixelFormat format) noexcept

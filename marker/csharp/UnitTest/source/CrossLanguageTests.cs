@@ -88,6 +88,19 @@ namespace MB.FrameMarker.UnitTest
     }
 
     [TestCaseSource(nameof(Golden))]
+    public void GoldenImage_FromTheGrid(GoldenMarker golden)
+    {
+      var kind = golden.Payload.Kind == MarkerKind.Sync ? MarkerKind.Sync : MarkerKind.Frame;
+      var grid = new Vertex[Marker.MaxGridVertexCount];
+      var indices = new int[Marker.MaxIndexCount];
+      Assert.That(Marker.GridVertices(kind, golden.Options, golden.Origin, grid), Is.GreaterThan(0));
+      int count = Marker.ModulesToGridIndices(TestMarkers.Encode(golden.Payload, golden.Start), indices);
+      Assert.That(count, Is.GreaterThan(0));
+      var expanded = SoftwareRaster.Expand(grid, indices, count, 0);
+      AssertMatchesGolden(golden, SoftwareRaster.Triangles(expanded, golden.Width, golden.Height));
+    }
+
+    [TestCaseSource(nameof(Golden))]
     public void GoldenImage_FromTheBitmap(GoldenMarker golden)
     {
       var pixels = new byte[golden.Width * golden.Height];
