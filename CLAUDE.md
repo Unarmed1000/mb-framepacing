@@ -46,8 +46,7 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
 ```
 
 - **mb-quality**
-  - It lives in `../mb-quality` (`mb-quality.cmd`); its config is the root `.mb-quality.json`, and the CSharpier tool manifest is
-    `.config/dotnet-tools.json`.
+  - It is on the PATH; its config is the root `.mb-quality.json`, and the CSharpier tool manifest is `.config/dotnet-tools.json`.
   - It only checks folders that contain a solution and takes the `*.csproj` files next to it. So **every project folder has its own
     one-line `.slnx`**; keep them when adding a project. The root `mb-framepacing.slnx` is the IDE solution.
   - A run that reports "0 projects" means a project folder is missing its `.slnx`.
@@ -80,8 +79,8 @@ python -m unittest discover -s data/python -t data/python    # the Python data l
     `marker/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
   - CI runs it with `--check`.
   - `marker/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode (every drawing method pixel exact; `--graphics
-glcore|vulkan|d3d12` forces another graphics API); Unity editors are installed on this machine under
-    `C:/Program Files/Unity/Hub/Editor`. Run it after changing the core or the helpers.
+glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Unity Hub installed, or `--unity`. Run it after changing
+    the core or the helpers.
   - The core must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
     APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
 - **Standalone release archive:** `marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release
@@ -219,10 +218,9 @@ glcore|vulkan|d3d12` forces another graphics API); Unity editors are installed o
   `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
   value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**
-  - hand-maintained SDK csproj files (no FslBuild or MB.gen);
+  - hand-maintained SDK csproj files;
   - package versions only in the root `Directory.Packages.props`;
-  - C# style follows the sibling mb-tools repos: a boxed file header, 2-space indent, block namespaces, `m_`/`g_` field prefixes,
-    CSharpier (`.csharpierrc`, width 150).
+  - C# style: a boxed file header, 2-space indent, block namespaces, `m_`/`g_` field prefixes, CSharpier (`.csharpierrc`, width 150).
 - **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored, GoogleTest
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):

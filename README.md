@@ -401,7 +401,7 @@ This is the developer summary. Requirements: the .NET 10 SDK, CMake 4.0+ with a 
 AppleClang 15+), Python 3, and Node.js for formatting the docs.
 
 ```sh
-# .NET: libraries, command line tool, GUI and tests (mb-quality from the mb-tools collection, or plain dotnet)
+# .NET: libraries, command line tool, GUI and tests
 mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 

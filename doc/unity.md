@@ -20,7 +20,7 @@ https://github.com/Unarmed1000/mb-framepacing.git#upm/v0.1.0
 install it with **Add package from disk** (select its `package.json`):
 
 ```sh
-python marker/unity/build_upm.py --output ../mb-framemarker-upm
+python marker/unity/build_upm.py --output <folder>
 ```
 
 ## Quick start

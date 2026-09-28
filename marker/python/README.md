@@ -79,7 +79,7 @@ python -m unittest discover -s marker/python -t marker/python
 ```
 
 The golden images are found by walking up to `test-data/markers`, or from the `MB_FRAMEMARKER_TEST_DATA` environment variable;
-without them those tests are skipped (a copy of the library in another repository).
+without them those tests are skipped (a copy of the library on its own).
 
 ## License
 

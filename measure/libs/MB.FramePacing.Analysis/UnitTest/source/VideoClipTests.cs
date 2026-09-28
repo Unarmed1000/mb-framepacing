@@ -139,7 +139,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(Enumerable.Range(1, manifest.FrameCount - 1).Count(manifest.IsLate)), $"{clip}: late frames");
 
-      // Gamers Nexus's summaries, as mb-framepacing-explained's doc/measured-errors.md lists them for its modes
+      // Gamers Nexus's summaries: the |animation error| per frame, and as a percentage of the display time
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
       long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorTicks(i)));
       double errorPerFrameMs = absolute / (double)measured.Length / TimeSpan.TicksPerMillisecond;
