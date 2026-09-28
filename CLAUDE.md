@@ -124,8 +124,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Charts** live in `MB.FramePacing.Charts` (no GUI): the report cards as shapes (below). The GUI draws them itself with `CardView`
     (`FramePacing.Gui`, the style from `CardStyle`, which parses the SVG's style sheet; hover texts from `CardHover`); the Timeline card
     zooms (wheel), pans (drag) and resets (double-click), the distribution tabs follow its section, and **Save view** writes the card
-    on screen as SVG or PNG (`CardImage`). DocImages checks the zoom, pan, reset and hover with headless input. `RunCharts` (ScottPlot)
-    still writes the `--charts` / "Save charts" PNGs (`ChartFiles`) until they move to the cards. Test chart changes with
+    on screen as SVG or PNG (`CardImage`). DocImages checks the zoom, pan, reset and hover with headless input. `--charts` and "Save
+    charts" write the SVG cards (`ChartFiles`: the report and every `DistributionCard`). Test chart changes with
     `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
     with `VideoClipTests` by linked source files).
     - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
@@ -138,10 +138,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The frame timeline (`FrameTimelineCard`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
-    - The headline numbers come from `RunHeadline` only: the GUI's tiles and the band on top of `run-<id>-timeline.png`
-      (`HeadlineBand`) show the same tiles, so add or change a number there, not in the GUI.
+    - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, so add or change
+      a number there, not in the GUI.
     - The error and display time step charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);
-      those get a mark with their value at the edge (`ClippedValueMarks`).
+      those get a mark with their value at the edge (`ChartScale` decides the scales, `ReportCard.ClipMarks` draws the marks).
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
     0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
     `TimelineOptions.ErrorThresholdTicks`), and a display time step is off its target from half a refresh on. A source's precision (a

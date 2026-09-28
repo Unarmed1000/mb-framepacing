@@ -17,7 +17,6 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="NLog" />
-    <PackageReference Include="ScottPlot.Avalonia" />
   </ItemGroup>
 
   <ItemGroup>

@@ -41,7 +41,7 @@
           Content="Save charts"
           Command="{Binding SaveChartsCommand}"
           IsEnabled="{Binding HasRun}"
-          ToolTip.Tip="Write the charts of every run as images next to the reports (the same files as 'analyze --charts')."
+          ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
         />
       </Grid>
     </Border>

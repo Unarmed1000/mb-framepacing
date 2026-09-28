@@ -243,7 +243,7 @@ namespace MB.FramePacing.Charts
     {
       var withError = frames.Where(f => f.AnimationErrorTicks.HasValue).ToArray();
       var errorsMs = withError.Select(f => f.AnimationErrorTicks!.Value / (double)TimeSpan.TicksPerMillisecond).ToArray();
-      double limit = AnimationErrorBarsPlottable.Limit(errorsMs);
+      double limit = ChartScale.ErrorLimit(errorsMs);
       double zeroY = errorY + (ErrorH / 2);
       double YOf(double value) => zeroY - (Math.Clamp(value, -limit, limit) / limit * ErrorH / 2);
       plots.Add(
@@ -254,7 +254,7 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(PlotX1, errorY - 16, "+ shown too soon, − shown too late; the band is within the error threshold", "vsync-n", "end"));
       double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
       parts.Add(new RectShape("band", N(PlotX0, 1), N(YOf(threshold), 1), N(PlotX1 - PlotX0, 1), N(YOf(-threshold) - YOf(threshold), 1)));
-      foreach (var (position, _) in AnimationErrorBarsPlottable.Ticks(limit).Where(t => t.Position != 0))
+      foreach (double position in ChartScale.ErrorTicks(limit).Where(t => t != 0))
       {
         double y = YOf(position);
         parts.Add(GridLine(y));
@@ -347,13 +347,13 @@ namespace MB.FramePacing.Charts
           )
         );
       }
-      double top = DisplayTimeStepsPlottable.Top(holds.Select(h => h.Level).ToArray(), refreshMs);
+      double top = ChartScale.StepTop(holds.Select(h => h.Level).ToArray(), refreshMs);
       double YOf(double ms) => stepY + StepH - (Math.Min(ms, top) / top * StepH);
       plots.Add(new CardPlot(ReportItem.DisplayTimeStep, PlotX0, stepY, PlotX1, stepY + StepH, from, to, 0, top));
 
       parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
       parts.Add(new TextShape(PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
-      foreach (var (position, _) in DisplayTimeStepsPlottable.Ticks(refreshMs, top).Where(t => t.Position > 0))
+      foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
       {
         double y = YOf(position);
         parts.Add(GridLine(y));
@@ -479,10 +479,10 @@ namespace MB.FramePacing.Charts
       parts.Add(
         new TextShape(PlotX1, frameTimeY - 16, "blue: frametime (CPU start to the next); faint: CPU busy (until presented)", "vsync-n", "end")
       );
-      double top = DisplayTimeStepsPlottable.Top(spans.SelectMany(s => new[] { s.FrameTime, s.CpuBusy }).Where(v => v > 0).ToArray(), refreshMs);
+      double top = ChartScale.StepTop(spans.SelectMany(s => new[] { s.FrameTime, s.CpuBusy }).Where(v => v > 0).ToArray(), refreshMs);
       double YOf(double ms) => frameTimeY + FrameTimeH - (Math.Min(ms, top) / top * FrameTimeH);
       plots.Add(new CardPlot(ReportItem.FrameTime, PlotX0, frameTimeY, PlotX1, frameTimeY + FrameTimeH, from, to, 0, top));
-      foreach (var (position, _) in DisplayTimeStepsPlottable.Ticks(refreshMs, top).Where(t => t.Position > 0))
+      foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
       {
         double y = YOf(position);
         parts.Add(GridLine(y));

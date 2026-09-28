@@ -117,7 +117,7 @@ namespace MB.FramePacing.Charts
 
       double top = Math.Max(2 * refreshMs, histogram.Bins.Max(b => b.CenterMs + (histogram.BinWidthMs / 2))) + (refreshMs / 2);
       var plot = card.Plot(DisplayTimeStepHistogram, 0, top, LogBase, LogTop(histogram));
-      foreach (var (position, _) in DisplayTimeStepsPlottable.Ticks(refreshMs, top))
+      foreach (double position in ChartScale.StepTicks(refreshMs, top))
         card.XTick(plot, position, position == 0 ? "0" : $"{Ms(Math.Round(position, 1))} ms");
       LogGrid(card, plot);
       Bars(card, plot, histogram);

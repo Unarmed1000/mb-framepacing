@@ -91,7 +91,7 @@ namespace MB.FramePacing.App.Commands
       return command;
     }
 
-    /// <summary>Analyses a capture, writes the reports (and the chart images when <paramref name="charts"/> is set) and prints the results.</summary>
+    /// <summary>Analyses a capture, writes the reports (and the charts when <paramref name="charts"/> is set) and prints the results.</summary>
     public static int Run(string directory, AnalysisOptions options, bool charts)
     {
       try
@@ -106,10 +106,12 @@ namespace MB.FramePacing.App.Commands
             report = CaptureAnalyzer.Analyze(directory, options, new Progress<double>(value => task.Value = value));
             task.Value = 1.0;
           });
-        var chartFiles = charts ? ChartFiles.Write(report!, ChartTheme.Light) : Array.Empty<string>();
+        var chartFiles = charts ? ChartFiles.Write(report!) : Array.Empty<string>();
         Print(report!);
         if (chartFiles.Count > 0)
-          AnsiConsole.MarkupLineInterpolated($"[grey]{chartFiles.Count} chart image(s) written next to them (run-*-timeline.png, ...)[/]");
+          AnsiConsole.MarkupLineInterpolated(
+            $"[grey]{chartFiles.Count} chart(s) written next to them (run-*-report.svg, run-*-error-histogram.svg, ...)[/]"
+          );
         return Program.ResultSuccess;
       }
       catch (Exception ex)

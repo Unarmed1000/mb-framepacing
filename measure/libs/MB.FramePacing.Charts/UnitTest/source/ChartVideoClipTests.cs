@@ -1,9 +1,10 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The charts of the test clips in test-data/videos: every series each chart draws (the GUI shows them, the command line and the GUI write
-//* them as PNG files) is compared with the values the clip's manifest gives, point by point and exactly. The x axis is seconds since the
-//* run's first frame and the values are milliseconds, both converted from whole ticks the same way. Skipped when ffmpeg is not installed.
+//* The report cards of the test clips in test-data/videos (the GUI draws them, the command line and the GUI write them as SVG): every
+//* series each card draws is read back through its shapes and plot areas and compared with the values the clip's manifest gives, point by
+//* point: exactly where the shape holds the number, within the SVG's rounding where a path holds it. The x axis is seconds since the run's
+//* first frame and the values are milliseconds, both converted from whole ticks the same way. Skipped when ffmpeg is not installed.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -14,11 +15,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Analysis.UnitTest;
 using NUnit.Framework;
-using ScottPlot;
-using ScottPlot.Plottables;
 
 namespace MB.FramePacing.Charts.UnitTest
 {
@@ -49,113 +49,71 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// The Timeline: the animation error bar of every frame and the scale, every frame's hold on the display time step chart (until the next
-    /// frame, at its display time step, held too long when the next frame is late) and every frame's target over it, the 2 s late share at every frame,
-    /// and the refresh strip's span, refreshes and late flag of every frame.
+    /// The Timeline card: the animation error bar of every frame with an error, at its display time and exactly as high (bars too small to
+    /// see keep a minimum height, in the right direction), on the symmetric scale with the error threshold's band; every frame's hold on
+    /// the display time step panel (until the next frame, at its display time step, held too long when the next frame is late); and the
+    /// 2 s late share at every frame.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
-    public void Timeline_MatchesTheManifest(string clip)
+    public void TimelineCard_MatchesTheManifest(string clip)
     {
-      var (manifest, report, chart) = Analyze(clip);
-      using var error = new Plot();
-      using var displayTimeStep = new Plot();
-      using var lateShare = new Plot();
-      using var strip = new Plot();
-      RunCharts.Timeline(chart, ChartTheme.Light, error, displayTimeStep, lateShare, strip);
-
+      var (manifest, _, chart) = Analyze(clip);
+      var drawing = ReportCard.Build(
+        RunSection.Whole(chart),
+        ReportOptions.ShowOnly(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.LateShare })
+      );
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
       double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
-      long Origin(int i) => manifest.ShownTicks(i) - manifest.ShownTicks(0);
-      long refresh = RefreshTicks(chart);
 
-      var bars = error.GetPlottables<AnimationErrorBarsPlottable>().Single();
-      Assert.That(bars.TimeTicks, Is.EqualTo(measured.Select(Origin)), $"{clip}: error bar times");
-      Assert.That(bars.ErrorTicks, Is.EqualTo(measured.Select(manifest.AnimationErrorTicks)), $"{clip}: animation error");
+      var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
       double largest = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
-      Assert.That(bars.LimitMs, Is.EqualTo(Math.Max(2, largest * 1.15)), $"{clip}: symmetric scale");
-      Assert.That(bars.ThresholdTicks, Is.EqualTo(TimeSpan.TicksPerMillisecond), $"{clip}: 1 ms threshold band");
-      Assert.That(error.Axes.GetLimits().Bottom, Is.EqualTo(-bars.LimitMs), $"{clip}: centred on zero");
-      Assert.That(error.Axes.GetLimits().Top, Is.EqualTo(bars.LimitMs), $"{clip}: centred on zero");
+      Assert.That((error.YFrom, error.YTo), Is.EqualTo((-Math.Max(2, largest * 1.15), Math.Max(2, largest * 1.15))), $"{clip}: symmetric scale");
+      var band = drawing.Shapes.OfType<RectShape>().Single(r => r.Class == "band");
+      Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
+      var withError = measured.Where(i => manifest.AnimationErrorTicks(i) != 0).ToArray();
+      var bars = drawing.Shapes.OfType<RectShape>().Where(r => r.Class == "bar").ToArray();
+      Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
+      double zeroY = error.PixelY(0);
+      for (int k = 0; k < bars.Length; ++k)
+      {
+        double expected = Ms(manifest.AnimationErrorTicks(withError[k]));
+        bool up = bars[k].Y.Value < zeroY - 1e-9;
+        Assert.That(up, Is.EqualTo(expected > 0), $"{clip}: frame {withError[k]} shown too soon or too late");
+        if (Math.Abs(error.PixelY(expected) - zeroY) >= 1)
+        {
+          double value = error.ValueY(up ? bars[k].Y.Value : bars[k].Y.Value + bars[k].Height.Value);
+          Assert.That(value, Is.EqualTo(expected).Within(1e-9), $"{clip}: frame {withError[k]}'s animation error");
+        }
+      }
 
-      // Frame i is held until frame i + 1: its display time step is the hold's length, and it is held too long when frame i + 1 is late
-      var holds = measured.Select(i => i - 1).ToArray();
-      var steps = displayTimeStep.GetPlottables<DisplayTimeStepsPlottable>().Single();
-      Assert.That(steps.StartTicks, Is.EqualTo(holds.Select(Origin)), $"{clip}: holds start");
-      Assert.That(steps.EndTicks, Is.EqualTo(holds.Select(i => Origin(i + 1))), $"{clip}: holds end at the next frame");
-      Assert.That(steps.LevelTicks, Is.EqualTo(holds.Select(i => manifest.DisplayStepTicks(i + 1))), $"{clip}: display time step");
-      Assert.That(steps.HeldTooLong, Is.EqualTo(holds.Select(i => manifest.IsLate(i + 1))), $"{clip}: held too long");
-      Assert.That(steps.RefreshMs, Is.EqualTo(Ms(refresh)), $"{clip}: refresh grid");
-      Assert.That(displayTimeStep.GetPlottables<Scatter>(), Is.Empty, $"{clip}: the holds only (no target line)");
+      // Frame i is held from frame i - 1's display time until its own, at its display time step, too long when it is late
+      var step = drawing.Plots.Single(p => p.Id == ReportItem.DisplayTimeStep);
+      double pixelMs = (step.YTo - step.YFrom) / (step.Bottom - step.Top);
+      double pixelSeconds = (step.XTo - step.XFrom) / (step.Right - step.Left);
+      var holds = Segments(drawing, "held").Select(h => (h, Late: false)).Concat(Segments(drawing, "held-late").Select(h => (h, Late: true)));
+      var drawn = holds.OrderBy(h => h.h.X0).ToArray();
+      Assert.That(drawn, Has.Length.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
+      for (int k = 0; k < measured.Length; ++k)
+      {
+        int i = measured[k];
+        var (hold, late) = drawn[k];
+        Assert.That(step.ValueX(hold.X0), Is.EqualTo(Seconds(i - 1)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} starts");
+        Assert.That(step.ValueX(hold.X1), Is.EqualTo(Seconds(i)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} ends at the next frame");
+        Assert.That(step.ValueY(hold.Y), Is.EqualTo(Ms(manifest.DisplayStepTicks(i))).Within(0.051 * pixelMs), $"{clip}: display time step {i}");
+        Assert.That(late, Is.EqualTo(manifest.IsLate(i)), $"{clip}: hold {i} too long");
+      }
 
-      var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      var (shareTimes, shares) = SignalPoints(lateShare);
-      Assert.That(shareTimes, Is.EqualTo(all.Select(Seconds)), $"{clip}: late share times");
-      Assert.That(shares, Is.EqualTo(ExpectedLateShare(manifest)), $"{clip}: late share (%)");
-
-      var cells = strip.GetPlottables<RefreshStripPlottable>().Single();
-      long capturePeriod = report.Timeline.CapturePeriodTicks;
-      Assert.That(cells.StartTicks, Is.EqualTo(all.Select(Origin)), $"{clip}: strip, first shown");
-      Assert.That(
-        cells.EndTicks,
-        Is.EqualTo(
-          all.Select(i =>
-            i + 1 < manifest.FrameCount
-              ? Math.Min(manifest.VideoFrameTicks(manifest.Refresh[i + 1] - 1) + capturePeriod - manifest.ShownTicks(0), Origin(i + 1))
-              : manifest.VideoFrameTicks(manifest.RefreshCount - 1) + capturePeriod - manifest.ShownTicks(0)
-          )
-        ),
-        $"{clip}: strip, until the next frame (or one capture period after the last capture)"
-      );
-      Assert.That(cells.Cells, Is.EqualTo(all.Select(i => (int)manifest.RefreshesOnScreen(i))), $"{clip}: strip, refreshes per frame");
-      Assert.That(
-        cells.Flags.Select(f => f.HasFlag(PresentedFrameFlags.Late)),
-        Is.EqualTo(all.Select(i => i > 0 && manifest.IsLate(i))),
-        $"{clip}: strip, late frames"
-      );
-    }
-
-    /// <summary>Both histograms: one bar per occupied 0.1 ms bin at its centre, log10 of its count high; the threshold and median lines.</summary>
-    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
-    public void Histograms_MatchTheManifest(string clip)
-    {
-      var (manifest, _, chart) = Analyze(clip);
-      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
-
-      using var errors = new Plot();
-      RunCharts.ErrorHistogram(chart, ChartTheme.Light, errors);
-      AssertBars(errors, measured.Select(manifest.AnimationErrorTicks), clip + ": animation error histogram");
-      Assert.That(errors.GetPlottables<VerticalLine>().Select(l => l.X), Is.EquivalentTo(new[] { 1.0, -1.0 }), $"{clip}: ±1 ms threshold");
-
-      using var display = new Plot();
-      RunCharts.DisplayTimeStepHistogram(chart, ChartTheme.Light, display);
-      AssertBars(display, measured.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
-      double median = Analysis.Statistics.FromTicks(measured.Select(manifest.DisplayStepTicks)).P50;
-      Assert.That(display.GetPlottables<VerticalLine>().Single().X, Is.EqualTo(median), $"{clip}: median display time step");
-    }
-
-    /// <summary>The percentile curve (|animation error| at every 0.1 percentile) and the drift of every frame.</summary>
-    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
-    public void PercentilesAndDrift_MatchTheManifest(string clip)
-    {
-      var (manifest, _, chart) = Analyze(clip);
-
-      using var percentiles = new Plot();
-      RunCharts.ErrorPercentiles(chart, ChartTheme.Light, percentiles);
-      var sorted = Enumerable.Range(1, manifest.FrameCount - 1).Select(i => Ms(Math.Abs(manifest.AnimationErrorTicks(i)))).Order().ToArray();
-      var p = Enumerable.Range(0, 1001).Select(i => i / 10.0).ToArray();
-      AssertSeries(percentiles, RunCharts.ErrorPercentileLegend, p, p.Select(x => Analysis.Statistics.Percentile(sorted, x / 100)), clip);
-      Assert.That(percentiles.GetPlottables<Scatter>().Single().Data.GetScatterPoints()[^1].Y, Is.EqualTo(sorted[^1]), $"{clip}: p100 = worst");
-
-      using var drift = new Plot();
-      RunCharts.Drift(chart, ChartTheme.Light, drift);
-      var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      var (driftTimes, drifts) = SignalPoints(drift);
-      Assert.That(
-        driftTimes,
-        Is.EqualTo(all.Select(i => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond)),
-        $"{clip}: drift times"
-      );
-      Assert.That(drifts, Is.EqualTo(all.Select(i => Ms(manifest.DriftTicks(i)))), $"{clip}: drift");
+      // Every frame's point, once: a stretch in a new colour starts at the point the previous one ended on
+      var lateShare = drawing.Plots.Single(p => p.Id == ReportItem.LateShare);
+      var points = new[] { "late-line-none", "late-line", "late-line-adapted" }
+        .SelectMany(cls => PathPoints(drawing, cls))
+        .Distinct()
+        .OrderBy(point => point.X)
+        .ToArray();
+      var shares = ExpectedLateShare(manifest);
+      Assert.That(points, Has.Length.EqualTo(manifest.FrameCount), $"{clip}: a late share point per frame");
+      double shareTolerance = 0.051 * (lateShare.YTo - lateShare.YFrom) / (lateShare.Bottom - lateShare.Top);
+      Assert.That(points.Select(point => lateShare.ValueY(point.Y)), Is.EqualTo(shares).Within(shareTolerance), $"{clip}: late share (%)");
     }
 
     /// <summary>
@@ -202,32 +160,29 @@ namespace MB.FramePacing.Charts.UnitTest
       );
     }
 
-    /// <summary>The report files: every chart of the run as a PNG of the documented size.</summary>
+    /// <summary>The report files: every chart of the run as an SVG card next to the other reports.</summary>
     [Test]
     public void ChartFiles_WriteEveryChart()
     {
       var (_, report, _) = Analyze("60-busy-swappy");
-      var files = ChartFiles.Write(report, ChartTheme.Light);
+      var files = ChartFiles.Write(report);
       Assert.That(
         files.Select(Path.GetFileName),
         Is.EqualTo(
           new[]
           {
-            "run-1-timeline.png",
-            "run-1-error-histogram.png",
-            "run-1-error-percentiles.png",
-            "run-1-display-time-step-histogram.png",
-            "run-1-drift.png",
             "run-1-report.svg",
+            "run-1-error-histogram.svg",
+            "run-1-display-time-step-histogram.svg",
+            "run-1-error-percentiles.svg",
+            "run-1-drift.svg",
           }
         )
       );
-      foreach (var file in files.Where(f => f.EndsWith(".png", StringComparison.Ordinal)))
+      foreach (var file in files)
       {
         Assert.That(Path.GetDirectoryName(file), Is.EqualTo(report.OutputDirectory), file);
-        var (width, height) = PngSize(file);
-        Assert.That(width, Is.EqualTo(ChartFiles.Width), file);
-        Assert.That(height, Is.GreaterThanOrEqualTo(ChartFiles.DistributionHeight), file);
+        Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Load(file), file);
       }
     }
 
@@ -349,11 +304,11 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
     }
 
-    /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers, and the report's Timeline image carries them on top.</summary>
+    /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers.</summary>
     [Test]
     public void Headline_ShowsTheRunsNumbers()
     {
-      var (manifest, report, chart) = Analyze("60-busy-swappy");
+      var (manifest, _, chart) = Analyze("60-busy-swappy");
       var tiles = RunHeadline.Tiles(chart);
       Assert.That(
         tiles.Select(t => t.Caption),
@@ -379,13 +334,6 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(late.Warning, Is.EqualTo(measured.Any(manifest.IsLate)));
       double worst = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
       Assert.That(tiles.Single(t => t.Caption == "Worst error").Value, Is.EqualTo(worst.ToString("0.0", CultureInfo.InvariantCulture) + " ms"));
-
-      // The band is as wide as the image and holds every tile in one row at the report's width
-      Assert.That(HeadlineBand.Columns(tiles.Count, ChartFiles.Width), Is.EqualTo(tiles.Count));
-      using var band = HeadlineBand.Render(chart, ChartTheme.Light, ChartFiles.Width);
-      Assert.That(band.Width, Is.EqualTo(ChartFiles.Width));
-      var files = ChartFiles.Write(report, ChartTheme.Light);
-      Assert.That(PngSize(files[0]).Height, Is.EqualTo(band.Height + ChartFiles.TimelinePlotsHeight), "the band above the Timeline's plots");
     }
 
     private (ClipManifest Manifest, AnalysisReport Report, ChartRun Chart) Analyze(string clip)
@@ -421,52 +369,28 @@ namespace MB.FramePacing.Charts.UnitTest
       return shares;
     }
 
-    /// <summary>The points of a plot's one signal (the late share and the drift, drawn as signals so long runs stay fast).</summary>
-    private static (double[] Xs, double[] Ys) SignalPoints(Plot plot)
-    {
-      var source = (ScottPlot.DataSources.SignalXYSourceGenericArray<double, double>)plot.GetPlottables<SignalXY>().Single().Data;
-      return (source.Xs, source.Ys);
-    }
+    /// <summary>A path's horizontal segments ("M x0 y H x1"), as the display time step panel draws its holds.</summary>
+    private static IEnumerable<(double X0, double Y, double X1)> Segments(CardDrawing drawing, string cls) =>
+      drawing
+        .Shapes.OfType<PathShape>()
+        .Where(p => p.Class == cls)
+        .SelectMany(p => Regex.Matches(p.Data, "M(-?[0-9.]+) (-?[0-9.]+)H(-?[0-9.]+)"))
+        .Select(m => (Number(m.Groups[1].Value), Number(m.Groups[2].Value), Number(m.Groups[3].Value)));
 
-    private static void AssertSeries(Plot plot, string legend, IEnumerable<double> xs, IEnumerable<double> ys, string clip)
-    {
-      var expectedX = xs.ToArray();
-      var series = plot.GetPlottables<Scatter>().Where(s => s.LegendText == legend).ToArray();
-      if (expectedX.Length == 0)
-      {
-        Assert.That(series, Is.Empty, $"{clip}: no '{legend}' points");
-        return;
-      }
-      Assert.That(series, Has.Length.EqualTo(1), $"{clip}: one '{legend}' series");
-      var points = series[0].Data.GetScatterPoints();
-      Assert.That(points.Select(p => p.X), Is.EqualTo(expectedX), $"{clip}: '{legend}' x");
-      Assert.That(points.Select(p => p.Y), Is.EqualTo(ys.ToArray()), $"{clip}: '{legend}' y");
-    }
+    /// <summary>A path's points (M and L commands).</summary>
+    private static IEnumerable<(double X, double Y)> PathPoints(CardDrawing drawing, string cls) =>
+      drawing
+        .Shapes.OfType<PathShape>()
+        .Where(p => p.Class == cls)
+        .SelectMany(p => Regex.Matches(p.Data, "[ML](-?[0-9.]+) (-?[0-9.]+)"))
+        .Select(m => (Number(m.Groups[1].Value), Number(m.Groups[2].Value)));
+
+    private static double Number(string text) => double.Parse(text, CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The bars of a histogram of <paramref name="ticks"/>: 0.1 ms bins centred on multiples of 0.1 ms (wider, a multiple, only when the range
-    /// needs more than the maximum bin count), one bar per occupied bin at its centre with log10(count) as its height.
-    /// </summary>
-    private static void AssertBars(Plot plot, IEnumerable<long> ticks, string what)
-    {
-      var values = ticks.ToArray();
-      long width = Histogram.DefaultBinWidthTicks;
-      long Bin(long value) => (long)Math.Floor((value / (double)width) + 0.5);
-      long needed = Bin(values.Max()) - Bin(values.Min()) + 1;
-      if (needed > Histogram.DefaultMaxBins)
-        width *= (needed + Histogram.DefaultMaxBins - 1) / Histogram.DefaultMaxBins;
-      double widthMs = width / (double)TimeSpan.TicksPerMillisecond;
-      var expected = values.GroupBy(Bin).OrderBy(g => g.Key).Select(g => (Position: g.Key * widthMs, Height: Math.Log10(g.Count()))).ToArray();
-
-      var bars = plot.GetPlottables<BarPlot>().Single().Bars;
-      Assert.That(bars.Select(b => b.Position), Is.EqualTo(expected.Select(e => e.Position)), what + ": bar positions (ms)");
-      Assert.That(bars.Select(b => b.Value), Is.EqualTo(expected.Select(e => e.Height)), what + ": bar heights (log10 count)");
-      Assert.That(values.Length, Is.EqualTo(values.GroupBy(Bin).Sum(g => g.Count())), what + ": every frame in a bar");
-    }
-
-    /// <summary>
-    /// A distribution card's bars of <paramref name="ticks"/>, as <see cref="AssertBars"/> expects them: each bar's centre at its bin's centre
-    /// and its top at log10 of its count, read back through the card's plot area.
+    /// A distribution card's bars of <paramref name="ticks"/>: 0.1 ms bins centred on multiples of 0.1 ms (wider, a multiple, only when the
+    /// range needs more than the maximum bin count), each bar's centre at its bin's centre and its top at log10 of its count, read back
+    /// through the card's plot area.
     /// </summary>
     private static void AssertCardBars(CardDrawing card, IEnumerable<long> ticks, string what)
     {
@@ -495,26 +419,14 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var plot = card.Plots.Single();
       string data = card.Shapes.OfType<PathShape>().Single(p => p.Class == "curve").Data;
-      var points = System
-        .Text.RegularExpressions.Regex.Matches(data, "[ML](-?[0-9.]+) (-?[0-9.]+)")
-        .Select(m =>
-          (X: double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), Y: double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture))
-        )
+      var points = Regex
+        .Matches(data, "[ML](-?[0-9.]+) (-?[0-9.]+)")
+        .Select(m => (X: Number(m.Groups[1].Value), Y: Number(m.Groups[2].Value)))
         .ToArray();
       var want = expected.Select(e => (X: plot.PixelX(e.X), Y: plot.PixelY(e.Y))).ToArray();
       Assert.That(points, Has.Length.EqualTo(want.Length), what + ": a point per value");
       Assert.That(points.Select(p => p.X), Is.EqualTo(want.Select(w => w.X)).Within(0.0501), what + ": x");
       Assert.That(points.Select(p => p.Y), Is.EqualTo(want.Select(w => w.Y)).Within(0.0501), what + ": y");
-    }
-
-    private static (int Width, int Height) PngSize(string path)
-    {
-      // PNG: 8 byte signature, then the IHDR chunk (length, type) with the width and height as big endian 32 bit numbers
-      var header = new byte[24];
-      using (var stream = File.OpenRead(path))
-        stream.ReadExactly(header);
-      int BigEndian(int offset) => (header[offset] << 24) | (header[offset + 1] << 16) | (header[offset + 2] << 8) | header[offset + 3];
-      return (BigEndian(16), BigEndian(20));
     }
 
     private static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;

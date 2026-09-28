@@ -139,16 +139,16 @@ capture-20260924-153000/          (import-... for imports)
     ├── summary.json              counts, statistics, histograms, warnings per run
     ├── captures.csv              one row per captured frame: its times, what its marker said and the marker's bytes
     ├── run-<id>-frames.csv       one row per application frame shown: display time step, animation error, drift
-    ├── run-<id>-*.png            only on request: the charts of the Analyze page (timeline, under the run's
-    │                             headline numbers; error-histogram, error-percentiles, display-time-step-histogram, drift)
-    └── run-<id>-report*.svg      only on request: the run (or a section of it) as one SVG report card
+    ├── run-<id>-report*.svg      only on request: the run (or a section of it) as one SVG report card
+    └── run-<id>-<card>*.svg      only on request: the distribution cards of the Analyze page (error-histogram,
+                                  error-percentiles, display-time-step-histogram, drift)
 ```
 
 `summary.json` and the CSV files are specified in [the analysis output format](analysis-output-format.md), `captures.mbcd` in
 [the capture data format](capture-data-format.md); the [data libraries](../data/README.md) read them in your own code.
 
-The chart images and the whole run's report are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or the
-GUI's **Save charts**; both write the same files. `render` draws reports from an analysis (the capture itself is not needed):
+The whole run's report and distribution cards are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or
+the GUI's **Save charts**; both write the same files, as SVG. `render` draws reports from an analysis (the capture itself is not needed):
 
 ```sh
 mb-framepacing render capture-20260924-153000                      # the whole run: run-<id>-report.svg and the distribution cards
@@ -183,7 +183,7 @@ the error histogram marks the error threshold either way, the display time step 
 |animation error| from p0 to p100 in steps of 0.1 with the threshold and p95, p99 and p99.9 marked; the drift card the animation time
 minus the display time since the run's first frame. `--cards error-histogram,drift` draws only those, `--cards none` none.
 
-The headline numbers on the Analyze page (the timeline image shows the same above its charts):
+The headline numbers on the Analyze page (the report card shows the same):
 
 | Tile               | Meaning                                                                                                                 |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |

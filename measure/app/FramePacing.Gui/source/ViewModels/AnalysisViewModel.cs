@@ -250,7 +250,7 @@ namespace MB.FramePacing.Gui.ViewModels
         m_dialogs.ShowInFileManager(ReportDirectory);
     }
 
-    /// <summary>Write the charts of every run as PNG images next to the reports (the same files as 'analyze --charts').</summary>
+    /// <summary>Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts').</summary>
     [RelayCommand]
     private async Task SaveChartsAsync()
     {
@@ -258,13 +258,13 @@ namespace MB.FramePacing.Gui.ViewModels
         return;
       try
       {
-        var files = await Task.Run(() => ChartFiles.Write(report, ChartTheme.Light));
+        var files = await Task.Run(() => ChartFiles.Write(report));
         ErrorText = string.Empty;
-        SummaryText = $"{files.Count} chart image(s) written to {report.OutputDirectory}";
+        SummaryText = $"{files.Count} chart(s) written to {report.OutputDirectory}";
       }
       catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
       {
-        ErrorText = "Could not write the chart images: " + ex.Message;
+        ErrorText = "Could not write the charts: " + ex.Message;
       }
     }
 

@@ -279,8 +279,9 @@ errors, and the display time steps of a game adapting its rate.
 
 ![Animation error by percentile](doc/images/chart-error-percentiles.svg)
 
-The charts can also be written as PNG files next to the reports (`run-<id>-timeline.png`, `-error-histogram.png`,
-`-error-percentiles.png`, `-display-time-step-histogram.png`, `-drift.png`): `--charts` on the command line, **Save charts** in the GUI. The
+The charts can also be written as SVG cards next to the reports (`run-<id>-report.svg`, `-error-histogram.svg`,
+`-error-percentiles.svg`, `-display-time-step-histogram.svg`, `-drift.svg`): `--charts` on the command line, **Save charts** in the
+GUI (`render --png` makes PNGs of them). The
 histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`; the error per frame and
 percent error in `runs[].statistics`), and late frames carry `Late`
 in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools: the files are specified in

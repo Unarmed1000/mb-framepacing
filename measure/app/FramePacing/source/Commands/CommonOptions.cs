@@ -39,11 +39,12 @@ namespace MB.FramePacing.App.Commands
           + "analysis needs.",
       };
 
-    /// <summary>--charts: also write the Analyze page's charts as PNG images next to the reports.</summary>
+    /// <summary>--charts: also write the Analyze page's charts as SVG cards next to the reports.</summary>
     public static Option<bool> Charts() =>
       new Option<bool>("--charts")
       {
-        Description = "Also write the charts as PNG images next to the reports (run-<id>-timeline.png, -error-histogram.png, ...).",
+        Description =
+          "Also write the charts as SVG cards next to the reports (run-<id>-report.svg, -error-histogram.svg, ...; 'render --png' makes PNGs).",
       };
 
     /// <summary>--display-hz: the display refresh rate the user expects, compared with the one the capture shows.</summary>
