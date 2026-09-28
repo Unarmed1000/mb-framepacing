@@ -158,6 +158,50 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(drifts, Is.EqualTo(all.Select(i => Ms(manifest.DriftTicks(i)))), $"{clip}: drift");
     }
 
+    /// <summary>
+    /// The distribution cards, read back through their shapes and plot areas: a histogram bar per occupied bin at its centre, log10 of its
+    /// count high (shape numbers are exact), the threshold and median lines; the percentile curve at every 0.1 percentile and the drift of
+    /// every frame (path points, written with one decimal: within 0.05 px).
+    /// </summary>
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    public void DistributionCards_MatchTheManifest(string clip)
+    {
+      var (manifest, report, _) = Analyze(clip);
+      var section = RunSection.Whole(AnalysisOutput.Read(report.CaptureDirectory).Single().Chart);
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
+
+      var errors = DistributionCard.Build(DistributionCard.ErrorHistogram, section);
+      AssertCardBars(errors, measured.Select(manifest.AnimationErrorTicks), clip + ": animation error histogram");
+      var errorPlot = errors.Plots.Single();
+      Assert.That(
+        errors.Shapes.OfType<LineShape>().Where(l => l.Class == "average-line").Select(l => errorPlot.ValueX(l.X1.Value)),
+        Is.EqualTo(new[] { -1.0, 1.0 }).Within(1e-9),
+        $"{clip}: ±1 ms threshold"
+      );
+
+      var display = DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section);
+      AssertCardBars(display, measured.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
+      double median = Analysis.Statistics.FromTicks(measured.Select(manifest.DisplayStepTicks)).P50;
+      var medianLine = display.Shapes.OfType<LineShape>().Single(l => l.Class == "average-line");
+      Assert.That(display.Plots.Single().ValueX(medianLine.X1.Value), Is.EqualTo(median).Within(1e-9), $"{clip}: median display time step");
+
+      var percentiles = DistributionCard.Build(DistributionCard.ErrorPercentiles, section);
+      var sorted = measured.Select(i => Ms(Math.Abs(manifest.AnimationErrorTicks(i)))).Order().ToArray();
+      AssertCurve(
+        percentiles,
+        DistributionCard.CurvePercentiles.Select(p => (p, Analysis.Statistics.Percentile(sorted, p / 100))),
+        clip + ": |animation error| by percentile"
+      );
+
+      var drift = DistributionCard.Build(DistributionCard.Drift, section);
+      var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
+      AssertCurve(
+        drift,
+        all.Select(i => ((manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond, Ms(manifest.DriftTicks(i)))),
+        clip + ": drift"
+      );
+    }
+
     /// <summary>The report files: every chart of the run as a PNG of the documented size.</summary>
     [Test]
     public void ChartFiles_WriteEveryChart()
@@ -418,6 +462,49 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(bars.Select(b => b.Position), Is.EqualTo(expected.Select(e => e.Position)), what + ": bar positions (ms)");
       Assert.That(bars.Select(b => b.Value), Is.EqualTo(expected.Select(e => e.Height)), what + ": bar heights (log10 count)");
       Assert.That(values.Length, Is.EqualTo(values.GroupBy(Bin).Sum(g => g.Count())), what + ": every frame in a bar");
+    }
+
+    /// <summary>
+    /// A distribution card's bars of <paramref name="ticks"/>, as <see cref="AssertBars"/> expects them: each bar's centre at its bin's centre
+    /// and its top at log10 of its count, read back through the card's plot area.
+    /// </summary>
+    private static void AssertCardBars(CardDrawing card, IEnumerable<long> ticks, string what)
+    {
+      var values = ticks.ToArray();
+      long width = Histogram.DefaultBinWidthTicks;
+      long Bin(long value) => (long)Math.Floor((value / (double)width) + 0.5);
+      long needed = Bin(values.Max()) - Bin(values.Min()) + 1;
+      if (needed > Histogram.DefaultMaxBins)
+        width *= (needed + Histogram.DefaultMaxBins - 1) / Histogram.DefaultMaxBins;
+      double widthMs = width / (double)TimeSpan.TicksPerMillisecond;
+      var expected = values.GroupBy(Bin).OrderBy(g => g.Key).Select(g => (Position: g.Key * widthMs, Height: Math.Log10(g.Count()))).ToArray();
+
+      var plot = card.Plots.Single();
+      var bars = card.Shapes.OfType<RectShape>().Where(r => r.Class == "hist-bar").ToArray();
+      Assert.That(
+        bars.Select(b => plot.ValueX(b.X.Value + (b.Width.Value / 2))),
+        Is.EqualTo(expected.Select(e => e.Position)).Within(1e-9),
+        what + ": centres"
+      );
+      Assert.That(bars.Select(b => plot.ValueY(b.Y.Value)), Is.EqualTo(expected.Select(e => e.Height)).Within(1e-9), what + ": log10 counts");
+      Assert.That(bars.Select(b => b.Y.Value + b.Height.Value), Is.All.EqualTo(plot.Bottom).Within(1e-9), what + ": from the bottom");
+    }
+
+    /// <summary>A card's curve, point by point: each point where the plot puts the expected value, within the path's 0.05 px rounding.</summary>
+    private static void AssertCurve(CardDrawing card, IEnumerable<(double X, double Y)> expected, string what)
+    {
+      var plot = card.Plots.Single();
+      string data = card.Shapes.OfType<PathShape>().Single(p => p.Class == "curve").Data;
+      var points = System
+        .Text.RegularExpressions.Regex.Matches(data, "[ML](-?[0-9.]+) (-?[0-9.]+)")
+        .Select(m =>
+          (X: double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), Y: double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture))
+        )
+        .ToArray();
+      var want = expected.Select(e => (X: plot.PixelX(e.X), Y: plot.PixelY(e.Y))).ToArray();
+      Assert.That(points, Has.Length.EqualTo(want.Length), what + ": a point per value");
+      Assert.That(points.Select(p => p.X), Is.EqualTo(want.Select(w => w.X)).Within(0.0501), what + ": x");
+      Assert.That(points.Select(p => p.Y), Is.EqualTo(want.Select(w => w.Y)).Within(0.0501), what + ": y");
     }
 
     private static (int Width, int Height) PngSize(string path)

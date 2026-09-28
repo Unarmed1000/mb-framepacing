@@ -2,8 +2,8 @@
 //* File Description
 //* ----------------
 //* Writes a run's SVG reports (ReportCard) next to its other reports: the whole run or a section (<prefix>-report.svg,
-//* <prefix>-report-<from>s-<to>s.svg), optionally the detail sections around the worst animation error and the worst 2 s of late frames, and
-//* optionally each as a PNG through a headless browser.
+//* <prefix>-report-<from>s-<to>s.svg), optionally the detail sections around the worst animation error and the worst 2 s of late frames, the
+//* distribution cards (DistributionCard, <prefix>-<card>.svg) and the frame timeline, and optionally each as a PNG through a headless browser.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -41,14 +41,34 @@ namespace MB.FramePacing.Charts
     )
     {
       var written = new List<string>();
-      var whole = RunSection.Whole(run);
-      var section = fromSeconds.HasValue || toSeconds.HasValue ? RunSection.Create(run, fromSeconds ?? 0, toSeconds ?? whole.ToSeconds) : whole;
-      written.AddRange(WriteOne(section, Path.Combine(directory, prefix + "-report" + SectionSuffix(section)), png, options));
+      var section = Section(run, fromSeconds, toSeconds);
+      written.AddRange(WriteOne(ReportCard.Render(section, options), Path.Combine(directory, prefix + "-report" + SectionSuffix(section)), png));
       if (details)
       {
         foreach (var (name, detail) in Details(run))
-          written.AddRange(WriteOne(detail, Path.Combine(directory, $"{prefix}-report-{name}"), png, options));
+          written.AddRange(WriteOne(ReportCard.Render(detail, options), Path.Combine(directory, $"{prefix}-report-{name}"), png));
       }
+      return written;
+    }
+
+    /// <summary>
+    /// Write the distribution cards <paramref name="cards"/> (<see cref="DistributionCard"/> ids) of <paramref name="run"/>, all of it or
+    /// <paramref name="fromSeconds"/> to <paramref name="toSeconds"/>, as &lt;prefix&gt;-&lt;card&gt;.svg (and .png). Returns the files written.
+    /// </summary>
+    public static IReadOnlyList<string> WriteCards(
+      ChartRun run,
+      string prefix,
+      string directory,
+      IEnumerable<string> cards,
+      double? fromSeconds = null,
+      double? toSeconds = null,
+      bool png = false
+    )
+    {
+      var section = Section(run, fromSeconds, toSeconds);
+      var written = new List<string>();
+      foreach (string card in cards)
+        written.AddRange(WriteOne(DistributionCard.Render(card, section), Path.Combine(directory, $"{prefix}-{card}{SectionSuffix(section)}"), png));
       return written;
     }
 
@@ -101,22 +121,20 @@ namespace MB.FramePacing.Charts
     )
     {
       var section = RunSection.Create(run, fromSeconds, toSeconds);
-      string path = Path.Combine(directory, prefix + "-timeline" + SectionSuffix(section));
-      string svg = path + ".svg";
-      File.WriteAllText(svg, FrameTimelineCard.Render(section), new UTF8Encoding(false));
-      var written = new List<string> { svg };
-      if (png)
-      {
-        HeadlessBrowser.SavePng(svg, path + ".png");
-        written.Add(path + ".png");
-      }
-      return written;
+      return WriteOne(FrameTimelineCard.Render(section), Path.Combine(directory, prefix + "-timeline" + SectionSuffix(section)), png).ToList();
     }
 
-    private static IEnumerable<string> WriteOne(RunSection section, string pathWithoutExtension, bool png, ReportOptions? options)
+    /// <summary>The whole run, or <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of it when either is given.</summary>
+    private static RunSection Section(ChartRun run, double? fromSeconds, double? toSeconds)
+    {
+      var whole = RunSection.Whole(run);
+      return fromSeconds.HasValue || toSeconds.HasValue ? RunSection.Create(run, fromSeconds ?? 0, toSeconds ?? whole.ToSeconds) : whole;
+    }
+
+    private static IEnumerable<string> WriteOne(string content, string pathWithoutExtension, bool png)
     {
       string svg = pathWithoutExtension + ".svg";
-      File.WriteAllText(svg, ReportCard.Render(section, options), new UTF8Encoding(false));
+      File.WriteAllText(svg, content, new UTF8Encoding(false));
       yield return svg;
       if (png)
       {

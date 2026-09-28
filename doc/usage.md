@@ -151,7 +151,7 @@ The chart images and the whole run's report are written by `--charts` (`analyze`
 GUI's **Save charts**; both write the same files. `render` draws reports from an analysis (the capture itself is not needed):
 
 ```sh
-mb-framepacing render capture-20260924-153000                      # the whole run: run-<id>-report.svg
+mb-framepacing render capture-20260924-153000                      # the whole run: run-<id>-report.svg and the distribution cards
 mb-framepacing render capture-20260924-153000 --from 120 --to 125  # 5 s of it, every frame: run-<id>-report-120s-125s.svg
 mb-framepacing render capture-20260924-153000 --details --png      # also the worst moments, and PNGs (needs Edge or Chrome)
 mb-framepacing render capture-20260924-153000 --timeline --from 12.5 --to 12.8  # the frame timeline: run-<id>-timeline-12.5s-12.8s.svg
@@ -171,6 +171,17 @@ Times are seconds since the run's first frame, the Timeline's axis. Every item o
 `worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
 (`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
 Chrome, found in the usual places or set with `MB_BROWSER`.
+
+The **refresh strip** draws one cell per refresh from each frame's first capture, a new shade with every frame and late frames red. With
+a capture card, the refreshes between a frame's last capture and the next frame (captures that could not be decoded) are grey; a camera
+sees each frame until the next one. A mark above the strip shows a frame with skipped frame indices before it, or a tear.
+
+The **distribution cards** are drawn next to the report for the same run or section: `run-<id>-error-histogram.svg`,
+`-display-time-step-histogram.svg`, `-error-percentiles.svg` and `-drift.svg` (with the section's `-<from>s-<to>s`). The histograms
+use the fixed 0.1 ms bins with the counts on a log scale, so a handful of bad frames stay visible next to thousands of good ones;
+the error histogram marks the error threshold either way, the display time step histogram its median. The percentile card draws the
+|animation error| from p0 to p100 in steps of 0.1 with the threshold and p95, p99 and p99.9 marked; the drift card the animation time
+minus the display time since the run's first frame. `--cards error-histogram,drift` draws only those, `--cards none` none.
 
 The headline numbers on the Analyze page (the timeline image shows the same above its charts):
 

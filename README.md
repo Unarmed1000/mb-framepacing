@@ -291,7 +291,9 @@ Chrome). A section of a few seconds shows every frame and refresh; a long run sh
 and the middle 90 % solid.
 
 Every item of the card can be left out (`--hide late-share,refresh-strip`) or kept alone (`--only animation-error`); `--help`
-lists the ids.
+lists the ids. Next to the report, `render` draws the distributions as cards in the same style (`run-<id>-<card>.svg`): the
+animation error and display time step histograms (0.1 ms bins, counts on a log scale), the |animation error| by percentile and the
+cumulative drift; `--cards` picks them (`--cards none` for the report only).
 
 The test clips (`test-data/videos`, made by mb-framepacing-explained) as reports. The busy stretch at the full rate is the example
 above: the frames that miss a refresh are late, and each is off by a whole refresh. Its companion adapts its rate like Android's

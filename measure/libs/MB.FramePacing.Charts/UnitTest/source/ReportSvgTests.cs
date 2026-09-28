@@ -336,5 +336,107 @@ namespace MB.FramePacing.Charts.UnitTest
       var error = Assert.Throws<ArgumentException>(() => ReportOptions.ParseIds("late-share,frametimes"));
       Assert.That(error!.Message, Does.Contain("frametimes").And.Contain("Known:").And.Contain(ReportItem.RefreshStrip));
     }
+
+    /// <summary>
+    /// The refresh strip: a capture card's refreshes between a frame's last capture and the next frame (not decoded) are unknown cells, a
+    /// camera's frame lasts until the next one; frames with skipped frame indices before them, or torn, get a mark above the strip.
+    /// </summary>
+    [Test]
+    public void Strip_ShowsUnknownRefreshesAndMarksSkippedOrTornFrames()
+    {
+      var run = Synthetic(40, lateEvery: 0);
+      var frames = run
+        .Run.Frames.Select(
+          (f, i) =>
+            i switch
+            {
+              5 => f with { OnScreenTicks = 3 * Refresh },
+              10 => f with { FirstSeenTicks = f.FirstSeenTicks + (2 * Refresh), LastSeenTicks = f.LastSeenTicks + (2 * Refresh), SkippedBefore = 2 },
+              12 => f with
+              {
+                FirstSeenTicks = f.FirstSeenTicks + (2 * Refresh),
+                LastSeenTicks = f.LastSeenTicks + (2 * Refresh),
+                Flags = PresentedFrameFlags.Torn,
+              },
+              > 5 => f with { FirstSeenTicks = f.FirstSeenTicks + (2 * Refresh), LastSeenTicks = f.LastSeenTicks + (2 * Refresh) },
+              _ => f,
+            }
+        )
+        .ToList();
+      var card = run with { Run = run.Run with { Frames = frames } };
+      var only = ReportOptions.ShowOnly(new[] { ReportItem.RefreshStrip });
+
+      var drawing = ReportCard.Build(RunSection.Whole(card), only);
+      var cells = drawing.Shapes.OfType<RectShape>().ToList();
+      Assert.That(cells, Has.Count.EqualTo(42), "a cell per refresh: 39 frames of one, one of three");
+      Assert.That(cells.Count(c => c.Class == "neutral"), Is.EqualTo(2), "the two refreshes after frame 5's last capture are unknown");
+      var marks = drawing.Shapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
+      Assert.That(marks.Data.Count(c => c == 'M'), Is.EqualTo(2), "frame 10 (skipped indices before it) and frame 12 (torn)");
+      Assert.That(drawing.Shapes.OfType<TextShape>().Any(t => t.Content.Contains("grey not decoded", StringComparison.Ordinal)));
+
+      var camera = ReportCard.Build(RunSection.Whole(card with { Camera = true }), only);
+      Assert.That(camera.Shapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero, "a camera sees frame 5 until frame 6");
+      Assert.That(camera.Shapes.OfType<RectShape>().Count(), Is.EqualTo(42));
+
+      var clean = ReportCard.Build(RunSection.Whole(run), only);
+      Assert.That(clean.Shapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero);
+      Assert.That(clean.Shapes.OfType<PathShape>().Any(p => p.Class == "strip-mark"), Is.False);
+      Assert.That(
+        clean.Shapes.OfType<TextShape>().Single(t => t.X == ReportCard.PlotX1 && t.Content.StartsWith("one cell", StringComparison.Ordinal)).Content,
+        Does.Not.Contain("grey").And.Not.Contain("tear")
+      );
+    }
+
+    /// <summary>Every panel's plot area maps its time range onto the plot's width: the section's start at the left edge, its end at the right.</summary>
+    [Test]
+    public void Plots_MapTheSectionOntoThePanels()
+    {
+      var run = OneHour();
+      var section = RunSection.Create(run, 100, 102);
+      var drawing = ReportCard.Build(section);
+      Assert.That(
+        drawing.Plots.Select(p => p.Id),
+        Is.EqualTo(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.LateShare, ReportItem.RefreshStrip }),
+        "no frametime panel plot: the synthetic markers carry no CPU times"
+      );
+      foreach (var plot in drawing.Plots)
+      {
+        Assert.That((plot.Left, plot.Right, plot.XFrom, plot.XTo), Is.EqualTo((ReportCard.PlotX0, ReportCard.PlotX1, 100.0, 102.0)), plot.Id);
+        Assert.That(plot.ValueX(plot.PixelX(101.25)), Is.EqualTo(101.25).Within(1e-9), plot.Id);
+        Assert.That(plot.ValueY(plot.PixelY(0.5)), Is.EqualTo(0.5).Within(1e-9), plot.Id);
+      }
+      var error = drawing.Plots[0];
+      Assert.That(error.YFrom, Is.EqualTo(-error.YTo), "the error scale is symmetric");
+    }
+
+    /// <summary>
+    /// The distribution cards of the hour: each writes what its shapes hold, has one plot, and stays small (the drift draws per pixel column);
+    /// the histograms have a bar per occupied bin.
+    /// </summary>
+    [Test]
+    public void DistributionCards_OneHour()
+    {
+      var run = OneHour();
+      var section = RunSection.Whole(run);
+      var histograms = RunHistograms.Create(run.Run);
+      foreach (var (id, _) in DistributionCard.All)
+      {
+        var drawing = DistributionCard.Build(id, section);
+        string svg = DistributionCard.Render(id, section);
+        Assert.That(SvgCardWriter.Write(drawing), Is.EqualTo(svg), id);
+        Assert.That(drawing.Plots.Single().Id, Is.EqualTo(id));
+        Assert.That(svg.Length, Is.LessThan(200_000), id + ": small");
+        Assert.That(drawing.Title, Does.StartWith("Run 1  'one hour': "), id);
+        Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), id);
+      }
+      int Bars(string id) => DistributionCard.Build(id, section).Shapes.OfType<RectShape>().Count(r => r.Class == "hist-bar");
+      Assert.That(Bars(DistributionCard.ErrorHistogram), Is.EqualTo(histograms.AnimationErrorMs.Bins.Count(b => b.Count > 0)));
+      Assert.That(Bars(DistributionCard.DisplayTimeStepHistogram), Is.EqualTo(histograms.DisplayDeltaMs.Bins.Count(b => b.Count > 0)));
+      var drift = DistributionCard.Build(DistributionCard.Drift, section).Shapes.OfType<PathShape>().Single(p => p.Class == "curve");
+      Assert.That(drift.Data.Count(c => c is 'M' or 'L'), Is.LessThanOrEqualTo(2 * (int)(ReportCard.PlotX1 - ReportCard.PlotX0 + 1)), "per column");
+
+      var error = Assert.Throws<ArgumentException>(() => DistributionCard.Build("histogram", section));
+      Assert.That(error!.Message, Does.Contain("Known:").And.Contain(DistributionCard.Drift));
+    }
   }
 }

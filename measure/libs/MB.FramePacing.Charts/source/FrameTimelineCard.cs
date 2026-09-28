@@ -240,7 +240,7 @@ namespace MB.FramePacing.Charts
 
       Key(parts, used, legendY, threshold);
       header.Add(new GroupShape(headerExtra, parts));
-      return new CardDrawing(title, width, height + headerExtra, header);
+      return new CardDrawing(title, width, height + headerExtra, header, Array.Empty<CardPlot>());
     }
 
     /// <summary>

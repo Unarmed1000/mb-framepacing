@@ -100,18 +100,19 @@ namespace MB.FramePacing.Charts
         DisplayBox(parts, chart, frames, refreshMs);
 
       Tiles(parts, tiles, layout.TilesY);
+      var plots = new List<CardPlot>();
       if (layout.ErrorY is { } errorY)
-        ErrorPanel(parts, section, frames, Seconds, XOf, perFrame, errorY);
+        ErrorPanel(parts, plots, section, frames, Seconds, XOf, perFrame, errorY);
       if (layout.StepY is { } stepY)
-        StepPanel(parts, frames, Seconds, XOf, perFrame, refreshMs, from, to, stepY);
+        StepPanel(parts, plots, frames, Seconds, XOf, perFrame, refreshMs, from, to, stepY);
       if (layout.FrameTimeY is { } frameTimeY)
-        FrameTimePanel(parts, frames, Seconds, XOf, perFrame, refreshMs, from, to, frameTimeY);
+        FrameTimePanel(parts, plots, frames, Seconds, XOf, perFrame, refreshMs, from, to, frameTimeY);
       if (layout.LateY is { } lateY)
-        LatePanel(parts, section, Seconds, XOf, perFrame, lateY);
+        LatePanel(parts, plots, section, Seconds, XOf, perFrame, lateY);
       if (layout.StripY is { } stripY)
-        StripPanel(parts, frames, Seconds, XOf, refreshMs, from, to, chart.CapturePeriodTicks, stripY);
+        StripPanel(parts, plots, frames, Seconds, XOf, refreshMs, from, to, chart, stripY);
 
-      return new CardDrawing(title, Width, layout.Height, parts);
+      return new CardDrawing(title, Width, layout.Height, parts, plots);
     }
 
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
@@ -231,6 +232,7 @@ namespace MB.FramePacing.Charts
 
     private static void ErrorPanel(
       List<CardShape> parts,
+      List<CardPlot> plots,
       RunSection section,
       IReadOnlyList<PresentedFrame> frames,
       Func<PresentedFrame, double> seconds,
@@ -244,6 +246,9 @@ namespace MB.FramePacing.Charts
       double limit = AnimationErrorBarsPlottable.Limit(errorsMs);
       double zeroY = errorY + (ErrorH / 2);
       double YOf(double value) => zeroY - (Math.Clamp(value, -limit, limit) / limit * ErrorH / 2);
+      plots.Add(
+        new CardPlot(ReportItem.AnimationError, PlotX0, errorY, PlotX1, errorY + ErrorH, section.FromSeconds, section.ToSeconds, -limit, limit)
+      );
 
       parts.Add(new TextShape(20, errorY - 16, "ANIMATION ERROR PER FRAME", "label", "start"));
       parts.Add(new TextShape(PlotX1, errorY - 16, "+ shown too soon, − shown too late; the band is within the error threshold", "vsync-n", "end"));
@@ -315,6 +320,7 @@ namespace MB.FramePacing.Charts
 
     private static void StepPanel(
       List<CardShape> parts,
+      List<CardPlot> plots,
       IReadOnlyList<PresentedFrame> frames,
       Func<PresentedFrame, double> seconds,
       Func<double, double> xOf,
@@ -343,6 +349,7 @@ namespace MB.FramePacing.Charts
       }
       double top = DisplayTimeStepsPlottable.Top(holds.Select(h => h.Level).ToArray(), refreshMs);
       double YOf(double ms) => stepY + StepH - (Math.Min(ms, top) / top * StepH);
+      plots.Add(new CardPlot(ReportItem.DisplayTimeStep, PlotX0, stepY, PlotX1, stepY + StepH, from, to, 0, top));
 
       parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
       parts.Add(new TextShape(PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
@@ -437,6 +444,7 @@ namespace MB.FramePacing.Charts
     /// </summary>
     private static void FrameTimePanel(
       List<CardShape> parts,
+      List<CardPlot> plots,
       IReadOnlyList<PresentedFrame> frames,
       Func<PresentedFrame, double> seconds,
       Func<double, double> xOf,
@@ -473,6 +481,7 @@ namespace MB.FramePacing.Charts
       );
       double top = DisplayTimeStepsPlottable.Top(spans.SelectMany(s => new[] { s.FrameTime, s.CpuBusy }).Where(v => v > 0).ToArray(), refreshMs);
       double YOf(double ms) => frameTimeY + FrameTimeH - (Math.Min(ms, top) / top * FrameTimeH);
+      plots.Add(new CardPlot(ReportItem.FrameTime, PlotX0, frameTimeY, PlotX1, frameTimeY + FrameTimeH, from, to, 0, top));
       foreach (var (position, _) in DisplayTimeStepsPlottable.Ticks(refreshMs, top).Where(t => t.Position > 0))
       {
         double y = YOf(position);
@@ -558,6 +567,7 @@ namespace MB.FramePacing.Charts
 
     private static void LatePanel(
       List<CardShape> parts,
+      List<CardPlot> plots,
       RunSection section,
       Func<PresentedFrame, double> seconds,
       Func<double, double> xOf,
@@ -592,6 +602,7 @@ namespace MB.FramePacing.Charts
       double max = points.Count > 0 ? points.Max(p => p.Share) : 0;
       double topShare = NiceCeiling(Math.Max(5, max * 1.25));
       double YOf(double share) => lateY + LateH - (share / topShare * LateH);
+      plots.Add(new CardPlot(ReportItem.LateShare, PlotX0, lateY, PlotX1, lateY + LateH, section.FromSeconds, section.ToSeconds, 0, topShare));
       foreach (double tick in new[] { 0, topShare / 2, topShare })
       {
         parts.Add(GridLine(YOf(tick)));
@@ -659,15 +670,21 @@ namespace MB.FramePacing.Charts
       TimeTicks(parts, section.FromSeconds, section.ToSeconds, xOf, lateY + LateH);
     }
 
+    /// <summary>
+    /// One cell per refresh, from each frame's first capture: a new shade with every frame, late frames red. A capture card sees whole refreshes,
+    /// so the refreshes between a frame's last capture and the next frame (captures that could not be decoded) are unknown cells; a camera sees
+    /// each frame until the next one. Frames with skipped frame indices before them, or torn, get a mark above the strip.
+    /// </summary>
     private static void StripPanel(
       List<CardShape> parts,
+      List<CardPlot> plots,
       IReadOnlyList<PresentedFrame> frames,
       Func<PresentedFrame, double> seconds,
       Func<double, double> xOf,
       double refreshMs,
       double from,
       double to,
-      long capturePeriodTicks,
+      ChartRun chart,
       double stripY
     )
     {
@@ -682,13 +699,24 @@ namespace MB.FramePacing.Charts
         );
         return;
       }
-      parts.Add(new TextShape(PlotX1, stripY - 16, "one cell per refresh, a new shade with every new frame, late frames red", "vsync-n", "end"));
+      plots.Add(new CardPlot(ReportItem.RefreshStrip, PlotX0, stripY, PlotX1, stripY + StripH, from, to, 0, 1));
+      int legend = parts.Count;
+      parts.Add(new TextShape(PlotX1, stripY - 16, string.Empty, "vsync-n", "end"));
       long refreshTicks = (long)Math.Round(refreshMs * TimeSpan.TicksPerMillisecond);
+      int Cells(long ticks) => refreshTicks > 0 ? (int)Math.Max(0, (ticks + (refreshTicks / 2)) / refreshTicks) : 1;
+      var marks = new StringBuilder();
+      bool anyUnknown = false;
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
-        long onScreen = frame.OnScreenTicks > 0 ? frame.OnScreenTicks : capturePeriodTicks;
-        int cells = refreshTicks > 0 ? (int)Math.Max(1, (onScreen + (refreshTicks / 2)) / refreshTicks) : 1;
+        long onScreen = frame.OnScreenTicks > 0 ? frame.OnScreenTicks : chart.CapturePeriodTicks;
+        int cells = Math.Max(1, Cells(onScreen));
+        int seen = cells;
+        if (!chart.Camera && i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment)
+        {
+          long shown = Math.Min(frame.LastSeenTicks + chart.CapturePeriodTicks, frames[i + 1].FirstSeenTicks) - frame.FirstSeenTicks;
+          seen = Math.Clamp(Cells(shown), 1, cells);
+        }
         string cls =
           (frame.Flags & PresentedFrameFlags.Late) != 0 ? "strip-late"
           : i % 2 == 0 ? "strip-a"
@@ -699,9 +727,31 @@ namespace MB.FramePacing.Charts
           double x = x0 + (c * cellW);
           if (x >= PlotX1)
             break;
-          parts.Add(new RectShape(cls, N(x + 0.5, 1), N(stripY, 0), N(Math.Max(0.5, Math.Min(cellW - 1, PlotX1 - x - 0.5)), 1), N(StripH, 0), "2"));
+          anyUnknown |= c >= seen;
+          parts.Add(
+            new RectShape(
+              c < seen ? cls : "neutral",
+              N(x + 0.5, 1),
+              N(stripY, 0),
+              N(Math.Max(0.5, Math.Min(cellW - 1, PlotX1 - x - 0.5)), 1),
+              N(StripH, 0),
+              "2"
+            )
+          );
         }
+        if (frame.SkippedBefore > 0 || (frame.Flags & PresentedFrameFlags.Torn) != 0)
+          marks.Append($"M{Fixed(x0 + 0.5, 1)} {Fixed(stripY - 2, 1)}L{Fixed(x0 - 3, 1)} {Fixed(stripY - 8, 1)}H{Fixed(x0 + 4, 1)}Z");
       }
+      AddPath(parts, "strip-mark", marks);
+      parts[legend] = new TextShape(
+        PlotX1,
+        stripY - 16,
+        "one cell per refresh, a new shade with every new frame, late frames red"
+          + (anyUnknown ? ", grey not decoded" : string.Empty)
+          + (marks.Length > 0 ? "; ▾ skipped frame indices or a tear" : string.Empty),
+        "vsync-n",
+        "end"
+      );
       TimeTicks(parts, from, to, xOf, stripY + StripH);
     }
 
@@ -768,7 +818,7 @@ namespace MB.FramePacing.Charts
     private static readonly double[] g_timeSteps = { 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600 };
 
     /// <summary>The time axis under a panel: a label every "nice" step, at most a dozen.</summary>
-    private static void TimeTicks(List<CardShape> parts, double from, double to, Func<double, double> xOf, double bottom)
+    internal static void TimeTicks(List<CardShape> parts, double from, double to, Func<double, double> xOf, double bottom)
     {
       double length = to - from;
       double step = g_timeSteps.FirstOrDefault(s => length / s <= 12, 3600);
@@ -782,9 +832,9 @@ namespace MB.FramePacing.Charts
       }
     }
 
-    private static LineShape GridLine(double y) => new LineShape("grid", N(PlotX0, 0), N(y, 1), N(PlotX1, 0), N(y, 1));
+    internal static LineShape GridLine(double y) => new LineShape("grid", N(PlotX0, 0), N(y, 1), N(PlotX1, 0), N(y, 1));
 
-    private static void AddPath(List<CardShape> parts, string cls, StringBuilder d)
+    internal static void AddPath(List<CardShape> parts, string cls, StringBuilder d)
     {
       if (d.Length > 0)
         parts.Add(new PathShape(cls, d.ToString()));
@@ -800,7 +850,7 @@ namespace MB.FramePacing.Charts
       return 100;
     }
 
-    private static string Ms1(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
+    internal static string Ms1(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 
     private static string Percent(double share) => share.ToString("P1", CultureInfo.InvariantCulture);
 

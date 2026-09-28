@@ -1,14 +1,15 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* 'render': draw a run of an analysis, or a section of it, as an SVG report (and PNG through a headless Edge or Chrome) from the analysis
-//* output (summary.json and the run's frames CSV), without the capture.
+//* 'render': draw a run of an analysis, or a section of it, as an SVG report and distribution cards (and PNG through a headless Edge or
+//* Chrome) from the analysis output (summary.json and the run's frames CSV), without the capture.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.CommandLine;
 using System.IO;
 using System.Linq;
@@ -51,8 +52,14 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "Show only these items (comma separated, the same ids as --hide; naming a tile keeps the tiles row for it).",
       };
+      string cardIds = string.Join(", ", DistributionCard.All.Select(c => c.Id));
+      var cardsOption = new Option<string>("--cards")
+      {
+        Description = $"The distribution cards to draw next to the report, comma separated: {cardIds}; 'all' (the default) or 'none'.",
+        DefaultValueFactory = _ => "all",
+      };
 
-      var command = new Command("render", "Draw an analysed run, or a section of it, as an SVG report (and PNG).")
+      var command = new Command("render", "Draw an analysed run, or a section of it, as an SVG report and distribution cards (and PNG).")
       {
         folderArgument,
         runOption,
@@ -65,6 +72,7 @@ namespace MB.FramePacing.App.Commands
         outputOption,
         hideOption,
         onlyOption,
+        cardsOption,
       };
       command.SetAction(parseResult =>
       {
@@ -84,6 +92,7 @@ namespace MB.FramePacing.App.Commands
           var options = parseResult.GetValue(onlyOption) is { } only ? ReportOptions.ShowOnly(ReportOptions.ParseIds(only)) : ReportOptions.Default;
           if (parseResult.GetValue(hideOption) is { } hide)
             options = options.Hide(ReportOptions.ParseIds(hide));
+          var cards = ParseCards(parseResult.GetValue(cardsOption)!);
           Directory.CreateDirectory(output);
           foreach (var run in runs)
           {
@@ -107,6 +116,19 @@ namespace MB.FramePacing.App.Commands
               parseResult.GetValue(pngOption),
               options
             );
+            files = files
+              .Concat(
+                ReportFiles.WriteCards(
+                  run.Chart,
+                  run.FilePrefix,
+                  output,
+                  cards,
+                  parseResult.GetValue(fromOption),
+                  parseResult.GetValue(toOption),
+                  parseResult.GetValue(pngOption)
+                )
+              )
+              .ToList();
             foreach (var file in files)
               AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");
           }
@@ -119,6 +141,24 @@ namespace MB.FramePacing.App.Commands
         }
       });
       return command;
+    }
+
+    /// <summary>The --cards ids: 'all', 'none', or known card ids.</summary>
+    private static IReadOnlyList<string> ParseCards(string text)
+    {
+      var ids = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+      if (ids is ["all"])
+        return DistributionCard.All.Select(c => c.Id).ToList();
+      if (ids is ["none"])
+        return Array.Empty<string>();
+      foreach (string id in ids)
+      {
+        if (!DistributionCard.IsKnown(id))
+          throw new InvalidOperationException(
+            $"Unknown card '{id}'. Known: {string.Join(", ", DistributionCard.All.Select(c => c.Id))}, or 'all' or 'none'."
+          );
+      }
+      return ids;
     }
   }
 }

@@ -128,6 +128,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
       (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`).
+    - Cards are shapes (`CardDrawing`: `RectShape`, `LineShape`, `PathShape`, `TextShape`, `GroupShape`, plus `CardPlot` per plot
+      area with its data range, for the GUI's zoom and hover and for tests that read values back); `SvgCardWriter` writes them.
+      `DistributionCard` builds the error and display time step histograms, the error percentiles and the drift (`render --cards`).
     - The frame timeline (`FrameTimelineCard`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
