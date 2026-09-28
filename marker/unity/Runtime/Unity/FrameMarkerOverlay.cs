@@ -59,12 +59,16 @@ namespace MB.FrameMarker.Unity
     private Material m_material;
 
     [Tooltip(
-      "How the marker is drawn: Shader (one quad with a dedicated shader, the fastest; needs shader model 3.5, else it draws Geometry), Bitmap (a module texture scaled up) or Geometry (pixel aligned quads, works everywhere). All draw the same pixels."
+      "How the marker is drawn, fastest first: Shader Packed Bits (one quad whose shader reads the 211 packed module bytes), Shader (one quad, a texel per module; both need shader model 3.5, else they draw Geometry), Bitmap (a module texture scaled up) or Geometry (pixel aligned quads, works everywhere). All draw the same pixels."
     )]
     [SerializeField]
-    private FrameMarkerRenderMode m_renderMode = FrameMarkerRenderMode.Shader;
+    private FrameMarkerRenderMode m_renderMode = FrameMarkerRenderMode.ShaderPackedBits;
 
-    [Tooltip("The Shader render mode's shader (Hidden/MB/FrameMarkerQuad, set when the component is added): referencing it keeps it in player builds.")]
+    [Tooltip("The Shader Packed Bits mode's shader (Hidden/MB/FrameMarkerQuadPacked, set when the component is added): referencing it keeps it in player builds.")]
+    [SerializeField]
+    private Shader m_packedShader;
+
+    [Tooltip("The Shader mode's shader (Hidden/MB/FrameMarkerQuad, set when the component is added): referencing it keeps it in player builds.")]
     [SerializeField]
     private Shader m_quadShader;
 
@@ -253,9 +257,18 @@ namespace MB.FrameMarker.Unity
           texture.DrawNow(options, origin, width, height);
         return;
       }
-      if (m_renderMode == FrameMarkerRenderMode.Shader)
+      if (m_renderMode == FrameMarkerRenderMode.ShaderPackedBits || m_renderMode == FrameMarkerRenderMode.Shader)
       {
-        var quad = sync ? m_syncQuad ??= new FrameMarkerQuad(m_quadShader) : m_mainQuad ??= new FrameMarkerQuad(m_quadShader);
+        bool packed = m_renderMode == FrameMarkerRenderMode.ShaderPackedBits;
+        if (m_mainQuad != null && m_mainQuad.PackedBits != packed)
+        {
+          // The mode changed at run time: the quads are made again for it
+          m_mainQuad.Dispose();
+          m_syncQuad?.Dispose();
+          (m_mainQuad, m_syncQuad) = (null, null);
+        }
+        var shader = packed ? m_packedShader : m_quadShader;
+        var quad = sync ? m_syncQuad ??= new FrameMarkerQuad(packed, shader) : m_mainQuad ??= new FrameMarkerQuad(packed, shader);
         if (quad.Update(matrix, options, origin, height))
         {
           quad.DrawNow(width);
@@ -264,7 +277,7 @@ namespace MB.FrameMarker.Unity
         if (!m_shaderWarned)
         {
           Debug.LogWarning(
-            $"FrameMarkerOverlay: shader {FrameMarkerQuad.ShaderName} is not available (it needs shader model 3.5, and in player builds the component's Quad Shader or 'Always Included Shaders'). Drawing geometry instead.",
+            $"FrameMarkerOverlay: shader {(packed ? FrameMarkerQuad.PackedShaderName : FrameMarkerQuad.ShaderName)} is not available (it needs shader model 3.5, and in player builds the component's reference or 'Always Included Shaders'). Drawing geometry instead.",
             this
           );
           m_shaderWarned = true;

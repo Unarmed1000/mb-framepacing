@@ -20,6 +20,7 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 | `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |
 | `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                                   |
 | `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests                           |
+| `marker/shaders/`                                 | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan  |
 | `data/VERSION`                                    | Version of the data libraries (released with `data-v*` tags)                                                    |
 | `data/python/`                                    | Python data library `mb_framepacing_data` (reads; standard library, Python 3.11) + unittest tests               |
 | `data/cpp/`                                       | C++20 data library `mb_framepacingdata` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests |
@@ -216,6 +217,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
 - **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested). The C++ public API
   has one header per type; `FrameMarker.hpp` includes them all and declares the functions. CI runs `tools/check_one_type_per_file.py`.
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
+- **Reference shaders (`marker/shaders/`, BSD):** one quad whose fragment shader finds each pixel's module, from the packed bits
+  (`Bits()` as constants; the fastest way to draw the marker) or a texel per module. One folder per API: `hlsl/` (`FrameMarker.hlsl` is
+  the lookup, also included by the Unity shaders; `build_upm.py` copies it into the package), `gl/`, `gles2/` (GLSL ES 1.00: no
+  integers, so float arithmetic, and `#error` without `highp`: not 100 % exact with `mediump`), `vulkan/`. `python
+tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs it); `--render` (needs `pip install moderngl` and a
+  GPU; `VULKAN_SDK` for DXC and SPIRV-Cross) draws every one and compares every pixel with `modules_to_bitmap`. Run it after touching
+  a shader, and `check_in_unity.py` (also `--graphics glcore|gles|vulkan`) after touching the Unity ones.
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
   `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a

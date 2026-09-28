@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Draws the marker as one opaque quad with a dedicated shader (Hidden/MB/FrameMarkerQuad): per frame only a 41x41 module texture (1681
-//* bytes) changes; the quad and its material stay. Encode the marker with MarkerGenerator.TryGenerateModules and pass the matrix to Update,
+//* Draws the marker as one opaque quad with a dedicated shader: per frame only its module texture changes, either the module matrix's packed
+//* bits as they are (Hidden/MB/FrameMarkerQuadPacked, 211 bytes, the fastest) or one texel per module (Hidden/MB/FrameMarkerQuad, a 41x41
+//* texture of 1681 bytes); the quad and its material stay. Encode the marker with MarkerGenerator.TryGenerateModules and pass the matrix to Update,
 //* then DrawNow (GL immediate mode, the way FrameMarkerOverlay draws) or draw Mesh with Material from your own command buffer, with
 //* PixelSpace.Projection. Needs shader model 3.5; add the shader to 'Always Included Shaders' in player builds. Update never allocates.
 //*
@@ -18,15 +19,19 @@ namespace MB.FrameMarker.Unity
 {
   public sealed class FrameMarkerQuad : IDisposable
   {
-    /// <summary>The shader's name, for Shader.Find and 'Always Included Shaders'.</summary>
+    /// <summary>The one-texel-per-module shader's name, for Shader.Find and 'Always Included Shaders'.</summary>
     public const string ShaderName = "Hidden/MB/FrameMarkerQuad";
 
+    /// <summary>The packed bits shader's name, for Shader.Find and 'Always Included Shaders'.</summary>
+    public const string PackedShaderName = "Hidden/MB/FrameMarkerQuadPacked";
+
     private static readonly int g_modules = Shader.PropertyToID("_Modules");
+    private static readonly int g_bits = Shader.PropertyToID("_Bits");
     private static readonly int g_moduleSizePx = Shader.PropertyToID("_ModuleSizePx");
     private static readonly int g_quietZoneModules = Shader.PropertyToID("_QuietZoneModules");
     private static readonly int g_size = Shader.PropertyToID("_Size");
 
-    private readonly byte[] m_texels = new byte[Marker.QrModuleCount * Marker.QrModuleCount];
+    private readonly byte[] m_texels;
     private readonly Vector3[] m_positions = new Vector3[4];
     private readonly Vector2[] m_uvs = new Vector2[4];
     private readonly Vertex[] m_corners = new Vertex[4];
@@ -36,29 +41,37 @@ namespace MB.FrameMarker.Unity
     private int m_outputHeight = -1;
 
     /// <summary>
-    /// A quad with <paramref name="shader"/> (null: found by <see cref="ShaderName"/>), or an instance whose <see cref="Material"/> is null
-    /// when the shader is not available. A shader a component references is kept in player builds; one only found by name must be in
-    /// 'Always Included Shaders'.
+    /// A quad that reads the module matrix's packed bits (<paramref name="packedBits"/>, a 211 x 1 texture) or one texel per module (a 41 x
+    /// 41 texture), drawn with <paramref name="shader"/> (null: found by <see cref="PackedShaderName"/> or <see cref="ShaderName"/>); an
+    /// instance whose <see cref="Material"/> is null when the shader is not available. A shader a component references is kept in player
+    /// builds; one only found by name must be in 'Always Included Shaders'.
     /// </summary>
-    public FrameMarkerQuad(Shader shader = null)
+    public FrameMarkerQuad(bool packedBits = false, Shader shader = null)
     {
-      shader = shader != null ? shader : Shader.Find(ShaderName);
+      PackedBits = packedBits;
+      int width = packedBits ? Marker.MaxPackedModuleByteCount : Marker.QrModuleCount;
+      int height = packedBits ? 1 : Marker.QrModuleCount;
+      m_texels = new byte[width * height];
+      shader = shader != null ? shader : Shader.Find(packedBits ? PackedShaderName : ShaderName);
       if (shader == null || !shader.isSupported)
         return;
       Material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
-      m_texture = new Texture2D(Marker.QrModuleCount, Marker.QrModuleCount, TextureFormat.R8, false, true)
+      m_texture = new Texture2D(width, height, TextureFormat.R8, false, true)
       {
-        name = "MB Frame Marker Modules",
+        name = packedBits ? "MB Frame Marker Packed Bits" : "MB Frame Marker Modules",
         hideFlags = HideFlags.HideAndDontSave,
         filterMode = FilterMode.Point,
         wrapMode = TextureWrapMode.Clamp,
       };
-      Material.SetTexture(g_modules, m_texture);
+      Material.SetTexture(packedBits ? g_bits : g_modules, m_texture);
       Mesh = new Mesh { name = "MB Frame Marker Quad", hideFlags = HideFlags.HideAndDontSave };
       Mesh.SetVertices(m_positions);
       Mesh.SetUVs(0, m_uvs);
       Mesh.SetIndices(new[] { 0, 1, 3, 3, 1, 2 }, MeshTopology.Triangles, 0);
     }
+
+    /// <summary>The texture holds the module matrix's packed bits (211 bytes) instead of one texel per module (1681).</summary>
+    public bool PackedBits { get; }
 
     /// <summary>The material with the module texture and the marker's size, or null when the shader is not available.</summary>
     public Material Material { get; private set; }
@@ -75,9 +88,16 @@ namespace MB.FrameMarker.Unity
     {
       if (Material == null || matrix.IsEmpty || !Marker.IsValid(options))
         return false;
-      // One texel per module, top row first (the shader loads texel (column, row) directly)
-      if (!Marker.ModulesToBitmap(matrix, new Options(1, 0), default, m_texels, Marker.QrModuleCount, Marker.QrModuleCount, PixelFormat.Gray8))
+      if (PackedBits)
+      {
+        // The packed bits as they are; a sync marker's 79 bytes leave the rest of the texture unused
+        matrix.Bits.CopyTo(m_texels);
+      }
+      else if (!Marker.ModulesToBitmap(matrix, new Options(1, 0), default, m_texels, Marker.QrModuleCount, Marker.QrModuleCount, PixelFormat.Gray8))
+      {
+        // One texel per module, top row first (the shader loads texel (column, row) directly)
         return false;
+      }
       m_texture.SetPixelData(m_texels, 0);
       m_texture.Apply(false);
       Material.SetFloat(g_moduleSizePx, options.ModuleSizePx);

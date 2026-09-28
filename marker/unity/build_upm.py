@@ -40,12 +40,16 @@ META_IMPORTERS = {
     ".json": "PackageManifestImporter:\n  externalObjects: {}\n",
     ".md": "TextScriptImporter:\n  externalObjects: {}\n",
     ".shader": "ShaderImporter:\n  externalObjects: {}\n  defaultTextures: []\n  nonModifiableTextures: []\n",
+    ".hlsl": "ShaderIncludeImporter:\n  externalObjects: {}\n",
 }
 META_FOOTER = "  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
 
 # A script's default references are assigned when its component is added: the overlay references its shader, so builds keep it
 DEFAULT_REFERENCES = {
-    "Runtime/Unity/FrameMarkerOverlay.cs": {"m_quadShader": "Runtime/Unity/FrameMarkerQuad.shader"},
+    "Runtime/Unity/FrameMarkerOverlay.cs": {
+        "m_packedShader": "Runtime/Unity/FrameMarkerQuadPacked.shader",
+        "m_quadShader": "Runtime/Unity/FrameMarkerQuad.shader",
+    },
 }
 SHADER_FILE_ID = 4800000
 
@@ -134,6 +138,8 @@ def assemble(output: Path, version: str) -> None:
     copy_sources(MARKER_DIR / "csharp" / "source", output / "Runtime" / "Core", "*.cs")
     _ = shutil.copy2(SCRIPT_DIR / "Runtime" / "Core" / "MB.FrameMarker.asmdef", output / "Runtime" / "Core" / "MB.FrameMarker.asmdef")
     copy_sources(SCRIPT_DIR / "Runtime" / "Unity", output / "Runtime" / "Unity", "*")
+    # The shaders include the reference shaders' module lookup, the same code other engines use
+    _ = shutil.copy2(MARKER_DIR / "shaders" / "hlsl" / "FrameMarker.hlsl", output / "Runtime" / "Unity" / "FrameMarker.hlsl")
     _ = shutil.copytree(SCRIPT_DIR / "Samples~", output / "Samples~")
 
     for path in sorted(output.rglob("*")):

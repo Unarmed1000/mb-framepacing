@@ -85,17 +85,17 @@ comes from Unity.
 
 ## Settings
 
-| Setting                 | Meaning                                                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stored Height           | Height of the frames the capture tool stores; picks the module size. 0 = the output height                                                                                                                                           |
-| MJPEG                   | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                                                                                                                                             |
-| Module Size Px          | Fixed module size in output pixels (overrides Stored Height)                                                                                                                                                                         |
-| Sync Marker             | Also draw the small sync marker at the bottom left: it detects tearing, and camera capture needs it for its timing                                                                                                                   |
-| Draw When Idle          | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus                                                                                                                                |
-| Material                | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored                                                                                                                        |
-| Render Mode             | How it is drawn, the same pixels every way, fastest first: Shader (one quad with a dedicated shader, shader model 3.5; the default), Bitmap (a module texture scaled up) or Geometry (quads, works everywhere); `RenderMode` in code |
-| Quad Shader             | The Shader mode's shader, set when the component is added; referencing it keeps it in player builds                                                                                                                                  |
-| Sequence Marker Seconds | How long the start and end markers stay on screen (default 0.1 s: three frames of a 30 fps capture; one captured frame is enough)                                                                                                    |
+| Setting                    | Meaning                                                                                                                                                                                                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Stored Height              | Height of the frames the capture tool stores; picks the module size. 0 = the output height                                                                                                                                                                                                                               |
+| MJPEG                      | The capture card delivers MJPEG: 4 instead of 3 stored pixels per module                                                                                                                                                                                                                                                 |
+| Module Size Px             | Fixed module size in output pixels (overrides Stored Height)                                                                                                                                                                                                                                                             |
+| Sync Marker                | Also draw the small sync marker at the bottom left: it detects tearing, and camera capture needs it for its timing                                                                                                                                                                                                       |
+| Draw When Idle             | Draw frame markers (run id 0) while no run is active; `DrawWhenIdle` in code, e.g. off while in menus                                                                                                                                                                                                                    |
+| Material                   | Optional unlit vertex color material without blending, depth test or culling; default Hidden/Internal-Colored                                                                                                                                                                                                            |
+| Render Mode                | How it is drawn, the same pixels every way, fastest first: Shader Packed Bits (one quad whose shader reads the 211 packed module bytes; the default), Shader (one quad, a texel per module; both need shader model 3.5), Bitmap (a module texture scaled up) or Geometry (quads, works everywhere); `RenderMode` in code |
+| Packed Shader, Quad Shader | The two shader modes' shaders, set when the component is added; referencing them keeps them in player builds                                                                                                                                                                                                             |
+| Sequence Marker Seconds    | How long the start and end markers stay on screen (default 0.1 s: three frames of a 30 fps capture; one captured frame is enough)                                                                                                                                                                                        |
 
 ## How it draws, and the rules
 
@@ -107,8 +107,8 @@ apply:
 - **Last in the frame:** nothing may be drawn over or blended with the marker.
 - **HDR output off:** tone mapping would change its black and white. The overlay warns once when HDR output is active (Unity 2023.1+).
 - **Pixel exact:** vertices lie on pixel corners and map 1:1 to output pixels, no half-pixel offset.
-- **Player builds:** the Shader render mode (the default) uses `Hidden/MB/FrameMarkerQuad`, which the component references (Quad
-  Shader), so builds keep it. Without it (or without shader model 3.5) the overlay warns once and draws geometry, whose default
+- **Player builds:** the shader render modes use `Hidden/MB/FrameMarkerQuadPacked` (the default) and `Hidden/MB/FrameMarkerQuad`,
+  which the component references, so builds keep them. Without it (or without shader model 3.5) the overlay warns once and draws geometry, whose default
   material uses the built-in shader `Hidden/Internal-Colored`. If the marker is missing in a build, add the shaders under **Project
   Settings → Graphics → Always Included Shaders**, or assign a material.
 
@@ -141,8 +141,9 @@ commands.DrawMesh(markerMesh.Mesh, Matrix4x4.identity, material);
 
 `FrameMarkerGL.DrawQuads` draws marker quads with GL immediate mode into the current render target, the way the overlay does.
 
-`FrameMarkerQuad` draws the marker as one opaque quad with the dedicated shader `Hidden/MB/FrameMarkerQuad`: per frame only a 41×41
-module texture changes. `quad.Update(matrix, options, origin, Screen.height)`, then `quad.DrawNow(Screen.width)` (GL immediate mode) or
+`FrameMarkerQuad` draws the marker as one opaque quad with a dedicated shader: per frame only its texture changes, the 211 packed module
+bytes (`new FrameMarkerQuad(packedBits: true)`, `Hidden/MB/FrameMarkerQuadPacked`) or a 41×41 texel per module (`Hidden/MB/FrameMarkerQuad`).
+`quad.Update(matrix, options, origin, Screen.height)`, then `quad.DrawNow(Screen.width)` (GL immediate mode) or
 draw `quad.Mesh` with `quad.Material` from a command buffer with `PixelSpace.Projection`. It needs shader model 3.5 (`Material` is null
 without it).
 

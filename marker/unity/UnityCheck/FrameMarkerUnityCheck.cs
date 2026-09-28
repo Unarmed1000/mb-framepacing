@@ -36,7 +36,18 @@ public static class FrameMarkerUnityCheck
     try
     {
       failures += CheckModuleDigest(Environment.GetEnvironmentVariable("MB_FRAMEMARKER_TEST_DATA"));
-      foreach (var method in new[] { "FrameMarkerGL", "FrameMarkerMesh", "FrameMarkerTexture", "FrameMarkerQuad GL", "FrameMarkerQuad mesh" })
+      foreach (
+        var method in new[]
+        {
+          "FrameMarkerGL",
+          "FrameMarkerMesh",
+          "FrameMarkerTexture",
+          "FrameMarkerQuad GL",
+          "FrameMarkerQuad mesh",
+          "FrameMarkerQuad packed GL",
+          "FrameMarkerQuad packed mesh",
+        }
+      )
         failures += CheckRendering(method);
       failures += CheckTexture();
     }
@@ -150,10 +161,10 @@ public static class FrameMarkerUnityCheck
               texture.DrawNow(options, origin, Width, Height);
               break;
             default:
-              quad ??= new FrameMarkerQuad();
+              quad ??= new FrameMarkerQuad(packedBits: method.Contains("packed", StringComparison.Ordinal));
               if (!quad.Update(matrix, options, origin, Height))
                 throw new InvalidOperationException("FrameMarkerQuad.Update failed (shader not available?)");
-              if (method == "FrameMarkerQuad GL")
+              if (method.EndsWith(" GL", StringComparison.Ordinal))
               {
                 GL.Clear(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
                 quad.DrawNow(Width);

@@ -10,7 +10,8 @@ shows the **animation error**: how far what the game animated is from what was a
 - **`MB.FrameMarker.Unity`** (`Runtime/Unity`):
   - `FrameMarkerOverlay`: add it to a GameObject and the marker is drawn at the end of every frame, on top of everything.
   - `BeginRun` / `EndRun` / `RunFor`: bracket the part to measure with start and end markers.
-  - `FrameMarkerQuad`: the marker as one quad with a dedicated shader (`Hidden/MB/FrameMarkerQuad`, shader model 3.5).
+  - `FrameMarkerQuad`: the marker as one quad with a dedicated shader, from the packed bits (`Hidden/MB/FrameMarkerQuadPacked`) or a
+    texel per module (`Hidden/MB/FrameMarkerQuad`); shader model 3.5.
   - `FrameMarkerMesh` and `PixelSpace`: the marker as a static grid with per-frame indices, drawn from your own render pipeline code.
   - `FrameMarkerTexture`: the marker as a `Texture2D` at module resolution, for UI or anything that shows an image.
 - **Samples:** Benchmark (a camera pan measured as one run).
@@ -19,12 +20,15 @@ shows the **animation error**: how far what the game animated is from what was a
 
 All draw exactly the same pixels; per frame, for the 41×41 main marker:
 
-| #   | Way                                                    | Per frame                                     | Needs                                        |
-| --- | ------------------------------------------------------ | --------------------------------------------- | -------------------------------------------- |
-| 1   | Overlay **Render Mode: Shader** (the default)          | A 1,681 byte module texture and one quad      | Shader model 3.5 (it falls back to Geometry) |
-| 2   | `FrameMarkerMesh` in your command buffer               | About 2,600 indices; the grid's vertices stay | Your own render pipeline code                |
-| 3   | Overlay **Render Mode: Bitmap** (`FrameMarkerTexture`) | A 41×41 RGBA texture drawn scaled up          | Nothing                                      |
-| 4   | Overlay **Render Mode: Geometry**                      | About 440 rectangles in GL immediate mode     | Nothing: works on every graphics API         |
+| #   | Way                                                       | Per frame                                           | Needs                                                        |
+| --- | --------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| 1   | Overlay **Render Mode: Shader Packed Bits** (the default) | The 211 packed bytes (a 211×1 texture) and one quad | Shader model 3.5 (it falls back to Geometry)                 |
+| 2   | Overlay **Render Mode: Shader**                           | A 1,681 byte module texture and one quad            | Shader model 3.5 (it falls back to Geometry)                 |
+| 3   | `FrameMarkerMesh` in your command buffer                  | About 2,600 indices; the grid's vertices stay       | Your own render pipeline code                                |
+| 4   | Overlay **Render Mode: Bitmap** (`FrameMarkerTexture`)    | A 41×41 RGBA texture drawn scaled up                | Nothing                                                      |
+| 5   | Overlay **Render Mode: Geometry**                         | About 440 rectangles in GL immediate mode           | Nothing: works on every graphics API, OpenGL ES 2.0 included |
+
+The shaders' module lookup is the reference shaders' (`FrameMarker.hlsl`, from `marker/shaders` in the repository).
 
 ## Quick start
 

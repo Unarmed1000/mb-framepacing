@@ -108,63 +108,40 @@ void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runI
 That is the simplest to add. The same matrix draws in other forms, and one encode can feed several; **most efficient first**, per
 frame for the 41×41 main marker (about 440 dark runs):
 
-1. **A dedicated shader:** one opaque quad whose fragment shader looks its module up in a 41×41 texture; per frame only the texture's
-   1,681 bytes change. Below.
-2. **`GridVertices` + `ModulesToGridIndices`:** a static grid of vertices (every module corner; 1768 for the main marker, 680 for the
+1. **A dedicated shader reading the packed bits:** one opaque quad whose fragment shader takes each module's bit from `Bits()`, set as
+   211 bytes of constants; below.
+2. **A dedicated shader reading a texel per module:** the same quad, the modules in a 41×41 texture (1,681 bytes per frame); below.
+3. **`GridVertices` + `ModulesToGridIndices`:** a static grid of vertices (every module corner; 1768 for the main marker, 680 for the
    sync marker) that you upload once, and per frame only the indices of the dark runs: about 2,600 (10 KB as 32 bit, 5 KB as 16 bit;
    the grid fits 16 bit indices). The grid stays valid while the kind's symbol size, the options and the origin do.
-3. **`ModulesToBitmap` at module resolution:** with `ModuleSizePx` 1 and origin (0, 0), a 41×41 image to draw as a texture scaled up
+4. **`ModulesToBitmap` at module resolution:** with `ModuleSizePx` 1 and origin (0, 0), a 41×41 image to draw as a texture scaled up
    by a whole number with point filtering (1,681 pixels per frame).
-4. **`ModulesToIndexed`** (4 vertices and 6 indices per quad, for index buffers) or **`ModulesToTriangles`** (above): about 1,750
+5. **`ModulesToIndexed`** (4 vertices and 6 indices per quad, for index buffers) or **`ModulesToTriangles`** (above): about 1,750
    vertices and 2,600 indices, or 2,600 vertices, rebuilt every frame.
-5. **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs (about 440).
-6. **`ModulesToBitmap` at full size:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA
+6. **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs (about 440).
+7. **`ModulesToBitmap` at full size:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA
    buffers take the same bytes, since the marker is black and white), for software rendering, video frames and images.
 
 `ModuleMatrix::Bits()` gives the packed bits themselves (1 bit per module, row-major, most significant bit first).
 
 ### A dedicated shader
 
-Draw one quad covering the marker (`MarkerSizePx(options, kind)` pixels square at the origin) and give each corner the marker-local pixel
-coordinate as its texture coordinate: (0, 0) top-left, (size, size) bottom-right, +y down, whatever your API's y axis. Every fragment then
-gets `(px + 0.5, py + 0.5)`, and `floor(uv / ModuleSizePx)` is exact on every platform. The module texture is `ModulesToBitmap(matrix,
-{1, 0}, {0, 0}, texels, 41, 41, PixelFormat::Gray8)` uploaded as a 41×41 single channel texture (R8, no filtering, no mip maps), row 0
-the symbol's top row; per frame only these 1681 bytes change. A sync marker uses the top-left 25×25 of it.
+[`marker/shaders`](../marker/shaders/README.md) has ready-made shaders for Direct3D (HLSL), OpenGL 3.3 and OpenGL ES 3.0, OpenGL ES 2.0 and
+Vulkan (GLSL), each reading the packed bits or a texel per module; its README says how to draw them with each API. In short: the vertex
+shader makes one quad from the vertex index (draw 4 vertices as a triangle strip, no vertex buffer; OpenGL ES 2.0 needs a buffer of the
+4 corners) and hands on the marker-local pixel coordinate, (0, 0) top-left, +y down. Every fragment then gets `(px + 0.5, py + 0.5)`,
+`floor(uv / ModuleSizePx)` is exact on every platform, and the fragment shader outputs pure black or white:
 
-```hlsl
-Texture2D<float> Modules;   // 41 x 41, R8
-cbuffer Marker { float ModuleSizePx; float QuietZoneModules; float Size; }   // Size: 41, or 25 for the sync marker
+- **Packed bits:** module `i = row × size + column` is bit `7 − (i mod 8)` of byte `i / 8` of `Bits()`; copy the 211 bytes (79 for the
+  sync marker) as they are into 14 `uint4` of constants. OpenGL ES 2.0 has no integers: there they come in a 211×1 texture and the
+  bit comes from float arithmetic.
+- **A texel per module:** `ModulesToBitmap(matrix, {1, 0}, {0, 0}, texels, 41, 41, PixelFormat::Gray8)` uploaded as a 41×41 single
+  channel texture (no filtering, no mip maps), row 0 the symbol's top row; a sync marker uses its top-left 25×25.
 
-float4 MarkerFragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
-{
-  int2 module = int2(floor(uv / ModuleSizePx)) - int(QuietZoneModules);
-  float luma = 1.0;
-  if (all(module >= 0) && all(module < int(Size)))
-    luma = Modules.Load(int3(module, 0)) < 0.5 ? 0.0 : 1.0;
-  return float4(luma, luma, luma, 1.0);
-}
-```
-
-```glsl
-uniform sampler2D modules;   // 41 x 41, R8
-uniform float moduleSizePx;
-uniform float quietZoneModules;
-uniform float size;          // 41, or 25 for the sync marker
-in vec2 uv;
-out vec4 color;
-
-void main()
-{
-  ivec2 module = ivec2(floor(uv / moduleSizePx)) - int(quietZoneModules);
-  float luma = 1.0;
-  if (all(greaterThanEqual(module, ivec2(0))) && all(lessThan(module, ivec2(int(size)))))
-    luma = texelFetch(modules, module, 0).r < 0.5 ? 0.0 : 1.0;
-  color = vec4(luma, luma, luma, 1.0);
-}
-```
-
-Draw it opaque, without blending, depth test or culling. `Load` and `texelFetch` read the texel row as uploaded, so the texture needs no
-flip on any API. Unity's package ships this shader (`Hidden/MB/FrameMarkerQuad`, [Unity](unity.md)).
+Draw it opaque, without blending, depth test or culling, last. On OpenGL ES 2.0 the shaders need `highp` floats in the fragment shader
+(they do not compile without, rather than draw a wrong marker); draw geometry there instead. `tools/check_shaders.py --render` draws
+every shader and compares every pixel with `ModulesToBitmap`. Unity's package draws with the same lookup (`Hidden/MB/FrameMarkerQuadPacked`,
+[Unity](unity.md)).
 
 Triangles are `(TL, TR, BL) (BL, TR, BR)`, clockwise on screen. Size your buffers with the `Max…Count()` functions; they fit every
 marker kind.

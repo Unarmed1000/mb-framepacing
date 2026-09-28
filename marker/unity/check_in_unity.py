@@ -38,7 +38,7 @@ def parse_args() -> Arguments:
     _ = parser.add_argument("--keep", action="store_true", help="Keep the temporary project and log.")
     _ = parser.add_argument(
         "--graphics",
-        choices=["d3d11", "d3d12", "glcore", "vulkan", "metal"],
+        choices=["d3d11", "d3d12", "glcore", "gles", "vulkan", "metal"],
         help="Force a graphics API (Unity's -force-<api>); default: the platform's. Textures and the y axis differ between them.",
     )
     return parser.parse_args(namespace=Arguments())

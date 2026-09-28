@@ -105,6 +105,8 @@ install(TARGETS mb_framemarker EXPORT mb_framemarkerTargets
 # The library's own license and the one third-party component compiled into it (qrcodegen)
 install(FILES ${MB_FRAMEMARKER_META_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framemarker)
 install(FILES ${MB_FRAMEMARKER_LEGAL_DIR}/licenses/qrcodegen-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framemarker/licenses)
+# The reference shaders that draw the marker as one quad (marker/shaders; shaders/ in a release archive)
+install(DIRECTORY ${MB_FRAMEMARKER_META_DIR}/shaders/ DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framemarker/shaders)
 install(EXPORT mb_framemarkerTargets NAMESPACE mb:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framemarker)
 configure_package_config_file(cmake/mb_framemarkerConfig.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/mb_framemarkerConfig.cmake

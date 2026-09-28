@@ -42,6 +42,10 @@ PATTERNS = (
     "*.props",
     "*.slnx",
     "*.yml",
+    "*.shader",
+    "*.hlsl",
+    "*.vert",
+    "*.frag",
 )
 
 
@@ -61,12 +65,13 @@ def header_line(relative: str, identifier: str) -> str:
 
 
 def insert_at(relative: str, lines: list[str]) -> int:
-    """Where the identifier goes: inside the C# file header box, after a shebang or XML declaration, otherwise first."""
+    """Where the identifier goes: inside the C# file header box, after a shebang, XML declaration or GLSL #version line (which must
+    come first), otherwise first."""
     if relative.endswith(".cs"):
         for i, line in enumerate(lines[:HEADER_LINES]):
             if line.startswith("//* (c) "):
                 return i + 1
-    if lines and (lines[0].startswith("#!") or lines[0].startswith("<?xml")):
+    if lines and lines[0].startswith(("#!", "<?xml", "#version")):
         return 1
     return 0
 

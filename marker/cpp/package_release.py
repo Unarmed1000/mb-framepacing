@@ -4,7 +4,8 @@
 
   mb-framemarker-cpp-<version>.tar.gz and .zip, each holding one folder mb-framemarker-cpp-<version>/ with
     the library source tree (marker/cpp without build output), VERSION, LICENSE,
-    licenses/ (qrcodegen: compiled in; GoogleTest: fetched by the tests) and doc/ (marker format, integration guide)
+    licenses/ (qrcodegen: compiled in; GoogleTest: fetched by the tests), doc/ (marker format, integration guide) and shaders/ (the
+    reference shaders)
   SHA256SUMS
 
 With --verify the extracted archive is configured, built and tested standalone, and the consumer project
@@ -35,6 +36,8 @@ EXTRA_FILES = {
     "doc/marker-format.md": REPOSITORY_ROOT / "doc" / "marker-format.md",
     "doc/integrating.md": REPOSITORY_ROOT / "doc" / "integrating.md",
 }
+# The reference shaders (HLSL, GLSL for OpenGL, OpenGL ES 2.0 and Vulkan) that draw the marker as one quad
+EXTRA_DIRECTORIES = {"shaders": MARKER_DIR / "shaders"}
 
 
 class Arguments(argparse.Namespace):
@@ -70,6 +73,8 @@ def stage(root: Path) -> None:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         _ = shutil.copy2(source, target)
+    for name, source in EXTRA_DIRECTORIES.items():
+        _ = shutil.copytree(source, root / name)
 
 
 def create_archives(output: Path, version: str) -> list[Path]:
