@@ -596,8 +596,8 @@ namespace MB.FramePacing.Charts
       string note = $"whole run {Percent(pacing.LateShare)}";
       if (points.Any(p => p.Adapted))
         note =
-          $"amber: the frames' marker target frame time is above the run's usual {Ms1(usualTicks / (double)TimeSpan.TicksPerMillisecond)} ms; "
-          + $"whole run {Percent(pacing.LateShare)}";
+          $"red: late frames; amber: none late while the markers' target frame time is above the run's usual "
+          + $"{Ms1(usualTicks / (double)TimeSpan.TicksPerMillisecond)} ms; whole run {Percent(pacing.LateShare)}";
       parts.Add(new TextShape(PlotX1, lateY - 16, note, "vsync-n", "end"));
       double max = points.Count > 0 ? points.Max(p => p.Share) : 0;
       double topShare = NiceCeiling(Math.Max(5, max * 1.25));
@@ -610,8 +610,9 @@ namespace MB.FramePacing.Charts
           new TextShape(PlotX0 - 10, YOf(tick) + 4, tick == 0 ? "0" : $"{tick.ToString("0.##", CultureInfo.InvariantCulture)} %", "vsync-n", "end")
         );
       }
-      // Green where no frame in the window was late, red where some were, amber where the markers' target frame time is above the run's
-      // usual one; each stretch starts where the previous one ended, so the line is whole
+      // Red where frames in the window were late (each against its own target, so also when the pacer lowered its rate and still missed
+      // it), amber where none was late while the markers' target frame time is above the run's usual one, green where none was late at
+      // the usual target; each stretch starts where the previous one ended, so the line is whole
       var paths = new Dictionary<string, StringBuilder>
       {
         ["late-line-none"] = new StringBuilder(),
@@ -636,9 +637,9 @@ namespace MB.FramePacing.Charts
         last = (x, y);
       }
       static string Style(double share, bool isAdapted) =>
-        share <= 0 ? "late-line-none"
+        share > 0 ? "late-line"
         : isAdapted ? "late-line-adapted"
-        : "late-line";
+        : "late-line-none";
       if (perFrame)
       {
         foreach (var (x, share, isAdapted) in points)

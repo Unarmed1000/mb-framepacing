@@ -247,7 +247,10 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
   bad pacing; an error bar while the steps stay flat is delta time jitter.
 - **Frametime and CPU busy** (when the markers carry the CPU start time and CPU busy): the application side on the same grid, each
   frame's frametime (its CPU start to the next frame's) as a blue step and its CPU busy (until it was presented) as a faint bar.
-- **Share of late frames in the last 2 s:** the late frames among the frames of the 2 s before each frame.
+- **Share of late frames in the last 2 s:** the late frames among the frames of the 2 s before each frame. Red where frames were
+  late, each against its own target, so also when the pacer lowered its rate and still missed it; amber where none was late while
+  the markers' target frame time was above the run's usual one (a lowered rate that held); green where none was late at the usual
+  target.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red; grey where a capture card's captures
   could not be decoded, and a mark above frames with skipped frame indices before them (or a tear). Zoom in to see hold patterns
   such as 3-then-1.
