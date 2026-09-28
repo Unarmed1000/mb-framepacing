@@ -4,7 +4,7 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
   xmlns:charts="using:MB.FramePacing.Charts"
-  xmlns:scottplot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+  xmlns:views="using:MB.FramePacing.Gui.Views"
   x:Class="MB.FramePacing.Gui.Views.AnalysisView"
   x:DataType="vm:AnalysisViewModel"
 >
@@ -41,7 +41,7 @@
           Content="Save charts"
           Command="{Binding SaveChartsCommand}"
           IsEnabled="{Binding HasRun}"
-          ToolTip.Tip="Write the charts of every run as PNG images next to the reports (the same files as 'analyze --charts')."
+          ToolTip.Tip="Write the charts of every run as images next to the reports (the same files as 'analyze --charts')."
         />
       </Grid>
     </Border>
@@ -66,21 +66,21 @@
         <ComboBox ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="260" />
         <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding SelectedRun.StartText, FallbackValue=''}" />
       </Grid>
-      <!-- The headline tiles: RunHeadline builds them, the same the report's Timeline image shows -->
+      <!-- The headline tiles: RunHeadline builds them, the same the report card shows, in the card's tile style -->
       <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <WrapPanel ItemSpacing="10" LineSpacing="10" />
+            <WrapPanel ItemSpacing="8" LineSpacing="8" />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="charts:HeadlineTile">
             <Border Classes="tile" ToolTip.Tip="{Binding Explanation}">
-              <StackPanel>
-                <TextBlock Classes="caption" Text="{Binding Caption}" />
-                <StackPanel Orientation="Horizontal" Spacing="6">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="tileLabel" Text="{Binding Caption, Converter={x:Static views:UpperCaseConverter.Instance}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock Classes="tileValue" Classes.warning="{Binding Warning}" Text="{Binding Value}" />
-                  <TextBlock Classes="caption" VerticalAlignment="Bottom" Text="{Binding Detail}" />
+                  <TextBlock Classes="tileDetail" VerticalAlignment="Bottom" Text="{Binding Detail}" />
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -134,44 +134,51 @@
       </Expander>
     </StackPanel>
 
-    <!-- Charts -->
+    <!-- The report cards of the selected run: the Timeline zooms (wheel), pans (drag) and resets (double-click); the distributions follow
+         the section it shows -->
     <Border Grid.Row="3" Classes="card" Padding="4" IsVisible="{Binding HasRun}">
       <Grid>
-        <TabControl>
+        <TabControl SelectedIndex="{Binding SelectedCardIndex}">
           <TabItem Header="Timeline">
-            <!-- Four plots on one linked time axis need more height than the other tabs: the tab scrolls, the plots zoom -->
             <ScrollViewer>
-              <Grid x:Name="TimelinePanel" RowDefinitions="240,240,160,110">
-                <scottplot:AvaPlot x:Name="ErrorPlot" />
-                <scottplot:AvaPlot Grid.Row="1" x:Name="DisplayTimeStepPlot" />
-                <scottplot:AvaPlot Grid.Row="2" x:Name="LateSharePlot" />
-                <scottplot:AvaPlot Grid.Row="3" x:Name="RefreshStripPlot" />
-              </Grid>
+              <views:CardView x:Name="TimelineCardView" Drawing="{Binding TimelineCard}" CanZoom="True" Margin="8" />
             </ScrollViewer>
           </TabItem>
           <TabItem Header="Error histogram">
-            <scottplot:AvaPlot x:Name="ErrorHistogramPlot" />
+            <ScrollViewer>
+              <views:CardView x:Name="ErrorHistogramCardView" Drawing="{Binding ErrorHistogramCard}" Margin="8" />
+            </ScrollViewer>
           </TabItem>
           <TabItem Header="Error percentiles">
-            <scottplot:AvaPlot x:Name="ErrorPercentilePlot" />
+            <ScrollViewer>
+              <views:CardView x:Name="ErrorPercentilesCardView" Drawing="{Binding ErrorPercentilesCard}" Margin="8" />
+            </ScrollViewer>
           </TabItem>
           <TabItem Header="Display time step histogram">
-            <scottplot:AvaPlot x:Name="DisplayTimeStepHistogramPlot" />
+            <ScrollViewer>
+              <views:CardView x:Name="DisplayTimeStepHistogramCardView" Drawing="{Binding DisplayTimeStepHistogramCard}" Margin="8" />
+            </ScrollViewer>
           </TabItem>
           <TabItem Header="Drift">
-            <scottplot:AvaPlot x:Name="DriftPlot" />
+            <ScrollViewer>
+              <views:CardView x:Name="DriftCardView" Drawing="{Binding DriftCard}" Margin="8" />
+            </ScrollViewer>
           </TabItem>
         </TabControl>
-        <!-- Next to the tab headers: back to the whole run after zooming or panning (double-clicking a chart does the same) -->
-        <Button
-          x:Name="ResetZoomButton"
-          Content="Reset zoom"
-          HorizontalAlignment="Right"
-          VerticalAlignment="Top"
-          Margin="0,8,8,0"
-          Click="OnResetZoom"
-          ToolTip.Tip="Show every chart for the whole run again. Double-clicking a chart does the same."
-        />
+        <!-- Next to the tab headers: the section shown, back to the whole run, and saving the card as it is shown -->
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
+          <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding SectionText}" />
+          <Button
+            Content="Reset zoom"
+            Command="{Binding ResetRangeCommand}"
+            ToolTip.Tip="Show the whole run again. Double-clicking the Timeline does the same."
+          />
+          <Button
+            Content="Save view..."
+            Command="{Binding SaveViewCommand}"
+            ToolTip.Tip="Save the card on screen as it is shown (the section, zoomed), as SVG or PNG."
+          />
+        </StackPanel>
       </Grid>
     </Border>
   </Grid>

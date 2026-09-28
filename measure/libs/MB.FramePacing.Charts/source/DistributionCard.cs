@@ -133,7 +133,7 @@ namespace MB.FramePacing.Charts
       var card = Card.Start(
         section,
         "animation error by percentile",
-        "|animation error| by percentile of the frames with an animation error: how bad the worst frames are.",
+        "|animation error| by percentile of the presented frames (every frame with a measured error): how bad the worst frames are.",
         "|ANIMATION ERROR| BY PERCENTILE",
         sorted.Length > 0
           ? $"dashed: the {Ms(threshold)} ms error threshold; dotted: "
@@ -168,7 +168,7 @@ namespace MB.FramePacing.Charts
       foreach (double p in CurvePercentiles)
         d.Append(d.Length == 0 ? 'M' : 'L').Append($"{Fixed(plot.PixelX(p), 1)} {Fixed(plot.PixelY(Statistics.Percentile(sorted, p / 100)), 1)}");
       ReportCard.AddPath(card.Parts, "curve", d);
-      return card.Finish("percentile of the frames with an animation error");
+      return card.Finish("percentile of the presented frames");
     }
 
     private static CardDrawing BuildDrift(RunSection section)

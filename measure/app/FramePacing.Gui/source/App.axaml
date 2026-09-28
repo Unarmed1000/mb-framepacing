@@ -89,8 +89,8 @@
       <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="Padding" Value="14,10" />
-      <Setter Property="MinWidth" Value="130" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="MinWidth" Value="120" />
     </Style>
 
     <!-- Text roles -->
@@ -112,9 +112,22 @@
     <Style Selector="TextBlock.value">
       <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace" />
     </Style>
-    <Style Selector="TextBlock.tileValue">
-      <Setter Property="FontSize" Value="22" />
+    <!-- The headline tiles, after the report card's (.label, .tile-value and .vsync-n of its style sheet) -->
+    <Style Selector="TextBlock.tileLabel">
+      <Setter Property="Foreground" Value="{DynamicResource SubtleBrush}" />
+      <Setter Property="FontSize" Value="11" />
       <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="0.88" />
+    </Style>
+    <Style Selector="TextBlock.tileValue">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.tileDetail">
+      <Setter Property="Foreground" Value="{DynamicResource SubtleBrush}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="LetterSpacing" Value="0.44" />
+      <Setter Property="Margin" Value="0,0,0,3" />
     </Style>
     <Style Selector="TextBlock.ok">
       <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />

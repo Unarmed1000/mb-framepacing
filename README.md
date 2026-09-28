@@ -231,8 +231,10 @@ of the two causes of animation error dominates: frames with an error where the d
 early or dropped frames); frames with an error while the display time step stays even are **delta time jitter** (uneven animation
 steps).
 
-The **Timeline** tab puts everything on one time axis; zooming or panning one chart moves the others, and **Reset zoom** (or a
-double-click on a chart) shows the whole run again:
+The GUI draws the report's cards itself. The **Timeline** tab shows the report's panels on one time axis: the mouse wheel zooms
+around the pointer, dragging pans, and **Reset zoom** (or a double-click) shows the whole run again; hovering shows the frame under
+the pointer (its display time step, animation error, lateness, frametime and CPU busy). The distribution tabs follow the section the
+Timeline shows, and **Save view...** saves the card on screen, as it is zoomed, as SVG or PNG.
 
 The same panels as a report (below) of a test clip, a busy stretch at the full rate:
 
@@ -246,8 +248,9 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
 - **Frametime and CPU busy** (when the markers carry the CPU start time and CPU busy): the application side on the same grid, each
   frame's frametime (its CPU start to the next frame's) as a blue step and its CPU busy (until it was presented) as a faint bar.
 - **Share of late frames in the last 2 s:** the late frames among the frames of the 2 s before each frame.
-- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, a tick where frames were skipped.
-  Zoom in to see hold patterns such as 3-then-1.
+- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red; grey where a capture card's captures
+  could not be decoded, and a mark above frames with skipped frame indices before them (or a tear). Zoom in to see hold patterns
+  such as 3-then-1.
 
 The start of its busy stretch as a frame timeline (`render --timeline`): each frame's CPU work from its CPU start time for its CPU
 busy, when it was presented, and what every refresh showed:
@@ -257,12 +260,13 @@ busy, when it was presented, and what every refresh showed:
 When a few frames are far off everything else (a hitch of hundreds of milliseconds among errors of a few), the error and display
 time step scales cover the rest, and each frame beyond the scale gets a mark at the edge with its value; zoom out to see it whole.
 
-The other tabs show how the values are distributed. The count axes are logarithmic, so a handful of bad frames stays visible next
-to hundreds of good ones.
+The other tabs show how the values are distributed (`render` writes them as `run-<id>-<card>.svg` too). The count axes are
+logarithmic, so a handful of bad frames stays visible next to hundreds of good ones. The examples are test clips: a naive 5 ms timer's
+errors, and the display time steps of a game adapting its rate.
 
 | Animation error distribution                                       | Display time step distribution                                                   |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| ![Animation error histogram](doc/images/chart-error-histogram.png) | ![Display time step histogram](doc/images/chart-display-time-step-histogram.png) |
+| ![Animation error histogram](doc/images/chart-error-histogram.svg) | ![Display time step histogram](doc/images/chart-display-time-step-histogram.svg) |
 
 - **Animation error distribution:** how often each error occurred, in 0.1 ms bars for every capture source. Everything between the
   dashed lines (the error threshold, ±1 ms unless `--error-threshold-ms` changes it) counts as no error. Bars further out are real
@@ -273,7 +277,7 @@ to hundreds of good ones.
 - **Animation error by percentile:** every frame's absolute error, sorted. The flat part is the typical frame; the rise on the
   right shows how bad the worst 5 % and 1 % are, and makes two runs easy to compare.
 
-![Animation error by percentile](doc/images/chart-error-percentiles.png)
+![Animation error by percentile](doc/images/chart-error-percentiles.svg)
 
 The charts can also be written as PNG files next to the reports (`run-<id>-timeline.png`, `-error-histogram.png`,
 `-error-percentiles.png`, `-display-time-step-histogram.png`, `-drift.png`): `--charts` on the command line, **Save charts** in the GUI. The

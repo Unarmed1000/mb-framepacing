@@ -121,8 +121,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - A capture card captures at the display's native refresh rate: that is a fundamental assumption, not a setting. The analysis
     takes the capture period as the refresh period; display time steps are whole refreshes. `SyntheticCaptureSource` refuses a capture rate that differs
     from the refresh; `selftest --fps N` simulates an N Hz display.
-  - **Charts** live in `MB.FramePacing.Charts` (`RunCharts`, ScottPlot core, no GUI): the GUI draws them into its controls, and on request
-    (`--charts`, the GUI's "Save charts") `ChartFiles` writes them as `run-<id>-*.png` next to the reports. Test chart changes with
+  - **Charts** live in `MB.FramePacing.Charts` (no GUI): the report cards as shapes (below). The GUI draws them itself with `CardView`
+    (`FramePacing.Gui`, the style from `CardStyle`, which parses the SVG's style sheet; hover texts from `CardHover`); the Timeline card
+    zooms (wheel), pans (drag) and resets (double-click), the distribution tabs follow its section, and **Save view** writes the card
+    on screen as SVG or PNG (`CardImage`). DocImages checks the zoom, pan, reset and hover with headless input. `RunCharts` (ScottPlot)
+    still writes the `--charts` / "Save charts" PNGs (`ChartFiles`) until they move to the cards. Test chart changes with
     `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
     with `VideoClipTests` by linked source files).
     - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet

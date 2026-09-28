@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="495" viewBox="0 0 1180 495" role="img" aria-label="Run 1  '60-busy-swappy': display time step distribution">
+<title>Run 1  '60-busy-swappy': display time step distribution</title>
+<style>
+  text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+         font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
+  .card { fill: #1f242b; fill-opacity: 0.94; stroke: #8b949e; stroke-opacity: 0.25; stroke-width: 1; }
+  .title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { fill: #8b949e; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; fill: #8b949e; }
+  .vsync-n { font-size: 11px; fill: #6e7681; letter-spacing: 0.04em; }
+  .axis { font-size: 12px; fill: #c9d1d9; }
+  .vsync { stroke: #ffffff; stroke-opacity: 0.34; stroke-width: 1; stroke-dasharray: 3 4; }
+  .vsync-skip { stroke: #ffffff; stroke-opacity: 0.09; stroke-width: 1; stroke-dasharray: 2 6; }
+  .vsync-target { font-size: 11px; font-weight: 600; fill: #c9d1d9; letter-spacing: 0.04em; }
+  .vsync-n-skip { font-size: 11px; fill: #545b64; letter-spacing: 0.04em; }
+  .box { fill: #ffffff; fill-opacity: 0.06; stroke: #ffffff; stroke-opacity: 0.22; stroke-width: 1; }
+  .frame { font-size: 14px; font-weight: 700; }
+  .box-time { fill: #b1bac4; font-size: 12px; }
+  .arrow { stroke: #8b949e; stroke-width: 1.2; }
+  .arrowhead { fill: #8b949e; }
+  .ok { fill: #2ea043; }
+  .hold { fill: #2ea043; fill-opacity: 0.45; }
+  .again { fill: #d29922; }
+  .off { fill: #e5534b; }
+  .cell-text { font-size: 14px; font-weight: 700; fill: #ffffff; }
+  .dark-text { fill: #1c1f24; }
+  .zero { fill: #6e7681; }
+  .err { fill: #ff7b72; font-weight: 600; }
+  .err-pill { fill: #e5534b; fill-opacity: 0.16; }
+  .neutral { fill: #3d444d; }
+  .lane { font-size: 15px; font-weight: 600; }
+  .same { fill: #7ee787; font-weight: 600; }
+
+  .tile { fill: #ffffff; fill-opacity: 0.05; stroke: #ffffff; stroke-opacity: 0.12; stroke-width: 1; }
+  .tile-value { font-size: 20px; font-weight: 600; }
+  .grid { stroke: #ffffff; stroke-opacity: 0.1; stroke-width: 1; }
+  .zero-line { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; }
+  .bar { fill: #e5534b; }
+  .display-line { stroke: #2ea043; stroke-width: 2; fill: none; }
+  .step-line { stroke: #58a6ff; stroke-width: 1.2; fill: none; stroke-linejoin: round; }
+  .strip-a { fill: #6e7681; }
+  .strip-b { fill: #adbac7; }
+  .average-line { stroke: #d29922; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  .average-text { fill: #d29922; font-size: 12px; }
+
+  .band { fill: #ffffff; fill-opacity: 0.06; }
+  .held { stroke: #2ea043; stroke-width: 2.5; fill: none; }
+  .held-late { stroke: #e5534b; stroke-width: 2.5; fill: none; }
+  .bar-range { fill: #e5534b; fill-opacity: 0.3; }
+  .held-fill { fill: #2ea043; }
+  .held-fill-late { fill: #e5534b; }
+  .held-range { fill: #2ea043; fill-opacity: 0.3; }
+  .held-range-late { fill: #e5534b; fill-opacity: 0.3; }
+  .riser { stroke: #ffffff; stroke-opacity: 0.3; stroke-width: 1; fill: none; }
+  .late-line { stroke: #e5534b; stroke-width: 1.5; fill: none; stroke-linejoin: round; }
+  .late-line-adapted { stroke: #d29922; stroke-width: 1.5; fill: none; stroke-linejoin: round; }
+  .late-line-none { stroke: #2ea043; stroke-width: 1.5; fill: none; stroke-linejoin: round; }
+  .frametime { stroke: #58a6ff; stroke-width: 2.5; fill: none; }
+  .frametime-range { fill: #58a6ff; fill-opacity: 0.3; }
+  .frametime-fill { fill: #58a6ff; }
+  .cpu-busy { fill: #58a6ff; fill-opacity: 0.22; }
+  .strip-late { fill: #e5534b; }
+  .strip-mark { fill: #e6edf3; }
+  .hist-bar { fill: #58a6ff; }
+  .curve { stroke: #58a6ff; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  .clip-mark { fill: #e5534b; }
+  .clip-text { font-size: 11px; fill: #e6edf3; }
+  .warn { fill: #d29922; }
+</style>
+<rect class="card" x="0.5" y="0.5" width="1179" height="494" rx="14"/>
+<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '60-busy-swappy': display time step distribution</text>
+<text x="20.0" y="54.0" text-anchor="start" class="sub">How long each frame stayed on screen, in 0.1 ms bins: steady pacing is one tall bar, uneven pacing adds bars at other steps.</text>
+<text x="20.0" y="73.0" text-anchor="start" class="sub">The whole run: 8.0 s, 336 presented frames.</text>
+<text x="20.0" y="115.0" text-anchor="start" class="label">DISPLAY TIME STEP DISTRIBUTION</text>
+<text x="1140.0" y="115.0" text-anchor="end" class="vsync-n">presented frames on a log scale; dashed: the median, 16.7 ms</text>
+<text x="110.0" y="449.0" text-anchor="middle" class="vsync-n">0</text>
+<text x="521.8" y="449.0" text-anchor="middle" class="vsync-n">16.7 ms</text>
+<text x="933.7" y="449.0" text-anchor="middle" class="vsync-n">33.3 ms</text>
+<line class="grid" x1="110" y1="403.7" x2="1140" y2="403.7"/>
+<text x="100.0" y="407.7" text-anchor="end" class="vsync-n">1</text>
+<line class="grid" x1="110" y1="312.8" x2="1140" y2="312.8"/>
+<text x="100.0" y="316.8" text-anchor="end" class="vsync-n">10</text>
+<line class="grid" x1="110" y1="221.9" x2="1140" y2="221.9"/>
+<text x="100.0" y="225.9" text-anchor="end" class="vsync-n">100</text>
+<line class="grid" x1="110" y1="131.0" x2="1140" y2="131.0"/>
+<text x="100.0" y="135.0" text-anchor="end" class="vsync-n">1,000</text>
+<rect class="hist-bar" x="521.55" y="196.4" width="2.22" height="234.6"/>
+<rect class="hist-bar" x="931.73" y="207.5" width="2.22" height="223.5"/>
+<line class="average-line" x1="521.8" y1="131" x2="521.8" y2="431"/>
+<text x="625.0" y="471.0" text-anchor="middle" class="vsync-n">display time step (ms)</text>
+</svg>

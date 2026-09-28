@@ -1,7 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Analysis page: pick a capture, analyse it, show warnings, per run statistics and the per-frame data for the charts.
+//* Analysis page: pick a capture, analyse it, show warnings, per run statistics and the report cards of the selected run. The cards show one
+//* section of the run (all of it at first): zooming and panning the Timeline card chooses it, and the distribution cards follow.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -25,6 +26,23 @@ namespace MB.FramePacing.Gui.ViewModels
     private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
     private AnalysisReport? m_report;
+    private RunSection? m_section;
+    private CardHover? m_hover;
+
+    /// <summary>The Timeline card shows the panels only: the page has its own tiles and title.</summary>
+    public static readonly ReportOptions TimelineOptions = ReportOptions.ShowOnly(
+      new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.FrameTime, ReportItem.LateShare, ReportItem.RefreshStrip }
+    );
+
+    /// <summary>The cards in the order of the page's tabs: the Timeline (the report's panels), then the distributions.</summary>
+    public static readonly IReadOnlyList<string> CardIds = new[]
+    {
+      "report",
+      DistributionCard.ErrorHistogram,
+      DistributionCard.ErrorPercentiles,
+      DistributionCard.DisplayTimeStepHistogram,
+      DistributionCard.Drift,
+    };
 
     public AnalysisViewModel(IDialogService dialogs, GuiSettings settings)
     {
@@ -89,11 +107,125 @@ namespace MB.FramePacing.Gui.ViewModels
     [NotifyPropertyChangedFor(nameof(HasRun))]
     public partial RunViewModel? SelectedRun { get; set; }
 
+    /// <summary>The Timeline card of the section.</summary>
+    [ObservableProperty]
+    public partial CardDrawing? TimelineCard { get; set; }
+
+    [ObservableProperty]
+    public partial CardDrawing? ErrorHistogramCard { get; set; }
+
+    [ObservableProperty]
+    public partial CardDrawing? ErrorPercentilesCard { get; set; }
+
+    [ObservableProperty]
+    public partial CardDrawing? DisplayTimeStepHistogramCard { get; set; }
+
+    [ObservableProperty]
+    public partial CardDrawing? DriftCard { get; set; }
+
+    /// <summary>The tab shown: an index into <see cref="CardIds"/>.</summary>
+    [ObservableProperty]
+    public partial int SelectedCardIndex { get; set; }
+
+    /// <summary>Which part of the run the cards show.</summary>
+    [ObservableProperty]
+    public partial string SectionText { get; set; } = string.Empty;
+
     public bool IsIdle => !IsBusy;
 
     public bool HasRun => SelectedRun != null;
 
     public bool HasWarnings => Warnings.Count > 0;
+
+    /// <summary>Show <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of the selected run (seconds since its first frame), kept inside the
+    /// run and at least a few capture periods long.</summary>
+    public void ShowRange(double fromSeconds, double toSeconds)
+    {
+      if (SelectedRun?.Chart is not { } chart)
+        return;
+      var whole = RunSection.Whole(chart);
+      double shortest = Math.Min(whole.ToSeconds, Math.Max(0.01, 4.0 * chart.CapturePeriodTicks / TimeSpan.TicksPerSecond));
+      double length = Math.Clamp(toSeconds - fromSeconds, shortest, whole.ToSeconds);
+      double from = Math.Clamp(fromSeconds, 0, whole.ToSeconds - length);
+      ShowSection(from <= 0 && length >= whole.ToSeconds ? whole : RunSection.Create(chart, from, from + length));
+    }
+
+    /// <summary>Back to the whole run.</summary>
+    [RelayCommand]
+    private void ResetRange()
+    {
+      if (SelectedRun?.Chart is { } chart)
+        ShowSection(RunSection.Whole(chart));
+    }
+
+    /// <summary>What the cards show at a point of one of their plots (the frame, the bin, the percentile).</summary>
+    public string? HoverText(CardPlot plot, double x, double y) => m_hover?.Describe(plot, x, y);
+
+    /// <summary>Save the card on screen, as it is zoomed, as SVG or PNG.</summary>
+    [RelayCommand]
+    private async Task SaveViewAsync()
+    {
+      var card = SelectedCardIndex switch
+      {
+        0 => TimelineCard,
+        1 => ErrorHistogramCard,
+        2 => ErrorPercentilesCard,
+        3 => DisplayTimeStepHistogramCard,
+        _ => DriftCard,
+      };
+      if (card == null || m_section is not { } section)
+        return;
+      string suffix = section.IsWholeRun
+        ? string.Empty
+        : string.Create(CultureInfo.InvariantCulture, $"-{section.FromSeconds:0.###}s-{section.ToSeconds:0.###}s");
+      string name = $"run-{section.Run.Run.RunId}-{CardIds[Math.Clamp(SelectedCardIndex, 0, CardIds.Count - 1)]}{suffix}";
+      var path = await m_dialogs.SaveFileAsync("Save the chart as it is shown", name, new[] { ("SVG image", "svg"), ("PNG image", "png") });
+      if (path == null)
+        return;
+      try
+      {
+        CardImage.Save(card, path);
+        ErrorText = string.Empty;
+        SummaryText = $"Saved {path}";
+      }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+      {
+        ErrorText = "Could not save the chart: " + ex.Message;
+      }
+    }
+
+    /// <summary>A new run keeps the range shown when the run has it, else shows all of itself.</summary>
+    partial void OnSelectedRunChanged(RunViewModel? value)
+    {
+      if (value?.Chart is not { } chart)
+      {
+        ShowSection(null);
+        return;
+      }
+      var whole = RunSection.Whole(chart);
+      bool keep = m_section is { IsWholeRun: false } shown && shown.ToSeconds <= whole.ToSeconds;
+      ShowSection(keep ? RunSection.Create(chart, m_section!.FromSeconds, m_section.ToSeconds) : whole);
+    }
+
+    private void ShowSection(RunSection? section)
+    {
+      m_section = section;
+      m_hover = section != null ? new CardHover(section) : null;
+      TimelineCard = section != null ? ReportCard.Build(section, TimelineOptions) : null;
+      ErrorHistogramCard = section != null ? DistributionCard.Build(DistributionCard.ErrorHistogram, section) : null;
+      ErrorPercentilesCard = section != null ? DistributionCard.Build(DistributionCard.ErrorPercentiles, section) : null;
+      DisplayTimeStepHistogramCard = section != null ? DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section) : null;
+      DriftCard = section != null ? DistributionCard.Build(DistributionCard.Drift, section) : null;
+      SectionText = section switch
+      {
+        null => string.Empty,
+        { IsWholeRun: true } => string.Create(CultureInfo.InvariantCulture, $"The whole run: {section.ToSeconds:0.0} s"),
+        _ => string.Create(
+          CultureInfo.InvariantCulture,
+          $"{section.FromSeconds:0.000}–{section.ToSeconds:0.000} s of {RunSection.Whole(section.Run).ToSeconds:0.0} s"
+        ),
+      };
+    }
 
     /// <summary>Analyse a capture right after it was recorded.</summary>
     public void AnalyzeDirectory(string directory)

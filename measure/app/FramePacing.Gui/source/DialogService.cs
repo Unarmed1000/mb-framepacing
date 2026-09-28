@@ -1,12 +1,13 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Folder/file pickers and "show in file manager", behind an interface so the view models stay free of UI types.
+//* Folder/file pickers, the save dialog and "show in file manager", behind an interface so the view models stay free of UI types.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -40,6 +41,21 @@ namespace MB.FramePacing.Gui
     {
       var files = await m_topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false });
       return files.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    public async Task<string?> SaveFileAsync(string title, string suggestedName, IReadOnlyList<(string Name, string Extension)> types)
+    {
+      var file = await m_topLevel.StorageProvider.SaveFilePickerAsync(
+        new FilePickerSaveOptions
+        {
+          Title = title,
+          SuggestedFileName = suggestedName,
+          DefaultExtension = types.Count > 0 ? types[0].Extension : null,
+          FileTypeChoices = types.Select(t => new FilePickerFileType(t.Name) { Patterns = new[] { "*." + t.Extension } }).ToList(),
+          ShowOverwritePrompt = true,
+        }
+      );
+      return file?.TryGetLocalPath();
     }
 
     public async Task CopyToClipboardAsync(string text)

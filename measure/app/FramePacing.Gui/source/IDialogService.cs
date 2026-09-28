@@ -8,6 +8,7 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace MB.FramePacing.Gui
@@ -17,6 +18,9 @@ namespace MB.FramePacing.Gui
     Task<string?> PickFolderAsync(string title, string? startDirectory);
 
     Task<string?> PickFileAsync(string title);
+
+    /// <summary>Ask where to save a file: <paramref name="types"/> are (name, extension without the dot) pairs, the first the default.</summary>
+    Task<string?> SaveFileAsync(string title, string suggestedName, IReadOnlyList<(string Name, string Extension)> types);
 
     void ShowInFileManager(string directory);
 

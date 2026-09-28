@@ -337,6 +337,83 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(error!.Message, Does.Contain("frametimes").And.Contain("Known:").And.Contain(ReportItem.RefreshStrip));
     }
 
+    /// <summary>The GUI's style comes from the SVG's sheet: text starts from the 'text' rule, and a later rule of the sheet wins, as in CSS.</summary>
+    [Test]
+    public void CardStyle_ResolvesTheSheetLikeCss()
+    {
+      var text = CardStyle.Resolve(string.Empty, text: true);
+      Assert.That((text.Fill, text.FontSize, text.TabularNumbers), Is.EqualTo(("#e6edf3", 13.0, true)));
+      var warning = CardStyle.Resolve("tile-value warn", text: true);
+      Assert.That((warning.Fill, warning.FontSize, warning.FontWeight), Is.EqualTo(("#d29922", 20.0, 600)), ".warn comes later in the sheet");
+      var label = CardStyle.Resolve("label", text: true);
+      Assert.That((label.FontSize, label.LetterSpacingEm, label.Fill), Is.EqualTo((11.0, 0.08, "#8b949e")));
+      var vsync = CardStyle.Resolve("vsync", text: false);
+      Assert.That(vsync.StrokeDashArray, Is.EqualTo(new[] { 3.0, 4.0 }));
+      Assert.That((vsync.Stroke, vsync.StrokeOpacity, vsync.Fill), Is.EqualTo(("#ffffff", 0.34, (string?)null)));
+      var curve = CardStyle.Resolve("curve", text: false);
+      Assert.That((curve.Fill, curve.StrokeWidth, curve.RoundJoins), Is.EqualTo(("none", 2.0, true)));
+      Assert.That(CardStyle.Resolve("card", text: false).FillOpacity, Is.EqualTo(0.94));
+    }
+
+    /// <summary>Every class a card draws with is in the style sheet, so the GUI draws every shape the way the SVG shows it.</summary>
+    [Test]
+    public void CardStyle_HasEveryClassTheCardsUse()
+    {
+      var run = Synthetic(240 * 10);
+      var section = RunSection.Create(run, 4, 5);
+      var drawings = new List<CardDrawing> { ReportCard.Build(section), FrameTimelineCard.Build(RunSection.Create(run, 4, 4.1)) };
+      drawings.AddRange(DistributionCard.All.Select(card => DistributionCard.Build(card.Id, section)));
+      var known = CardStyle.Rules.Select(rule => rule.Selector).ToHashSet();
+      IEnumerable<string> Classes(IEnumerable<CardShape> shapes) =>
+        shapes.SelectMany(shape =>
+          shape switch
+          {
+            RectShape r => new[] { r.Class },
+            LineShape l => new[] { l.Class },
+            PathShape p => new[] { p.Class },
+            TextShape t => new[] { t.Class },
+            GroupShape g => Classes(g.Children),
+            _ => Array.Empty<string>(),
+          }
+        );
+      var used = drawings.SelectMany(d => Classes(d.Shapes)).SelectMany(c => c.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToHashSet();
+      Assert.That(used, Is.Not.Empty);
+      Assert.That(used.Where(c => !known.Contains(c)), Is.Empty, "classes without a rule");
+    }
+
+    /// <summary>The hover text: the frame shown at a time (the last one first seen by then), a histogram's bin, a percentile.</summary>
+    [Test]
+    public void CardHover_DescribesThePointUnderThePointer()
+    {
+      var run = Synthetic(240 * 10);
+      var section = RunSection.Whole(run);
+      var hover = new CardHover(section);
+      var frames = run.Run.Frames;
+      double Seconds(int i) => (frames[i].FirstSeenTicks - frames[0].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
+      Assert.That(hover.FrameAt(Seconds(100)), Is.SameAs(frames[100]));
+      Assert.That(hover.FrameAt((Seconds(100) + Seconds(101)) / 2), Is.SameAs(frames[100]), "until the next frame appears");
+      Assert.That(hover.FrameAt(-1), Is.SameAs(frames[0]));
+
+      var drawing = ReportCard.Build(section);
+      var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
+      // Frame 97 is late (every 97th): held two refreshes, one refresh off
+      string text = hover.Describe(error, Seconds(97), 0)!;
+      Assert.That(text, Does.StartWith($"Frame 97 at {Seconds(97).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)} s (late)"));
+      Assert.That(text, Does.Contain("display time step 8.33 ms").And.Contain("animation error -4.17 ms"));
+
+      var histogram = DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section).Plots.Single();
+      var steps = RunHistograms.Create(run.Run).DisplayDeltaMs;
+      var tallest = steps.Bins.MaxBy(b => b.Count)!;
+      Assert.That(
+        hover.Describe(histogram, tallest.CenterMs, 0),
+        Is.EqualTo(
+          $"display time step {tallest.CenterMs.ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture)} ms (bin of 0.1 ms): {tallest.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} frames"
+        )
+      );
+      var percentiles = DistributionCard.Build(DistributionCard.ErrorPercentiles, section).Plots.Single();
+      Assert.That(hover.Describe(percentiles, 150, 0), Does.StartWith("p100.0: |animation error|"), "clamped to 100");
+    }
+
     /// <summary>
     /// The refresh strip: a capture card's refreshes between a frame's last capture and the next frame (not decoded) are unknown cells, a
     /// camera's frame lasts until the next one; frames with skipped frame indices before them, or torn, get a mark above the strip.
