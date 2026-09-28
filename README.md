@@ -23,7 +23,7 @@ allocate nothing per frame:
 | Your application                 | Marker library                                                                               | Guide                                        |
 | -------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | C++ (any engine or graphics API) | [`marker/cpp`](marker/cpp): C++20, CMake, no dependencies                                    | [Integrating the marker](doc/integrating.md) |
-| C# / .NET                        | [`marker/csharp`](marker/csharp): `MB.FrameMarker`, .NET Standard 2.0, no dependencies       | [Integrating the marker](doc/integrating.md) |
+| C# / .NET                        | [`marker/csharp`](marker/csharp): `MB.FrameMarker`, .NET Standard 2.1, no dependencies       | [Integrating the marker](doc/integrating.md) |
 | Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component | [Unity](doc/unity.md)                        |
 | Python 3.11+                     | [`marker/python`](marker/python): `mb_framemarker`, standard library only                    | [Python library](marker/python/README.md)    |
 
@@ -421,7 +421,7 @@ flowchart TB
     subgraph marker["marker/: goes into your application"]
         L["marker/cpp: mb_framemarker<br/>C++20 library"]
         R["marker-render<br/>golden test images"]
-        CS["marker/csharp: MB.FrameMarker<br/>C# library (.NET Standard 2.0)"]
+        CS["marker/csharp: MB.FrameMarker<br/>C# library (.NET Standard 2.1)"]
         U["marker/unity<br/>Unity package + helpers"]
     end
     subgraph dotnet["measure/ (.NET 10): records and analyses"]
@@ -443,7 +443,7 @@ flowchart TB
 | ------------------------- | ------------------------------------------------------------------------------------------------- |
 | `marker/`                 | **Goes into your application**: the marker libraries and their version                            |
 | `marker/cpp/`             | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check |
-| `marker/csharp/`          | The general C# marker library `MB.FrameMarker` (.NET Standard 2.0, C# 9) and its NUnit tests      |
+| `marker/csharp/`          | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests      |
 | `marker/unity/`           | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)      |
 | `measure/`                | **Measures it**: the recording and analysis tools and their version                               |
 | `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                                     |

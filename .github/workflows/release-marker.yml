@@ -140,7 +140,7 @@ jobs:
           https://github.com/${GITHUB_REPOSITORY}.git#upm/v${VERSION}
           \`\`\`
 
-          ## C# (.NET Standard 2.0)
+          ## C# (.NET Standard 2.1)
 
           The general library is \`marker/csharp\` at this tag.
           EOF

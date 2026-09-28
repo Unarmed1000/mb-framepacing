@@ -12,6 +12,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Buffers.Binary;
 
 namespace MB.FrameMarker
 {
@@ -121,95 +122,95 @@ namespace MB.FrameMarker
     public static long SecondsToTicks(double seconds) => (long)Math.Round(seconds * TicksPerSecond);
 
     /// <summary>
-    /// Serialize the payload into <paramref name="destination"/> at <paramref name="offset"/>. Start markers append the metadata, other kinds
-    /// ignore it. <see cref="MaxEncodedPayloadByteCount"/> bytes are always enough. Returns the number of bytes written, or 0 if the
-    /// destination is too small.
+    /// Serialize the payload into <paramref name="destination"/>. Start markers append the metadata, other kinds ignore it.
+    /// <see cref="MaxEncodedPayloadByteCount"/> bytes are always enough. Returns the number of bytes written, or 0 if the destination is too
+    /// small.
     /// </summary>
-    public static int EncodePayload(in Payload payload, in StartMetadata metadata, byte[] destination, int offset = 0)
+    public static int EncodePayload(in Payload payload, in StartMetadata metadata, Span<byte> destination)
     {
       bool isStart = payload.Kind == MarkerKind.SequenceStart;
       int byteCount =
         isStart ? StartPayloadByteCount
         : payload.Kind == MarkerKind.Sync ? SyncPayloadByteCount
         : PayloadByteCount;
-      if (destination == null || offset < 0 || destination.Length - offset < byteCount)
+      if (destination.Length < byteCount)
         return 0;
 
-      destination[offset] = PayloadMagic0;
-      destination[offset + 1] = PayloadMagic1;
-      destination[offset + 2] = PayloadFormatVersion;
-      destination[offset + OffsetKind] = (byte)payload.Kind;
-      WriteLittleEndian(destination, offset + OffsetFrameIndex, payload.FrameIndex, 8);
+      destination[0] = PayloadMagic0;
+      destination[1] = PayloadMagic1;
+      destination[2] = PayloadFormatVersion;
+      destination[OffsetKind] = (byte)payload.Kind;
+      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(OffsetFrameIndex), payload.FrameIndex);
       // A sync marker is the start of the header: magic, format version, kind and frame index
       if (payload.Kind == MarkerKind.Sync)
         return byteCount;
-      WriteLittleEndian(destination, offset + OffsetAnimationTicks, unchecked((ulong)payload.AnimationTicks), 8);
-      WriteLittleEndian(destination, offset + OffsetRunId, payload.RunId, 4);
-      WriteLittleEndian(destination, offset + OffsetIntendedDisplayTicks, unchecked((ulong)payload.IntendedDisplayTicks), 8);
-      WriteLittleEndian(destination, offset + OffsetTargetFrameTicks, payload.TargetFrameTicks, 4);
-      WriteLittleEndian(destination, offset + OffsetCpuStartTicks, unchecked((ulong)payload.CpuStartTicks), 8);
-      WriteLittleEndian(destination, offset + OffsetCpuBusyTicks, payload.CpuBusyTicks, 4);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetAnimationTicks), payload.AnimationTicks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetRunId), payload.RunId);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetIntendedDisplayTicks), payload.IntendedDisplayTicks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetTargetFrameTicks), payload.TargetFrameTicks);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetCpuStartTicks), payload.CpuStartTicks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetCpuBusyTicks), payload.CpuBusyTicks);
       if (isStart)
       {
-        WriteLittleEndian(destination, offset + OffsetStartUtcTicks, unchecked((ulong)metadata.UtcTicks), 8);
-        metadata.SequenceId.TryCopyTo(destination, offset + OffsetSequenceId);
+        BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetStartUtcTicks), metadata.UtcTicks);
+        metadata.SequenceId.TryCopyTo(destination.Slice(OffsetSequenceId));
       }
       return byteCount;
     }
 
-    /// <summary>Serialize a frame or end marker payload (start markers need <see cref="EncodePayload(in Payload, in StartMetadata, byte[], int)"/>).</summary>
-    public static int EncodePayload(in Payload payload, byte[] destination, int offset = 0) => EncodePayload(payload, default, destination, offset);
+    /// <summary>Serialize a frame or end marker payload (start markers need the overload with <see cref="StartMetadata"/>).</summary>
+    public static int EncodePayload(in Payload payload, Span<byte> destination) => EncodePayload(payload, default, destination);
 
-    /// <summary>Parse the wire format. Returns false on a wrong length, magic, format version or an unknown kind.</summary>
-    public static bool TryDecodePayload(byte[] source, int offset, int count, out Payload payload, out StartMetadata metadata)
+    /// <summary>
+    /// Parse the wire format: <paramref name="source"/> is exactly one payload. Returns false on a wrong length, magic, format version or an
+    /// unknown kind.
+    /// </summary>
+    public static bool TryDecodePayload(ReadOnlySpan<byte> source, out Payload payload, out StartMetadata metadata)
     {
       payload = default;
       metadata = default;
       if (
-        source == null
-        || offset < 0
-        || count < SyncPayloadByteCount
-        || source.Length - offset < count
-        || source[offset] != PayloadMagic0
-        || source[offset + 1] != PayloadMagic1
-        || source[offset + 2] != PayloadFormatVersion
-        || source[offset + OffsetKind] > (byte)MarkerKind.Sync
+        source.Length < SyncPayloadByteCount
+        || source[0] != PayloadMagic0
+        || source[1] != PayloadMagic1
+        || source[2] != PayloadFormatVersion
+        || source[OffsetKind] > (byte)MarkerKind.Sync
       )
         return false;
 
-      var kind = (MarkerKind)source[offset + OffsetKind];
+      var kind = (MarkerKind)source[OffsetKind];
       if (kind == MarkerKind.Sync)
       {
-        if (count != SyncPayloadByteCount)
+        if (source.Length != SyncPayloadByteCount)
           return false;
-        payload = new Payload(ReadLittleEndian(source, offset + OffsetFrameIndex, 8), 0, 0, kind);
+        payload = new Payload(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)), 0, 0, kind);
         return true;
       }
-      if (count < PayloadByteCount)
+      if (source.Length < PayloadByteCount)
         return false;
       if (kind == MarkerKind.SequenceStart)
       {
-        if (count != StartPayloadByteCount)
+        if (source.Length != StartPayloadByteCount)
           return false;
         metadata = new StartMetadata(
-          unchecked((long)ReadLittleEndian(source, offset + OffsetStartUtcTicks, 8)),
-          SequenceId.FromBytes(source, offset + OffsetSequenceId)
+          BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetStartUtcTicks)),
+          SequenceId.FromBytes(source.Slice(OffsetSequenceId, SequenceId.ByteCount))
         );
       }
-      else if (count != PayloadByteCount)
+      else if (source.Length != PayloadByteCount)
       {
         return false;
       }
 
       payload = new Payload(
-        ReadLittleEndian(source, offset + OffsetFrameIndex, 8),
-        unchecked((long)ReadLittleEndian(source, offset + OffsetAnimationTicks, 8)),
-        (uint)ReadLittleEndian(source, offset + OffsetRunId, 4),
+        BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
+        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetAnimationTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
         kind,
-        unchecked((long)ReadLittleEndian(source, offset + OffsetIntendedDisplayTicks, 8)),
-        (uint)ReadLittleEndian(source, offset + OffsetTargetFrameTicks, 4),
-        unchecked((long)ReadLittleEndian(source, offset + OffsetCpuStartTicks, 8)),
-        (uint)ReadLittleEndian(source, offset + OffsetCpuBusyTicks, 4)
+        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetIntendedDisplayTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetTargetFrameTicks)),
+        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetCpuStartTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetCpuBusyTicks))
       );
       return true;
     }
@@ -218,64 +219,58 @@ namespace MB.FrameMarker
     /// Convert quads to a triangle list: 6 vertices per quad, (TL, TR, BL) (BL, TR, BR), clockwise on screen (+y down). Returns the number
     /// of vertices written, or 0 if the destination is too small.
     /// </summary>
-    public static int QuadsToTriangles(Quad[] quads, int quadCount, Vertex[] destination)
+    public static int QuadsToTriangles(ReadOnlySpan<Quad> quads, Span<Vertex> destination)
     {
-      if (quads == null || destination == null || quadCount < 0 || quadCount > quads.Length || destination.Length < quadCount * 6)
+      if (destination.Length < quads.Length * 6)
         return 0;
-      for (int i = 0; i < quadCount; ++i)
-        WriteTriangles(quads[i], destination, i * 6);
-      return quadCount * 6;
+      for (int i = 0; i < quads.Length; ++i)
+        WriteTriangles(quads[i], destination.Slice(i * 6, 6));
+      return quads.Length * 6;
     }
 
     /// <summary>
     /// Convert quads to an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on screen.
     /// <paramref name="baseVertex"/> is added to every index. Returns an empty count if a destination is too small.
     /// </summary>
-    public static IndexedCount QuadsToIndexed(Quad[] quads, int quadCount, Vertex[] vertices, int[] indices, int baseVertex = 0)
+    public static IndexedCount QuadsToIndexed(ReadOnlySpan<Quad> quads, Span<Vertex> vertices, Span<int> indices, int baseVertex = 0)
     {
-      if (
-        quads == null
-        || vertices == null
-        || indices == null
-        || quadCount < 0
-        || quadCount > quads.Length
-        || vertices.Length < quadCount * 4
-        || indices.Length < quadCount * 6
-      )
+      if (vertices.Length < quads.Length * 4 || indices.Length < quads.Length * 6)
         return default;
-      for (int i = 0; i < quadCount; ++i)
-        WriteIndexed(quads[i], vertices, i * 4, indices, i * 6, baseVertex + (i * 4));
-      return new IndexedCount(quadCount * 4, quadCount * 6);
+      for (int i = 0; i < quads.Length; ++i)
+        WriteIndexed(quads[i], vertices.Slice(i * 4, 4), indices.Slice(i * 6, 6), baseVertex + (i * 4));
+      return new IndexedCount(quads.Length * 4, quads.Length * 6);
     }
 
-    internal static void WriteTriangles(in Quad quad, Vertex[] destination, int offset)
+    /// <summary>The quad's two triangles into <paramref name="destination"/> (6 vertices).</summary>
+    internal static void WriteTriangles(in Quad quad, Span<Vertex> destination)
     {
       byte luma = quad.Dark ? (byte)0 : (byte)255;
       var topLeft = new Vertex(quad.Left, quad.Top, luma);
       var topRight = new Vertex(quad.Right, quad.Top, luma);
       var bottomRight = new Vertex(quad.Right, quad.Bottom, luma);
       var bottomLeft = new Vertex(quad.Left, quad.Bottom, luma);
-      destination[offset] = topLeft;
-      destination[offset + 1] = topRight;
-      destination[offset + 2] = bottomLeft;
-      destination[offset + 3] = bottomLeft;
-      destination[offset + 4] = topRight;
-      destination[offset + 5] = bottomRight;
+      destination[0] = topLeft;
+      destination[1] = topRight;
+      destination[2] = bottomLeft;
+      destination[3] = bottomLeft;
+      destination[4] = topRight;
+      destination[5] = bottomRight;
     }
 
-    internal static void WriteIndexed(in Quad quad, Vertex[] vertices, int vertexOffset, int[] indices, int indexOffset, int firstIndex)
+    /// <summary>The quad's 4 vertices and 6 indices (starting at <paramref name="firstIndex"/>).</summary>
+    internal static void WriteIndexed(in Quad quad, Span<Vertex> vertices, Span<int> indices, int firstIndex)
     {
       byte luma = quad.Dark ? (byte)0 : (byte)255;
-      vertices[vertexOffset] = new Vertex(quad.Left, quad.Top, luma);
-      vertices[vertexOffset + 1] = new Vertex(quad.Right, quad.Top, luma);
-      vertices[vertexOffset + 2] = new Vertex(quad.Right, quad.Bottom, luma);
-      vertices[vertexOffset + 3] = new Vertex(quad.Left, quad.Bottom, luma);
-      indices[indexOffset] = firstIndex;
-      indices[indexOffset + 1] = firstIndex + 1;
-      indices[indexOffset + 2] = firstIndex + 3;
-      indices[indexOffset + 3] = firstIndex + 3;
-      indices[indexOffset + 4] = firstIndex + 1;
-      indices[indexOffset + 5] = firstIndex + 2;
+      vertices[0] = new Vertex(quad.Left, quad.Top, luma);
+      vertices[1] = new Vertex(quad.Right, quad.Top, luma);
+      vertices[2] = new Vertex(quad.Right, quad.Bottom, luma);
+      vertices[3] = new Vertex(quad.Left, quad.Bottom, luma);
+      indices[0] = firstIndex;
+      indices[1] = firstIndex + 1;
+      indices[2] = firstIndex + 3;
+      indices[3] = firstIndex + 3;
+      indices[4] = firstIndex + 1;
+      indices[5] = firstIndex + 2;
     }
 
     private static int CeilDiv(long numerator, long denominator) => (int)((numerator + denominator - 1) / denominator);
@@ -291,20 +286,6 @@ namespace MB.FrameMarker
       // ModuleSizePx = ceil(storedPxPerModule / s) where s = storedHeight / sourceHeight
       int size = CeilDiv((long)storedPxPerModule * sourceHeight, storedHeight);
       return size < storedPxPerModule ? storedPxPerModule : size;
-    }
-
-    private static void WriteLittleEndian(byte[] destination, int offset, ulong value, int byteCount)
-    {
-      for (int i = 0; i < byteCount; ++i)
-        destination[offset + i] = (byte)(value >> (8 * i));
-    }
-
-    private static ulong ReadLittleEndian(byte[] source, int offset, int byteCount)
-    {
-      ulong value = 0;
-      for (int i = 0; i < byteCount; ++i)
-        value |= (ulong)source[offset + i] << (8 * i);
-      return value;
     }
   }
 }

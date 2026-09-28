@@ -47,6 +47,9 @@ namespace MB.FrameMarker.UnitTest
       long written = 0;
       var options = Options.Default;
       var origin = Marker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 2);
+      // The span path with stack buffers, as a caller without arrays uses it
+      Span<Quad> stackQuads = stackalloc Quad[Marker.MaxQuadCount];
+      Span<byte> stackBytes = stackalloc byte[Marker.MaxEncodedPayloadByteCount];
       for (int frame = 0; frame < frames; ++frame)
       {
         var payload = new Payload((ulong)frame, Marker.SecondsToTicks(frame / 60.0), 7, MarkerKind.Frame, 1000 + frame, 166_667, 900 + frame, 80_000);
@@ -61,8 +64,11 @@ namespace MB.FrameMarker.UnitTest
         written += SequenceId.FromGuid(g_guid).IsEmpty ? 0 : 1;
         written += SequenceId.TryFromText("camera pan", out var tag) && !tag.IsEmpty ? 1 : 0;
         int quadCount = m_generator.GenerateQuads(payload, options, origin, m_quads);
-        written += Marker.QuadsToTriangles(m_quads, quadCount, m_triangles);
-        written += Marker.QuadsToIndexed(m_quads, quadCount, m_indexedVertices, m_indices).IndexCount;
+        written += Marker.QuadsToTriangles(m_quads.AsSpan(0, quadCount), m_triangles);
+        written += Marker.QuadsToIndexed(m_quads.AsSpan(0, quadCount), m_indexedVertices, m_indices).IndexCount;
+        written += m_generator.GenerateStartQuads(payload, m_metadata, options, origin, stackQuads);
+        int byteCount = Marker.EncodePayload(payload.WithKind(MarkerKind.SequenceStart), m_metadata, stackBytes);
+        written += Marker.TryDecodePayload(stackBytes.Slice(0, byteCount), out _, out var decoded) && !decoded.SequenceId.IsEmpty ? 1 : 0;
       }
       return written;
     }

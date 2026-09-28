@@ -9,6 +9,7 @@
 //****************************************************************************************************************************************************
 
 #if UNITY_2021_3_OR_NEWER
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -35,16 +36,16 @@ namespace MB.FrameMarker.Unity
     }
 
     /// <summary>
-    /// Draw <paramref name="count"/> quads (pixel coordinates of an <paramref name="outputWidth"/> x <paramref name="outputHeight"/> output,
+    /// Draw <paramref name="quads"/> (pixel coordinates of an <paramref name="outputWidth"/> x <paramref name="outputHeight"/> output,
     /// top-left origin) into the current render target with <paramref name="material"/>. Does not allocate.
     /// </summary>
-    public static void DrawQuads(Material material, Quad[] quads, int count, int outputWidth, int outputHeight)
+    public static void DrawQuads(Material material, ReadOnlySpan<Quad> quads, int outputWidth, int outputHeight)
     {
       GL.PushMatrix();
       _ = material.SetPass(0);
       GL.LoadPixelMatrix(0f, outputWidth, 0f, outputHeight);
       GL.Begin(GL.QUADS);
-      for (int i = 0; i < count; ++i)
+      for (int i = 0; i < quads.Length; ++i)
       {
         var quad = quads[i];
         GL.Color(quad.Dark ? Color.black : Color.white);

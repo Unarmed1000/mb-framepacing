@@ -46,9 +46,9 @@ namespace MB.FramePacing.Marker
     /// <summary>Serialize the payload. Start markers append the metadata (empty if null), other kinds ignore it.</summary>
     public byte[] Encode(StartMetadata? metadata = null)
     {
-      var buffer = new byte[MaxEncodedByteCount];
+      Span<byte> buffer = stackalloc byte[MaxEncodedByteCount];
       int count = FM.Marker.EncodePayload(ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), buffer);
-      return buffer.AsSpan(0, count).ToArray();
+      return buffer.Slice(0, count).ToArray();
     }
 
     /// <summary>Parse the wire format. Fails on a wrong length, magic, format version or unknown kind.</summary>
@@ -57,8 +57,7 @@ namespace MB.FramePacing.Marker
     {
       payload = default;
       metadata = null;
-      var bytes = src.ToArray();
-      if (!FM.Marker.TryDecodePayload(bytes, 0, bytes.Length, out var decoded, out var start))
+      if (!FM.Marker.TryDecodePayload(src, out var decoded, out var start))
         return false;
       payload = new MarkerPayload(
         decoded.FrameIndex,

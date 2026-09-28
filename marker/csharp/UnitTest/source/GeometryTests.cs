@@ -7,6 +7,7 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
 using System.Linq;
 using NUnit.Framework;
 
@@ -123,14 +124,14 @@ namespace MB.FrameMarker.UnitTest
       int quadCount = generator.GenerateQuads(payload, options, origin, quads);
 
       var converted = new Vertex[quadCount * 6];
-      Assert.That(Marker.QuadsToTriangles(quads, quadCount, converted), Is.EqualTo(quadCount * 6));
+      Assert.That(Marker.QuadsToTriangles(quads.AsSpan(0, quadCount), converted), Is.EqualTo(quadCount * 6));
       var direct = new Vertex[Marker.MaxTriangleVertexCount];
       int vertexCount = generator.GenerateTriangles(payload, options, origin, direct);
       Assert.That(direct.Take(vertexCount), Is.EqualTo(converted));
 
       var convertedVertices = new Vertex[quadCount * 4];
       var convertedIndices = new int[quadCount * 6];
-      Marker.QuadsToIndexed(quads, quadCount, convertedVertices, convertedIndices, 50);
+      Marker.QuadsToIndexed(quads.AsSpan(0, quadCount), convertedVertices, convertedIndices, 50);
       var vertices = new Vertex[Marker.MaxIndexedVertexCount];
       var indices = new int[Marker.MaxIndexCount];
       var count = generator.GenerateIndexed(payload, options, origin, vertices, indices, 50);
@@ -143,7 +144,7 @@ namespace MB.FrameMarker.UnitTest
     {
       var quads = new[] { new Quad(0, 0, 10, 10, false), new Quad(2, 3, 4, 5, true) };
       var triangles = new Vertex[12];
-      Assert.That(Marker.QuadsToTriangles(quads, 2, triangles), Is.EqualTo(12));
+      Assert.That(Marker.QuadsToTriangles(quads.AsSpan(0, 2), triangles), Is.EqualTo(12));
       Assert.That(
         triangles.Take(6),
         Is.EqualTo(
@@ -163,7 +164,7 @@ namespace MB.FrameMarker.UnitTest
 
       var vertices = new Vertex[8];
       var indices = new int[12];
-      var count = Marker.QuadsToIndexed(quads, 2, vertices, indices, 100);
+      var count = Marker.QuadsToIndexed(quads.AsSpan(0, 2), vertices, indices, 100);
       Assert.That((count.VertexCount, count.IndexCount), Is.EqualTo((8, 12)));
       Assert.That(vertices.Skip(4), Is.EqualTo(new[] { new Vertex(2, 3, 0), new Vertex(4, 3, 0), new Vertex(4, 5, 0), new Vertex(2, 5, 0) }));
       Assert.That(indices, Is.EqualTo(new[] { 100, 101, 103, 103, 101, 102, 104, 105, 107, 107, 105, 106 }));
@@ -181,7 +182,7 @@ namespace MB.FrameMarker.UnitTest
       Assert.That(generator.GenerateTriangles(payload, Options.Default, default, new Vertex[12]), Is.Zero);
       var failed = generator.GenerateIndexed(payload, Options.Default, default, new Vertex[Marker.MaxIndexedVertexCount], new int[12]);
       Assert.That((failed.VertexCount, failed.IndexCount), Is.EqualTo((0, 0)));
-      Assert.That(Marker.QuadsToTriangles(new Quad[2], 2, new Vertex[11]), Is.Zero);
+      Assert.That(Marker.QuadsToTriangles(new Quad[2].AsSpan(0, 2), new Vertex[11]), Is.Zero);
     }
 
     [Test]

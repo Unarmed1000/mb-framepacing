@@ -224,7 +224,7 @@ namespace MB.FrameMarker.Unity
         payload.Kind == MarkerKind.SequenceStart
           ? m_generator.GenerateStartQuads(payload, m_start, options, origin, m_quads)
           : m_generator.GenerateQuads(payload, options, origin, m_quads);
-      FrameMarkerGL.DrawQuads(material, m_quads, count, width, height);
+      FrameMarkerGL.DrawQuads(material, m_quads.AsSpan(0, count), width, height);
     }
 
     private double AnimationTime() => AnimationTimeProvider != null ? AnimationTimeProvider() : Time.timeAsDouble;

@@ -17,7 +17,7 @@ See `README.md` for the overview and `doc/marker-format.md` for the marker speci
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `marker/VERSION`                                  | Version of the marker libraries (released with `marker-v*` tags)                                   |
 | `marker/cpp/`                                     | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                               |
-| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.0, C# 9, no dependencies) + NUnit tests       |
+| `marker/csharp/`                                  | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests       |
 | `marker/unity/`                                   | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                      |
 | `marker/python/`                                  | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests              |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                               |
@@ -73,7 +73,8 @@ dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fp
   - CI runs it with `--check`.
   - `marker/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode; Unity editors are installed on this machine
     under `C:/Program Files/Unity/Hub/Editor`. Run it after changing the core or the helpers.
-  - The core must stay C# 9 / .NET Standard 2.0 without UnityEngine.
+  - The core must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
+    APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
 - **Standalone release archive:** `marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release
   archive, and falls back to `marker/VERSION`, `marker/LICENSE` and the repository root's `licenses/` otherwise.
 - **Docs**

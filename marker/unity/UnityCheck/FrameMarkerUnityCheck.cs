@@ -117,7 +117,7 @@ public static class FrameMarkerUnityCheck
       {
         RenderTexture.active = target;
         GL.Clear(true, true, new Color(0.5f, 0.5f, 0.5f, 1f));
-        FrameMarkerGL.DrawQuads(material, quads, quadCount, Width, Height);
+        FrameMarkerGL.DrawQuads(material, quads.AsSpan(0, quadCount), Width, Height);
       }
       readback.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
       readback.Apply();

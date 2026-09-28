@@ -106,7 +106,7 @@ namespace MB.FrameMarker.UnitTest
       var payload = new Payload(frame, ticks, run, kind);
       var bytes = new byte[Marker.MaxEncodedPayloadByteCount];
       int count = Marker.EncodePayload(payload, default, bytes);
-      Assert.That(Marker.TryDecodePayload(bytes, 0, count, out var decoded, out _), Is.True);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
     }
 
@@ -121,7 +121,7 @@ namespace MB.FrameMarker.UnitTest
         var payload = new Payload(7, 8, 9, kind, intendedDisplayTicks, targetFrameTicks, -intendedDisplayTicks / 2, targetFrameTicks / 3);
         var bytes = new byte[Marker.MaxEncodedPayloadByteCount];
         int count = Marker.EncodePayload(payload, new StartMetadata(1, new SequenceId(1, 2)), bytes);
-        Assert.That(Marker.TryDecodePayload(bytes, 0, count, out var decoded, out _), Is.True);
+        Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
         Assert.That(decoded, Is.EqualTo(payload));
         Assert.That(decoded.IntendedDisplayTicks, Is.EqualTo(intendedDisplayTicks));
         Assert.That(decoded.TargetFrameTicks, Is.EqualTo(targetFrameTicks));
@@ -137,18 +137,18 @@ namespace MB.FrameMarker.UnitTest
       int count = Marker.EncodePayload(new Payload(0x0102030405060708u, 123, 4, MarkerKind.Sync, 5, 6), bytes);
       Assert.That(count, Is.EqualTo(Marker.SyncPayloadByteCount));
       Assert.That(bytes.AsSpan(0, count).ToArray(), Is.EqualTo(new byte[] { (byte)'M', (byte)'F', 1, 3, 8, 7, 6, 5, 4, 3, 2, 1 }));
-      Assert.That(Marker.TryDecodePayload(bytes, 0, count, out var decoded, out _), Is.True);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
       Assert.That(decoded, Is.EqualTo(new Payload(0x0102030405060708u, 0, 0, MarkerKind.Sync)));
-      Assert.That(Marker.TryDecodePayload(bytes, 0, count + 1, out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, count + 1), out _, out _), Is.False);
     }
 
     [Test]
     public void StartMetadata_RoundTrips()
     {
-      var bytes = new byte[Marker.MaxEncodedPayloadByteCount + 5];
+      var bytes = new byte[Marker.MaxEncodedPayloadByteCount + 6];
       var payload = new Payload(10, 20, 30, MarkerKind.SequenceStart, 40, 50, 60, 70);
       var id = new SequenceId(0x0011_2233_4455_6677, 0x8899_AABB_CCDD_EEFF);
-      int count = Marker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), bytes, 5);
+      int count = Marker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), bytes.AsSpan(5));
       Assert.That(count, Is.EqualTo(Marker.StartPayloadByteCount));
       Assert.That(count, Is.EqualTo(72));
       // The sequence id's 16 bytes as they are, at offset 56
@@ -157,14 +157,14 @@ namespace MB.FrameMarker.UnitTest
         Is.EqualTo(new byte[] { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF })
       );
 
-      Assert.That(Marker.TryDecodePayload(bytes, 5, count, out var decoded, out var metadata), Is.True);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(5, count), out var decoded, out var metadata), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
       Assert.That(metadata.UtcTicks, Is.EqualTo(638_000_000_000_000_000));
       Assert.That(metadata.SequenceId, Is.EqualTo(id));
 
       // A start marker of another length is rejected; frame payloads ignore the metadata
-      Assert.That(Marker.TryDecodePayload(bytes, 5, count - 1, out _, out _), Is.False);
-      Assert.That(Marker.TryDecodePayload(bytes, 5, count + 1, out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(5, count - 1), out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(5, count + 1), out _, out _), Is.False);
       Assert.That(Marker.EncodePayload(new Payload(1, 2, 3), new StartMetadata(5, id), bytes), Is.EqualTo(Marker.PayloadByteCount));
     }
 
@@ -218,23 +218,23 @@ namespace MB.FrameMarker.UnitTest
     {
       var bytes = new byte[Marker.PayloadByteCount];
       Marker.EncodePayload(new Payload(1, 2), bytes);
-      Assert.That(Marker.TryDecodePayload(bytes, 0, Marker.PayloadByteCount - 1, out _, out _), Is.False, "short");
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, Marker.PayloadByteCount - 1), out _, out _), Is.False, "short");
       bytes[0] = (byte)'X';
-      Assert.That(Marker.TryDecodePayload(bytes, 0, bytes.Length, out _, out _), Is.False, "magic");
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "magic");
       bytes[0] = (byte)'M';
       bytes[2] = 2;
-      Assert.That(Marker.TryDecodePayload(bytes, 0, bytes.Length, out _, out _), Is.False, "format version");
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "format version");
       bytes[2] = 1;
       bytes[3] = 3;
-      Assert.That(Marker.TryDecodePayload(bytes, 0, bytes.Length, out _, out _), Is.False, "kind");
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "kind");
       bytes[3] = 0;
-      Assert.That(Marker.TryDecodePayload(bytes, 0, bytes.Length, out _, out _), Is.True);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.True);
 
       // A start marker without its metadata block, or with a byte too many
       Marker.EncodePayload(new Payload(1, 2, 3, MarkerKind.SequenceStart), default, bytes = new byte[Marker.StartPayloadByteCount + 1]);
-      Assert.That(Marker.TryDecodePayload(bytes, 0, Marker.PayloadByteCount, out _, out _), Is.False);
-      Assert.That(Marker.TryDecodePayload(bytes, 0, bytes.Length, out _, out _), Is.False);
-      Assert.That(Marker.TryDecodePayload(bytes, 0, Marker.StartPayloadByteCount, out _, out _), Is.True);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, Marker.PayloadByteCount), out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, Marker.StartPayloadByteCount), out _, out _), Is.True);
     }
 
     [Test]

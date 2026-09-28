@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- The general C# marker library. No dependencies, .NET Standard 2.0 and C# 9 without nullable annotations, so the same sources also
+  <!-- The general C# marker library. No dependencies, .NET Standard 2.1 (Span) and C# 9 without nullable annotations, so the same sources also
        compile inside Unity (2021.3+). Nothing here may allocate on the per-frame path. -->
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>MB.FrameMarker</AssemblyName>

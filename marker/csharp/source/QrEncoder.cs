@@ -77,14 +77,15 @@ namespace MB.FrameMarker
     public bool IsDark(int x, int y) => m_modules[(y * MaxSize) + x];
 
     /// <summary>
-    /// Encode <paramref name="data"/>[0, length) in byte mode with error correction level M, using the smallest version in
+    /// Encode <paramref name="data"/> in byte mode with error correction level M, using the smallest version in
     /// [<paramref name="minVersion"/>, <paramref name="maxVersion"/>] that fits and the mask with the lowest penalty.
     /// Returns false when the data does not fit (or the version range is outside 1-6).
     /// </summary>
-    public bool Encode(byte[] data, int length, int minVersion, int maxVersion)
+    public bool Encode(ReadOnlySpan<byte> data, int minVersion, int maxVersion)
     {
-      if (minVersion < MinVersion || maxVersion > MaxVersion || minVersion > maxVersion || length < 0 || length > data.Length)
+      if (minVersion < MinVersion || maxVersion > MaxVersion || minVersion > maxVersion)
         return false;
+      int length = data.Length;
 
       int usedBits = 4 + ByteModeCountBits + (8 * length);
       int version = minVersion;
