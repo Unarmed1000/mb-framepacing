@@ -86,8 +86,9 @@ namespace
   T ParseNumber(const std::string_view text, const std::string_view name)
   {
     T value{};
-    const auto* const end = text.data() + text.size();
-    const auto result = std::from_chars(text.data(), end, value);
+    const char* const first = text.data();
+    const char* const end = first + text.size();
+    const auto result = std::from_chars(first, end, value);
     if (result.ec != std::errc() || result.ptr != end)
     {
       throw std::invalid_argument("Invalid value '" + std::string(text) + "' for " + std::string(name));
@@ -339,6 +340,8 @@ namespace
   }
 }
 
+// Every exception is caught below; clang-tidy still follows MSVC's standard library into allocation failures past the handlers
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char* argv[])
 {
   try
@@ -347,16 +350,17 @@ int main(int argc, char* argv[])
     std::string outputPath;
     std::string goldenDirectory;
 
-    for (int i = 1; i < argc; ++i)
+    const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
+    for (std::size_t i = 1; i < arguments.size(); ++i)
     {
-      const std::string_view arg(argv[i]);
+      const std::string_view arg(arguments[i]);
       const auto next = [&]() -> std::string_view
       {
-        if (i + 1 >= argc)
+        if (i + 1 >= arguments.size())
         {
           throw std::invalid_argument("Missing value for " + std::string(arg));
         }
-        return argv[++i];
+        return arguments[++i];
       };
 
       if (arg == "--help" || arg == "-h")
@@ -494,6 +498,11 @@ int main(int argc, char* argv[])
   catch (const std::exception& ex)
   {
     std::cerr << "marker-render: " << ex.what() << '\n';
+    return 1;
+  }
+  catch (...)
+  {
+    std::cerr << "marker-render: unknown error\n";
     return 1;
   }
 }

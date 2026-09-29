@@ -71,7 +71,9 @@ python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Pytho
   without it, single-project builds go to `bin/x64` and cause MSB3270 warnings.
 - **C++ formatting and linting**
   - C++ follows `sdk/marker/cpp/.clang-format` and `sdk/marker/cpp/.clang-tidy` (namespaces are CamelCase: `MB::FrameMarker`); `sdk/data/cpp`
-    has copies of both.
+    has copies of both. The `.clang-tidy` checks and options are gtec-demo-framework's (plus `hicpp-exception-baseclass`); keep
+    both copies equal. Suppress a finding only with `NOLINTNEXTLINE(<check>)` and a comment line saying why (the MSVC standard
+    library makes `bugprone-exception-escape` report allocation failures that are caught).
   - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of both C++ libraries
     (`--library marker|data` for one), with the versions CI pins in `requirements-dev.txt`. clang-tidy needs a configured build of
     each: `<library>/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the

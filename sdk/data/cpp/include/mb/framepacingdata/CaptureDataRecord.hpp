@@ -28,7 +28,7 @@ namespace MB::FramePacingData
     std::vector<uint8_t> MainBytes;
     std::vector<uint8_t> SecondBytes;
 
-    bool HasDeviceTicks() const noexcept
+    [[nodiscard]] bool HasDeviceTicks() const noexcept
     {
       return DeviceTicks != UnknownTicks;
     }

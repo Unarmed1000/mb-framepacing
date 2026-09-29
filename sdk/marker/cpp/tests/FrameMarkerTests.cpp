@@ -1042,7 +1042,7 @@ TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
 TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
 {
   const FM::ModuleMatrix matrix = Encode({1u, 2, 3u});
-  std::vector<uint8_t> pixels(64u * 64u * 4u, 128u);
+  std::vector<uint8_t> pixels(std::size_t{64} * 64u * 4u, 128u);
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, {0, 4}, {}, pixels, 64, 64, FM::PixelFormat::Gray8)) << "invalid options";
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, pixels, 64, 64, FM::PixelFormat::Rgb24, 64u * 3u - 1u)) << "short stride";
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, std::span<uint8_t>(pixels).first((64u * 64u * 4u) - 1u), 64, 64, FM::PixelFormat::Rgba32))

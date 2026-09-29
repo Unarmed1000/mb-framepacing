@@ -23,19 +23,19 @@ namespace MB::FrameMarker
 
   public:
     //! Modules per side: 41 for the main marker, 25 for the sync marker, 0 before a successful GenerateModules.
-    constexpr int32_t Size() const noexcept
+    [[nodiscard]] constexpr int32_t Size() const noexcept
     {
       return m_size;
     }
 
-    constexpr bool IsDark(const int32_t x, const int32_t y) const noexcept
+    [[nodiscard]] constexpr bool IsDark(const int32_t x, const int32_t y) const noexcept
     {
       const auto index = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_size)) + static_cast<std::size_t>(x);
       return ((static_cast<uint32_t>(m_bits[index / 8u]) >> (7u - static_cast<uint32_t>(index % 8u))) & 1u) != 0u;
     }
 
     //! The packed bits: PackedModuleByteCount(Size()) bytes.
-    constexpr std::span<const uint8_t> Bits() const noexcept
+    [[nodiscard]] constexpr std::span<const uint8_t> Bits() const noexcept
     {
       return std::span<const uint8_t>(m_bits).first(PackedModuleByteCount(m_size));
     }

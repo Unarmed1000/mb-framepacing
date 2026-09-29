@@ -23,12 +23,12 @@ namespace MB::FramePacingData
   public:
     explicit CaptureDataReader(const std::filesystem::path& path);
 
-    const CaptureDataHeader& Header() const noexcept
+    [[nodiscard]] const CaptureDataHeader& Header() const noexcept
     {
       return m_header;
     }
 
-    int64_t RecordCount() const noexcept
+    [[nodiscard]] int64_t RecordCount() const noexcept
     {
       return m_recordCount;
     }

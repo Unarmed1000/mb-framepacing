@@ -189,6 +189,8 @@ namespace MB::FramePacingData
     }
 
     //! The lines of a CSV file, split on commas, and its columns by name.
+    // MSVC's std::unordered_map can throw bad_array_new_length inside its noexcept special members, and clang-tidy follows it there
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     struct Table
     {
       std::unordered_map<std::string, std::size_t> Columns;
@@ -258,8 +260,9 @@ namespace MB::FramePacingData
     T ParseInteger(const std::string_view text)
     {
       T value{};
-      const auto* const end = text.data() + text.size();
-      const auto result = std::from_chars(text.data(), end, value);
+      const char* const first = text.data();
+      const char* const end = first + text.size();
+      const auto result = std::from_chars(first, end, value);
       if (text.empty() || result.ec != std::errc() || result.ptr != end)
       {
         throw DataFormatError("'" + std::string(text) + "' is not an integer");
@@ -354,7 +357,7 @@ namespace MB::FramePacingData
 
   AnalysisSummary ReadSummary(const std::filesystem::path& path)
   {
-    std::ifstream file(path, std::ios::binary);
+    const std::ifstream file(path, std::ios::binary);
     if (!file)
     {
       throw std::runtime_error("Cannot open '" + path.string() + "'");
@@ -463,7 +466,7 @@ namespace MB::FramePacingData
     {
       return folder;
     }
-    const auto analysis = folder / AnalysisDirectoryName;
+    auto analysis = folder / AnalysisDirectoryName;
     if (std::filesystem::is_regular_file(analysis / SummaryFileName))
     {
       return analysis;

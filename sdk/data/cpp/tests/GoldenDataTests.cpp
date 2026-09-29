@@ -26,7 +26,7 @@ namespace
   {
     for (auto folder = std::filesystem::path(MB_FRAMEPACINGDATA_SOURCE_DIR); !folder.empty(); folder = folder.parent_path())
     {
-      const auto candidate = folder / "test-data" / "data" / Clip;
+      auto candidate = folder / "test-data" / "data" / Clip;
       if (std::filesystem::is_regular_file(candidate / "digest.json"))
       {
         return candidate;

@@ -9,11 +9,13 @@
 
 #include <string_view>
 
-// CMake substitutes the placeholders below; keep clang-format away from them
+// CMake substitutes the placeholders below; keep clang-format away from them. They are macros on purpose, for #if.
 // clang-format off
+// NOLINTBEGIN(cppcoreguidelines-macro-usage)
 #define MB_FRAMEMARKER_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
 #define MB_FRAMEMARKER_VERSION_MINOR @PROJECT_VERSION_MINOR@
 #define MB_FRAMEMARKER_VERSION_PATCH @PROJECT_VERSION_PATCH@
+// NOLINTEND(cppcoreguidelines-macro-usage)
 // clang-format on
 
 namespace MB::FrameMarker

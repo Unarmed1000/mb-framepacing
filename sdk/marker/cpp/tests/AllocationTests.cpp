@@ -128,7 +128,7 @@ namespace
   std::array<uint32_t, FM::MaxIndexCount()> g_indices{};
   std::array<FM::Vertex, FM::MaxGridVertexCount()> g_grid{};
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> g_payloadBytes{};
-  std::array<uint8_t, 294u * 294u * 4u> g_pixels{};
+  std::array<uint8_t, std::size_t{294} * 294u * 4u> g_pixels{};
   FM::ModuleMatrix g_matrix{};
   FM::ModuleMatrix g_startMatrix{};
 }

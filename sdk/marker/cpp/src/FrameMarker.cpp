@@ -15,7 +15,7 @@ namespace MB::FrameMarker
     static_assert(MaxEncodedPayloadByteCount <= QrBufferLength);
     static_assert(QrModuleCount == 41);
     static_assert(MaxQuadCount() == 862u);
-    static_assert(MaxTriangleVertexCount() == 862u * 6u);
+    static_assert(MaxTriangleVertexCount() == std::size_t{862} * 6u);
 
     //! The first module at or after column from of a row (whose first module is bit rowStart) that is dark (or light), or size when there
     //! is none. Reads whole bytes: a byte without such a module is skipped at once.
@@ -43,7 +43,7 @@ namespace MB::FrameMarker
 
     //! Every horizontal run of dark modules, row by row: emit(row, firstColumn, endColumn) returns false to stop early.
     template <typename TEmit>
-    bool WalkRuns(const ModuleMatrix& matrix, TEmit&& emit) noexcept
+    bool WalkRuns(const ModuleMatrix& matrix, const TEmit& emit) noexcept
     {
       const int32_t size = matrix.Size();
       const std::span<const uint8_t> bits = matrix.Bits();
@@ -67,7 +67,7 @@ namespace MB::FrameMarker
     //! Walk the marker in draw order: the light background (symbol + quiet zone), then one dark quad per horizontal run of dark modules.
     //! Every quad goes straight to emit, which writes it in its output format and returns false when the output is full.
     template <typename TEmit>
-    bool WalkQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, TEmit&& emit) noexcept
+    bool WalkQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const TEmit& emit) noexcept
     {
       const int32_t moduleSize = options.ModuleSizePx;
       const int32_t markerSize = (matrix.Size() + (2 * options.QuietZoneModules)) * options.ModuleSizePx;

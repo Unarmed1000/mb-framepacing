@@ -20,7 +20,7 @@ namespace MB::FrameMarker
     std::array<uint8_t, ByteCount> Bytes{};
 
     //! All zero: no sequence id.
-    constexpr bool IsEmpty() const noexcept
+    [[nodiscard]] constexpr bool IsEmpty() const noexcept
     {
       for (const uint8_t value : Bytes)
       {
