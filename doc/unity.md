@@ -78,13 +78,19 @@ steady clock, and may give its own CPU busy:
 overlay.IntendedDisplayTicksProvider = () => pacer.IntendedDisplayTicks;
 overlay.CpuStartTicksProvider = () => pacer.CpuStartTicks;
 overlay.CpuBusyTicksProvider = () => pacer.CpuBusyTicks; // optional
+overlay.TargetFrameTicksProvider = () => pacer.TargetFrameTicks; // the interval it aims for now; default: Unity's settings (below)
 overlay.PreferredFrameTicksProvider = () => pacer.PreferredFrameTicks; // the rate the game wants; default: as the target
 overlay.StaticProvider = () => nothingAnimates; // optional: the Static flag on idle frames
 ```
 
-The **preferred frame time** is the rate the game wants to run at. Without a provider it is the same as the target frame time
-(`Application.targetFrameRate`, which Unity does not lower on its own); a pacer that runs the game slower than it wants gives its
-preferred rate here. `Marker.OnDemandFrameTicks` says the game presents only when something changes.
+The **target frame time** without a provider is what Unity's settings aim for: on Android and iOS `Application.targetFrameRate`
+(30 fps while it is unset; they ignore `QualitySettings.vSyncCount`); elsewhere the refresh rate divided by
+`QualitySettings.vSyncCount` while vsync is on (`Application.targetFrameRate` is then ignored), else `Application.targetFrameRate`,
+else on the web the refresh rate, else unknown (0). XR platforms ignore both settings: give the XR display's rate as a provider. The
+**preferred frame time** is the rate the game wants to run at. Without a provider it is the same default, which Unity does not lower
+on its own; a pacer that runs the game slower than it wants gives its preferred rate here. `Marker.OnDemandFrameTicks` says the game
+presents only when something changes. What each field means, and what to write for typical frame pacers, is in
+[Filling the marker fields](marker-fields.md).
 
 With only an `IntendedDisplayTicksProvider`, the CPU start time is left unknown (0) rather than mixing two clocks; CPU busy still
 comes from Unity.

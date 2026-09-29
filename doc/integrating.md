@@ -10,7 +10,8 @@ This guide puts the marker into an application. There are four ways in:
 | Python                           | The Python library [`marker/python`](../marker/python/README.md) (`mb_framemarker`)                                     |
 
 All four produce exactly the same pixels. The libraries are renderer independent: they give you pixel aligned geometry to draw with
-whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md).
+whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md);
+[Filling the marker fields](marker-fields.md) says where each field's value comes from and what the analysis does with it.
 
 ## 1. Add the C++ library
 
@@ -98,8 +99,8 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
-  const auto ticks = static_cast<int64_t>(animationSeconds * FM::TicksPerSecond); // the time your animation used
-  FM::GenerateModules({frameIndex, ticks, runId, FM::MarkerKind::Frame}, matrix);
+  const int64_t ticks = std::llround(animationSeconds * FM::TicksPerSecond); // the time your animation used
+  FM::GenerateModules({.FrameIndex = frameIndex, .AnimationTicks = ticks, .RunId = runId}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 }
@@ -159,22 +160,30 @@ look like a huge error.
 
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the
-application side, including frames that took several refreshes or overlap the next one:
+application side, including frames that took several refreshes or overlap the next one. Name the fields: the payload's order is not
+the order on the wire, and designated initializers keep them apart:
 
 ```cpp
-const FM::Payload payload{frameIndex,    ticks,        runId,
-                          FM::MarkerKind::Frame, intendedDisplayTicks, targetFrameTicks,
-                          cpuStartTicks, cpuBusyTicks, preferredFrameTicks,
-                          nothingAnimates ? FM::MarkerFlags::Static : FM::MarkerFlags::None};
+const FM::Payload payload{.FrameIndex = frameIndex,
+                          .AnimationTicks = ticks,
+                          .RunId = runId,
+                          .IntendedDisplayTicks = intendedDisplayTicks,
+                          .TargetFrameTicks = targetFrameTicks,
+                          .CpuStartTicks = cpuStartTicks,
+                          .CpuBusyTicks = cpuBusyTicks,
+                          .PreferredFrameTicks = preferredFrameTicks,
+                          .Flags = nothingAnimates ? FM::MarkerFlags::Static : FM::MarkerFlags::None};
 ```
 
-**The sync marker (optional; required for camera capture).** Draw the small sync marker bottom-left as well, with the same frame
-index. The analysis flags tearing when the two disagree, and a camera filming the screen times the frames by it:
+What to write in each field, for typical frame pacers, is in [Filling the marker fields](marker-fields.md).
+
+**The sync marker (optional; required for camera capture).** Draw the small sync marker bottom-left as well, with the same run id
+and frame index. The analysis flags tearing when the two disagree, and a camera filming the screen times the frames by it:
 
 ```cpp
 const FM::Point syncOrigin = FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 2);
 FM::ModuleMatrix sync;
-FM::GenerateModules({frameIndex, 0, 0u, FM::MarkerKind::Sync}, sync);
+FM::GenerateModules({.FrameIndex = frameIndex, .RunId = runId, .Kind = FM::MarkerKind::Sync}, sync);
 const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);
 ```
 
@@ -208,7 +217,10 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload{frameIndex, static_cast<int64_t>(animationSeconds * FM::TicksPerSecond), /*runId*/ 7, kind};
+  const FM::Payload payload{.FrameIndex = frameIndex,
+                            .AnimationTicks = std::llround(animationSeconds * FM::TicksPerSecond),
+                            .RunId = 7,
+                            .Kind = kind};
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }

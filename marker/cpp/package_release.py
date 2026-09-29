@@ -36,6 +36,7 @@ EXTRA_FILES = {
     "licenses/googletest-BSD-3-Clause.txt": REPOSITORY_ROOT / "licenses" / "googletest-BSD-3-Clause.txt",
     "doc/marker-format.md": REPOSITORY_ROOT / "doc" / "marker-format.md",
     "doc/integrating.md": REPOSITORY_ROOT / "doc" / "integrating.md",
+    "doc/marker-fields.md": REPOSITORY_ROOT / "doc" / "marker-fields.md",
 }
 # The reference shaders (HLSL, GLSL for OpenGL, OpenGL ES 2.0 and Vulkan) that draw the marker as one quad
 EXTRA_DIRECTORIES = {"shaders": MARKER_DIR / "shaders"}

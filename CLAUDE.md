@@ -296,7 +296,7 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):
   - BSD 3-Clause: `marker/` (the libraries applications embed; `marker/LICENSE` holds the text alone and is what the C++ archive,
-    the CMake install and the Unity package ship), `doc/marker-format.md`, `doc/integrating.md`, `test-data/markers/`, and the data
+    the CMake install and the Unity package ship), `doc/marker-format.md`, `doc/integrating.md`, `doc/marker-fields.md`, `test-data/markers/`, and the data
     libraries and their formats: `data/` (`data/LICENSE`), `doc/capture-data-format.md`, `doc/analysis-output-format.md`,
     `test-data/data/`.
   - PolyForm Perimeter 1.0.1: everything else (the tools, their libraries, scripts, other docs, build and CI files). The tools ship

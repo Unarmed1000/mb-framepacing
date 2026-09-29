@@ -39,7 +39,8 @@ The shaders' module lookup is the reference shaders' (`FrameMarker.hlsl`, from `
    `StartCoroutine(overlay.RunFor(10))`) around the part to measure. Each run gets a new UUID as its sequence id; pass your own
    `SequenceId` (a UUID, or a text tag of at most 16 ASCII characters) to match captures to your own records.
 
-The full guide is in [doc/unity.md](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/unity.md).
+The full guide is in [doc/unity.md](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/unity.md); what to write in each field (for a game with its own frame pacer) is in
+[Filling the marker fields](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/marker-fields.md).
 
 ## License
 

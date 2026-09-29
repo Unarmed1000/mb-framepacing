@@ -6,8 +6,8 @@ tools, then shows the **animation error**: how far what the application animated
 
 C++20, CMake 4.0+, no dependencies. It gives you pixel aligned geometry for any renderer and never allocates. The format is specified
 in [marker-format.md](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/marker-format.md); the full guide is
-[Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/integrating.md) (both are also in a release
-archive's `doc/` folder), and the shaders that draw it fastest in [`marker/shaders`](https://github.com/Unarmed1000/mb-framepacing/tree/master/marker/shaders) (a release archive's `shaders/`).
+[Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/integrating.md), and what to write in each field is in
+[Filling the marker fields](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/marker-fields.md) (all three are also in a release archive's `doc/` folder), and the shaders that draw it fastest in [`marker/shaders`](https://github.com/Unarmed1000/mb-framepacing/tree/master/marker/shaders) (a release archive's `shaders/`).
 
 ## Add it
 

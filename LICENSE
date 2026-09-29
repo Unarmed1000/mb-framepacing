@@ -10,6 +10,7 @@ This repository is licensed under two licenses, by path:
   - marker/ (the frame marker libraries)
   - doc/marker-format.md (the marker format specification)
   - doc/integrating.md (the guide to building the markers into an application)
+  - doc/marker-fields.md (the guide to filling the marker's fields)
   - test-data/markers/ (the golden marker images)
   - data/ (the data libraries, which read and write the capture data and the analysis output)
   - doc/capture-data-format.md and doc/analysis-output-format.md (the data formats)

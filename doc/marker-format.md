@@ -11,7 +11,9 @@ Special **start** and **end** markers bracket a test run so the analyzer can cut
 The C++20 library in [`marker/cpp/`](../marker/cpp) generates the marker geometry, and so do the C# library `MB.FrameMarker`
 ([`marker/csharp/`](../marker/csharp)) and the Python library `mb_framemarker` ([`marker/python/`](../marker/python)). The C# library
 `MB.FramePacing.Marker` decodes it.
-Both implement this document; if they disagree, this document is the reference.
+Both implement this document; if they disagree, this document is the reference. [Integrating the marker](integrating.md) builds it
+into an application, and [Filling the marker fields](marker-fields.md) says where each field's value comes from, when it changes and
+what the analysis does with it, with examples for typical frame pacers.
 
 > **Two counters, never mixed.** The marker's _frame index_ is the application's own rendered-frame counter. The capture tool
 > keeps a separate _capture index_, one per frame the capture card delivers. The two run at different rates (for example a game
@@ -67,7 +69,7 @@ A sync marker belongs to the main marker with the same run id and frame index.
 Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, or an unknown kind.
 
 `AnimationTicks` must come from the same clock the application's animation uses (its "game time"), not from a separate
-wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `static_cast<int64_t>(t * 10'000'000.0)` in C++, or
+wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `std::llround(t * 10'000'000.0)` in C++, or
 `std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(d).count()`.
 
 ### Frame pacing: intended display time, target frame time and preferred frame time
@@ -111,7 +113,8 @@ pacing fields tell the analysis:
 - **Bit 0, static:** nothing animates in this frame; it looks the same whatever time it is shown at (an idle screen, a paused menu
   with nothing moving). Set it on every such frame. The analysis does not judge the animation error of a step from or to a static
   frame, because there is no motion to be off: an animation clock that pauses while nothing animates would otherwise make the first
-  frame after an idle stretch look as far off as the stretch was long. The frame's display time step still counts.
+  frame after an idle stretch look as far off as the stretch was long. The frame can still be late; its time on screen is left out
+  of the frame rates, which describe the frames that animate.
 - **Bits 1 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
 
 ### CPU start time and CPU busy
@@ -203,8 +206,9 @@ A test run is bracketed by a start and an end marker:
 
 The analyzer measures the frames between the last captured start marker and the first captured end marker with the same run id.
 A capture may contain several runs; each one is reported separately. Without start/end markers the whole capture is analysed as
-one run (with a warning). A backwards `FrameIndex` jump or a new run id (for example the application restarted) starts a new segment
-and is never counted as an error.
+one run (with a warning). A `FrameIndex` that goes back by more than 1000 (the application restarted) starts a new segment and is never
+counted as an error; one that goes back less is an older frame shown again (out of order). An application that restarts gives the new
+run a new run id.
 
 `mb-framepacing capture --wait-for-start --stop-at-end` uses the same markers to start and stop the recording automatically. It
 checks every captured frame (a live capture as it arrives, a video file frame by frame), so one captured frame of each marker is enough.
@@ -310,8 +314,16 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 // Pacing: when the pacer intends this frame to be shown (steady clock ticks), its target frame time and the frame time the
 // application wants to run at. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
 // marker is drawn last, just before Present). 0 = unknown. MarkerFlags::Static when nothing animates in this frame
-const FM::Payload payload{frameIndex,   animationTicks, runId,          kind,              intendedDisplayTicks, targetFrameTicks,
-                          cpuStartTicks, cpuBusyTicks,  preferredFrameTicks, FM::MarkerFlags::None};
+const FM::Payload payload{.FrameIndex = frameIndex,
+                          .AnimationTicks = animationTicks,
+                          .RunId = runId,
+                          .Kind = kind,
+                          .IntendedDisplayTicks = intendedDisplayTicks,
+                          .TargetFrameTicks = targetFrameTicks,
+                          .CpuStartTicks = cpuStartTicks,
+                          .CpuBusyTicks = cpuBusyTicks,
+                          .PreferredFrameTicks = preferredFrameTicks,
+                          .Flags = FM::MarkerFlags::None};
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
 // FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
 // FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.

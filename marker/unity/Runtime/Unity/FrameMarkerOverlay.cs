@@ -22,6 +22,9 @@ namespace MB.FrameMarker.Unity
   [AddComponentMenu("MB/Frame Marker Overlay")]
   public sealed class FrameMarkerOverlay : MonoBehaviour
   {
+    // Android and iOS run at this rate while Application.targetFrameRate is unset
+    private const double MobileDefaultFps = 30;
+
     [Header("Capture")]
     [Tooltip(
       "Height of the frames the capture tool stores, for example 540 for --scale 960x540. Picks the module size (3 stored pixels per module). 0 = the output height."
@@ -106,8 +109,9 @@ namespace MB.FrameMarker.Unity
     public Func<long> IntendedDisplayTicksProvider { get; set; }
 
     /// <summary>
-    /// The interval the game aims for between frames, in ticks (100 ns). Null = from Application.targetFrameRate, or from the refresh rate
-    /// and QualitySettings.vSyncCount; 0 when neither is set.
+    /// The interval the game aims for between frames, in ticks (100 ns). Null = what Unity's settings aim for: on Android and iOS
+    /// Application.targetFrameRate (30 fps when unset); elsewhere the refresh rate divided by QualitySettings.vSyncCount while vsync is on,
+    /// else Application.targetFrameRate; 0 when unknown (XR platforms: give the XR display's rate here).
     /// </summary>
     public Func<uint> TargetFrameTicksProvider { get; set; }
 
@@ -325,22 +329,34 @@ namespace MB.FrameMarker.Unity
       return ticks > 0 ? ticks : 1;
     }
 
-    /// <summary>The frame rate Unity aims for: Application.targetFrameRate, else the refresh rate divided by the vsync count; 0 if unknown.</summary>
+    /// <summary>
+    /// The frame interval Unity aims for, as the Application.targetFrameRate documentation describes it: on Android and iOS the
+    /// targetFrameRate (they ignore vSyncCount; unset, they run at 30 fps); elsewhere the refresh rate divided by QualitySettings.vSyncCount
+    /// while vsync is on (targetFrameRate is then ignored), else the targetFrameRate, else on the web the refresh rate. 0 if unknown: a
+    /// desktop without either renders as fast as it can, and XR platforms ignore both (their SDK sets the rate).
+    /// </summary>
     private static uint DefaultTargetFrameTicks()
     {
-      double fps = 0;
-      if (QualitySettings.vSyncCount > 0)
-      {
 #if UNITY_2022_2_OR_NEWER
-        double refreshHz = Screen.currentResolution.refreshRateRatio.value;
+      double refreshHz = Screen.currentResolution.refreshRateRatio.value;
 #else
-        double refreshHz = Screen.currentResolution.refreshRate;
+      double refreshHz = Screen.currentResolution.refreshRate;
 #endif
-        fps = refreshHz / QualitySettings.vSyncCount;
-      }
-      else if (Application.targetFrameRate > 0)
+      int targetFps = Application.targetFrameRate;
+      double fps;
+      switch (Application.platform)
       {
-        fps = Application.targetFrameRate;
+        case RuntimePlatform.Android:
+        case RuntimePlatform.IPhonePlayer:
+          fps = targetFps > 0 ? targetFps : MobileDefaultFps;
+          break;
+        default:
+          fps =
+            QualitySettings.vSyncCount > 0 ? refreshHz / QualitySettings.vSyncCount
+            : targetFps > 0 ? targetFps
+            : Application.platform == RuntimePlatform.WebGLPlayer ? refreshHz
+            : 0;
+          break;
       }
       return fps > 0 ? (uint)Math.Round(Marker.TicksPerSecond / fps) : 0u;
     }

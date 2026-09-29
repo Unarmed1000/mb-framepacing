@@ -5,7 +5,8 @@
 // Used to produce the golden images the C# decoder tests consume (test-data/markers).
 //
 //   marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync] [--intended-ticks <i64>]
-//                 [--target-ticks <u32>] [--cpu-start-ticks <i64>] [--cpu-busy-ticks <u32>] [--utc-ticks <i64>]
+//                 [--target-ticks <u32>] [--cpu-start-ticks <i64>] [--cpu-busy-ticks <u32>] [--preferred-ticks <u32>]
+//                 [--flags <0-255>] [--utc-ticks <i64>]
 //                 [--sequence-id <text> | --sequence-id-hex <hex>] [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]
 //                 [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>

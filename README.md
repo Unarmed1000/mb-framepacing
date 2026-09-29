@@ -130,6 +130,8 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
 - **C#:** the general library [`marker/csharp`](marker/csharp/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `Marker.ModulesToTriangles`).
 - **Unity:** the **[Unity package](doc/unity.md)** adds an overlay component that does all of this for you.
+- **Every field:** **[Filling the marker fields](doc/marker-fields.md)** says where each value comes from, when it changes and what
+  the analysis does with it, with examples for typical frame pacers.
 - **Python:** [`marker/python`](marker/python/README.md) (`mb_framemarker`), which also draws into pixel buffers.
 
 [`marker/README.md`](marker/README.md) compares the four libraries; each has its own README with a quick start and its API.
@@ -188,11 +190,11 @@ The exact format, sizing rules and placement are in [`doc/marker-format.md`](doc
 
 ## Getting started
 
-| Step                               | Guide                                                                                                                      |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 1. Install and build, per platform | **[Windows](doc/install/windows.md)** · **[Ubuntu](doc/install/ubuntu.md)** · **[macOS (Homebrew)](doc/install/macos.md)** |
-| 2. Put the marker into your app    | **[Integrating the marker](doc/integrating.md)** (C++ library, size, position, start/end markers)                          |
-| 3. Take a measurement and read it  | **[Using mb-framepacing](doc/usage.md)** (test game, capture card, video/image import, results, troubleshooting)           |
+| Step                               | Guide                                                                                                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Install and build, per platform | **[Windows](doc/install/windows.md)** · **[Ubuntu](doc/install/ubuntu.md)** · **[macOS (Homebrew)](doc/install/macos.md)**                               |
+| 2. Put the marker into your app    | **[Integrating the marker](doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](doc/marker-fields.md)** |
+| 3. Take a measurement and read it  | **[Using mb-framepacing](doc/usage.md)** (test game, capture card, video/image import, results, troubleshooting)                                         |
 
 The platform guides cover ffmpeg, building the tools and putting them on your PATH, capture card devices and permissions, and
 building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).

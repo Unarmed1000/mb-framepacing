@@ -5,8 +5,8 @@ QR code that carries the frame index and the animation time. A capture of the di
 tools, then shows the **animation error**: how far what the application animated is from what was actually shown on screen.
 
 It draws exactly the same pixels as the C++ and C# libraries: the tests check it against the golden images the C++ library writes
-(`test-data/markers`). The format is specified in [doc/marker-format.md](../../doc/marker-format.md). Standard library only, Python
-3.11 or later.
+(`test-data/markers`). The format is specified in [doc/marker-format.md](../../doc/marker-format.md); what to write in each field is
+in [Filling the marker fields](../../doc/marker-fields.md). Standard library only, Python 3.11 or later.
 
 ## Quick start
 
@@ -47,7 +47,7 @@ modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelForm
 
 ```python
 sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)  # bottom-left
-sync = generate_modules(Payload(frame_index, 0, kind=MarkerKind.SYNC))
+sync = generate_modules(Payload(frame_index, 0, run_id=1, kind=MarkerKind.SYNC))  # the main marker's run id and frame index
 modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelFormat.RGB24)
 ```
 

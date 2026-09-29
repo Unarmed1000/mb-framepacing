@@ -45,7 +45,8 @@ Unity's overlay draws 1 (Render Mode **Shader Packed Bits**, the default), 2 (**
 works everywhere and is the fallback without shader model 3.5), and `FrameMarkerMesh` draws 3 from your own command buffers.
 
 How to put the marker into an application (size, place, start and end markers, the rules that keep it readable) is in
-[Integrating the marker](../doc/integrating.md); Unity has its own [guide](../doc/unity.md).
+[Integrating the marker](../doc/integrating.md); Unity has its own [guide](../doc/unity.md). What to write in each field, for
+typical frame pacers, is in [Filling the marker fields](../doc/marker-fields.md).
 
 ## Version
 
