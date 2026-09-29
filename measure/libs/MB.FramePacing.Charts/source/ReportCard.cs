@@ -29,6 +29,9 @@ namespace MB.FramePacing.Charts
     public const double PlotX0 = 110;
     public const double PlotX1 = Width - 40;
 
+    /// <summary>The plots' width on a card <paramref name="width"/> units wide.</summary>
+    public static double PlotWidth(double width) => width - (Width - PlotX1) - PlotX0;
+
     private const double TileH = 64;
     private const double TileGap = 12;
     private const int TilesPerRow = 4;
@@ -64,9 +67,17 @@ namespace MB.FramePacing.Charts
     /// <summary>
     /// The card of <paramref name="section"/> as shapes, with the items <paramref name="options"/> shows (all by default). With
     /// <paramref name="wholeRunScales"/> the panels keep the whole run's scales (the GUI, so the axes stay while zooming and scrolling);
-    /// otherwise each scales to the section.
+    /// otherwise each scales to the section. With <paramref name="visible"/> (seconds, inside the section) the plots show that range and the
+    /// rest of the section lies beyond their edges, in the panels' scrolling layers (ScrollShape): the GUI's scrolling window, which it moves
+    /// without building again.
     /// </summary>
-    public static CardDrawing Build(RunSection section, ReportOptions? options = null, bool wholeRunScales = false, double width = Width)
+    public static CardDrawing Build(
+      RunSection section,
+      ReportOptions? options = null,
+      bool wholeRunScales = false,
+      double width = Width,
+      (double From, double To)? visible = null
+    )
     {
       double plotX1 = width - (Width - PlotX1);
       options ??= ReportOptions.Default;
@@ -76,11 +87,13 @@ namespace MB.FramePacing.Charts
       double refreshMs = pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
       double from = section.FromSeconds;
       double to = section.ToSeconds;
+      var (viewFrom, viewTo) = visible ?? (from, to);
       var data = section.Data;
-      double XOf(double seconds) => PlotX0 + ((plotX1 - PlotX0) * (seconds - from) / (to - from));
+      double XOf(double seconds) => PlotX0 + ((plotX1 - PlotX0) * (seconds - viewFrom) / (viewTo - viewFrom));
       double XOfFrame(int index) => XOf(data.Seconds(index));
       int frameCount = section.FrameCount;
-      double pixelsPerFrame = frameCount > 0 ? (plotX1 - PlotX0) / frameCount : double.MaxValue;
+      // The section's frames over its width at the visible range's scale
+      double pixelsPerFrame = frameCount > 0 ? (plotX1 - PlotX0) * ((to - from) / (viewTo - viewFrom)) / frameCount : double.MaxValue;
       bool perFrame = pixelsPerFrame >= 1;
 
       string title = RunHeadline.Title(run) + (section.IsWholeRun ? string.Empty : $", {Ms1(from)}–{Ms1(to)} s");
@@ -111,7 +124,7 @@ namespace MB.FramePacing.Charts
       Tiles(parts, tiles, layout.TilesY, width);
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
       var panels = new List<Action<List<CardShape>, List<CardPlot>>>();
-      var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, plotX1);
+      var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, plotX1, viewFrom, viewTo, pixelsPerFrame);
       if (layout.ErrorY is { } errorY)
         panels.Add((shapes, plots) => ErrorPanel(shapes, plots, view, errorY));
       if (layout.StepY is { } stepY)
@@ -253,9 +266,35 @@ namespace MB.FramePacing.Charts
       Func<int, double> XOfFrame,
       bool PerFrame,
       bool WholeRunScales,
-      double PlotX1
+      double PlotX1,
+      double ViewFrom,
+      double ViewTo,
+      double PixelsPerFrame
     )
     {
+      /// <summary>Where the section ends on the card: beyond the plot's right edge when the visible range is shorter.</summary>
+      public double EndX => XOf(Section.ToSeconds);
+
+      /// <summary>A shape that moves with the time axis: into the scrolling layer of the band <paramref name="top"/> to <paramref name="bottom"/>.</summary>
+      public void Move(List<CardShape> parts, CardShape shape, double top, double bottom) => AddScrolling(parts, shape, PlotX0, top, PlotX1, bottom);
+
+      public void MovePath(List<CardShape> parts, string cls, StringBuilder d, double top, double bottom)
+      {
+        if (d.Length > 0)
+          Move(parts, new PathShape(cls, d.ToString()), top, bottom);
+      }
+
+      /// <summary>The time axis under a panel, for the section at the visible range's step: labels scroll, a little beyond the plot's edges.</summary>
+      public void Ticks(List<CardShape> parts, double bottom) =>
+        TimeTicks(
+          shape => AddScrolling(parts, shape, PlotX0 - TickOverhang, bottom, PlotX1 + TickOverhang, bottom + 26),
+          Section.FromSeconds,
+          Section.ToSeconds,
+          ViewTo - ViewFrom,
+          XOf,
+          bottom
+        );
+
       public RunChartData Data => Section.Data;
 
       public double From => Section.FromSeconds;
@@ -288,7 +327,7 @@ namespace MB.FramePacing.Charts
           : ChartScale.MinErrorLimitMs;
       double zeroY = errorY + (ErrorH / 2);
       double YOf(double value) => zeroY - (Math.Clamp(value, -limit, limit) / limit * ErrorH / 2);
-      plots.Add(new CardPlot(ReportItem.AnimationError, PlotX0, errorY, view.PlotX1, errorY + ErrorH, view.From, view.To, -limit, limit));
+      plots.Add(new CardPlot(ReportItem.AnimationError, PlotX0, errorY, view.PlotX1, errorY + ErrorH, view.ViewFrom, view.ViewTo, -limit, limit));
 
       parts.Add(new TextShape(20, errorY - 16, "ANIMATION ERROR PER FRAME", "label", "start"));
       parts.Add(
@@ -307,7 +346,7 @@ namespace MB.FramePacing.Charts
       var clipped = new List<(double X, double Value, bool Top)>();
       if (view.PerFrame)
       {
-        double barW = Math.Max(1.0, ((view.PlotX1 - PlotX0) / Math.Max(1, section.FrameCount)) - 0.6);
+        double barW = Math.Max(1.0, (section.FrameCount > 0 ? view.PixelsPerFrame : view.PlotX1 - PlotX0) - 0.6);
         foreach (int i in errors.FramesIn(section.Start, section.End))
         {
           double value = TicksMs(data.Frames[i].AnimationErrorTicks!.Value);
@@ -315,7 +354,7 @@ namespace MB.FramePacing.Charts
             continue;
           double x = view.XOfFrame(i);
           var (y0, y1) = (Math.Min(zeroY, YOf(value)), Math.Max(zeroY, YOf(value)));
-          parts.Add(new RectShape("bar", N(x, 2), N(y0, 1), N(barW, 2), N(Math.Max(MinBarHeight, y1 - y0), 1)));
+          view.Move(parts, new RectShape("bar", N(x, 2), N(y0, 1), N(barW, 2), N(Math.Max(MinBarHeight, y1 - y0), 1)), errorY, errorY + ErrorH);
           if (Math.Abs(value) > limit)
             clipped.Add((x + (barW / 2), value, value > 0));
         }
@@ -358,13 +397,20 @@ namespace MB.FramePacing.Charts
           if (min < -limit)
             clipped.Add((column + 0.5, min, false));
         }
-        AddPath(parts, "bar-range", range);
-        AddPath(parts, "bar", typical);
+        view.MovePath(parts, "bar-range", range, errorY, errorY + ErrorH);
+        view.MovePath(parts, "bar", typical, errorY, errorY + ErrorH);
       }
       parts.Add(new LineShape("zero-line", N(PlotX0, 0), N(zeroY, 0), N(view.PlotX1, 0), N(zeroY, 0)));
       parts.Add(new TextShape(PlotX0 - 10, zeroY + 4, "0", "vsync-n", "end"));
-      ClipMarks(parts, clipped, errorY, errorY + ErrorH, v => $"{Ms(v, sign: true)} ms", view.PlotX1);
-      TimeTicks(parts, view.From, view.To, view.XOf, errorY + ErrorH);
+      ClipMarks(
+        shape => view.Move(parts, shape, errorY, errorY + ErrorH),
+        clipped,
+        errorY,
+        errorY + ErrorH,
+        v => $"{Ms(v, sign: true)} ms",
+        view.PlotX1
+      );
+      view.Ticks(parts, errorY + ErrorH);
     }
 
     private static void StepPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double stepY)
@@ -385,8 +431,8 @@ namespace MB.FramePacing.Charts
           )
           : ChartScale.StepTop(Array.Empty<double>(), refreshMs);
       double YOf(double ms) => stepY + StepH - (Math.Min(ms, top) / top * StepH);
-      double X1(int frame) => Math.Min(view.PlotX1, view.XOfFrame(frame + 1));
-      plots.Add(new CardPlot(ReportItem.DisplayTimeStep, PlotX0, stepY, view.PlotX1, stepY + StepH, view.From, view.To, 0, top));
+      double X1(int frame) => Math.Min(view.EndX, view.XOfFrame(frame + 1));
+      plots.Add(new CardPlot(ReportItem.DisplayTimeStep, PlotX0, stepY, view.PlotX1, stepY + StepH, view.ViewFrom, view.ViewTo, 0, top));
 
       parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
       parts.Add(new TextShape(view.PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
@@ -420,9 +466,9 @@ namespace MB.FramePacing.Charts
             clipped.Add(((x0 + x1) / 2, level, true));
           previous = (x1, level);
         }
-        AddPath(parts, "riser", risers);
-        AddPath(parts, "held", onTime);
-        AddPath(parts, "held-late", late);
+        view.MovePath(parts, "riser", risers, stepY, stepY + StepH);
+        view.MovePath(parts, "held", onTime, stepY, stepY + StepH);
+        view.MovePath(parts, "held-late", late, stepY, stepY + StepH);
       }
       else
       {
@@ -466,15 +512,15 @@ namespace MB.FramePacing.Charts
             && lateHolds.Values.CountBelow(lateStart, lateEnd, middle + 1) > lateHolds.Values.CountBelow(lateStart, lateEnd, middle);
           (middleLate ? medianLate : median).Append($"M{Fixed(key, 0)} {Fixed(YOf(TicksMs(middle)), 1)}H{Fixed(columnEnd, 1)}");
         }
-        AddPath(parts, "held-range", onTimeRange);
-        AddPath(parts, "held-range-late", lateRange);
-        AddPath(parts, "held", median);
-        AddPath(parts, "held-late", medianLate);
-        AddPath(parts, "held-fill", solid);
-        AddPath(parts, "held-fill-late", solidLate);
+        view.MovePath(parts, "held-range", onTimeRange, stepY, stepY + StepH);
+        view.MovePath(parts, "held-range-late", lateRange, stepY, stepY + StepH);
+        view.MovePath(parts, "held", median, stepY, stepY + StepH);
+        view.MovePath(parts, "held-late", medianLate, stepY, stepY + StepH);
+        view.MovePath(parts, "held-fill", solid, stepY, stepY + StepH);
+        view.MovePath(parts, "held-fill-late", solidLate, stepY, stepY + StepH);
       }
-      ClipMarks(parts, clipped, stepY, stepY + StepH, v => $"{Ms(v)} ms", view.PlotX1);
-      TimeTicks(parts, view.From, view.To, view.XOf, stepY + StepH);
+      ClipMarks(shape => view.Move(parts, shape, stepY, stepY + StepH), clipped, stepY, stepY + StepH, v => $"{Ms(v)} ms", view.PlotX1);
+      view.Ticks(parts, stepY + StepH);
     }
 
     /// <summary>
@@ -511,12 +557,12 @@ namespace MB.FramePacing.Charts
       // A span ends at the next frame of its segment in the section, else after the frame's time on screen
       double X1(int i) =>
         Math.Min(
-          view.PlotX1,
+          view.EndX,
           i + 1 < section.End && frames[i + 1].Segment == frames[i].Segment
             ? view.XOfFrame(i + 1)
             : view.XOf(data.Seconds(i) + (frames[i].OnScreenTicks / (double)TimeSpan.TicksPerSecond))
         );
-      plots.Add(new CardPlot(ReportItem.FrameTime, PlotX0, frameTimeY, view.PlotX1, frameTimeY + FrameTimeH, view.From, view.To, 0, top));
+      plots.Add(new CardPlot(ReportItem.FrameTime, PlotX0, frameTimeY, view.PlotX1, frameTimeY + FrameTimeH, view.ViewFrom, view.ViewTo, 0, top));
       foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
       {
         double y = YOf(position);
@@ -548,8 +594,8 @@ namespace MB.FramePacing.Charts
           if (highest > top)
             clipped.Add(((x0 + x1) / 2, highest, true));
         }
-        AddPath(parts, "cpu-busy", busy);
-        AddPath(parts, "frametime", steps);
+        view.MovePath(parts, "cpu-busy", busy, frameTimeY, frameTimeY + FrameTimeH);
+        view.MovePath(parts, "frametime", steps, frameTimeY, frameTimeY + FrameTimeH);
       }
       else
       {
@@ -602,13 +648,20 @@ namespace MB.FramePacing.Charts
           double middle = TicksMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, (levelCount - 1) / 2));
           median.Append($"M{Fixed(key, 0)} {Fixed(YOf(middle), 1)}H{Fixed(end, 1)}");
         }
-        AddPath(parts, "cpu-busy", busy);
-        AddPath(parts, "frametime-range", range);
-        AddPath(parts, "frametime", median);
-        AddPath(parts, "frametime-fill", solid);
+        view.MovePath(parts, "cpu-busy", busy, frameTimeY, frameTimeY + FrameTimeH);
+        view.MovePath(parts, "frametime-range", range, frameTimeY, frameTimeY + FrameTimeH);
+        view.MovePath(parts, "frametime", median, frameTimeY, frameTimeY + FrameTimeH);
+        view.MovePath(parts, "frametime-fill", solid, frameTimeY, frameTimeY + FrameTimeH);
       }
-      ClipMarks(parts, clipped, frameTimeY, frameTimeY + FrameTimeH, v => $"{Ms(v)} ms", view.PlotX1);
-      TimeTicks(parts, view.From, view.To, view.XOf, frameTimeY + FrameTimeH);
+      ClipMarks(
+        shape => view.Move(parts, shape, frameTimeY, frameTimeY + FrameTimeH),
+        clipped,
+        frameTimeY,
+        frameTimeY + FrameTimeH,
+        v => $"{Ms(v)} ms",
+        view.PlotX1
+      );
+      view.Ticks(parts, frameTimeY + FrameTimeH);
     }
 
     private static void LatePanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double lateY)
@@ -632,7 +685,7 @@ namespace MB.FramePacing.Charts
       double max = scaleEnd > scaleStart ? LateShareData.ShareOf(late.Shares.KthSmallest(scaleStart, scaleEnd, scaleEnd - scaleStart - 1)) : 0;
       double topShare = NiceCeiling(Math.Max(5, max * 1.25));
       double YOf(double share) => lateY + LateH - (share / topShare * LateH);
-      plots.Add(new CardPlot(ReportItem.LateShare, PlotX0, lateY, view.PlotX1, lateY + LateH, view.From, view.To, 0, topShare));
+      plots.Add(new CardPlot(ReportItem.LateShare, PlotX0, lateY, view.PlotX1, lateY + LateH, view.ViewFrom, view.ViewTo, 0, topShare));
       foreach (double tick in new[] { 0, topShare / 2, topShare })
       {
         parts.Add(GridLine(YOf(tick), view.PlotX1));
@@ -689,8 +742,8 @@ namespace MB.FramePacing.Charts
         }
       }
       foreach (var (style, path) in paths)
-        AddPath(parts, style, path);
-      TimeTicks(parts, view.From, view.To, view.XOf, lateY + LateH);
+        view.MovePath(parts, style, path, lateY, lateY + LateH);
+      view.Ticks(parts, lateY + LateH);
     }
 
     /// <summary>
@@ -702,8 +755,8 @@ namespace MB.FramePacing.Charts
     {
       var section = view.Section;
       var frames = view.Data.Frames;
-      double from = view.From;
-      double to = view.To;
+      double from = view.ViewFrom;
+      double to = view.ViewTo;
       double cellW = (view.PlotX1 - PlotX0) * refreshMs / 1000 / (to - from);
       parts.Add(new TextShape(20, stripY - 16, "REFRESH STRIP", "label", "start"));
       if (cellW < MinCellPixels)
@@ -735,30 +788,33 @@ namespace MB.FramePacing.Charts
         }
         string cls =
           (frame.Flags & PresentedFrameFlags.Late) != 0 ? "strip-late"
-          : (i - section.Start) % 2 == 0 ? "strip-a"
+          : i % 2 == 0 ? "strip-a"
           : "strip-b";
         double x0 = view.XOfFrame(i);
         for (int c = 0; c < cells; ++c)
         {
           double x = x0 + (c * cellW);
-          if (x >= view.PlotX1)
+          if (x >= view.EndX)
             break;
           anyUnknown |= c >= seen;
-          parts.Add(
+          view.Move(
+            parts,
             new RectShape(
               c < seen ? cls : "neutral",
               N(x + 0.5, 1),
               N(stripY, 0),
-              N(Math.Max(0.5, Math.Min(cellW - 1, view.PlotX1 - x - 0.5)), 1),
+              N(Math.Max(0.5, Math.Min(cellW - 1, view.EndX - x - 0.5)), 1),
               N(StripH, 0),
               "2"
-            )
+            ),
+            stripY - 10,
+            stripY + StripH
           );
         }
         if (frame.SkippedBefore > 0 || (frame.Flags & PresentedFrameFlags.Torn) != 0)
           marks.Append($"M{Fixed(x0 + 0.5, 1)} {Fixed(stripY - 2, 1)}L{Fixed(x0 - 3, 1)} {Fixed(stripY - 8, 1)}H{Fixed(x0 + 4, 1)}Z");
       }
-      AddPath(parts, "strip-mark", marks);
+      view.MovePath(parts, "strip-mark", marks, stripY - 10, stripY + StripH);
       parts[legend] = new TextShape(
         view.PlotX1,
         stripY - 16,
@@ -768,14 +824,39 @@ namespace MB.FramePacing.Charts
         "vsync-n",
         "end"
       );
-      TimeTicks(parts, from, to, view.XOf, stripY + StripH);
+      view.Ticks(parts, stripY + StripH);
     }
 
     // ------------------------------------------------------------------------------------------------------------------------------------------
 
+    // Time labels are centred on their time: those at the plot's edges reach this far beyond it
+    private const double TickOverhang = 30;
+
+    /// <summary>
+    /// Add <paramref name="shape"/> to the scrolling layer (ScrollShape) of the clip area given, the last part when it is that layer, else a new
+    /// one, so the shapes keep their order.
+    /// </summary>
+    private static void AddScrolling(List<CardShape> parts, CardShape shape, double left, double top, double right, double bottom)
+    {
+      if (
+        parts.Count > 0
+        && parts[^1] is ScrollShape last
+        && last.Left == left
+        && last.Top == top
+        && last.Right == right
+        && last.Bottom == bottom
+        && last.Children is List<CardShape> children
+      )
+      {
+        children.Add(shape);
+        return;
+      }
+      parts.Add(new ScrollShape(left, top, right, bottom, new List<CardShape> { shape }));
+    }
+
     /// <summary>Values beyond the panel's scale: a triangle at its edge, and the value beside it, largest first and where it does not overlap.</summary>
     private static void ClipMarks(
-      List<CardShape> parts,
+      Action<CardShape> add,
       List<(double X, double Value, bool Top)> clipped,
       double top,
       double bottom,
@@ -788,7 +869,7 @@ namespace MB.FramePacing.Charts
       {
         double edge = atTop ? top : bottom;
         double inside = atTop ? edge + 6 : edge - 6;
-        parts.Add(new PathShape("clip-mark", $"M{Fixed(x, 1)} {Fixed(edge, 1)}L{Fixed(x - 4, 1)} {Fixed(inside, 1)}H{Fixed(x + 4, 1)}Z"));
+        add(new PathShape("clip-mark", $"M{Fixed(x, 1)} {Fixed(edge, 1)}L{Fixed(x - 4, 1)} {Fixed(inside, 1)}H{Fixed(x + 4, 1)}Z"));
         string text = format(value);
         double left = x + 6;
         double right = left + (text.Length * 6.2);
@@ -797,16 +878,19 @@ namespace MB.FramePacing.Charts
         if (placed.Any(p => p.Top == atTop && left < p.Right + 4 && right > p.Left - 4))
           continue;
         placed.Add((left, right, atTop));
-        parts.Add(new TextShape(left, atTop ? edge + 17 : edge - 8, text, "clip-text", "start"));
+        add(new TextShape(left, atTop ? edge + 17 : edge - 8, text, "clip-text", "start"));
       }
     }
 
     private static readonly double[] g_timeSteps = { 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600 };
 
     /// <summary>The time axis under a panel: a label every "nice" step, at most a dozen.</summary>
-    internal static void TimeTicks(List<CardShape> parts, double from, double to, Func<double, double> xOf, double bottom)
+    internal static void TimeTicks(List<CardShape> parts, double from, double to, Func<double, double> xOf, double bottom) =>
+      TimeTicks(parts.Add, from, to, to - from, xOf, bottom);
+
+    /// <summary>The labels from <paramref name="from"/> to <paramref name="to"/> at the step for <paramref name="length"/> seconds, on whole steps.</summary>
+    private static void TimeTicks(Action<CardShape> add, double from, double to, double length, Func<double, double> xOf, double bottom)
     {
-      double length = to - from;
       double step = g_timeSteps.FirstOrDefault(s => length / s <= 12, 3600);
       bool minutes = step >= 60;
       for (double t = Math.Ceiling(from / step) * step; t <= to + 1e-9; t += step)
@@ -814,7 +898,7 @@ namespace MB.FramePacing.Charts
         string label = minutes
           ? $"{(t / 60).ToString("0.##", CultureInfo.InvariantCulture)} min"
           : $"{t.ToString("0.##", CultureInfo.InvariantCulture)} s";
-        parts.Add(new TextShape(xOf(t), bottom + 18, label, "vsync-n"));
+        add(new TextShape(xOf(t), bottom + 18, label, "vsync-n"));
       }
     }
 

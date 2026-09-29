@@ -56,6 +56,11 @@ namespace MB.FramePacing.Charts
         case TextShape t:
           parts.Add(Text(t.X, t.Y, t.Content, t.Class, t.Anchor));
           break;
+        case ScrollShape scroll:
+          // A file shows exactly its range: the scrolling shapes are written where they are
+          foreach (var child in scroll.Children)
+            Add(parts, child);
+          break;
         case GroupShape g:
           parts.Add($"<g transform=\"translate(0 {Fixed(g.TranslateY, 0)})\">");
           foreach (var child in g.Children)

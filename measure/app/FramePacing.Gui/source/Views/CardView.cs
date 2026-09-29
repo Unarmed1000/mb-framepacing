@@ -3,8 +3,10 @@
 //* ----------------
 //* Draws a report card (CardDrawing) the way its SVG shows it: the same shapes with the style sheet's values (CardStyle), text in Inter,
 //* scaled to the control's width. With CanZoom the mouse wheel zooms the time axis around the pointer, a drag pans it and a double-click
-//* goes back to the whole run, and a horizontal wheel or Shift+wheel scrolls (the view asks its owner, which builds the card again); hovering a plot draws a cursor
-//* line and what HoverText says about that point.
+//* goes back to the whole run, and a horizontal wheel or Shift+wheel scrolls (the view asks its owner). A card built as a sliding window
+//* (ScrollShape layers reaching beyond the plots) scrolls by ScrollOffset alone: the layers move, clipped to the plots, and the plots' time
+//* ranges move with them, so nothing is built again until the owner sends a new window. Hovering a plot draws a cursor line and what
+//* HoverText says about that point.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -29,6 +31,8 @@ namespace MB.FramePacing.Gui.Views
 
     public static readonly StyledProperty<bool> CanZoomProperty = AvaloniaProperty.Register<CardView, bool>(nameof(CanZoom));
 
+    public static readonly StyledProperty<double> ScrollOffsetProperty = AvaloniaProperty.Register<CardView, double>(nameof(ScrollOffset));
+
     // The wheel zooms by this much per notch; sideways it scrolls by this share of the range in view
     private const double ZoomStep = 0.8;
     private const double ScrollStep = 0.1;
@@ -43,7 +47,7 @@ namespace MB.FramePacing.Gui.Views
 
     static CardView()
     {
-      AffectsRender<CardView>(DrawingProperty);
+      AffectsRender<CardView>(DrawingProperty, ScrollOffsetProperty);
       AffectsMeasure<CardView>(DrawingProperty);
     }
 
@@ -64,6 +68,13 @@ namespace MB.FramePacing.Gui.Views
     {
       get => GetValue(CanZoomProperty);
       set => SetValue(CanZoomProperty, value);
+    }
+
+    /// <summary>How far the card's scrolling layers are moved to the right, in card units: the sliding window's position.</summary>
+    public double ScrollOffset
+    {
+      get => GetValue(ScrollOffsetProperty);
+      set => SetValue(ScrollOffsetProperty, value);
     }
 
     /// <summary>What to show at a point of a plot (its values), or null for nothing.</summary>
@@ -91,12 +102,10 @@ namespace MB.FramePacing.Gui.Views
     {
       base.OnPropertyChanged(change);
       if (change.Property == DrawingProperty)
-      {
         m_operations = Drawing is { } drawing ? Prepare(drawing) : new List<Action<DrawingContext>>();
-        // The pointer stays where it is: describe the same place on the new card
-        if (m_hover is { } hover && Drawing is { } card)
-          m_hover = Hover(card, hover.Card);
-      }
+      // The pointer stays where it is: describe the same place on the new card, or at the new offset
+      if ((change.Property == DrawingProperty || change.Property == ScrollOffsetProperty) && m_hover is { } hover && Drawing is { } card)
+        m_hover = Hover(card, hover.Card);
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -208,7 +217,18 @@ namespace MB.FramePacing.Gui.Views
 
     private Point ToCard(Point control) => new Point(control.X / Scale, control.Y / Scale);
 
-    private static CardPlot? PlotAt(CardDrawing drawing, Point card) => drawing.Plots.FirstOrDefault(p => p.Contains(card.X, card.Y));
+    /// <summary>The plot at the point, its time range moved with the scrolling layers.</summary>
+    private CardPlot? PlotAt(CardDrawing drawing, Point card) =>
+      drawing.Plots.FirstOrDefault(p => p.Contains(card.X, card.Y)) is { } plot ? Scrolled(plot) : null;
+
+    private CardPlot Scrolled(CardPlot plot)
+    {
+      double offset = ScrollOffset;
+      if (offset == 0)
+        return plot;
+      double seconds = offset * (plot.XTo - plot.XFrom) / (plot.Right - plot.Left);
+      return plot with { XFrom = plot.XFrom - seconds, XTo = plot.XTo - seconds };
+    }
 
     private (CardPlot, Point, string?)? Hover(CardDrawing drawing, Point card) =>
       PlotAt(drawing, card) is { } plot ? (plot, card, HoverText?.Invoke(plot, plot.ValueX(card.X), plot.ValueY(card.Y))) : null;
@@ -232,7 +252,7 @@ namespace MB.FramePacing.Gui.Views
     // ------------------------------------------------------------------------------------------------------------------------------------------
     // Drawing: every shape turned once into what draws it
 
-    private static List<Action<DrawingContext>> Prepare(CardDrawing drawing)
+    private List<Action<DrawingContext>> Prepare(CardDrawing drawing)
     {
       var operations = new List<Action<DrawingContext>>();
       var card = CardStyle.Resolve("card", text: false);
@@ -245,7 +265,7 @@ namespace MB.FramePacing.Gui.Views
       return operations;
     }
 
-    private static void Add(List<Action<DrawingContext>> operations, CardShape shape)
+    private void Add(List<Action<DrawingContext>> operations, CardShape shape)
     {
       switch (shape)
       {
@@ -301,6 +321,23 @@ namespace MB.FramePacing.Gui.Views
           operations.Add(context =>
           {
             using (context.PushTransform(translate))
+            {
+              foreach (var child in children)
+                child(context);
+            }
+          });
+          break;
+        }
+        case ScrollShape layer:
+        {
+          var children = new List<Action<DrawingContext>>();
+          foreach (var child in layer.Children)
+            Add(children, child);
+          var clip = new Rect(layer.Left, layer.Top, layer.Right - layer.Left, layer.Bottom - layer.Top);
+          operations.Add(context =>
+          {
+            using (context.PushClip(clip))
+            using (context.PushTransform(Matrix.CreateTranslation(ScrollOffset, 0)))
             {
               foreach (var child in children)
                 child(context);

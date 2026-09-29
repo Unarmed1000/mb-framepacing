@@ -142,7 +142,13 @@
           <TabItem Header="Timeline">
             <Grid RowDefinitions="*,Auto">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <views:CardView x:Name="TimelineCardView" Drawing="{Binding TimelineCard}" CanZoom="True" Margin="8" />
+                <views:CardView
+                  x:Name="TimelineCardView"
+                  Drawing="{Binding TimelineCard}"
+                  ScrollOffset="{Binding TimelineOffset}"
+                  CanZoom="True"
+                  Margin="8"
+                />
               </ScrollViewer>
               <!-- Where the view is in the run: drag it, or scroll sideways on the card -->
               <ScrollBar

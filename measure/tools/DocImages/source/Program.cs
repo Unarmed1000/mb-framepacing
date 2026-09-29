@@ -196,12 +196,31 @@ namespace MB.FramePacing.DocImages
 
     /// <summary>
     /// The Timeline card with real (headless) input, its cards built in the background: it is laid out for its width; wheel notches in quick
-    /// succession add up, around the time under the pointer; a sideways wheel scrolls and the scrollbar follows; a drag pans; a double-click
-    /// shows the whole run again; hovering a plot names the frame under the pointer. Throws when one does not; no picture.
+    /// succession add up, around the time under the pointer; zoomed, it is a sliding window: a sideways wheel, the scrollbar and a drag only
+    /// move it (the same card, the scrollbar following), and scrolling near its edge brings the next window; a double-click shows the whole run
+    /// again; hovering a plot names the frame under the pointer. Throws when one does not; no picture.
     /// </summary>
     private static async Task CheckTimelineInteractionAsync(Window window, AnalysisViewModel analysis)
     {
       var card = window.GetVisualDescendants().OfType<CardView>().Single(v => v.Name == "TimelineCardView");
+      // The first plot as shown: its time range moved with the sliding window
+      CardPlot Shown()
+      {
+        var plot = card.Drawing!.Plots[0];
+        double seconds = card.ScrollOffset * (plot.XTo - plot.XFrom) / (plot.Right - plot.Left);
+        return plot with { XFrom = plot.XFrom - seconds, XTo = plot.XTo - seconds };
+      }
+      async Task Settle(string what)
+      {
+        try
+        {
+          await WaitUntil(() => card.Drawing != null && !analysis.IsBuildingCards, TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException)
+        {
+          throw new InvalidOperationException($"Timeline card: {what}: the cards were not built ({analysis.SectionText})");
+        }
+      }
       async Task<CardPlot> Built(CardDrawing? before, string what)
       {
         try
@@ -212,7 +231,7 @@ namespace MB.FramePacing.DocImages
         {
           throw new InvalidOperationException($"Timeline card: {what}: no new card ({analysis.SectionText})");
         }
-        return card.Drawing!.Plots[0];
+        return Shown();
       }
       void Expect(bool condition, string what)
       {
@@ -220,7 +239,7 @@ namespace MB.FramePacing.DocImages
           throw new InvalidOperationException($"Timeline card: {what} ({analysis.SectionText})");
       }
 
-      await WaitUntil(() => card.Drawing != null && !analysis.IsBuildingCards, TimeSpan.FromSeconds(10));
+      await Settle("the first card");
       var drawing = card.Drawing!;
       Expect(Math.Abs(drawing.Width - Math.Max(AnalysisViewModel.MinCardWidth, Math.Floor(card.Bounds.Width))) < 1, "laid out for its width");
       var plot = drawing.Plots[0];
@@ -244,24 +263,43 @@ namespace MB.FramePacing.DocImages
       Expect(Math.Abs(zoomed.ValueX((zoomed.Left + zoomed.Right) / 2) - atPointer) < 1e-6, "the time under the pointer stays there");
       Expect(analysis.CanScroll && Math.Abs(analysis.ScrollValue - zoomed.XFrom) < 1e-9, "the scrollbar shows where the view is");
 
-      // Sideways: two notches to the right, a fifth of the view (each step's card is noted before the input: it may arrive with it)
-      var before = card.Drawing;
+      // Zoomed in further, the window is a small part of the run
+      for (int i = 0; i < 10; ++i)
+        window.MouseWheel(middle, new Vector(0, 1));
+      zoomed = await Built(card.Drawing, "the wheel zooms in further");
+      length = zoomed.XTo - zoomed.XFrom;
+      var window0 = card.Drawing;
+
+      // Sideways: two notches to the right, a fifth of the view; within the window only the card moves
       window.MouseWheel(middle, new Vector(-2, 0));
-      var scrolled = await Built(before, "a sideways wheel scrolls");
+      Dispatcher.UIThread.RunJobs();
+      var scrolled = Shown();
+      Expect(card.Drawing == window0 && card.ScrollOffset < 0, "a sideways wheel within the window moves the card, nothing is built");
       Expect(Math.Abs(scrolled.XFrom - (zoomed.XFrom + (length * 0.2))) < 1e-6, "a sideways wheel scrolls a tenth of the view per notch");
       Expect(Math.Abs(analysis.ScrollValue - scrolled.XFrom) < 1e-9, "the scrollbar follows");
-      before = card.Drawing;
+      await Settle("the distribution cards follow the scroll");
+      Expect(card.Drawing == window0, "the distribution cards follow without a new Timeline card");
+
       analysis.ScrollValue = zoomed.XFrom;
-      var back = await Built(before, "the scrollbar scrolls");
-      Expect(Math.Abs(back.XFrom - zoomed.XFrom) < 1e-6, "the scrollbar scrolls the view");
+      Dispatcher.UIThread.RunJobs();
+      Expect(card.Drawing == window0 && Math.Abs(Shown().XFrom - zoomed.XFrom) < 1e-6, "the scrollbar moves the window back");
 
       var right = At((plot.Left + plot.Right) / 2 + 100, (plot.Top + plot.Bottom) / 2);
-      before = card.Drawing;
       window.MouseDown(middle, MouseButton.Left);
       window.MouseMove(right);
       window.MouseUp(right, MouseButton.Left);
-      var panned = await Built(before, "dragging pans");
-      Expect(panned.XFrom < back.XFrom && Math.Abs((panned.XTo - panned.XFrom) - length) < 1e-6, "dragging right pans back");
+      Dispatcher.UIThread.RunJobs();
+      var panned = Shown();
+      Expect(card.Drawing == window0, "a drag within the window moves the card");
+      Expect(panned.XFrom < zoomed.XFrom && Math.Abs((panned.XTo - panned.XFrom) - length) < 1e-6, "dragging right pans back");
+      await Settle("after the drag");
+
+      // Seven notches to the right from where it was built: within half a screen of the window's edge, the next window is built
+      analysis.ScrollValue = zoomed.XFrom;
+      var before = card.Drawing;
+      window.MouseWheel(middle, new Vector(-7, 0));
+      var slid = await Built(before, "scrolling near the window's edge builds the next one");
+      Expect(Math.Abs(slid.XFrom - (zoomed.XFrom + (length * 0.7))) < 1e-6, "the next window shows the view scrolled to");
 
       before = card.Drawing;
       window.MouseDown(middle, MouseButton.Left);
@@ -269,7 +307,7 @@ namespace MB.FramePacing.DocImages
       window.MouseDown(middle, MouseButton.Left);
       window.MouseUp(middle, MouseButton.Left);
       _ = await Built(before, "a double-click resets");
-      Expect(analysis.SectionText == whole && !analysis.CanScroll, "a double-click shows the whole run");
+      Expect(analysis.SectionText == whole && !analysis.CanScroll && card.ScrollOffset == 0, "a double-click shows the whole run");
       window.MouseMove(middle);
       Dispatcher.UIThread.RunJobs();
       var frame = new MB.FramePacing.Charts.CardHover(RunSection.Whole(analysis.SelectedRun!.Chart)).FrameAt(atPointer);
@@ -277,7 +315,9 @@ namespace MB.FramePacing.DocImages
         analysis.HoverText(card.Drawing!.Plots[0], atPointer, 0)?.StartsWith($"Frame {frame!.FrameIndex} at", StringComparison.Ordinal) == true,
         "hovering names the frame under the pointer"
       );
-      Console.WriteLine("  Timeline card: width, wheel zoom, sideways scroll, scrollbar, drag, double-click and hover work");
+      Console.WriteLine(
+        "  Timeline card: width, wheel zoom, sliding window (sideways scroll, scrollbar, drag, next window), double-click and hover work"
+      );
     }
 
     /// <summary>The Timeline tab's plots, one below the other, as one image.</summary>

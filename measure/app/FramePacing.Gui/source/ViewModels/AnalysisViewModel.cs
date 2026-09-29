@@ -3,7 +3,10 @@
 //* ----------------
 //* Analysis page: pick a capture, analyse it, show warnings, per run statistics and the report cards of the selected run. The cards show one
 //* section of the run (all of it at first): zooming and panning the Timeline card chooses it, and the distribution cards follow. The cards
-//* are built on the thread pool; only the latest request's are shown, and the cards on screen stay until they arrive.
+//* are built on the thread pool; only the latest request's are shown, and the cards on screen stay until they arrive. A zoomed Timeline is
+//* a sliding window: built for a screen more on either side, so scrolling only moves it (TimelineOffset), and the next window is built in
+//* the background when the view comes within half a screen of its edge. Every window at one zoom starts on a whole pixel column of the
+//* run's time, so the next one draws the same columns and replaces the old one without a visible change.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -14,6 +17,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -28,8 +32,16 @@ namespace MB.FramePacing.Gui.ViewModels
     private readonly GuiSettings m_settings;
     private AnalysisReport? m_report;
     private readonly LatestRequest<SectionCards> m_builds = new LatestRequest<SectionCards>();
-    private RunSection? m_section;
+    private readonly LatestRequest<SectionCards> m_follows = new LatestRequest<SectionCards>();
+    private bool m_building;
+    private bool m_following;
+    private SectionCards? m_cards;
     private CardHover? m_hover;
+
+    // The Timeline's sliding window: the latest one asked for, and the one on screen
+    private TimelineWindow? m_window;
+    private TimelineWindow? m_shownWindow;
+    private CardHover? m_windowHover;
 
     // The range last asked for (null: the whole run): zooming builds on it, so wheel notches add up while a build runs
     private (double From, double To)? m_requested;
@@ -118,9 +130,13 @@ namespace MB.FramePacing.Gui.ViewModels
     [NotifyPropertyChangedFor(nameof(HasRun))]
     public partial RunViewModel? SelectedRun { get; set; }
 
-    /// <summary>The Timeline card of the section.</summary>
+    /// <summary>The Timeline card of the section: a sliding window around it when zoomed.</summary>
     [ObservableProperty]
     public partial CardDrawing? TimelineCard { get; set; }
+
+    /// <summary>How far the Timeline's sliding window is moved to the right (card units), so the view is in its plots.</summary>
+    [ObservableProperty]
+    public partial double TimelineOffset { get; set; }
 
     [ObservableProperty]
     public partial CardDrawing? ErrorHistogramCard { get; set; }
@@ -226,27 +242,27 @@ namespace MB.FramePacing.Gui.ViewModels
         Request(chart, null);
     }
 
-    /// <summary>What the cards show at a point of one of their plots (the frame, the bin, the percentile).</summary>
-    public string? HoverText(CardPlot plot, double x, double y) => m_hover?.Describe(plot, x, y);
+    /// <summary>What the cards show at a point of one of their plots (the frame, the bin, the percentile); the Timeline's frames come from its window.</summary>
+    public string? HoverText(CardPlot plot, double x, double y) => (CardIds.Contains(plot.Id) ? m_hover : m_windowHover)?.Describe(plot, x, y);
 
     /// <summary>Save the card on screen, as it is zoomed, as SVG or PNG.</summary>
     [RelayCommand]
     private async Task SaveViewAsync()
     {
-      var card = SelectedCardIndex switch
-      {
-        0 => TimelineCard,
-        1 => ErrorHistogramCard,
-        2 => ErrorPercentilesCard,
-        3 => DisplayTimeStepHistogramCard,
-        _ => DriftCard,
-      };
-      if (card == null || m_section is not { } section)
+      if (SelectedRun?.Chart is not { } chart || TimelineCard == null)
         return;
+      // Exactly the range in view (the Timeline on screen is a wider window), as wide as shown
+      var section = ViewSection(chart, m_requested);
+      string id = CardIds[Math.Clamp(SelectedCardIndex, 0, CardIds.Count - 1)];
+      double width = TimelineCard.Width;
+      var card =
+        SelectedCardIndex == 0
+          ? ReportCard.Build(section, TimelineOptions, wholeRunScales: true, width: width)
+          : DistributionCard.Build(id, section, width);
       string suffix = section.IsWholeRun
         ? string.Empty
         : string.Create(CultureInfo.InvariantCulture, $"-{section.FromSeconds:0.###}s-{section.ToSeconds:0.###}s");
-      string name = $"run-{section.Run.Run.RunId}-{CardIds[Math.Clamp(SelectedCardIndex, 0, CardIds.Count - 1)]}{suffix}";
+      string name = $"run-{section.Run.Run.RunId}-{id}{suffix}";
       var path = await m_dialogs.SaveFileAsync("Save the chart as it is shown", name, new[] { ("SVG image", "svg"), ("PNG image", "png") });
       if (path == null)
         return;
@@ -268,7 +284,12 @@ namespace MB.FramePacing.Gui.ViewModels
       if (value?.Chart is not { } chart)
       {
         m_builds.Cancel();
+        m_follows.Cancel();
+        m_building = m_following = false;
+        IsBuildingCards = false;
         m_requested = null;
+        m_window = m_shownWindow = null;
+        m_windowHover = null;
         Show(null);
         return;
       }
@@ -276,36 +297,95 @@ namespace MB.FramePacing.Gui.ViewModels
       Request(chart, keep ? m_requested : null);
     }
 
-    /// <summary>Build the cards of <paramref name="range"/> (null: the whole run) on the thread pool; show them unless a newer request came.</summary>
-    private async void Request(ChartRun chart, (double From, double To)? range)
+    /// <summary>
+    /// Show <paramref name="range"/> (null: the whole run). Within the sliding window asked for last, at the same zoom and width, the window
+    /// only moves (the next one is built when the view nears its edge) and the distribution cards follow; otherwise a new window is built.
+    /// </summary>
+    private void Request(ChartRun chart, (double From, double To)? range)
     {
       m_requested = range;
-      IsBuildingCards = true;
       UpdateScroll(chart, range);
+      SectionText = SectionDescription(chart, range);
+      if (range is { } view && m_window is { } window && window.Holds(chart, view, m_cardWidth))
+      {
+        MoveWindow();
+        if (window.NearEdge(view))
+          BuildWindow(chart, range);
+        else
+          Follow(chart, view);
+        return;
+      }
+      BuildWindow(chart, range);
+    }
+
+    /// <summary>A new sliding window around <paramref name="range"/> with every card, on the thread pool; shown unless a newer one was asked for.</summary>
+    private async void BuildWindow(ChartRun chart, (double From, double To)? range)
+    {
       double width = m_cardWidth;
+      var window = TimelineWindow.Around(chart, range, width);
+      m_window = window;
+      // This build brings the distribution cards of the range too
+      m_follows.Cancel();
+      m_following = false;
+      m_building = true;
+      IsBuildingCards = true;
       try
       {
         // The Timeline keeps the whole run's scales, so its axes stay while zooming and scrolling
         var cards = await m_builds.Run(token =>
-          SectionCards.Build(
-            range is { } r ? RunSection.Create(chart, r.From, r.To) : RunSection.Whole(chart),
-            TimelineOptions,
-            token,
-            width,
-            wholeRunScales: true
-          )
+          SectionCards.Build(ViewSection(chart, range), TimelineOptions, token, width, wholeRunScales: true, window.Card)
         );
-        if (cards != null)
-        {
-          Show(cards);
-          IsBuildingCards = false;
-        }
+        if (cards == null)
+          return;
+        m_building = false;
+        m_shownWindow = window;
+        m_windowHover = new CardHover(window.Section);
+        TimelineCard = cards.Timeline;
+        MoveWindow();
+        Show(cards);
+        // The view moved on while this one was built: its distribution cards
+        if (m_requested is { } view && range != view)
+          Follow(chart, view);
+        UpdateBuilding();
       }
       catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
       {
         ErrorText = "Could not draw the charts: " + ex.Message;
-        IsBuildingCards = false;
+        m_building = false;
+        UpdateBuilding();
       }
+    }
+
+    /// <summary>The distribution cards of <paramref name="view"/>, on the thread pool; the Timeline's window stays.</summary>
+    private async void Follow(ChartRun chart, (double From, double To) view)
+    {
+      // Before the first window arrives there is nothing to follow: that build brings the cards
+      if (m_building || m_cards is not { } cards)
+        return;
+      m_following = true;
+      IsBuildingCards = true;
+      var followed = await m_follows.Run(token => cards.Follow(ViewSection(chart, view), token));
+      if (followed == null)
+        return;
+      m_following = false;
+      Show(followed);
+      UpdateBuilding();
+    }
+
+    /// <summary>Put the view in the Timeline's plots: the window on screen moved by the view's distance from where it was built to show.</summary>
+    private void MoveWindow() => TimelineOffset = m_shownWindow is { } shown && m_requested is { } view ? shown.OffsetFor(view, m_cardWidth) : 0;
+
+    private void UpdateBuilding() => IsBuildingCards = m_building || m_following;
+
+    private static RunSection ViewSection(ChartRun chart, (double From, double To)? range) =>
+      range is { } r ? RunSection.Create(chart, r.From, r.To) : RunSection.Whole(chart);
+
+    private static string SectionDescription(ChartRun chart, (double From, double To)? range)
+    {
+      double whole = RunSection.Whole(chart).ToSeconds;
+      return range is { } r
+        ? string.Create(CultureInfo.InvariantCulture, $"{r.From:0.000}–{r.To:0.000} s of {whole:0.0} s")
+        : string.Create(CultureInfo.InvariantCulture, $"The whole run: {whole:0.0} s");
     }
 
     /// <summary>The scrollbar at once, before the cards arrive: it follows what was asked for.</summary>
@@ -327,26 +407,21 @@ namespace MB.FramePacing.Gui.ViewModels
       }
     }
 
+    /// <summary>The distribution cards of the cards' section, and what hovering them says; nothing at all without cards.</summary>
     private void Show(SectionCards? cards)
     {
-      var section = cards?.Section;
-      m_section = section;
-      m_hover = section != null ? new CardHover(section) : null;
-      TimelineCard = cards?.Timeline;
+      m_cards = cards;
+      m_hover = cards != null ? new CardHover(cards.Section) : null;
+      if (cards == null)
+      {
+        TimelineCard = null;
+        TimelineOffset = 0;
+        SectionText = string.Empty;
+      }
       ErrorHistogramCard = cards?.ErrorHistogram;
       ErrorPercentilesCard = cards?.ErrorPercentiles;
       DisplayTimeStepHistogramCard = cards?.DisplayTimeStepHistogram;
       DriftCard = cards?.Drift;
-      IsBuildingCards = false;
-      SectionText = section switch
-      {
-        null => string.Empty,
-        { IsWholeRun: true } => string.Create(CultureInfo.InvariantCulture, $"The whole run: {section.ToSeconds:0.0} s"),
-        _ => string.Create(
-          CultureInfo.InvariantCulture,
-          $"{section.FromSeconds:0.000}–{section.ToSeconds:0.000} s of {RunSection.Whole(section.Run).ToSeconds:0.0} s"
-        ),
-      };
     }
 
     /// <summary>Analyse a capture right after it was recorded.</summary>

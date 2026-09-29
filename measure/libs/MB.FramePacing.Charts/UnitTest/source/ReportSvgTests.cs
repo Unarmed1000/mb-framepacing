@@ -80,7 +80,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var drawing = ReportCard.Build(section);
       Assert.That(drawing.Shapes, Is.Not.Empty);
       Assert.That(SvgCardWriter.Write(drawing, "#fff"), Is.EqualTo(ReportCard.Render(section, background: "#fff")));
-      Assert.That(drawing.Shapes.OfType<TextShape>().First().Content, Is.EqualTo(drawing.Title), "the title comes first");
+      Assert.That(drawing.FlatShapes.OfType<TextShape>().First().Content, Is.EqualTo(drawing.Title), "the title comes first");
     }
 
     [Test]
@@ -243,7 +243,7 @@ namespace MB.FramePacing.Charts.UnitTest
       double Seconds(int i) => (frames[i].FirstSeenTicks - frames[0].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
       (double X, double Y)[] Points(string cls) =>
         drawing
-          .Shapes.OfType<PathShape>()
+          .FlatShapes.OfType<PathShape>()
           .Where(p => p.Class == cls)
           .SelectMany(p => Regex.Matches(p.Data, "[ML](-?[0-9.]+) (-?[0-9.]+)"))
           .Select(m =>
@@ -270,7 +270,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(amber.Max(p => p.X), Is.EqualTo(Seconds(2399)).Within(tolerance), "amber again after the late frame's window");
       Assert.That(
         drawing
-          .Shapes.OfType<TextShape>()
+          .FlatShapes.OfType<TextShape>()
           .Any(t => t.Content.StartsWith("amber: on screen longer than a refresh (4.2 ms) as the pacer intended", StringComparison.Ordinal))
       );
     }
@@ -449,6 +449,7 @@ namespace MB.FramePacing.Charts.UnitTest
             PathShape p => new[] { p.Class },
             TextShape t => new[] { t.Class },
             GroupShape g => Classes(g.Children),
+            ScrollShape l => Classes(l.Children),
             _ => Array.Empty<string>(),
           }
         );
@@ -520,22 +521,25 @@ namespace MB.FramePacing.Charts.UnitTest
       var only = ReportOptions.ShowOnly(new[] { ReportItem.RefreshStrip });
 
       var drawing = ReportCard.Build(RunSection.Whole(card), only);
-      var cells = drawing.Shapes.OfType<RectShape>().ToList();
+      var cells = drawing.FlatShapes.OfType<RectShape>().ToList();
       Assert.That(cells, Has.Count.EqualTo(42), "a cell per refresh: 39 frames of one, one of three");
       Assert.That(cells.Count(c => c.Class == "neutral"), Is.EqualTo(2), "the two refreshes after frame 5's last capture are unknown");
-      var marks = drawing.Shapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
+      var marks = drawing.FlatShapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
       Assert.That(marks.Data.Count(c => c == 'M'), Is.EqualTo(2), "frame 10 (skipped indices before it) and frame 12 (torn)");
-      Assert.That(drawing.Shapes.OfType<TextShape>().Any(t => t.Content.Contains("grey not decoded", StringComparison.Ordinal)));
+      Assert.That(drawing.FlatShapes.OfType<TextShape>().Any(t => t.Content.Contains("grey not decoded", StringComparison.Ordinal)));
 
       var camera = ReportCard.Build(RunSection.Whole(card with { Camera = true }), only);
-      Assert.That(camera.Shapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero, "a camera sees frame 5 until frame 6");
-      Assert.That(camera.Shapes.OfType<RectShape>().Count(), Is.EqualTo(42));
+      Assert.That(camera.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero, "a camera sees frame 5 until frame 6");
+      Assert.That(camera.FlatShapes.OfType<RectShape>().Count(), Is.EqualTo(42));
 
       var clean = ReportCard.Build(RunSection.Whole(run), only);
-      Assert.That(clean.Shapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero);
-      Assert.That(clean.Shapes.OfType<PathShape>().Any(p => p.Class == "strip-mark"), Is.False);
+      Assert.That(clean.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero);
+      Assert.That(clean.FlatShapes.OfType<PathShape>().Any(p => p.Class == "strip-mark"), Is.False);
       Assert.That(
-        clean.Shapes.OfType<TextShape>().Single(t => t.X == ReportCard.PlotX1 && t.Content.StartsWith("one cell", StringComparison.Ordinal)).Content,
+        clean
+          .FlatShapes.OfType<TextShape>()
+          .Single(t => t.X == ReportCard.PlotX1 && t.Content.StartsWith("one cell", StringComparison.Ordinal))
+          .Content,
         Does.Not.Contain("grey").And.Not.Contain("tear")
       );
     }
@@ -582,10 +586,10 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(drawing.Title, Does.StartWith("Run 1  'one hour': "), id);
         Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), id);
       }
-      int Bars(string id) => DistributionCard.Build(id, section).Shapes.OfType<RectShape>().Count(r => r.Class == "hist-bar");
+      int Bars(string id) => DistributionCard.Build(id, section).FlatShapes.OfType<RectShape>().Count(r => r.Class == "hist-bar");
       Assert.That(Bars(DistributionCard.ErrorHistogram), Is.EqualTo(histograms.AnimationErrorMs.Bins.Count(b => b.Count > 0)));
       Assert.That(Bars(DistributionCard.DisplayTimeStepHistogram), Is.EqualTo(histograms.DisplayDeltaMs.Bins.Count(b => b.Count > 0)));
-      var drift = DistributionCard.Build(DistributionCard.Drift, section).Shapes.OfType<PathShape>().Single(p => p.Class == "curve");
+      var drift = DistributionCard.Build(DistributionCard.Drift, section).FlatShapes.OfType<PathShape>().Single(p => p.Class == "curve");
       Assert.That(drift.Data.Count(c => c is 'M' or 'L'), Is.LessThanOrEqualTo(2 * (int)(ReportCard.PlotX1 - ReportCard.PlotX0 + 1)), "per column");
 
       var error = Assert.Throws<ArgumentException>(() => DistributionCard.Build("histogram", section));

@@ -3,7 +3,8 @@
 //* ----------------
 //* What the GUI does on every zoom and scroll of a long run at 240 Hz (1 hour: 864,000 frames; 10 hours: 8.64 million): cut the section and
 //* build its Timeline card (the report's panels, the whole run's scales) and its four distribution cards, with the run's prepared data
-//* (RunChartData) already made; and making that data, once per run. A frame of the GUI is 16 ms.
+//* (RunChartData) already made; the sliding window the GUI builds when zoomed (three screens); and making that data, once per run. A frame
+//* of the GUI is 16 ms.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -44,6 +45,16 @@ namespace MB.FramePacing.Benchmarks
 
     [Benchmark]
     public CardDrawing TimelineCard() => ReportCard.Build(Section(), g_panels, wholeRunScales: true);
+
+    /// <summary>
+    /// The GUI's sliding window when zoomed: the view and a screen more on either side, built once per zoom and when a scroll nears its edge
+    /// (scrolling within it builds nothing).
+    /// </summary>
+    [Benchmark]
+    public CardDrawing? TimelineWindow() =>
+      Seconds <= 0
+        ? null
+        : ReportCard.Build(RunSection.Create(m_run, 1200 - Seconds, 1200 + (2 * Seconds)), g_panels, true, visible: (1200, 1200 + Seconds));
 
     [Benchmark]
     public int DistributionCards()

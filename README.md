@@ -236,8 +236,9 @@ mouse wheel zooms around the pointer, a sideways wheel or swipe (or Shift with t
 right, and **Reset zoom** (or a double-click) shows the whole run again; the scales stay the whole run's, so the axes do not jump while
 you look around. Hovering shows the frame under the pointer (its display time step, animation error, lateness, frametime and CPU
 busy). The distribution tabs follow the section the Timeline shows, and **Save view...** saves the card on screen, as it is zoomed, as
-SVG or PNG. Every zoom and scroll draws in a few milliseconds whatever the capture's length, ten hours included: each pixel column's
-numbers come from data prepared once per run.
+SVG or PNG. Every zoom draws in a few milliseconds whatever the capture's length, ten hours included: each pixel column's numbers
+come from data prepared once per run. Zoomed in, the Timeline is a sliding window, drawn a screen wider on either side, so scrolling
+only moves it; the next window is drawn in the background before you reach its edge.
 
 The same panels as a report (below) of a test clip, a busy stretch at the full rate:
 

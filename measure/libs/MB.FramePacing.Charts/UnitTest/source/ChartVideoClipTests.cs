@@ -68,10 +68,10 @@ namespace MB.FramePacing.Charts.UnitTest
       var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
       double largest = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
       Assert.That((error.YFrom, error.YTo), Is.EqualTo((-Math.Max(2, largest * 1.15), Math.Max(2, largest * 1.15))), $"{clip}: symmetric scale");
-      var band = drawing.Shapes.OfType<RectShape>().Single(r => r.Class == "band");
+      var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "band");
       Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
       var withError = measured.Where(i => manifest.AnimationErrorTicks(i) != 0).ToArray();
-      var bars = drawing.Shapes.OfType<RectShape>().Where(r => r.Class == "bar").ToArray();
+      var bars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class == "bar").ToArray();
       Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
       double zeroY = error.PixelY(0);
       for (int k = 0; k < bars.Length; ++k)
@@ -132,7 +132,7 @@ namespace MB.FramePacing.Charts.UnitTest
       AssertCardBars(errors, measured.Select(manifest.AnimationErrorTicks), clip + ": animation error histogram");
       var errorPlot = errors.Plots.Single();
       Assert.That(
-        errors.Shapes.OfType<LineShape>().Where(l => l.Class == "average-line").Select(l => errorPlot.ValueX(l.X1.Value)),
+        errors.FlatShapes.OfType<LineShape>().Where(l => l.Class == "average-line").Select(l => errorPlot.ValueX(l.X1.Value)),
         Is.EqualTo(new[] { -1.0, 1.0 }).Within(1e-9),
         $"{clip}: ±1 ms threshold"
       );
@@ -140,7 +140,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var display = DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section);
       AssertCardBars(display, measured.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
       double median = Analysis.Statistics.FromTicks(measured.Select(manifest.DisplayStepTicks)).P50;
-      var medianLine = display.Shapes.OfType<LineShape>().Single(l => l.Class == "average-line");
+      var medianLine = display.FlatShapes.OfType<LineShape>().Single(l => l.Class == "average-line");
       Assert.That(display.Plots.Single().ValueX(medianLine.X1.Value), Is.EqualTo(median).Within(1e-9), $"{clip}: median display time step");
 
       var percentiles = DistributionCard.Build(DistributionCard.ErrorPercentiles, section);
@@ -376,7 +376,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// <summary>A path's horizontal segments ("M x0 y H x1"), as the display time step panel draws its holds.</summary>
     private static IEnumerable<(double X0, double Y, double X1)> Segments(CardDrawing drawing, string cls) =>
       drawing
-        .Shapes.OfType<PathShape>()
+        .FlatShapes.OfType<PathShape>()
         .Where(p => p.Class == cls)
         .SelectMany(p => Regex.Matches(p.Data, "M(-?[0-9.]+) (-?[0-9.]+)H(-?[0-9.]+)"))
         .Select(m => (Number(m.Groups[1].Value), Number(m.Groups[2].Value), Number(m.Groups[3].Value)));
@@ -384,7 +384,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// <summary>A path's points (M and L commands).</summary>
     private static IEnumerable<(double X, double Y)> PathPoints(CardDrawing drawing, string cls) =>
       drawing
-        .Shapes.OfType<PathShape>()
+        .FlatShapes.OfType<PathShape>()
         .Where(p => p.Class == cls)
         .SelectMany(p => Regex.Matches(p.Data, "[ML](-?[0-9.]+) (-?[0-9.]+)"))
         .Select(m => (Number(m.Groups[1].Value), Number(m.Groups[2].Value)));
@@ -408,7 +408,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var expected = values.GroupBy(Bin).OrderBy(g => g.Key).Select(g => (Position: g.Key * widthMs, Height: Math.Log10(g.Count()))).ToArray();
 
       var plot = card.Plots.Single();
-      var bars = card.Shapes.OfType<RectShape>().Where(r => r.Class == "hist-bar").ToArray();
+      var bars = card.FlatShapes.OfType<RectShape>().Where(r => r.Class == "hist-bar").ToArray();
       Assert.That(
         bars.Select(b => plot.ValueX(b.X.Value + (b.Width.Value / 2))),
         Is.EqualTo(expected.Select(e => e.Position)).Within(1e-9),
@@ -422,7 +422,7 @@ namespace MB.FramePacing.Charts.UnitTest
     private static void AssertCurve(CardDrawing card, IEnumerable<(double X, double Y)> expected, string what)
     {
       var plot = card.Plots.Single();
-      string data = card.Shapes.OfType<PathShape>().Single(p => p.Class == "curve").Data;
+      string data = card.FlatShapes.OfType<PathShape>().Single(p => p.Class == "curve").Data;
       var points = Regex
         .Matches(data, "[ML](-?[0-9.]+) (-?[0-9.]+)")
         .Select(m => (X: Number(m.Groups[1].Value), Y: Number(m.Groups[2].Value)))
