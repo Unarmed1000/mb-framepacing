@@ -67,16 +67,17 @@
         <ComboBox ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="260" />
         <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding SelectedRun.StartText, FallbackValue=''}" />
       </Grid>
-      <!-- The headline tiles: RunHeadline builds them, the same the report card shows, in the card's tile style -->
-      <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}">
+      <!-- The headline tiles: RunHeadline builds them, the same the report card shows, in the card's tile style and its rows
+           (ReportOptions.TilesPerRowFor) -->
+      <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}" Margin="0,0,-8,-8">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <WrapPanel ItemSpacing="8" LineSpacing="8" />
+            <UniformGrid Columns="{Binding SelectedRun.TileColumns, FallbackValue=4}" />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="charts:HeadlineTile">
-            <Border Classes="tile" ToolTip.Tip="{Binding Explanation}">
+            <Border Classes="tile" Margin="0,0,8,8" ToolTip.Tip="{Binding Explanation}">
               <StackPanel Spacing="4">
                 <TextBlock Classes="tileLabel" Text="{Binding Caption, Converter={x:Static views:UpperCaseConverter.Instance}}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">

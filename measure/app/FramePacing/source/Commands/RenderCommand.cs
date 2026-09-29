@@ -54,9 +54,12 @@ namespace MB.FramePacing.App.Commands
           "Show only these items (comma separated, the same ids as --hide; naming a tile keeps the tiles row for it, naming an overlay its panel).",
       };
       string overlays = string.Join(", ", ReportItem.Overlays.Keys);
+      string autoTiles = string.Join(", ", ReportItem.AutoTiles);
       var showOption = new Option<string?>("--show")
       {
-        Description = $"Also draw these opt-in overlays, comma separated: {overlays} (on the display time step panel).",
+        Description =
+          $"Also draw these opt-in items, comma separated: the overlays {overlays} (on the display time step panel), and the tiles "
+          + $"{autoTiles}, which are otherwise left out when the run has no dropped or out-of-order frames.",
       };
       var titleOption = new Option<string?>("--title")
       {
@@ -70,10 +73,11 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "Leave out the tiles without a value (too few frames, no pacing) and the late share when no frame is late.",
       };
-      var tilesPerRowOption = new Option<int>("--tiles-per-row")
+      var tilesPerRowOption = new Option<int?>("--tiles-per-row")
       {
-        Description = $"How many headline tiles go in a row (1 to {ReportOptions.MaxTilesPerRow}).",
-        DefaultValueFactory = _ => ReportOptions.DefaultTilesPerRow,
+        Description =
+          $"How many headline tiles go in a row (1 to {ReportOptions.MaxTilesPerRow}). Default: two rows, half the tiles each (at least "
+          + $"{ReportOptions.MinAutoTilesPerRow}).",
       };
       string cardIds = string.Join(", ", DistributionCard.All.Select(c => c.Id));
       var cardsOption = new Option<string>("--cards")

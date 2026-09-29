@@ -353,6 +353,7 @@ namespace MB.FramePacing.Analysis
         sourceDrops,
         frames.Count,
         frames.Aggregate(0L, (sum, f) => sum + (long)f.SkippedBefore),
+        DroppedFrames.Before(frames).Sum(),
         outOfOrder,
         frames.Count > 0 ? frames[^1].Segment + 1 : 0
       );

@@ -167,13 +167,14 @@ is presented after it first appears.
 
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
-(all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-off`, `error-p99`, `error-p999`,
-`worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`.
-Overlays are opt-in: `--show animation-time-step` draws the animation time step as a blue line over the display time step (an even
+(all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
+`error-p99`, `error-p999`, `worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`.
+The tiles `frames-dropped` and `out-of-order` are left out together when the run (or section) has neither; `--show
+frames-dropped,out-of-order` keeps them anyway, `--hide` leaves them out. Overlays are opt-in: `--show animation-time-step` draws the animation time step as a blue line over the display time step (an even
 display with an uneven animation is delta time jitter; the scale covers both). For a card in a document: `--title "..."` replaces
 the run's title, `--strip-seconds 1` draws the refresh strip over only the first second (readable cells on a long section),
 `--hide-empty` leaves out the tiles without a value (the 0.1 % low and p99.9 below 1,000 frames) and the late share when no frame is
-late, and `--tiles-per-row 5` puts five tiles in a row (default 4):
+late, and `--tiles-per-row 5` puts five tiles in a row (default: two rows, half the tiles each, at least four):
 
 ```sh
 mb-framepacing render capture-20260924-153000 --cards none --only title,display,tiles,animation-error,display-time-step,refresh-strip \
@@ -212,16 +213,18 @@ minus the display time since the run's first frame. `--cards error-histogram,dri
 
 The headline numbers on the Analyze page (the report card shows the same):
 
-| Tile               | Meaning                                                                                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Average fps        | Presented frames per second of the time their display time steps cover; underneath the mean step and the frame count, or how many static frames are excluded |
-| 1 % low            | The frame rate at the 99th percentile display time step (nearest rank), the step underneath; needs 100 frames                                                |
-| 0.1 % low          | The same at the 99.9th percentile; needs 1000 frames                                                                                                         |
-| Frames visibly off | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share                                      |
-| Error p99          | 99 % of the frames have a smaller \|animation error\|; needs 100 frames                                                                                      |
-| Error p99.9        | 99.9 % of the frames have a smaller \|animation error\|; needs 1000 frames                                                                                   |
-| Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                                                                  |
-| Late frames        | Frames shown later than planned (see below), and their share of the run                                                                                      |
+| Tile               | Meaning                                                                                                                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Average fps        | Presented frames per second of the time their display time steps cover; underneath the mean step and the frame count, or how many static frames are excluded                                                                        |
+| 1 % low            | The frame rate at the 99th percentile display time step (nearest rank), the step underneath; needs 100 frames                                                                                                                       |
+| 0.1 % low          | The same at the 99.9th percentile; needs 1000 frames                                                                                                                                                                                |
+| Frames dropped     | Frames the application rendered that never reached the display (skipped frame indices over a capture without gaps, never shown later), and their share of the rendered frames; only when the run has dropped or out-of-order frames |
+| Out of order       | Refreshes that showed an older frame again after a newer one; only when the run has dropped or out-of-order frames                                                                                                                  |
+| Frames visibly off | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share                                                                                                             |
+| Error p99          | 99 % of the frames have a smaller \|animation error\|; needs 100 frames                                                                                                                                                             |
+| Error p99.9        | 99.9 % of the frames have a smaller \|animation error\|; needs 1000 frames                                                                                                                                                          |
+| Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                                                                                                                                         |
+| Late frames        | Frames shown later than planned (see below), and their share of the run                                                                                                                                                             |
 
 The frame rate numbers (average fps, the lows) and the display time step statistics and histogram describe the frames that animate: a
 static frame's time on screen (the marker's `Static` flag) is left out, and the tile, the report's description and the statistics

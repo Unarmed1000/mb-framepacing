@@ -18,6 +18,7 @@ namespace MB.FramePacing.Data
     long SourceDropEvents,
     long PresentedFrames,
     long SkippedFrameIndices,
+    long DroppedFrames,
     long OutOfOrderCaptures,
     int Segments
   );

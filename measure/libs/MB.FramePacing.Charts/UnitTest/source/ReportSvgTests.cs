@@ -355,7 +355,7 @@ namespace MB.FramePacing.Charts.UnitTest
         null,
         true,
         true,
-        new RunCounts(Count, Count, 0, 0, 0, 0, Count, 0, 0, 1),
+        new RunCounts(Count, Count, 0, 0, 0, 0, Count, 0, 0, 0, 1),
         RunStatistics.From(frames, TimeSpan.TicksPerMillisecond, Refresh),
         frames,
         Array.Empty<string>(),
@@ -423,8 +423,36 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Count(tile, "class=\"tile\""), Is.EqualTo(1), "one tile");
       Assert.That(tile, Does.Contain(">FRAMES VISIBLY OFF<"));
 
+      // Every tile but the auto ones: this run has nothing dropped or out of order
       string tiles = ReportCard.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.Tiles }));
-      Assert.That(Count(tiles, "class=\"tile\""), Is.EqualTo(ReportItem.TileIds.Count), "every tile");
+      Assert.That(Count(tiles, "class=\"tile\""), Is.EqualTo(ReportItem.TileIds.Count - ReportItem.AutoTiles.Count), "every tile");
+    }
+
+    /// <summary>
+    /// Frames dropped and out of order are left out together when the run has neither, shown on purpose with Show, left out with Hide; the
+    /// tiles go in two rows (four or five a row) unless the options set the row length.
+    /// </summary>
+    [Test]
+    public void Options_AutoTiles_ShowOnlyWhatTheRunHas()
+    {
+      var section = RunSection.Whole(Synthetic(2400));
+      Assert.That(section.Run.Run.Counts.DroppedFrames + section.Run.Run.Counts.OutOfOrderCaptures, Is.Zero);
+      IReadOnlyList<RectShape> TilesOf(ReportOptions options) =>
+        ReportCard.Build(section, options).FlatShapes.OfType<RectShape>().Where(r => r.Class == "tile" && r.Y.Value > 80).ToList();
+      int Rows(IReadOnlyList<RectShape> tiles) => tiles.Select(t => t.Y.Value).Distinct().Count();
+
+      var auto = TilesOf(ReportOptions.Default);
+      Assert.That(auto, Has.Count.EqualTo(8), "nothing dropped or out of order: the pair is left out");
+      Assert.That(Rows(auto), Is.EqualTo(2), "two rows of four");
+      Assert.That(RunHeadline.Shown(section.Run, ReportOptions.Default).Select(t => t.Id), Has.None.AnyOf(ReportItem.AutoTiles.ToArray()));
+
+      var shown = TilesOf(ReportOptions.Default.Show(ReportItem.AutoTiles));
+      Assert.That(shown, Has.Count.EqualTo(10), "shown on purpose, though both are 0");
+      Assert.That(Rows(shown), Is.EqualTo(2), "two rows of five");
+
+      Assert.That(TilesOf(ReportOptions.Default.Show(ReportItem.AutoTiles).Hide(new[] { ReportItem.OutOfOrder })), Has.Count.EqualTo(9));
+      Assert.That(Rows(TilesOf(ReportOptions.Default with { TilesPerRow = 8 })), Is.EqualTo(1), "a row length set by the options");
+      Assert.That(ReportOptions.Default.TilesPerRowFor(3), Is.EqualTo(ReportOptions.MinAutoTilesPerRow));
     }
 
     [Test]

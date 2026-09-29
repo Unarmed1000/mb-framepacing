@@ -151,6 +151,7 @@ namespace MB.FramePacing.Analysis
         c.SourceDropEvents,
         c.PresentedFrames,
         c.SkippedFrameIndices,
+        c.DroppedFrames,
         c.OutOfOrderCaptures,
         c.Segments
       );
@@ -165,6 +166,7 @@ namespace MB.FramePacing.Analysis
         c.SourceDropEvents,
         c.PresentedFrames,
         c.SkippedFrameIndices,
+        c.DroppedFrames,
         c.OutOfOrderCaptures,
         c.Segments
       );

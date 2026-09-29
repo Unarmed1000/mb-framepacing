@@ -19,6 +19,8 @@ namespace MB.FramePacing.Analysis
     long SourceDropEvents,
     long PresentedFrames,
     long SkippedFrameIndices,
+    // Frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order (DroppedFrames)
+    long DroppedFrames,
     long OutOfOrderCaptures,
     int Segments
   );

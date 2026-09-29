@@ -122,6 +122,7 @@ def _summary(summary: AnalysisSummary) -> dict[str, JsonValue]:
                 "hasStartMarker": run.has_start_marker,
                 "hasEndMarker": run.has_end_marker,
                 "presentedFrames": run.counts.presented_frames,
+                "droppedFrames": run.counts.dropped_frames,
                 "captures": run.counts.captures,
                 "displayDeltaCount": run.statistics.display_delta_ms.count,
                 "displayDeltaP50": run.statistics.display_delta_ms.p50,

@@ -124,9 +124,7 @@ namespace MB.FramePacing.Charts
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
       // The section's own numbers only when a tile shows them
-      var tiles = ReportItem.TileIds.Any(options.IsShown)
-        ? RunHeadline.Tiles(section.Section).Where(t => options.IsShown(t.Id) && (t.HasValue || !options.HideEmpty)).ToList()
-        : new List<HeadlineTile>();
+      var tiles = ReportItem.TileIds.Any(options.IsShown) ? RunHeadline.Shown(section.Section, options).ToList() : new List<HeadlineTile>();
       if (options.HideEmpty && options.IsShown(ReportItem.LateShare) && (section.Section.Run.Pacing?.LateFrames ?? 0) == 0)
         options = options.Hide(new[] { ReportItem.LateShare });
       // What the application wants, when its markers say so: a line of its own in the display box
@@ -139,7 +137,7 @@ namespace MB.FramePacing.Charts
       if (options.IsShown(ReportItem.Display))
         DisplayBox(parts, chart, section, refreshMs, width, wants, displayH);
 
-      Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRow);
+      Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRowFor(tiles.Count));
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
       var panels = new List<Action<List<CardShape>, List<CardPlot>>>();
       var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, plotX1, viewFrom, viewTo, pixelsPerFrame);
@@ -218,7 +216,8 @@ namespace MB.FramePacing.Charts
         double tilesY = cursor;
         if (tiles > 0)
         {
-          int rows = (tiles + options.TilesPerRow - 1) / options.TilesPerRow;
+          int perRow = options.TilesPerRowFor(tiles);
+          int rows = (tiles + perRow - 1) / perRow;
           cursor = tilesY + (rows * TileH) + ((rows - 1) * TileGap);
           previous = "tiles";
         }

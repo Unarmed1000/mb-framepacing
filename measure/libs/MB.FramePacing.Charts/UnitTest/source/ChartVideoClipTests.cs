@@ -482,7 +482,21 @@ namespace MB.FramePacing.Charts.UnitTest
       var tiles = RunHeadline.Tiles(chart);
       Assert.That(
         tiles.Select(t => t.Caption),
-        Is.EqualTo(new[] { "Average fps", "1 % low", "0.1 % low", "Frames visibly off", "Error p99", "Error p99.9", "Worst error", "Late frames" })
+        Is.EqualTo(
+          new[]
+          {
+            "Average fps",
+            "1 % low",
+            "0.1 % low",
+            "Frames dropped",
+            "Out of order",
+            "Frames visibly off",
+            "Error p99",
+            "Error p99.9",
+            "Worst error",
+            "Late frames",
+          }
+        )
       );
       var s = chart.Run.Statistics;
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
@@ -537,6 +551,30 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(
         half.Section.Run.Statistics.ExcludedStaticFrames,
         Is.EqualTo(half.Section.Run.Frames.Count(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0))
+      );
+    }
+
+    /// <summary>
+    /// The frames dropped and out of order tiles count what the manifest says: frames never on screen, refreshes that showed an older
+    /// frame; a clip with neither leaves both out.
+    /// </summary>
+    [TestCase("60-naive-5ms-diagram-slow-frames-every-1s-dropped-frames")]
+    [TestCase("60-naive-5ms-diagram-slow-frames-every-1s-out-of-order")]
+    [TestCase("60-busy-swappy")]
+    public void FaultTiles_CountWhatTheManifestSays(string clip)
+    {
+      var (manifest, _, chart) = Analyze(clip);
+      long dropped = Enumerable.Range(1, manifest.FrameCount - 1).Sum(manifest.DroppedBefore);
+      long older = Enumerable.Range(0, manifest.FrameCount).Sum(i => manifest.OlderFramesAfter(i).Count);
+      Assert.That(chart.Run.Counts.DroppedFrames, Is.EqualTo(dropped), $"{clip}: frames dropped");
+      Assert.That(chart.Run.Counts.OutOfOrderCaptures, Is.EqualTo(older), $"{clip}: refreshes out of order");
+      var tiles = RunHeadline.Tiles(chart);
+      Assert.That(tiles.Single(t => t.Id == ReportItem.FramesDropped).Value, Is.EqualTo(dropped.ToString("N0", CultureInfo.InvariantCulture)));
+      Assert.That(tiles.Single(t => t.Id == ReportItem.OutOfOrder).Value, Is.EqualTo(older.ToString("N0", CultureInfo.InvariantCulture)));
+      Assert.That(
+        RunHeadline.Shown(chart, ReportOptions.Default),
+        Has.Count.EqualTo(dropped + older > 0 ? 10 : 8),
+        $"{clip}: the pair only when needed"
       );
     }
 

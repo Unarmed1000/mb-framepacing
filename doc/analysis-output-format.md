@@ -77,7 +77,8 @@ One JSON object, written indented, with camelCase names. Null values are left ou
 
 **`counts`** (integers): `captures`, `decoded`, `undecodable`, `torn`, `notRecorded` (captures the recorder dropped),
 `sourceDropEvents` (drops the source reported), `presentedFrames`, `skippedFrameIndices` (frame indices never seen),
-`outOfOrderCaptures`, `segments` (parts of the run between gaps in the capture).
+`droppedFrames` (frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order),
+`outOfOrderCaptures` (captures that showed an older frame again), `segments` (parts of the run between gaps in the capture).
 
 **Statistics of a quantity** (every `...Ms` object below): `count`, `min`, `mean`, `stdDev` (the sample standard deviation), `p50`,
 `p95`, `p99`, `p999`, `max`. Percentiles interpolate linearly between the closest ranks. `count` 0 means no value, and every other

@@ -94,7 +94,14 @@ namespace MB.FramePacing.Charts
       {
         Frames = frames,
         Statistics = RunStatistics.From(frames, Run.ErrorThresholdTicks, Run.CapturePeriodTicks),
-        Counts = Run.Run.Counts with { PresentedFrames = frames.Count },
+        // The section's own counts of what reached the display: presented, skipped and dropped frames, captures out of order
+        Counts = Run.Run.Counts with
+        {
+          PresentedFrames = frames.Count,
+          SkippedFrameIndices = frames.Sum(f => (long)f.SkippedBefore),
+          DroppedFrames = Enumerable.Range(Start, FrameCount).Sum(i => Data.DroppedBeforeFrame[i]),
+          OutOfOrderCaptures = frames.Sum(f => (long)(f.OlderFrames?.Count ?? 0)),
+        },
         Pacing = Run.Run.Pacing is { } pacing ? SectionPacing(pacing, frames) : null,
       };
       return Run with { Run = analysis };

@@ -11,6 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using MB.FramePacing.Analysis;
 
 namespace MB.FramePacing.Charts
@@ -23,11 +24,12 @@ namespace MB.FramePacing.Charts
     /// <summary>"Sequence id 46521e10-…." when the title shows a name instead, else null.</summary>
     public static string? SequenceLine(RunAnalysis run) => run.Name != null && run.SequenceId != null ? $"Sequence id {run.SequenceId}." : null;
 
-    /// <summary>The headline tiles, in the order the GUI and the report show them.</summary>
+    /// <summary>The headline tiles, in the order the GUI and the report show them (<see cref="ReportItem.TileIds"/>).</summary>
     public static IReadOnlyList<HeadlineTile> Tiles(ChartRun chart)
     {
       var run = chart.Run;
       var s = run.Statistics;
+      var c = run.Counts;
       var pacing = run.Pacing;
       double thresholdMs = chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
       int measured = s.AbsoluteAnimationErrorMs.Count;
@@ -37,8 +39,25 @@ namespace MB.FramePacing.Charts
         worst <= 0 ? string.Empty
         : -s.AnimationErrorMs.Min >= s.AnimationErrorMs.Max ? "too late"
         : "too soon";
-      return new[]
+      var tiles = new[]
       {
+        new HeadlineTile(
+          ReportItem.FramesDropped,
+          "Frames dropped",
+          Number(c.DroppedFrames),
+          c.PresentedFrames + c.DroppedFrames > 0 ? Percent(c.DroppedFrames / (double)(c.PresentedFrames + c.DroppedFrames)) : string.Empty,
+          c.DroppedFrames > 0,
+          "Frames the application rendered that never reached the display: frame indices skipped while the capture missed nothing, and never "
+            + "shown later. Underneath, their share of the rendered frames. A capture gap is never counted as dropped."
+        ),
+        new HeadlineTile(
+          ReportItem.OutOfOrder,
+          "Out of order",
+          Number(c.OutOfOrderCaptures),
+          c.OutOfOrderCaptures == 1 ? "refresh" : "refreshes",
+          c.OutOfOrderCaptures > 0,
+          "Refreshes that showed an older frame again after a newer one: frames presented in another order than they were rendered."
+        ),
         new HeadlineTile(
           ReportItem.AverageFps,
           "Average fps",
@@ -88,6 +107,20 @@ namespace MB.FramePacing.Charts
           pacing != null
         ),
       };
+      return tiles.OrderBy(t => ReportItem.TileIds.ToList().IndexOf(t.Id)).ToArray();
+    }
+
+    /// <summary>
+    /// The tiles <paramref name="options"/> show: the items it shows, with a value unless empty ones are hidden, and the auto tiles (frames
+    /// dropped, out of order) only when the run has either, unless shown on purpose.
+    /// </summary>
+    public static IReadOnlyList<HeadlineTile> Shown(ChartRun chart, ReportOptions options)
+    {
+      bool anyFault = chart.Run.Counts.DroppedFrames > 0 || chart.Run.Counts.OutOfOrderCaptures > 0;
+      return Tiles(chart)
+        .Where(t => options.IsShown(t.Id) && (t.HasValue || !options.HideEmpty))
+        .Where(t => anyFault || !ReportItem.AutoTiles.Contains(t.Id) || options.Shown.Contains(t.Id))
+        .ToList();
     }
 
     /// <summary>A 1 % or 0.1 % low: the frame rate at that percentile of the display time steps, with the step itself underneath.</summary>

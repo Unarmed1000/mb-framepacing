@@ -28,6 +28,8 @@ namespace MB.FramePacing.Charts
     public const string ErrorP999 = "error-p999";
     public const string WorstError = "worst-error";
     public const string LateFrames = "late-frames";
+    public const string FramesDropped = "frames-dropped";
+    public const string OutOfOrder = "out-of-order";
     public const string AnimationError = "animation-error";
     public const string DisplayTimeStep = "display-time-step";
     public const string FrameTime = "frametime";
@@ -45,6 +47,8 @@ namespace MB.FramePacing.Charts
       (AverageFps, "tile: average fps (and the presented frames)"),
       (OnePercentLow, "tile: 1 % low"),
       (PointOnePercentLow, "tile: 0.1 % low"),
+      (FramesDropped, "tile: frames the application rendered that never reached the display"),
+      (OutOfOrder, "tile: refreshes that showed an older frame out of order"),
       (FramesOff, "tile: frames visibly off"),
       (ErrorP99, "tile: animation error p99"),
       (ErrorP999, "tile: animation error p99.9"),
@@ -61,15 +65,24 @@ namespace MB.FramePacing.Charts
     /// <summary>The ids of the headline tiles, which <see cref="Tiles"/> switches together.</summary>
     public static readonly IReadOnlyList<string> TileIds = new[]
     {
+      // First row: the frame rate and what reached the display; second: the animation error and late frames
       AverageFps,
       OnePercentLow,
       PointOnePercentLow,
+      FramesDropped,
+      OutOfOrder,
       FramesOff,
       ErrorP99,
       ErrorP999,
       WorstError,
       LateFrames,
     };
+
+    /// <summary>
+    /// The tiles shown when the run has something to count: frames dropped and out of order, together, unless both are 0. Showing one
+    /// (ReportOptions.Show) keeps it whatever it counts; hiding it leaves it out.
+    /// </summary>
+    public static readonly IReadOnlyList<string> AutoTiles = new[] { FramesDropped, OutOfOrder };
 
     /// <summary>The opt-in overlays, each with the panel it is drawn on: off unless shown (ReportOptions.Show), and only with that panel.</summary>
     public static readonly IReadOnlyDictionary<string, string> Overlays = new Dictionary<string, string> { [AnimationTimeStep] = DisplayTimeStep };

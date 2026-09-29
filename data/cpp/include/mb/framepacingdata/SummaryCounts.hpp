@@ -18,6 +18,8 @@ namespace MB::FramePacingData
     int64_t SourceDropEvents{0};
     int64_t PresentedFrames{0};
     int64_t SkippedFrameIndices{0};
+    //! Frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order.
+    int64_t DroppedFrames{0};
     int64_t OutOfOrderCaptures{0};
     int64_t Segments{0};
 

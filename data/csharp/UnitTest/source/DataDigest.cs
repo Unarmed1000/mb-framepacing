@@ -133,6 +133,7 @@ namespace MB.FramePacing.Data.UnitTest
                   ["hasStartMarker"] = r.HasStartMarker,
                   ["hasEndMarker"] = r.HasEndMarker,
                   ["presentedFrames"] = r.Counts.PresentedFrames,
+                  ["droppedFrames"] = r.Counts.DroppedFrames,
                   ["captures"] = r.Counts.Captures,
                   ["displayDeltaCount"] = r.Statistics.DisplayDeltaMs.Count,
                   ["displayDeltaP50"] = r.Statistics.DisplayDeltaMs.P50,

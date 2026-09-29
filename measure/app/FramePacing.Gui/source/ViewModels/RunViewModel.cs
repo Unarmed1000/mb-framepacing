@@ -28,7 +28,8 @@ namespace MB.FramePacing.Gui.ViewModels
       ErrorThresholdMs = errorThresholdMs;
       IsCamera = chart.Camera;
       Title = RunHeadline.Title(run);
-      Tiles = RunHeadline.Tiles(chart);
+      Tiles = RunHeadline.Shown(chart, ReportOptions.Default);
+      TileColumns = ReportOptions.Default.TilesPerRowFor(Tiles.Count);
       var c = run.Counts;
       StartText = run.StartTimeUtc is { } start ? $"Started {start.ToLocalTime():yyyy-MM-dd HH:mm:ss}" : "No start time";
       CountsText =
@@ -118,6 +119,9 @@ namespace MB.FramePacing.Gui.ViewModels
 
     /// <summary>The headline tiles, the same the report's Timeline image shows.</summary>
     public IReadOnlyList<HeadlineTile> Tiles { get; }
+
+    /// <summary>How many tiles go in a row: the report card's rule, two rows (ReportOptions.TilesPerRowFor).</summary>
+    public int TileColumns { get; }
     public string StartText { get; }
     public string CountsText { get; }
     public string ErrorFramesText { get; }

@@ -123,6 +123,7 @@ namespace MB::FramePacingData
       run.Counts.SourceDropEvents = Required<int64_t>(counts, "sourceDropEvents");
       run.Counts.PresentedFrames = Required<int64_t>(counts, "presentedFrames");
       run.Counts.SkippedFrameIndices = Required<int64_t>(counts, "skippedFrameIndices");
+      run.Counts.DroppedFrames = Required<int64_t>(counts, "droppedFrames");
       run.Counts.OutOfOrderCaptures = Required<int64_t>(counts, "outOfOrderCaptures");
       run.Counts.Segments = Required<int64_t>(counts, "segments");
 

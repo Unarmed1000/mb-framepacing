@@ -162,6 +162,7 @@ namespace
         {"hasStartMarker", run.HasStartMarker},
         {"hasEndMarker", run.HasEndMarker},
         {"presentedFrames", run.Counts.PresentedFrames},
+        {"droppedFrames", run.Counts.DroppedFrames},
         {"captures", run.Counts.Captures},
         {"displayDeltaCount", run.Statistics.DisplayDeltaMs.Count},
         {"displayDeltaP50", run.Statistics.DisplayDeltaMs.P50},
