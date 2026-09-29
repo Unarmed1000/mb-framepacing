@@ -3,7 +3,7 @@
 //* ----------------
 //* A subpixel image position. Pixel (x, y) covers [x, x+1) x [y, y+1), so its centre is (x + 0.5, y + 0.5).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

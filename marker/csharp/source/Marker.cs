@@ -7,7 +7,7 @@
 //* Coordinates are pixels with the origin at the top-left corner, +x to the right and +y down. Every quad edge and every vertex lies on
 //* an integer pixel edge.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

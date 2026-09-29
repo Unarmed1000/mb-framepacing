@@ -5,7 +5,7 @@
 //* save_png in generate_diagrams.py): the browser draws the style sheet and the fonts exactly as it shows the SVG. The browser comes from
 //* MB_BROWSER, the usual install locations, then PATH.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* One line of a run's frames CSV (run-<id>-frames.csv, doc/analysis-output-format.md): one presented frame. Times are 100 ns ticks; null is
 //* an empty cell. The display side comes from the capture, the pacing and CPU fields from the markers.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* Saves a report card as the GUI draws it: SVG through SvgCardWriter (the same file the command line writes), or PNG by rendering a CardView
 //* offscreen at twice the card's size (no browser needed).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

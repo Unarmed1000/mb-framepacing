@@ -4,7 +4,7 @@
 //* Encode, then draw: what a caller does each frame (MarkerGenerator.TryGenerateModules, then a Marker.ModulesTo... output), in one call for
 //* the geometry tests. A start payload is encoded with its metadata.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

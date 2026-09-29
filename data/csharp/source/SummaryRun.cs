@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json's runs[]: one measured run (from a start marker to an end marker, or the frames of one run id).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

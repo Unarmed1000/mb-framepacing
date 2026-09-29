@@ -6,7 +6,7 @@
 //* that do not go through ffmpeg (the synthetic camera, future camera SDKs). The rig never moves, so where every stored pixel samples the
 //* camera frame is computed once; each frame is then a gather without allocations.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

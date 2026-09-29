@@ -4,7 +4,7 @@
 //* EXPERIMENTAL camera captures: calculate the display's refresh period from when a camera first saw each frame. A capture card needs no
 //* estimate: it captures at the display's refresh rate.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

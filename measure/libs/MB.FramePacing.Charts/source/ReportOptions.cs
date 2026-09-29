@@ -4,7 +4,7 @@
 //* Which items a report card shows (ReportItem ids): all of them by default; Hide switches some off, ShowOnly keeps just the ones named. A
 //* tile shows when neither it nor "tiles" is hidden.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

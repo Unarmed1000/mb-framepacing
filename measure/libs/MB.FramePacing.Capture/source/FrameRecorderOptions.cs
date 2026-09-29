@@ -4,7 +4,7 @@
 //* Options for FrameRecorder: ring size, pre-roll while waiting for the start marker, and whether a full ring makes the source wait (files) or
 //* drops frames (live sources).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

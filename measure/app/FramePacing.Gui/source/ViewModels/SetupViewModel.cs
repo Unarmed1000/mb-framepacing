@@ -4,7 +4,7 @@
 //* The setup dialog: get ffmpeg, point the tool at it, choose where captures go. Shown automatically when ffmpeg is missing and from the
 //* Settings button. Everything is stored in mb-framepacing.json, so the command line tool uses the same settings.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

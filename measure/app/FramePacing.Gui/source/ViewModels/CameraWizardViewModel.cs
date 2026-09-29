@@ -5,7 +5,7 @@
 //* Verify -> Done); a new camera is mounted, calibrated and saved under a name (Choose -> Mount -> Source -> Calibrate -> Save -> Done), so the
 //* next time it can be picked from the list and calibration is skipped.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

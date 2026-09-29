@@ -5,7 +5,7 @@
 //* line endings, which the tools write as the platform's). MB_FRAMEPACING_UPDATE_TEST_DATA=1 writes digest.json instead of checking it
 //* (tools/update_test_data.py).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

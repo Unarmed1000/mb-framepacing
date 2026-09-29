@@ -4,7 +4,7 @@
 //* Remembered GUI state (per user, in the local application data folder). The ffmpeg installation and the capture folder live in the
 //* shared mb-framepacing.json configuration file instead (see FramePacingConfig), so the command line tool uses them too.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

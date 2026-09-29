@@ -3,7 +3,7 @@
 //* ----------------
 //* Looks at every captured frame, in capture order, before the recorder writes or discards it (the start/end marker triggers).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

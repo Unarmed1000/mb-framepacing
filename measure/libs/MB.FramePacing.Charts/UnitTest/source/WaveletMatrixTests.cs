@@ -4,7 +4,7 @@
 //* The wavelet matrix answers exactly what sorting the range would: its k-th smallest value, how many values are below a bound, and its
 //* percentiles as Statistics.Percentile interpolates them, for random ranges of random values with many duplicates.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -5,7 +5,7 @@
 //* step, animation error, lateness, frametime and CPU busy), on a histogram the bin under the pointer and its frames, on the percentile
 //* curve the |animation error| at that percentile. Only values the analysis has; the histograms and the sorted errors are computed once.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

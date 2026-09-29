@@ -3,7 +3,7 @@
 //* ----------------
 //* What FrameMarkerOverlay currently draws: frame markers outside a run, the start marker, the run's frame markers or the end marker.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

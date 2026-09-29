@@ -6,7 +6,7 @@
 //* sidecar. Shared by the CLI and the GUI. The recorder decodes every captured frame and the start/end triggers use that decode; only the
 //* live preview image is sampled.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

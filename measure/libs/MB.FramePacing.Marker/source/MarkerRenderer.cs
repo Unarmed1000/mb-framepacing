@@ -4,7 +4,7 @@
 //* C# twin of the C++ marker generator: renders the marker into a GrayImage. Used by the synthetic capture source and the tests; applications
 //* use the marker libraries (marker/cpp/, marker/csharp/); this draws with the C# one. The symbol parameters and sizing rules are defined in doc/marker-format.md.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

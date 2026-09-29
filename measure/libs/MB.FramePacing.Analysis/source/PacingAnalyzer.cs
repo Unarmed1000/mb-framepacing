@@ -4,7 +4,7 @@
 //* Measures every frame against what the application aimed for: late frames, the pacer's pacing and prediction errors, the late share and
 //* which cause dominates the animation error.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

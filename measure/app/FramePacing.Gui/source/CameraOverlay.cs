@@ -4,7 +4,7 @@
 //* Outlines the calibrated marker zones on a camera frame for the camera wizard (VERY EXPERIMENTAL camera support): the timing zone (scanned
 //* first) in green, the second zone in orange.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

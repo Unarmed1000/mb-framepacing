@@ -4,7 +4,7 @@
 //* End to end through the real recorder and files: the capture data (captures.mbcd) must hold the ground truth marker of every captured frame,
 //* decoded live, and the frames themselves (frames.mbfc) are only stored when asked for.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

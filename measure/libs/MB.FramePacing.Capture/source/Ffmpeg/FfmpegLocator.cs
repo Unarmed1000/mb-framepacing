@@ -4,7 +4,7 @@
 //* Finds the ffmpeg executable. FFmpeg is never bundled: the user installs it (see licenses/README.md) and we run it as a separate process.
 //* Order: an explicit path (--ffmpeg / GUI), the MB_FFMPEG environment variable, mb-framepacing.json (ffmpegPath), then PATH.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -5,7 +5,7 @@
 //* perspective transform and lens, with a rolling scanout (row y shows a new frame y/height of the scanout after vsync), panel response,
 //* exposure blending, blur, noise and a drifting camera clock. It is the ground truth for the camera calibration, rectification and analysis.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

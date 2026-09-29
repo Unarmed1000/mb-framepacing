@@ -4,7 +4,7 @@
 //* Capture and frame counts of one run: decoded, undecodable, torn and not recorded captures, presented and skipped frames, out of order
 //* captures and segments.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

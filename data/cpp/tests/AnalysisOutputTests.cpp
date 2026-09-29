@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // summary.json and the CSVs: the format version, columns by name, whole ticks.
 #include <mb/framepacingdata/FramePacingData.hpp>

@@ -4,7 +4,7 @@
 //* The dialogs and shell actions the view models need (file and folder pickers, opening URLs and files, the clipboard, the setup dialog), so
 //* the view models do not depend on a window.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

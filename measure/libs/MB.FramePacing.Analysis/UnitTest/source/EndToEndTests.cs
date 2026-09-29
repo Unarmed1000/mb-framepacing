@@ -4,7 +4,7 @@
 //* Synthetic capture -> frames.mbfc -> CaptureAnalyzer. The analyzer must recover the synthetic ground truth exactly: every presented frame,
 //* its first-seen capture time, skipped frame indices and the animation error caused by the injected stalls.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

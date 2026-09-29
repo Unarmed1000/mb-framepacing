@@ -3,7 +3,7 @@
 //* ----------------
 //* mb-framepacing.json: template, round trip and how it takes part in finding ffmpeg.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

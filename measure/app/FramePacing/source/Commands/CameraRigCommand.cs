@@ -5,7 +5,7 @@
 //* screen from a clip or a live device, and check it has not moved. Also the '--camera' step 'capture' and 'import' run: verify, then store
 //* only the rectified marker zones.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -8,7 +8,7 @@
 //* ranges move with them, so nothing is built again until the owner sends a new window. Hovering a plot draws a cursor line and what
 //* HoverText says about that point.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

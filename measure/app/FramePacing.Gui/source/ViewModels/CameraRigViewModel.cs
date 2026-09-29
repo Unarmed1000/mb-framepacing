@@ -4,7 +4,7 @@
 //* The capture page's camera card (VERY EXPERIMENTAL camera support): film the screen with a saved, calibrated camera. New cameras are set up
 //* in the camera wizard; saved ones are picked from the list, so calibration is skipped and every capture only verifies the camera.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* 'selftest': run the whole pipeline without hardware. A synthetic game (with stalls and skipped frames) is captured through the real
 //* recorder into a real capture file and analysed; the result is compared with the synthetic ground truth.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

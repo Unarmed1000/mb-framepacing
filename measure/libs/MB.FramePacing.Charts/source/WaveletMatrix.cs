@@ -9,7 +9,7 @@
 //* Claude, Navarro and Ordóñez, "The wavelet matrix", Information Systems 47 (2015); range quantiles: Gagie, Puglisi and Turpin, "Range
 //* quantile queries: another virtue of wavelet trees", SPIRE 2009. The values are replaced by their rank among the distinct values first.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

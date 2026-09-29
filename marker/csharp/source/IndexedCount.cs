@@ -3,7 +3,7 @@
 //* ----------------
 //* How many vertices and indices an indexed triangle list call wrote. Both are 0 when the call failed.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

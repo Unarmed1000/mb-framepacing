@@ -4,7 +4,7 @@
 //* Capture page: pick a source, (optionally) tune the mode, start/stop, live status and preview. ffmpeg and the capture folder come from the
 //* configuration file, which the setup dialog edits.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

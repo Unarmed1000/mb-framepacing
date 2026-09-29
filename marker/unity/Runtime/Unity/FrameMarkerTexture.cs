@@ -6,7 +6,7 @@
 //* every module covers exactly the same pixels as the geometry would. Encode the marker with MarkerGenerator.TryGenerateModules and pass
 //* the matrix to Update. Update allocates only when the texture's size changes (another quiet zone, or a sync marker after a main one).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

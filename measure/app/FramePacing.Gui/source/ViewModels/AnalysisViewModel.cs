@@ -8,7 +8,7 @@
 //* the background when the view comes within half a screen of its edge. Every window at one zoom starts on a whole pixel column of the
 //* run's time, so the next one draws the same columns and replaces the old one without a visible change.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

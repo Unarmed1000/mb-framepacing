@@ -1,5 +1,6 @@
 #ifndef MB_FRAMEMARKER_CONSTANTS_HPP
 #define MB_FRAMEMARKER_CONSTANTS_HPP
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // Constants of the frame marker format and geometry. See doc/marker-format.md for the full specification.

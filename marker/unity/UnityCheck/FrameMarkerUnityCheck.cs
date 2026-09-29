@@ -11,7 +11,7 @@
 //*   - FrameMarkerTexture holds the module-resolution bitmap, bottom row first as Unity textures are.
 //* Exits the editor with 0 when everything passed.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

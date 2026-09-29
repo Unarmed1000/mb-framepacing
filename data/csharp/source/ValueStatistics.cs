@@ -3,7 +3,7 @@
 //* ----------------
 //* The statistics of one quantity in summary.json, in milliseconds: percentiles by linear interpolation between the closest ranks.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

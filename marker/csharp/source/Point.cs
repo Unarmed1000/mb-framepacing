@@ -3,7 +3,7 @@
 //* ----------------
 //* A pixel position: origin at the top-left corner, +x to the right, +y down.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* Calibrated cameras saved by name (EXPERIMENTAL camera support), so a mounted camera is calibrated once and later captures only verify it.
 //* The library lives next to the configuration file (camera-rigs/<name>.camera-rig.json), so the command line and the GUI share it.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

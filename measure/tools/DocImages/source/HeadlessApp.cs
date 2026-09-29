@@ -3,7 +3,7 @@
 //* ----------------
 //* The Avalonia app builder DocImages uses: the real GUI on the headless platform with the Skia renderer.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

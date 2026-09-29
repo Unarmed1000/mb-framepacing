@@ -5,7 +5,7 @@
 //* values the SVG shows: a shape's style is the 'text' rule for texts, then every rule of its classes in the order of the sheet (all
 //* selectors are single classes, so a later rule wins, as in CSS).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

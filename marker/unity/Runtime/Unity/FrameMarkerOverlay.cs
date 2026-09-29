@@ -7,7 +7,7 @@
 //* unless the game supplies its pacer's. BeginRun / EndRun (or the RunFor coroutine) bracket the part to measure with the
 //* start and end markers. Nothing is allocated per frame.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

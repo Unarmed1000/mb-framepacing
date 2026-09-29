@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the marker's reference shaders (marker/shaders) with glslang (required; CI installs it):
   - gl/      as OpenGL 3.3 core and as OpenGL ES 3.0 (the header their comment names);

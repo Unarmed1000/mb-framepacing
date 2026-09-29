@@ -3,7 +3,7 @@
 //* ----------------
 //* One run read back from an analysis output folder: what the charts are drawn from, and the prefix its report files are named with.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

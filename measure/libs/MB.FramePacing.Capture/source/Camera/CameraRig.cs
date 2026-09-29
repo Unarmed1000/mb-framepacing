@@ -4,7 +4,7 @@
 //* A calibrated camera rig (EXPERIMENTAL camera support): a high speed camera mounted at a fixed position in front of the screen, with the
 //* two marker zones it sees. Calibrated once (CameraCalibrator), saved as <name>.camera-rig.json, and verified before every camera capture.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

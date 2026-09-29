@@ -4,7 +4,7 @@
 //* The headline of one run, the same in the GUI and the report files: its title, the headline tiles (average fps, 1 % and 0.1 % low,
 //* frames visibly off, animation error p99 and p99.9, worst error, late frames) and which cause of animation error dominates.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

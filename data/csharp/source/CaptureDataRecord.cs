@@ -4,7 +4,7 @@
 //* One record of captures.mbcd (doc/capture-data-format.md): 192 bytes per capture, little endian. The capture part (index, host and device
 //* ticks, flags) is laid out like a frames.mbfc record header; then the status and the markers' encoded bytes as they were read.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

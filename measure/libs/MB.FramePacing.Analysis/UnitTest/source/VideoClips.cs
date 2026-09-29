@@ -4,7 +4,7 @@
 //* The test clips in test-data/videos: where they are, their names, finding ffmpeg (tests are ignored without it) and importing a clip as a
 //* capture through the real import path. Shared by the VideoClip tests of the analysis and of the charts.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The marker as one opaque quad, read from its packed module bits: the module matrix's bytes as they are (1 bit per module, row-major,

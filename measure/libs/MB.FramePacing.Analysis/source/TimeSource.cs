@@ -3,7 +3,7 @@
 //* ----------------
 //* Which capture clock the analysis uses: device timestamps, host timestamps, or device when every record has one.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

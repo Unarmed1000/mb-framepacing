@@ -3,7 +3,7 @@
 //* ----------------
 //* Recorder behaviour: ordering, drops when the ring is full, late device timestamps and armed pre-roll.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

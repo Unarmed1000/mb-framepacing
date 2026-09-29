@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json and the CSVs: the format version, the file names, and columns an older file lacks or a newer one adds.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

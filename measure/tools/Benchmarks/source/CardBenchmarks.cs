@@ -6,7 +6,7 @@
 //* (RunChartData) already made; the sliding window the GUI builds when zoomed (three screens); and making that data, once per run. A frame
 //* of the GUI is 16 ms.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

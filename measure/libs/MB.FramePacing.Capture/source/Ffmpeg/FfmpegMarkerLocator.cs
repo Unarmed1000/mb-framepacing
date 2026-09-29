@@ -4,7 +4,7 @@
 //* Fast capture, step one: run ffmpeg on the whole source frame (no crop, no scale) just long enough to find the marker, then compute the
 //* region to store. Nothing is recorded; the capture itself starts a new ffmpeg with the crop.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

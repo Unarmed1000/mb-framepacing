@@ -4,7 +4,7 @@
 //* Writes the charts of every run of an analysis next to its other reports, as SVG cards (the command line's --charts and the GUI's Save
 //* charts): the whole run's report card and every distribution card.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

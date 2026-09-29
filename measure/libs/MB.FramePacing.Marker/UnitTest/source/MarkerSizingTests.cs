@@ -3,7 +3,7 @@
 //* ----------------
 //* Sizing advice for a capture setup (the 'marker-size' command): module size, marker sizes and origin alignment.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

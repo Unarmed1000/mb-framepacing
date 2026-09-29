@@ -5,7 +5,7 @@
 //* run) and the range its plots show as built. Scrolling within it only moves the card; its start is snapped to a whole pixel column of the
 //* run's time, so every window at one zoom and width draws the same columns. The whole run is a window of its own that never moves.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

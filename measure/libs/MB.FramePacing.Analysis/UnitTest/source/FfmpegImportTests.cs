@@ -4,7 +4,7 @@
 //* End to end through a real ffmpeg: synthetic marker frames -> image folder / video file -> import -> analyze -> must match the ground truth.
 //* Skipped when ffmpeg is not installed (see FfmpegLocator for where it is looked up).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

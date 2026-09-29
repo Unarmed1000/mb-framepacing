@@ -4,7 +4,7 @@
 //* Analysis page view. The report cards are CardViews bound to the view model's cards; this wires the Timeline card's zoom, pan, scroll and
 //* reset to the view model's section, its width to the cards' layout, and every card's hover text to the view model.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -1,5 +1,6 @@
 #ifndef MB_FRAMEPACINGDATA_FRAMEPACINGDATA_HPP
 #define MB_FRAMEPACINGDATA_FRAMEPACINGDATA_HPP
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB::FramePacingData - reads the data of the mb-framepacing tools: the capture data (captures.mbcd, doc/capture-data-format.md) and the

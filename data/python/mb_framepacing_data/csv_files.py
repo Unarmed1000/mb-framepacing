@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """A run's frames CSV (run-<id>-frames.csv) and captures.csv (doc/analysis-output-format.md): a header line, then one line per presented
 frame or per capture, comma separated. Columns are found by their name, so columns an older file lacks read as None and columns a newer

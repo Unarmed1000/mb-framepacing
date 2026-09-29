@@ -3,7 +3,7 @@
 //* ----------------
 //* Which cause dominates a run's animation error: uneven display (bad pacing) or uneven animation steps on an even display (delta time jitter).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

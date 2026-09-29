@@ -3,7 +3,7 @@
 //* ----------------
 //* One line of an analysis CSV, split on commas, read by column name so columns added later and columns an older file lacks both work.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

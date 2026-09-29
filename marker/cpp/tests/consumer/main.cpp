@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The smallest program using mb_framemarker: encode one frame marker, draw it as a triangle list and print what was generated.

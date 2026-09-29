@@ -3,7 +3,7 @@
 //* ----------------
 //* One result of calibrating or verifying a camera rig, such as "module size" or "exposure" (EXPERIMENTAL camera support).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

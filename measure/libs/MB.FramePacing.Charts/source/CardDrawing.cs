@@ -5,7 +5,7 @@
 //* grey rounded rectangle the size of the drawing), and its plot areas with their data ranges. SvgCardWriter writes it as SVG; the GUI draws
 //* it directly. FlatShapes lists the shapes as a file shows them: those of the scrolling layers (ScrollShape) in their place.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

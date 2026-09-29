@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include <mb/framepacingdata/FramePacingData.hpp>
 #include <nlohmann/json.hpp>

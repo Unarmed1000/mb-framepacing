@@ -7,7 +7,7 @@
 //* then DrawNow (GL immediate mode, the way FrameMarkerOverlay draws) or draw Mesh with Material from your own command buffer, with
 //* PixelSpace.Projection. Needs shader model 3.5; add the shader to 'Always Included Shaders' in player builds. Update never allocates.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

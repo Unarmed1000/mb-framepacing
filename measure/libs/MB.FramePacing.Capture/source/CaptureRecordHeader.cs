@@ -3,7 +3,7 @@
 //* ----------------
 //* The per-frame record header of a .mbfc capture file: capture index, host and device timestamps and flags.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

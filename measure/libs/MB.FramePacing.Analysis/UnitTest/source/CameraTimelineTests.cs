@@ -4,7 +4,7 @@
 //* The EXPERIMENTAL camera rules of the timeline on hand-made rows: scanout delay, camera tears, frames only the second zone saw, and
 //* uncertain starts only for gaps longer than the usual scanout transition.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """The golden data (test-data/data): this library reads what digest.json says, the same values as the C# library."""
 

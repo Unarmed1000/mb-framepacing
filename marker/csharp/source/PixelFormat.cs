@@ -12,7 +12,7 @@
 //* Because R, G and B are equal, a BGR24 or BGRA32 buffer (Unity's BGRA32, System.Drawing's Format32bppArgb in memory) gets exactly the same
 //* bytes: use Rgb24 or Rgba32 for them. A buffer with alpha first in memory (ARGB) is not supported.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

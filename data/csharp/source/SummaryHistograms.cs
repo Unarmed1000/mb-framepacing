@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json's runs[].histograms: the animation error and the display time step, in fixed bins.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

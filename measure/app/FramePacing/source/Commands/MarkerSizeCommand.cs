@@ -4,7 +4,7 @@
 //* 'marker-size': the marker module size and position an application should use for a capture setup (doc/marker-format.md "Sizing"),
 //* with the settings for the C++, C# and Unity libraries.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

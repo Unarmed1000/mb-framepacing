@@ -3,7 +3,7 @@
 //* ----------------
 //* Extra data carried by a SequenceStart marker: the wall clock start time and the sequence id.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

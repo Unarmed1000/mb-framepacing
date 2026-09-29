@@ -10,7 +10,7 @@
 //* reads every frame's markers into a second ring of captures.mbcd records (the capture data); the inspector (the start/end marker
 //* triggers) gets that decode. The writer writes the data records, and the frames themselves only when they are kept (frames.mbfc).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

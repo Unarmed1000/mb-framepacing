@@ -4,7 +4,7 @@
 //* The module grid decoder camera captures use (DecodeGrid / sampleModuleGrid): frame and start markers of every version, soft edges, and
 //* that capture card decoders keep the pure barcode path.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* Options for the synthetic test game: capture and display rates, run length, stalls, skipped frames, run id and name, and the stored frame
 //* size.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

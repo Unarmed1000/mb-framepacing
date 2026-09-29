@@ -5,7 +5,7 @@
 //* built in parallel. The builders only read the section, so any thread may build them. The Timeline may be a sliding window: built for a
 //* longer section with the view inside it, so the GUI scrolls by moving it; the distribution cards then follow the view on their own.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

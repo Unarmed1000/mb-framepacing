@@ -1,4 +1,5 @@
 #version 450
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker, Vulkan (GLSL 4.50, compile to SPIR-V with glslangValidator -V or glslc): the marker's quad from the vertex index. Draw 4

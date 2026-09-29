@@ -4,7 +4,7 @@
 //* A plane to plane perspective transform (3x3 matrix, H33 = 1). A camera filming a flat screen maps screen (or marker module) coordinates to
 //* camera pixels through one of these.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

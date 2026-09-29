@@ -5,7 +5,7 @@
 //* it clusters them by origin (the main marker's frame, start and end kinds share one; the sync marker has its own) and locks onto each.
 //* Used live during a capture and afterwards on frames.mbfc alike, so both lock onto the same layout.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

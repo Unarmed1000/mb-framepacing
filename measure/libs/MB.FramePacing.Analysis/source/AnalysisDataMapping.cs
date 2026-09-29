@@ -4,7 +4,7 @@
 //* Between the data library's analysis output (MB.FramePacing.Data: summary.json and the CSVs, the file format) and the analysis's types, in
 //* both directions: the analysis writes through it, and reports read an analysis back through it to the tick.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

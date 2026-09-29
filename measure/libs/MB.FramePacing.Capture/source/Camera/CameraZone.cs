@@ -4,7 +4,7 @@
 //* One marker slot as the calibrated camera sees it (EXPERIMENTAL camera support): the module to camera transform, and the area a camera
 //* capture rectifies and stores for it.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

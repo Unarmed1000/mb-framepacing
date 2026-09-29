@@ -6,7 +6,7 @@
 //*   - an existing folder     -> an image sequence (needs a frame rate or a timestamp file)
 //*   - anything else          -> a stream URL (rtsp://, srt://, udp://, http(s)://, ...), handled live
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

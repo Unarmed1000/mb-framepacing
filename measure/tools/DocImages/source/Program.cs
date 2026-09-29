@@ -6,7 +6,7 @@
 //*     synthetic test game, and each page is saved as PNG. Machine specific text (paths) is replaced with neutral example values first.
 //*   - Marker examples: how the markers look inside an application frame.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

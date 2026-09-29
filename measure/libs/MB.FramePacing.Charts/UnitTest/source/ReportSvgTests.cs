@@ -4,7 +4,7 @@
 //* The SVG report: its helpers give exactly what mb-framepacing-explained's Python gives, an hour of frames draws per pixel column and stays
 //* small, a section of it draws every frame, and the PNG comes out of a headless browser at twice the size (skipped without one).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

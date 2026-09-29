@@ -3,7 +3,7 @@
 //* ----------------
 //* A rectangle of a report card, with rounded corners of Rx (its SVG text, empty for square corners).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

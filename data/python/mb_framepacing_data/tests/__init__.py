@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """The data library's tests. Decoding a marker needs mb_framemarker: when it is not installed, the copy in mb-framepacing's marker/python
 (found above this file) is used."""

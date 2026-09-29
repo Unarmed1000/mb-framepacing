@@ -4,7 +4,7 @@
 //* Software rasterizers for the tests, matching how marker-render draws the golden images: a 128 grey canvas, pixel-edge vertices, drawn
 //* in order.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

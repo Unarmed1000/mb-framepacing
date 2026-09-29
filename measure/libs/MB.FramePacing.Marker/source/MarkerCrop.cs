@@ -5,7 +5,7 @@
 //* and the integer downscale that still leaves the recommended number of stored pixels per module. The marker must not move. The crop is
 //* applied exactly (ffmpeg crop exact=1: odd offsets on chroma subsampled inputs are fine, only luma is stored).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

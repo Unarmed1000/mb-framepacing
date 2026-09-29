@@ -3,7 +3,7 @@
 //* ----------------
 //* Reads captures.mbcd: the header, then the records by index or all of them. A partial last record (a capture stopped mid-write) is ignored.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

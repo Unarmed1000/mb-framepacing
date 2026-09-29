@@ -4,7 +4,7 @@
 //* The Settings page: ffmpeg and the captures folder (changed through the setup dialog, stored in the configuration file), the switch for the
 //* experimental features (stored in the GUI settings), and where both files are.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

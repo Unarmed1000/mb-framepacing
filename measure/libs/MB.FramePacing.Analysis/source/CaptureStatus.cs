@@ -4,7 +4,7 @@
 //* What a capture row holds: a decoded marker, an unreadable marker, a torn marker (two frames in one capture) or a frame the recorder did not
 //* store.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

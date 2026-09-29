@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json's runs[].statistics: the run's display and animation time steps, animation error, drift, frame rates and the CPU side.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

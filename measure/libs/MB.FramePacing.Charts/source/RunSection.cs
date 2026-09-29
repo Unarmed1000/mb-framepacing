@@ -5,7 +5,7 @@
 //* something asks for them, the headline numbers of just those frames (statistics, late frames, the worst 2 s), computed by the analysis's
 //* own functions. Times are seconds since the run's first frame, as on the Timeline. Immutable.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

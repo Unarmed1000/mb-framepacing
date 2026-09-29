@@ -4,7 +4,7 @@
 //* Options for TimelineAnalyzer: the frame index jump that counts as an application restart, an optional run filter, the application's
 //* target frame rate, the display refresh rate the user expects and the camera rig's calibrated refresh rate.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

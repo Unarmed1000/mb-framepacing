@@ -3,7 +3,7 @@
 //* ----------------
 //* How large the marker is drawn: the module size in source pixels and the quiet zone around the symbol.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

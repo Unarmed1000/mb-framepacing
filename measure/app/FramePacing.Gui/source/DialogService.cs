@@ -3,7 +3,7 @@
 //* ----------------
 //* Folder/file pickers, the save dialog and "show in file manager", behind an interface so the view models stay free of UI types.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

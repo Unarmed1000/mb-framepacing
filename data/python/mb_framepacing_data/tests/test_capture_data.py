@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """captures.mbcd: header fields at their offsets, newer and foreign files refused, a partial last record ignored."""
 

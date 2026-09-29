@@ -5,7 +5,7 @@
 //* have a value of some kind (an animation error, a hold, a late hold...), and where a range of frames starts in the sequence of those
 //* values. One bit per frame, plus one count per 64.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

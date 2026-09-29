@@ -6,7 +6,7 @@
 //* point: exactly where the shape holds the number, within the SVG's rounding where a path holds it. The x axis is seconds since the run's
 //* first frame and the values are milliseconds, both converted from whole ticks the same way. Skipped when ffmpeg is not installed.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

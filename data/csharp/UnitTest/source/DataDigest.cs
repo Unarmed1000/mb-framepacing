@@ -5,7 +5,7 @@
 //* The C#, Python and C++ data libraries compute the same digest from the same files and compare it with digest.json, so all three read the
 //* same values.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

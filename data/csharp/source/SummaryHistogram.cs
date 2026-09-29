@@ -3,7 +3,7 @@
 //* ----------------
 //* One histogram of summary.json: bin k covers [(k - 0.5) * width, (k + 0.5) * width) and is listed by its center.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

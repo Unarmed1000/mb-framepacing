@@ -5,7 +5,7 @@
 //* device ticks are the exact simulated capture instants. Runs either paced in real time (to exercise the recorder like real hardware) or as
 //* fast as possible.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

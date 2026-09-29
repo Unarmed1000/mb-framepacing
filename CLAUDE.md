@@ -260,8 +260,10 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
     the root `LICENSE`, which holds both texts, since they include the BSD marker library.
   - Every source file names its license on an `SPDX-License-Identifier` line near its top: `BSD-3-Clause` under `marker/`,
     `test-data/markers/`, `data/` and `test-data/data/`, `LicenseRef-PolyForm-Perimeter-1.0.1` elsewhere (inside the boxed C# header, after a shebang, as an XML
-    comment in XAML/MSBuild/solution files). `python tools/check_license_headers.py` checks it (CI `lint`), `--fix` adds missing
-    ones. Third-party code (`third_party/`) keeps its own notices; each language's marker library keeps it in a `third_party/`
+    comment in XAML/MSBuild/solution files). Every code file (not MSBuild, solutions or workflows) has
+    `SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS` on the line right before it, in the same comment style: the SPDX
+    short form (as the Linux kernel and REUSE use it), never the license text in the file. `python tools/check_license_headers.py`
+    checks both (CI `lint`), `--fix` adds missing ones (the copyright with the current year). Third-party code (`third_party/`) keeps its own notices; each language's marker library keeps it in a `third_party/`
     folder of its own (`marker/cpp/third_party/`, `marker/python/mb_framemarker/third_party/`), with its license text next to it.
   - A new file belongs to the license of its path. Moving code across that line (for example from `measure/` into `marker/`)
     changes its license: only Mana Battery can decide that.

@@ -4,7 +4,7 @@
 //* The data every marker carries: the application's frame index, its animation time, the test run, the marker kind and the frame pacer's
 //* intended display time and target frame time.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

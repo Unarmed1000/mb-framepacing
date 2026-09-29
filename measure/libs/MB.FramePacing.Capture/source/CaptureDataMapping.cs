@@ -4,7 +4,7 @@
 //* Between the capture data library's header (MB.FramePacing.Data, the file format) and the tools' types: the captured frames' header and
 //* the marker locks.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

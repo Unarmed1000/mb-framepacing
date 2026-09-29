@@ -5,7 +5,7 @@
 //* bins, wider when the range needs more than the maximum bin count), counted with the wavelet matrix, two queries per bin, so the cost does
 //* not grow with the section's length.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

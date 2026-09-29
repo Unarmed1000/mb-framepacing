@@ -5,7 +5,7 @@
 //* wrote without the capture: the runs, their pacing, statistics and counts, and every presented frame. The CSV's milliseconds have four
 //* decimals, which is whole 100 ns ticks, so the frames come back to the tick.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

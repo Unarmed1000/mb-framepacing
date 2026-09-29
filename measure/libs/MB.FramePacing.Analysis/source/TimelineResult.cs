@@ -3,7 +3,7 @@
 //* ----------------
 //* Result of TimelineAnalyzer: the capture period, the animation error threshold, every analysed run and the warnings.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

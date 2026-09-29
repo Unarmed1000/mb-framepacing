@@ -6,7 +6,7 @@
 //* refinement against the known module pattern), measures how much later the scanout reaches the sync marker and the refresh rate, and
 //* checks module size, focus, exposure, flicker and stability. Verification only checks that both markers are still where the rig says.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

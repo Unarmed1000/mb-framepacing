@@ -4,7 +4,7 @@
 //* Where a run's frame targets come from: the application's frame pacer (through the marker), a target frame rate given to the tools, or the
 //* display's native refresh rate.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

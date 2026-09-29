@@ -19,7 +19,11 @@ This repository is licensed under two licenses, by path:
 - The PolyForm Perimeter License 1.0.1 (Part 2 below) covers everything else: the measurement tools and their
   libraries, the scripts, the other documentation, and the build and CI files.
 
-Every source file names its license on an SPDX-License-Identifier line near its top:
+Every source file names its license on an SPDX-License-Identifier line near its top, and every code file
+names its copyright holder on an SPDX-FileCopyrightText line right before it (SPDX file tags, ISO/IEC 5962):
+
+    SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+    SPDX-License-Identifier: BSD-3-Clause
 
 - BSD-3-Clause: the BSD 3-Clause License (Part 1).
 - LicenseRef-PolyForm-Perimeter-1.0.1: the PolyForm Perimeter License 1.0.1 (Part 2). It is not on the SPDX

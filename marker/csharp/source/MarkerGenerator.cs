@@ -7,7 +7,7 @@
 //* Create one generator and reuse it every frame: the QR encoder's buffers are allocated in the constructor (the payload bytes live on the
 //* stack, the matrix in the caller's bytes), so encoding never allocates. Not thread-safe; use one generator per thread.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

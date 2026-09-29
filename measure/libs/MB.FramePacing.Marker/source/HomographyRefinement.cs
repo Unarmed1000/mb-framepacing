@@ -3,7 +3,7 @@
 //* ----------------
 //* The outcome of HomographyRefiner: the fitted module to image transform and how well the marker model explains the image.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

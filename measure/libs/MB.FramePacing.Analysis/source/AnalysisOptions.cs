@@ -3,7 +3,7 @@
 //* ----------------
 //* Options for CaptureAnalyzer: the capture clock, the timeline rules, the report directory and the tool version.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

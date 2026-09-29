@@ -4,7 +4,7 @@
 //* A deterministic model of "a game presenting frames on vsync, captured by a capture card". It produces the ground truth the analyzer must
 //* recover: which application frame is on screen at every capture instant.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* Reads the golden data the C++ library writes with marker-render --golden (test-data/markers): the image manifest, the module digest
 //* and the PGM images.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

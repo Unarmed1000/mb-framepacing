@@ -4,7 +4,7 @@
 //* The CSV files' time format: milliseconds with at most four decimals, which is exactly a whole number of 100 ns ticks, so reading one back
 //* gives the tick it was written from.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

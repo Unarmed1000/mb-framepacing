@@ -4,7 +4,7 @@
 //* Sample: turns the GameObject (for example the camera) for a few seconds and brackets the turn with start and end markers, so a capture
 //* measures exactly that part. Needs a FrameMarkerOverlay in the scene.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

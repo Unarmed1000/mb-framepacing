@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """The file names of an analysis output folder (doc/analysis-output-format.md), finding it next to a capture, and its time format:
 milliseconds with at most four decimals, which is exactly a whole number of 100 ns ticks."""

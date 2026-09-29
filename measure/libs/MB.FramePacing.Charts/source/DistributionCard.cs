@@ -5,7 +5,7 @@
 //* display time step histogram (the fixed 0.1 ms bins of every capture source, counts on a log scale so a handful of bad frames stay visible
 //* next to thousands of good ones), the |animation error| by percentile, and the cumulative drift over time.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

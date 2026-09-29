@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json's runs[].pacing: the refresh, the target the frames are measured against, late frames and the verdict.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

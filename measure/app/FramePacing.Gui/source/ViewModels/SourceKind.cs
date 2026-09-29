@@ -3,7 +3,7 @@
 //* ----------------
 //* The kinds of source the Capture page offers: a capture card, a video file, an image folder, a network stream or the synthetic test game.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* Writes captures.mbcd: the header first (rewritten by Complete once the marker locations are known), then whole records as they come. A new
 //* file only: it never replaces an existing one.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* What a report card's style sheet (SvgMarkup) says about one class, or what several classes together say about a shape: its fill and
 //* stroke with their opacities, the stroke's width, dashes and joins, and for text the font. Null means the sheet does not set it.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -8,7 +8,7 @@
 //* A view over bytes the caller owns (a stackalloc, or a reused byte[] of Marker.MaxPackedModuleByteCount), so it never allocates. C# 9 has no
 //* safe inline buffer, so it is a ref struct: pass it on, but keep the bytes, not the view, in a field.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

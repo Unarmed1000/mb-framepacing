@@ -5,7 +5,7 @@
 //* overtook returns null instead of its result. The GUI builds its cards with it, so a zoom never shows a card older than the last one asked
 //* for. The result is checked on the caller's context (the GUI's thread), where the caller also applies it.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

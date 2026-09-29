@@ -4,7 +4,7 @@
 //* A pixel aligned vertex: X and Y lie on pixel corners (top-left origin, +y down). Luma is 0 (dark) or 255 (light); render it as the RGB
 //* color (Luma, Luma, Luma).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

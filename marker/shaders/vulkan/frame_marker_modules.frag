@@ -1,4 +1,5 @@
 #version 450
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker, Vulkan (GLSL 4.50): looks each module up in a 41 x 41 VK_FORMAT_R8_UNORM image, one texel per module (1681 bytes per

@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json's runs[].camera (EXPERIMENTAL camera captures): the scanout delay between the zones and the tears the camera saw.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

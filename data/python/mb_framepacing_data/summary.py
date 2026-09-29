@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """summary.json (doc/analysis-output-format.md): the capture, the analysis settings and every run's counts, statistics, pacing and
 histograms. Its formatVersion covers the CSV files it names; a file without it is format 1, a newer one is refused. Fields a file lacks

@@ -4,7 +4,7 @@
 //* Settings files keep the old version: the file a save replaces (or a delete removes) is kept as <file>.bak, the last file in a format as
 //* <file>.v<N>.bak when a save changes the format, identical saves change nothing and a failed save leaves the file alone.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

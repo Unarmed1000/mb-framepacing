@@ -3,7 +3,7 @@
 //* ----------------
 //* Result of CaptureDecoder: the capture file header, where the markers are, which clock was used and one row per capture.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

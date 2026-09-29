@@ -4,7 +4,7 @@
 //* The marker size and position an application should use for a capture setup: its output resolution, the stored capture height and
 //* whether the card delivers MJPEG. Uses the marker library's own sizing functions, so the advice matches what the libraries compute.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

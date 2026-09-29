@@ -4,7 +4,7 @@
 //* What a marker means. Frame markers are drawn every frame of a test run; the sequence markers bracket the run so the analyzer can cut the
 //* capture to exactly the measured window. See doc/marker-format.md "Test sequences".
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

@@ -5,7 +5,7 @@
 //* cheap locked decode. EXPERIMENTAL camera captures know their layout up front. The recorder's inspection thread runs it live; the analysis
 //* runs the same steps on the first frames of frames.mbfc, so both lock onto the same layout. Not thread safe.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

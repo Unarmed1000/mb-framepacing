@@ -4,7 +4,7 @@
 //* Binary PGM (P5, 8 bit) reader/writer. The C++ marker-render tool writes the golden images in this format and the tools use it for debug
 //* dumps, so no image library dependency is needed.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

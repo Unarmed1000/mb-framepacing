@@ -1,5 +1,6 @@
 #ifndef MB_FRAMEMARKER_POINT_HPP
 #define MB_FRAMEMARKER_POINT_HPP
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <cstdint>

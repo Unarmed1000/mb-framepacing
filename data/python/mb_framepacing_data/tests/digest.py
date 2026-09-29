@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """The golden data's digest, as the C# library's tests compute it (data/csharp/UnitTest/source/DataDigest.cs): counts and sums of what a
 reader reads from every file. It must equal digest.json, so this library reads the same values as the C# one."""

@@ -3,7 +3,7 @@
 //* ----------------
 //* The region of the source a fast capture stores (see MarkerCrop) and the integer area downscale applied to it.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

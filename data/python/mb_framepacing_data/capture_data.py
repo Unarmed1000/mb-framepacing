@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Mana Battery ApS
 
 """captures.mbcd (doc/capture-data-format.md): a 256 byte header, then one 192 byte record per capture, little endian. The header describes
 the frames the markers were read from and where the markers are; a record holds a capture's times and its markers' bytes as read."""

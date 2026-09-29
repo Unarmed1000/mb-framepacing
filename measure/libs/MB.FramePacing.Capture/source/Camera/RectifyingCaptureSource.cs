@@ -4,7 +4,7 @@
 //* Wraps a capture source that delivers whole camera frames and passes on only the rig's rectified zones (EXPERIMENTAL camera support), like
 //* the ffmpeg camera filter does for ffmpeg sources.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

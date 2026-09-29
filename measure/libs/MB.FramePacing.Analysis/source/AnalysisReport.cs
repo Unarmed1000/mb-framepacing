@@ -3,7 +3,7 @@
 //* ----------------
 //* Everything CaptureAnalyzer produced for one capture: session info, decoded captures, runs and warnings.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

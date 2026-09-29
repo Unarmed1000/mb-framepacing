@@ -9,7 +9,7 @@
 //*  - "... frame dropped!" / "dropping frame"                      -> frames the device/ffmpeg dropped
 //* Lines arrive on the stderr reader thread; everything exposed is safe to read from other threads.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -4,7 +4,7 @@
 //* A folder of images as a capture source. The images are listed in an ffconcat file with one duration per image, so ffmpeg delivers them
 //* with the right timestamps: evenly spaced (a frame rate) or taken from a timestamp file.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

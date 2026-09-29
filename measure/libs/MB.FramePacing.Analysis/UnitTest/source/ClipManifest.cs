@@ -5,7 +5,7 @@
 //* follow from it: every video frame's marker, and per frame of the clip its display time step, animation time step, animation error, lateness,
 //* target and drift, all in whole ticks. The VideoClip tests of the analysis and of the charts compare with it.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

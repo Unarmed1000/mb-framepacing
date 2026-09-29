@@ -4,7 +4,7 @@
 //* The header of captures.mbcd (doc/capture-data-format.md): 256 bytes, little endian. It describes the captured frames the markers were read
 //* from, where the markers are, and whether the frames were stored too.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

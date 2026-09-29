@@ -3,7 +3,7 @@
 //* ----------------
 //* 'name': set or clear the name stored in a capture's capture.json, which reports show instead of the runs' sequence id.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

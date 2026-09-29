@@ -4,7 +4,7 @@
 //* Where a frame marker was found: its bounds (including the quiet zone) and module size in image pixels. Once the analyzer knows this it
 //* decodes with DecodeLocked, which samples the module grid directly instead of searching for finder patterns.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

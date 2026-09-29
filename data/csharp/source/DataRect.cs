@@ -3,7 +3,7 @@
 //* ----------------
 //* An integer pixel rectangle of the capture data: [X, X+Width) x [Y, Y+Height).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

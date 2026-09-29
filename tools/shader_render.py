@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
 """check_shaders.py --render: draw the marker's reference shaders with OpenGL (moderngl, a 4.1 context, which also takes GLSL ES 1.00) and

@@ -3,7 +3,7 @@
 //* ----------------
 //* How FrameMarkerOverlay draws the marker, fastest first. All draw exactly the same pixels; ShaderPackedBits is the default.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

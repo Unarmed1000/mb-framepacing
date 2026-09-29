@@ -9,7 +9,7 @@
 //*   macOS    ~/Library/Application Support/mb-framepacing/mb-framepacing.json
 //*   Linux    $XDG_CONFIG_HOME/mb-framepacing/mb-framepacing.json (default ~/.config/...)
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

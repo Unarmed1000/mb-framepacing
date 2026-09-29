@@ -4,7 +4,7 @@
 //* 'locate': find the marker in a capture device's picture and print the region a fast capture stores (--roi/--scale for 'capture'). The
 //* same search runs before 'capture --roi auto' and 'import --roi auto'. Nothing is recorded.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

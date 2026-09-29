@@ -3,7 +3,7 @@
 //* ----------------
 //* What reading a capture's markers gave (captures.mbcd record byte 28).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

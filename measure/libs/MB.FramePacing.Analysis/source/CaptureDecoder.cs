@@ -7,7 +7,7 @@
 //* live: search frame by frame in capture order until MarkerLocator knows where the markers are, then decode every remaining frame in parallel
 //* with the locked decoder. So both produce the same records.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

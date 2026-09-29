@@ -3,7 +3,7 @@
 //* ----------------
 //* What a marker means. Frame markers are drawn every frame of a test run; the sequence markers bracket the run.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

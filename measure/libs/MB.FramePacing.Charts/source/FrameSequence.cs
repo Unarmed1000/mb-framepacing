@@ -5,7 +5,7 @@
 //* that have one: which frames do (RankBits) and the values as a wavelet matrix (built on first use, once). A range of frames maps to the
 //* range of its values in constant time, and the matrix answers that range's minimum, maximum, percentiles and counts exactly. Immutable.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

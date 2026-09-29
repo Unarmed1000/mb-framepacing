@@ -3,7 +3,7 @@
 //* ----------------
 //* Axis aligned rectangle covering the pixels [Left,Right) x [Top,Bottom). Every edge lies on an integer pixel edge.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

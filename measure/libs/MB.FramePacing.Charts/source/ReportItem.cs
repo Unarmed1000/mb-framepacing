@@ -4,7 +4,7 @@
 //* The items of a report card, each with a stable id that switches it on or off (ReportOptions, 'render --hide / --only'): the title, the
 //* description, the display box, every headline tile (or all of them), and every panel.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

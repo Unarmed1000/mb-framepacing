@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the C++ libraries (the marker library, marker/cpp, and the data library, data/cpp) with clang-format and clang-tidy (config: each
 library's .clang-format and .clang-tidy, the same rules).

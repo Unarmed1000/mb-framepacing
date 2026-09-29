@@ -9,7 +9,7 @@
 //* its new version, even after a crash or a power cut, and two programs saving at once do not collide. The backups are written before the file
 //* is replaced; if they can not be written, the save fails and the file is left alone. Restore a backup by copying it back.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

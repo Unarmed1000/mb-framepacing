@@ -4,7 +4,7 @@
 //* Finds where the application draws its marker by reading frames from a source without recording them (nothing is written to disk). The
 //* first step of a fast capture, which then only stores that region. A few decodes must agree: a marker that moves can not be cropped.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

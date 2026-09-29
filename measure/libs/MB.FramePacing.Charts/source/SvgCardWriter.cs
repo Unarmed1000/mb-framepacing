@@ -4,7 +4,7 @@
 //* Writes a card drawing as SVG: the element with its size, title and style sheet (SvgMarkup's, verbatim), an optional page colour behind
 //* the card, the card, then every shape in order, one element per line.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

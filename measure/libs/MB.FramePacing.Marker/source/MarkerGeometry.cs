@@ -4,7 +4,7 @@
 //* Where the QR detector found a marker's finder and alignment pattern centres, in image pixels. Four points define the perspective transform
 //* from module coordinates to the image, which is how a camera filming the screen is calibrated.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

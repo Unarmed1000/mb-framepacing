@@ -4,7 +4,7 @@
 //* 'capture': record a capture card through ffmpeg into <dir>/captures.mbcd (every frame's decoded markers; + frames.mbfc with --keep-frames,
 //* + capture.json), with a live status line. Ctrl+C stops.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

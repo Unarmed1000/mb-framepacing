@@ -4,7 +4,7 @@
 //* Options for the synthetic high speed camera: the screen it films (size, marker zones), where the camera sits (perspective, lens), and
 //* what the display and sensor do to the image (scanout, panel response, exposure, blur, noise, clock drift).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

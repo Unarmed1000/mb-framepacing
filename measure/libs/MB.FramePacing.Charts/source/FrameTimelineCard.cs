@@ -7,7 +7,7 @@
 //* time step and animation error. The CPU times are on the pacer's clock; they are placed on the capture's clock with the markers' intended
 //* display times (on-time frames appear at their intended vsync), or without those so that no frame is presented after it appears.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

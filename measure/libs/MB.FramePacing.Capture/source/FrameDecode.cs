@@ -4,7 +4,7 @@
 //* What one captured frame's markers said: the main marker (frame, start or end) and the second one (the sync marker that checks tearing,
 //* or a camera's second zone that measures the scanout). The same whether decoded live during the capture or afterwards from frames.mbfc.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

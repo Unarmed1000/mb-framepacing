@@ -8,7 +8,7 @@
 //* frame the device delivers arrives exactly once. showinfo, the last filter, prints one line per output frame with its pts on stderr.
 //* Requires FFmpeg 5.1 or newer (-fps_mode).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

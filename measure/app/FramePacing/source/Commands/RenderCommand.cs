@@ -4,7 +4,7 @@
 //* 'render': draw a run of an analysis, or a section of it, as an SVG report and distribution cards (and PNG through a headless Edge or
 //* Chrome) from the analysis output (summary.json and the run's frames CSV), without the capture.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

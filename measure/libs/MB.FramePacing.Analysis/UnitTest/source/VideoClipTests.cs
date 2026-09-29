@@ -5,7 +5,7 @@
 //* and compare with the generator's manifest (ClipManifest), exactly. First the decoding: every video frame's marker must hold the payload
 //* the generator drew (see marker_payload in its generate_videos.py). Then the analysis, frame by frame. Skipped when ffmpeg is not installed.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

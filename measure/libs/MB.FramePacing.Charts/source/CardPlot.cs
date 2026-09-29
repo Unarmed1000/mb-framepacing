@@ -5,7 +5,7 @@
 //* time or a value (zoom, pan, hover) and tests can read a shape's value back. The x range grows to the right, the y range upwards; a
 //* logarithmic count axis holds log10 of the counts.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

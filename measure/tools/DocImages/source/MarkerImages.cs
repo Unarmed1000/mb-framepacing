@@ -4,7 +4,7 @@
 //* Marker example images for the documentation: markers drawn into a mock game frame exactly the way an application draws them (pixel
 //* aligned modules, pure black/white, drawn last on top of the scene).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

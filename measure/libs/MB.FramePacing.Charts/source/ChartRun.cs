@@ -3,7 +3,7 @@
 //* ----------------
 //* What the charts of one run are drawn from: the analysed run and the capture's period and error threshold, in ticks.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

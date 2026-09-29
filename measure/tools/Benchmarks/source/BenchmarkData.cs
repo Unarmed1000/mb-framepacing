@@ -4,7 +4,7 @@
 //* The inputs the benchmarks share: a capture card frame with its marker lock, and a synthetic high speed camera frame with a calibrated rig
 //* and its rectified zones (EXPERIMENTAL camera support).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

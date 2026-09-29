@@ -4,7 +4,7 @@
 //* The scales of the report's time panels: the error scale is symmetric with room above the largest error, the display time step scale
 //* sits half a refresh above the longest hold on a grid of whole refreshes, and both leave out a hitch far above everything else.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

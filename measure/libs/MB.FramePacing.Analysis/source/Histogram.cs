@@ -5,7 +5,7 @@
 //* measured values, and a coarse measurement shows as their spread. The bins cover min..max without gaps (empty bins included), so they
 //* can be drawn directly.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

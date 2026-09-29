@@ -5,7 +5,7 @@
 //* top and whole-refresh grid. Each covers every value unless a few are far beyond the rest (a hitch): those are left beyond the scale
 //* and marked at its edge (ReportCard).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -1,4 +1,5 @@
 #version 330 core
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker: looks each module up in a 41 x 41 single channel texture, one texel per module (1681 bytes per frame). Per frame, fill

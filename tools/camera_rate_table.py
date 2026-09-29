@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Measure how precise camera capture is at each camera frame rate, on the simulated camera (VERY EXPERIMENTAL camera support).
 

@@ -5,7 +5,7 @@
 //* plot (the GUI prepares a wider window than it shows, so scrolling only moves them). The GUI clips them to Left..Right and Top..Bottom and
 //* shifts them by its scroll offset; the SVG writer writes them where they are, as if they were not grouped.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

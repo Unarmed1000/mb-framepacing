@@ -6,7 +6,7 @@
 //* (found by binary search on the display times), and every pixel column's numbers come from queries on these, so a card costs per column,
 //* not per frame, whatever the run's length. Everything is built on first use, once, and is safe to read from any thread.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

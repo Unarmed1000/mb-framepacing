@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Regenerate the data libraries' golden data (test-data/data): a test clip imported and analysed by the tools.
 

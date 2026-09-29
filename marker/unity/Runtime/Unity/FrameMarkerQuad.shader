@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The marker as one opaque quad: the fragment looks its module up in a module texture (FrameMarkerQuad fills it). The quad's UV is the

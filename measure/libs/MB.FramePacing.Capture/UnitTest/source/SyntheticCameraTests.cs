@@ -4,7 +4,7 @@
 //* The synthetic high speed camera: its frames decode, the markers sit where the ground truth transform says, and the rolling scanout shows
 //* the new frame in the top zone before the bottom zone.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

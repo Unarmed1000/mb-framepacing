@@ -6,7 +6,7 @@
 //* matrix to Update. Draw the mesh last, with PixelSpace.Projection, an unlit vertex color material without blending, depth test or culling.
 //* The vertices are a static grid; each frame only uploads indices (about 5 KB). Update never allocates.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

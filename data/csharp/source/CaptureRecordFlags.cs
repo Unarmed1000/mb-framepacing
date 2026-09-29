@@ -3,7 +3,7 @@
 //* ----------------
 //* What the capture source reported about a capture (captures.mbcd and frames.mbfc record flags).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

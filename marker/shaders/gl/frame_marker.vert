@@ -1,4 +1,5 @@
 #version 330 core
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker: the marker's quad from the vertex id. Draw 4 vertices as GL_TRIANGLE_STRIP with an empty vertex array object (no

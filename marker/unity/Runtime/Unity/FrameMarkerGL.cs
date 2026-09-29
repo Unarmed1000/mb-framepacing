@@ -4,7 +4,7 @@
 //* Draws marker quads with GL immediate mode into the current render target, pixel exact (the marker's top-left origin is flipped to
 //* Unity's bottom-left). FrameMarkerOverlay uses it at the end of the frame; call it yourself to draw the marker from your own code.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

@@ -1,4 +1,5 @@
 #version 330 core
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker: reads each module's bit from the module matrix's packed bits (211 bytes per frame; the fastest). Per frame, copy

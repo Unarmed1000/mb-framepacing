@@ -4,7 +4,7 @@
 //* The C# library must draw exactly what the C++ library draws: the same module matrix for 512 pseudo random payloads
 //* (test-data/markers/modules.csv) and byte identical golden images from quads, triangle lists and indexed triangle lists.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

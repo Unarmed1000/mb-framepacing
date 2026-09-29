@@ -3,7 +3,7 @@
 //* ----------------
 //* captures.mbcd: the header and records round trip, newer and foreign files are refused, and a partial last record is ignored.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

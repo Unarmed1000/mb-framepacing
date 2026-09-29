@@ -3,7 +3,7 @@
 //* ----------------
 //* Options for importing an image sequence: its frame rate or a timestamp file (videos and streams carry their own timestamps).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

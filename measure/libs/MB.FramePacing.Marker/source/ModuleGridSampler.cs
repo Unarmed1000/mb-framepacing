@@ -5,7 +5,7 @@
 //* own black and white levels. Unlike ZXing's pure barcode mode it does not look for the outermost black pixels, so soft edges, low contrast
 //* single modules (camera footage after rectification, MJPEG) and noise in the quiet zone do not throw it off.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

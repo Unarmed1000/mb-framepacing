@@ -3,7 +3,7 @@
 //* ----------------
 //* Finds the golden data (test-data/data, written by the tools with tools/update_test_data.py) by walking up from the test directory.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

@@ -3,7 +3,7 @@
 //* ----------------
 //* The file names of an analysis output folder (doc/analysis-output-format.md), and finding it next to a capture.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

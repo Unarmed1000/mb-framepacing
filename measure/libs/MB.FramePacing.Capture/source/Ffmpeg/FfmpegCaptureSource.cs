@@ -5,7 +5,7 @@
 //* (showinfo) and are resolved by the recorder's writer thread. ffmpeg itself reports the stored frame size, so a capture works even when
 //* neither mode nor scale is given.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

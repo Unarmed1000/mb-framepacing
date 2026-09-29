@@ -4,7 +4,7 @@
 //* The .mbfc capture file: a 64 byte header followed by fixed size records (one per captured frame), so records can be read at random and in
 //* parallel. All values are little endian.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

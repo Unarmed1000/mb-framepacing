@@ -4,7 +4,7 @@
 //* Passes a source's frames through unchanged and shows each one to a callback first, so the camera wizard can show what the camera sees while
 //* it calibrates or checks (VERY EXPERIMENTAL camera support). The callback runs on the source's thread and must not keep the image.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -5,7 +5,7 @@
 //* animation error summarised the way Gamers Nexus do (error per frame and percent error), and the frame rate the way benchmarks report
 //* it: average fps and the 1 % / 0.1 % lows.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

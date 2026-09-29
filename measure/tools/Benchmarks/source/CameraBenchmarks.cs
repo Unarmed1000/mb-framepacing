@@ -4,7 +4,7 @@
 //* EXPERIMENTAL camera support: rectifying a camera frame (per capture, the C# path for sources that do not use ffmpeg), refining a zone's
 //* transform and calibrating a rig (one-off), and rendering the synthetic camera (tests only).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

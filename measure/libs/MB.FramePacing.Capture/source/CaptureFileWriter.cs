@@ -4,7 +4,7 @@
 //* Appends records to a .mbfc file with large positional writes (RandomAccess) and optional preallocation. Not thread safe: owned by the
 //* recorder's writer thread.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

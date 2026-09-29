@@ -4,7 +4,7 @@
 //* EXPERIMENTAL camera capture end to end without ffmpeg: synthetic high speed camera -> rig calibration -> rectified zones -> recorder ->
 //* analysis, against the synthetic ground truth (presented frames, display times, scanout delay, tears).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

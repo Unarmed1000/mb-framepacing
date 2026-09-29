@@ -4,7 +4,7 @@
 //* Pacing of one run: the refresh and target frame time used (and the refresh the user expected), late frames, the share of late frames
 //* over time and which cause dominates the animation error.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

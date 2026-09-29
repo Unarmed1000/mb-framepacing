@@ -4,7 +4,7 @@
 //* Late frames, the late share and the pacing verdict on hand-built rows of a capture card at the display's refresh rate (one capture is one
 //* refresh).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

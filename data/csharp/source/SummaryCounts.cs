@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json's runs[].counts: what the run's captures held.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

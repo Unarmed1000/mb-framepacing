@@ -4,7 +4,7 @@
 //* An hour of a 240 Hz game as an analysed run, for the card benchmarks: every 97th frame late (held two refreshes, off by one refresh),
 //* every 7th off by half a millisecond either way, and one 700 ms hitch (the report tests' synthetic run).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

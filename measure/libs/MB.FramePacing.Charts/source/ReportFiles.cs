@@ -5,7 +5,7 @@
 //* <prefix>-report-<from>s-<to>s.svg), optionally the detail sections around the worst animation error and the worst 2 s of late frames, the
 //* distribution cards (DistributionCard, <prefix>-<card>.svg) and the frame timeline, and optionally each as a PNG through a headless browser.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

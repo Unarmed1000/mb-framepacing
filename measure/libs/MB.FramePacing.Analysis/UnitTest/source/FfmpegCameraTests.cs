@@ -4,7 +4,7 @@
 //* EXPERIMENTAL camera capture end to end through a real ffmpeg: the synthetic high speed camera is encoded as a slow motion clip (stored at
 //* 30 fps), a rig is calibrated from it, and the import stores only the rectified marker zones. Skipped when ffmpeg is not installed.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

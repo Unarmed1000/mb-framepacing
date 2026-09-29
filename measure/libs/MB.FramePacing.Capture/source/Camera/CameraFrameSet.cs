@@ -4,7 +4,7 @@
 //* A short run of whole camera frames held in memory for calibrating or verifying a camera rig (EXPERIMENTAL camera support). Collecting
 //* first and processing afterwards works the same for live devices (which can not wait) and clips.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

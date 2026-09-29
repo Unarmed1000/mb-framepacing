@@ -3,7 +3,7 @@
 //* ----------------
 //* Where a capture's marker is: its bounds (including the quiet zone) and its module size, in stored pixels.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

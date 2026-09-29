@@ -7,7 +7,7 @@
 //* section's start, so a section shows the run's own values. Per pixel column: the shares' range from a wavelet matrix, the colours from
 //* rank bits. Immutable.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 """Build and run the consumer project (this folder) against mb_framemarker the ways doc/integrating.md documents.
 

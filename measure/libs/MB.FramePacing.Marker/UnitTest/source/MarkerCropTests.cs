@@ -4,7 +4,7 @@
 //* Fast capture crop: the downscale factor, alignment and clamping, and that every marker drawn at the origin still decodes after the crop
 //* and the downscale.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

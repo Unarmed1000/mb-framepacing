@@ -4,7 +4,7 @@
 //* BenchmarkDotNet entry point: dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*" (name the csproj:
 //* building the folder picks its .slnx, which does not build the libraries optimized).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

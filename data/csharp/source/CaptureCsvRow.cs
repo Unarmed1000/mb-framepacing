@@ -4,7 +4,7 @@
 //* One line of captures.csv (doc/analysis-output-format.md): one capture, as the analysis read it. Times are 100 ns ticks; null is an empty
 //* cell.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

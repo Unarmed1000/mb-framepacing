@@ -4,7 +4,7 @@
 //* 'import': record from something other than a capture card - a video file, a folder of images or a stream URL - into a capture folder that
 //* 'analyze' reads like any other capture.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

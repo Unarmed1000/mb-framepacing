@@ -3,7 +3,7 @@
 //* ----------------
 //* A mode a device offers. Fps is the maximum for the size (0 if the platform does not report it).
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

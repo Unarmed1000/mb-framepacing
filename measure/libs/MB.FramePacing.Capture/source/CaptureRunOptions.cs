@@ -4,7 +4,7 @@
 //* Options for CaptureRunner: output directory, duration, start and end marker triggering, ring size, live preview, the target frame
 //* rate, the expected display refresh rate and the version information stored in capture.json.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

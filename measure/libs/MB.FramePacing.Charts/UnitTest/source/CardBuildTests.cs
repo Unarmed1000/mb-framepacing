@@ -5,7 +5,7 @@
 //* build is cancelled), the parallel build draws exactly what the card builders draw one by one, and the Timeline's sliding window shows
 //* its visible range and draws the same shapes as its neighbours at one zoom.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

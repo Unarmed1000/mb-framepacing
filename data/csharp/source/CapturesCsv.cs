@@ -4,7 +4,7 @@
 //* Reads and writes captures.csv: a header line, then one line per capture index, comma separated, UTF-8 without a byte order mark. Reading
 //* goes by column name. Camera captures add a column.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 

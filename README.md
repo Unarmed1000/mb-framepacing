@@ -489,8 +489,9 @@ marker format specification, the integration guide and the golden marker images 
 libraries (`data/`), the formats they read and their golden data. Everything else,
 including the measurement tools, is PolyForm Perimeter 1.0.1: free to use, change and share for any purpose, including
 inside companies, but not to provide others a product that competes with it. Every source file names its license on an
-`SPDX-License-Identifier` line (`BSD-3-Clause`, or `LicenseRef-PolyForm-Perimeter-1.0.1`). Third-party components and their
-licenses are listed in [`licenses/README.md`](licenses/README.md).
+`SPDX-License-Identifier` line (`BSD-3-Clause`, or `LicenseRef-PolyForm-Perimeter-1.0.1`), and every code file its copyright
+holder on an `SPDX-FileCopyrightText` line (`Copyright (C) 2026 Mana Battery ApS`): the SPDX short form, instead of the license
+text in every file. Third-party components and their licenses are listed in [`licenses/README.md`](licenses/README.md).
 
 ## Disclaimer
 

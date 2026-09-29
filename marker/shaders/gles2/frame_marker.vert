@@ -1,4 +1,5 @@
 #version 100
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker, GLSL ES 1.00 (OpenGL ES 2.0, WebGL 1): the marker's quad. There is no gl_VertexID, so draw a vertex buffer of its 4

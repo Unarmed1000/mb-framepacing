@@ -4,7 +4,7 @@
 //* Groups points by the pixel column they fall in (the floor of their x), as a report card draws a long section: one index array in column
 //* order and each column's range of it, instead of a LINQ group per column. Points already in x order (a run's frames are) are not sorted.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

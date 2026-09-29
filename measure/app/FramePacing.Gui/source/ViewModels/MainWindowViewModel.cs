@@ -4,7 +4,7 @@
 //* Top level view model: header (ffmpeg status, settings), the capture and analysis pages and the first-run setup. A finished capture is
 //* handed to the analysis page and analysed right away.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

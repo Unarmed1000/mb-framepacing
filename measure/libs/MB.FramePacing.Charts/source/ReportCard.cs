@@ -8,7 +8,7 @@
 //* plottables do), so an hour stays a small file. The error and display time step scales follow the GUI charts, including their marks for
 //* the few values far beyond the rest.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 

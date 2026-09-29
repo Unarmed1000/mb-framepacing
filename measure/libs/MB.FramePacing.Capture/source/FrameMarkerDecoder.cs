@@ -5,7 +5,7 @@
 //* (capture cards: torn when they disagree) or, for EXPERIMENTAL camera captures, the second zone's frame index (the scanout). Used live
 //* during a capture (LiveFrameDecoder) and afterwards on frames.mbfc (the analysis), so both produce the same records.
 //*
-//* (c) 2026 Mana Battery
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
