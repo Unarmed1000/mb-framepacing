@@ -153,6 +153,23 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Xs(card.Shapes.Where(s => s is not ScrollShape)).All(x => x >= 0 && x <= card.Width), "the rest stays on the card");
     }
 
+    /// <summary>The animation time step overlay moves with time: its line is in the scrolling layers, as the display time step's holds are.</summary>
+    [Test]
+    public void SlidingWindow_TheAnimationTimeStepScrolls()
+    {
+      var run = ReportSvgTests.Synthetic(240 * 60);
+      var card = ReportCard.Build(
+        RunSection.Create(run, 18, 24),
+        g_panels.Show(new[] { ReportItem.AnimationTimeStep }),
+        wholeRunScales: true,
+        visible: (20, 22)
+      );
+      var scrolling = card.Shapes.OfType<ScrollShape>().SelectMany(l => l.Children).OfType<PathShape>().ToList();
+      Assert.That(scrolling.Any(p => p.Class == "step-line"), "in a scrolling layer");
+      Assert.That(scrolling.Any(p => p.Class == "held"), "with the holds");
+      Assert.That(card.Shapes.OfType<PathShape>().Any(p => p.Class == "step-line"), Is.False, "not fixed on the card");
+    }
+
     /// <summary>
     /// Two windows at one zoom whose visible ranges start a whole number of pixels apart draw the same shapes, moved by those pixels: the
     /// GUI swaps in the next window without a visible change.

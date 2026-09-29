@@ -129,6 +129,34 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
+    /// The animation time step over the display time step (opt-in): every frame's animation time step on its hold, from the previous frame's
+    /// display time until its own, on the panel's scale (which covers the animation time steps too), as one joined line.
+    /// </summary>
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    public void AnimationTimeStep_MatchesTheManifest(string clip)
+    {
+      var (manifest, _, chart) = Analyze(clip);
+      var drawing = ReportCard.Build(RunSection.Whole(chart), ReportOptions.ShowOnly(new[] { ReportItem.AnimationTimeStep }));
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
+      double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
+
+      var step = drawing.Plots.Single(p => p.Id == ReportItem.DisplayTimeStep);
+      double pixelMs = (step.YTo - step.YFrom) / (step.Bottom - step.Top);
+      double pixelSeconds = (step.XTo - step.XFrom) / (step.Right - step.Left);
+      var drawn = SteppedLine(drawing, "step-line").ToArray();
+      Assert.That(drawn, Has.Length.EqualTo(measured.Length), $"{clip}: an animation time step per frame until the next");
+      for (int k = 0; k < measured.Length; ++k)
+      {
+        int i = measured[k];
+        var hold = drawn[k];
+        double expected = Math.Clamp(Ms(manifest.AnimationStepTicks(i)), 0, step.YTo);
+        Assert.That(step.ValueX(hold.X0), Is.EqualTo(Seconds(i - 1)).Within(0.051 * pixelSeconds), $"{clip}: step {i} starts");
+        Assert.That(step.ValueX(hold.X1), Is.EqualTo(Seconds(i)).Within(0.051 * pixelSeconds), $"{clip}: step {i} ends at the next frame");
+        Assert.That(step.ValueY(hold.Y), Is.EqualTo(expected).Within(0.051 * pixelMs), $"{clip}: animation time step {i}");
+      }
+    }
+
+    /// <summary>
     /// The distribution cards, read back through their shapes and plot areas: a histogram bar per occupied bin at its centre, log10 of its
     /// count high (shape numbers are exact), the threshold and median lines; the percentile curve at every 0.1 percentile and the drift of
     /// every frame (path points, written with one decimal: within 0.05 px).
@@ -392,6 +420,23 @@ namespace MB.FramePacing.Charts.UnitTest
         .Where(p => p.Class == cls)
         .SelectMany(p => Regex.Matches(p.Data, "M(-?[0-9.]+) (-?[0-9.]+)H(-?[0-9.]+)"))
         .Select(m => (Number(m.Groups[1].Value), Number(m.Groups[2].Value), Number(m.Groups[3].Value)));
+
+    /// <summary>A stepped line's holds: "M x0 yHx1", then "VyHx1" for each hold that starts where the one before ended.</summary>
+    private static IEnumerable<(double X0, double Y, double X1)> SteppedLine(CardDrawing drawing, string cls)
+    {
+      foreach (var path in drawing.FlatShapes.OfType<PathShape>().Where(p => p.Class == cls))
+      {
+        double x = 0;
+        foreach (Match m in Regex.Matches(path.Data, "M(-?[0-9.]+) (-?[0-9.]+)H(-?[0-9.]+)|V(-?[0-9.]+)H(-?[0-9.]+)"))
+        {
+          bool moved = m.Groups[1].Success;
+          double x0 = moved ? Number(m.Groups[1].Value) : x;
+          double y = Number(m.Groups[moved ? 2 : 4].Value);
+          x = Number(m.Groups[moved ? 3 : 5].Value);
+          yield return (x0, y, x);
+        }
+      }
+    }
 
     /// <summary>A path's points (M and L commands).</summary>
     private static IEnumerable<(double X, double Y)> PathPoints(CardDrawing drawing, string cls) =>

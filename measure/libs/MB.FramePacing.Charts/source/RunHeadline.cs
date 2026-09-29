@@ -46,7 +46,8 @@ namespace MB.FramePacing.Charts
           (s.AverageFps > 0 ? Invariant(1000 / s.AverageFps, "0.00") + " ms · " : string.Empty) + Number(run.Counts.PresentedFrames) + " frames",
           false,
           "Presented frames per second: the frames with a display time step over the time those steps cover (what the display showed); "
-            + "underneath, the mean display time step and the number of presented frames."
+            + "underneath, the mean display time step and the number of presented frames.",
+          s.AverageFps > 0
         ),
         Low(ReportItem.OnePercentLow, "1 % low", s.OnePercentLowFps, "99", RunStatistics.MinFramesForOnePercentLow),
         Low(ReportItem.PointOnePercentLow, "0.1 % low", s.PointOnePercentLowFps, "99.9", RunStatistics.MinFramesForPointOnePercentLow),
@@ -81,7 +82,8 @@ namespace MB.FramePacing.Charts
           pacing != null ? Number(pacing.LateFrames) : "-",
           pacing != null ? Percent(pacing.LateShare) : string.Empty,
           pacing?.LateFrames > 0,
-          "Frames shown at least one refresh later than the target frame time after the previous frame."
+          "Frames shown at least one refresh later than the target frame time after the previous frame.",
+          pacing != null
         ),
       };
     }
@@ -95,7 +97,8 @@ namespace MB.FramePacing.Charts
         fps is { } shown ? Invariant(1000 / shown, "0.0") + " ms" : $"needs {Number(minFrames)} frames",
         false,
         $"The frame rate at the {percentile}th percentile display time step (nearest rank): {percentile} % of the frames stayed on screen "
-          + "no longer than the step underneath."
+          + "no longer than the step underneath.",
+        fps.HasValue
       );
 
     /// <summary>A tail percentile of the |animation error|: the rare frames a player notices, which an average or the p95 hides.</summary>
@@ -106,7 +109,8 @@ namespace MB.FramePacing.Charts
         measured >= minFrames ? Invariant(valueMs, "0.0") + " ms" : "-",
         measured >= minFrames ? string.Empty : $"needs {Number(minFrames)} frames",
         false,
-        $"{percentile} % of the frames have an |animation error| below this."
+        $"{percentile} % of the frames have an |animation error| below this.",
+        measured >= minFrames
       );
 
     /// <summary>Which cause of animation error dominates, with the counts behind it ("mostly bad pacing: ... (3 error frame(s) ...).").</summary>

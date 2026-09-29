@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* The items of a report card, each with a stable id that switches it on or off (ReportOptions, 'render --hide / --only'): the title, the
-//* description, the display box, every headline tile (or all of them), and every panel.
+//* description, the display box, every headline tile (or all of them), and every panel. Overlays are opt-in ('render --show'): drawn on a
+//* panel only when asked for.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -32,6 +33,7 @@ namespace MB.FramePacing.Charts
     public const string FrameTime = "frametime";
     public const string LateShare = "late-share";
     public const string RefreshStrip = "refresh-strip";
+    public const string AnimationTimeStep = "animation-time-step";
 
     /// <summary>Every item, in the order the card shows them, with what it is.</summary>
     public static readonly IReadOnlyList<(string Id, string Description)> All = new[]
@@ -53,6 +55,7 @@ namespace MB.FramePacing.Charts
       (FrameTime, "panel: frametime and CPU busy (from the markers)"),
       (LateShare, "panel: share of late frames in the last 2 s"),
       (RefreshStrip, "panel: refresh strip"),
+      (AnimationTimeStep, "overlay (opt-in): the animation time step on the display time step panel"),
     };
 
     /// <summary>The ids of the headline tiles, which <see cref="Tiles"/> switches together.</summary>
@@ -67,6 +70,9 @@ namespace MB.FramePacing.Charts
       WorstError,
       LateFrames,
     };
+
+    /// <summary>The opt-in overlays, each with the panel it is drawn on: off unless shown (ReportOptions.Show), and only with that panel.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Overlays = new Dictionary<string, string> { [AnimationTimeStep] = DisplayTimeStep };
 
     public static bool IsKnown(string id) => All.Any(item => item.Id == id);
   }

@@ -168,7 +168,19 @@ is presented after it first appears.
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-off`, `error-p99`, `error-p999`,
-`worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`. `--details` adds 2 s either side of the largest animation error
+`worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`.
+Overlays are opt-in: `--show animation-time-step` draws the animation time step as a blue line over the display time step (an even
+display with an uneven animation is delta time jitter; the scale covers both). For a card in a document: `--title "..."` replaces
+the run's title, `--strip-seconds 1` draws the refresh strip over only the first second (readable cells on a long section),
+`--hide-empty` leaves out the tiles without a value (the 0.1 % low and p99.9 below 1,000 frames) and the late share when no frame is
+late, and `--tiles-per-row 5` puts five tiles in a row (default 4):
+
+```sh
+mb-framepacing render capture-20260924-153000 --cards none --only title,display,tiles,animation-error,display-time-step,refresh-strip \
+  --show animation-time-step --strip-seconds 1 --hide-empty --tiles-per-row 5 --title "Naive timer, heavy load"
+```
+
+`--details` adds 2 s either side of the largest animation error
 (`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
 Chrome, found in the usual places or set with `MB_BROWSER`.
 

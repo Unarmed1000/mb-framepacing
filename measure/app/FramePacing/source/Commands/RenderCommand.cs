@@ -50,7 +50,30 @@ namespace MB.FramePacing.App.Commands
       var hideOption = new Option<string?>("--hide") { Description = $"Leave these items out of the card, comma separated: {items}." };
       var onlyOption = new Option<string?>("--only")
       {
-        Description = "Show only these items (comma separated, the same ids as --hide; naming a tile keeps the tiles row for it).",
+        Description =
+          "Show only these items (comma separated, the same ids as --hide; naming a tile keeps the tiles row for it, naming an overlay its panel).",
+      };
+      string overlays = string.Join(", ", ReportItem.Overlays.Keys);
+      var showOption = new Option<string?>("--show")
+      {
+        Description = $"Also draw these opt-in overlays, comma separated: {overlays} (on the display time step panel).",
+      };
+      var titleOption = new Option<string?>("--title")
+      {
+        Description = "The report's title instead of 'Run N  name' (every run gets it; a section's time range is still added).",
+      };
+      var stripSecondsOption = new Option<double?>("--strip-seconds")
+      {
+        Description = "The refresh strip shows only the first this many seconds of the section, with its own time axis (e.g. 1).",
+      };
+      var hideEmptyOption = new Option<bool>("--hide-empty")
+      {
+        Description = "Leave out the tiles without a value (too few frames, no pacing) and the late share when no frame is late.",
+      };
+      var tilesPerRowOption = new Option<int>("--tiles-per-row")
+      {
+        Description = $"How many headline tiles go in a row (1 to {ReportOptions.MaxTilesPerRow}).",
+        DefaultValueFactory = _ => ReportOptions.DefaultTilesPerRow,
       };
       string cardIds = string.Join(", ", DistributionCard.All.Select(c => c.Id));
       var cardsOption = new Option<string>("--cards")
@@ -72,6 +95,11 @@ namespace MB.FramePacing.App.Commands
         outputOption,
         hideOption,
         onlyOption,
+        showOption,
+        titleOption,
+        stripSecondsOption,
+        hideEmptyOption,
+        tilesPerRowOption,
         cardsOption,
       };
       command.SetAction(parseResult =>
@@ -90,8 +118,17 @@ namespace MB.FramePacing.App.Commands
             throw new InvalidOperationException(runId != null ? $"The analysis has no run {runId}" : "The analysis has no runs");
           string output = parseResult.GetValue(outputOption) is { } path ? Path.GetFullPath(path) : AnalysisOutput.Directory(folder);
           var options = parseResult.GetValue(onlyOption) is { } only ? ReportOptions.ShowOnly(ReportOptions.ParseIds(only)) : ReportOptions.Default;
+          if (parseResult.GetValue(showOption) is { } show)
+            options = options.Show(ReportOptions.ParseIds(show));
           if (parseResult.GetValue(hideOption) is { } hide)
             options = options.Hide(ReportOptions.ParseIds(hide));
+          options = options with
+          {
+            Title = parseResult.GetValue(titleOption),
+            StripSeconds = parseResult.GetValue(stripSecondsOption),
+            HideEmpty = parseResult.GetValue(hideEmptyOption),
+            TilesPerRow = parseResult.GetValue(tilesPerRowOption),
+          };
           var cards = ParseCards(parseResult.GetValue(cardsOption)!);
           Directory.CreateDirectory(output);
           foreach (var run in runs)

@@ -3,7 +3,9 @@
 //* ----------------
 //* A run, or a section of one, as one card (shapes: CardDrawing, written as SVG by SvgCardWriter, drawn by the GUI) in the style of mb-framepacing-explained's example charts (generate_charts.py): the headline
 //* tiles, the animation error per frame as signed bars, the display time step as held steps (green as planned, red held too long), the share
-//* of late frames in the last 2 s, and the refresh strip. The x axis is seconds since the run's first frame, as on the
+//* of late frames in the last 2 s, and the refresh strip; opt-in, the animation time step over the display time step (as generate_charts.py
+//* draws them), and for a card in a document its own title, a strip of the first seconds and a tiles row of its own width (ReportOptions).
+//* The x axis is seconds since the run's first frame, as on the
 //* Timeline. A section short enough to give every frame a pixel draws every frame; longer ones draw each pixel column's range (as the GUI's
 //* plottables do), so an hour stays a small file. The error and display time step scales follow the GUI charts, including their marks for
 //* the few values far beyond the rest.
@@ -34,7 +36,6 @@ namespace MB.FramePacing.Charts
 
     private const double TileH = 64;
     private const double TileGap = 12;
-    private const int TilesPerRow = 4;
     private const double ErrorH = 150;
     private const double StepH = 130;
     private const double FrameTimeH = 130;
@@ -96,7 +97,7 @@ namespace MB.FramePacing.Charts
       double pixelsPerFrame = frameCount > 0 ? (plotX1 - PlotX0) * ((to - from) / (viewTo - viewFrom)) / frameCount : double.MaxValue;
       bool perFrame = pixelsPerFrame >= 1;
 
-      string title = RunHeadline.Title(run) + (section.IsWholeRun ? string.Empty : $", {Ms1(from)}–{Ms1(to)} s");
+      string title = (options.Title ?? RunHeadline.Title(run)) + (section.IsWholeRun ? string.Empty : $", {Ms1(from)}–{Ms1(to)} s");
       var description = new List<string>
       {
         (
@@ -114,33 +115,69 @@ namespace MB.FramePacing.Charts
         description.Add(sequence);
       // The section's own numbers only when a tile shows them
       var tiles = ReportItem.TileIds.Any(options.IsShown)
-        ? RunHeadline.Tiles(section.Section).Where(t => options.IsShown(t.Id)).ToList()
+        ? RunHeadline.Tiles(section.Section).Where(t => options.IsShown(t.Id) && (t.HasValue || !options.HideEmpty)).ToList()
         : new List<HeadlineTile>();
+      if (options.HideEmpty && options.IsShown(ReportItem.LateShare) && (section.Section.Run.Pacing?.LateFrames ?? 0) == 0)
+        options = options.Hide(new[] { ReportItem.LateShare });
       var layout = Layout.For(options, description.Count, tiles.Count);
       var parts = Header(title, options.IsShown(ReportItem.Description) ? description : Array.Empty<string>(), options.IsShown(ReportItem.Title));
       if (options.IsShown(ReportItem.Display))
         DisplayBox(parts, chart, section, refreshMs, width);
 
-      Tiles(parts, tiles, layout.TilesY, width);
+      Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRow);
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
       var panels = new List<Action<List<CardShape>, List<CardPlot>>>();
       var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, plotX1, viewFrom, viewTo, pixelsPerFrame);
       if (layout.ErrorY is { } errorY)
         panels.Add((shapes, plots) => ErrorPanel(shapes, plots, view, refreshMs, errorY));
       if (layout.StepY is { } stepY)
-        panels.Add((shapes, plots) => StepPanel(shapes, plots, view, refreshMs, stepY));
+      {
+        bool animation = options.IsShown(ReportItem.AnimationTimeStep);
+        panels.Add((shapes, plots) => StepPanel(shapes, plots, view, refreshMs, stepY, animation));
+      }
       if (layout.FrameTimeY is { } frameTimeY)
         panels.Add((shapes, plots) => FrameTimePanel(shapes, plots, view, refreshMs, frameTimeY));
       if (layout.LateY is { } lateY)
         panels.Add((shapes, plots) => LatePanel(shapes, plots, view, lateY));
       if (layout.StripY is { } stripY)
-        panels.Add((shapes, plots) => StripPanel(shapes, plots, view, refreshMs, chart, stripY));
+      {
+        var (stripView, stripLabel) = StripView(view, options.StripSeconds);
+        panels.Add((shapes, plots) => StripPanel(shapes, plots, stripView, refreshMs, chart, stripY, stripLabel));
+      }
       var drawn = panels.Select(_ => (Shapes: new List<CardShape>(), Plots: new List<CardPlot>())).ToArray();
       Parallel.For(0, panels.Count, i => panels[i](drawn[i].Shapes, drawn[i].Plots));
       foreach (var (shapes, _) in drawn)
         parts.AddRange(shapes);
 
       return new CardDrawing(title, width, layout.Height, parts, drawn.SelectMany(d => d.Plots).ToList());
+    }
+
+    /// <summary>
+    /// The refresh strip's view and label: the panels' view, or with <paramref name="seconds"/> shorter than the section, only the section's
+    /// first seconds across the whole plot width, on a time axis of its own (fixed, not scrolling with the visible range).
+    /// </summary>
+    private static (PanelView View, string Label) StripView(PanelView view, double? seconds)
+    {
+      if (seconds is not { } length || view.To - view.From <= length)
+        return (view, "REFRESH STRIP");
+      var strip = RunSection.Create(view.Section.Run, view.From, view.From + length);
+      double from = strip.FromSeconds;
+      double to = strip.ToSeconds;
+      double plotX1 = view.PlotX1;
+      var data = view.Data;
+      double XOf(double s) => PlotX0 + ((plotX1 - PlotX0) * (s - from) / (to - from));
+      int frames = Math.Max(1, strip.FrameCount);
+      var stripView = view with
+      {
+        Section = strip,
+        XOf = XOf,
+        XOfFrame = i => XOf(data.Seconds(i)),
+        ViewFrom = from,
+        ViewTo = to,
+        PerFrame = (plotX1 - PlotX0) / frames >= 1,
+        PixelsPerFrame = (plotX1 - PlotX0) / frames,
+      };
+      return (stripView, $"REFRESH STRIP, FIRST {length.ToString("0.##", CultureInfo.InvariantCulture)} S");
     }
 
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
@@ -166,7 +203,7 @@ namespace MB.FramePacing.Charts
         double tilesY = cursor;
         if (tiles > 0)
         {
-          int rows = (tiles + TilesPerRow - 1) / TilesPerRow;
+          int rows = (tiles + options.TilesPerRow - 1) / options.TilesPerRow;
           cursor = tilesY + (rows * TileH) + ((rows - 1) * TileGap);
           previous = "tiles";
         }
@@ -243,14 +280,14 @@ namespace MB.FramePacing.Charts
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
 
-    private static void Tiles(List<CardShape> parts, IReadOnlyList<HeadlineTile> tiles, double tilesY, double width)
+    private static void Tiles(List<CardShape> parts, IReadOnlyList<HeadlineTile> tiles, double tilesY, double width, int perRow)
     {
-      double tileW = (width - 40 - ((TilesPerRow - 1) * TileGap)) / TilesPerRow;
+      double tileW = (width - 40 - ((perRow - 1) * TileGap)) / perRow;
       for (int i = 0; i < tiles.Count; ++i)
       {
         var tile = tiles[i];
-        double x = 20 + ((i % TilesPerRow) * (tileW + TileGap));
-        double y = tilesY + ((i / TilesPerRow) * (TileH + TileGap));
+        double x = 20 + ((i % perRow) * (tileW + TileGap));
+        double y = tilesY + ((i / perRow) * (TileH + TileGap));
         parts.Add(new RectShape("tile", N(x, 1), N(y, 0), N(tileW, 1), N(TileH, 0), "10"));
         parts.Add(new TextShape(x + 14, y + 20, tile.Caption.ToUpperInvariant(), "label", "start"));
         parts.Add(new TextShape(x + 14, y + 44, tile.Value, tile.Warning ? "tile-value warn" : "tile-value", "start"));
@@ -429,7 +466,11 @@ namespace MB.FramePacing.Charts
       view.Ticks(parts, errorY + ErrorH);
     }
 
-    private static void StepPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double stepY)
+    /// <summary>
+    /// The display time step as held steps (green as planned, red held too long). With <paramref name="animation"/>, the animation time step
+    /// under it as a blue line on the same holds and scale: an even display with an uneven animation is delta time jitter.
+    /// </summary>
+    private static void StepPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double stepY, bool animation)
     {
       // Each frame's hold: from its first sighting to the next frame of its segment (in the section), at the next frame's display time step
       var section = view.Section;
@@ -437,21 +478,33 @@ namespace MB.FramePacing.Charts
       var holds = data.Holds;
       int holdEnd = Math.Max(section.Start, section.End - 1);
       var (scaleFrom, scaleTo) = view.WholeRunScales ? (0, data.Frames.Count) : (section.Start, holdEnd);
-      var (scaleStart, scaleEnd) = holds.Of(scaleFrom, scaleTo);
+      // The scale covers the display time steps, and the animation time steps when they are drawn too
+      var scales = new List<(double Longest, double Bulk)>();
+      foreach (var sequence in animation ? new[] { holds, data.AnimationHolds } : new[] { holds })
+      {
+        var (scaleStart, scaleEnd) = sequence.Of(scaleFrom, scaleTo);
+        if (scaleEnd > scaleStart)
+          scales.Add((MaxMs(sequence.Values, scaleStart, scaleEnd), sequence.Values.PercentileMs(scaleStart, scaleEnd, ChartScale.BulkPercentile)));
+      }
       double top =
-        scaleEnd > scaleStart
-          ? ChartScale.StepTop(
-            MaxMs(holds.Values, scaleStart, scaleEnd),
-            holds.Values.PercentileMs(scaleStart, scaleEnd, ChartScale.BulkPercentile),
-            refreshMs
-          )
+        scales.Count > 0
+          ? ChartScale.StepTop(scales.Max(s => s.Longest), scales.Max(s => s.Bulk), refreshMs)
           : ChartScale.StepTop(Array.Empty<double>(), refreshMs);
-      double YOf(double ms) => stepY + StepH - (Math.Min(ms, top) / top * StepH);
+      // An animation time step can be 0 or less (the animation clock stood still or went back): drawn at 0
+      double YOf(double ms) => stepY + StepH - (Math.Clamp(ms, 0, top) / top * StepH);
       double X1(int frame) => Math.Min(view.EndX, view.XOfFrame(frame + 1));
       plots.Add(new CardPlot(ReportItem.DisplayTimeStep, PlotX0, stepY, view.PlotX1, stepY + StepH, view.ViewFrom, view.ViewTo, 0, top));
 
-      parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
-      parts.Add(new TextShape(view.PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
+      if (animation)
+      {
+        parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP AND ANIMATION TIME STEP", "label", "start"));
+        parts.Add(new TextShape(view.PlotX1, stepY - 16, "green display time step (red held too long), blue animation time step", "vsync-n", "end"));
+      }
+      else
+      {
+        parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
+        parts.Add(new TextShape(view.PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
+      }
       foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
       {
         double y = YOf(position);
@@ -460,6 +513,8 @@ namespace MB.FramePacing.Charts
       }
       parts.Add(GridLine(YOf(0), view.PlotX1));
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
+      if (animation)
+        AnimationSteps(parts, view, holdEnd, YOf, X1, stepY);
 
       var clipped = new List<(double X, double Value, bool Top)>();
       if (view.PerFrame)
@@ -537,6 +592,62 @@ namespace MB.FramePacing.Charts
       }
       ClipMarks(shape => view.Move(parts, shape, stepY, stepY + StepH), clipped, stepY, stepY + StepH, v => $"{Ms(v)} ms", view.PlotX1);
       view.Ticks(parts, stepY + StepH);
+    }
+
+    /// <summary>
+    /// The animation time step on the display time step's holds (under them): per frame one blue line, stepping at each hold's start; per pixel
+    /// column the range faint and the lower middle value as the line. Values beyond the scale stay at its edge (the display's marks tell).
+    /// </summary>
+    private static void AnimationSteps(
+      List<CardShape> parts,
+      PanelView view,
+      int holdEnd,
+      Func<double, double> yOf,
+      Func<int, double> x1Of,
+      double stepY
+    )
+    {
+      var section = view.Section;
+      var steps = view.Data.AnimationHolds;
+      var line = new StringBuilder();
+      if (view.PerFrame)
+      {
+        double? previousX1 = null;
+        foreach (int i in steps.FramesIn(section.Start, holdEnd))
+        {
+          double x0 = view.XOfFrame(i);
+          double x1 = x1Of(i);
+          double y = yOf(TicksMs(view.Data.Frames[i + 1].AnimationDeltaTicks!.Value));
+          // Joined to the hold before when it ends where this one starts (a gap in the segment starts a new line)
+          line.Append(
+            previousX1 is { } before && Math.Abs(before - x0) < 1e-6
+              ? $"V{Fixed(y, 1)}H{Fixed(x1, 1)}"
+              : $"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}"
+          );
+          previousX1 = x1;
+        }
+        view.MovePath(parts, "step-line", line, stepY, stepY + StepH);
+        return;
+      }
+      var range = new StringBuilder();
+      foreach (var (key, frameStart, frameEnd) in view.Columns(section.Start, holdEnd))
+      {
+        var (start, end) = steps.Of(frameStart, frameEnd);
+        int count = end - start;
+        if (count == 0)
+          continue;
+        int last = frameEnd - 1;
+        while (!steps.Frames[last])
+          --last;
+        double columnEnd = Math.Max(key + 1, x1Of(last));
+        double lowest = TicksMs(steps.Values.KthSmallest(start, end, 0));
+        double highest = MaxMs(steps.Values, start, end);
+        range.Append($"M{Fixed(key, 0)} {Fixed(yOf(highest) - 0.6, 1)}H{Fixed(columnEnd, 1)}V{Fixed(yOf(lowest) + 0.6, 1)}H{Fixed(key, 0)}Z");
+        double middle = TicksMs(steps.Values.KthSmallest(start, end, (count - 1) / 2));
+        line.Append($"M{Fixed(key, 0)} {Fixed(yOf(middle), 1)}H{Fixed(columnEnd, 1)}");
+      }
+      view.MovePath(parts, "step-range", range, stepY, stepY + StepH);
+      view.MovePath(parts, "step-line", line, stepY, stepY + StepH);
     }
 
     /// <summary>
@@ -767,14 +878,22 @@ namespace MB.FramePacing.Charts
     /// so the refreshes between a frame's last capture and the next frame (captures that could not be decoded) are unknown cells; a camera sees
     /// each frame until the next one. Frames with skipped frame indices before them, or torn, get a mark above the strip.
     /// </summary>
-    private static void StripPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, ChartRun chart, double stripY)
+    private static void StripPanel(
+      List<CardShape> parts,
+      List<CardPlot> plots,
+      PanelView view,
+      double refreshMs,
+      ChartRun chart,
+      double stripY,
+      string label
+    )
     {
       var section = view.Section;
       var frames = view.Data.Frames;
       double from = view.ViewFrom;
       double to = view.ViewTo;
       double cellW = (view.PlotX1 - PlotX0) * refreshMs / 1000 / (to - from);
-      parts.Add(new TextShape(20, stripY - 16, "REFRESH STRIP", "label", "start"));
+      parts.Add(new TextShape(20, stripY - 16, label, "label", "start"));
       if (cellW < MinCellPixels)
       {
         double longest = (view.PlotX1 - PlotX0) / MinCellPixels * refreshMs / 1000;

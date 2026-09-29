@@ -29,6 +29,7 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<FrameSequence> m_displaySteps;
     private readonly Lazy<FrameSequence> m_holds;
     private readonly Lazy<FrameSequence> m_lateHolds;
+    private readonly Lazy<FrameSequence> m_animationHolds;
     private readonly Lazy<FrameSequence> m_frameTimes;
     private readonly Lazy<FrameSequence> m_cpuBusy;
     private readonly Lazy<RankBits> m_spans;
@@ -59,6 +60,7 @@ namespace MB.FramePacing.Charts
       m_lateHolds = Once(() =>
         new FrameSequence(count, i => HasNext(i) && (Frames[i + 1].Flags & PresentedFrameFlags.Late) != 0 ? Frames[i + 1].DisplayDeltaTicks : null)
       );
+      m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDeltaTicks : null));
       m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTimeTicks is > 0 and var t ? t : null));
       m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null));
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTimeTicks is > 0 || Frames[i].CpuBusyTicks > 0));
@@ -105,6 +107,9 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The holds whose next frame is late (held too long).</summary>
     public FrameSequence LateHolds => m_lateHolds.Value;
+
+    /// <summary>Each frame's hold at the next frame's animation time step: the animation time step over the display time step.</summary>
+    public FrameSequence AnimationHolds => m_animationHolds.Value;
 
     public FrameSequence FrameTimes => m_frameTimes.Value;
 

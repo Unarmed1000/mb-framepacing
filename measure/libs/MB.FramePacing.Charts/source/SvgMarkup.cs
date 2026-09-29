@@ -65,7 +65,8 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// The report's own classes, in the same palette: the error threshold band, the refresh lines the animation errors reach, the held steps of the display time step (after the web page's
-    /// frame chart: green as planned, red held too long, faint risers), the frametime (the web page's step-line blue) and CPU busy, the late
+    /// frame chart: green as planned, red held too long, faint risers), the range of the animation time step over it (its line is CHART_STYLE's
+    /// step-line), the frametime (the web page's step-line blue) and CPU busy, the late
     /// share, the late strip cells and the marks above the strip, the distribution cards' bars and curves, the marks of values beyond a scale,
     /// and warning values.
     /// </summary>
@@ -86,6 +87,7 @@ namespace MB.FramePacing.Charts
       + "  .late-line-none { stroke: #2ea043; stroke-width: 1.5; fill: none; stroke-linejoin: round; }\n"
       + "  .frametime { stroke: #58a6ff; stroke-width: 2.5; fill: none; }\n"
       + "  .frametime-range { fill: #58a6ff; fill-opacity: 0.3; }\n"
+      + "  .step-range { fill: #58a6ff; fill-opacity: 0.25; }\n"
       + "  .frametime-fill { fill: #58a6ff; }\n"
       + "  .cpu-busy { fill: #58a6ff; fill-opacity: 0.22; }\n"
       + "  .strip-late { fill: #e5534b; }\n"

@@ -374,7 +374,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var section = RunSection.Whole(Synthetic(2400));
       string all = ReportCard.Render(section);
-      Assert.That(ReportCard.Render(section, ReportOptions.Default), Is.EqualTo(all), "the default options draw everything");
+      Assert.That(ReportCard.Render(section, ReportOptions.Default), Is.EqualTo(all), "the default options draw the standard card");
       Assert.That(g_marks.All(m => all.Contains(m.Mark, StringComparison.Ordinal)), "every item is in the full card");
       foreach (var (id, mark) in g_marks.Append((ReportItem.Tiles, ">PRESENTED FRAMES<")))
       {
@@ -413,6 +413,134 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(error!.Message, Does.Contain("frametimes").And.Contain("Known:").And.Contain(ReportItem.RefreshStrip));
     }
 
+    /// <summary>
+    /// The animation time step is opt-in: not in the standard card; shown, a blue line on the display time step's holds (one hold per frame
+    /// until the next, joined), taking no room, on a scale that covers it; naming it alone keeps its panel; without the panel it is not drawn.
+    /// </summary>
+    [Test]
+    public void Options_AnimationTimeStep_IsAnOptInOverlay()
+    {
+      // Fewer frames than pixels: every frame drawn
+      var run = Synthetic(480);
+      var section = RunSection.Whole(run);
+      string plain = ReportCard.Render(section);
+      Assert.That(plain, Does.Not.Contain("class=\"step-line\""), "not in the standard card");
+
+      var shown = ReportOptions.Default.Show(new[] { ReportItem.AnimationTimeStep });
+      var drawing = ReportCard.Build(section, shown);
+      string svg = SvgCardWriter.Write(drawing, null);
+      Assert.That(svg, Does.Contain(">DISPLAY TIME STEP AND ANIMATION TIME STEP<"));
+      Assert.That(HeightOf(svg), Is.EqualTo(HeightOf(plain)), "an overlay takes no room");
+      var line = drawing.FlatShapes.OfType<PathShape>().Single(p => p.Class == "step-line");
+      Assert.That(line.Data.Count(c => c == 'M'), Is.EqualTo(1), "one line: every hold follows the one before");
+      Assert.That(line.Data.Count(c => c == 'H'), Is.EqualTo(run.Run.Frames.Count - 1), "a hold per frame until the next");
+
+      var only = ReportCard.Build(section, ReportOptions.ShowOnly(new[] { ReportItem.AnimationTimeStep }));
+      Assert.That(only.Plots.Select(p => p.Id), Is.EqualTo(new[] { ReportItem.DisplayTimeStep }), "naming the overlay keeps its panel");
+      Assert.That(only.FlatShapes.OfType<PathShape>().Any(p => p.Class == "step-line"));
+      string noPanel = ReportCard.Render(section, shown.Hide(new[] { ReportItem.DisplayTimeStep }));
+      Assert.That(noPanel, Does.Not.Contain("class=\"step-line\""), "no panel, no overlay");
+      Assert.That(ReportCard.Render(section, shown.Hide(new[] { ReportItem.AnimationTimeStep })), Is.EqualTo(plain), "hidden again");
+
+      // Every 50th frame's animation time step four refreshes long: the scale covers it only with the overlay
+      var longSteps = run with
+      {
+        Run = run.Run with { Frames = run.Run.Frames.Select((f, i) => i % 50 == 25 ? f with { AnimationDeltaTicks = 4 * Refresh } : f).ToList() },
+      };
+      double Top(ReportOptions options) =>
+        ReportCard.Build(RunSection.Whole(longSteps), options).Plots.Single(p => p.Id == ReportItem.DisplayTimeStep).YTo;
+      double refreshMs = Refresh / (double)TimeSpan.TicksPerMillisecond;
+      Assert.That(Top(ReportOptions.Default), Is.EqualTo(2.5 * refreshMs).Within(1e-9), "two refreshes and a half: the late frames' holds");
+      Assert.That(Top(shown), Is.EqualTo(4.5 * refreshMs).Within(1e-9), "four refreshes and a half: the animation time steps too");
+
+      var error = Assert.Throws<ArgumentException>(() => ReportOptions.Default.Show(new[] { ReportItem.FrameTime }));
+      Assert.That(error!.Message, Does.Contain(ReportItem.FrameTime).And.Contain(ReportItem.AnimationTimeStep));
+    }
+
+    /// <summary>An hour draws the animation time step per pixel column too: its range faint and its middle value as the line.</summary>
+    [Test]
+    public void Options_AnimationTimeStep_OneHour_DrawsPerPixelColumn()
+    {
+      string svg = ReportCard.Render(RunSection.Whole(OneHour()), ReportOptions.Default.Show(new[] { ReportItem.AnimationTimeStep }));
+      Assert.That(Count(svg, "<path class=\"step-range\""), Is.EqualTo(1));
+      Assert.That(Count(svg, "<path class=\"step-line\""), Is.EqualTo(1));
+      Assert.That(svg.Length, Is.LessThan(1_000_000), "still a small file");
+    }
+
+    /// <summary>
+    /// The refresh strip over the first second: a cell per refresh of that second across the plot, its own time axis from 0 to 1 s, and a
+    /// label that says so; longer than the section, the standard strip.
+    /// </summary>
+    [Test]
+    public void Options_StripSeconds_DrawsTheFirstSeconds()
+    {
+      var run = Synthetic(240 * 10, lateEvery: 0);
+      var section = RunSection.Whole(run);
+      var only = ReportOptions.ShowOnly(new[] { ReportItem.RefreshStrip });
+      Assert.That(ReportCard.Render(section, only), Does.Contain("render a section of at most"), "ten seconds at 240 Hz are too many cells");
+
+      var drawing = ReportCard.Build(section, only with { StripSeconds = 1 });
+      // A refresh is a whole number of ticks, a little under 1/240 s: the frame that appears just before 1 s starts its cell at the edge
+      int shown = run.Run.Frames.Count(f => f.FirstSeenTicks < TimeSpan.TicksPerSecond);
+      Assert.That(shown, Is.EqualTo(241));
+      Assert.That(drawing.FlatShapes.OfType<RectShape>().Count(), Is.EqualTo(shown), "a cell per refresh of the first second");
+      var plot = drawing.Plots.Single();
+      Assert.That((plot.XFrom, plot.XTo, plot.Left, plot.Right), Is.EqualTo((0.0, 1.0, ReportCard.PlotX0, ReportCard.PlotX1)));
+      var texts = drawing.FlatShapes.OfType<TextShape>().Select(t => t.Content).ToList();
+      Assert.That(texts, Does.Contain("REFRESH STRIP, FIRST 1 S").And.Contain("1 s").And.Not.Contain("10 s"));
+
+      Assert.That(ReportCard.Render(section, only with { StripSeconds = 20 }), Is.EqualTo(ReportCard.Render(section, only)), "the whole section");
+      Assert.Throws<ArgumentOutOfRangeException>(() => _ = ReportOptions.Default with { StripSeconds = 0 });
+    }
+
+    /// <summary>A title of the card's own replaces the run's; a section still adds its time range.</summary>
+    [Test]
+    public void Options_Title_ReplacesTheRunsTitle()
+    {
+      var run = Synthetic(240 * 10, lateEvery: 0);
+      var titled = ReportOptions.Default with { Title = "Naive timer, heavy load" };
+      string whole = ReportCard.Render(RunSection.Whole(run), titled);
+      Assert.That(whole, Does.Contain(">Naive timer, heavy load<").And.Not.Contain(">Run 1"));
+      Assert.That(ReportCard.Render(RunSection.Create(run, 2, 4), titled), Does.Contain(">Naive timer, heavy load, 2.0–4.0 s<"));
+    }
+
+    /// <summary>
+    /// Hide empty leaves out the tiles without a value (0.1 % low and error p99.9 below 1,000 frames) and the late share of a run without a
+    /// late frame; a tile of 0 late frames has a value and stays; a run with late frames keeps the late share.
+    /// </summary>
+    [Test]
+    public void Options_HideEmpty_LeavesOutWhatHasNothingToShow()
+    {
+      var quiet = RunSection.Whole(Synthetic(480, lateEvery: 0));
+      var hideEmpty = ReportOptions.Default with { HideEmpty = true };
+      string all = ReportCard.Render(quiet);
+      Assert.That(all, Does.Contain(">0.1 % LOW<").And.Contain(">ERROR P99.9<").And.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S<"));
+      string svg = ReportCard.Render(quiet, hideEmpty);
+      Assert.That(svg, Does.Not.Contain(">0.1 % LOW<").And.Not.Contain(">ERROR P99.9<").And.Not.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S<"));
+      Assert.That(svg, Does.Contain(">1 % LOW<").And.Contain(">ERROR P99<").And.Contain(">LATE FRAMES<"));
+      Assert.That(Count(svg, "class=\"tile\""), Is.EqualTo(Count(all, "class=\"tile\"") - 2), "two tiles fewer (the display box stays)");
+      Assert.That(HeightOf(svg), Is.LessThan(HeightOf(all)));
+
+      string late = ReportCard.Render(RunSection.Whole(Synthetic(480)), hideEmpty);
+      Assert.That(late, Does.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S<"), "late frames: the late share stays");
+    }
+
+    /// <summary>Five tiles in a row of five are one row: a tile and a gap lower than in rows of four.</summary>
+    [Test]
+    public void Options_TilesPerRow_LaysOutTheTiles()
+    {
+      var section = RunSection.Whole(Synthetic(2400));
+      var five = ReportOptions.ShowOnly(
+        new[] { ReportItem.AverageFps, ReportItem.OnePercentLow, ReportItem.FramesOff, ReportItem.ErrorP99, ReportItem.WorstError }
+      );
+      string fourPerRow = ReportCard.Render(section, five);
+      string fivePerRow = ReportCard.Render(section, five with { TilesPerRow = 5 });
+      Assert.That(Count(fivePerRow, "class=\"tile\""), Is.EqualTo(5));
+      Assert.That(HeightOf(fourPerRow) - HeightOf(fivePerRow), Is.EqualTo(64 + 12), "one row less: a tile and the gap");
+      Assert.Throws<ArgumentOutOfRangeException>(() => _ = ReportOptions.Default with { TilesPerRow = 0 });
+      Assert.Throws<ArgumentOutOfRangeException>(() => _ = ReportOptions.Default with { TilesPerRow = ReportOptions.MaxTilesPerRow + 1 });
+    }
+
     /// <summary>The GUI's style comes from the SVG's sheet: text starts from the 'text' rule, and a later rule of the sheet wins, as in CSS.</summary>
     [Test]
     public void CardStyle_ResolvesTheSheetLikeCss()
@@ -437,7 +565,14 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var run = Synthetic(240 * 10);
       var section = RunSection.Create(run, 4, 5);
-      var drawings = new List<CardDrawing> { ReportCard.Build(section), FrameTimelineCard.Build(RunSection.Create(run, 4, 4.1)) };
+      var overlay = ReportOptions.Default.Show(new[] { ReportItem.AnimationTimeStep });
+      var drawings = new List<CardDrawing>
+      {
+        ReportCard.Build(section),
+        ReportCard.Build(section, overlay),
+        ReportCard.Build(RunSection.Whole(run), overlay),
+        FrameTimelineCard.Build(RunSection.Create(run, 4, 4.1)),
+      };
       drawings.AddRange(DistributionCard.All.Select(card => DistributionCard.Build(card.Id, section)));
       var known = CardStyle.Rules.Select(rule => rule.Selector).ToHashSet();
       IEnumerable<string> Classes(IEnumerable<CardShape> shapes) =>

@@ -146,6 +146,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
       (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`).
+    - `ReportOptions` picks the items (`ReportItem` ids: `--hide`/`--only`); overlays (`ReportItem.Overlays`, now the animation time
+      step on the display time step panel) are opt-in (`Show`, `--show`) and need their panel. The layout options are for a card in a
+      document (explained's charts page): `Title`, `StripSeconds` (the strip over the first seconds, its own axis), `HideEmpty` (tiles
+      without a value, `HeadlineTile.HasValue`, and the late share without late frames), `TilesPerRow`. The defaults are the standard
+      card: `--charts`, Save charts, the GUI and DocImages never set them.
     - Cards are shapes (`CardDrawing`: `RectShape`, `LineShape`, `PathShape`, `TextShape`, `GroupShape`, plus `CardPlot` per plot
       area with its data range, for the GUI's zoom and hover and for tests that read values back); `SvgCardWriter` writes them.
       `DistributionCard` builds the error and display time step histograms, the error percentiles and the drift (`render --cards`).
@@ -153,7 +158,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, so add or change
-      a number there, not in the GUI.
+      a number there, not in the GUI. A tile without a number shows "-" with `HasValue` false.
     - The animation error panel draws a refresh line (`error-refresh`, dashed amber, labelled "+1 refresh (16.7 ms)") at every whole
       refresh an error reaches within a tenth of a refresh, over the frames the scale covers, and only inside the scale
       (`ChartScale.ErrorRefreshTicks`, at most four per side).
