@@ -10,16 +10,20 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace MB.FramePacing.Charts
 {
   public static class HeadlessBrowser
   {
     public const string EnvironmentVariable = "MB_BROWSER";
+
+    private static readonly TimeSpan g_timeout = TimeSpan.FromSeconds(60);
 
     private static readonly string[] g_candidates =
     {
@@ -65,37 +69,40 @@ namespace MB.FramePacing.Charts
       string profile = Path.Combine(Path.GetTempPath(), "mb-framepacing-browser-" + Guid.NewGuid().ToString("N"));
       try
       {
-        var start = new ProcessStartInfo(browser)
+        var arguments = new List<string>
         {
-          RedirectStandardOutput = true,
-          RedirectStandardError = true,
-          UseShellExecute = false,
+          "--default-background-color=00000000",
+          "--headless=new",
+          "--disable-gpu",
+          "--hide-scrollbars",
+          "--force-device-scale-factor=2",
+          // A fresh profile every time: no first run dialogs, no default browser question, no extensions
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--disable-extensions",
+          $"--user-data-dir={profile}",
+          $"--window-size={width},{height}",
+          $"--screenshot={Path.GetFullPath(pngPath)}",
         };
-        foreach (
-          var argument in new[]
-          {
-            "--default-background-color=00000000",
-            "--headless=new",
-            "--disable-gpu",
-            "--hide-scrollbars",
-            "--force-device-scale-factor=2",
-            $"--user-data-dir={profile}",
-            $"--window-size={width},{height}",
-            $"--screenshot={Path.GetFullPath(pngPath)}",
-            new Uri(Path.GetFullPath(svgPath)).AbsoluteUri,
-          }
-        )
-          start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {browser}");
-        _ = process.StandardOutput.ReadToEndAsync();
-        _ = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(60_000))
+        // macOS: a new profile would ask the keychain for its encryption key, which blocks a headless browser
+        if (OperatingSystem.IsMacOS())
+          arguments.Add("--use-mock-keychain");
+        // Linux: containers and CI machines often have a small /dev/shm
+        if (OperatingSystem.IsLinux())
+          arguments.Add("--disable-dev-shm-usage");
+        arguments.Add(new Uri(Path.GetFullPath(svgPath)).AbsoluteUri);
+
+        var (exitCode, errors) = Run(browser, arguments, pngPath);
+        // Linux without unprivileged user namespaces (Ubuntu 24.04's AppArmor rule, containers, CI machines): the browser falls back to its
+        // setuid sandbox helper and aborts when that is not installed as root. It opens only this local SVG and loads nothing else, so it
+        // runs without the sandbox then
+        if (exitCode != 0 && OperatingSystem.IsLinux() && errors.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
         {
-          process.Kill(entireProcessTree: true);
-          throw new TimeoutException($"{browser} did not save {pngPath} within 60 s");
+          arguments.Insert(0, "--no-sandbox");
+          (exitCode, errors) = Run(browser, arguments, pngPath);
         }
-        if (process.ExitCode != 0 || !File.Exists(pngPath))
-          throw new InvalidOperationException($"{browser} failed to save {pngPath} (exit code {process.ExitCode})");
+        if (exitCode != 0 || !IsCompletePng(pngPath))
+          throw new InvalidOperationException($"{browser} failed to save {pngPath} (exit code {exitCode}){Tail(errors)}");
       }
       finally
       {
@@ -107,6 +114,76 @@ namespace MB.FramePacing.Charts
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
       }
+    }
+
+    /// <summary>
+    /// Run the browser once: its exit code and error output. A browser that saved the whole PNG but does not exit (headless Chrome on macOS
+    /// can hang while shutting down) is ended and counts as done.
+    /// </summary>
+    private static (int ExitCode, string Errors) Run(string browser, IReadOnlyList<string> arguments, string pngPath)
+    {
+      var start = new ProcessStartInfo(browser)
+      {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      foreach (var argument in arguments)
+        start.ArgumentList.Add(argument);
+      using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {browser}");
+      _ = process.StandardOutput.ReadToEndAsync();
+      var errors = process.StandardError.ReadToEndAsync();
+      var elapsed = Stopwatch.StartNew();
+      while (!process.WaitForExit(250))
+      {
+        if (IsCompletePng(pngPath))
+        {
+          process.Kill(entireProcessTree: true);
+          // With a time limit: without one, WaitForExit also waits for the redirected output to close, which a helper process the browser
+          // started on its own can keep open
+          process.WaitForExit(5000);
+          return (0, Text(errors));
+        }
+        if (elapsed.Elapsed > g_timeout)
+        {
+          process.Kill(entireProcessTree: true);
+          throw new TimeoutException($"{browser} did not save {pngPath} within {g_timeout.TotalSeconds:0} s{Tail(Text(errors))}");
+        }
+      }
+      return (process.ExitCode, Text(errors));
+    }
+
+    /// <summary>The PNG is there and whole: it ends with its IEND chunk, which the browser writes last.</summary>
+    private static bool IsCompletePng(string path)
+    {
+      try
+      {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        if (stream.Length < 20)
+          return false;
+        var end = new byte[12];
+        stream.Seek(-end.Length, SeekOrigin.End);
+        stream.ReadExactly(end);
+        return end[4] == 'I' && end[5] == 'E' && end[6] == 'N' && end[7] == 'D';
+      }
+      catch (IOException)
+      {
+        return false;
+      }
+      catch (UnauthorizedAccessException)
+      {
+        return false;
+      }
+    }
+
+    /// <summary>What the browser wrote to its error output, or nothing when it has not finished writing it in time.</summary>
+    private static string Text(Task<string> errors) => errors.Wait(2000) ? errors.Result : string.Empty;
+
+    /// <summary>The browser's last error lines, for the exception: they say why it failed.</summary>
+    private static string Tail(string errors)
+    {
+      var lines = errors.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+      return lines.Length == 0 ? string.Empty : ":" + Environment.NewLine + string.Join(Environment.NewLine, lines.TakeLast(20));
     }
   }
 }
