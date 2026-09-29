@@ -124,10 +124,18 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Charts** live in `MB.FramePacing.Charts` (no GUI): the report cards as shapes (below). The GUI draws them itself with `CardView`
     (`FramePacing.Gui`, the style from `CardStyle`, which parses the SVG's style sheet; hover texts from `CardHover`); the Timeline card
     zooms (wheel), pans (drag) and resets (double-click), the distribution tabs follow its section, and **Save view** writes the card
-    on screen as SVG or PNG (`CardImage`). DocImages checks the zoom, pan, reset and hover with headless input. `--charts` and "Save
-    charts" write the SVG cards (`ChartFiles`: the report and every `DistributionCard`). Test chart changes with
-    `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
-    with `VideoClipTests` by linked source files).
+    on screen as SVG or PNG (`CardImage`). DocImages checks the width, zoom, sideways scroll, scrollbar, drag, reset and hover with
+    headless input.
+    - **Long runs cost per pixel column, not per frame:** `RunChartData` (cached per `ChartRun`, immutable, built on first use) holds
+      each kind of value as a `FrameSequence` (`RankBits`: which frames have one; a `WaveletMatrix`: exact k-th smallest and counts below a
+      bound for any range in about 20 steps) and the late share (`LateShareData`). A `RunSection` is a frame range found by binary search;
+      its statistics are computed only when a tile needs them. The panels walk the pixel columns (`PixelColumns.Walk`) and query min, max,
+      median, percentiles and histograms (`SectionHistograms`) exactly: the output is byte-identical to sorting. The GUI builds cards
+      at the window's width (`width`), with the whole run's scales (`wholeRunScales`), in the background (`SectionCards`,
+      `LatestRequest`: a newer zoom cancels an older build). `CardBenchmarks` measures 1 and 10 hours at 240 Hz: a few ms per zoom. `--charts` and "Save
+      charts" write the SVG cards (`ChartFiles`: the report and every `DistributionCard`). Test chart changes with
+      `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
+      with `VideoClipTests` by linked source files).
     - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section

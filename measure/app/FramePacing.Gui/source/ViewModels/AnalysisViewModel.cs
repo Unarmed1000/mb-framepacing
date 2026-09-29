@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* Analysis page: pick a capture, analyse it, show warnings, per run statistics and the report cards of the selected run. The cards show one
-//* section of the run (all of it at first): zooming and panning the Timeline card chooses it, and the distribution cards follow.
+//* section of the run (all of it at first): zooming and panning the Timeline card chooses it, and the distribution cards follow. The cards
+//* are built on the thread pool; only the latest request's are shown, and the cards on screen stay until they arrive.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -26,8 +27,18 @@ namespace MB.FramePacing.Gui.ViewModels
     private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
     private AnalysisReport? m_report;
+    private readonly LatestRequest<SectionCards> m_builds = new LatestRequest<SectionCards>();
     private RunSection? m_section;
     private CardHover? m_hover;
+
+    // The range last asked for (null: the whole run): zooming builds on it, so wheel notches add up while a build runs
+    private (double From, double To)? m_requested;
+
+    // The cards' width in the window, in device independent pixels: one column per pixel (the files keep ReportCard.Width)
+    private double m_cardWidth = ReportCard.Width;
+
+    /// <summary>The narrowest card laid out for the window; a narrower window scales it down.</summary>
+    public const double MinCardWidth = 640;
 
     /// <summary>The Timeline card shows the panels only: the page has its own tiles and title.</summary>
     public static readonly ReportOptions TimelineOptions = ReportOptions.ShowOnly(
@@ -131,6 +142,54 @@ namespace MB.FramePacing.Gui.ViewModels
     [ObservableProperty]
     public partial string SectionText { get; set; } = string.Empty;
 
+    /// <summary>Cards are being built for a new section; the ones on screen stay until they are done.</summary>
+    [ObservableProperty]
+    public partial bool IsBuildingCards { get; set; }
+
+    /// <summary>The scrollbar under the Timeline: the seconds in view, the last start there is, and the start (seconds since the first frame).</summary>
+    [ObservableProperty]
+    public partial double ViewSeconds { get; set; }
+
+    [ObservableProperty]
+    public partial double ScrollMaximum { get; set; }
+
+    [ObservableProperty]
+    public partial double ScrollValue { get; set; }
+
+    /// <summary>Only part of the run is in view: the scrollbar shows.</summary>
+    [ObservableProperty]
+    public partial bool CanScroll { get; set; }
+
+    private bool m_settingScroll;
+
+    /// <summary>The scrollbar moved: show the same length from there.</summary>
+    partial void OnScrollValueChanged(double value)
+    {
+      if (m_settingScroll || m_requested is not { } range)
+        return;
+      ShowRange(value, value + (range.To - range.From));
+    }
+
+    /// <summary>The cards' room in the window changed: lay them out for it.</summary>
+    public void SetCardWidth(double width)
+    {
+      width = Math.Max(MinCardWidth, Math.Floor(width));
+      if (Math.Abs(width - m_cardWidth) < 1)
+        return;
+      m_cardWidth = width;
+      if (SelectedRun?.Chart is { } chart)
+        Request(chart, m_requested);
+    }
+
+    /// <summary>Scroll by <paramref name="fraction"/> of the range in view (negative: to the left).</summary>
+    public void Scroll(double fraction)
+    {
+      if (SelectedRun?.Chart is not { } chart || m_requested is not { } range)
+        return;
+      double shift = (range.To - range.From) * fraction;
+      ShowRange(range.From + shift, range.To + shift);
+    }
+
     public bool IsIdle => !IsBusy;
 
     public bool HasRun => SelectedRun != null;
@@ -143,11 +202,20 @@ namespace MB.FramePacing.Gui.ViewModels
     {
       if (SelectedRun?.Chart is not { } chart)
         return;
-      var whole = RunSection.Whole(chart);
-      double shortest = Math.Min(whole.ToSeconds, Math.Max(0.01, 4.0 * chart.CapturePeriodTicks / TimeSpan.TicksPerSecond));
-      double length = Math.Clamp(toSeconds - fromSeconds, shortest, whole.ToSeconds);
-      double from = Math.Clamp(fromSeconds, 0, whole.ToSeconds - length);
-      ShowSection(from <= 0 && length >= whole.ToSeconds ? whole : RunSection.Create(chart, from, from + length));
+      double whole = RunSection.Whole(chart).ToSeconds;
+      double shortest = Math.Min(whole, Math.Max(0.01, 4.0 * chart.CapturePeriodTicks / TimeSpan.TicksPerSecond));
+      double length = Math.Clamp(toSeconds - fromSeconds, shortest, whole);
+      double from = Math.Clamp(fromSeconds, 0, whole - length);
+      Request(chart, from <= 0 && length >= whole ? null : (from, from + length));
+    }
+
+    /// <summary>Zoom by <paramref name="factor"/> around <paramref name="atSeconds"/>: the range last asked for, scaled, the time kept in place.</summary>
+    public void Zoom(double atSeconds, double factor)
+    {
+      if (SelectedRun?.Chart is not { } chart)
+        return;
+      var (from, to) = m_requested ?? (0, RunSection.Whole(chart).ToSeconds);
+      ShowRange(atSeconds - ((atSeconds - from) * factor), atSeconds + ((to - atSeconds) * factor));
     }
 
     /// <summary>Back to the whole run.</summary>
@@ -155,7 +223,7 @@ namespace MB.FramePacing.Gui.ViewModels
     private void ResetRange()
     {
       if (SelectedRun?.Chart is { } chart)
-        ShowSection(RunSection.Whole(chart));
+        Request(chart, null);
     }
 
     /// <summary>What the cards show at a point of one of their plots (the frame, the bin, the percentile).</summary>
@@ -199,23 +267,77 @@ namespace MB.FramePacing.Gui.ViewModels
     {
       if (value?.Chart is not { } chart)
       {
-        ShowSection(null);
+        m_builds.Cancel();
+        m_requested = null;
+        Show(null);
         return;
       }
-      var whole = RunSection.Whole(chart);
-      bool keep = m_section is { IsWholeRun: false } shown && shown.ToSeconds <= whole.ToSeconds;
-      ShowSection(keep ? RunSection.Create(chart, m_section!.FromSeconds, m_section.ToSeconds) : whole);
+      bool keep = m_requested is { } range && range.To <= RunSection.Whole(chart).ToSeconds;
+      Request(chart, keep ? m_requested : null);
     }
 
-    private void ShowSection(RunSection? section)
+    /// <summary>Build the cards of <paramref name="range"/> (null: the whole run) on the thread pool; show them unless a newer request came.</summary>
+    private async void Request(ChartRun chart, (double From, double To)? range)
     {
+      m_requested = range;
+      IsBuildingCards = true;
+      UpdateScroll(chart, range);
+      double width = m_cardWidth;
+      try
+      {
+        // The Timeline keeps the whole run's scales, so its axes stay while zooming and scrolling
+        var cards = await m_builds.Run(token =>
+          SectionCards.Build(
+            range is { } r ? RunSection.Create(chart, r.From, r.To) : RunSection.Whole(chart),
+            TimelineOptions,
+            token,
+            width,
+            wholeRunScales: true
+          )
+        );
+        if (cards != null)
+        {
+          Show(cards);
+          IsBuildingCards = false;
+        }
+      }
+      catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+      {
+        ErrorText = "Could not draw the charts: " + ex.Message;
+        IsBuildingCards = false;
+      }
+    }
+
+    /// <summary>The scrollbar at once, before the cards arrive: it follows what was asked for.</summary>
+    private void UpdateScroll(ChartRun chart, (double From, double To)? range)
+    {
+      double whole = RunSection.Whole(chart).ToSeconds;
+      var (from, to) = range ?? (0, whole);
+      m_settingScroll = true;
+      try
+      {
+        ViewSeconds = to - from;
+        ScrollMaximum = Math.Max(0, whole - (to - from));
+        ScrollValue = from;
+        CanScroll = range != null;
+      }
+      finally
+      {
+        m_settingScroll = false;
+      }
+    }
+
+    private void Show(SectionCards? cards)
+    {
+      var section = cards?.Section;
       m_section = section;
       m_hover = section != null ? new CardHover(section) : null;
-      TimelineCard = section != null ? ReportCard.Build(section, TimelineOptions) : null;
-      ErrorHistogramCard = section != null ? DistributionCard.Build(DistributionCard.ErrorHistogram, section) : null;
-      ErrorPercentilesCard = section != null ? DistributionCard.Build(DistributionCard.ErrorPercentiles, section) : null;
-      DisplayTimeStepHistogramCard = section != null ? DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section) : null;
-      DriftCard = section != null ? DistributionCard.Build(DistributionCard.Drift, section) : null;
+      TimelineCard = cards?.Timeline;
+      ErrorHistogramCard = cards?.ErrorHistogram;
+      ErrorPercentilesCard = cards?.ErrorPercentiles;
+      DisplayTimeStepHistogramCard = cards?.DisplayTimeStepHistogram;
+      DriftCard = cards?.Drift;
+      IsBuildingCards = false;
       SectionText = section switch
       {
         null => string.Empty,

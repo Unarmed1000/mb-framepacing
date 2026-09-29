@@ -140,9 +140,25 @@
       <Grid>
         <TabControl SelectedIndex="{Binding SelectedCardIndex}">
           <TabItem Header="Timeline">
-            <ScrollViewer>
-              <views:CardView x:Name="TimelineCardView" Drawing="{Binding TimelineCard}" CanZoom="True" Margin="8" />
-            </ScrollViewer>
+            <Grid RowDefinitions="*,Auto">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <views:CardView x:Name="TimelineCardView" Drawing="{Binding TimelineCard}" CanZoom="True" Margin="8" />
+              </ScrollViewer>
+              <!-- Where the view is in the run: drag it, or scroll sideways on the card -->
+              <ScrollBar
+                Grid.Row="1"
+                Orientation="Horizontal"
+                AllowAutoHide="False"
+                Margin="8,0,8,4"
+                Minimum="0"
+                Maximum="{Binding ScrollMaximum}"
+                ViewportSize="{Binding ViewSeconds}"
+                Value="{Binding ScrollValue}"
+                SmallChange="{Binding ViewSeconds, Converter={x:Static views:FractionConverter.Tenth}}"
+                LargeChange="{Binding ViewSeconds}"
+                Visibility="Auto"
+              />
+            </Grid>
           </TabItem>
           <TabItem Header="Error histogram">
             <ScrollViewer>
@@ -167,6 +183,13 @@
         </TabControl>
         <!-- Next to the tab headers: the section shown, back to the whole run, and saving the card as it is shown -->
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
+          <ProgressBar
+            IsIndeterminate="True"
+            IsVisible="{Binding IsBuildingCards}"
+            Width="60"
+            VerticalAlignment="Center"
+            ToolTip.Tip="Drawing the charts for the new section; the ones shown stay until they are done."
+          />
           <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding SectionText}" />
           <Button
             Content="Reset zoom"

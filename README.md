@@ -231,10 +231,13 @@ of the two causes of animation error dominates: frames with an error where the d
 early or dropped frames); frames with an error while the display time step stays even are **delta time jitter** (uneven animation
 steps).
 
-The GUI draws the report's cards itself. The **Timeline** tab shows the report's panels on one time axis: the mouse wheel zooms
-around the pointer, dragging pans, and **Reset zoom** (or a double-click) shows the whole run again; hovering shows the frame under
-the pointer (its display time step, animation error, lateness, frametime and CPU busy). The distribution tabs follow the section the
-Timeline shows, and **Save view...** saves the card on screen, as it is zoomed, as SVG or PNG.
+The GUI draws the report's cards itself, as wide as the window. The **Timeline** tab shows the report's panels on one time axis: the
+mouse wheel zooms around the pointer, a sideways wheel or swipe (or Shift with the wheel), dragging and the scrollbar scroll left and
+right, and **Reset zoom** (or a double-click) shows the whole run again; the scales stay the whole run's, so the axes do not jump while
+you look around. Hovering shows the frame under the pointer (its display time step, animation error, lateness, frametime and CPU
+busy). The distribution tabs follow the section the Timeline shows, and **Save view...** saves the card on screen, as it is zoomed, as
+SVG or PNG. Every zoom and scroll draws in a few milliseconds whatever the capture's length, ten hours included: each pixel column's
+numbers come from data prepared once per run.
 
 The same panels as a report (below) of a test clip, a busy stretch at the full rate:
 

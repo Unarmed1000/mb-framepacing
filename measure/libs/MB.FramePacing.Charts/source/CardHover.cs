@@ -20,14 +20,14 @@ namespace MB.FramePacing.Charts
   public sealed class CardHover
   {
     private readonly RunSection m_section;
-    private readonly Lazy<RunHistograms> m_histograms;
-    private readonly Lazy<double[]> m_sortedErrors;
+    private readonly Lazy<Histogram> m_errors;
+    private readonly Lazy<Histogram> m_displaySteps;
 
     public CardHover(RunSection section)
     {
       m_section = section;
-      m_histograms = new Lazy<RunHistograms>(() => RunHistograms.Create(section.Section.Run));
-      m_sortedErrors = new Lazy<double[]>(() => DistributionCard.SortedAbsoluteErrorsMs(section));
+      m_errors = new Lazy<Histogram>(() => SectionHistograms.AnimationErrorMs(section));
+      m_displaySteps = new Lazy<Histogram>(() => SectionHistograms.DisplayDeltaMs(section));
     }
 
     /// <summary>The text for the point (<paramref name="x"/>, <paramref name="y"/>) in <paramref name="plot"/>'s values, or null for none.</summary>
@@ -36,16 +36,15 @@ namespace MB.FramePacing.Charts
       switch (plot.Id)
       {
         case DistributionCard.ErrorHistogram:
-          return Bin(m_histograms.Value.AnimationErrorMs, x, "animation error", sign: true);
+          return Bin(m_errors.Value, x, "animation error", sign: true);
         case DistributionCard.DisplayTimeStepHistogram:
-          return Bin(m_histograms.Value.DisplayDeltaMs, x, "display time step", sign: false);
+          return Bin(m_displaySteps.Value, x, "display time step", sign: false);
         case DistributionCard.ErrorPercentiles:
         {
-          var sorted = m_sortedErrors.Value;
-          if (sorted.Length == 0)
+          if (DistributionCard.ErrorCount(m_section) == 0)
             return null;
           double p = Math.Clamp(x, 0, 100);
-          return $"p{Invariant(p, "0.0")}: |animation error| {Invariant(Statistics.Percentile(sorted, p / 100), "0.00")} ms";
+          return $"p{Invariant(p, "0.0")}: |animation error| {Invariant(DistributionCard.AbsoluteErrorPercentileMs(m_section, p / 100), "0.00")} ms";
         }
         case DistributionCard.Drift:
           return FrameAt(x) is { } frame ? $"{Heading(frame)}\ndrift {Ms(frame.DriftTicks, sign: true)} ms" : null;
@@ -57,21 +56,12 @@ namespace MB.FramePacing.Charts
     /// <summary>The section's frame shown at <paramref name="seconds"/> (since the run's first frame): the last one first seen by then.</summary>
     public PresentedFrame? FrameAt(double seconds)
     {
-      var frames = m_section.Section.Run.Frames;
-      if (frames.Count == 0)
+      if (m_section.FrameCount == 0)
         return null;
+      var frames = m_section.Data.Frames;
       long ticks = m_section.OriginTicks + (long)Math.Round(seconds * TimeSpan.TicksPerSecond);
-      int low = 0;
-      int high = frames.Count;
-      while (low < high)
-      {
-        int middle = low + ((high - low) / 2);
-        if (frames[middle].FirstSeenTicks <= ticks)
-          low = middle + 1;
-        else
-          high = middle;
-      }
-      return frames[Math.Max(0, low - 1)];
+      int after = RunChartData.FirstWhere(m_section.Start, m_section.End, i => frames[i].FirstSeenTicks > ticks);
+      return frames[Math.Max(m_section.Start, after - 1)];
     }
 
     private string Describe(PresentedFrame frame)

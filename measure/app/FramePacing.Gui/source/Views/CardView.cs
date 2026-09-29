@@ -3,7 +3,7 @@
 //* ----------------
 //* Draws a report card (CardDrawing) the way its SVG shows it: the same shapes with the style sheet's values (CardStyle), text in Inter,
 //* scaled to the control's width. With CanZoom the mouse wheel zooms the time axis around the pointer, a drag pans it and a double-click
-//* goes back to the whole run (the view asks its owner for the new range, which builds the card again); hovering a plot draws a cursor
+//* goes back to the whole run, and a horizontal wheel or Shift+wheel scrolls (the view asks its owner, which builds the card again); hovering a plot draws a cursor
 //* line and what HoverText says about that point.
 //*
 //* (c) 2026 Mana Battery
@@ -29,8 +29,9 @@ namespace MB.FramePacing.Gui.Views
 
     public static readonly StyledProperty<bool> CanZoomProperty = AvaloniaProperty.Register<CardView, bool>(nameof(CanZoom));
 
-    // The wheel zooms by this much per notch
+    // The wheel zooms by this much per notch; sideways it scrolls by this share of the range in view
     private const double ZoomStep = 0.8;
+    private const double ScrollStep = 0.1;
     private static readonly FontFamily g_font = new FontFamily("fonts:Inter#Inter");
     private static readonly IBrush g_hoverBackground = new SolidColorBrush(Color.Parse("#0d1117"), 0.92);
     private static readonly IPen g_hoverBorder = new Pen(new SolidColorBrush(Color.Parse("#8b949e"), 0.5), 1);
@@ -68,8 +69,17 @@ namespace MB.FramePacing.Gui.Views
     /// <summary>What to show at a point of a plot (its values), or null for nothing.</summary>
     public Func<CardPlot, double, double, string?>? HoverText { get; set; }
 
-    /// <summary>The time range the user zoomed or panned to, in the plots' x values (seconds).</summary>
+    /// <summary>The time range the user panned to, in the plots' x values (seconds).</summary>
     public event Action<double, double>? RangeRequested;
+
+    /// <summary>
+    /// The wheel: zoom by the factor around the time under the pointer. The owner applies it to the range it last asked for, so notches add
+    /// up while the card on screen is still the older one.
+    /// </summary>
+    public event Action<double, double>? ZoomRequested;
+
+    /// <summary>A horizontal wheel or swipe, or Shift+wheel: scroll by this fraction of the range in view (negative: to the left).</summary>
+    public event Action<double>? ScrollRequested;
 
     /// <summary>A double-click: back to the whole run.</summary>
     public event Action? ResetRequested;
@@ -173,15 +183,26 @@ namespace MB.FramePacing.Gui.Views
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
       base.OnPointerWheelChanged(e);
-      if (!CanZoom || Drawing is not { } drawing || e.Delta.Y == 0)
+      if (!CanZoom || Drawing is not { } drawing)
+        return;
+      // Sideways (a horizontal wheel or swipe, or Shift with the wheel) scrolls; a tenth of the range in view per notch
+      double sideways =
+        e.Delta.X != 0 ? -e.Delta.X
+        : (e.KeyModifiers & KeyModifiers.Shift) != 0 ? -e.Delta.Y
+        : 0;
+      if (sideways != 0)
+      {
+        ScrollRequested?.Invoke(sideways * ScrollStep);
+        e.Handled = true;
+        return;
+      }
+      if (e.Delta.Y == 0)
         return;
       var card = ToCard(e.GetPosition(this));
       if (PlotAt(drawing, card) is not { } plot)
         return;
       // Zoom around the time under the pointer: it stays where it is
-      double factor = Math.Pow(ZoomStep, e.Delta.Y);
-      double at = plot.ValueX(card.X);
-      RangeRequested?.Invoke(at - ((at - plot.XFrom) * factor), at + ((plot.XTo - at) * factor));
+      ZoomRequested?.Invoke(plot.ValueX(card.X), Math.Pow(ZoomStep, e.Delta.Y));
       e.Handled = true;
     }
 

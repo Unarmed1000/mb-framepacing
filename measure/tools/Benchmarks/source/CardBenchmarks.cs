@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* What the GUI does on every zoom and pan of an hour at 240 Hz (864,000 frames): cut the section (its statistics included) and build its
-//* Timeline card (the report's panels) and its four distribution cards. A frame of the GUI is 16 ms.
+//* What the GUI does on every zoom and scroll of a long run at 240 Hz (1 hour: 864,000 frames; 10 hours: 8.64 million): cut the section and
+//* build its Timeline card (the report's panels, the whole run's scales) and its four distribution cards, with the run's prepared data
+//* (RunChartData) already made; and making that data, once per run. A frame of the GUI is 16 ms.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -23,23 +24,26 @@ namespace MB.FramePacing.Benchmarks
     private ChartRun m_run = null!;
     private RunSection m_whole = null!;
 
-    [Params(3600.0, 60.0, 2.0)]
+    [Params(1, 10)]
+    public int Hours { get; set; }
+
+    /// <summary>The seconds in view: the whole run (0), a minute or 2 s.</summary>
+    [Params(0.0, 60.0, 2.0)]
     public double Seconds { get; set; }
 
     [GlobalSetup]
     public void Setup()
     {
-      m_run = SyntheticHour.Create();
+      m_run = SyntheticHour.Create(240 * 3600 * Hours);
       m_whole = RunSection.Whole(m_run);
+      // The data is prepared once per run, when it is first shown
+      _ = SectionCards.Build(m_whole, g_panels);
     }
 
-    private RunSection Section() => Seconds >= m_whole.ToSeconds ? m_whole : RunSection.Create(m_run, 1200, 1200 + Seconds);
+    private RunSection Section() => Seconds <= 0 ? m_whole : RunSection.Create(m_run, 1200, 1200 + Seconds);
 
     [Benchmark]
-    public RunSection CutSection() => Section();
-
-    [Benchmark]
-    public CardDrawing TimelineCard() => ReportCard.Build(Section(), g_panels);
+    public CardDrawing TimelineCard() => ReportCard.Build(Section(), g_panels, wholeRunScales: true);
 
     [Benchmark]
     public int DistributionCards()
@@ -49,6 +53,16 @@ namespace MB.FramePacing.Benchmarks
       foreach (var (id, _) in DistributionCard.All)
         shapes += DistributionCard.Build(id, section).Shapes.Count;
       return shapes;
+    }
+
+    /// <summary>Preparing the data from scratch (a new run object, so nothing is cached) and drawing the whole run once.</summary>
+    [Benchmark]
+    public SectionCards FirstShow()
+    {
+      if (Seconds > 0)
+        return null!;
+      var run = m_run with { };
+      return SectionCards.Build(RunSection.Whole(run), g_panels);
     }
   }
 }

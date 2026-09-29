@@ -42,7 +42,6 @@ namespace MB.FramePacing.Charts
     };
 
     private const double PlotX0 = ReportCard.PlotX0;
-    private const double PlotX1 = ReportCard.PlotX1;
     private const double PlotH = 300;
     private const double BarShare = 0.9;
     private static readonly double[] g_percentileMarks = { 95, 99, 99.9 };
@@ -52,31 +51,35 @@ namespace MB.FramePacing.Charts
     /// <summary>The SVG of card <paramref name="id"/> of <paramref name="section"/>; <paramref name="background"/> as <see cref="ReportCard.Render"/>.</summary>
     public static string Render(string id, RunSection section, string? background = null) => SvgCardWriter.Write(Build(id, section), background);
 
-    /// <summary>Card <paramref name="id"/> of <paramref name="section"/> as shapes.</summary>
-    public static CardDrawing Build(string id, RunSection section) =>
+    /// <summary>Card <paramref name="id"/> of <paramref name="section"/> as shapes, <paramref name="width"/> units wide.</summary>
+    public static CardDrawing Build(string id, RunSection section, double width = ReportCard.Width) =>
       id switch
       {
-        ErrorHistogram => BuildErrorHistogram(section),
-        DisplayTimeStepHistogram => BuildDisplayTimeStepHistogram(section),
-        ErrorPercentiles => BuildErrorPercentiles(section),
-        Drift => BuildDrift(section),
+        ErrorHistogram => BuildErrorHistogram(section, width),
+        DisplayTimeStepHistogram => BuildDisplayTimeStepHistogram(section, width),
+        ErrorPercentiles => BuildErrorPercentiles(section, width),
+        Drift => BuildDrift(section, width),
         _ => throw new ArgumentException($"Unknown card '{id}'. Known: {string.Join(", ", All.Select(c => c.Id))}", nameof(id)),
       };
 
-    /// <summary>|animation error| (ms) of the section's frames, sorted: the error percentile curve's data.</summary>
-    public static double[] SortedAbsoluteErrorsMs(RunSection section) =>
-      section
-        .Section.Run.Frames.Where(f => f.AnimationErrorTicks.HasValue)
-        .Select(f => Math.Abs(f.AnimationErrorTicks!.Value) / (double)TimeSpan.TicksPerMillisecond)
-        .Order()
-        .ToArray();
-
-    private static CardDrawing BuildErrorHistogram(RunSection section)
+    /// <summary>|animation error| (ms) at <paramref name="fraction"/> of the section's frames that have one (Statistics.Percentile of them sorted).</summary>
+    public static double AbsoluteErrorPercentileMs(RunSection section, double fraction)
     {
-      var histogram = RunHistograms.Create(section.Section.Run).AnimationErrorMs;
+      var errors = section.Data.AbsoluteErrors;
+      var (start, end) = errors.Of(section.Start, section.End);
+      return errors.Values.PercentileMs(start, end, fraction);
+    }
+
+    /// <summary>How many of the section's frames have an animation error.</summary>
+    public static int ErrorCount(RunSection section) => section.Data.Errors.Frames.CountIn(section.Start, section.End);
+
+    private static CardDrawing BuildErrorHistogram(RunSection section, double width)
+    {
+      var histogram = SectionHistograms.AnimationErrorMs(section);
       double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
       var card = Card.Start(
         section,
+        width,
         "animation error distribution",
         "How often each animation error occurs, in 0.1 ms bins: + shown too soon (right), − shown too late (left).",
         "ANIMATION ERROR DISTRIBUTION",
@@ -99,14 +102,16 @@ namespace MB.FramePacing.Charts
       return card.Finish("animation error (ms)");
     }
 
-    private static CardDrawing BuildDisplayTimeStepHistogram(RunSection section)
+    private static CardDrawing BuildDisplayTimeStepHistogram(RunSection section, double width)
     {
-      var run = section.Section.Run;
-      var histogram = RunHistograms.Create(run).DisplayDeltaMs;
-      double refreshMs = RefreshMs(section.Section);
-      double median = run.Statistics.DisplayDeltaMs.P50;
+      var histogram = SectionHistograms.DisplayDeltaMs(section);
+      double refreshMs = RefreshMs(section.Run);
+      var steps = section.Data.DisplaySteps;
+      var (stepStart, stepEnd) = steps.Of(section.Start, section.End);
+      double median = stepEnd > stepStart ? steps.Values.PercentileMs(stepStart, stepEnd, 0.5) : 0;
       var card = Card.Start(
         section,
+        width,
         "display time step distribution",
         "How long each frame stayed on screen, in 0.1 ms bins: steady pacing is one tall bar, uneven pacing adds bars at other steps.",
         "DISPLAY TIME STEP DISTRIBUTION",
@@ -126,27 +131,26 @@ namespace MB.FramePacing.Charts
       return card.Finish("display time step (ms)");
     }
 
-    private static CardDrawing BuildErrorPercentiles(RunSection section)
+    private static CardDrawing BuildErrorPercentiles(RunSection section, double width)
     {
-      var sorted = SortedAbsoluteErrorsMs(section);
+      int count = ErrorCount(section);
+      double Percentile(double fraction) => AbsoluteErrorPercentileMs(section, fraction);
       double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
       var card = Card.Start(
         section,
+        width,
         "animation error by percentile",
         "|animation error| by percentile of the presented frames (every frame with a measured error): how bad the worst frames are.",
         "|ANIMATION ERROR| BY PERCENTILE",
-        sorted.Length > 0
+        count > 0
           ? $"dashed: the {Ms(threshold)} ms error threshold; dotted: "
-            + string.Join(
-              ", ",
-              g_percentileMarks.Select(p => $"p{p.ToString("0.#", CultureInfo.InvariantCulture)} {Ms(Statistics.Percentile(sorted, p / 100))} ms")
-            )
+            + string.Join(", ", g_percentileMarks.Select(p => $"p{p.ToString("0.#", CultureInfo.InvariantCulture)} {Ms(Percentile(p / 100))} ms"))
           : string.Empty
       );
-      if (sorted.Length == 0)
+      if (count == 0)
         return card.Empty(ErrorPercentiles, "no frames with an animation error");
 
-      double high = Math.Max(sorted[^1], threshold) * 1.1;
+      double high = Math.Max(Percentile(1), threshold) * 1.1;
       double step = NiceStep(high, 6);
       double top = Math.Ceiling(high / step) * step;
       var plot = card.Plot(ErrorPercentiles, 0, 100, 0, top);
@@ -157,7 +161,7 @@ namespace MB.FramePacing.Charts
       card.YGrid(plot, 0, "0");
 
       double thresholdY = plot.PixelY(threshold);
-      card.Parts.Add(new LineShape("average-line", N(PlotX0, 0), N(thresholdY, 1), N(PlotX1, 0), N(thresholdY, 1)));
+      card.Parts.Add(new LineShape("average-line", N(PlotX0, 0), N(thresholdY, 1), N(card.PlotX1, 0), N(thresholdY, 1)));
       card.Parts.Add(new TextShape(PlotX0 + 6, thresholdY - 5, $"{Ms(threshold)} ms error threshold", "average-text", "start"));
       foreach (double p in g_percentileMarks)
       {
@@ -166,27 +170,31 @@ namespace MB.FramePacing.Charts
       }
       var d = new StringBuilder();
       foreach (double p in CurvePercentiles)
-        d.Append(d.Length == 0 ? 'M' : 'L').Append($"{Fixed(plot.PixelX(p), 1)} {Fixed(plot.PixelY(Statistics.Percentile(sorted, p / 100)), 1)}");
+        d.Append(d.Length == 0 ? 'M' : 'L').Append($"{Fixed(plot.PixelX(p), 1)} {Fixed(plot.PixelY(Percentile(p / 100)), 1)}");
       ReportCard.AddPath(card.Parts, "curve", d);
       return card.Finish("percentile of the presented frames");
     }
 
-    private static CardDrawing BuildDrift(RunSection section)
+    private static CardDrawing BuildDrift(RunSection section, double width)
     {
-      var frames = section.Section.Run.Frames;
+      var data = section.Data;
+      var drift = data.Drift;
+      int frameCount = section.FrameCount;
       var card = Card.Start(
         section,
+        width,
         "drift",
         "Cumulative drift: animation time minus display time since the run's first frame, per frame at its display time.",
         "CUMULATIVE DRIFT",
         string.Empty
       );
-      if (frames.Count == 0)
+      if (frameCount == 0)
         return card.Empty(Drift, "no presented frames");
 
-      var driftMs = frames.Select(f => f.DriftTicks / (double)TimeSpan.TicksPerMillisecond).ToArray();
-      double low = Math.Min(0, driftMs.Min());
-      double high = Math.Max(0, driftMs.Max());
+      static double TicksMs(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
+      // Every frame has a drift: the frames' range is the drifts' range
+      double low = Math.Min(0, TicksMs(drift.Values.KthSmallest(section.Start, section.End, 0)));
+      double high = Math.Max(0, TicksMs(drift.Values.KthSmallest(section.Start, section.End, frameCount - 1)));
       if (high - low < 1)
         (low, high) = (low - ((1 - (high - low)) / 2), high + ((1 - (high - low)) / 2));
       double pad = (high - low) * 0.1;
@@ -200,31 +208,24 @@ namespace MB.FramePacing.Charts
           card.YGrid(plot, v, $"{Ms(v, sign: true)} ms");
       }
       double zeroY = plot.PixelY(0);
-      card.Parts.Add(new LineShape("zero-line", N(PlotX0, 0), N(zeroY, 1), N(PlotX1, 0), N(zeroY, 1)));
+      card.Parts.Add(new LineShape("zero-line", N(PlotX0, 0), N(zeroY, 1), N(card.PlotX1, 0), N(zeroY, 1)));
       card.Parts.Add(new TextShape(PlotX0 - 10, zeroY + 4, "0", "vsync-n", "end"));
 
-      long origin = section.OriginTicks;
-      var xs = frames.Select(f => plot.PixelX((f.FirstSeenTicks - origin) / (double)TimeSpan.TicksPerSecond)).ToArray();
+      double XOfFrame(int index) => plot.PixelX(data.Seconds(index));
       var d = new StringBuilder();
       void Point(double x, double value) => d.Append(d.Length == 0 ? 'M' : 'L').Append($"{Fixed(x, 1)} {Fixed(plot.PixelY(value), 1)}");
-      if ((PlotX1 - PlotX0) / frames.Count >= 1)
+      if ((card.PlotX1 - PlotX0) / frameCount >= 1)
       {
-        for (int i = 0; i < frames.Count; ++i)
-          Point(xs[i], driftMs[i]);
+        for (int i = section.Start; i < section.End; ++i)
+          Point(XOfFrame(i), TicksMs(data.Frames[i].DriftTicks));
       }
       else
       {
         // Per pixel column: from its lowest to its highest drift, so an hour stays a small file
-        var (order, columns) = PixelColumns.Of(xs);
-        foreach (var (column, start, count) in columns)
+        foreach (var (column, start, end) in PixelColumns.Walk(section.Start, section.End, XOfFrame))
         {
-          double min = double.MaxValue;
-          double max = double.MinValue;
-          foreach (int index in order.AsSpan(start, count))
-          {
-            min = Math.Min(min, driftMs[index]);
-            max = Math.Max(max, driftMs[index]);
-          }
+          double min = TicksMs(drift.Values.KthSmallest(start, end, 0));
+          double max = TicksMs(drift.Values.KthSmallest(start, end, end - start - 1));
           Point(column + 0.5, min);
           if (max > min)
             Point(column + 0.5, max);
@@ -278,21 +279,27 @@ namespace MB.FramePacing.Charts
       private readonly List<CardPlot> m_plots = new List<CardPlot>();
       private readonly double m_top;
 
-      private Card(string title, List<CardShape> parts, double top)
+      private Card(string title, List<CardShape> parts, double top, double width)
       {
         m_title = title;
         Parts = parts;
         m_top = top;
+        Width = width;
       }
+
+      public double Width { get; }
+
+      /// <summary>The plot's right edge: 40 units before the card's.</summary>
+      public double PlotX1 => Width - (ReportCard.Width - ReportCard.PlotX1);
 
       public List<CardShape> Parts { get; }
 
       private double Bottom => m_top + PlotH;
 
-      public static Card Start(RunSection section, string name, string explanation, string label, string note)
+      public static Card Start(RunSection section, double width, string name, string explanation, string label, string note)
       {
         var run = section.Run.Run;
-        int count = section.Section.Run.Frames.Count;
+        int count = section.FrameCount;
         string title =
           $"{RunHeadline.Title(run)}{(section.IsWholeRun ? string.Empty : $", {ReportCard.Ms1(section.FromSeconds)}–{ReportCard.Ms1(section.ToSeconds)} s")}: {name}";
         string frames = $"{count.ToString("N0", CultureInfo.InvariantCulture)} presented frames";
@@ -310,8 +317,8 @@ namespace MB.FramePacing.Charts
         double top = 54 + ((description.Count - 1) * 19) + 58;
         parts.Add(new TextShape(20, top - 16, label, "label", "start"));
         if (note.Length > 0)
-          parts.Add(new TextShape(PlotX1, top - 16, note, "vsync-n", "end"));
-        return new Card(title, parts, top);
+          parts.Add(new TextShape(width - (ReportCard.Width - ReportCard.PlotX1), top - 16, note, "vsync-n", "end"));
+        return new Card(title, parts, top, width);
       }
 
       public CardPlot Plot(string id, double xFrom, double xTo, double yFrom, double yTo)
@@ -328,7 +335,7 @@ namespace MB.FramePacing.Charts
       public void YGrid(CardPlot plot, double value, string label)
       {
         double y = plot.PixelY(value);
-        Parts.Add(ReportCard.GridLine(y));
+        Parts.Add(ReportCard.GridLine(y, PlotX1));
         Parts.Add(new TextShape(PlotX0 - 10, y + 4, label, "vsync-n", "end"));
       }
 
@@ -345,7 +352,7 @@ namespace MB.FramePacing.Charts
       {
         if (axisTitle.Length > 0)
           Parts.Add(new TextShape((PlotX0 + PlotX1) / 2, Bottom + 40, axisTitle, "vsync-n"));
-        return new CardDrawing(m_title, ReportCard.Width, Bottom + 64, Parts, m_plots);
+        return new CardDrawing(m_title, Width, Bottom + 64, Parts, m_plots);
       }
     }
   }

@@ -42,9 +42,16 @@ namespace MB.FramePacing.Charts
     {
       if (errorsMs.Count == 0)
         return MinErrorLimitMs;
-      var sorted = errorsMs.Select(Math.Abs).Order().ToArray();
-      double all = Math.Max(MinErrorLimitMs, sorted[^1] * ErrorHeadroom);
-      double bulk = Math.Max(MinErrorLimitMs, Statistics.Percentile(sorted, BulkPercentile) * ErrorHeadroom);
+      var sorted = errorsMs.Select(Math.Abs).ToArray();
+      Array.Sort(sorted);
+      return ErrorLimit(sorted[^1], Statistics.Percentile(sorted, BulkPercentile));
+    }
+
+    /// <summary>The error scale from the largest |error| and the <see cref="BulkPercentile"/> of the |errors|.</summary>
+    public static double ErrorLimit(double largestMs, double bulkMs)
+    {
+      double all = Math.Max(MinErrorLimitMs, largestMs * ErrorHeadroom);
+      double bulk = Math.Max(MinErrorLimitMs, bulkMs * ErrorHeadroom);
       return all <= ClipFactor * bulk ? all : bulk;
     }
 
@@ -79,9 +86,16 @@ namespace MB.FramePacing.Charts
     {
       if (levelsMs.Count == 0)
         return (2 * refreshMs) + (refreshMs / 2);
-      var sorted = levelsMs.Order().ToArray();
-      double all = Math.Max(2 * refreshMs, sorted[^1]) + (refreshMs / 2);
-      double bulk = Math.Max(2 * refreshMs, Statistics.Percentile(sorted, BulkPercentile)) + (refreshMs / 2);
+      var sorted = levelsMs.ToArray();
+      Array.Sort(sorted);
+      return StepTop(sorted[^1], Statistics.Percentile(sorted, BulkPercentile), refreshMs);
+    }
+
+    /// <summary>The display time step scale's top from the longest hold and the <see cref="BulkPercentile"/> of the holds.</summary>
+    public static double StepTop(double longestMs, double bulkMs, double refreshMs)
+    {
+      double all = Math.Max(2 * refreshMs, longestMs) + (refreshMs / 2);
+      double bulk = Math.Max(2 * refreshMs, bulkMs) + (refreshMs / 2);
       return all <= ClipFactor * bulk ? all : bulk;
     }
 

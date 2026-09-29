@@ -96,7 +96,7 @@ namespace MB.FramePacing.DocImages
       await Task.Delay(300);
       Save(window, Path.Combine(output, "gui-analysis.png"));
 
-      CheckTimelineInteraction(window, viewModel.Analysis);
+      await CheckTimelineInteractionAsync(window, viewModel.Analysis);
 
       // The setup dialog as a user without ffmpeg sees it after pressing 'Find automatically'
       var setupViewModel = new SetupViewModel(
@@ -195,53 +195,89 @@ namespace MB.FramePacing.DocImages
     }
 
     /// <summary>
-    /// The Timeline card with real (headless) input: the wheel zooms around the pointer, a drag pans, a double-click shows the whole run
-    /// again, and hovering a plot draws the frame under the pointer. Throws when one does not; no picture.
+    /// The Timeline card with real (headless) input, its cards built in the background: it is laid out for its width; wheel notches in quick
+    /// succession add up, around the time under the pointer; a sideways wheel scrolls and the scrollbar follows; a drag pans; a double-click
+    /// shows the whole run again; hovering a plot names the frame under the pointer. Throws when one does not; no picture.
     /// </summary>
-    private static void CheckTimelineInteraction(Window window, AnalysisViewModel analysis)
+    private static async Task CheckTimelineInteractionAsync(Window window, AnalysisViewModel analysis)
     {
       var card = window.GetVisualDescendants().OfType<CardView>().Single(v => v.Name == "TimelineCardView");
-      var drawing = card.Drawing ?? throw new InvalidOperationException("The Timeline card is empty");
+      async Task<CardPlot> Built(CardDrawing? before, string what)
+      {
+        try
+        {
+          await WaitUntil(() => card.Drawing != null && card.Drawing != before && !analysis.IsBuildingCards, TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException)
+        {
+          throw new InvalidOperationException($"Timeline card: {what}: no new card ({analysis.SectionText})");
+        }
+        return card.Drawing!.Plots[0];
+      }
+      void Expect(bool condition, string what)
+      {
+        if (!condition)
+          throw new InvalidOperationException($"Timeline card: {what} ({analysis.SectionText})");
+      }
+
+      await WaitUntil(() => card.Drawing != null && !analysis.IsBuildingCards, TimeSpan.FromSeconds(10));
+      var drawing = card.Drawing!;
+      Expect(Math.Abs(drawing.Width - Math.Max(AnalysisViewModel.MinCardWidth, Math.Floor(card.Bounds.Width))) < 1, "laid out for its width");
       var plot = drawing.Plots[0];
       double scale = card.Bounds.Width / drawing.Width;
       Point At(double x, double y) =>
         card.TranslatePoint(new Point(x * scale, y * scale), window) ?? throw new InvalidOperationException("The card is not in the window");
       var middle = At((plot.Left + plot.Right) / 2, (plot.Top + plot.Bottom) / 2);
-      void Expect(bool condition, string what)
-      {
-        Dispatcher.UIThread.RunJobs();
-        if (!condition)
-          throw new InvalidOperationException($"Timeline card: {what} ({analysis.SectionText})");
-      }
-
-      string whole = analysis.SectionText;
-      window.MouseMove(middle);
-      Expect(card.Drawing == drawing, "hovering does not change the card");
-      window.MouseWheel(middle, new Vector(0, 3));
-      var zoomed = card.Drawing!.Plots[0];
-      Expect(zoomed.XTo - zoomed.XFrom < (plot.XTo - plot.XFrom) * 0.6, "the wheel zooms in");
       double atPointer = plot.ValueX((plot.Left + plot.Right) / 2);
+      string whole = analysis.SectionText;
+
+      window.MouseMove(middle);
+      Dispatcher.UIThread.RunJobs();
+      Expect(card.Drawing == drawing, "hovering does not change the card");
+      // Three notches before a card arrives: they add up
+      window.MouseWheel(middle, new Vector(0, 1));
+      window.MouseWheel(middle, new Vector(0, 1));
+      window.MouseWheel(middle, new Vector(0, 1));
+      var zoomed = await Built(drawing, "the wheel zooms in");
+      double length = zoomed.XTo - zoomed.XFrom;
+      Expect(Math.Abs(length - ((plot.XTo - plot.XFrom) * 0.8 * 0.8 * 0.8)) < 1e-6, "three notches zoom three times");
       Expect(Math.Abs(zoomed.ValueX((zoomed.Left + zoomed.Right) / 2) - atPointer) < 1e-6, "the time under the pointer stays there");
+      Expect(analysis.CanScroll && Math.Abs(analysis.ScrollValue - zoomed.XFrom) < 1e-9, "the scrollbar shows where the view is");
+
+      // Sideways: two notches to the right, a fifth of the view (each step's card is noted before the input: it may arrive with it)
+      var before = card.Drawing;
+      window.MouseWheel(middle, new Vector(-2, 0));
+      var scrolled = await Built(before, "a sideways wheel scrolls");
+      Expect(Math.Abs(scrolled.XFrom - (zoomed.XFrom + (length * 0.2))) < 1e-6, "a sideways wheel scrolls a tenth of the view per notch");
+      Expect(Math.Abs(analysis.ScrollValue - scrolled.XFrom) < 1e-9, "the scrollbar follows");
+      before = card.Drawing;
+      analysis.ScrollValue = zoomed.XFrom;
+      var back = await Built(before, "the scrollbar scrolls");
+      Expect(Math.Abs(back.XFrom - zoomed.XFrom) < 1e-6, "the scrollbar scrolls the view");
 
       var right = At((plot.Left + plot.Right) / 2 + 100, (plot.Top + plot.Bottom) / 2);
+      before = card.Drawing;
       window.MouseDown(middle, MouseButton.Left);
       window.MouseMove(right);
       window.MouseUp(right, MouseButton.Left);
-      var panned = card.Drawing!.Plots[0];
-      Expect(panned.XFrom < zoomed.XFrom && Math.Abs((panned.XTo - panned.XFrom) - (zoomed.XTo - zoomed.XFrom)) < 1e-6, "dragging right pans back");
+      var panned = await Built(before, "dragging pans");
+      Expect(panned.XFrom < back.XFrom && Math.Abs((panned.XTo - panned.XFrom) - length) < 1e-6, "dragging right pans back");
 
+      before = card.Drawing;
       window.MouseDown(middle, MouseButton.Left);
       window.MouseUp(middle, MouseButton.Left);
       window.MouseDown(middle, MouseButton.Left);
       window.MouseUp(middle, MouseButton.Left);
-      Expect(analysis.SectionText == whole, "a double-click shows the whole run");
-      window.MouseMove(At((plot.Left + plot.Right) / 2, (plot.Top + plot.Bottom) / 2));
+      _ = await Built(before, "a double-click resets");
+      Expect(analysis.SectionText == whole && !analysis.CanScroll, "a double-click shows the whole run");
+      window.MouseMove(middle);
+      Dispatcher.UIThread.RunJobs();
       var frame = new MB.FramePacing.Charts.CardHover(RunSection.Whole(analysis.SelectedRun!.Chart)).FrameAt(atPointer);
       Expect(
         analysis.HoverText(card.Drawing!.Plots[0], atPointer, 0)?.StartsWith($"Frame {frame!.FrameIndex} at", StringComparison.Ordinal) == true,
         "hovering names the frame under the pointer"
       );
-      Console.WriteLine("  Timeline card: wheel zoom, drag, double-click and hover work");
+      Console.WriteLine("  Timeline card: width, wheel zoom, sideways scroll, scrollbar, drag, double-click and hover work");
     }
 
     /// <summary>The Timeline tab's plots, one below the other, as one image.</summary>

@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* A time range of a run to draw: its frames, and the headline numbers of just those frames (statistics, late frames, the worst 2 s),
-//* computed by the analysis's own functions. Times are seconds since the run's first frame, as on the Timeline.
+//* A time range of a run to draw: the range of its frames in the run's prepared data (RunChartData, found by binary search), and, only when
+//* something asks for them, the headline numbers of just those frames (statistics, late frames, the worst 2 s), computed by the analysis's
+//* own functions. Times are seconds since the run's first frame, as on the Timeline. Immutable.
 //*
 //* (c) 2026 Mana Battery
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -11,28 +12,62 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using MB.FramePacing.Analysis;
 
 namespace MB.FramePacing.Charts
 {
-  /// <param name="Run">The whole run.</param>
-  /// <param name="FromSeconds">Where the section starts, in seconds since the run's first frame.</param>
-  /// <param name="ToSeconds">Where it ends.</param>
-  /// <param name="Section">The section as a run of its own: its frames and their numbers (the whole run when the section is all of it).</param>
-  public sealed record RunSection(ChartRun Run, double FromSeconds, double ToSeconds, ChartRun Section)
+  public sealed class RunSection
   {
-    /// <summary>The time at 0 s: the run's first frame.</summary>
-    public long OriginTicks => Run.Run.Frames.Count > 0 ? Run.Run.Frames[0].FirstSeenTicks : 0;
+    private readonly Lazy<ChartRun> m_section;
+
+    private RunSection(ChartRun run, double fromSeconds, double toSeconds, int start, int end, bool wholeRun)
+    {
+      Run = run;
+      FromSeconds = fromSeconds;
+      ToSeconds = toSeconds;
+      Start = start;
+      End = end;
+      IsWholeRun = wholeRun;
+      m_section = wholeRun ? new Lazy<ChartRun>(run) : new Lazy<ChartRun>(CreateSection, LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    /// <summary>The whole run.</summary>
+    public ChartRun Run { get; }
+
+    /// <summary>Where the section starts, in seconds since the run's first frame.</summary>
+    public double FromSeconds { get; }
+
+    /// <summary>Where it ends.</summary>
+    public double ToSeconds { get; }
+
+    /// <summary>The section's first frame in the run's prepared data (<see cref="Data"/>).</summary>
+    public int Start { get; }
+
+    /// <summary>The frame after its last.</summary>
+    public int End { get; }
+
+    /// <summary>How many frames the section has.</summary>
+    public int FrameCount => End - Start;
 
     /// <summary>The section covers the whole run.</summary>
-    public bool IsWholeRun => ReferenceEquals(Run, Section);
+    public bool IsWholeRun { get; }
+
+    /// <summary>The run's prepared data.</summary>
+    public RunChartData Data => RunChartData.Of(Run);
+
+    /// <summary>The section as a run of its own: its frames and their numbers (the whole run when the section is all of it), made when first asked for.</summary>
+    public ChartRun Section => m_section.Value;
+
+    /// <summary>The time at 0 s: the run's first frame.</summary>
+    public long OriginTicks => Run.Run.Frames.Count > 0 ? Run.Run.Frames[0].FirstSeenTicks : 0;
 
     /// <summary>The whole run: from its first frame to one capture period after its last.</summary>
     public static RunSection Whole(ChartRun run)
     {
       var frames = run.Run.Frames;
       double end = frames.Count > 0 ? Seconds(frames[^1].LastSeenTicks - frames[0].FirstSeenTicks + run.CapturePeriodTicks) : 1;
-      return new RunSection(run, 0, Math.Max(end, 0.001), run);
+      return new RunSection(run, 0, Math.Max(end, 0.001), 0, frames.Count, wholeRun: true);
     }
 
     /// <summary>The frames first seen from <paramref name="fromSeconds"/> to <paramref name="toSeconds"/>, clamped to the run.</summary>
@@ -45,17 +80,24 @@ namespace MB.FramePacing.Charts
         to = Math.Min(whole.ToSeconds, from + 0.001);
       if (from <= 0 && to >= whole.ToSeconds)
         return whole;
+      var (start, end) = RunChartData.Of(run).Range(from, to);
+      return new RunSection(run, from, to, start, end, wholeRun: false);
+    }
 
-      long origin = whole.OriginTicks;
-      var frames = FramesBetween(run.Run.Frames, origin, from, to);
-      var analysis = run.Run with
+    private ChartRun CreateSection()
+    {
+      var all = Data.Frames;
+      var frames = new List<PresentedFrame>(FrameCount);
+      for (int i = Start; i < End; ++i)
+        frames.Add(all[i]);
+      var analysis = Run.Run with
       {
         Frames = frames,
-        Statistics = RunStatistics.From(frames, run.ErrorThresholdTicks, run.CapturePeriodTicks),
-        Counts = run.Run.Counts with { PresentedFrames = frames.Count },
-        Pacing = run.Run.Pacing is { } pacing ? SectionPacing(pacing, frames) : null,
+        Statistics = RunStatistics.From(frames, Run.ErrorThresholdTicks, Run.CapturePeriodTicks),
+        Counts = Run.Run.Counts with { PresentedFrames = frames.Count },
+        Pacing = Run.Run.Pacing is { } pacing ? SectionPacing(pacing, frames) : null,
       };
-      return new RunSection(run, from, to, run with { Run = analysis });
+      return Run with { Run = analysis };
     }
 
     /// <summary>The run's pacing with the late frames, their share and the worst 2 s of the section's frames.</summary>
@@ -69,43 +111,6 @@ namespace MB.FramePacing.Charts
         LateShare = measured > 0 ? late / (double)measured : 0,
         WorstLateShare = LateShare.Worst(frames, LateShare.WindowTicks),
       };
-    }
-
-    /// <summary>
-    /// The frames first seen from <paramref name="from"/> to <paramref name="to"/> seconds after <paramref name="origin"/>: found by binary
-    /// search in display order (a run's frames are), else by looking at every frame.
-    /// </summary>
-    private static List<PresentedFrame> FramesBetween(IReadOnlyList<PresentedFrame> all, long origin, double from, double to)
-    {
-      bool Before(PresentedFrame f) => Seconds(f.FirstSeenTicks - origin) < from;
-      bool After(PresentedFrame f) => Seconds(f.FirstSeenTicks - origin) > to;
-      for (int i = 1; i < all.Count; ++i)
-      {
-        if (all[i].FirstSeenTicks < all[i - 1].FirstSeenTicks)
-          return all.Where(f => !Before(f) && !After(f)).ToList();
-      }
-      int first = LowerBound(all, f => !Before(f));
-      int end = LowerBound(all, After);
-      var frames = new List<PresentedFrame>(Math.Max(0, end - first));
-      for (int i = first; i < end; ++i)
-        frames.Add(all[i]);
-      return frames;
-    }
-
-    /// <summary>The first index where <paramref name="reached"/> holds (it holds from some index on), or the count.</summary>
-    private static int LowerBound(IReadOnlyList<PresentedFrame> frames, Func<PresentedFrame, bool> reached)
-    {
-      int low = 0;
-      int high = frames.Count;
-      while (low < high)
-      {
-        int middle = low + ((high - low) / 2);
-        if (reached(frames[middle]))
-          high = middle;
-        else
-          low = middle + 1;
-      }
-      return low;
     }
 
     private static double Seconds(long ticks) => ticks / (double)TimeSpan.TicksPerSecond;

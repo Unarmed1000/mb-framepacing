@@ -64,6 +64,12 @@ namespace MB.FramePacing.Charts.UnitTest
         var expected = xs.Select((x, i) => (x, i)).GroupBy(p => (int)Math.Floor(p.x)).OrderBy(g => g.Key).ToList();
         Assert.That(columns.Select(c => (c.Column, c.Count)), Is.EqualTo(expected.Select(g => (g.Key, g.Count()))), $"ordered {ordered}");
         Assert.That(order, Is.EqualTo(expected.SelectMany(g => g.Select(p => p.i))), $"ordered {ordered}");
+        if (ordered)
+        {
+          // Walking points in x order finds the same columns, galloping over each
+          Assert.That(PixelColumns.Walk(0, xs.Length, i => xs[i]).Select(c => (c.Column, c.Start, c.End - c.Start)), Is.EqualTo(columns));
+          Assert.That(PixelColumns.Walk(100, 300, i => xs[i]).Sum(c => c.End - c.Start), Is.EqualTo(200), "a part of them");
+        }
       }
     }
 
@@ -269,7 +275,7 @@ namespace MB.FramePacing.Charts.UnitTest
       );
     }
 
-    private static ChartRun Synthetic(int Count, int lateEvery = 97)
+    internal static ChartRun Synthetic(int Count, int lateEvery = 97)
     {
       var frames = new List<PresentedFrame>(Count);
       long time = 0;
