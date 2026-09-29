@@ -309,6 +309,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
 
 ## Conventions
 
+- **Branches:** `master` restarted on 2026-09-30 as one commit holding the tree of `legacy` 595e0f4, so its history has one folder
+  structure (`sdk/`, `measure/`). All development happens on `master`, and its history stays linear. `legacy` holds the history
+  before that. It is frozen (it ends in a merge of `master`, with the same tree) and may be deleted: old commit SHAs, such as
+  submodule pins, only stay reachable while it exists.
 - **Vocabulary:** use the terms of `sdk/doc/vocabulary.md` in code, UI text and docs. **Display time** is the moment a frame was first
   seen on screen; **display time step** is how long it stayed (the time to the next frame). Animation error = animation time step -
   display time step.
