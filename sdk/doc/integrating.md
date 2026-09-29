@@ -56,6 +56,21 @@ find_package(mb_framemarker 0.1 CONFIG REQUIRED)   # with CMAKE_PREFIX_PATH=<pre
 target_link_libraries(my_game PRIVATE mb::framemarker)
 ```
 
+**e) Conan 2:** the recipes are in the repository ([`sdk/conan`](../conan), laid out as conan-center-index is). Add a checkout as a
+remote, then require the package; Conan builds it from the release archive:
+
+```sh
+conan remote add mb-framepacing <checkout>/sdk/conan --type local-recipes-index
+conan install --requires mb-framemarker/0.1.0 --build=missing -s compiler.cppstd=20
+```
+
+```cmake
+find_package(mb_framemarker CONFIG REQUIRED)   # from Conan's CMakeDeps
+target_link_libraries(my_game PRIVATE mb::framemarker)
+```
+
+The remote holds recipes only, no prebuilt binaries, and the library needs C++20: the profile's `compiler.cppstd` must be 20 or newer.
+
 What your project gets:
 
 - One static library target, **`mb::framemarker`**, in every way above.
@@ -72,7 +87,8 @@ What your project gets:
   accepts the same minor version; from 1.0 it accepts any newer version with the same major version.
 
 CI builds and runs a consumer project (`sdk/marker/cpp/tests/consumer`) with FetchContent, `add_subdirectory` and `find_package`, and
-every release archive is consumed through its URL and hash before it is published. The git way uses the same source tree.
+every release archive is consumed through its URL and hash before it is published. The Conan recipes are built and tested on
+Windows, Ubuntu and macOS from every push, and from every release archive once it is published. The git way uses the same source tree.
 
 ## 2. Choose the size and place once
 

@@ -7,6 +7,7 @@
 #               FetchContent (URL + URL_HASH) before anything is published
 #   4. release  a GitHub Release with the archives and the snippets to use them
 #   5. upm      the Unity package on the orphan branch upm, tagged upm/v<version> (install from git URL ...#upm/v<version>)
+#   6. conan    the released archive built and tested through the Conan recipe (sdk/conan) on Windows, Ubuntu and macOS
 # See doc/releasing.md. Everything uses the default GITHUB_TOKEN; GitHub-hosted runners are free for public repositories.
 name: release-marker
 
@@ -180,3 +181,29 @@ jobs:
           git commit -m "com.manabattery.framemarker $VERSION (from $GITHUB_REF_NAME, ${GITHUB_SHA::7})"
           git tag "upm/v$VERSION"
           git push origin upm "upm/v$VERSION"
+
+  conan:
+    name: Conan recipe ${{ matrix.os }}
+    needs: [verify, release]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4 (the test package builds with it)
+        uses: lukka/get-cmake@v4.4.2
+      - name: The released archive through the recipe (the version is added here only; commit it with tools/add_conan_version.py)
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          python="$(command -v python3 || command -v python)"
+          "$python" -m venv .venv
+          venv_python=.venv/bin/python
+          [ -x "$venv_python" ] || venv_python=.venv/Scripts/python
+          "$venv_python" -m pip install --quiet "$(grep '^conan==' requirements-dev.txt)"
+          "$venv_python" tools/add_conan_version.py marker "$VERSION" --repository "$GITHUB_REPOSITORY"
+          "$venv_python" tools/check_conan.py --released --library marker --version "$VERSION"

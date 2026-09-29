@@ -175,6 +175,28 @@ jobs:
       - name: clang-format and clang-tidy
         run: python3 tools/check_cpp.py --preset linux-sanitize
 
+  conan:
+    name: Conan recipes ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4 (the test packages build with it)
+        uses: lukka/get-cmake@v4.4.2
+      - name: Both recipes, built from this checkout (sdk/conan as a local-recipes-index remote)
+        shell: bash
+        run: |
+          python="$(command -v python3 || command -v python)"
+          "$python" -m venv .venv
+          venv_python=.venv/bin/python
+          [ -x "$venv_python" ] || venv_python=.venv/Scripts/python
+          "$venv_python" -m pip install --quiet "$(grep '^conan==' requirements-dev.txt)"
+          "$venv_python" tools/check_conan.py
+
   semver:
     name: semantic versions (VERSION files, MB.FrameMarker API)
     runs-on: ubuntu-latest

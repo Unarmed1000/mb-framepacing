@@ -23,8 +23,9 @@ FetchContent_MakeAvailable(mb_framemarker)
 target_link_libraries(my_game PRIVATE mb::framemarker)
 ```
 
-Or git (`GIT_TAG marker-v0.1.0`, `SOURCE_SUBDIR sdk/marker/cpp`), `add_subdirectory` of this folder, or an installed copy with
-`find_package(mb_framemarker 0.1 CONFIG REQUIRED)`. Every way gives one static library target, `mb::framemarker`. When the
+Or git (`GIT_TAG marker-v0.1.0`, `SOURCE_SUBDIR sdk/marker/cpp`), `add_subdirectory` of this folder, an installed copy with
+`find_package(mb_framemarker 0.1 CONFIG REQUIRED)`, or Conan 2 (`mb-framemarker/0.1.0` from the recipes in
+[`sdk/conan`](https://github.com/Unarmed1000/mb-framepacing/tree/master/sdk/conan), see the guide). Every way gives one static library target, `mb::framemarker`. When the
 library is not the top-level project its tests, tools and warnings-as-errors are off (`MB_FRAMEMARKER_BUILD_TESTS`,
 `MB_FRAMEMARKER_BUILD_TOOLS`, `MB_FRAMEMARKER_WARNINGS_AS_ERRORS`).
 

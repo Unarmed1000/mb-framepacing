@@ -494,6 +494,7 @@ flowchart TB
 | `sdk/marker/python/`        | The Python marker library `mb_framemarker` (standard library only) and its unittest tests                |
 | `sdk/marker/shaders/`       | Reference shaders that draw the marker as one quad                                                       |
 | `sdk/data/`                 | **Reads the results**: the data libraries (C#, C++, Python) for the capture data and the analysis output |
+| `sdk/conan/`                | Conan 2 recipes of the C++ libraries (a local-recipes-index remote)                                      |
 | `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats               |
 | `sdk/test-data/`            | Golden marker images (checked by every marker library) and the data libraries' golden data               |
 | `measure/`                  | **Measures it**: the recording and analysis tools and their version                                      |

@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# The released versions and their recipe folder. tools/add_conan_version.py adds a version after its data-v<version> release.
+versions: {}

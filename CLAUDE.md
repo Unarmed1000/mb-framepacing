@@ -30,6 +30,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/data/python/`                                | Python data library `mb_framepacing_data` (reads; standard library, Python 3.11) + unittest tests               |
 | `sdk/data/cpp/`                                   | C++20 data library `mb_framepacingdata` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests |
 | `sdk/data/csharp/`                                | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output         |
+| `sdk/conan/`                                      | Conan 2 recipes of both C++ libraries (conan-center-index layout, a local-recipes-index remote)                 |
 | `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, capture data and analysis output formats              |
 | `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                     |
 | `sdk/test-data/data/`                             | The data libraries' golden data: a test clip imported and analysed, and `digest.json`                           |
@@ -54,6 +55,7 @@ cd sdk/marker/cpp && cmake --preset windows && cmake --build --preset windows &&
 cd sdk/data/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows     # the C++ data library, the same way
 dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fps 500  # end to end without hardware
 python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Python data library against sdk/test-data/data
+.venv\Scripts\python tools/check_conan.py        # both Conan recipes built from this checkout, in a temporary Conan home
 ```
 
 - **mb-quality**
@@ -271,6 +273,17 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `doc/releasing.md`). A `tools-v*` tag (which must match `measure/VERSION`) also builds the self-contained tools.
   - `.github/dependabot.yml` opens weekly grouped updates for GitHub Actions, NuGet (packages and dotnet tools), npm and pip.
     GoogleTest and nlohmann/json (FetchContent URLs) and qrcodegen (vendored) are updated by hand.
+- **Conan recipes (`sdk/conan`):**
+  - `recipes/<name>/all/` holds `conanfile.py`, `conandata.yml` (each version's release archive URL and SHA-256) and `test_package/`;
+    `recipes/<name>/config.yml` lists the versions. They build the release archives (`package_release.py`), never the checkout.
+  - A version is added after its release: `python tools/add_conan_version.py marker|data <version>` (reads the release's
+    `SHA256SUMS`), then commit. The release workflows test the new archive through the recipe (`check_conan.py --released`).
+  - `tools/check_conan.py` (CI `conan` job, Windows/Ubuntu/macOS) builds both recipes from this checkout's archives, using a copy of
+    `sdk/conan` as a local-recipes-index remote, then `conan test` of each test package with `compiler.cppstd=20`.
+  - **Every Conan run uses a temporary `CONAN_HOME`**: never touch the user's cache (their global Conan may be another version;
+    running a newer one migrates the cache). Conan is pinned in `requirements-dev.txt`.
+  - basedpyright excludes `sdk/conan` (Conan's API is untyped); ruff still checks the recipes. The test packages' C++ is formatted by
+    `check_cpp.py` (`sdk/conan/.clang-format`, a copy).
 - **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks the three VERSION files and compares the
   public API of `MB.FrameMarker` with the last `marker-v*` release and of `MB.FramePacing.Data` with the last `data-v*` release using
   ApiCompat. `sdk/marker/VERSION` and `sdk/data/VERSION` are the next releases' versions: raise them in the change that alters the API (0.x:

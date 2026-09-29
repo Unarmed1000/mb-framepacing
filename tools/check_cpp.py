@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the C++ libraries (the marker library, sdk/marker/cpp, and the data library, sdk/data/cpp) with clang-format and clang-tidy (config: each
-library's .clang-format and .clang-tidy, the same rules).
+library's .clang-format and .clang-tidy, the same rules). The Conan recipes' test packages (sdk/conan) are only formatted, with all libraries.
 
 Only our sources are checked, never third_party/ or fetched dependencies. clang-tidy needs a configured build of each library (GoogleTest
 and nlohmann/json headers, the generated Version.hpp), found at <library>/build/<preset>:
@@ -65,6 +65,10 @@ LIBRARIES = {
         build_includes=("include", "mb_framemarker/include"),
     ),
 }
+
+
+# The Conan recipes' test packages build against the packages, not in a library's build, so they are only formatted (sdk/conan/.clang-format)
+CONAN_TEST_PACKAGES = "sdk/conan/recipes/*/all/test_package/*.cpp"
 
 
 class Arguments(argparse.Namespace):
@@ -133,6 +137,9 @@ def main() -> int:
     for name, library in LIBRARIES.items():
         if args.library in ("all", name):
             ok = check(root, library, args) and ok
+    if args.library == "all":
+        test_packages = sorted(path.relative_to(root).as_posix() for path in root.glob(CONAN_TEST_PACKAGES))
+        ok = run([tool("clang-format"), "--dry-run", "--Werror", *test_packages], root) and ok
     print("C++ checks passed" if ok else "C++ checks FAILED")
     return 0 if ok else 1
 

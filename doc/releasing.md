@@ -48,6 +48,7 @@ The workflow `.github/workflows/release-marker.yml` then:
    tests and consumes it through FetchContent before anything is published.
 4. **Creates the GitHub Release** with the archives and the FetchContent and Unity snippets (with the real hash).
 5. **Publishes the Unity package** on the `upm` branch, tagged `upm/v<version>`.
+6. **Builds the Conan recipe** from the published archive on Windows, Ubuntu and macOS (see [Conan](#conan)).
 
 Nothing is published if any step fails. To try the packaging locally:
 
@@ -81,6 +82,8 @@ The workflow `.github/workflows/release-data.yml` then:
    itself), then installs this checkout's marker library, and builds, tests and installs the extracted archive against it, and builds a
    consumer through `find_package` and one through FetchContent before anything is published.
 4. **Creates the GitHub Release** with the archives and the C++, Python and C# snippets (with the real hash).
+5. **Builds the Conan recipe** from the published archive on Windows, Ubuntu and macOS (see [Conan](#conan)). Its marker library comes
+   from the recipes in the tagged commit, so commit the marker release's Conan version before tagging the data libraries.
 
 The C++ library needs the marker library; a release of the data libraries names the marker version it needs (`sdk/data/cpp/CMakeLists.txt`,
 `MB_FRAMEPACINGDATA_MARKER_VERSION`). To try the packaging locally:
@@ -88,6 +91,25 @@ The C++ library needs the marker library; a release of the data libraries names 
 ```sh
 python sdk/data/cpp/package_release.py --output dist --verify
 ```
+
+## Conan
+
+The Conan 2 recipes (`sdk/conan/recipes/mb-framemarker` and `mb-framepacingdata`) are laid out as conan-center-index is, so a checkout
+works as a `local-recipes-index` remote. Each version builds its release archive, so a version is added **after** its release: the
+release workflow tests it through the recipe without committing it; to publish it, add it and commit:
+
+```sh
+python tools/add_conan_version.py marker 0.2.0     # or: data 0.2.0; reads the release's SHA256SUMS
+git commit -am "Conan: mb-framemarker 0.2.0"
+```
+
+`python tools/check_conan.py` builds both recipes from this checkout's sources (CI runs it on every push); `--released` uses the
+recipes' own versions and archives. Both run in a temporary Conan home, never the user's cache.
+
+**ConanCenter, later:** fork conan-center-index, copy `sdk/conan/recipes/<name>` to its `recipes/<name>` (mb-framemarker first: the
+data recipe needs it), and open a pull request per library and version. The first one needs the Contributor License Agreement. Their
+build service builds and publishes the binaries after a manual review; a new version is a pull request that adds it to `config.yml` and
+`conandata.yml`.
 
 ## Tools
 

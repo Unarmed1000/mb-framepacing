@@ -19,6 +19,11 @@ add_subdirectory(third_party/mb-framepacing/sdk/data/cpp)
 target_link_libraries(my_tool PRIVATE mb::framepacingdata)
 ```
 
+With Conan 2, `mb-framepacingdata/0.1.0` from the recipes in
+[`sdk/conan`](https://github.com/Unarmed1000/mb-framepacing/tree/master/sdk/conan) brings the marker library and nlohmann/json along
+(`conan remote add mb-framepacing <checkout>/sdk/conan --type local-recipes-index`, the profile with `compiler.cppstd=20`), and
+`find_package(mb_framepacingdata CONFIG REQUIRED)` gives `mb::framepacingdata`.
+
 nlohmann/json is found with `find_package(nlohmann_json 3.12)` when installed, and downloaded (a pinned release) otherwise. When the
 library is not the top-level project its tests and warnings-as-errors are off (`MB_FRAMEPACINGDATA_BUILD_TESTS`,
 `MB_FRAMEPACINGDATA_WARNINGS_AS_ERRORS`), so GoogleTest is never downloaded.
