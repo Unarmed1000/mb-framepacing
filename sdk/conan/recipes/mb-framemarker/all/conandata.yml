@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# The release archive of each version (marker-v<version>). tools/add_conan_version.py adds a version after its release.
+sources: {}

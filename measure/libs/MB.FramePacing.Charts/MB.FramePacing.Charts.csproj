@@ -1,0 +1,11 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The report cards of the analysis as shapes: written as SVG (and PNG through a browser), drawn by the GUI -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.Charts.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Analysis\MB.FramePacing.Analysis.csproj" />
+  </ItemGroup>
+</Project>

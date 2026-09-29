@@ -1,0 +1,212 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+# Release the marker libraries (C++, C# and the Unity package): push a tag marker-v<version> that matches sdk/marker/VERSION.
+#   1. verify   the tag is semantic versioning and matches sdk/marker/VERSION, and the version bump covers the API changes since the
+#               previous release (tools/check_semver.py)
+#   2. test     C++ and C# libraries on Windows, Ubuntu and macOS, and the documented CMake consumer setups
+#   3. package  the C++ source archives (tar.gz, zip) and SHA256SUMS; the extracted archive must build, pass its tests and work through
+#               FetchContent (URL + URL_HASH) before anything is published
+#   4. release  a GitHub Release with the archives and the snippets to use them
+#   5. upm      the Unity package on the orphan branch upm, tagged upm/v<version> (install from git URL ...#upm/v<version>)
+#   6. conan    the released archive built and tested through the Conan recipe (sdk/conan) on Windows, Ubuntu and macOS
+# See doc/releasing.md. Everything uses the default GITHUB_TOKEN; GitHub-hosted runners are free for public repositories.
+name: release-marker
+
+on:
+  push:
+    tags: ["marker-v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the previous release is the API baseline
+      - id: version
+        name: Tag is marker-v<semver> and matches sdk/marker/VERSION
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#marker-v}"
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.[1-9][0-9]*)?$ ]]; then
+            echo "::error::$GITHUB_REF_NAME is not marker-v<major>.<minor>.<patch>, optionally with -alpha.N, -beta.N or -rc.N"; exit 1
+          fi
+          expected="$(tr -d '[:space:]' < sdk/marker/VERSION)"
+          if [ "$version" != "$expected" ]; then
+            echo "::error::the tag says $version, sdk/marker/VERSION says $expected"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: The version bump covers the API changes since the previous release
+        run: |
+          dotnet tool restore
+          python3 tools/check_semver.py
+
+  test:
+    name: test ${{ matrix.os }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: CMake 4
+        uses: lukka/get-cmake@v4.4.2
+      - name: C++ library
+        shell: bash
+        run: |
+          cmake -S sdk/marker/cpp -B sdk/marker/cpp/build/release -DCMAKE_BUILD_TYPE=Release
+          cmake --build sdk/marker/cpp/build/release --config Release --parallel
+          ctest --test-dir sdk/marker/cpp/build/release -C Release --output-on-failure
+      - name: C# library
+        run: dotnet test sdk/marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj -c Release
+      - name: CMake consumers (FetchContent, add_subdirectory, find_package)
+        shell: bash
+        run: |
+          # Windows runners have 'python', Linux and macOS 'python3'
+          "$(command -v python3 || command -v python)" sdk/marker/cpp/tests/consumer/check_consumers.py
+
+  package:
+    name: package C++ archives
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4
+        uses: lukka/get-cmake@v4.4.2
+      - name: Create and verify the archives
+        run: python3 sdk/marker/cpp/package_release.py --output dist --verify
+      - uses: actions/upload-artifact@v7
+        with:
+          name: marker-release
+          path: dist/
+          retention-days: 7
+
+  release:
+    name: GitHub Release
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: marker-release
+          path: dist
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          sha256="$(grep "mb-framemarker-cpp-$VERSION.tar.gz" dist/SHA256SUMS | cut -d' ' -f1)"
+          # find_package takes the numbers only: 0.2.0-beta.1 asks for 0.2
+          numbers="${VERSION%%-*}"
+          major_minor="${numbers%.*}"
+          # A pre-release (a version with -alpha.N, -beta.N or -rc.N) is marked as one on GitHub
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
+          cat > notes.md <<EOF
+          ## C++ (CMake 4.0+, C++20)
+
+          \`\`\`cmake
+          include(FetchContent)
+          FetchContent_Declare(mb_framemarker
+            URL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/mb-framemarker-cpp-${VERSION}.tar.gz
+            URL_HASH SHA256=${sha256}
+            FIND_PACKAGE_ARGS ${major_minor} CONFIG)
+          FetchContent_MakeAvailable(mb_framemarker)
+          target_link_libraries(my_game PRIVATE mb::framemarker)
+          \`\`\`
+
+          ## Unity (2021.3+)
+
+          Package Manager, Add package from git URL:
+          \`\`\`text
+          https://github.com/${GITHUB_REPOSITORY}.git#upm/v${VERSION}
+          \`\`\`
+
+          ## C# (.NET Standard 2.1)
+
+          The general library is \`sdk/marker/csharp\` at this tag.
+          EOF
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Marker libraries $VERSION" --notes-file notes.md --generate-notes "${prerelease[@]}"
+
+  upm:
+    name: Unity package (upm branch)
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Assemble the package
+        run: python3 sdk/marker/unity/build_upm.py --output "$RUNNER_TEMP/package" --check
+      - name: Commit it to the upm branch and tag it
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="$RUNNER_TEMP/upm-branch"
+          if git ls-remote --exit-code --heads origin upm > /dev/null; then
+            git fetch origin upm
+            git worktree add "$branch" -B upm origin/upm
+          else
+            git worktree add --orphan -b upm "$branch"
+          fi
+          find "$branch" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R "$RUNNER_TEMP/package/." "$branch/"
+          cd "$branch"
+          git add -A
+          git commit -m "com.manabattery.framemarker $VERSION (from $GITHUB_REF_NAME, ${GITHUB_SHA::7})"
+          git tag "upm/v$VERSION"
+          git push origin upm "upm/v$VERSION"
+
+  conan:
+    name: Conan recipe ${{ matrix.os }}
+    needs: [verify, release]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4 (the test package builds with it)
+        uses: lukka/get-cmake@v4.4.2
+      - name: uv (Python from .python-version, the dev tools from uv.lock)
+        uses: astral-sh/setup-uv@v10.2.0
+      - name: The released archive through the recipe (the version is added here only; commit it with tools/add_conan_version.py)
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          uv sync --locked
+          uv run tools/add_conan_version.py marker "$VERSION" --repository "$GITHUB_REPOSITORY"
+          uv run tools/check_conan.py --released --library marker --version "$VERSION"

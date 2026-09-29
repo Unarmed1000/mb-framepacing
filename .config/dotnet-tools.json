@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "csharpier": {
+      "version": "1.3.0",
+      "commands": ["csharpier"],
+      "rollForward": false
+    },
+    "microsoft.dotnet.apicompat.tool": {
+      "version": "10.0.401",
+      "commands": ["apicompat"],
+      "rollForward": false
+    }
+  }
+}

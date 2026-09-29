@@ -1,0 +1,216 @@
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<UserControl
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  xmlns:charts="using:MB.FramePacing.Charts"
+  xmlns:views="using:MB.FramePacing.Gui.Views"
+  x:Class="MB.FramePacing.Gui.Views.AnalysisView"
+  x:DataType="vm:AnalysisViewModel"
+>
+  <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+    <!-- Which capture -->
+    <Border Classes="card" Padding="12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+        <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
+        <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
+        <ComboBox
+          Grid.Column="2"
+          ItemsSource="{Binding TimeSources}"
+          SelectedItem="{Binding SelectedTimeSource}"
+          ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available."
+        />
+        <TextBox
+          Grid.Column="3"
+          Width="120"
+          Text="{Binding TargetFpsText}"
+          PlaceholderText="Target fps"
+          ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Empty = the target stored with the capture, else the pacing in the markers, else one refresh per frame."
+        />
+        <TextBox
+          Grid.Column="4"
+          Width="120"
+          Text="{Binding DisplayHzText}"
+          PlaceholderText="Display Hz"
+          ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Empty = the rate stored with the capture, or no comparison."
+        />
+        <Button Grid.Column="5" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
+        <Button Grid.Column="6" Content="Open reports" Command="{Binding OpenReportsCommand}" />
+        <Button
+          Grid.Column="7"
+          Content="Save charts"
+          Command="{Binding SaveChartsCommand}"
+          IsEnabled="{Binding HasRun}"
+          ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
+        />
+      </Grid>
+    </Border>
+
+    <!-- Status, warnings -->
+    <StackPanel Grid.Row="1" Spacing="4">
+      <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" IsVisible="{Binding IsBusy}" />
+      <TextBlock Classes="subtle" Text="{Binding SummaryText}" TextWrapping="Wrap" />
+      <TextBlock Classes="error" Text="{Binding ErrorText}" />
+      <ItemsControl ItemsSource="{Binding Warnings}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Classes="warning" Text="{Binding StringFormat='⚠ {0}'}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- Headline numbers for the selected run -->
+    <StackPanel Grid.Row="2" Spacing="10" IsVisible="{Binding HasRun}">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <ComboBox ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="260" />
+        <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding SelectedRun.StartText, FallbackValue=''}" />
+      </Grid>
+      <!-- The headline tiles: RunHeadline builds them, the same the report card shows, in the card's tile style and its rows
+           (ReportOptions.TilesPerRowFor) -->
+      <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}" Margin="0,0,-8,-8">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="{Binding SelectedRun.TileColumns, FallbackValue=4}" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="charts:HeadlineTile">
+            <Border Classes="tile" Margin="0,0,8,8" ToolTip.Tip="{Binding Explanation}">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="tileLabel" Text="{Binding Caption, Converter={x:Static views:UpperCaseConverter.Instance}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Classes="tileValue" Classes.warning="{Binding Warning}" Text="{Binding Value}" />
+                  <TextBlock Classes="tileDetail" VerticalAlignment="Bottom" Text="{Binding Detail}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="{Binding SelectedRun.VerdictText, FallbackValue=''}" TextWrapping="Wrap" />
+      <TextBlock Classes="caption" Text="{Binding SelectedRun.TargetText, FallbackValue=''}" TextWrapping="Wrap" />
+      <TextBlock
+        Classes="caption"
+        Classes.warning="{Binding SelectedRun.RefreshMismatch, FallbackValue=False}"
+        Text="{Binding SelectedRun.RefreshText, FallbackValue=''}"
+        TextWrapping="Wrap"
+      />
+      <TextBlock Classes="caption" Text="{Binding SelectedRun.CountsText, FallbackValue=''}" TextWrapping="Wrap" />
+      <ItemsControl ItemsSource="{Binding SelectedRun.Warnings, FallbackValue={x:Null}}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Classes="warning" Text="{Binding StringFormat='⚠ {0}'}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Expander Header="Detailed statistics (ms)" HorizontalAlignment="Stretch">
+        <StackPanel>
+          <Grid ColumnDefinitions="170,80,80,80,80,80,80,80">
+            <TextBlock Grid.Column="1" Classes="caption" Text="min" TextAlignment="Right" />
+            <TextBlock Grid.Column="2" Classes="caption" Text="mean" TextAlignment="Right" />
+            <TextBlock Grid.Column="3" Classes="caption" Text="p50" TextAlignment="Right" />
+            <TextBlock Grid.Column="4" Classes="caption" Text="p95" TextAlignment="Right" />
+            <TextBlock Grid.Column="5" Classes="caption" Text="p99" TextAlignment="Right" />
+            <TextBlock Grid.Column="6" Classes="caption" Text="max" TextAlignment="Right" />
+            <TextBlock Grid.Column="7" Classes="caption" Text="stddev" TextAlignment="Right" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding SelectedRun.Statistics, FallbackValue={x:Null}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StatisticsRow">
+                <Grid ColumnDefinitions="170,80,80,80,80,80,80,80">
+                  <TextBlock Grid.Column="0" Text="{Binding Name}" />
+                  <TextBlock Grid.Column="1" Classes="value" Text="{Binding Min}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="2" Classes="value" Text="{Binding Mean}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="3" Classes="value" Text="{Binding P50}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="4" Classes="value" Text="{Binding P95}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="5" Classes="value" Text="{Binding P99}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="6" Classes="value" Text="{Binding Max}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="7" Classes="value" Text="{Binding StdDev}" TextAlignment="Right" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Expander>
+    </StackPanel>
+
+    <!-- The report cards of the selected run: the Timeline zooms (wheel), pans (drag) and resets (double-click); the distributions follow
+         the section it shows -->
+    <Border Grid.Row="3" Classes="card" Padding="4" IsVisible="{Binding HasRun}">
+      <Grid>
+        <TabControl SelectedIndex="{Binding SelectedCardIndex}">
+          <TabItem Header="Timeline">
+            <Grid RowDefinitions="*,Auto">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <views:CardView
+                  x:Name="TimelineCardView"
+                  Drawing="{Binding TimelineCard}"
+                  ScrollOffset="{Binding TimelineOffset}"
+                  CanZoom="True"
+                  Margin="8"
+                />
+              </ScrollViewer>
+              <!-- Where the view is in the run: drag it, or scroll sideways on the card -->
+              <ScrollBar
+                Grid.Row="1"
+                Orientation="Horizontal"
+                AllowAutoHide="False"
+                Margin="8,0,8,4"
+                Minimum="0"
+                Maximum="{Binding ScrollMaximum}"
+                ViewportSize="{Binding ViewSeconds}"
+                Value="{Binding ScrollValue}"
+                SmallChange="{Binding ViewSeconds, Converter={x:Static views:FractionConverter.Tenth}}"
+                LargeChange="{Binding ViewSeconds}"
+                Visibility="Auto"
+              />
+            </Grid>
+          </TabItem>
+          <TabItem Header="Error histogram">
+            <ScrollViewer>
+              <views:CardView x:Name="ErrorHistogramCardView" Drawing="{Binding ErrorHistogramCard}" Margin="8" />
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="Error percentiles">
+            <ScrollViewer>
+              <views:CardView x:Name="ErrorPercentilesCardView" Drawing="{Binding ErrorPercentilesCard}" Margin="8" />
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="Display time step histogram">
+            <ScrollViewer>
+              <views:CardView x:Name="DisplayTimeStepHistogramCardView" Drawing="{Binding DisplayTimeStepHistogramCard}" Margin="8" />
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="Drift">
+            <ScrollViewer>
+              <views:CardView x:Name="DriftCardView" Drawing="{Binding DriftCard}" Margin="8" />
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
+        <!-- Next to the tab headers: the section shown, back to the whole run, and saving the card as it is shown -->
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
+          <ProgressBar
+            IsIndeterminate="True"
+            IsVisible="{Binding IsBuildingCards}"
+            Width="60"
+            VerticalAlignment="Center"
+            ToolTip.Tip="Drawing the charts for the new section; the ones shown stay until they are done."
+          />
+          <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding SectionText}" />
+          <Button
+            Content="Reset zoom"
+            Command="{Binding ResetRangeCommand}"
+            ToolTip.Tip="Show the whole run again. Double-clicking the Timeline does the same."
+          />
+          <Button
+            Content="Save view..."
+            Command="{Binding SaveViewCommand}"
+            ToolTip.Tip="Save the card on screen as it is shown (the section, zoomed), as SVG or PNG."
+          />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

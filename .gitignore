@@ -1,0 +1,40 @@
+# C++ (CMake presets build into sdk/marker/cpp/build/<preset>)
+/sdk/marker/cpp/build/
+/sdk/data/cpp/build/
+/sdk/marker/cpp/out/
+CMakeUserPresets.json
+
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+*.lscache
+/build/
+/measure/build/
+/measure/logs/
+publish/
+
+# Capture output
+*.mbfc
+/captures/
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.ruff_cache/
+.venv/
+
+# Node (Prettier)
+node_modules/
+
+# BenchmarkDotNet results (measure/tools/Benchmarks)
+BenchmarkDotNet.Artifacts/

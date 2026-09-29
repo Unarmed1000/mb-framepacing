@@ -1,0 +1,262 @@
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<UserControl
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  x:Class="MB.FramePacing.Gui.Views.CaptureView"
+  x:DataType="vm:CaptureViewModel"
+>
+  <Grid ColumnDefinitions="380,16,*">
+    <!-- Left: what to capture and how -->
+    <ScrollViewer Grid.Column="0">
+      <StackPanel Spacing="12">
+        <Border Classes="card" IsEnabled="{Binding IsIdle}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="cardTitle" Text="Source" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <ComboBox ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" HorizontalAlignment="Stretch" />
+              <Button Grid.Column="1" Content="⟳" Command="{Binding RefreshDevicesCommand}" ToolTip.Tip="Look for capture devices again" />
+            </Grid>
+            <TextBlock Classes="caption" Text="{Binding SourceHint}" TextWrapping="Wrap" />
+            <StackPanel Spacing="6" IsVisible="{Binding IsMediaSource}">
+              <TextBlock Classes="caption" Text="{Binding MediaPathLabel}" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBox Text="{Binding MediaPath}" PlaceholderText="path or rtsp://host/stream" />
+                <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseMediaCommand}" IsVisible="{Binding CanBrowseMedia}" />
+              </Grid>
+              <StackPanel Spacing="6" IsVisible="{Binding IsImageFolder}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                  <TextBlock Text="Frames per second" VerticalAlignment="Center" />
+                  <TextBox Grid.Column="1" Text="{Binding ImageFpsText}" PlaceholderText="240" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                  <TextBox Text="{Binding TimestampFile}" PlaceholderText="optional: exact times (CSV fileName,timeMs)" />
+                  <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseTimestampsCommand}" />
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+            <Expander Header="Advanced" IsVisible="{Binding !SelectedDevice.IsSynthetic, FallbackValue=False}" HorizontalAlignment="Stretch">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="caption" Text="Device mode" IsVisible="{Binding IsFfmpegDevice}" />
+                <ComboBox
+                  ItemsSource="{Binding Modes}"
+                  SelectedItem="{Binding SelectedMode}"
+                  HorizontalAlignment="Stretch"
+                  PlaceholderText="device default"
+                  IsVisible="{Binding IsFfmpegDevice}"
+                />
+                <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding IsFfmpegDevice}">
+                  <TextBox Text="{Binding ModeText}" PlaceholderText="1920x1080@240" />
+                  <TextBox Grid.Column="2" Text="{Binding InputFormat}" PlaceholderText="format (mjpeg, nv12)" />
+                </Grid>
+                <TextBlock Classes="caption" Text="Stored size (smaller = less disk, keep the ratio an integer)" />
+                <TextBox Text="{Binding ScaleText}" PlaceholderText="e.g. 960x540 (empty = full size)" />
+                <TextBlock Classes="caption" Text="Only store a region (source pixels)" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                  <TextBox Text="{Binding RoiText}" PlaceholderText="x,y,width,height or auto (empty = whole frame)" />
+                  <Button
+                    Grid.Column="1"
+                    Content="Locate marker"
+                    Command="{Binding LocateMarkerCommand}"
+                    ToolTip.Tip="Find the marker and store only its region: far less disk. The marker must not move."
+                  />
+                </Grid>
+                <TextBlock
+                  Classes="caption"
+                  Text="{Binding LocateText}"
+                  TextWrapping="Wrap"
+                  IsVisible="{Binding LocateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                />
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+        </Border>
+
+        <!-- VERY EXPERIMENTAL: filming the screen with a calibrated high speed camera (only with the experimental features on) -->
+        <Border Classes="card" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
+          <Expander IsExpanded="{Binding Camera.UseCamera, Mode=OneTime}" HorizontalAlignment="Stretch">
+            <Expander.Header>
+              <TextBlock Classes="cardTitle" Text="Camera (very experimental)" />
+            </Expander.Header>
+            <StackPanel Spacing="8">
+              <TextBlock Classes="warning" Text="{x:Static vm:CameraRigViewModel.ExperimentalText}" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <Button
+                  Classes="accent"
+                  Content="Set up camera..."
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center"
+                  Command="{Binding Camera.SetUpCommand}"
+                  ToolTip.Tip="Pick a saved camera, or mount, calibrate and save a new one"
+                />
+                <Button
+                  Grid.Column="1"
+                  Content="Verify"
+                  Command="{Binding Camera.VerifyCommand}"
+                  ToolTip.Tip="Check that the camera still sees the markers where it was calibrated"
+                />
+              </Grid>
+              <CheckBox Content="Film the screen with this camera" IsChecked="{Binding Camera.UseCamera}" IsEnabled="{Binding Camera.HasSavedRigs}" />
+              <ComboBox
+                ItemsSource="{Binding Camera.SavedRigs}"
+                SelectedItem="{Binding Camera.SelectedRig}"
+                HorizontalAlignment="Stretch"
+                IsVisible="{Binding Camera.HasSavedRigs}"
+              />
+              <TextBlock Classes="caption" Text="{Binding Camera.RigSummary}" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding Camera.UseCamera}">
+                <TextBlock Text="Recorded fps (slow motion clips)" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Camera.RecordedFpsText}" PlaceholderText="empty = the clip's own timestamps" />
+              </Grid>
+              <TextBlock
+                Classes="caption"
+                Text="{Binding Camera.StatusText}"
+                TextWrapping="Wrap"
+                IsVisible="{Binding Camera.StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+              />
+              <ItemsControl ItemsSource="{Binding Camera.Checks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CameraCheckItem">
+                    <TextBlock
+                      Text="{Binding Text}"
+                      FontSize="12"
+                      TextWrapping="Wrap"
+                      Classes.ok="{Binding IsPass}"
+                      Classes.warning="{Binding IsWarn}"
+                      Classes.error="{Binding IsFail}"
+                    />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Expander>
+        </Border>
+
+        <Border Classes="card" IsEnabled="{Binding IsIdle}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="cardTitle" Text="Recording" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+              <TextBlock Text="Stop after" VerticalAlignment="Center" />
+              <TextBox
+                Grid.Column="1"
+                Text="{Binding DurationText}"
+                PlaceholderText="empty = no limit"
+                ToolTip.Tip="An optional limit, e.g. 30s or 2m, counted from the start (marker): the capture stops then even before the end marker."
+              />
+            </Grid>
+            <CheckBox
+              Content="Start at the start marker"
+              IsChecked="{Binding WaitForStart}"
+              ToolTip.Tip="Record from the application's start marker (with a short pre-roll). Untick for an application without start and end markers."
+            />
+            <CheckBox
+              Content="Stop at the end marker"
+              IsChecked="{Binding StopAtEnd}"
+              ToolTip.Tip="Stop once the run's end marker has been seen. Otherwise the capture runs until Stop (or the limit)."
+            />
+            <CheckBox
+              Content="Store video frames"
+              IsChecked="{Binding KeepFrames}"
+              ToolTip.Tip="Also store every captured frame (about 0.5 MB each at 960x540). Not needed for the analysis: every frame's decoded markers and timestamps are always stored (192 bytes each). Tick it to look at the frames or to decode them again later."
+            />
+            <Grid
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="10"
+              ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Stored with the capture."
+            >
+              <TextBlock Text="Target frame rate" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding TargetFpsText}" PlaceholderText="empty = from the frames" />
+            </Grid>
+            <Grid
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="10"
+              ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Stored with the capture."
+            >
+              <TextBlock Text="Display refresh rate" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding DisplayHzText}" PlaceholderText="Hz, empty = no check" />
+            </Grid>
+            <Grid
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="10"
+              ToolTip.Tip="A name for this capture: the reports show it instead of the runs' sequence id. Stored with the capture."
+            >
+              <TextBlock Text="Name" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding CaptureName}" PlaceholderText="empty = the run's sequence id" />
+            </Grid>
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding OutputRoot, StringFormat='Saved in {0}'}" />
+          </StackPanel>
+        </Border>
+
+        <Button Classes="accent big" Content="Start capture" Command="{Binding StartCommand}" IsVisible="{Binding IsIdle}" />
+        <Button Classes="big" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding IsCapturing}" />
+        <TextBlock Classes="error" Text="{Binding ErrorText}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Right: live status -->
+    <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="title" Text="{Binding PhaseText}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Show files" Command="{Binding OpenLastCaptureCommand}" />
+      </Grid>
+
+      <WrapPanel Grid.Row="1" ItemSpacing="10" LineSpacing="10">
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Time" />
+            <TextBlock Classes="tileValue" Text="{Binding ElapsedText}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Frames / second" />
+            <TextBlock Classes="tileValue" Text="{Binding FpsText}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Frames saved" />
+            <TextBlock Classes="tileValue" Text="{Binding FramesText}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Disk" />
+            <TextBlock Classes="tileValue" Text="{Binding BandwidthText}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="Dropped frames" />
+            <TextBlock Classes="tileValue" Classes.error="{Binding HasDrops}" Text="{Binding DropsText}" />
+          </StackPanel>
+        </Border>
+        <Border Classes="tile" MinWidth="200">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="caption" Text="Recorder buffer" />
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding RingFillPercent}" Height="8" Margin="0,8,0,0" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+
+      <Border Grid.Row="2" Classes="card" Padding="0" ClipToBounds="True">
+        <Grid RowDefinitions="*,Auto">
+          <Border Background="{DynamicResource PreviewBrush}" CornerRadius="10,10,0,0">
+            <Panel>
+              <Image Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" />
+              <TextBlock
+                Text="The live picture appears here while capturing"
+                Foreground="#80FFFFFF"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsVisible="{Binding !HasPreview}"
+              />
+            </Panel>
+          </Border>
+          <TextBlock Grid.Row="1" Classes="value" Margin="14,8" Text="{Binding MarkerText}" />
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

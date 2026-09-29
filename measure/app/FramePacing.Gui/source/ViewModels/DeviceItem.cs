@@ -1,0 +1,21 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* An entry of the source list. Device is only set for capture cards.
+//*
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//****************************************************************************************************************************************************
+
+using MB.FramePacing.Capture.Ffmpeg;
+
+namespace MB.FramePacing.Gui.ViewModels
+{
+  /// <summary>An entry of the source list. <see cref="Device"/> is only set for capture cards.</summary>
+  public sealed record DeviceItem(string Title, CaptureDevice? Device, SourceKind Kind = SourceKind.Device)
+  {
+    public bool IsSynthetic => Kind is SourceKind.Synthetic or SourceKind.SyntheticCamera;
+
+    public override string ToString() => Title;
+  }
+}

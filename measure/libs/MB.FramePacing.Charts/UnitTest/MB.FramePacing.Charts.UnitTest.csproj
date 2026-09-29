@@ -1,0 +1,14 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('UnitTest.props', '$(MSBuildProjectDirectory)'))" />
+
+  <ItemGroup>
+    <!-- The test clips and their manifests, shared with the analysis tests -->
+    <Compile Include="..\..\MB.FramePacing.Analysis\UnitTest\source\ClipManifest.cs" Link="source\ClipManifest.cs" />
+    <Compile Include="..\..\MB.FramePacing.Analysis\UnitTest\source\VideoClips.cs" Link="source\VideoClips.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Charts.csproj" />
+  </ItemGroup>
+</Project>

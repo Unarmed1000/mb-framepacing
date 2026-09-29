@@ -1,0 +1,210 @@
+{
+  "captureData": {
+    "header": {
+      "width": 1280,
+      "height": 720,
+      "frameRateNumerator": 60,
+      "frameRateDenominator": 1,
+      "sourceWidth": 1280,
+      "sourceHeight": 720,
+      "region": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "markers": [
+        {
+          "bounds": [
+            32,
+            32,
+            147,
+            147
+          ],
+          "moduleSizePx": 3
+        }
+      ],
+      "framesStored": false,
+      "camera": false
+    },
+    "recordCount": 486,
+    "captureIndexSum": 117855,
+    "hostTicksSum": 1278983072,
+    "deviceTicksCount": 486,
+    "deviceTicksSum": 19642500000,
+    "sourceDropsSum": 0,
+    "statusCounts": {
+      "Decoded": 486
+    },
+    "mainByteCount": 25830,
+    "secondByteCount": 0,
+    "decodedMainPayloads": 486,
+    "frameIndexSum": 280133,
+    "animationTicksSum": 19359000001
+  },
+  "summary": {
+    "formatVersion": 1,
+    "scanout": "SingleScanout",
+    "timeSource": "Device",
+    "capturePeriodMs": 16.6667,
+    "errorThresholdMs": 1,
+    "markerCount": 1,
+    "warningCount": 0,
+    "runs": [
+      {
+        "runId": 1,
+        "sequenceId": "46521e10-865e-535c-90c0-cc6404c94d2a",
+        "framesFile": "run-1-frames.csv",
+        "hasStartMarker": true,
+        "hasEndMarker": true,
+        "presentedFrames": 388,
+        "droppedFrames": 0,
+        "sourceDroppedFrames": 0,
+        "missedCaptures": 0,
+        "captures": 480,
+        "displayDeltaCount": 387,
+        "displayDeltaP50": 16.6667,
+        "animationErrorMax": 16.6667,
+        "averageFps": 48.47599185167429,
+        "excludedStaticFrames": 0,
+        "uncertainSteps": 0,
+        "cpuBusyCount": 388,
+        "pacingSource": "Schedule",
+        "lateFrames": 92,
+        "histogramBins": 335
+      }
+    ]
+  },
+  "frames": [
+    {
+      "file": "run-1-frames.csv",
+      "rowCount": 388,
+      "columns": {
+        "segment": {
+          "count": 388,
+          "sum": 0
+        },
+        "frameIndex": {
+          "count": 388,
+          "sum": 225622
+        },
+        "animationMs": {
+          "count": 388,
+          "sum": 15877333334
+        },
+        "firstCaptureIndex": {
+          "count": 388,
+          "sum": 96520
+        },
+        "firstSeenMs": {
+          "count": 388,
+          "sum": 16086666666
+        },
+        "onScreenMs": {
+          "count": 388,
+          "sum": 80000000
+        },
+        "captures": {
+          "count": 388,
+          "sum": 480
+        },
+        "skippedBefore": {
+          "count": 388,
+          "sum": 0
+        },
+        "displayDeltaMs": {
+          "count": 387,
+          "sum": 79833333
+        },
+        "animationDeltaMs": {
+          "count": 387,
+          "sum": 79833333
+        },
+        "animationErrorMs": {
+          "count": 387,
+          "sum": 0
+        },
+        "driftMs": {
+          "count": 388,
+          "sum": -15333332
+        },
+        "intendedDisplayMs": {
+          "count": 387,
+          "sum": 15877333334
+        },
+        "markerTargetMs": {
+          "count": 388,
+          "sum": 64666796
+        },
+        "targetMs": {
+          "count": 388,
+          "sum": 80000160
+        },
+        "pacingErrorMs": {
+          "count": 386,
+          "sum": 0
+        },
+        "predictionErrorMs": {
+          "count": 386,
+          "sum": 0
+        },
+        "latenessMs": {
+          "count": 387,
+          "sum": 15333332
+        },
+        "lastSeenMs": {
+          "count": 388,
+          "sum": 16102000000
+        },
+        "cpuStartMs": {
+          "count": 387,
+          "sum": 15812666666
+        },
+        "cpuBusyMs": {
+          "count": 388,
+          "sum": 53484094
+        },
+        "frameTimeMs": {
+          "count": 385,
+          "sum": 79500000
+        },
+        "cpuWaitMs": {
+          "count": 385,
+          "sum": 26378375
+        },
+        "mainMarkerFirstSeenMs": {
+          "count": 0,
+          "sum": 0
+        },
+        "scanoutDelayMs": {
+          "count": 0,
+          "sum": 0
+        }
+      },
+      "flagCounts": {
+        "Late": 92
+      },
+      "olderFrameCount": 0,
+      "olderFrameIndexSum": 0
+    }
+  ],
+  "captures": {
+    "rowCount": 486,
+    "statusCounts": {
+      "Decoded": 486
+    },
+    "kindCounts": {
+      "Frame": 480,
+      "SequenceEnd": 3,
+      "SequenceStart": 3
+    },
+    "captureTicksSum": 19642500000,
+    "frameIndexSum": 280133,
+    "hostTicksSum": 1278983072,
+    "sourceDropsSum": 0,
+    "missedSum": 0,
+    "syncCount": 0,
+    "syncFrameIndexSum": 0,
+    "payloadByteCount": 25830
+  }
+}

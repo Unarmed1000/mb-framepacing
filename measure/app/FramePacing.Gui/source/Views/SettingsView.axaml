@@ -1,0 +1,87 @@
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<UserControl
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  x:Class="MB.FramePacing.Gui.Views.SettingsView"
+  x:DataType="vm:SettingsViewModel"
+>
+  <ScrollViewer>
+    <StackPanel Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
+      <!-- ffmpeg and the captures folder: the configuration file, changed through the setup dialog -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="cardTitle" Text="ffmpeg and captures" />
+          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+            <TextBlock Classes="subtle" Text="ffmpeg" />
+            <TextBlock Grid.Column="1" Text="{Binding FfmpegSummary}" Classes.ok="{Binding FfmpegReady}" Classes.error="{Binding !FfmpegReady}" />
+            <TextBlock Grid.Row="1" Classes="subtle" Text="ffmpeg path" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="value" Text="{Binding FfmpegPathText}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="2" Classes="subtle" Text="Captures folder" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="value" Text="{Binding CaptureDirectoryText}" TextWrapping="Wrap" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+              Classes="accent"
+              Content="Set up..."
+              Command="{Binding SetUpCommand}"
+              ToolTip.Tip="Find ffmpeg and choose where captures are saved"
+            />
+            <Button Content="Open the configuration file" Command="{Binding OpenConfigFileCommand}" ToolTip.Tip="{Binding ConfigPath}" />
+          </StackPanel>
+          <TextBlock
+            Classes="error"
+            Text="{Binding StatusText}"
+            TextWrapping="Wrap"
+            IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+          />
+        </StackPanel>
+      </Border>
+
+      <!-- Experimental features: hidden (and never used) unless switched on -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="cardTitle" Text="Experimental features" />
+          <CheckBox Content="Enable experimental features" IsChecked="{Binding ExperimentalFeatures}" />
+          <TextBlock
+            Classes="subtle"
+            TextWrapping="Wrap"
+            Text="Camera capture: film the screen with a calibrated high speed camera instead of a capture card. When enabled, the Capture page shows the Camera card and the synthetic camera source; when disabled, they are hidden and a camera set up earlier is not used."
+          />
+          <TextBlock Classes="warning" Text="{Binding ExperimentalText}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <!-- Where things are -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="cardTitle" Text="About" />
+          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+            <TextBlock Classes="subtle" Text="Version" />
+            <TextBlock Grid.Column="1" Classes="value" Text="{Binding Version}" />
+            <TextBlock Grid.Row="1" Classes="subtle" Text="Configuration" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="value" Text="{Binding ConfigPath}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="2" Classes="subtle" Text="GUI settings" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="value" Text="{Binding GuiSettingsPath}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="3" Classes="subtle" Text="Log files" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="value" Text="{Binding LogDirectory}" TextWrapping="Wrap" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+              Content="Open the log folder"
+              Command="{Binding OpenLogFolderCommand}"
+              ToolTip.Tip="The GUI writes a log file per day here, the last 7 days kept: attach it when reporting a problem"
+            />
+          </StackPanel>
+          <TextBlock
+            Classes="error"
+            Text="{Binding LogStatusText}"
+            TextWrapping="Wrap"
+            IsVisible="{Binding LogStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+          />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

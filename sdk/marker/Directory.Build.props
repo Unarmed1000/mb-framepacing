@@ -1,0 +1,15 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- The marker libraries. Their version comes from sdk/marker/VERSION, shared with the C++ library and released with marker-v* tags.
+       MSBuild also imports this file into the Visual Studio projects CMake generates under sdk/marker/cpp, so it only touches C# projects. -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <!-- A pre-release (0.2.0-beta.1): the numbers are the VersionPrefix, the rest the VersionSuffix (NuGet's 0.2.0-beta.1) -->
+    <MbVersionText>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</MbVersionText>
+    <VersionPrefix>$(MbVersionText)</VersionPrefix>
+    <VersionPrefix Condition="$(MbVersionText.Contains('-'))">$(MbVersionText.Substring(0, $(MbVersionText.IndexOf('-'))))</VersionPrefix>
+    <VersionSuffix Condition="$(MbVersionText.Contains('-'))"
+      >$(MbVersionText.Substring($([MSBuild]::Add($(MbVersionText.IndexOf('-')), 1))))</VersionSuffix>
+  </PropertyGroup>
+</Project>

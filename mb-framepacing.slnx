@@ -1,0 +1,34 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Folder Name="/marker/">
+    <Project Path="sdk/marker/csharp/MB.FrameMarker.csproj" />
+  </Folder>
+  <Folder Name="/data/">
+    <Project Path="sdk/data/csharp/MB.FramePacing.Data.csproj" />
+  </Folder>
+  <Folder Name="/app/">
+    <Project Path="measure/app/FramePacing/FramePacing.csproj" />
+    <Project Path="measure/app/FramePacing.Gui/FramePacing.Gui.csproj" />
+  </Folder>
+  <Folder Name="/libs/">
+    <Project Path="measure/libs/MB.FramePacing.Analysis/MB.FramePacing.Analysis.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Capture/MB.FramePacing.Capture.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Charts/MB.FramePacing.Charts.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Marker/MB.FramePacing.Marker.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="measure/tools/Benchmarks/Benchmarks.csproj" />
+    <Project Path="measure/tools/DocImages/DocImages.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="sdk/data/csharp/UnitTest/MB.FramePacing.Data.UnitTest.csproj" />
+    <Project Path="sdk/marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Analysis/UnitTest/MB.FramePacing.Analysis.UnitTest.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Capture/UnitTest/MB.FramePacing.Capture.UnitTest.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Charts/UnitTest/MB.FramePacing.Charts.UnitTest.csproj" />
+    <Project Path="measure/libs/MB.FramePacing.Marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj" />
+  </Folder>
+</Solution>

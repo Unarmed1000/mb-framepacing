@@ -1,0 +1,250 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* Synthetic capture -> frames.mbfc -> CaptureAnalyzer. The analyzer must recover the synthetic ground truth exactly: every presented frame,
+//* its first-seen capture time, skipped frame indices and the animation error caused by the injected stalls.
+//*
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//****************************************************************************************************************************************************
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using MB.FramePacing.Capture;
+using MB.FramePacing.Capture.Synthetic;
+using MB.FramePacing.Data;
+using MB.FramePacing.Marker;
+using NUnit.Framework;
+
+namespace MB.FramePacing.Analysis.UnitTest
+{
+  [TestFixture]
+  public class EndToEndTests
+  {
+    private string m_directory = string.Empty;
+
+    [SetUp]
+    public void SetUp()
+    {
+      m_directory = Path.Combine(Path.GetTempPath(), "mb-framepacing-tests", Guid.NewGuid().ToString("N"));
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+      try
+      {
+        if (Directory.Exists(m_directory))
+          Directory.Delete(m_directory, true);
+      }
+      catch (IOException) { }
+    }
+
+    private static List<(ulong FrameIndex, long AnimationTicks, long FirstSeenTicks)> ExpectedFrames(SyntheticScenario scenario)
+    {
+      var expected = new List<(ulong, long, long)>();
+      for (long i = 0; i < scenario.CaptureCount; ++i)
+      {
+        int index = scenario.PresentedIndexAt(i);
+        if (index < 0)
+          continue;
+        var payload = scenario.PresentedFrames[index].Payload;
+        if (payload.Kind != MarkerKind.Frame)
+          continue;
+        if (expected.Count == 0 || expected[^1].Item1 != payload.FrameIndex)
+          expected.Add((payload.FrameIndex, payload.AnimationTicks, scenario.CaptureTicks(i)));
+      }
+      return expected;
+    }
+
+    /// <summary>The name given at capture is stored in capture.json and names the runs; an analysis can override it.</summary>
+    [Test]
+    public void Analyzer_NamesTheRunsAsTheCaptureSays()
+    {
+      var scenario = new SyntheticScenario(
+        new SyntheticScenarioOptions
+        {
+          CaptureFps = 60,
+          RefreshHz = 60,
+          RunSeconds = 1,
+          SequenceTag = "named",
+        }
+      );
+      using (var source = new SyntheticCaptureSource(scenario, paced: false))
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = m_directory, Name = "menu scroll" }, null, CancellationToken.None);
+
+      Assert.That(CaptureSessionInfo.TryLoad(m_directory)!.Name, Is.EqualTo("menu scroll"));
+      var run = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions()).Timeline.Runs.Single();
+      Assert.That((run.Name, run.SequenceId), Is.EqualTo(("menu scroll", "named")));
+      var overridden = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions { Name = "busy menu" }).Timeline.Runs.Single();
+      Assert.That(overridden.Name, Is.EqualTo("busy menu"));
+    }
+
+    // A capture card captures at the display's refresh rate
+    [TestCase(60.0, 10, 0)]
+    [TestCase(144.0, 13, 29)]
+    [TestCase(240.0, 0, 11)]
+    [TestCase(500.0, 37, 53)]
+    public void Analyzer_RecoversTheGroundTruth(double refreshHz, int stallEvery, int skipEvery)
+    {
+      var scenario = new SyntheticScenario(
+        new SyntheticScenarioOptions
+        {
+          CaptureFps = refreshHz,
+          RefreshHz = refreshHz,
+          RunSeconds = 2,
+          StallEvery = stallEvery,
+          SkipEvery = skipEvery,
+          SequenceTag = "e2e",
+          RunId = 42,
+        }
+      );
+      using (var source = new SyntheticCaptureSource(scenario, paced: false))
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = m_directory, RingFrames = 8192 }, null, CancellationToken.None);
+
+      var report = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions());
+
+      Assert.That(report.Capture.TimeSource, Is.EqualTo(TimeSource.Device));
+      Assert.That(report.Capture.Layout.ModuleSizePx, Is.EqualTo(scenario.Options.ModuleSizePx).Within(0.2));
+      var run = report.Timeline.Runs.Single();
+      Assert.That(run.RunId, Is.EqualTo(42));
+      Assert.That(run.SequenceId, Is.EqualTo("e2e"));
+      Assert.That(run.StartTimeUtc, Is.EqualTo(scenario.StartMetadata.StartTimeUtc));
+      Assert.That(run.HasStartMarker && run.HasEndMarker);
+      Assert.That(run.Counts.Undecodable + run.Counts.Torn + run.Counts.NotRecorded, Is.Zero);
+
+      var expected = ExpectedFrames(scenario);
+      Assert.That(run.Frames.Select(f => f.FrameIndex), Is.EqualTo(expected.Select(e => e.FrameIndex)));
+      for (int i = 0; i < expected.Count; ++i)
+      {
+        var frame = run.Frames[i];
+        Assert.That(frame.FirstSeenTicks, Is.EqualTo(expected[i].FirstSeenTicks), $"frame {frame.FrameIndex}");
+        if (i > 0)
+        {
+          long expectedError =
+            (expected[i].AnimationTicks - expected[i - 1].AnimationTicks) - (expected[i].FirstSeenTicks - expected[i - 1].FirstSeenTicks);
+          Assert.That(frame.AnimationErrorTicks, Is.EqualTo(expectedError), $"frame {frame.FrameIndex}");
+        }
+      }
+
+      // A stalled frame is shown at least a refresh after the vsync it was rendered for (the synthetic pacer's schedule)
+      var truth = scenario.PresentedFrames.ToDictionary(f => f.Payload.FrameIndex);
+      int stalls = expected
+        .Skip(1)
+        .Count(e =>
+          truth[e.FrameIndex].DisplayTicks - (truth[e.FrameIndex].Payload.IntendedDisplayTicks - SyntheticScenario.PacerEpochTicks)
+          >= scenario.RefreshIntervalTicks / 2
+        );
+      Assert.That(run.Pacing, Is.Not.Null);
+      Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(report.CapturePeriodMs), "a capture card captures at the display's refresh rate");
+      Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
+      if (stallEvery > 0)
+      {
+        Assert.That(stalls, Is.GreaterThan(0));
+        Assert.That(run.Statistics.FramesWithAnimationError, Is.GreaterThanOrEqualTo(stalls), "a stall of one refresh is a real animation error");
+        Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.BadPacing));
+      }
+      else
+        Assert.That(
+          run.Statistics.AnimationErrorMs.Min,
+          Is.GreaterThanOrEqualTo(-1000.0 / refreshHz - 1e-6),
+          "no stalls: only skips (positive) and quantisation"
+        );
+
+      // Reports
+      var summaryPath = Path.Combine(report.OutputDirectory, CaptureAnalyzer.SummaryFileName);
+      Assert.That(File.Exists(summaryPath));
+      using (var summary = System.Text.Json.JsonDocument.Parse(File.ReadAllText(summaryPath)))
+      {
+        var histograms = summary.RootElement.GetProperty("runs")[0].GetProperty("histograms");
+        long withError = run.Frames.LongCount(f => f.AnimationErrorTicks.HasValue);
+        Assert.That(histograms.GetProperty("animationErrorMs").GetProperty("total").GetInt64(), Is.EqualTo(withError));
+        long binWidthTicks = (long)
+          Math.Round(histograms.GetProperty("displayDeltaMs").GetProperty("binWidthMs").GetDouble() * TimeSpan.TicksPerMillisecond);
+        Assert.That(
+          binWidthTicks % Histogram.DefaultBinWidthTicks,
+          Is.Zero,
+          "the fixed bin width (or a multiple for a wide range), whatever the capture period"
+        );
+      }
+      Assert.That(
+        File.ReadLines(Path.Combine(report.OutputDirectory, CaptureAnalyzer.CapturesFileName)).Count(),
+        Is.EqualTo(scenario.CaptureCount + 1)
+      );
+      Assert.That(File.ReadLines(Path.Combine(report.OutputDirectory, "run-42-frames.csv")).Count(), Is.EqualTo(expected.Count + 1));
+    }
+
+    [Test]
+    public void Analyzer_TearingMarkers_DetectTornCaptures()
+    {
+      // The main marker and the sync marker below it; for a few captures the sync marker shows the next frame (a tear between them)
+      var header = new CaptureFileHeader(200, 320, FrameRate.FromFps(240));
+      Directory.CreateDirectory(m_directory);
+      var framesPath = Path.Combine(m_directory, CaptureSessionInfo.FramesFileName);
+      var frame = new GrayImage(header.Width, header.Height, 96);
+      var record = new byte[header.RecordSize];
+      int frames = 40;
+      using (var writer = new CaptureFileWriter(framesPath, header))
+      {
+        for (int i = 0; i < frames; ++i)
+        {
+          ulong top = (ulong)(i / 4);
+          ulong bottom = i % 4 == 3 ? top + 1 : top;
+          // The same frame index of another run (the application restarted) is another frame too
+          uint bottomRun = i % 8 == 5 ? 2u : 1u;
+          var kind = i < 4 ? MarkerKind.SequenceStart : MarkerKind.Frame;
+          StartMetadata? start = kind == MarkerKind.SequenceStart ? StartMetadata.FromTag(0, "tear") : null;
+          Array.Fill(frame.Pixels, (byte)96);
+          MarkerRenderer.Render(frame, new MarkerPayload(top, (long)top * 166_667, 1, kind), 12, 12, 3, metadata: start);
+          if (kind == MarkerKind.Frame)
+            MarkerRenderer.Render(frame, new MarkerPayload(bottom, 0, bottomRun, MarkerKind.Sync), 12, 200, 3);
+          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
+          frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
+          writer.WriteRecords(record);
+        }
+      }
+
+      var report = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions());
+
+      Assert.That(report.Capture.Layout.Locks, Has.Count.EqualTo(2));
+      Assert.That(
+        report.Capture.Rows.Count(r => r.Status == CaptureStatus.Torn),
+        Is.EqualTo(9 + 5),
+        "captures 7, 11, ... 39 (frame index) and 5, 13, ... 37 (run id) are torn"
+      );
+    }
+
+    [TestCase(true, 20, true)]
+    [TestCase(true, 1, false)]
+    [TestCase(false, 20, false)]
+    public void Analyzer_RegionCapture_WarnsWhenTheMarkerMayHaveMoved(bool region, int lostCaptures, bool expectWarning)
+    {
+      // Only the marker's region was stored (fast capture); the last captures lost the marker, as if the application moved it
+      var header = new CaptureFileHeader(160, 160, FrameRate.FromFps(240), 1920, 1080, region ? new PixelRect(16, 16, 320, 320) : default);
+      Directory.CreateDirectory(m_directory);
+      var frame = new GrayImage(header.Width, header.Height, 96);
+      var record = new byte[header.RecordSize];
+      const int Captures = 40;
+      using (var writer = new CaptureFileWriter(Path.Combine(m_directory, CaptureSessionInfo.FramesFileName), header))
+      {
+        for (int i = 0; i < Captures; ++i)
+        {
+          Array.Fill(frame.Pixels, (byte)96);
+          if (i < Captures - lostCaptures)
+            MarkerRenderer.Render(frame, new MarkerPayload((ulong)(i / 4), i / 4 * 166_667L, 1, MarkerKind.Frame), 8, 8, 3);
+          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
+          frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
+          writer.WriteRecords(record);
+        }
+      }
+
+      var report = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions());
+
+      Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable), Is.EqualTo(lostCaptures));
+      Assert.That(report.Warnings.Any(w => w.Contains("may have moved", StringComparison.Ordinal)), Is.EqualTo(expectWarning));
+    }
+  }
+}
