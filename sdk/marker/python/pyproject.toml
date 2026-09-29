@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mb-framemarker"
-# The marker libraries' version, sdk/marker/VERSION (a test checks that mb_framemarker.__version__ matches it)
+# The marker libraries' version, sdk/marker/VERSION as PEP 440 spells it (0.2.0-beta.1 is 0.2.0b1; a test checks that mb_framemarker.__version__ matches it)
 version = "0.1.0"
 description = "The mb-framepacing frame marker: draw the frame index and animation time into every frame as a QR code"
 readme = "README.md"

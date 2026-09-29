@@ -9,6 +9,6 @@ namespace MB::FramePacingData
 {
   LibraryVersion GetLibraryVersion() noexcept
   {
-    return {VersionMajor, VersionMinor, VersionPatch, VersionString};
+    return {VersionMajor, VersionMinor, VersionPatch, VersionString, VersionPrerelease};
   }
 }

@@ -10,6 +10,25 @@ The repository has three release streams with their own versions ([semantic vers
 
 The marker libraries (C++, C# and the Unity package) share one version because they implement the same marker format and API.
 
+## Pre-releases
+
+A version may carry a pre-release: `-alpha.N`, `-beta.N` or `-rc.N` (N from 1), in the VERSION file and the tag alike
+(`marker-v0.2.0-beta.1`). They sort as semantic versioning says: `0.2.0-alpha.1` < `0.2.0-alpha.2` < `0.2.0-beta.1` < `0.2.0-rc.1` <
+`0.2.0`. The release runs as any other and its GitHub Release is marked as a pre-release. Each language spells it as its own tools
+expect:
+
+| Where                                    | `0.2.0-beta.1` is                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| C++ (`Version.hpp`, `GetLibraryVersion`) | `VersionString` `"0.2.0-beta.1"`, `VersionPrerelease` `"beta.1"`, numbers 0, 2, 0          |
+| CMake package                            | version 0.2.0: `find_package(mb_framemarker 0.2)` also accepts its pre-releases            |
+| .NET                                     | `VersionPrefix` 0.2.0, `VersionSuffix` beta.1 (NuGet's `0.2.0-beta.1`)                     |
+| Python (`pyproject.toml`, `__version__`) | `0.2.0b1` (PEP 440: `a`, `b`, `rc`); write it there by hand, a test checks it              |
+| Unity package, Conan                     | `0.2.0-beta.1`; Conan version ranges skip pre-releases unless asked (`include_prerelease`) |
+
+The API check (`tools/check_semver.py`) compares with the newest **stable** release: the pre-releases of a version may change its API
+among themselves, and the version must cover the changes since the last stable release. A VERSION file is never lower than the newest
+tag of its stream, pre-releases included.
+
 ## Marker libraries
 
 `sdk/marker/VERSION` is the version of the **next** release. Raise it in the change that alters the API, not only when you release:

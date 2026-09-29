@@ -881,8 +881,8 @@ TEST(Sizing, RecommendedOrigins)
 TEST(Version, MatchesTheVersionFile)
 {
   EXPECT_EQ(FM::VersionString, std::string_view(MB_FRAMEMARKER_EXPECTED_VERSION));
-  EXPECT_EQ(std::to_string(FM::VersionMajor) + "." + std::to_string(FM::VersionMinor) + "." + std::to_string(FM::VersionPatch),
-            std::string(FM::VersionString));
+  const std::string numbers = std::to_string(FM::VersionMajor) + "." + std::to_string(FM::VersionMinor) + "." + std::to_string(FM::VersionPatch);
+  EXPECT_EQ(FM::VersionPrerelease.empty() ? numbers : numbers + "-" + std::string(FM::VersionPrerelease), std::string(FM::VersionString));
 }
 
 TEST(Version, TheLinkedLibraryHasTheVersionOfTheHeader)
@@ -892,6 +892,7 @@ TEST(Version, TheLinkedLibraryHasTheVersionOfTheHeader)
   EXPECT_EQ(version.Major, FM::VersionMajor);
   EXPECT_EQ(version.Minor, FM::VersionMinor);
   EXPECT_EQ(version.Patch, FM::VersionPatch);
+  EXPECT_EQ(version.Prerelease, FM::VersionPrerelease);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------

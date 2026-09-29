@@ -7,6 +7,7 @@ then review and commit the change (see doc/releasing.md). The release workflows 
 through the recipe (tools/check_conan.py --released).
 
   python tools/add_conan_version.py marker 0.2.0
+  python tools/add_conan_version.py marker 0.3.0-beta.1
   python tools/add_conan_version.py data 0.2.0 --repository <owner>/<name>
 """
 
@@ -23,7 +24,9 @@ LIBRARIES = {
     "marker": ("mb-framemarker", "marker-v", "mb-framemarker-cpp"),
     "data": ("mb-framepacingdata", "data-v", "mb-framepacingdata-cpp"),
 }
-VERSION = re.compile(r"^\d+\.\d+\.\d+$")
+VERSION = re.compile(r"^\d+\.\d+\.\d+(-(alpha|beta|rc)\.[1-9]\d*)?$")
+# A pre-release sorts before its release, and alpha before beta before rc (as Conan orders them)
+PRERELEASE_LABELS = ("alpha", "beta", "rc")
 # The entries of both files: a quoted version, then its indented fields
 ENTRY = re.compile(r'^  "(?P<version>[^"]+)":\n((?:    .*\n)+)', re.MULTILINE)
 FIELD = re.compile(r'^    (?P<key>\w+): "?(?P<value>[^"\n]*)"?$', re.MULTILINE)
@@ -44,7 +47,12 @@ def read_entries(path: Path) -> tuple[str, dict[str, dict[str, str]]]:
 
 
 def version_key(version: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in version.split("."))
+    numbers, _, prerelease = version.partition("-")
+    major, minor, patch = (int(part) for part in numbers.split("."))
+    if not prerelease:
+        return (major, minor, patch, 1, 0, 0)
+    label, _, number = prerelease.partition(".")
+    return (major, minor, patch, 0, PRERELEASE_LABELS.index(label), int(number))
 
 
 def write_entries(path: Path, header: str, key: str, entries: dict[str, dict[str, str]], quoted: bool) -> None:
@@ -68,11 +76,11 @@ def released_sha256(url: str, archive: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     _ = parser.add_argument("library", choices=list(LIBRARIES))
-    _ = parser.add_argument("version", help="the released version, MAJOR.MINOR.PATCH")
+    _ = parser.add_argument("version", help="the released version, MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N")
     _ = parser.add_argument("--repository", help="the GitHub repository with the release (default: Unarmed1000/mb-framepacing)")
     args = parser.parse_args(namespace=Arguments())
     if not VERSION.match(args.version):
-        parser.error(f"{args.version} is not MAJOR.MINOR.PATCH")
+        parser.error(f"{args.version} is not MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N")
 
     name, tag_prefix, archive_prefix = LIBRARIES[args.library]
     archive = f"{archive_prefix}-{args.version}.tar.gz"

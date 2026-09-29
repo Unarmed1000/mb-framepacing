@@ -110,6 +110,10 @@ def main() -> int:
                 add_local_version(index, recipe, version, work / "dist" / recipe.library / f"{recipe.archive_prefix}-{version}.tar.gz")
 
         run([conan, "profile", "detect"], env)
+        # Version ranges skip pre-releases unless asked: the data recipe's range must find a marker pre-release built from this checkout
+        if not args.released:
+            with (work / "home" / "global.conf").open("a", encoding="utf-8") as conf:
+                _ = conf.write("core.version_ranges:resolve_prereleases=True\n")
         # The index first, so these recipes win over any of the same name elsewhere; ConanCenter for CMake and nlohmann/json
         run([conan, "remote", "add", "mb-framepacing", str(index), "--type", "local-recipes-index", "--index", "0"], env)
         for recipe in recipes:

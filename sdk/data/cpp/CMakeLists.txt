@@ -12,14 +12,24 @@ else()
   set(MB_FRAMEPACINGDATA_LEGAL_DIR "${CMAKE_CURRENT_LIST_DIR}/../../..")
 endif()
 
-# Edit sdk/data/VERSION to bump the data libraries, or override with -DMB_FRAMEPACINGDATA_VERSION=x.y.z.
+# Edit sdk/data/VERSION to bump the data libraries (an edit reconfigures), or build one tree as another version with
+# -DMB_FRAMEPACINGDATA_VERSION_OVERRIDE=x.y.z.
+# A pre-release adds -alpha.N, -beta.N or -rc.N (see doc/releasing.md); CMake's project version is the numbers alone.
 file(STRINGS "${MB_FRAMEPACINGDATA_META_DIR}/VERSION" MB_FRAMEPACINGDATA_VERSION_FILE LIMIT_COUNT 1)
-set(MB_FRAMEPACINGDATA_VERSION "${MB_FRAMEPACINGDATA_VERSION_FILE}" CACHE STRING "mb_framepacingdata version (defaults to sdk/data/VERSION)")
-if(NOT MB_FRAMEPACINGDATA_VERSION MATCHES "^[0-9]+\.[0-9]+\.[0-9]+$")
-  message(FATAL_ERROR "MB_FRAMEPACINGDATA_VERSION '${MB_FRAMEPACINGDATA_VERSION}' is not MAJOR.MINOR.PATCH")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${MB_FRAMEPACINGDATA_META_DIR}/VERSION")
+set(MB_FRAMEPACINGDATA_VERSION_OVERRIDE "" CACHE STRING "Build as this mb_framepacingdata version instead of VERSION's (empty: VERSION)")
+# A normal variable, read on every configure: it also hides a cached value from an older configure
+set(MB_FRAMEPACINGDATA_VERSION "${MB_FRAMEPACINGDATA_VERSION_FILE}")
+if(MB_FRAMEPACINGDATA_VERSION_OVERRIDE)
+  set(MB_FRAMEPACINGDATA_VERSION "${MB_FRAMEPACINGDATA_VERSION_OVERRIDE}")
 endif()
+if(NOT MB_FRAMEPACINGDATA_VERSION MATCHES "^([0-9]+\\.[0-9]+\\.[0-9]+)(-((alpha|beta|rc)\\.[1-9][0-9]*))?$")
+  message(FATAL_ERROR "MB_FRAMEPACINGDATA_VERSION '${MB_FRAMEPACINGDATA_VERSION}' is not MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N")
+endif()
+set(MB_FRAMEPACINGDATA_VERSION_NUMBERS "${CMAKE_MATCH_1}")
+set(MB_FRAMEPACINGDATA_VERSION_PRERELEASE "${CMAKE_MATCH_3}")
 
-project(mb_framepacingdata VERSION ${MB_FRAMEPACINGDATA_VERSION} DESCRIPTION "Reads the mb-framepacing tools' capture data and analysis output" LANGUAGES C CXX)
+project(mb_framepacingdata VERSION ${MB_FRAMEPACINGDATA_VERSION_NUMBERS} DESCRIPTION "Reads the mb-framepacing tools' capture data and analysis output" LANGUAGES C CXX)
 
 option(MB_FRAMEPACINGDATA_BUILD_TESTS "Build the mb_framepacingdata unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACINGDATA_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})
@@ -114,7 +124,7 @@ if(MB_FRAMEPACINGDATA_BUILD_TESTS)
   target_compile_options(mb_framepacingdata_tests PRIVATE ${MB_FRAMEPACINGDATA_CXX_WARNINGS})
   # The golden data (test-data/data) is found above this folder; a copy outside the repository skips those tests
   target_compile_definitions(mb_framepacingdata_tests PRIVATE MB_FRAMEPACINGDATA_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-                                                              MB_FRAMEPACINGDATA_EXPECTED_VERSION="${PROJECT_VERSION}")
+                                                              MB_FRAMEPACINGDATA_EXPECTED_VERSION="${MB_FRAMEPACINGDATA_VERSION}")
   include(GoogleTest)
   gtest_discover_tests(mb_framepacingdata_tests)
 endif()

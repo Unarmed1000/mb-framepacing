@@ -290,6 +290,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   public API of `MB.FrameMarker` with the last `marker-v*` release and of `MB.FramePacing.Data` with the last `data-v*` release using
   ApiCompat. `sdk/marker/VERSION` and `sdk/data/VERSION` are the next releases' versions: raise them in the change that alters the API (0.x:
   minor for any API change; from 1.0: major for breaking changes).
+  - A version may be a pre-release: `-alpha.N`, `-beta.N` or `-rc.N` only (doc/releasing.md "Pre-releases"). CMake splits it off
+    (`project()` takes the numbers; `Version.hpp` has `VersionString` and `VersionPrerelease`), .NET makes it the `VersionSuffix`, and
+    Python spells it as PEP 440 does (`0.2.0b1`, by hand in `pyproject.toml` and `__version__`; `test_version.py` checks both). The
+    API baseline is the newest stable release.
+  - CMake reads VERSION on every configure (a normal variable; an edit reconfigures); `-D<NAME>_VERSION_OVERRIDE` builds one tree as
+    another version.
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `sdk/marker/cpp/build/<preset>/Release/marker-render --golden sdk/test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
   the C# tests and the Python tests (`python -m unittest discover -s sdk/marker/python -t sdk/marker/python`).

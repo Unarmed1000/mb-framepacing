@@ -31,6 +31,7 @@ TEST(AnalysisOutput, TheVersionIsTheDataLibraries)
   EXPECT_EQ(version.Major, FD::VersionMajor);
   EXPECT_EQ(version.Minor, FD::VersionMinor);
   EXPECT_EQ(version.Patch, FD::VersionPatch);
+  EXPECT_EQ(version.Prerelease, FD::VersionPrerelease);
 }
 
 TEST(AnalysisOutput, ASummaryWithoutAFormatVersionIsFormatOne)

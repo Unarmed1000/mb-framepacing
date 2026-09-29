@@ -38,8 +38,8 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#marker-v}"
-          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::$GITHUB_REF_NAME is not marker-v<major>.<minor>.<patch>"; exit 1
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.[1-9][0-9]*)?$ ]]; then
+            echo "::error::$GITHUB_REF_NAME is not marker-v<major>.<minor>.<patch>, optionally with -alpha.N, -beta.N or -rc.N"; exit 1
           fi
           expected="$(tr -d '[:space:]' < sdk/marker/VERSION)"
           if [ "$version" != "$expected" ]; then
@@ -120,7 +120,12 @@ jobs:
         shell: bash
         run: |
           sha256="$(grep "mb-framemarker-cpp-$VERSION.tar.gz" dist/SHA256SUMS | cut -d' ' -f1)"
-          major_minor="${VERSION%.*}"
+          # find_package takes the numbers only: 0.2.0-beta.1 asks for 0.2
+          numbers="${VERSION%%-*}"
+          major_minor="${numbers%.*}"
+          # A pre-release (a version with -alpha.N, -beta.N or -rc.N) is marked as one on GitHub
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
           cat > notes.md <<EOF
           ## C++ (CMake 4.0+, C++20)
 
@@ -145,7 +150,7 @@ jobs:
 
           The general library is \`sdk/marker/csharp\` at this tag.
           EOF
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Marker libraries $VERSION" --notes-file notes.md --generate-notes
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Marker libraries $VERSION" --notes-file notes.md --generate-notes "${prerelease[@]}"
 
   upm:
     name: Unity package (upm branch)

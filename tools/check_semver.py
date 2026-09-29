@@ -3,11 +3,12 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the semantic versions of the three release streams (see doc/releasing.md).
 
-1. sdk/marker/VERSION, measure/VERSION and sdk/data/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their
-   stream (marker-v*, tools-v*, data-v*).
-2. The public API of the C# marker library MB.FrameMarker is compared with the newest marker-v* release, and that of the C# data
-   library MB.FramePacing.Data with the newest data-v* release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool
-   restore). The C++ marker API mirrors the C# one, so this also guards the C++ marker library.
+1. sdk/marker/VERSION, measure/VERSION and sdk/data/VERSION are MAJOR.MINOR.PATCH, optionally with a pre-release (-alpha.N, -beta.N
+   or -rc.N), and never lower than the newest release tag of their stream (marker-v*, tools-v*, data-v*), pre-releases included, in
+   semantic version order: 0.2.0-alpha.1 < 0.2.0-alpha.2 < 0.2.0-beta.1 < 0.2.0-rc.1 < 0.2.0.
+2. The public API of the C# marker library MB.FrameMarker is compared with the newest stable marker-v* release, and that of the C# data
+   library MB.FramePacing.Data with the newest stable data-v* release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool
+   restore). Pre-releases are not a baseline: the pre-releases of a version may change its API among themselves. The C++ marker API mirrors the C# one, so this also guards the C++ marker library.
    - A breaking change needs a new major version (a new minor version while the major version is 0).
    - Any other API change (an addition) needs at least a new minor version.
    Without a release tag of the stream there is nothing to compare with, and its API check is skipped. A tag on the checked out commit itself
@@ -28,7 +29,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|rc)\.([1-9][0-9]*))?$")
+# A pre-release sorts before its release, and alpha before beta before rc
+PRERELEASE_LABELS = ("alpha", "beta", "rc")
 
 
 @dataclass(frozen=True)
@@ -50,7 +53,8 @@ API_STREAMS = (
     ApiStream("MB.FramePacing.Data", Path("sdk/data/csharp/MB.FramePacing.Data.csproj"), "sdk/data/VERSION", "data-v"),
 )
 
-Version = tuple[int, int, int]
+# (major, minor, patch, 1 for a release or 0 for a pre-release, the pre-release label's rank, its number): sorts as semver does
+Version = tuple[int, int, int, int, int, int]
 
 
 def error(message: str) -> None:
@@ -68,22 +72,32 @@ def parse(text: str) -> Version | None:
     match = SEMVER.match(text)
     if match is None:
         return None
-    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    numbers = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    if match.group(4) is None:
+        return (*numbers, 1, 0, 0)
+    return (*numbers, 0, PRERELEASE_LABELS.index(match.group(4)), int(match.group(5)))
+
+
+def is_prerelease(version: Version) -> bool:
+    return version[3] == 0
 
 
 def show(version: Version) -> str:
-    return f"{version[0]}.{version[1]}.{version[2]}"
+    numbers = f"{version[0]}.{version[1]}.{version[2]}"
+    return f"{numbers}-{PRERELEASE_LABELS[version[4]]}.{version[5]}" if is_prerelease(version) else numbers
 
 
 def git(root: Path, *args: str) -> str:
     return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout
 
 
-def newest_tag(root: Path, prefix: str, skip: frozenset[str]) -> tuple[str, Version] | None:
+def newest_tag(root: Path, prefix: str, skip: frozenset[str], stable_only: bool = False) -> tuple[str, Version] | None:
     newest: tuple[str, Version] | None = None
     for tag in git(root, "tag", "--list", prefix + "*").splitlines():
         version = parse(tag.removeprefix(prefix))
-        if tag not in skip and version is not None and (newest is None or version > newest[1]):
+        if version is None or tag in skip or (stable_only and is_prerelease(version)):
+            continue
+        if newest is None or version > newest[1]:
             newest = (tag, version)
     return newest
 
@@ -93,7 +107,7 @@ def check_stream(root: Path, version_file: str, prefix: str) -> Version | None:
     text = (root / version_file).read_text(encoding="utf-8").strip()
     version = parse(text)
     if version is None:
-        error(f"{version_file} is '{text}', expected MAJOR.MINOR.PATCH (for example 1.2.3)")
+        error(f"{version_file} is '{text}', expected MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N (for example 1.2.3 or 1.2.3-beta.1)")
         return None
     newest = newest_tag(root, prefix, frozenset())
     if newest is not None and version < newest[1]:
@@ -131,9 +145,9 @@ def api_compat(root: Path, baseline: Path, current: Path, strict: bool) -> tuple
 def check_api(root: Path, stream: ApiStream, version: Version) -> bool:
     # The release run checks out the new tag itself; compare with the release before it
     at_head = frozenset(git(root, "tag", "--points-at", "HEAD").splitlines())
-    newest = newest_tag(root, stream.tag_prefix, at_head)
+    newest = newest_tag(root, stream.tag_prefix, at_head, stable_only=True)
     if newest is None:
-        notice(f"No {stream.tag_prefix}* release yet, so there is no {stream.library} API to compare with")
+        notice(f"No stable {stream.tag_prefix}* release yet, so there is no {stream.library} API to compare with")
         return True
     tag, released = newest
 

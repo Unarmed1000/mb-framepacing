@@ -7,13 +7,16 @@
 
 namespace MB::FramePacingData
 {
-  //! A library version, MAJOR.MINOR.PATCH, and as text ("0.1.0"). GetLibraryVersion() gives the linked library's.
+  //! A library version, MAJOR.MINOR.PATCH, and as text ("0.1.0", or "0.2.0-beta.1" for a pre-release). GetLibraryVersion() gives the
+  //! linked library's.
   struct LibraryVersion
   {
     int Major{0};
     int Minor{0};
     int Patch{0};
     std::string_view Text;
+    //! The pre-release ("alpha.1", "beta.2", "rc.1"), empty for a release
+    std::string_view Prerelease;
   };
 }
 

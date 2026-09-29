@@ -12,14 +12,24 @@ else()
   set(MB_FRAMEMARKER_LEGAL_DIR "${CMAKE_CURRENT_LIST_DIR}/../../..")
 endif()
 
-# Edit sdk/marker/VERSION to bump the marker libraries, or override with -DMB_FRAMEMARKER_VERSION=x.y.z.
+# Edit sdk/marker/VERSION to bump the marker libraries (an edit reconfigures), or build one tree as another version with
+# -DMB_FRAMEMARKER_VERSION_OVERRIDE=x.y.z.
+# A pre-release adds -alpha.N, -beta.N or -rc.N (see doc/releasing.md); CMake's project version is the numbers alone.
 file(STRINGS "${MB_FRAMEMARKER_META_DIR}/VERSION" MB_FRAMEMARKER_VERSION_FILE LIMIT_COUNT 1)
-set(MB_FRAMEMARKER_VERSION "${MB_FRAMEMARKER_VERSION_FILE}" CACHE STRING "mb_framemarker version (defaults to sdk/marker/VERSION)")
-if(NOT MB_FRAMEMARKER_VERSION MATCHES "^[0-9]+\.[0-9]+\.[0-9]+$")
-  message(FATAL_ERROR "MB_FRAMEMARKER_VERSION '${MB_FRAMEMARKER_VERSION}' is not MAJOR.MINOR.PATCH (a parent project may have set a variable of that name)")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${MB_FRAMEMARKER_META_DIR}/VERSION")
+set(MB_FRAMEMARKER_VERSION_OVERRIDE "" CACHE STRING "Build as this mb_framemarker version instead of VERSION's (empty: VERSION)")
+# A normal variable, read on every configure: it also hides a cached value from an older configure
+set(MB_FRAMEMARKER_VERSION "${MB_FRAMEMARKER_VERSION_FILE}")
+if(MB_FRAMEMARKER_VERSION_OVERRIDE)
+  set(MB_FRAMEMARKER_VERSION "${MB_FRAMEMARKER_VERSION_OVERRIDE}")
 endif()
+if(NOT MB_FRAMEMARKER_VERSION MATCHES "^([0-9]+\\.[0-9]+\\.[0-9]+)(-((alpha|beta|rc)\\.[1-9][0-9]*))?$")
+  message(FATAL_ERROR "MB_FRAMEMARKER_VERSION '${MB_FRAMEMARKER_VERSION}' is not MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N")
+endif()
+set(MB_FRAMEMARKER_VERSION_NUMBERS "${CMAKE_MATCH_1}")
+set(MB_FRAMEMARKER_VERSION_PRERELEASE "${CMAKE_MATCH_3}")
 
-project(mb_framemarker VERSION ${MB_FRAMEMARKER_VERSION} DESCRIPTION "Pixel aligned QR frame marker geometry" LANGUAGES C CXX)
+project(mb_framemarker VERSION ${MB_FRAMEMARKER_VERSION_NUMBERS} DESCRIPTION "Pixel aligned QR frame marker geometry" LANGUAGES C CXX)
 
 # Tests and tools only build by default when this is the top level project, so engines that add_subdirectory/FetchContent the library
 # never download GoogleTest.
@@ -96,7 +106,7 @@ if(MB_FRAMEMARKER_BUILD_TESTS)
   add_executable(mb_framemarker_tests tests/FrameMarkerTests.cpp tests/AllocationTests.cpp)
   target_link_libraries(mb_framemarker_tests PRIVATE mb::framemarker GTest::gtest_main)
   target_compile_options(mb_framemarker_tests PRIVATE ${MB_FRAMEMARKER_CXX_WARNINGS})
-  target_compile_definitions(mb_framemarker_tests PRIVATE MB_FRAMEMARKER_EXPECTED_VERSION="${PROJECT_VERSION}")
+  target_compile_definitions(mb_framemarker_tests PRIVATE MB_FRAMEMARKER_EXPECTED_VERSION="${MB_FRAMEMARKER_VERSION}")
   include(GoogleTest)
   gtest_discover_tests(mb_framemarker_tests)
 endif()
