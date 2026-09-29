@@ -19,7 +19,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 
 | Path                                              | Contents                                                                                                        |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `sdk/`                                            | **BSD 3-Clause**: everything below it                                                                           |
+| `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)     |
 | `sdk/marker/VERSION`                              | Version of the marker libraries (released with `marker-v*` tags)                                                |
 | `sdk/marker/cpp/`                                 | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                                            |
 | `sdk/marker/csharp/`                              | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |

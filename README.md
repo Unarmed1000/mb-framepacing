@@ -483,28 +483,28 @@ flowchart TB
     AN --> GUI
 ```
 
-| Path                        | Contents                                                                                                 |
-| --------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `sdk/`                      | **BSD 3-Clause**: everything applications embed or use to read the results                               |
-| `sdk/marker/`               | **Goes into your application**: the marker libraries and their version                                   |
-| `sdk/marker/cpp/`           | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check        |
-| `sdk/marker/csharp/`        | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests             |
-| `sdk/marker/unity/`         | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)             |
-| `sdk/marker/python/`        | The Python marker library `mb_framemarker` (standard library only) and its unittest tests                |
-| `sdk/marker/shaders/`       | Reference shaders that draw the marker as one quad                                                       |
-| `sdk/data/`                 | **Reads the results**: the data libraries (C#, C++, Python) for the capture data and the analysis output |
-| `sdk/conan/`                | Conan 2 recipes of the C++ libraries (a local-recipes-index remote)                                      |
-| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats               |
-| `sdk/test-data/`            | Golden marker images (checked by every marker library) and the data libraries' golden data               |
-| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                      |
-| `measure/libs/`             | Marker, Capture, Analysis and Charts libraries with their NUnit tests                                    |
-| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                      |
-| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                |
-| `measure/doc/`              | Platform, usage and camera guides, images                                                                |
-| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                          |
-| `doc/`                      | Release guide and roadmap                                                                                |
-| `tools/`                    | Repository scripts: checks, golden data                                                                  |
-| `licenses/`                 | Licenses of every third-party component                                                                  |
+| Path                        | Contents                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start |
+| `sdk/marker/`               | **Goes into your application**: the marker libraries and their version                                     |
+| `sdk/marker/cpp/`           | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check          |
+| `sdk/marker/csharp/`        | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests               |
+| `sdk/marker/unity/`         | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)               |
+| `sdk/marker/python/`        | The Python marker library `mb_framemarker` (standard library only) and its unittest tests                  |
+| `sdk/marker/shaders/`       | Reference shaders that draw the marker as one quad                                                         |
+| `sdk/data/`                 | **Reads the results**: the data libraries (C#, C++, Python) for the capture data and the analysis output   |
+| `sdk/conan/`                | Conan 2 recipes of the C++ libraries (a local-recipes-index remote)                                        |
+| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats                 |
+| `sdk/test-data/`            | Golden marker images (checked by every marker library) and the data libraries' golden data                 |
+| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                        |
+| `measure/libs/`             | Marker, Capture, Analysis and Charts libraries with their NUnit tests                                      |
+| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                        |
+| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                  |
+| `measure/doc/`              | Platform, usage and camera guides, images                                                                  |
+| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                            |
+| `doc/`                      | Release guide and roadmap                                                                                  |
+| `tools/`                    | Repository scripts: checks, golden data                                                                    |
+| `licenses/`                 | Licenses of every third-party component                                                                    |
 
 ## License
 
