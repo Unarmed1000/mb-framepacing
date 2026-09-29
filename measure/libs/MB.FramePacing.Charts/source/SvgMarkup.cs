@@ -68,8 +68,8 @@ namespace MB.FramePacing.Charts
     /// frame chart: green as planned, red held too long, faint risers), the range of the animation time step over it (its line is CHART_STYLE's
     /// step-line), the frametime (the web page's step-line blue) and CPU busy, the late
     /// share, the late strip cells and the marks above the strip, the distribution cards' bars and curves, the marks of values beyond a scale,
-    /// warning values, the static stretches (violet bands behind the panels, violet strip cells) and 'key', which marks a panel key's swatches
-    /// so they are never taken for data (no style of its own).
+    /// warning values, the static stretches (violet bands behind the panels, violet strip cells) and the panel keys' swatch colours (key-*:
+    /// the colour of the data each stands for, as a text fill).
     /// </summary>
     public const string ReportStyle =
       "\n  .band { fill: #ffffff; fill-opacity: 0.06; }\n"
@@ -82,7 +82,16 @@ namespace MB.FramePacing.Charts
       + "  .static-text { font-size: 11px; fill: #a371f7; letter-spacing: 0.04em; }\n"
       + "  .strip-static-a { fill: #a371f7; fill-opacity: 0.55; }\n"
       + "  .strip-static-b { fill: #a371f7; fill-opacity: 0.85; }\n"
-      + "  .key { }\n"
+      + "  .key-faint { fill: #ffffff; fill-opacity: 0.3; }\n"
+      + "  .key-amber { fill: #d29922; }\n"
+      + "  .key-green { fill: #2ea043; }\n"
+      + "  .key-red { fill: #e5534b; }\n"
+      + "  .key-blue { fill: #58a6ff; }\n"
+      + "  .key-blue-faint { fill: #58a6ff; fill-opacity: 0.45; }\n"
+      + "  .key-violet-a { fill: #a371f7; fill-opacity: 0.55; }\n"
+      + "  .key-violet-b { fill: #a371f7; fill-opacity: 0.85; }\n"
+      + "  .key-grey { fill: #3d444d; }\n"
+      + "  .key-mark { fill: #e6edf3; }\n"
       + "  .held-fill { fill: #2ea043; }\n"
       + "  .held-fill-late { fill: #e5534b; }\n"
       + "  .held-range { fill: #2ea043; fill-opacity: 0.3; }\n"

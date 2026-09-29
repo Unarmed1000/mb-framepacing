@@ -266,14 +266,20 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(X + 14, Y + 19, "DISPLAY", "label", "start"));
       string rate = Hz(pacing);
       bool mismatch = pacing?.MatchesExpectedRefresh == false;
-      parts.Add(new TextShape(X + 14, Y + 42, rate, mismatch ? "tile-value warn" : "tile-value", "start"));
+
       string kind =
         pacing == null ? "unknown"
         : pacing.RefreshCalculated ? "calculated from the camera"
         : "fixed refresh (vsync)";
       if (pacing?.ExpectedRefreshHz is { } expected && mismatch)
         kind += $", expected {expected.ToString("0.##", CultureInfo.InvariantCulture)} Hz";
-      parts.Add(new TextShape(X + 14 + (rate.Length * 11.5) + 8, Y + 42, kind, "vsync-n", "start"));
+      parts.Add(
+        new TextRunsShape(
+          X + 14,
+          Y + 42,
+          new[] { new TextRun(rate, mismatch ? "tile-value warn" : "tile-value"), new TextRun("  " + kind, "vsync-n") }
+        )
+      );
 
       // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate, like Swappy,
       // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
@@ -339,9 +345,11 @@ namespace MB.FramePacing.Charts
         double y = tilesY + ((i / perRow) * (TileH + TileGap));
         parts.Add(new RectShape("tile", N(x, 1), N(y, 0), N(tileW, 1), N(TileH, 0), "10"));
         parts.Add(new TextShape(x + 14, y + 20, tile.Caption.ToUpperInvariant(), "label", "start"));
-        parts.Add(new TextShape(x + 14, y + 44, tile.Value, tile.Warning ? "tile-value warn" : "tile-value", "start"));
+        // The value and its detail as one line: whatever draws it puts the detail right after the value
+        var runs = new List<TextRun> { new TextRun(tile.Value, tile.Warning ? "tile-value warn" : "tile-value") };
         if (tile.Detail.Length > 0)
-          parts.Add(new TextShape(x + 14 + (tile.Value.Length * 11.5) + 8, y + 44, tile.Detail, "vsync-n", "start"));
+          runs.Add(new TextRun("  " + tile.Detail, "vsync-n"));
+        parts.Add(new TextRunsShape(x + 14, y + 44, runs));
       }
     }
 
@@ -395,37 +403,57 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// A panel's key, right aligned on the baseline <paramref name="y"/>: per item one swatch and its word. A swatch is a filled square (two
-    /// classes: split in halves, for colours that alternate per frame), a line (<c>Line</c>) or the ▾ mark (class <c>strip-mark</c>). Swatches
-    /// carry the class "key" too, so they are never taken for the data they stand for.
+    /// A panel's key, right aligned on the baseline <paramref name="y"/>: per item a swatch and its word, as one line of text runs, so whatever
+    /// draws it lays the pieces out (no width is guessed). A swatch is a coloured character in the colour of the data it stands for (the
+    /// <c>key-</c> classes): ■ for a fill, ━ for a line (<c>Line</c>), ┅ for the refresh line, ▾ for the strip's mark, and ▐▌ in two colours
+    /// for colours that alternate per frame (two classes).
     /// </summary>
     private static List<CardShape> Key(double right, double y, IReadOnlyList<(string[] Classes, string Text, bool Line)> items)
     {
-      const double Swatch = 9;
-      const double Space = 5;
-      const double Gap = 22;
-      // Left to right from where the whole key ends at the right edge: each word starts right after its swatch
-      double x = right - items.Sum(item => (item.Line ? 14 : Swatch) + Space + SmallTextWidth(item.Text)) - (Math.Max(0, items.Count - 1) * Gap);
-      var shapes = new List<CardShape>();
+      var runs = new List<TextRun>();
       foreach (var (classes, text, line) in items)
       {
-        double width = line ? 14 : Swatch;
-        if (line)
-          shapes.Add(new LineShape(classes[0] + " key", N(x, 1), N(y - 4, 1), N(x + width, 1), N(y - 4, 1)));
-        else if (classes[0] == "strip-mark")
-          shapes.Add(new PathShape("strip-mark key", $"M{Fixed(x + 4.5, 1)} {Fixed(y, 1)}L{Fixed(x + 1, 1)} {Fixed(y - 6, 1)}H{Fixed(x + 8, 1)}Z"));
-        else if (classes.Length == 2)
+        if (runs.Count > 0)
+          runs.Add(new TextRun("  "));
+        if (classes.Length == 2)
         {
-          shapes.Add(new RectShape(classes[0] + " key", N(x, 1), N(y - Swatch, 1), N(Swatch / 2, 1), N(Swatch, 0)));
-          shapes.Add(new RectShape(classes[1] + " key", N(x + (Swatch / 2), 1), N(y - Swatch, 1), N(Swatch / 2, 1), N(Swatch, 0)));
+          runs.Add(new TextRun("▐", g_keyColours[classes[0]]));
+          runs.Add(new TextRun("▌", g_keyColours[classes[1]]));
         }
         else
-          shapes.Add(new RectShape(classes[0] + " key", N(x, 1), N(y - Swatch, 1), N(Swatch, 0), N(Swatch, 0), "2"));
-        shapes.Add(new TextShape(x + width + Space, y, text, "vsync-n", "start"));
-        x += width + Space + SmallTextWidth(text) + Gap;
+        {
+          string glyph =
+            classes[0] == "strip-mark" ? "▾"
+            : classes[0] == "error-refresh" ? "┅"
+            : line ? "━"
+            : "■";
+          runs.Add(new TextRun(glyph, g_keyColours[classes[0]]));
+        }
+        runs.Add(new TextRun(" " + text));
       }
-      return shapes;
+      return runs.Count > 0 ? new List<CardShape> { new TextRunsShape(right, y, runs, "vsync-n", "end") } : new List<CardShape>();
     }
+
+    /// <summary>The key colour of each kind of data a panel draws: its fill or stroke as a text fill.</summary>
+    private static readonly Dictionary<string, string> g_keyColours = new Dictionary<string, string>
+    {
+      ["band"] = "key-faint",
+      ["error-refresh"] = "key-amber",
+      ["static-band"] = "key-violet-a",
+      ["held"] = "key-green",
+      ["held-late"] = "key-red",
+      ["step-line"] = "key-blue",
+      ["frametime"] = "key-blue",
+      ["cpu-busy"] = "key-blue-faint",
+      ["late-line-none"] = "key-green",
+      ["late-line-adapted"] = "key-amber",
+      ["late-line"] = "key-red",
+      ["strip-late"] = "key-red",
+      ["strip-static-a"] = "key-violet-a",
+      ["strip-static-b"] = "key-violet-b",
+      ["neutral"] = "key-grey",
+      ["strip-mark"] = "key-mark",
+    };
 
     /// <summary>The key item of the static bands: what a band behind a panel's data means.</summary>
     private static readonly (string[] Classes, string Text, bool Line) g_staticKey = (new[] { "static-band" }, "static: nothing animates", false);

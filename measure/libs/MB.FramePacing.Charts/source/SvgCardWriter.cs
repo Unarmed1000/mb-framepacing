@@ -10,6 +10,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static MB.FramePacing.Charts.SvgMarkup;
 
 namespace MB.FramePacing.Charts
@@ -56,6 +57,16 @@ namespace MB.FramePacing.Charts
         case TextShape t:
           parts.Add(Text(t.X, t.Y, t.Content, t.Class, t.Anchor));
           break;
+        case TextRunsShape t:
+        {
+          // One text, a tspan per styled piece: the browser lays them out end to end
+          string cls = t.Class.Length > 0 ? $" class=\"{t.Class}\"" : string.Empty;
+          string body = string.Concat(
+            t.Runs.Select(r => r.Class.Length > 0 ? $"<tspan class=\"{r.Class}\">{Escape(r.Text)}</tspan>" : Escape(r.Text))
+          );
+          parts.Add($"<text x=\"{Fixed(t.X, 1)}\" y=\"{Fixed(t.Y, 1)}\" text-anchor=\"{t.Anchor}\"{cls}>{body}</text>");
+          break;
+        }
         case ScrollShape scroll:
           // A file shows exactly its range: the scrolling shapes are written where they are
           foreach (var child in scroll.Children)

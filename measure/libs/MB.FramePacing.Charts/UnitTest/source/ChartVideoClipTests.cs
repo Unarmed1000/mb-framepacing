@@ -197,7 +197,7 @@ namespace MB.FramePacing.Charts.UnitTest
         $"{clip}: on every panel"
       );
       Assert.That(
-        drawing.FlatShapes.OfType<TextShape>().Count(t => t.Content == "static: nothing animates" && t.Class == "vsync-n"),
+        drawing.FlatShapes.OfType<TextRunsShape>().Count(t => t.Runs.Any(r => r.Text.Trim() == "static: nothing animates")),
         Is.EqualTo(stretches.Count > 0 ? 4 : 0),
         $"{clip}: the key of every panel names the static stretches"
       );

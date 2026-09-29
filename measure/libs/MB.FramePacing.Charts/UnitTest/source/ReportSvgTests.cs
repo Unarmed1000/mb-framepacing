@@ -243,10 +243,7 @@ namespace MB.FramePacing.Charts.UnitTest
         "frames held longer as intended count: the line rises in amber"
       );
       Assert.That(amber.Max(p => p.X), Is.EqualTo(Seconds(2399)).Within(tolerance), "amber again after the late frame's window");
-      Assert.That(
-        drawing.FlatShapes.OfType<TextShape>().Any(t => t.Content == "longer than the application prefers, as the pacer intended"),
-        "the key says what amber means"
-      );
+      Assert.That(KeyWords(drawing).Contains("longer than the application prefers, as the pacer intended"), "the key says what amber means");
     }
 
     /// <summary>
@@ -686,14 +683,17 @@ namespace MB.FramePacing.Charts.UnitTest
       var only = ReportOptions.ShowOnly(new[] { ReportItem.RefreshStrip });
 
       var drawing = ReportCard.Build(RunSection.Whole(card), only);
-      // The cells, not the key's swatches
-      var cells = drawing.FlatShapes.OfType<RectShape>().Where(r => !r.Class.EndsWith(" key", StringComparison.Ordinal)).ToList();
+      var cells = drawing.FlatShapes.OfType<RectShape>().ToList();
       Assert.That(cells, Has.Count.EqualTo(42), "a cell per refresh: 39 frames of one, one of three");
       Assert.That(cells.Count(c => c.Class == "neutral"), Is.EqualTo(2), "the two refreshes after frame 5's last capture are unknown");
       var marks = drawing.FlatShapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
       Assert.That(marks.Data.Count(c => c == 'M'), Is.EqualTo(2), "frame 10 (skipped indices before it) and frame 12 (torn)");
-      Assert.That(drawing.FlatShapes.OfType<TextShape>().Any(t => t.Content == "not decoded"), "the key names the unknown refreshes");
-      Assert.That(drawing.FlatShapes.OfType<RectShape>().Count(r => r.Class == "neutral key"), Is.EqualTo(1), "with their swatch");
+      Assert.That(KeyWords(drawing), Does.Contain("not decoded"), "the key names the unknown refreshes");
+      Assert.That(
+        drawing.FlatShapes.OfType<TextRunsShape>().SelectMany(t => t.Runs).Count(r => r.Class == "key-grey"),
+        Is.EqualTo(1),
+        "with their swatch in their colour"
+      );
 
       var camera = ReportCard.Build(RunSection.Whole(card with { Camera = true }), only);
       Assert.That(camera.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero, "a camera sees frame 5 until frame 6");
@@ -703,9 +703,18 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(clean.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero);
       Assert.That(clean.FlatShapes.OfType<PathShape>().Any(p => p.Class == "strip-mark"), Is.False);
       // A clean strip has nothing to explain: no key
-      Assert.That(clean.FlatShapes.Where(shape => shape is RectShape { Class: var c } && c.EndsWith(" key", StringComparison.Ordinal)), Is.Empty);
-      Assert.That(clean.FlatShapes.OfType<TextShape>().Select(t => t.Content), Has.None.EqualTo("not decoded").And.None.Contains("torn"));
+      Assert.That(KeyWords(clean), Is.Empty);
     }
+
+    /// <summary>The words of a card's keys (text runs without a class of their own; swatches have their key colour).</summary>
+    private static List<string> KeyWords(CardDrawing drawing) =>
+      drawing
+        .FlatShapes.OfType<TextRunsShape>()
+        .SelectMany(t => t.Runs)
+        .Where(r => r.Class.Length == 0)
+        .Select(r => r.Text.Trim())
+        .Where(w => w.Length > 0)
+        .ToList();
 
     /// <summary>Every panel's plot area maps its time range onto the plot's width: the section's start at the left edge, its end at the right.</summary>
     [Test]

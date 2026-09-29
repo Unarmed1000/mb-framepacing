@@ -298,9 +298,28 @@ namespace MB.FramePacing.Gui.Views
           operations.Add(context => context.DrawGeometry(fill, pen, geometry));
           break;
         }
+        case TextRunsShape t:
+        {
+          // Each piece measured in its own style, laid out end to end on the line's baseline
+          var layouts = t.Runs.Select(run => Text(run.Text, t.ClassOf(run))).ToArray();
+          double total = layouts.Sum(l => l.WidthIncludingTrailingWhitespace);
+          double at = t.Anchor switch
+          {
+            "middle" => t.X - (total / 2),
+            "end" => t.X - total,
+            _ => t.X,
+          };
+          foreach (var piece in layouts)
+          {
+            var origin = new Point(at, t.Y - piece.TextLines[0].Baseline);
+            operations.Add(context => piece.Draw(context, origin));
+            at += piece.WidthIncludingTrailingWhitespace;
+          }
+          break;
+        }
         case TextShape t:
         {
-          var layout = Text(t);
+          var layout = Text(t.Content, t.Class);
           double width = layout.WidthIncludingTrailingWhitespace;
           double x = t.Anchor switch
           {
@@ -350,9 +369,9 @@ namespace MB.FramePacing.Gui.Views
       }
     }
 
-    private static TextLayout Text(TextShape text)
+    private static TextLayout Text(string content, string classes)
     {
-      var style = CardStyle.Resolve(text.Class, text: true);
+      var style = CardStyle.Resolve(classes, text: true);
       double size = style.FontSize ?? 13;
       var weight = style.FontWeight switch
       {
@@ -362,7 +381,7 @@ namespace MB.FramePacing.Gui.Views
       };
       var features = style.TabularNumbers == true ? new FontFeatureCollection { FontFeature.Parse("tnum") } : null;
       return new TextLayout(
-        text.Content,
+        content,
         new Typeface(g_font, FontStyle.Normal, weight),
         size,
         Brush(style.Fill, style.FillOpacity, defaultBlack: true),

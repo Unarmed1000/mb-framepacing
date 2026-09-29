@@ -165,8 +165,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The error and display time step charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);
       those get a mark with their value at the edge (`ChartScale` decides the scales, `ReportCard.ClipMarks` draws the marks).
     - **Keys:** every panel's title says what it shows; its key (`ReportCard.Key`, right aligned) names each colour with one swatch per
-      entry (a filled square, split in halves for colours that alternate per frame; a line; the ▾ mark) and lists only what the section
-      shows. Swatches carry the class `key` too, so tests counting a class by exact match never count them.
+      entry and lists only what the section shows. A key, a tile's value with its detail and the display box's rate line are one
+      `TextRunsShape` (pieces of text, each in its own classes) that the renderer lays out end to end (a `<text>` with `<tspan>`s in SVG,
+      measured pieces in `CardView`), so no width is guessed. Swatches are coloured characters in the `key-*` classes (■ fill, ━ line,
+      ┅ refresh line, ▾ mark, ▐▌ for colours that alternate per frame).
     - **Static stretches:** a violet band (`static-band`) behind every time panel from the first static frame's display time to the next
       frame's (`RunChartData.StaticStretches`), violet strip cells (`strip-static-a`/`-b`). The display time step and frametime scales
       leave static frames' holds and frametimes out (`RunChartData.AnimatingHolds`, `AnimatingFrameTimes`); they get edge marks.
