@@ -29,7 +29,7 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1384397243,
+    "hostTicksSum": 1288663730,
     "deviceTicksCount": 486,
     "deviceTicksSum": 19642500000,
     "sourceDropCount": 0,
@@ -193,7 +193,7 @@
     },
     "captureTicksSum": 19642500000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1384397243,
+    "hostTicksSum": 1288663730,
     "sourceDropCount": 0,
     "payloadByteCount": 25830
   }

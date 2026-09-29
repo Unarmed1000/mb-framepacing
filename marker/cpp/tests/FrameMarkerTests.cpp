@@ -178,10 +178,12 @@ TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
   const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::SequenceEnd, 0x3132333435363738, 0x41424344u,
                             0x5152535455565758,  0x61626364u,        0x71727374u, FM::MarkerFlags::Static};
   const auto bytes = PayloadBytes(payload);
+  // magic, version, kind | run id | frame index | flags | animation time | preferred, target frame time | intended display time |
+  // CPU start time | CPU busy
   const std::array<uint8_t, FM::PayloadByteCount> expected{
-    'M',   'F',   1u,    2u,    0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u, 0x18u, 0x17u, 0x16u, 0x15u, 0x14u, 0x13u,
-    0x12u, 0x11u, 0x24u, 0x23u, 0x22u, 0x21u, 0x38u, 0x37u, 0x36u, 0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x44u, 0x43u, 0x42u, 0x41u,
-    0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u, 0x74u, 0x73u, 0x72u, 0x71u, 0x01u};
+    'M',   'F',   1u,    2u,    0x24u, 0x23u, 0x22u, 0x21u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u, 0x01u, 0x18u,
+    0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x74u, 0x73u, 0x72u, 0x71u, 0x44u, 0x43u, 0x42u, 0x41u, 0x38u, 0x37u, 0x36u,
+    0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u};
   EXPECT_EQ(FM::PayloadByteCount, 53u);
   EXPECT_TRUE(std::equal(bytes.begin(), bytes.end(), expected.begin(), expected.end()));
 }
@@ -212,7 +214,7 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
 TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
 {
   const auto bytes = PayloadBytes({0u, -1, 0u});
-  for (std::size_t i = 12; i < 20; ++i)
+  for (std::size_t i = 17; i < 25; ++i)
   {
     EXPECT_EQ(bytes[i], 0xFFu) << "byte " << i;
   }
@@ -443,18 +445,19 @@ TEST(Symbol, SyncMarkersAreVersion2)
   EXPECT_EQ(quads.front(), (FM::Quad{10, 20, 10 + 99, 20 + 99, false}));
 }
 
-TEST(Payload, SyncMarkerCarriesOnlyTheFrameIndex)
+TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 {
   std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
   const FM::Payload payload{0x0102030405060708u, 123, 4u, FM::MarkerKind::Sync, 5, 6u, 7, 8u};
   const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
   ASSERT_EQ(byteCount, FM::SyncPayloadByteCount);
-  const std::array<uint8_t, FM::SyncPayloadByteCount> expected{'M', 'F', 1u, 3u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
+  const std::array<uint8_t, FM::SyncPayloadByteCount> expected{'M',   'F',   1u,    3u,    0x04u, 0x00u, 0x00u, 0x00u,
+                                                               0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
   EXPECT_TRUE(std::equal(expected.begin(), expected.end(), buffer.begin()));
 
   FM::Payload decoded{};
   ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
-  EXPECT_EQ(decoded, (FM::Payload{payload.FrameIndex, 0, 0u, FM::MarkerKind::Sync}));
+  EXPECT_EQ(decoded, (FM::Payload{payload.FrameIndex, 0, payload.RunId, FM::MarkerKind::Sync}));
   EXPECT_EQ(decoded.CpuStartTicks, 0);
   EXPECT_EQ(decoded.CpuBusyTicks, 0u);
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));

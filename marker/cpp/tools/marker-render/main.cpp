@@ -190,8 +190,8 @@ namespace
     digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,preferredFrameTicks,"
               "flags,startUtcTicks,sequenceIdHex,size,modulesHex\n";
 
-    // "mb-frame" + 1: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
-    uint64_t state = 0x6D622D6672616D66u;
+    // "mb-frame" + 5: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
+    uint64_t state = 0x6D622D6672616D6Au;
     for (int32_t row = 0; row < RowCount; ++row)
     {
       FM::Payload payload;
@@ -281,7 +281,7 @@ namespace
        {0, TextSequenceId("golden-run")}},
       {{601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 120'000u}, {GoldenStartUtcTicks, GoldenBytesId}},
       {{900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd, 0, 0u, 0, 80'000u}, {}},
-      {{0x0102030405060708u, 0, 0u, FM::MarkerKind::Sync}, {}},
+      {{0x0102030405060708u, 0, 0x21222324u, FM::MarkerKind::Sync}, {}},
     }};
     constexpr std::array<int32_t, 4> ModuleSizes{2, 3, 4, 6};
 

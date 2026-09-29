@@ -39,7 +39,7 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(START_PAYLOAD_BYTE_COUNT, 77)
         self.assertEqual(ON_DEMAND_FRAME_TICKS, U32_MAX)
         self.assertEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, START_PAYLOAD_BYTE_COUNT)
-        self.assertEqual(SYNC_PAYLOAD_BYTE_COUNT, 12)
+        self.assertEqual(SYNC_PAYLOAD_BYTE_COUNT, 16)
 
     def test_encode_produces_the_documented_little_endian_layout(self) -> None:
         payload = Payload(
@@ -57,15 +57,15 @@ class PayloadTests(unittest.TestCase):
         data = encode_payload(payload)
         expected = (
             b"MF\x01\x02"
-            + bytes([8, 7, 6, 5, 4, 3, 2, 1])
-            + bytes([0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11])
-            + bytes([0x24, 0x23, 0x22, 0x21])
-            + bytes([0x38, 0x37, 0x36, 0x35, 0x34, 0x33, 0x32, 0x31])
-            + bytes([0x44, 0x43, 0x42, 0x41])
-            + bytes([0x58, 0x57, 0x56, 0x55, 0x54, 0x53, 0x52, 0x51])
-            + bytes([0x64, 0x63, 0x62, 0x61])
-            + bytes([0x74, 0x73, 0x72, 0x71])
-            + bytes([0x01])
+            + bytes([0x24, 0x23, 0x22, 0x21])  # run id
+            + bytes([8, 7, 6, 5, 4, 3, 2, 1])  # frame index
+            + bytes([0x01])  # flags
+            + bytes([0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11])  # animation time
+            + bytes([0x74, 0x73, 0x72, 0x71])  # preferred frame time
+            + bytes([0x44, 0x43, 0x42, 0x41])  # target frame time
+            + bytes([0x38, 0x37, 0x36, 0x35, 0x34, 0x33, 0x32, 0x31])  # intended display time
+            + bytes([0x58, 0x57, 0x56, 0x55, 0x54, 0x53, 0x52, 0x51])  # CPU start time
+            + bytes([0x64, 0x63, 0x62, 0x61])  # CPU busy
         )
         self.assertEqual(data, expected)
         self.assertEqual(len(data), PAYLOAD_BYTE_COUNT)
@@ -79,18 +79,18 @@ class PayloadTests(unittest.TestCase):
         end_header = encode_payload(payload.with_kind(MarkerKind.SEQUENCE_END))
         self.assertEqual(data[:3] + data[4:PAYLOAD_BYTE_COUNT], end_header[:3] + end_header[4:])
         self.assertEqual(data[3], MarkerKind.SEQUENCE_START)
-        self.assertEqual(data[36:44], bytes([6, 0, 0, 0, 0, 0, 0, 0]))
-        self.assertEqual(data[44:48], bytes([7, 0, 0, 0]))
-        self.assertEqual(data[48:52], bytes([9, 0, 0, 0]))
-        self.assertEqual(data[52], 1)
+        self.assertEqual(data[16], 1)
+        self.assertEqual(data[25:29], bytes([9, 0, 0, 0]))
+        self.assertEqual(data[41:49], bytes([6, 0, 0, 0, 0, 0, 0, 0]))
+        self.assertEqual(data[49:53], bytes([7, 0, 0, 0]))
         self.assertEqual(data[53:61], bytes([8, 7, 6, 5, 4, 3, 2, 1]))
         # The sequence id is stored as its bytes, in order
         self.assertEqual(data[61:77], bytes(range(0xA0, 0xB0)))
 
     def test_negative_ticks_are_stored_as_twos_complement(self) -> None:
-        self.assertEqual(encode_payload(Payload(0, -1))[12:20], b"\xff" * 8)
-        self.assertEqual(encode_payload(Payload(0, 0, 0, MarkerKind.FRAME, -2))[24:32], b"\xfe" + (b"\xff" * 7))
-        self.assertEqual(encode_payload(Payload(0, 0, 0, MarkerKind.FRAME, cpu_start_ticks=-3))[36:44], b"\xfd" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(0, -1))[17:25], b"\xff" * 8)
+        self.assertEqual(encode_payload(Payload(0, 0, 0, MarkerKind.FRAME, -2))[33:41], b"\xfe" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(0, 0, 0, MarkerKind.FRAME, cpu_start_ticks=-3))[41:49], b"\xfd" + (b"\xff" * 7))
 
     def test_the_optional_fields_default_to_unknown(self) -> None:
         payload = Payload(1, 2, 3, MarkerKind.SEQUENCE_END)
@@ -127,33 +127,33 @@ class PayloadTests(unittest.TestCase):
                 assert decoded is not None
                 self.assertEqual(decoded[0], payload)
 
-    def test_sync_marker_carries_only_the_frame_index(self) -> None:
+    def test_sync_marker_carries_only_the_run_id_and_the_frame_index(self) -> None:
         payload = Payload(0x0102030405060708, 123, 4, MarkerKind.SYNC, 5, 6, 7, 8)
         data = encode_payload(payload, StartMetadata(7, SequenceId.from_text("ignored")))
-        self.assertEqual(data, b"MF\x01\x03" + bytes([8, 7, 6, 5, 4, 3, 2, 1]))
+        self.assertEqual(data, b"MF\x01\x03" + bytes([4, 0, 0, 0]) + bytes([8, 7, 6, 5, 4, 3, 2, 1]))
         self.assertEqual(len(data), SYNC_PAYLOAD_BYTE_COUNT)
-        self.assertEqual(try_decode_payload(data), (Payload(payload.frame_index, 0, 0, MarkerKind.SYNC), None))
+        self.assertEqual(try_decode_payload(data), (Payload(payload.frame_index, 0, payload.run_id, MarkerKind.SYNC), None))
 
-        # Exactly 12 bytes: longer (for example a full header with kind 3) or shorter is rejected
+        # Exactly 16 bytes: longer (for example a full header with kind 3) or shorter is rejected
         self.assertIsNone(try_decode_payload(data + b"\x00"))
         self.assertIsNone(try_decode_payload(data[:-1]))
         self.assertIsNone(try_decode_payload(encode_payload(Payload(1, 2, 3))[:3] + b"\x03" + bytes(PAYLOAD_BYTE_COUNT - 4)))
-        # A 12 byte payload of another kind is too short
-        self.assertIsNone(try_decode_payload(b"MF\x01\x00" + bytes(8)))
+        # A 16 byte payload of another kind is too short
+        self.assertIsNone(try_decode_payload(b"MF\x01\x00" + bytes(12)))
 
     def test_sync_round_trips_and_range(self) -> None:
-        for frame_index in (0, 1, 42, U64_MAX):
-            with self.subTest(frame_index):
-                payload = Payload(frame_index, 0, 0, MarkerKind.SYNC)
+        for frame_index, run_id in ((0, 0), (1, 7), (42, U32_MAX), (U64_MAX, 1)):
+            with self.subTest(frame_index=frame_index, run_id=run_id):
+                payload = Payload(frame_index, 0, run_id, MarkerKind.SYNC)
                 self.assertEqual(try_decode_payload(encode_payload(payload)), (payload, None))
-        # Only the frame index is range checked: the other fields are not encoded
+        # Only the run id and the frame index are range checked: the other fields are not encoded
         self.assertEqual(
-            len(encode_payload(Payload(0, I64_MAX + 1, U32_MAX + 1, MarkerKind.SYNC, I64_MIN - 1, -1, I64_MAX + 1, U32_MAX + 1))),
+            len(encode_payload(Payload(0, I64_MAX + 1, 0, MarkerKind.SYNC, I64_MIN - 1, -1, I64_MAX + 1, U32_MAX + 1))),
             SYNC_PAYLOAD_BYTE_COUNT,
         )
-        for frame_index in (-1, U64_MAX + 1):
-            with self.subTest(frame_index), self.assertRaises(ValueError):
-                _ = encode_payload(Payload(frame_index, 0, 0, MarkerKind.SYNC))
+        for frame_index, run_id in ((-1, 0), (U64_MAX + 1, 0), (0, -1), (0, U32_MAX + 1)):
+            with self.subTest(frame_index=frame_index, run_id=run_id), self.assertRaises(ValueError):
+                _ = encode_payload(Payload(frame_index, 0, run_id, MarkerKind.SYNC))
 
     def test_start_metadata_round_trips(self) -> None:
         payload = Payload(10, 20, 30, MarkerKind.SEQUENCE_START, 40, 50, 60, 70)
@@ -214,7 +214,7 @@ class PayloadTests(unittest.TestCase):
         data[3] = 4
         self.assertIsNone(try_decode_payload(bytes(data)), "kind")
         data[3] = 3
-        self.assertIsNone(try_decode_payload(bytes(data)), "a sync kind needs exactly 12 bytes")
+        self.assertIsNone(try_decode_payload(bytes(data)), "a sync kind needs exactly 16 bytes")
         data[3] = 0
         self.assertIsNotNone(try_decode_payload(bytes(data)))
 

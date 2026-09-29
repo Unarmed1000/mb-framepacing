@@ -38,15 +38,15 @@ QR_CAPACITY_BYTES = 106
 is room for future fields."""
 
 SYNC_QR_VERSION = 2
-"""The sync marker (MarkerKind.SYNC) is QR version 2 (25x25 modules), error correction level M: magic | format version | kind | frame
-index u64."""
+"""The sync marker (MarkerKind.SYNC) is QR version 2 (25x25 modules), error correction level M: magic | format version | kind | run id
+u32 | frame index u64."""
 SYNC_QR_MODULE_COUNT = (4 * SYNC_QR_VERSION) + 17
-SYNC_PAYLOAD_BYTE_COUNT = 12
+SYNC_PAYLOAD_BYTE_COUNT = 16
 
 PAYLOAD_BYTE_COUNT = 53
-"""Payload header, shared by every marker kind (little endian): magic "MF" | format version | kind | frame index u64 | animation
-ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32 | CPU start ticks i64 | CPU busy ticks u32 | preferred frame
-ticks u32 | flags u8. Start and end markers carry the values of the frame that shows them."""
+"""Payload header, shared by every marker kind (little endian), grouped: magic "MF" | format version | kind | run id u32 | frame index
+u64 | flags u8 | animation ticks i64 | preferred frame ticks u32 | target frame ticks u32 | intended display ticks i64 | CPU start ticks
+i64 | CPU busy ticks u32. Start and end markers carry the values of the frame that shows them."""
 PAYLOAD_MAGIC = b"MF"
 PAYLOAD_FORMAT_VERSION = 1
 
@@ -80,8 +80,9 @@ MAX_PACKED_MODULE_BYTE_COUNT = packed_module_byte_count(QR_MODULE_COUNT)
 MAX_GRID_VERTEX_COUNT = 4 + ((QR_MODULE_COUNT + 1) ** 2)
 """Vertices of the main marker's static grid (grid_vertices): 1768; the sync marker's is 680. Both fit 16-bit indices."""
 
-_HEADER = struct.Struct("<2sBBQqIqIqIIB")
-_SYNC = struct.Struct("<2sBBQ")
+# Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work
+_HEADER = struct.Struct("<2sBBIQBqIIqqI")
+_SYNC = struct.Struct("<2sBBIQ")
 _START_FIELDS = struct.Struct(f"<q{SEQUENCE_ID_BYTE_COUNT}s")
 _DATE_TIME_EPOCH = datetime(1, 1, 1, tzinfo=UTC)
 
@@ -134,11 +135,11 @@ def seconds_to_ticks(seconds: float) -> int:
 
 def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> bytes:
     """Serialize the payload. Start markers append the metadata, other kinds ignore it; a sync marker is SYNC_PAYLOAD_BYTE_COUNT bytes
-    (the start of the header, up to the frame index) and ignores the other fields. Raises ValueError when an encoded field is out of its
+    (the start of the header: the run id and the frame index) and ignores the other fields. Raises ValueError when an encoded field is out of its
     range."""
     if payload.kind == MarkerKind.SYNC:
         try:
-            return _SYNC.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.frame_index)
+            return _SYNC.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.run_id, payload.frame_index)
         except struct.error as error:
             raise ValueError(f"payload out of range: {payload}") from error
     try:
@@ -146,15 +147,15 @@ def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> b
             PAYLOAD_MAGIC,
             PAYLOAD_FORMAT_VERSION,
             payload.kind,
-            payload.frame_index,
-            payload.animation_ticks,
             payload.run_id,
-            payload.intended_display_ticks,
+            payload.frame_index,
+            payload.flags,
+            payload.animation_ticks,
+            payload.preferred_frame_ticks,
             payload.target_frame_ticks,
+            payload.intended_display_ticks,
             payload.cpu_start_ticks,
             payload.cpu_busy_ticks,
-            payload.preferred_frame_ticks,
-            payload.flags,
         )
     except struct.error as error:
         raise ValueError(f"payload out of range: {payload}") from error
@@ -170,18 +171,18 @@ def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> b
 
 def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | None:
     """Parse the wire format: the payload and, for a start marker, its metadata. None on a wrong length, magic, format version or an
-    unknown kind. A sync payload (exactly SYNC_PAYLOAD_BYTE_COUNT bytes) decodes to its frame index with the other fields 0."""
+    unknown kind. A sync payload (exactly SYNC_PAYLOAD_BYTE_COUNT bytes) decodes to its run id and frame index with the other fields 0."""
     if len(data) < SYNC_PAYLOAD_BYTE_COUNT:
         return None
-    magic, version, kind, frame_index = cast(tuple[bytes, int, int, int], _SYNC.unpack_from(data))
+    magic, version, kind, run_id, frame_index = cast(tuple[bytes, int, int, int, int], _SYNC.unpack_from(data))
     if magic != PAYLOAD_MAGIC or version != PAYLOAD_FORMAT_VERSION or kind > max(MarkerKind):
         return None
     if kind == MarkerKind.SYNC:
-        return (Payload(frame_index, 0, 0, MarkerKind.SYNC), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
+        return (Payload(frame_index, 0, run_id, MarkerKind.SYNC), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
     if len(data) < PAYLOAD_BYTE_COUNT:
         return None
     fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))
-    _, _, _, _, animation_ticks, run_id, intended_display_ticks, target_frame_ticks, cpu_start_ticks, cpu_busy_ticks, preferred, flags = fields
+    _, _, _, _, _, flags, animation_ticks, preferred, target_frame_ticks, intended_display_ticks, cpu_start_ticks, cpu_busy_ticks = fields
     payload = Payload(
         frame_index,
         animation_ticks,

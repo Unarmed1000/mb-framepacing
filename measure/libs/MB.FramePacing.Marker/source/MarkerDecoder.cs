@@ -106,9 +106,15 @@ namespace MB.FramePacing.Marker
     public const int MaxUpscaledRetryPixels = 512 * 512;
 
     /// <summary>
-    /// Decode a single marker, optionally restricted to a region of the image. ZXing's finder pattern detector steps in whole pixels and misses
-    /// the occasional symbol at a non-integer scale near 3 stored pixels per module; when nothing is found in a region of at most
-    /// <see cref="MaxUpscaledRetryPixels"/>, the same region upscaled 2x is searched again.
+    /// Decode a single marker, optionally restricted to a region of the image.
+    /// <list type="bullet">
+    /// <item>ZXing's single code search stops at the first three finder pattern candidates. Some symbols hold a run of data modules that
+    /// looks exactly like a finder pattern; when it is met before the real third one, the search fails even on a perfect marker. ZXing's
+    /// multi code search tries the candidates in combination, so it runs next (no slower than the single search on a whole frame).</item>
+    /// <item>The finder pattern detector steps in whole pixels and misses the occasional symbol at a non-integer scale near 3 stored pixels
+    /// per module; when nothing is found in a region of at most <see cref="MaxUpscaledRetryPixels"/>, the same region upscaled 2x is
+    /// searched again.</item>
+    /// </list>
     /// </summary>
     public MarkerDecodeResult Decode(GrayImage image, PixelRect? region = null)
     {
@@ -116,7 +122,7 @@ namespace MB.FramePacing.Marker
       if (area.IsEmpty)
         return MarkerDecodeResult.NotFound;
 
-      var result = Find(image, area);
+      var result = Find(image, area) ?? FindAmongCandidates(image, area);
       if (result != null)
         return ToDecodeResult(result, area);
       return (long)area.Width * area.Height <= MaxUpscaledRetryPixels ? DecodeUpscaled(image, area) : MarkerDecodeResult.NotFound;
@@ -134,6 +140,19 @@ namespace MB.FramePacing.Marker
       }
     }
 
+    /// <summary>The multi code search: the first marker it decodes, or null.</summary>
+    private Result? FindAmongCandidates(GrayImage image, PixelRect area)
+    {
+      try
+      {
+        return m_multiReader.decodeMultiple(CreateBitmap(image, area), m_hints) is { Length: > 0 } results ? results[0] : null;
+      }
+      catch (ReaderException)
+      {
+        return null;
+      }
+    }
+
     /// <summary>The search on <paramref name="area"/> upscaled 2x (bilinear), its result mapped back to the image.</summary>
     private MarkerDecodeResult DecodeUpscaled(GrayImage image, PixelRect area)
     {
@@ -141,7 +160,7 @@ namespace MB.FramePacing.Marker
       for (int y = 0; y < area.Height; ++y)
         image.Row(area.Y + y).Slice(area.X, area.Width).CopyTo(region.Row(y));
       var upscaled = region.ResizeBilinear(area.Width * 2, area.Height * 2);
-      var result = Find(upscaled, upscaled.Bounds);
+      var result = Find(upscaled, upscaled.Bounds) ?? FindAmongCandidates(upscaled, upscaled.Bounds);
       if (result == null)
         return MarkerDecodeResult.NotFound;
       var decoded = ToDecodeResult(result, upscaled.Bounds);

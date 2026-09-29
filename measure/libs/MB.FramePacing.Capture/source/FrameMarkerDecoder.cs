@@ -45,7 +45,7 @@ namespace MB.FramePacing.Capture
       byte[]? second = sync?.Bytes;
       if (main is not { } found)
         return new FrameDecode(sync != null ? CaptureDataStatus.Torn : CaptureDataStatus.Undecodable, MarkerDecodeResult.NotFound, second);
-      bool torn = sync is { } other && other.Payload.FrameIndex != found.Payload.FrameIndex;
+      bool torn = sync is { } other && !other.Payload.IsSameFrame(found.Payload);
       return new FrameDecode(torn ? CaptureDataStatus.Torn : CaptureDataStatus.Decoded, found, second);
     }
 
@@ -91,7 +91,7 @@ namespace MB.FramePacing.Capture
         var other = decoder.DecodeLocked(image, layout.Locks[i]);
         if (other.IsDecoded)
           second ??= other.Bytes;
-        if (other.IsDecoded && primary.IsDecoded && other.Payload.FrameIndex != primary.Payload.FrameIndex)
+        if (other.IsDecoded && primary.IsDecoded && !other.Payload.IsSameFrame(primary.Payload))
           torn = true;
         if (other.IsDecoded && !primary.IsDecoded)
           torn = true;

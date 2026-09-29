@@ -41,7 +41,7 @@ modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelForm
   `str(sequence_id)` shows it as the text, or as the UUID's 8-4-4-4-12 form.
 - **Size:** every main marker (frame, start and end) is QR version 6, 41×41 modules, so it never changes size:
   `marker_size_px(options)` is `49 × module_size_px` with the default quiet zone (294 px for the default 6 px modules).
-- **Sync marker (optional; required for camera capture):** a small second marker that carries only the frame index, drawn every frame
+- **Sync marker (optional; required for camera capture):** a small second marker that carries only the run id and frame index, drawn every frame
   next to the main marker. It checks tearing on a capture card and times the frames for a camera. It is QR version 2, 25×25
   modules: `marker_size_px(options, MarkerKind.SYNC)` is `33 × module_size_px` (198 px for 6 px modules).
 
@@ -52,7 +52,7 @@ modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelF
 ```
 
 `recommended_origin(kind, ...)` places the main marker top-left and the sync marker bottom-left, both inset 32 px (rounded up to the
-`align_px` downscale ratio). A sync payload is 12 bytes (magic, format version, kind, frame index); its other fields are not encoded
+`align_px` downscale ratio). A sync payload is 16 bytes (magic, format version, kind, run id, frame index); its other fields are not encoded
 and decode as `0`.
 
 ## Ways to draw it, most efficient first

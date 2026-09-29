@@ -193,12 +193,14 @@ namespace MB.FramePacing.Analysis.UnitTest
         {
           ulong top = (ulong)(i / 4);
           ulong bottom = i % 4 == 3 ? top + 1 : top;
+          // The same frame index of another run (the application restarted) is another frame too
+          uint bottomRun = i % 8 == 5 ? 2u : 1u;
           var kind = i < 4 ? MarkerKind.SequenceStart : MarkerKind.Frame;
           StartMetadata? start = kind == MarkerKind.SequenceStart ? StartMetadata.FromTag(0, "tear") : null;
           Array.Fill(frame.Pixels, (byte)96);
           MarkerRenderer.Render(frame, new MarkerPayload(top, (long)top * 166_667, 1, kind), 12, 12, 3, metadata: start);
           if (kind == MarkerKind.Frame)
-            MarkerRenderer.Render(frame, new MarkerPayload(bottom, 0, 0, MarkerKind.Sync), 12, 200, 3);
+            MarkerRenderer.Render(frame, new MarkerPayload(bottom, 0, bottomRun, MarkerKind.Sync), 12, 200, 3);
           new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, CaptureRecordFlags.None, header.PixelByteCount).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
@@ -208,7 +210,11 @@ namespace MB.FramePacing.Analysis.UnitTest
       var report = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions());
 
       Assert.That(report.Capture.Layout.Locks, Has.Count.EqualTo(2));
-      Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Torn), Is.EqualTo(9), "captures 7, 11, ... 39 are torn");
+      Assert.That(
+        report.Capture.Rows.Count(r => r.Status == CaptureStatus.Torn),
+        Is.EqualTo(9 + 5),
+        "captures 7, 11, ... 39 (frame index) and 5, 13, ... 37 (run id) are torn"
+      );
     }
 
     [TestCase(true, 20, true)]

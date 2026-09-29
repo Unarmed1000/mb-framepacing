@@ -132,9 +132,8 @@ namespace MB.FramePacing.Analysis
     {
       long ticks = time == TimeSource.Device && record.HasDeviceTicks ? record.DeviceTicks : record.HostTicks;
       bool sourceDrop = (record.Flags & CaptureRecordFlags.SourceDropBefore) != 0;
-      // Camera: the second zone's frame index measures the scanout (capture cards: the sync marker only checked tearing, in the status)
-      ulong? secondary =
-        camera && record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second.FrameIndex : null;
+      // Camera: the second zone's frame measures the scanout (capture cards: the sync marker only checked tearing, in the status)
+      MarkerPayload? secondary = camera && record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second : null;
 
       var status = record.Status switch
       {

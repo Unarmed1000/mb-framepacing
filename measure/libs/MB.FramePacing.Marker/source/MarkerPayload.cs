@@ -56,6 +56,12 @@ namespace MB.FramePacing.Marker
 
     public TimeSpan AnimationTime => TimeSpan.FromTicks(AnimationTicks);
 
+    /// <summary>
+    /// The same frame as <paramref name="other"/>: the same run id and frame index, which is all a sync marker carries. Frame indices of
+    /// different runs are unrelated.
+    /// </summary>
+    public bool IsSameFrame(in MarkerPayload other) => RunId == other.RunId && FrameIndex == other.FrameIndex;
+
     /// <summary>Serialize the payload. Start markers append the metadata (empty if null), other kinds ignore it.</summary>
     public byte[] Encode(StartMetadata? metadata = null)
     {

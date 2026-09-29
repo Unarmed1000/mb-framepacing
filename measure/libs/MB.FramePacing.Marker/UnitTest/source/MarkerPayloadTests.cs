@@ -36,6 +36,12 @@ namespace MB.FramePacing.Marker.UnitTest
         (byte)'F',
         1,
         2,
+        // run id
+        0x24,
+        0x23,
+        0x22,
+        0x21,
+        // frame index
         0x08,
         0x07,
         0x06,
@@ -44,6 +50,9 @@ namespace MB.FramePacing.Marker.UnitTest
         0x03,
         0x02,
         0x01,
+        // flags
+        0x01,
+        // animation time
         0x18,
         0x17,
         0x16,
@@ -52,10 +61,17 @@ namespace MB.FramePacing.Marker.UnitTest
         0x13,
         0x12,
         0x11,
-        0x24,
-        0x23,
-        0x22,
-        0x21,
+        // preferred frame time
+        0x74,
+        0x73,
+        0x72,
+        0x71,
+        // target frame time
+        0x44,
+        0x43,
+        0x42,
+        0x41,
+        // intended display time
         0x38,
         0x37,
         0x36,
@@ -64,10 +80,7 @@ namespace MB.FramePacing.Marker.UnitTest
         0x33,
         0x32,
         0x31,
-        0x44,
-        0x43,
-        0x42,
-        0x41,
+        // CPU start time
         0x58,
         0x57,
         0x56,
@@ -76,15 +89,11 @@ namespace MB.FramePacing.Marker.UnitTest
         0x53,
         0x52,
         0x51,
+        // CPU busy
         0x64,
         0x63,
         0x62,
         0x61,
-        0x74,
-        0x73,
-        0x72,
-        0x71,
-        0x01,
       ];
       Assert.That(payload.Encode(), Is.EqualTo(expected));
     }

@@ -64,7 +64,7 @@ This is the most efficient way without a dedicated shader; the shaders (1 and 2 
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
   (`GenerateModules(payload, matrix, {utcTicks, sequenceId})`), and a payload of kind `MarkerKind::SequenceEnd`, each shown for a few frames. The sequence id is 16 opaque bytes unique to the run: a UUID's
   bytes, or a text tag of up to 16 printable ASCII characters (`SequenceId::TryFromText`).
-- **Sync marker (optional; required for camera capture):** a small second marker with only the frame index, drawn bottom-left
+- **Sync marker (optional; required for camera capture):** a small second marker with only the run id and frame index, drawn bottom-left
   (`RecommendedOrigin(MarkerKind::Sync, …)`) with a payload of kind `MarkerKind::Sync`.
 - **Size:** every main marker (frame, start, end) is QR version 6, 41×41 modules, so it never changes size:
   `MarkerSizePx(options)`. The sync marker is QR version 2, 25×25 modules.

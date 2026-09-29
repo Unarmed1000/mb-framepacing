@@ -179,8 +179,8 @@ flowchart LR
 | -------------------------------------------- | -------------------------------------------- | ---------------------------------------- |
 | ![Start marker](doc/images/marker-start.png) | ![Frame marker](doc/images/marker-frame.png) | ![End marker](doc/images/marker-end.png) |
 
-For tearing checks, also draw the small **sync marker** at the bottom left. It carries the frame index; when it disagrees with the
-main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
+For tearing checks, also draw the small **sync marker** at the bottom left. It carries the run id and frame index; when it disagrees with
+the main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
 
 ![The main marker top-left and the sync marker bottom-left](doc/images/marker-tearing.png)
 

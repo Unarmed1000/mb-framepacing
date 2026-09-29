@@ -27,12 +27,13 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>
     /// Rows of a camera capture: frame k is first decoded at capture k * 17 after 4 undecodable captures; the second zone shows each frame 10
     /// captures after the timing zone. <paramref name="longGapFrame"/> gets a 12 capture gap, <paramref name="tornFrame"/> reaches the second
-    /// zone 6 captures before the timing zone, <paramref name="secondZoneOnly"/> is never seen by the timing zone.
+    /// zone 6 captures before the timing zone, <paramref name="secondZoneOnly"/> is never seen by the timing zone. The run id is 1; the second
+    /// zone shows <paramref name="otherRunFrame"/> with run id 2, as another run's frame of the same index.
     /// </summary>
-    private static List<CaptureRow> Rows(int frames, int longGapFrame, int tornFrame, int secondZoneOnly)
+    private static List<CaptureRow> Rows(int frames, int longGapFrame, int tornFrame, int secondZoneOnly, int otherRunFrame = -1)
     {
       var primary = new Dictionary<long, ulong>();
-      var secondary = new Dictionary<long, ulong>();
+      var secondary = new Dictionary<long, (ulong Index, uint RunId)>();
       for (int k = 0; k < frames; ++k)
       {
         long first = (k + 1) * CapturesPerFrame;
@@ -45,14 +46,14 @@ namespace MB.FramePacing.Analysis.UnitTest
         long secondFirst = k == tornFrame ? first - 6 : first + SecondZoneDelay;
         // A newer frame replaces the older one in the second zone
         for (long c = secondFirst; c < secondFirst + CapturesPerFrame - Transition; ++c)
-          secondary[c] = index;
+          secondary[c] = (index, k == otherRunFrame ? 2u : 1u);
       }
 
       var rows = new List<CaptureRow>();
       long end = (frames + 1) * CapturesPerFrame;
       for (long c = CapturesPerFrame; c < end; ++c)
       {
-        ulong? second = secondary.TryGetValue(c, out var s) ? s : null;
+        MarkerPayload? second = secondary.TryGetValue(c, out var s) ? new MarkerPayload(s.Index, 0, s.RunId, MarkerKind.Sync) : null;
         rows.Add(
           primary.TryGetValue(c, out var p)
             ? new CaptureRow(c, c * Period, CaptureStatus.Decoded, new MarkerPayload(p, (long)(p - 100) * 16 * Period, 1), null, false, second)
@@ -145,6 +146,17 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Camera!.TornFrames, Is.EqualTo(1));
       Assert.That(run.Camera.SecondZoneOnlyFrames, Is.EqualTo(1));
       Assert.That(run.Frames.Single(f => f.FrameIndex == 121).SkippedBefore, Is.EqualTo(1UL));
+    }
+
+    [Test]
+    public void SecondZone_OfAnotherRun_IsNotThisRunsFrame()
+    {
+      // The early second zone of frame 108 belongs to run 2: it neither times frame 108 of run 1 nor makes it a tear
+      var run = Analyze(Rows(30, longGapFrame: -1, tornFrame: 8, secondZoneOnly: -1, otherRunFrame: 8));
+
+      Assert.That(run.Frames.Where(f => f.Flags.HasFlag(PresentedFrameFlags.Torn)), Is.Empty);
+      Assert.That(run.Camera!.TornFrames, Is.EqualTo(0));
+      Assert.That(run.Camera.ScanoutDelay.P50, Is.EqualTo(SecondZoneDelay).Within(0.01));
     }
   }
 }

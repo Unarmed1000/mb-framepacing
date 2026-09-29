@@ -32,7 +32,7 @@ namespace MB.FramePacing.Analysis
         row.HostTicks,
         row.DeviceTicks,
         row.MarkerBytes,
-        row.SecondaryFrameIndex
+        row.Secondary?.FrameIndex
       );
     }
 

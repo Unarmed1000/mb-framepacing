@@ -143,7 +143,9 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
       TestContext.Out.WriteLine($"{records} records, decoded {decoded[0]} / {decoded[1]}");
       Assert.That(records, Is.EqualTo(camera.CaptureCount));
-      Assert.That(decoded[0], Is.GreaterThan(records * 0.8));
+      // The main zone's share depends on the symbols (how many modules two consecutive frames share while the scanout crosses the marker):
+      // it varies between about 79 and 83 % with the run id alone
+      Assert.That(decoded[0], Is.GreaterThan(records * 0.75));
       Assert.That(decoded[1], Is.GreaterThan(records * 0.8));
 
       var session = CaptureSessionInfo.TryLoad(output)!;

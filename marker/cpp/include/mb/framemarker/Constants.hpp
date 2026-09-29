@@ -17,10 +17,10 @@ namespace MB::FrameMarker
   inline constexpr int32_t QrModuleCount = (4 * QrVersion) + 17;
   inline constexpr std::size_t QrCapacityBytes = 106;
 
-  //! The sync marker (MarkerKind::Sync) is QR version 2 (25x25 modules), ECC level M: magic | format version | kind | frame index u64.
+  //! The sync marker (MarkerKind::Sync) is QR version 2 (25x25 modules), ECC level M: magic | format version | kind | run id u32 | frame index u64.
   inline constexpr int32_t SyncQrVersion = 2;
   inline constexpr int32_t SyncQrModuleCount = (4 * SyncQrVersion) + 17;
-  inline constexpr std::size_t SyncPayloadByteCount = 12;
+  inline constexpr std::size_t SyncPayloadByteCount = 16;
 
   //! Payload header, shared by every marker kind (little endian):
   //! magic "MF" (2) | format version (1) | kind (1) | frame index u64 (8) | animation ticks i64 (8) | run id u32 (4) |

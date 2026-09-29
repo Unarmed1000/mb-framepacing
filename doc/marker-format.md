@@ -20,22 +20,24 @@ Both implement this document; if they disagree, this document is the reference.
 
 ## Payload
 
-Frame, start and end markers start with the same 53 byte header, little endian:
+Frame, start and end markers start with the same 53 byte header, little endian. Its fields are grouped: the format, which run and
+which frame, what the frame shows, the frame pacing (what the application wants, what the pacer aims for now, when this frame should
+show) and the CPU's work:
 
 | Offset | Size | Field                 | Notes                                                                                                                                                                                 |
 | ------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0      | 2    | Magic                 | ASCII `"MF"` (`0x4D 0x46`)                                                                                                                                                            |
 | 2      | 1    | Format version        | `1`                                                                                                                                                                                   |
 | 3      | 1    | Kind                  | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd (`3` = Sync is the small sync marker, see below)                                                                                  |
-| 4      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                        |
-| 12     | 8    | Animation time        | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.                                                                               |
-| 20     | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                   |
-| 24     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below). |
-| 32     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                             |
-| 36     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                    |
-| 44     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                     |
-| 48     | 4    | Preferred frame time  | `u32` ticks (100 ns), `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `166'667` for 60 fps, also while the pacer runs slower (see below).      |
-| 52     | 1    | Flags                 | Bit 0 = **static**: nothing animates in this frame (see below). Bits 1 to 7 are reserved: write `0`; decoders ignore them.                                                            |
+| 4      | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                   |
+| 8      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                        |
+| 16     | 1    | Flags                 | Bit 0 = **static**: nothing animates in this frame (see below). Bits 1 to 7 are reserved: write `0`; decoders ignore them.                                                            |
+| 17     | 8    | Animation time        | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.                                                                               |
+| 25     | 4    | Preferred frame time  | `u32` ticks (100 ns), `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `166'667` for 60 fps, also while the pacer runs slower (see below).      |
+| 29     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                             |
+| 33     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below). |
+| 41     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                    |
+| 49     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                     |
 
 Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
 carries the same frame index. Frame and end markers are exactly these 53 bytes. A **start marker** appends its metadata, 77 bytes
@@ -49,14 +51,18 @@ in all:
 The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
 8-4-4-4-12 form of a UUID.
 
-A **sync marker** (kind `3`) is a small second marker for tearing checks and camera timing. It carries only what those need:
+A **sync marker** (kind `3`) is a small second marker for tearing checks and camera timing. It carries only what those need, which
+identifies the frame: the header's first 16 bytes.
 
 | Offset | Size | Field          | Notes                                      |
 | ------ | ---- | -------------- | ------------------------------------------ |
 | 0      | 2    | Magic          | ASCII `"MF"`                               |
 | 2      | 1    | Format version | `1`                                        |
 | 3      | 1    | Kind           | `3` = Sync                                 |
-| 4      | 8    | Frame index    | `u64`, the same as the frame's main marker |
+| 4      | 4    | Run id         | `u32`, the same as the frame's main marker |
+| 8      | 8    | Frame index    | `u64`, the same as the frame's main marker |
+
+A sync marker belongs to the main marker with the same run id and frame index.
 
 Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, or an unknown kind.
 
@@ -133,7 +139,7 @@ where the next frame index was captured too. Leave the fields `0` when the appli
 - **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
   size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 53 of them and a start marker 77, which leaves room
   for future fields.
-- **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 12.
+- **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 16.
 - The Reed-Solomon error correction is the integrity check. A capture that mixes two frames (tearing, or a capture taken
   while the display changed frame) either fails ECC or decodes one of the two frames. The analyzer reports what it saw and never
   guesses.
@@ -280,8 +286,8 @@ multiple of the downscale ratio.
 - The inset keeps the marker away from scaler edge artefacts and capture-card cropping, and clear of TV overscan if the
   signal is mirrored to a TV.
 
-**Sync marker: bottom-left**, at the same X, `y = sourceHeight − 32 − syncMarkerSize`. It carries the same frame index as the main
-marker. Optional for a capture card, where it checks tearing: when the two markers show different frames, the analyzer flags the
+**Sync marker: bottom-left**, at the same X, `y = sourceHeight − 32 − syncMarkerSize`. It carries the same run id and frame index as
+the main marker. Optional for a capture card, where it checks tearing: when the two markers show different frames, the analyzer flags the
 capture as _torn_ and uses the main marker for timing. Required for camera capture.
 
 `MB::FrameMarker::RecommendedOrigin(kind, sourceWidth, sourceHeight, options, alignPx)` returns these positions: bottom-left for

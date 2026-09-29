@@ -238,8 +238,9 @@ namespace MB.FramePacing.Analysis
         var row = rows[i];
         if (row.SourceDropBefore)
           ++sourceDrops;
-        if (camera && row.SecondaryFrameIndex is { } secondaryIndex && row.Status != CaptureStatus.NotRecorded)
-          firstSecondary.TryAdd(secondaryIndex, row.CaptureTicks);
+        // The second zone may still show the previous run's frames: only this run's frame indices count
+        if (camera && row.Secondary is { } secondary && secondary.RunId == run.RunId && row.Status != CaptureStatus.NotRecorded)
+          firstSecondary.TryAdd(secondary.FrameIndex, row.CaptureTicks);
         switch (row.Status)
         {
           case CaptureStatus.Undecodable:

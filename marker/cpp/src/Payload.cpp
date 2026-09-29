@@ -11,25 +11,31 @@ namespace MB::FrameMarker
     constexpr std::size_t OffsetMagic1 = 1;
     constexpr std::size_t OffsetVersion = 2;
     constexpr std::size_t OffsetKind = 3;
-    constexpr std::size_t OffsetFrameIndex = 4;
-    constexpr std::size_t OffsetAnimationTicks = 12;
-    constexpr std::size_t OffsetRunId = 20;
-    constexpr std::size_t OffsetIntendedDisplayTicks = 24;
-    constexpr std::size_t OffsetTargetFrameTicks = 32;
-    constexpr std::size_t OffsetCpuStartTicks = 36;
-    constexpr std::size_t OffsetCpuBusyTicks = 44;
-    constexpr std::size_t OffsetPreferredFrameTicks = 48;
-    constexpr std::size_t OffsetFlags = 52;
+    // Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work
+    constexpr std::size_t OffsetRunId = 4;
+    constexpr std::size_t OffsetFrameIndex = 8;
+    constexpr std::size_t OffsetFlags = 16;
+    constexpr std::size_t OffsetAnimationTicks = 17;
+    constexpr std::size_t OffsetPreferredFrameTicks = 25;
+    constexpr std::size_t OffsetTargetFrameTicks = 29;
+    constexpr std::size_t OffsetIntendedDisplayTicks = 33;
+    constexpr std::size_t OffsetCpuStartTicks = 41;
+    constexpr std::size_t OffsetCpuBusyTicks = 49;
     constexpr std::size_t OffsetStartUtcTicks = PayloadByteCount;
     constexpr std::size_t OffsetSequenceId = OffsetStartUtcTicks + 8;
 
-    static_assert(OffsetTargetFrameTicks + 4 == OffsetCpuStartTicks);
-    static_assert(OffsetCpuStartTicks + 8 == OffsetCpuBusyTicks);
-    static_assert(OffsetCpuBusyTicks + 4 == OffsetPreferredFrameTicks);
-    static_assert(OffsetPreferredFrameTicks + 4 == OffsetFlags);
-    static_assert(OffsetFlags + 1 == PayloadByteCount);
-    static_assert(PayloadByteCount == 53u);
+    static_assert(OffsetKind + 1 == OffsetRunId);
+    static_assert(OffsetRunId + 4 == OffsetFrameIndex);
     static_assert(OffsetFrameIndex + 8 == SyncPayloadByteCount);
+    static_assert(SyncPayloadByteCount == OffsetFlags);
+    static_assert(OffsetFlags + 1 == OffsetAnimationTicks);
+    static_assert(OffsetAnimationTicks + 8 == OffsetPreferredFrameTicks);
+    static_assert(OffsetPreferredFrameTicks + 4 == OffsetTargetFrameTicks);
+    static_assert(OffsetTargetFrameTicks + 4 == OffsetIntendedDisplayTicks);
+    static_assert(OffsetIntendedDisplayTicks + 8 == OffsetCpuStartTicks);
+    static_assert(OffsetCpuStartTicks + 8 == OffsetCpuBusyTicks);
+    static_assert(OffsetCpuBusyTicks + 4 == PayloadByteCount);
+    static_assert(PayloadByteCount == 53u);
     static_assert(OffsetSequenceId + SequenceId::ByteCount == StartPayloadByteCount);
     static_assert(StartPayloadByteCount == 77u);
     static_assert(MaxEncodedPayloadByteCount <= QrCapacityBytes);
@@ -54,7 +60,7 @@ namespace MB::FrameMarker
       return value;
     }
 
-    //! The 53 byte header every kind starts with (a sync marker is its first 12 bytes).
+    //! The 53 byte header every kind starts with (a sync marker is its first 16 bytes: which run and frame).
     std::array<uint8_t, PayloadByteCount> EncodeHeader(const Payload& payload) noexcept
     {
       std::array<uint8_t, PayloadByteCount> bytes{};
@@ -62,16 +68,16 @@ namespace MB::FrameMarker
       bytes[OffsetMagic1] = PayloadMagic1;
       bytes[OffsetVersion] = PayloadFormatVersion;
       bytes[OffsetKind] = static_cast<uint8_t>(payload.Kind);
+      WriteLE<4>(bytes, OffsetRunId, payload.RunId);
       WriteLE<8>(bytes, OffsetFrameIndex, payload.FrameIndex);
+      bytes[OffsetFlags] = static_cast<uint8_t>(payload.Flags);
       // Two's complement, identical to C# BinaryPrimitives.WriteInt64LittleEndian
       WriteLE<8>(bytes, OffsetAnimationTicks, static_cast<uint64_t>(payload.AnimationTicks));
-      WriteLE<4>(bytes, OffsetRunId, payload.RunId);
-      WriteLE<8>(bytes, OffsetIntendedDisplayTicks, static_cast<uint64_t>(payload.IntendedDisplayTicks));
+      WriteLE<4>(bytes, OffsetPreferredFrameTicks, payload.PreferredFrameTicks);
       WriteLE<4>(bytes, OffsetTargetFrameTicks, payload.TargetFrameTicks);
+      WriteLE<8>(bytes, OffsetIntendedDisplayTicks, static_cast<uint64_t>(payload.IntendedDisplayTicks));
       WriteLE<8>(bytes, OffsetCpuStartTicks, static_cast<uint64_t>(payload.CpuStartTicks));
       WriteLE<4>(bytes, OffsetCpuBusyTicks, payload.CpuBusyTicks);
-      WriteLE<4>(bytes, OffsetPreferredFrameTicks, payload.PreferredFrameTicks);
-      bytes[OffsetFlags] = static_cast<uint8_t>(payload.Flags);
       return bytes;
     }
   }
@@ -85,7 +91,7 @@ namespace MB::FrameMarker
       return 0;
     }
 
-    // A sync marker is the start of the header: magic, format version, kind and frame index
+    // A sync marker is the start of the header: magic, format version, kind, run id and frame index
     const std::array<uint8_t, PayloadByteCount> header = EncodeHeader(payload);
     std::copy_n(header.begin(), std::min(byteCount, PayloadByteCount), dst.begin());
     if (isStart)
@@ -111,7 +117,7 @@ namespace MB::FrameMarker
       {
         return false;
       }
-      rPayload = Payload{ReadLE<8>(bytes, OffsetFrameIndex), 0, 0u, kind};
+      rPayload = Payload{ReadLE<8>(bytes, OffsetFrameIndex), 0, static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId)), kind};
       if (pMetadata != nullptr)
       {
         *pMetadata = StartMetadata{};
@@ -138,16 +144,16 @@ namespace MB::FrameMarker
     }
 
     rPayload.Kind = kind;
-    rPayload.FrameIndex = ReadLE<8>(bytes, OffsetFrameIndex);
-    rPayload.AnimationTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetAnimationTicks));
     rPayload.RunId = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId));
-    rPayload.IntendedDisplayTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetIntendedDisplayTicks));
-    rPayload.TargetFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetTargetFrameTicks));
-    rPayload.CpuStartTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetCpuStartTicks));
-    rPayload.CpuBusyTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetCpuBusyTicks));
-    rPayload.PreferredFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetPreferredFrameTicks));
+    rPayload.FrameIndex = ReadLE<8>(bytes, OffsetFrameIndex);
     // Every value is accepted: bits without a name are reserved and kept
     rPayload.Flags = static_cast<MarkerFlags>(bytes[OffsetFlags]);
+    rPayload.AnimationTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetAnimationTicks));
+    rPayload.PreferredFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetPreferredFrameTicks));
+    rPayload.TargetFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetTargetFrameTicks));
+    rPayload.IntendedDisplayTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetIntendedDisplayTicks));
+    rPayload.CpuStartTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetCpuStartTicks));
+    rPayload.CpuBusyTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetCpuBusyTicks));
     if (pMetadata != nullptr)
     {
       *pMetadata = metadata;

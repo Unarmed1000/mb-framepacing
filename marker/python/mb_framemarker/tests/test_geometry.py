@@ -120,8 +120,9 @@ class GeometryTests(unittest.TestCase):
         self.assertTrue(all(quad.right <= 10 + 99 - 12 and quad.bottom <= 20 + 99 - 12 for quad in quads[1:]))
         self.assertEqual(generate_triangles(payload, options, origin), to_triangles(quads))
         self.assertEqual(generate_indexed(payload, options, origin, 5), to_indexed(quads, 5))
-        # The other fields are not encoded: the same symbol whatever they hold
-        self.assertEqual(generate_quads(Payload(7, 123, 4, MarkerKind.SYNC, 5, 6), options, origin), quads)
+        # Only the run id and the frame index are encoded: the same symbol whatever the other fields hold
+        self.assertEqual(generate_quads(Payload(7, 123, 0, MarkerKind.SYNC, 5, 6), options, origin), quads)
+        self.assertNotEqual(generate_quads(Payload(7, 0, 4, MarkerKind.SYNC), options, origin), quads)
 
     def test_every_main_marker_kind_has_the_same_size(self) -> None:
         options, origin = Options(), Point(32, 32)

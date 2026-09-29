@@ -28,15 +28,15 @@ namespace MB.FrameMarker
     public const int QrModuleCount = (4 * QrVersion) + 17;
     public const int QrCapacityBytes = 106;
 
-    /// <summary>The sync marker (<see cref="MarkerKind.Sync"/>) is QR version 2 (25x25 modules): magic | format version | kind | frame index.</summary>
+    /// <summary>The sync marker (<see cref="MarkerKind.Sync"/>) is QR version 2 (25x25 modules): magic | format version | kind | run id | frame index.</summary>
     public const int SyncQrVersion = 2;
 
     public const int SyncQrModuleCount = (4 * SyncQrVersion) + 17;
-    public const int SyncPayloadByteCount = 12;
+    public const int SyncPayloadByteCount = 16;
 
-    /// <summary>Payload header, shared by every marker kind (little endian): magic "MF" | format version | kind | frame index u64 |
-    /// animation ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32 | CPU start ticks i64 | CPU busy ticks u32 |
-    /// preferred frame ticks u32 | flags u8. Start and end markers carry the values of the frame that shows them.</summary>
+    /// <summary>Payload header, shared by every marker kind (little endian), grouped: magic "MF" | format version | kind | run id u32 |
+    /// frame index u64 | flags u8 | animation ticks i64 | preferred frame ticks u32 | target frame ticks u32 | intended display ticks i64 |
+    /// CPU start ticks i64 | CPU busy ticks u32. Start and end markers carry the values of the frame that shows them.</summary>
     public const int PayloadByteCount = 53;
     public const byte PayloadMagic0 = (byte)'M';
     public const byte PayloadMagic1 = (byte)'F';
@@ -82,15 +82,15 @@ namespace MB.FrameMarker
     public const int MaxGridVertexCount = 4 + ((QrModuleCount + 1) * (QrModuleCount + 1));
 
     private const int OffsetKind = 3;
-    private const int OffsetFrameIndex = 4;
-    private const int OffsetAnimationTicks = 12;
-    private const int OffsetRunId = 20;
-    private const int OffsetIntendedDisplayTicks = 24;
-    private const int OffsetTargetFrameTicks = 32;
-    private const int OffsetCpuStartTicks = 36;
-    private const int OffsetCpuBusyTicks = 44;
-    private const int OffsetPreferredFrameTicks = 48;
-    private const int OffsetFlags = 52;
+    private const int OffsetRunId = 4;
+    private const int OffsetFrameIndex = 8;
+    private const int OffsetFlags = 16;
+    private const int OffsetAnimationTicks = 17;
+    private const int OffsetPreferredFrameTicks = 25;
+    private const int OffsetTargetFrameTicks = 29;
+    private const int OffsetIntendedDisplayTicks = 33;
+    private const int OffsetCpuStartTicks = 41;
+    private const int OffsetCpuBusyTicks = 49;
     private const int OffsetStartUtcTicks = PayloadByteCount;
     private const int OffsetSequenceId = OffsetStartUtcTicks + 8;
 
@@ -154,18 +154,18 @@ namespace MB.FrameMarker
       destination[1] = PayloadMagic1;
       destination[2] = PayloadFormatVersion;
       destination[OffsetKind] = (byte)payload.Kind;
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetRunId), payload.RunId);
       BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(OffsetFrameIndex), payload.FrameIndex);
-      // A sync marker is the start of the header: magic, format version, kind and frame index
+      // A sync marker is the start of the header: magic, format version, kind, run id and frame index
       if (payload.Kind == MarkerKind.Sync)
         return byteCount;
+      destination[OffsetFlags] = (byte)payload.Flags;
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetAnimationTicks), payload.AnimationTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetRunId), payload.RunId);
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetIntendedDisplayTicks), payload.IntendedDisplayTicks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetPreferredFrameTicks), payload.PreferredFrameTicks);
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetTargetFrameTicks), payload.TargetFrameTicks);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetIntendedDisplayTicks), payload.IntendedDisplayTicks);
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetCpuStartTicks), payload.CpuStartTicks);
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetCpuBusyTicks), payload.CpuBusyTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetPreferredFrameTicks), payload.PreferredFrameTicks);
-      destination[OffsetFlags] = (byte)payload.Flags;
       if (isStart)
       {
         BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetStartUtcTicks), metadata.UtcTicks);
@@ -196,7 +196,12 @@ namespace MB.FrameMarker
       {
         if (source.Length != SyncPayloadByteCount)
           return false;
-        payload = new Payload(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)), 0, 0, kind);
+        payload = new Payload(
+          BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
+          0,
+          BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
+          kind
+        );
         return true;
       }
       if (source.Length < PayloadByteCount)

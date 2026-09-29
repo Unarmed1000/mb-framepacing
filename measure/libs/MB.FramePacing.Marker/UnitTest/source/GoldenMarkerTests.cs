@@ -33,10 +33,8 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(locked.Payload, Is.EqualTo(golden.Payload));
       Assert.That(locked.Start, Is.EqualTo(golden.Start));
 
-      // ZXing's finder search misses about 1 in 100 version 6 payloads at 4 px modules and up (module patterns that confuse its finder
-      // detector); the analysis only needs one successful search per capture, so those are skipped here
+      // Every golden marker is found by the search too, also those whose data modules form a false finder pattern (the multi code search)
       var result = decoder.Decode(image);
-      Assume.That(result.Status, Is.EqualTo(MarkerDecodeStatus.Decoded), "the finder search missed this payload");
       Assert.That(result.Status, Is.EqualTo(MarkerDecodeStatus.Decoded));
       Assert.That(result.Payload, Is.EqualTo(golden.Payload));
       Assert.That(result.Start, Is.EqualTo(golden.Start));
@@ -48,7 +46,7 @@ namespace MB.FramePacing.Marker.UnitTest
     {
       var image = PgmFile.Read(golden.Path);
       var result = new MarkerDecoder().Decode(image);
-      Assume.That(result.IsDecoded);
+      Assert.That(result.IsDecoded);
 
       int size = MarkerRenderer.MarkerSizePx(golden.ModuleSizePx, golden.QuietZoneModules, golden.Payload.Kind);
       var expected = new PixelRect(golden.OriginX, golden.OriginY, size, size);
