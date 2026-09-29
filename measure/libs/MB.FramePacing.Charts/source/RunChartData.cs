@@ -28,10 +28,13 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<FrameSequence> m_frameRateSteps;
     private readonly Lazy<FrameSequence> m_displaySteps;
     private readonly Lazy<FrameSequence> m_holds;
+    private readonly Lazy<FrameSequence> m_animatingHolds;
+    private readonly Lazy<(int Start, int End)[]> m_staticStretches;
     private readonly Lazy<FrameSequence> m_lateHolds;
     private readonly Lazy<FrameSequence> m_animationHolds;
     private readonly Lazy<FrameSequence> m_frameTimes;
     private readonly Lazy<FrameSequence> m_cpuBusy;
+    private readonly Lazy<FrameSequence> m_animatingFrameTimes;
     private readonly Lazy<RankBits> m_spans;
     private readonly Lazy<WaveletMatrix> m_frameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_drift;
@@ -59,6 +62,24 @@ namespace MB.FramePacing.Charts
       );
       m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDeltaTicks));
       m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDeltaTicks : null));
+      m_animatingHolds = Once(() =>
+        new FrameSequence(count, i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.Static) == 0 ? Frames[i + 1].DisplayDeltaTicks : null)
+      );
+      m_staticStretches = Once(() =>
+      {
+        var stretches = new List<(int Start, int End)>();
+        for (int i = 0; i < count; ++i)
+        {
+          if ((Frames[i].Flags & PresentedFrameFlags.Static) == 0)
+            continue;
+          int end = i + 1;
+          while (end < count && (Frames[end].Flags & PresentedFrameFlags.Static) != 0 && Frames[end].Segment == Frames[i].Segment)
+            ++end;
+          stretches.Add((i, end));
+          i = end - 1;
+        }
+        return stretches.ToArray();
+      });
       m_lateHolds = Once(() =>
         new FrameSequence(count, i => HasNext(i) && (Frames[i + 1].Flags & PresentedFrameFlags.Late) != 0 ? Frames[i + 1].DisplayDeltaTicks : null)
       );
@@ -66,13 +87,17 @@ namespace MB.FramePacing.Charts
       m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTimeTicks is > 0 and var t ? t : null));
       m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null));
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTimeTicks is > 0 || Frames[i].CpuBusyTicks > 0));
+      m_animatingFrameTimes = Once(() =>
+        new FrameSequence(count, i => (Frames[i].Flags & PresentedFrameFlags.Static) == 0 && Frames[i].FrameTimeTicks is > 0 and var t ? t : null)
+      );
       m_frameTimesAndCpuBusy = Once(() =>
       {
-        // Per frame its frametime, then its CPU busy (each when above 0): a range of frames starts at its frametimes' plus its CPU busys' start
-        var values = new List<long>(FrameTimes.Count + CpuBusy.Count);
+        // Per frame its frametime (not a static frame's: an idle wait), then its CPU busy (each when above 0): a range of frames starts at its
+        // animating frametimes' plus its CPU busys' start
+        var values = new List<long>(AnimatingFrameTimes.Count + CpuBusy.Count);
         for (int i = 0; i < count; ++i)
         {
-          if (Frames[i].FrameTimeTicks is > 0 and var t)
+          if ((Frames[i].Flags & PresentedFrameFlags.Static) == 0 && Frames[i].FrameTimeTicks is > 0 and var t)
             values.Add(t);
           if (Frames[i].CpuBusyTicks > 0)
             values.Add(Frames[i].CpuBusyTicks);
@@ -107,6 +132,12 @@ namespace MB.FramePacing.Charts
     /// <summary>Each frame's hold: until the next frame of its segment, at the next frame's display time step.</summary>
     public FrameSequence Holds => m_holds.Value;
 
+    /// <summary>The holds of the frames that animate: a static frame's hold (an idle screen) is left out, as the display time step scale is.</summary>
+    public FrameSequence AnimatingHolds => m_animatingHolds.Value;
+
+    /// <summary>Runs of consecutive static frames of one segment, as frame ranges (start, end), in display order.</summary>
+    public IReadOnlyList<(int Start, int End)> StaticStretches => m_staticStretches.Value;
+
     /// <summary>The holds whose next frame is late (held too long).</summary>
     public FrameSequence LateHolds => m_lateHolds.Value;
 
@@ -120,9 +151,12 @@ namespace MB.FramePacing.Charts
     /// <summary>The frames with a frametime or a CPU busy: the frametime panel's spans.</summary>
     public RankBits Spans => m_spans.Value;
 
+    /// <summary>The frametimes of the frames that animate: a static frame's (an idle wait) is left out, as the frametime scale is.</summary>
+    public FrameSequence AnimatingFrameTimes => m_animatingFrameTimes.Value;
+
     /// <summary>
-    /// Every frametime and CPU busy above 0, per frame in that order: frames <c>a</c> to <c>b</c> are positions
-    /// <c>FrameTimes.Frames.Rank(a) + CpuBusy.Frames.Rank(a)</c> to the same at <c>b</c>.
+    /// The frametime panel's scale values: every frametime of a frame that animates and every CPU busy above 0, per frame in that order: frames
+    /// <c>a</c> to <c>b</c> are positions <c>AnimatingFrameTimes.Frames.Rank(a) + CpuBusy.Frames.Rank(a)</c> to the same at <c>b</c>.
     /// </summary>
     public WaveletMatrix FrameTimesAndCpuBusy => m_frameTimesAndCpuBusy.Value;
 

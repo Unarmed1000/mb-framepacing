@@ -68,7 +68,8 @@ namespace MB.FramePacing.Charts
     /// frame chart: green as planned, red held too long, faint risers), the range of the animation time step over it (its line is CHART_STYLE's
     /// step-line), the frametime (the web page's step-line blue) and CPU busy, the late
     /// share, the late strip cells and the marks above the strip, the distribution cards' bars and curves, the marks of values beyond a scale,
-    /// and warning values.
+    /// warning values, the static stretches (violet bands behind the panels, violet strip cells) and 'key', which marks a panel key's swatches
+    /// so they are never taken for data (no style of its own).
     /// </summary>
     public const string ReportStyle =
       "\n  .band { fill: #ffffff; fill-opacity: 0.06; }\n"
@@ -77,6 +78,11 @@ namespace MB.FramePacing.Charts
       + "  .held { stroke: #2ea043; stroke-width: 2.5; fill: none; }\n"
       + "  .held-late { stroke: #e5534b; stroke-width: 2.5; fill: none; }\n"
       + "  .bar-range { fill: #e5534b; fill-opacity: 0.3; }\n"
+      + "  .static-band { fill: #a371f7; fill-opacity: 0.14; }\n"
+      + "  .static-text { font-size: 11px; fill: #a371f7; letter-spacing: 0.04em; }\n"
+      + "  .strip-static-a { fill: #a371f7; fill-opacity: 0.55; }\n"
+      + "  .strip-static-b { fill: #a371f7; fill-opacity: 0.85; }\n"
+      + "  .key { }\n"
       + "  .held-fill { fill: #2ea043; }\n"
       + "  .held-fill-late { fill: #e5534b; }\n"
       + "  .held-range { fill: #2ea043; fill-opacity: 0.3; }\n"

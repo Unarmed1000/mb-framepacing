@@ -125,10 +125,15 @@ namespace MB.FramePacing.Charts
         : new List<HeadlineTile>();
       if (options.HideEmpty && options.IsShown(ReportItem.LateShare) && (section.Section.Run.Pacing?.LateFrames ?? 0) == 0)
         options = options.Hide(new[] { ReportItem.LateShare });
-      var layout = Layout.For(options, description.Count, tiles.Count);
+      // What the application wants, when its markers say so: a line of its own in the display box
+      string wants = options.IsShown(ReportItem.Display)
+        ? Wants(Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]))
+        : string.Empty;
+      double displayH = wants.Length > 0 ? DisplayBoxH + DisplayLineH : DisplayBoxH;
+      var layout = Layout.For(options, description.Count, tiles.Count, displayH);
       var parts = Header(title, options.IsShown(ReportItem.Description) ? description : Array.Empty<string>(), options.IsShown(ReportItem.Title));
       if (options.IsShown(ReportItem.Display))
-        DisplayBox(parts, chart, section, refreshMs, width);
+        DisplayBox(parts, chart, section, refreshMs, width, wants, displayH);
 
       Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRow);
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
@@ -189,7 +194,7 @@ namespace MB.FramePacing.Charts
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
     private sealed record Layout(double TilesY, double? ErrorY, double? StepY, double? FrameTimeY, double? LateY, double? StripY, double Height)
     {
-      public static Layout For(ReportOptions options, int descriptionLines, int tiles)
+      public static Layout For(ReportOptions options, int descriptionLines, int tiles, double displayH = DisplayBoxH)
       {
         bool title = options.IsShown(ReportItem.Title);
         bool description = options.IsShown(ReportItem.Description) && descriptionLines > 0;
@@ -203,7 +208,7 @@ namespace MB.FramePacing.Charts
             description ? (title ? 54 : 30) + ((descriptionLines - 1) * 19)
             : title ? 30
             : 0;
-          cursor = Math.Max(text > 0 ? text + 31 : 0, display ? 14 + 68 + 20 : 0);
+          cursor = Math.Max(text > 0 ? text + 31 : 0, display ? 14 + displayH + 20 : 0);
           previous = "header";
         }
         double tilesY = cursor;
@@ -242,15 +247,22 @@ namespace MB.FramePacing.Charts
     /// The display in the top right corner: its refresh rate, whether it is the fixed refresh a capture card captures at (vsync) or calculated
     /// from a camera's frames, the time per refresh, and what the frames targeted in whole refreshes.
     /// </summary>
-    private static void DisplayBox(List<CardShape> parts, ChartRun chart, RunSection section, double refreshMs, double width)
+    private static void DisplayBox(
+      List<CardShape> parts,
+      ChartRun chart,
+      RunSection section,
+      double refreshMs,
+      double width,
+      string wants,
+      double boxH
+    )
     {
       var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]);
       const double BoxW = 300;
-      const double BoxH = 68;
       double X = width - 20 - BoxW;
       const double Y = 14;
       var pacing = chart.Run.Pacing;
-      parts.Add(new RectShape("tile", N(X, 1), N(Y, 0), N(BoxW, 0), N(BoxH, 0), "10"));
+      parts.Add(new RectShape("tile", N(X, 1), N(Y, 0), N(BoxW, 0), N(boxH, 0), "10"));
       parts.Add(new TextShape(X + 14, Y + 19, "DISPLAY", "label", "start"));
       string rate = Hz(pacing);
       bool mismatch = pacing?.MatchesExpectedRefresh == false;
@@ -282,7 +294,19 @@ namespace MB.FramePacing.Charts
         : refreshes.Length == 1
           ? $", target {Refreshes(refreshes[0])} ({(1000 / (refreshes[0] * refreshMs)).ToString("0.#", CultureInfo.InvariantCulture)} fps)"
         : $", target {refreshes[0]}\u2013{Refreshes(refreshes[^1])}";
-      // What the application wants, when its markers say so
+      parts.Add(new TextShape(X + 14, Y + 60, $"{Ms1(refreshMs)} ms per refresh{target}", "vsync-n", "start"));
+      if (wants.Length > 0)
+        parts.Add(new TextShape(X + 14, Y + 60 + DisplayLineH, wants, "vsync-n", "start"));
+    }
+
+    // The display box's height, and one more line for what the application wants
+    private const double DisplayBoxH = 68;
+    private const double DisplayLineH = 16;
+
+    /// <summary>What the application wants, when its markers say so ("preferred 60 fps", "preferred 1–60 fps, on demand"), else empty.</summary>
+    private static string Wants(IEnumerable<PresentedFrame> frames)
+    {
+      static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
       var preferredFps = frames
         .Where(f => Known(f.MarkerPreferredFrameTicks))
         .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTicks, 1))
@@ -300,8 +324,7 @@ namespace MB.FramePacing.Charts
       }
       if (onDemand)
         wants.Add("on demand");
-      string preferred = wants.Count > 0 ? ", " + string.Join(", ", wants) : string.Empty;
-      parts.Add(new TextShape(X + 14, Y + 60, $"{Ms1(refreshMs)} ms per refresh{target}{preferred}", "vsync-n", "start"));
+      return string.Join(", ", wants);
     }
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
@@ -371,6 +394,113 @@ namespace MB.FramePacing.Charts
       public IEnumerable<(int Column, int Start, int End)> Columns(int start, int end) => PixelColumns.Walk(start, end, XOfFrame);
     }
 
+    /// <summary>
+    /// A panel's key, right aligned on the baseline <paramref name="y"/>: per item one swatch and its word. A swatch is a filled square (two
+    /// classes: split in halves, for colours that alternate per frame), a line (<c>Line</c>) or the ▾ mark (class <c>strip-mark</c>). Swatches
+    /// carry the class "key" too, so they are never taken for the data they stand for.
+    /// </summary>
+    private static List<CardShape> Key(double right, double y, IReadOnlyList<(string[] Classes, string Text, bool Line)> items)
+    {
+      const double Swatch = 9;
+      const double Space = 5;
+      const double Gap = 22;
+      // Left to right from where the whole key ends at the right edge: each word starts right after its swatch
+      double x = right - items.Sum(item => (item.Line ? 14 : Swatch) + Space + SmallTextWidth(item.Text)) - (Math.Max(0, items.Count - 1) * Gap);
+      var shapes = new List<CardShape>();
+      foreach (var (classes, text, line) in items)
+      {
+        double width = line ? 14 : Swatch;
+        if (line)
+          shapes.Add(new LineShape(classes[0] + " key", N(x, 1), N(y - 4, 1), N(x + width, 1), N(y - 4, 1)));
+        else if (classes[0] == "strip-mark")
+          shapes.Add(new PathShape("strip-mark key", $"M{Fixed(x + 4.5, 1)} {Fixed(y, 1)}L{Fixed(x + 1, 1)} {Fixed(y - 6, 1)}H{Fixed(x + 8, 1)}Z"));
+        else if (classes.Length == 2)
+        {
+          shapes.Add(new RectShape(classes[0] + " key", N(x, 1), N(y - Swatch, 1), N(Swatch / 2, 1), N(Swatch, 0)));
+          shapes.Add(new RectShape(classes[1] + " key", N(x + (Swatch / 2), 1), N(y - Swatch, 1), N(Swatch / 2, 1), N(Swatch, 0)));
+        }
+        else
+          shapes.Add(new RectShape(classes[0] + " key", N(x, 1), N(y - Swatch, 1), N(Swatch, 0), N(Swatch, 0), "2"));
+        shapes.Add(new TextShape(x + width + Space, y, text, "vsync-n", "start"));
+        x += width + Space + SmallTextWidth(text) + Gap;
+      }
+      return shapes;
+    }
+
+    /// <summary>The key item of the static bands: what a band behind a panel's data means.</summary>
+    private static readonly (string[] Classes, string Text, bool Line) g_staticKey = (new[] { "static-band" }, "static: nothing animates", false);
+
+    /// <summary>
+    /// About how wide a small (11 px, vsync-n: 0.04 em letter spacing) text is, in card units: per character by its kind, measured on rendered
+    /// cards.
+    /// </summary>
+    private static double SmallTextWidth(string text)
+    {
+      double width = 0;
+      foreach (char c in text)
+      {
+        width +=
+          "il.,:;'|!".Contains(c) ? 2.6
+          : "tfjr ".Contains(c) ? 3.4
+          : c is 'm' or 'w' ? 8.7
+          : c is 'M' or 'W' ? 9.5
+          : char.IsUpper(c) ? 6.9
+          : char.IsDigit(c) ? 6.0
+          : char.IsLower(c) ? 5.7
+          : 5.0;
+        width += 0.44;
+      }
+      return width;
+    }
+
+    private const string StaticLabel = "static: nothing animates";
+
+    /// <summary>
+    /// A violet band behind every stretch of static frames (nothing animates) from <paramref name="top"/> to <paramref name="bottom"/>: from the
+    /// first static frame's display time to the next frame's. Bands closer than a pixel merge; with <paramref name="label"/>, a band wide enough
+    /// says what it is.
+    /// </summary>
+    private static bool StaticBands(List<CardShape> parts, PanelView view, double top, double bottom, bool label)
+    {
+      var data = view.Data;
+      var stretches = data.StaticStretches;
+      if (stretches.Count == 0)
+        return false;
+      var section = view.Section;
+      // The first stretch that ends after the section's first frame
+      int lo = 0;
+      int hi = stretches.Count;
+      while (lo < hi)
+      {
+        int mid = (lo + hi) / 2;
+        if (stretches[mid].End <= section.Start)
+          lo = mid + 1;
+        else
+          hi = mid;
+      }
+      var bands = new List<(double X0, double X1)>();
+      for (int k = lo; k < stretches.Count && stretches[k].Start < section.End; ++k)
+      {
+        var (start, end) = stretches[k];
+        var last = data.Frames[end - 1];
+        double x0 = Math.Max(PlotX0 - 1, view.XOfFrame(Math.Max(start, section.Start)));
+        double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + (last.OnScreenTicks / (double)TimeSpan.TicksPerSecond)));
+        if (x1 <= x0)
+          continue;
+        if (bands.Count > 0 && x0 - bands[^1].X1 < 1)
+          bands[^1] = (bands[^1].X0, Math.Max(bands[^1].X1, x1));
+        else
+          bands.Add((x0, x1));
+      }
+      foreach (var (x0, x1) in bands)
+      {
+        view.Move(parts, new RectShape("static-band", N(x0, 1), N(top, 1), N(Math.Max(1, x1 - x0), 1), N(bottom - top, 1)), top, bottom);
+        if (label && x1 - x0 >= SmallTextWidth(StaticLabel) + 12)
+          view.Move(parts, new TextShape(x0 + 6, top + 13, StaticLabel, "static-text", "start"), top, bottom);
+      }
+      return bands.Count > 0;
+    }
+
     private static double TicksMs(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
 
     private static double MaxMs(WaveletMatrix values, int start, int end) => TicksMs(values.KthSmallest(start, end, end - start - 1));
@@ -392,10 +522,8 @@ namespace MB.FramePacing.Charts
       double YOf(double value) => zeroY - (Math.Clamp(value, -limit, limit) / limit * ErrorH / 2);
       plots.Add(new CardPlot(ReportItem.AnimationError, PlotX0, errorY, view.PlotX1, errorY + ErrorH, view.ViewFrom, view.ViewTo, -limit, limit));
 
-      parts.Add(new TextShape(20, errorY - 16, "ANIMATION ERROR PER FRAME", "label", "start"));
-      parts.Add(
-        new TextShape(view.PlotX1, errorY - 16, "+ shown too soon, − shown too late; the band is within the error threshold", "vsync-n", "end")
-      );
+      parts.Add(new TextShape(20, errorY - 16, "ANIMATION ERROR PER FRAME: + SHOWN TOO SOON, − SHOWN TOO LATE", "label", "start"));
+      var panelKey = new List<(string[] Classes, string Text, bool Line)> { (new[] { "band" }, "within the error threshold", false) };
       double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
       parts.Add(new RectShape("band", N(PlotX0, 1), N(YOf(threshold), 1), N(view.PlotX1 - PlotX0, 1), N(YOf(-threshold) - YOf(threshold), 1)));
       foreach (double position in ChartScale.ErrorTicks(limit).Where(t => t != 0))
@@ -420,8 +548,13 @@ namespace MB.FramePacing.Charts
           string text = $"{(position > 0 ? "+" : "−")}{refreshes} refresh{(refreshes == 1 ? string.Empty : "es")} ({Ms(Math.Abs(position))} ms)";
           parts.Add(new LineShape("error-refresh", N(PlotX0, 0), N(y, 1), N(view.PlotX1, 0), N(y, 1)));
           parts.Add(new TextShape(view.PlotX1 - 4, position > 0 ? y - 4 : y + 12, text, "error-refresh-text", "end"));
+          if (panelKey.Count == 1)
+            panelKey.Add((new[] { "error-refresh" }, "a whole refresh early or late", true));
         }
       }
+      if (StaticBands(parts, view, errorY, errorY + ErrorH, label: true))
+        panelKey.Add(g_staticKey);
+      parts.AddRange(Key(view.PlotX1, errorY - 16, panelKey));
       var clipped = new List<(double X, double Value, bool Top)>();
       if (view.PerFrame)
       {
@@ -504,9 +637,10 @@ namespace MB.FramePacing.Charts
       var holds = data.Holds;
       int holdEnd = Math.Max(section.Start, section.End - 1);
       var (scaleFrom, scaleTo) = view.WholeRunScales ? (0, data.Frames.Count) : (section.Start, holdEnd);
-      // The scale covers the display time steps, and the animation time steps when they are drawn too
+      // The scale covers the display time steps of the frames that animate (an idle screen's hold would squash them: it gets a mark at the
+      // edge), and the animation time steps when they are drawn too
       var scales = new List<(double Longest, double Bulk)>();
-      foreach (var sequence in animation ? new[] { holds, data.AnimationHolds } : new[] { holds })
+      foreach (var sequence in animation ? new[] { data.AnimatingHolds, data.AnimationHolds } : new[] { data.AnimatingHolds })
       {
         var (scaleStart, scaleEnd) = sequence.Of(scaleFrom, scaleTo);
         if (scaleEnd > scaleStart)
@@ -521,16 +655,22 @@ namespace MB.FramePacing.Charts
       double X1(int frame) => Math.Min(view.EndX, view.XOfFrame(frame + 1));
       plots.Add(new CardPlot(ReportItem.DisplayTimeStep, PlotX0, stepY, view.PlotX1, stepY + StepH, view.ViewFrom, view.ViewTo, 0, top));
 
+      parts.Add(
+        new TextShape(
+          20,
+          stepY - 16,
+          animation ? "DISPLAY TIME STEP AND ANIMATION TIME STEP" : "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN",
+          "label",
+          "start"
+        )
+      );
+      // The key: as planned, held too long (the next frame was late) where the section has it, the animation time step when drawn
+      var panelKey = new List<(string[] Classes, string Text, bool Line)> { (new[] { "held" }, "as planned", true) };
+      var (lateHoldsStart, lateHoldsEnd) = data.LateHolds.Of(section.Start, holdEnd);
+      if (lateHoldsEnd > lateHoldsStart)
+        panelKey.Add((new[] { "held-late" }, "held too long: the next frame was late", true));
       if (animation)
-      {
-        parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP AND ANIMATION TIME STEP", "label", "start"));
-        parts.Add(new TextShape(view.PlotX1, stepY - 16, "green display time step (red held too long), blue animation time step", "vsync-n", "end"));
-      }
-      else
-      {
-        parts.Add(new TextShape(20, stepY - 16, "DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN", "label", "start"));
-        parts.Add(new TextShape(view.PlotX1, stepY - 16, "green as planned, red held too long (the next frame was late)", "vsync-n", "end"));
-      }
+        panelKey.Add((new[] { "step-line" }, "animation time step", true));
       foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
       {
         double y = YOf(position);
@@ -539,6 +679,9 @@ namespace MB.FramePacing.Charts
       }
       parts.Add(GridLine(YOf(0), view.PlotX1));
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
+      if (StaticBands(parts, view, stepY, stepY + StepH, label: false))
+        panelKey.Add(g_staticKey);
+      parts.AddRange(Key(view.PlotX1, stepY - 16, panelKey));
       if (animation)
         AnimationSteps(parts, view, holdEnd, YOf, X1, stepY);
 
@@ -692,12 +835,15 @@ namespace MB.FramePacing.Charts
         parts.Add(new TextShape(PlotX0, frameTimeY + (FrameTimeH / 2), "the markers carry no CPU start time or CPU busy", "vsync-n", "start"));
         return;
       }
-      parts.Add(
-        new TextShape(view.PlotX1, frameTimeY - 16, "blue: frametime (CPU start to the next); faint: CPU busy (until presented)", "vsync-n", "end")
-      );
+      var panelKey = new List<(string[] Classes, string Text, bool Line)>
+      {
+        (new[] { "frametime" }, "frametime: CPU start to the next", true),
+        (new[] { "cpu-busy" }, "CPU busy: until presented", false),
+      };
       var frameTimes = data.FrameTimes;
       var cpuBusy = data.CpuBusy;
-      int Combined(int frame) => frameTimes.Frames.Rank(frame) + cpuBusy.Frames.Rank(frame);
+      // The scale leaves a static frame's frametime (an idle wait) out: it gets a mark at the edge
+      int Combined(int frame) => data.AnimatingFrameTimes.Frames.Rank(frame) + cpuBusy.Frames.Rank(frame);
       var (scaleFrom, scaleTo) = view.ScaleFrames;
       int scaleStart = Combined(scaleFrom);
       int scaleEnd = Combined(scaleTo);
@@ -724,6 +870,9 @@ namespace MB.FramePacing.Charts
       }
       parts.Add(GridLine(YOf(0), view.PlotX1));
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
+      if (StaticBands(parts, view, frameTimeY, frameTimeY + FrameTimeH, label: false))
+        panelKey.Add(g_staticKey);
+      parts.AddRange(Key(view.PlotX1, frameTimeY - 16, panelKey));
 
       var clipped = new List<(double X, double Value, bool Top)>();
       var busy = new StringBuilder();
@@ -822,18 +971,14 @@ namespace MB.FramePacing.Charts
       var section = view.Section;
       var data = view.Data;
       var pacing = section.Run.Run.Pacing;
-      parts.Add(new TextShape(20, lateY - 16, $"SHARE OF LATE FRAMES IN THE LAST {LateShare.WindowSeconds:0} S", "label", "start"));
+      string title = $"SHARE OF LATE FRAMES IN THE LAST {LateShare.WindowSeconds:0} S";
       if (pacing == null || data.Frames.Count == 0 || data.LateShare is not { } late)
       {
+        parts.Add(new TextShape(20, lateY - 16, title, "label", "start"));
         parts.Add(new TextShape(PlotX0, lateY + (LateH / 2), "no pacing information", "vsync-n", "start"));
         return;
       }
-      string note = $"whole run {Percent(pacing.LateShare)}";
-      if (late.AnyHeldLonger)
-        note =
-          $"amber: on screen longer than the application prefers, as the pacer intended; red: longer than it intended; "
-          + $"whole run {Percent(pacing.LateShare)}";
-      parts.Add(new TextShape(view.PlotX1, lateY - 16, note, "vsync-n", "end"));
+      parts.Add(new TextShape(20, lateY - 16, $"{title} (WHOLE RUN {Percent(pacing.LateShare)})", "label", "start"));
       var (scaleStart, scaleEnd) = view.ScaleFrames;
       double max = scaleEnd > scaleStart ? LateShareData.ShareOf(late.Shares.KthSmallest(scaleStart, scaleEnd, scaleEnd - scaleStart - 1)) : 0;
       double topShare = NiceCeiling(Math.Max(5, max * 1.25));
@@ -846,9 +991,10 @@ namespace MB.FramePacing.Charts
           new TextShape(PlotX0 - 10, YOf(tick) + 4, tick == 0 ? "0" : $"{tick.ToString("0.##", CultureInfo.InvariantCulture)} %", "vsync-n", "end")
         );
       }
+      bool staticLate = StaticBands(parts, view, lateY, lateY + LateH, label: false);
       // Red where a frame in the window was late (later than its target: the pacer's intent in the markers, else one refresh), amber
-      // where frames were only on screen longer than a refresh as the pacer intended, green where every frame took one refresh; each
-      // stretch starts where the previous one ended, so the line is whole
+      // where frames were only on screen longer than the application prefers, as the pacer intended, green otherwise; each stretch starts
+      // where the previous one ended, so the line is whole
       var paths = new Dictionary<string, StringBuilder>
       {
         ["late-line-none"] = new StringBuilder(),
@@ -896,6 +1042,23 @@ namespace MB.FramePacing.Charts
       }
       foreach (var (style, path) in paths)
         view.MovePath(parts, style, path, lateY, lateY + LateH);
+      // The key: the colours the line takes in the section
+      var panelKey = new List<(string[] Classes, string Text, bool Line)>();
+      foreach (
+        var (style, text) in new[]
+        {
+          ("late-line-none", "none late"),
+          ("late-line-adapted", "longer than the application prefers, as the pacer intended"),
+          ("late-line", "late: longer than the pacer intended"),
+        }
+      )
+      {
+        if (paths[style].Length > 0)
+          panelKey.Add((new[] { style }, text, true));
+      }
+      if (staticLate)
+        panelKey.Add(g_staticKey);
+      parts.AddRange(Key(view.PlotX1, lateY - 16, panelKey));
       view.Ticks(parts, lateY + LateH);
     }
 
@@ -919,11 +1082,10 @@ namespace MB.FramePacing.Charts
       double from = view.ViewFrom;
       double to = view.ViewTo;
       double cellW = (view.PlotX1 - PlotX0) * refreshMs / 1000 / (to - from);
-      parts.Add(new TextShape(20, stripY - 16, label, "label", "start"));
+      parts.Add(new TextShape(20, stripY - 16, label + ": ONE CELL PER REFRESH, A NEW SHADE PER FRAME", "label", "start"));
       if (cellW < MinCellPixels)
       {
         double longest = (view.PlotX1 - PlotX0) / MinCellPixels * refreshMs / 1000;
-        parts.Add(new TextShape(view.PlotX1, stripY - 16, "one cell per refresh, a new shade with every new frame", "vsync-n", "end"));
         parts.Add(
           new TextShape(PlotX0, stripY + (StripH / 2) + 4, $"render a section of at most {Ms1(longest)} s to see the refreshes", "vsync-n", "start")
         );
@@ -936,6 +1098,8 @@ namespace MB.FramePacing.Charts
       int Cells(long ticks) => refreshTicks > 0 ? (int)Math.Max(0, (ticks + (refreshTicks / 2)) / refreshTicks) : 1;
       var marks = new StringBuilder();
       bool anyUnknown = false;
+      bool anyStatic = false;
+      bool anyLate = false;
       for (int i = section.Start; i < section.End; ++i)
       {
         var frame = frames[i];
@@ -947,8 +1111,13 @@ namespace MB.FramePacing.Charts
           long shown = Math.Min(frame.LastSeenTicks + chart.CapturePeriodTicks, frames[i + 1].FirstSeenTicks) - frame.FirstSeenTicks;
           seen = Math.Clamp(Cells(shown), 1, cells);
         }
+        bool isStatic = (frame.Flags & PresentedFrameFlags.Static) != 0;
+        bool isLate = (frame.Flags & PresentedFrameFlags.Late) != 0;
+        anyStatic |= isStatic && !isLate;
+        anyLate |= isLate;
         string cls =
           (frame.Flags & PresentedFrameFlags.Late) != 0 ? "strip-late"
+          : isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
           : i % 2 == 0 ? "strip-a"
           : "strip-b";
         double x0 = view.XOfFrame(i);
@@ -976,15 +1145,18 @@ namespace MB.FramePacing.Charts
           marks.Append($"M{Fixed(x0 + 0.5, 1)} {Fixed(stripY - 2, 1)}L{Fixed(x0 - 3, 1)} {Fixed(stripY - 8, 1)}H{Fixed(x0 + 4, 1)}Z");
       }
       view.MovePath(parts, "strip-mark", marks, stripY - 10, stripY + StripH);
-      parts[legend] = new TextShape(
-        view.PlotX1,
-        stripY - 16,
-        "one cell per refresh, a new shade with every new frame, late frames red"
-          + (anyUnknown ? ", grey not decoded" : string.Empty)
-          + (marks.Length > 0 ? "; ▾ skipped frame indices or a tear" : string.Empty),
-        "vsync-n",
-        "end"
-      );
+      // The key: the exceptions the section shows
+      var panelKey = new List<(string[] Classes, string Text, bool Line)>();
+      if (anyLate)
+        panelKey.Add((new[] { "strip-late" }, "late", false));
+      if (anyStatic)
+        panelKey.Add((new[] { "strip-static-a", "strip-static-b" }, "static", false));
+      if (anyUnknown)
+        panelKey.Add((new[] { "neutral" }, "not decoded", false));
+      if (marks.Length > 0)
+        panelKey.Add((new[] { "strip-mark" }, "skipped frame indices or torn", false));
+      parts.RemoveAt(legend);
+      parts.InsertRange(legend, Key(view.PlotX1, stripY - 16, panelKey));
       view.Ticks(parts, stripY + StripH);
     }
 

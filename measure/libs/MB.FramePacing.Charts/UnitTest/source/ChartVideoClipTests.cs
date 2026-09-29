@@ -52,7 +52,8 @@ namespace MB.FramePacing.Charts.UnitTest
     /// The Timeline card: the animation error bar of every frame with an error, at its display time and exactly as high (bars too small to
     /// see keep a minimum height, in the right direction), on the symmetric scale with the error threshold's band; every frame's hold on
     /// the display time step panel (until the next frame, at its display time step, held too long when the next frame is late); and the
-    /// 2 s late share at every frame.
+    /// 2 s late share at every frame. The display time step and frametime scales leave static frames out (their holds and frametimes are
+    /// idle waits, drawn at the top edge), and a violet band behind every stretch of static frames, with the key saying so, on every panel.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
     public void TimelineCard_MatchesTheManifest(string clip)
@@ -60,7 +61,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var (manifest, _, chart) = Analyze(clip);
       var drawing = ReportCard.Build(
         RunSection.Whole(chart),
-        ReportOptions.ShowOnly(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.LateShare })
+        ReportOptions.ShowOnly(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.FrameTime, ReportItem.LateShare })
       );
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
       // The frames with an animation error: a step from or to a static frame is not judged
@@ -105,6 +106,9 @@ namespace MB.FramePacing.Charts.UnitTest
       var step = drawing.Plots.Single(p => p.Id == ReportItem.DisplayTimeStep);
       double pixelMs = (step.YTo - step.YFrom) / (step.Bottom - step.Top);
       double pixelSeconds = (step.XTo - step.XFrom) / (step.Right - step.Left);
+      // The scale covers the display time steps of the frames that animate: a static frame's hold (the next frame's step) is left out
+      var animating = measured.Where(manifest.CountsTowardFrameRate).Select(i => Ms(manifest.DisplayStepTicks(i))).ToArray();
+      Assert.That(step.YTo, Is.EqualTo(ChartScale.StepTop(animating, refreshMs)).Within(1e-9), $"{clip}: the step scale leaves static holds out");
       var holds = Segments(drawing, "held").Select(h => (h, Late: false)).Concat(Segments(drawing, "held-late").Select(h => (h, Late: true)));
       var drawn = holds.OrderBy(h => h.h.X0).ToArray();
       Assert.That(drawn, Has.Length.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
@@ -114,7 +118,11 @@ namespace MB.FramePacing.Charts.UnitTest
         var (hold, late) = drawn[k];
         Assert.That(step.ValueX(hold.X0), Is.EqualTo(Seconds(i - 1)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} starts");
         Assert.That(step.ValueX(hold.X1), Is.EqualTo(Seconds(i)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} ends at the next frame");
-        Assert.That(step.ValueY(hold.Y), Is.EqualTo(Ms(manifest.DisplayStepTicks(i))).Within(0.051 * pixelMs), $"{clip}: display time step {i}");
+        Assert.That(
+          step.ValueY(hold.Y),
+          Is.EqualTo(Math.Min(Ms(manifest.DisplayStepTicks(i)), step.YTo)).Within(0.051 * pixelMs),
+          $"{clip}: display time step {i} (at the top edge beyond the scale)"
+        );
         Assert.That(late, Is.EqualTo(manifest.IsLate(i)), $"{clip}: hold {i} too long");
       }
 
@@ -129,6 +137,70 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(points, Has.Length.EqualTo(manifest.FrameCount), $"{clip}: a late share point per frame");
       double shareTolerance = 0.051 * (lateShare.YTo - lateShare.YFrom) / (lateShare.Bottom - lateShare.Top);
       Assert.That(points.Select(point => lateShare.ValueY(point.Y)), Is.EqualTo(shares).Within(shareTolerance), $"{clip}: late share (%)");
+
+      // The frametime scale: every frametime of a frame that animates (to the next frame index) and every CPU busy; a static frame's
+      // frametime is an idle wait
+      var frameTime = drawing.Plots.Single(p => p.Id == ReportItem.FrameTime);
+      var frameTimeValues = Enumerable
+        .Range(0, manifest.FrameCount - 1)
+        .Where(i =>
+          !manifest.IsStatic(i)
+          && manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1
+          && manifest.CpuStartTicks(i) != 0
+          && manifest.CpuStartTicks(i + 1) != 0
+        )
+        .Select(i => Ms(manifest.CpuStartTicks(i + 1) - manifest.CpuStartTicks(i)))
+        .Concat(Enumerable.Range(0, manifest.FrameCount).Where(i => manifest.CpuBusyTicks(i) != 0).Select(i => Ms(manifest.CpuBusyTicks(i))))
+        .ToArray();
+      Assert.That(
+        frameTime.YTo,
+        Is.EqualTo(ChartScale.StepTop(frameTimeValues, refreshMs)).Within(1e-9),
+        $"{clip}: the frametime scale leaves static frametimes out"
+      );
+
+      // A violet band behind every stretch of static frames: from the first one's display time to the next frame's (bands closer than a
+      // pixel merge), on each of the four panels, and the key says what it is
+      double bandPixel = (error.XTo - error.XFrom) / (error.Right - error.Left);
+      var stretches = new List<(double From, double To)>();
+      for (int i = 0; i < manifest.FrameCount; ++i)
+      {
+        if (!manifest.IsStatic(i))
+          continue;
+        int end = i + 1;
+        while (end < manifest.FrameCount && manifest.IsStatic(end))
+          ++end;
+        double to = end < manifest.FrameCount ? Seconds(end) : Seconds(end - 1) + (manifest.RefreshesOnScreen(end - 1) * refreshMs / 1000);
+        if (stretches.Count > 0 && Seconds(i) - stretches[^1].To < bandPixel)
+          stretches[^1] = (stretches[^1].From, to);
+        else
+          stretches.Add((Seconds(i), to));
+        i = end - 1;
+      }
+      var bands = drawing
+        .FlatShapes.OfType<RectShape>()
+        .Where(r => r.Class == "static-band" && Math.Abs(r.Y.Value - error.Top) < 0.1)
+        .OrderBy(r => r.X.Value)
+        .ToArray();
+      Assert.That(bands, Has.Length.EqualTo(stretches.Count), $"{clip}: a band per static stretch");
+      for (int k = 0; k < bands.Length; ++k)
+      {
+        Assert.That(error.ValueX(bands[k].X.Value), Is.EqualTo(stretches[k].From).Within(0.06 * bandPixel), $"{clip}: static stretch {k} starts");
+        Assert.That(
+          error.ValueX(bands[k].X.Value + bands[k].Width.Value),
+          Is.EqualTo(Math.Min(stretches[k].To, error.XTo)).Within(0.06 * bandPixel),
+          $"{clip}: static stretch {k} ends"
+        );
+      }
+      Assert.That(
+        drawing.FlatShapes.OfType<RectShape>().Count(r => r.Class == "static-band"),
+        Is.EqualTo(4 * stretches.Count),
+        $"{clip}: on every panel"
+      );
+      Assert.That(
+        drawing.FlatShapes.OfType<TextShape>().Count(t => t.Content == "static: nothing animates" && t.Class == "vsync-n"),
+        Is.EqualTo(stretches.Count > 0 ? 4 : 0),
+        $"{clip}: the key of every panel names the static stretches"
+      );
     }
 
     /// <summary>
@@ -277,19 +349,26 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Segments("held") + Segments("held-late"), Is.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
       Assert.That(Segments("held-late"), Is.EqualTo(measured.Count(manifest.IsLate)), $"{clip}: held too long when the next frame is late");
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      // A cell per refresh a frame was seen in, red for a late frame; refreshes after that showed an older frame out of order (grey for now)
+      // A cell per refresh a frame was seen in, red for a late frame, violet for a static one; refreshes after that showed an older frame out
+      // of order (grey for now). The key's swatches carry the class "key" too, so they are not counted
+      int StaticCells() => Of("strip-static-a").Count() + Of("strip-static-b").Count();
+      Assert.That(
+        StaticCells(),
+        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !(i > 0 && manifest.IsLate(i))).Sum(i => (int)manifest.SeenRefreshes(i))),
+        $"{clip}: a violet cell per refresh of every static frame"
+      );
       Assert.That(
         Of("strip-late").Count(),
         Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(i => (int)manifest.SeenRefreshes(i))),
         $"{clip}: a red cell per refresh of every late frame"
       );
       Assert.That(
-        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count(),
+        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + StaticCells(),
         Is.EqualTo(all.Sum(i => (int)manifest.SeenRefreshes(i))),
         $"{clip}: a cell per refresh a frame was seen in"
       );
       Assert.That(
-        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + Of("neutral").Count(),
+        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + StaticCells() + Of("neutral").Count(),
         Is.EqualTo(all.Sum(i => (int)manifest.RefreshesOnScreen(i))),
         $"{clip}: a cell per refresh"
       );

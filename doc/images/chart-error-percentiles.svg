@@ -49,6 +49,11 @@
   .held { stroke: #2ea043; stroke-width: 2.5; fill: none; }
   .held-late { stroke: #e5534b; stroke-width: 2.5; fill: none; }
   .bar-range { fill: #e5534b; fill-opacity: 0.3; }
+  .static-band { fill: #a371f7; fill-opacity: 0.14; }
+  .static-text { font-size: 11px; fill: #a371f7; letter-spacing: 0.04em; }
+  .strip-static-a { fill: #a371f7; fill-opacity: 0.55; }
+  .strip-static-b { fill: #a371f7; fill-opacity: 0.85; }
+  .key { }
   .held-fill { fill: #2ea043; }
   .held-fill-late { fill: #e5534b; }
   .held-range { fill: #2ea043; fill-opacity: 0.3; }

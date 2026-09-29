@@ -247,6 +247,8 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
 
 ![The report of a busy stretch at the full rate: animation error, display time step, frametime and CPU busy, late share and refresh strip](doc/images/report-example-busy.svg)
 
+Every panel says in its title what it shows, and its key on the right names each colour, listing only what the section shows.
+
 - **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
   nothing. Everything inside the shaded band counts as no error.
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
@@ -259,9 +261,12 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
   where one was late; amber where they only stayed longer than preferred, as the pacer intended (a pacer running slower than the game
   wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. Static frames and
   frames presented on demand are never amber.
-- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red; grey where a capture card's captures
-  could not be decoded, and a mark above frames with skipped frame indices before them (or a tear). Zoom in to see hold patterns
-  such as 3-then-1.
+- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, static frames in violet; grey where a
+  capture card's captures could not be decoded, and a mark above frames with skipped frame indices before them (or a tear). Zoom in to
+  see hold patterns such as 3-then-1.
+- **Static stretches** (frames whose marker says nothing animates, such as an idle screen): a violet band behind every panel. The
+  display time step and frametime scales leave their idle waits out, so a second of idle screen does not squash the rest; those values
+  get a mark at the top edge.
 
 The start of its busy stretch as a frame timeline (`render --timeline`): each frame's CPU work from its CPU start time for its CPU
 busy, when it was presented, and what every refresh showed:

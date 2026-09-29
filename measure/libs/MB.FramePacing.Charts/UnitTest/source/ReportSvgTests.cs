@@ -244,9 +244,8 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       Assert.That(amber.Max(p => p.X), Is.EqualTo(Seconds(2399)).Within(tolerance), "amber again after the late frame's window");
       Assert.That(
-        drawing
-          .FlatShapes.OfType<TextShape>()
-          .Any(t => t.Content.StartsWith("amber: on screen longer than the application prefers, as the pacer intended", StringComparison.Ordinal))
+        drawing.FlatShapes.OfType<TextShape>().Any(t => t.Content == "longer than the application prefers, as the pacer intended"),
+        "the key says what amber means"
       );
     }
 
@@ -386,11 +385,11 @@ namespace MB.FramePacing.Charts.UnitTest
       (ReportItem.ErrorP999, ">ERROR P99.9<"),
       (ReportItem.WorstError, ">WORST ERROR<"),
       (ReportItem.LateFrames, ">LATE FRAMES<"),
-      (ReportItem.AnimationError, ">ANIMATION ERROR PER FRAME<"),
+      (ReportItem.AnimationError, ">ANIMATION ERROR PER FRAME: + SHOWN TOO SOON, − SHOWN TOO LATE<"),
       (ReportItem.DisplayTimeStep, ">DISPLAY TIME STEP: HOW LONG EACH FRAME STAYED ON SCREEN<"),
       (ReportItem.FrameTime, ">FRAMETIME AND CPU BUSY: THE APPLICATION SIDE, FROM THE MARKERS<"),
-      (ReportItem.LateShare, ">SHARE OF LATE FRAMES IN THE LAST 2 S<"),
-      (ReportItem.RefreshStrip, ">REFRESH STRIP<"),
+      (ReportItem.LateShare, ">SHARE OF LATE FRAMES IN THE LAST 2 S (WHOLE RUN "),
+      (ReportItem.RefreshStrip, ">REFRESH STRIP: ONE CELL PER REFRESH, A NEW SHADE PER FRAME<"),
     };
 
     /// <summary>Hiding an item removes exactly what it draws; the title, description, the tiles and every panel also make the card shorter.</summary>
@@ -420,7 +419,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var section = RunSection.Whole(Synthetic(2400));
       string panel = ReportCard.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.AnimationError }));
       Assert.That(g_marks.Where(m => m.Id != ReportItem.AnimationError).Any(m => panel.Contains(m.Mark, StringComparison.Ordinal)), Is.False);
-      Assert.That(panel, Does.Contain(">ANIMATION ERROR PER FRAME<"));
+      Assert.That(panel, Does.Contain(">ANIMATION ERROR PER FRAME: + SHOWN TOO SOON, − SHOWN TOO LATE<"));
       Assert.That(HeightOf(panel), Is.EqualTo(20 + 36 + 150 + 64), "margin and label, the panel, its time axis");
 
       string tile = ReportCard.Render(section, ReportOptions.ShowOnly(new[] { ReportItem.FramesOff }));
@@ -512,7 +511,10 @@ namespace MB.FramePacing.Charts.UnitTest
       var plot = drawing.Plots.Single();
       Assert.That((plot.XFrom, plot.XTo, plot.Left, plot.Right), Is.EqualTo((0.0, 1.0, ReportCard.PlotX0, ReportCard.PlotX1)));
       var texts = drawing.FlatShapes.OfType<TextShape>().Select(t => t.Content).ToList();
-      Assert.That(texts, Does.Contain("REFRESH STRIP, FIRST 1 S").And.Contain("1 s").And.Not.Contain("10 s"));
+      Assert.That(
+        texts,
+        Does.Contain("REFRESH STRIP, FIRST 1 S: ONE CELL PER REFRESH, A NEW SHADE PER FRAME").And.Contain("1 s").And.Not.Contain("10 s")
+      );
 
       Assert.That(ReportCard.Render(section, only with { StripSeconds = 20 }), Is.EqualTo(ReportCard.Render(section, only)), "the whole section");
       Assert.Throws<ArgumentOutOfRangeException>(() => _ = ReportOptions.Default with { StripSeconds = 0 });
@@ -539,15 +541,18 @@ namespace MB.FramePacing.Charts.UnitTest
       var quiet = RunSection.Whole(Synthetic(480, lateEvery: 0));
       var hideEmpty = ReportOptions.Default with { HideEmpty = true };
       string all = ReportCard.Render(quiet);
-      Assert.That(all, Does.Contain(">0.1 % LOW<").And.Contain(">ERROR P99.9<").And.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S<"));
+      Assert.That(all, Does.Contain(">0.1 % LOW<").And.Contain(">ERROR P99.9<").And.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S (WHOLE RUN "));
       string svg = ReportCard.Render(quiet, hideEmpty);
-      Assert.That(svg, Does.Not.Contain(">0.1 % LOW<").And.Not.Contain(">ERROR P99.9<").And.Not.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S<"));
+      Assert.That(
+        svg,
+        Does.Not.Contain(">0.1 % LOW<").And.Not.Contain(">ERROR P99.9<").And.Not.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S (WHOLE RUN ")
+      );
       Assert.That(svg, Does.Contain(">1 % LOW<").And.Contain(">ERROR P99<").And.Contain(">LATE FRAMES<"));
       Assert.That(Count(svg, "class=\"tile\""), Is.EqualTo(Count(all, "class=\"tile\"") - 2), "two tiles fewer (the display box stays)");
       Assert.That(HeightOf(svg), Is.LessThan(HeightOf(all)));
 
       string late = ReportCard.Render(RunSection.Whole(Synthetic(480)), hideEmpty);
-      Assert.That(late, Does.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S<"), "late frames: the late share stays");
+      Assert.That(late, Does.Contain(">SHARE OF LATE FRAMES IN THE LAST 2 S (WHOLE RUN "), "late frames: the late share stays");
     }
 
     /// <summary>Five tiles in a row of five are one row: a tile and a gap lower than in rows of four.</summary>
@@ -681,12 +686,14 @@ namespace MB.FramePacing.Charts.UnitTest
       var only = ReportOptions.ShowOnly(new[] { ReportItem.RefreshStrip });
 
       var drawing = ReportCard.Build(RunSection.Whole(card), only);
-      var cells = drawing.FlatShapes.OfType<RectShape>().ToList();
+      // The cells, not the key's swatches
+      var cells = drawing.FlatShapes.OfType<RectShape>().Where(r => !r.Class.EndsWith(" key", StringComparison.Ordinal)).ToList();
       Assert.That(cells, Has.Count.EqualTo(42), "a cell per refresh: 39 frames of one, one of three");
       Assert.That(cells.Count(c => c.Class == "neutral"), Is.EqualTo(2), "the two refreshes after frame 5's last capture are unknown");
       var marks = drawing.FlatShapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
       Assert.That(marks.Data.Count(c => c == 'M'), Is.EqualTo(2), "frame 10 (skipped indices before it) and frame 12 (torn)");
-      Assert.That(drawing.FlatShapes.OfType<TextShape>().Any(t => t.Content.Contains("grey not decoded", StringComparison.Ordinal)));
+      Assert.That(drawing.FlatShapes.OfType<TextShape>().Any(t => t.Content == "not decoded"), "the key names the unknown refreshes");
+      Assert.That(drawing.FlatShapes.OfType<RectShape>().Count(r => r.Class == "neutral key"), Is.EqualTo(1), "with their swatch");
 
       var camera = ReportCard.Build(RunSection.Whole(card with { Camera = true }), only);
       Assert.That(camera.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero, "a camera sees frame 5 until frame 6");
@@ -695,13 +702,9 @@ namespace MB.FramePacing.Charts.UnitTest
       var clean = ReportCard.Build(RunSection.Whole(run), only);
       Assert.That(clean.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero);
       Assert.That(clean.FlatShapes.OfType<PathShape>().Any(p => p.Class == "strip-mark"), Is.False);
-      Assert.That(
-        clean
-          .FlatShapes.OfType<TextShape>()
-          .Single(t => t.X == ReportCard.PlotX1 && t.Content.StartsWith("one cell", StringComparison.Ordinal))
-          .Content,
-        Does.Not.Contain("grey").And.Not.Contain("tear")
-      );
+      // A clean strip has nothing to explain: no key
+      Assert.That(clean.FlatShapes.Where(shape => shape is RectShape { Class: var c } && c.EndsWith(" key", StringComparison.Ordinal)), Is.Empty);
+      Assert.That(clean.FlatShapes.OfType<TextShape>().Select(t => t.Content), Has.None.EqualTo("not decoded").And.None.Contains("torn"));
     }
 
     /// <summary>Every panel's plot area maps its time range onto the plot's width: the section's start at the left edge, its end at the right.</summary>

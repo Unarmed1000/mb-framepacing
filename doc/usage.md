@@ -184,9 +184,17 @@ mb-framepacing render capture-20260924-153000 --cards none --only title,display,
 (`-worst-error`) and the worst 2 s of late frames (`-worst-late`). `--png` saves each at twice the size through a headless Edge or
 Chrome, found in the usual places or set with `MB_BROWSER`.
 
-The **refresh strip** draws one cell per refresh from each frame's first capture, a new shade with every frame and late frames red. With
-a capture card, the refreshes between a frame's last capture and the next frame (captures that could not be decoded) are grey; a camera
-sees each frame until the next one. A mark above the strip shows a frame with skipped frame indices before it, or a tear.
+Every panel says in its title what it shows; its key on the right names each colour and lists only what the section shows (a clean
+refresh strip has no key at all).
+
+The **refresh strip** draws one cell per refresh from each frame's first capture, a new shade with every frame, late frames red and
+static frames violet. With a capture card, the refreshes between a frame's last capture and the next frame (captures that could not be
+decoded) are grey; a camera sees each frame until the next one. A mark above the strip shows a frame with skipped frame indices before
+it, or a tear.
+
+**Static stretches** (the marker's `Static` flag: nothing animates) are a violet band behind every time panel. The display time step
+and frametime scales leave a static frame's hold and frametime out (idle waits), so an idle second does not squash the panel; those
+values get a mark with their value at the top edge.
 
 The **distribution cards** are drawn next to the report for the same run or section: `run-<id>-error-histogram.svg`,
 `-display-time-step-histogram.svg`, `-error-percentiles.svg` and `-drift.svg` (with the section's `-<from>s-<to>s`). The histograms
