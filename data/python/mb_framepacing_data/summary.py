@@ -128,8 +128,10 @@ class SummaryCounts:
 
 @dataclass(frozen=True)
 class SummaryStatistics:
-    """A run's statistics: the display and animation time steps and the animation error of the frames with one, every frame's drift and
-    time on screen, the frame rates, and the CPU side from the markers (CPU busy, frametime, CPU wait; count 0 when the markers carry none)."""
+    """A run's statistics: the animation time steps and the animation error of the frames with one, the display time steps and frame
+    rates of the frames that count toward the frame rate (excluded_static_frames display time steps are a static frame's time on screen and
+    left out), every frame's drift and time on screen, and the CPU side from the markers (CPU busy, frametime, CPU wait; count 0 when the
+    markers carry none)."""
 
     display_delta_ms: ValueStatistics
     animation_delta_ms: ValueStatistics
@@ -143,6 +145,7 @@ class SummaryStatistics:
     average_fps: float
     one_percent_low_fps: float | None
     point_one_percent_low_fps: float | None
+    excluded_static_frames: int
     cpu_busy_ms: ValueStatistics
     frame_time_ms: ValueStatistics
     cpu_wait_ms: ValueStatistics
@@ -338,6 +341,7 @@ def _statistics(value: _Object) -> SummaryStatistics:
         average_fps=value.optional_number("averageFps") or 0.0,
         one_percent_low_fps=value.optional_number("onePercentLowFps"),
         point_one_percent_low_fps=value.optional_number("pointOnePercentLowFps"),
+        excluded_static_frames=value.integer("excludedStaticFrames"),
         cpu_busy_ms=stats("cpuBusyMs"),
         frame_time_ms=stats("frameTimeMs"),
         cpu_wait_ms=stats("cpuWaitMs"),

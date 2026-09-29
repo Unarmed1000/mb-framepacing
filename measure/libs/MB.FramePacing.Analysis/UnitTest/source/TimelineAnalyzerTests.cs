@@ -115,7 +115,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     /// <summary>
     /// A second of idle screen (a static frame) between animated frames: the steps into and out of it are not judged, whether the
-    /// application's animation clock paused while nothing animated (48 ms) or kept running (1048 ms), and the drift does not jump.
+    /// application's animation clock paused while nothing animated (48 ms) or kept running (1048 ms), and the drift does not jump. The
+    /// frame rate numbers leave out the static frame's time on screen, and count it.
     /// </summary>
     [TestCase(64L)]
     [TestCase(1064L)]
@@ -134,10 +135,19 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(frames[4].Flags.HasFlag(PresentedFrameFlags.Static), Is.False);
       Assert.That(frames[3].AnimationErrorTicks, Is.Null, "the step to the static frame");
       Assert.That(frames[4].AnimationErrorTicks, Is.Null, "the step from it");
-      Assert.That(frames[4].DisplayDeltaTicks, Is.EqualTo(1000 * Ms), "its display time step still counts");
+      Assert.That(frames[4].DisplayDeltaTicks, Is.EqualTo(1000 * Ms), "the static frame's time on screen");
+      Assert.That(
+        frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.StaticBefore)),
+        Is.EqualTo(new[] { false, false, false, false, true, false })
+      );
       Assert.That(frames[5].AnimationErrorTicks, Is.EqualTo(0));
       Assert.That(frames.Select(f => f.DriftTicks), Is.All.EqualTo(0L), "the drift adds up only the judged steps");
       Assert.That(run.Statistics.FramesWithAnimationError, Is.Zero);
+      // The frame rates: the four 16 ms steps (the last animated frame's time on screen, before the static one, included)
+      Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(1));
+      Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(4));
+      Assert.That(run.Statistics.DisplayDeltaMs.Max, Is.EqualTo(16));
+      Assert.That(run.Statistics.AverageFps, Is.EqualTo(62.5).Within(1e-9));
     }
 
     /// <summary>An application that presents on demand has no interval to be late against: a long wait for its next frame is not late.</summary>

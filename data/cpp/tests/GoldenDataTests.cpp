@@ -167,6 +167,7 @@ namespace
         {"displayDeltaP50", run.Statistics.DisplayDeltaMs.P50},
         {"animationErrorMax", run.Statistics.AnimationErrorMs.Max},
         {"averageFps", run.Statistics.AverageFps},
+        {"excludedStaticFrames", run.Statistics.ExcludedStaticFrames},
         {"cpuBusyCount", run.Statistics.CpuBusyMs.Count},
         {"pacingSource", run.Pacing ? Json(run.Pacing->Source) : Json(nullptr)},
         {"lateFrames", run.Pacing ? run.Pacing->LateFrames : 0},

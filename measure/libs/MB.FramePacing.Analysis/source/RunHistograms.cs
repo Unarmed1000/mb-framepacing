@@ -16,10 +16,16 @@ namespace MB.FramePacing.Analysis
   {
     public static RunHistograms Create(RunAnalysis run)
     {
-      var frames = run.Frames.Where(f => f.AnimationErrorTicks.HasValue).ToArray();
+      // The animation errors of the frames with one; the display time steps of the frames that count toward the frame rate
       return new RunHistograms(
-        Histogram.FromTicks(frames.Select(f => f.AnimationErrorTicks!.Value), Histogram.DefaultBinWidthTicks),
-        Histogram.FromTicks(frames.Select(f => f.DisplayDeltaTicks!.Value), Histogram.DefaultBinWidthTicks)
+        Histogram.FromTicks(
+          run.Frames.Where(f => f.AnimationErrorTicks.HasValue).Select(f => f.AnimationErrorTicks!.Value),
+          Histogram.DefaultBinWidthTicks
+        ),
+        Histogram.FromTicks(
+          run.Frames.Where(RunStatistics.CountsTowardFrameRate).Select(f => f.DisplayDeltaTicks!.Value),
+          Histogram.DefaultBinWidthTicks
+        )
       );
     }
   }

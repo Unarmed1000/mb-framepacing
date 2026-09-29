@@ -19,8 +19,8 @@ namespace MB.FramePacing.Charts
     /// <summary>The animation errors of the section's frames that have one (RunHistograms.AnimationErrorMs).</summary>
     public static Histogram AnimationErrorMs(RunSection section) => Of(section.Data.Errors, section);
 
-    /// <summary>The display time steps of the same frames (RunHistograms.DisplayDeltaMs).</summary>
-    public static Histogram DisplayDeltaMs(RunSection section) => Of(section.Data.ErrorDisplaySteps, section);
+    /// <summary>The display time steps of the section's frames that count toward the frame rate (RunHistograms.DisplayDeltaMs).</summary>
+    public static Histogram DisplayDeltaMs(RunSection section) => Of(section.Data.FrameRateSteps, section);
 
     private static Histogram Of(FrameSequence sequence, RunSection section)
     {

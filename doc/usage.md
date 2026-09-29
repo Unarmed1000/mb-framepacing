@@ -197,16 +197,21 @@ minus the display time since the run's first frame. `--cards error-histogram,dri
 
 The headline numbers on the Analyze page (the report card shows the same):
 
-| Tile               | Meaning                                                                                                                 |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Average fps        | Presented frames per second of the time their display time steps cover; underneath the mean step and the frame count    |
-| 1 % low            | The frame rate at the 99th percentile display time step (nearest rank), the step underneath; needs 100 frames           |
-| 0.1 % low          | The same at the 99.9th percentile; needs 1000 frames                                                                    |
-| Frames visibly off | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share |
-| Error p99          | 99 % of the frames have a smaller \|animation error\|; needs 100 frames                                                 |
-| Error p99.9        | 99.9 % of the frames have a smaller \|animation error\|; needs 1000 frames                                              |
-| Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                             |
-| Late frames        | Frames shown later than planned (see below), and their share of the run                                                 |
+| Tile               | Meaning                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Average fps        | Presented frames per second of the time their display time steps cover; underneath the mean step and the frame count, or how many static frames are excluded |
+| 1 % low            | The frame rate at the 99th percentile display time step (nearest rank), the step underneath; needs 100 frames                                                |
+| 0.1 % low          | The same at the 99.9th percentile; needs 1000 frames                                                                                                         |
+| Frames visibly off | Frames whose \|animation error\| is above the error threshold: 1 ms, or `analyze --error-threshold-ms`, and their share                                      |
+| Error p99          | 99 % of the frames have a smaller \|animation error\|; needs 100 frames                                                                                      |
+| Error p99.9        | 99.9 % of the frames have a smaller \|animation error\|; needs 1000 frames                                                                                   |
+| Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                                                                  |
+| Late frames        | Frames shown later than planned (see below), and their share of the run                                                                                      |
+
+The frame rate numbers (average fps, the lows) and the display time step statistics and histogram describe the frames that animate: a
+static frame's time on screen (the marker's `Static` flag) is left out, and the tile, the report's description and the statistics
+table say how many ("excluding 48 static frames"; `statistics.excludedStaticFrames` in `summary.json`, `StaticBefore` in the frames
+CSV).
 
 Gamers Nexus's error per frame and percent error stay in `summary.json` (`statistics.errorPerFrameMs`, `statistics.percentError`)
 for comparisons with their numbers.

@@ -111,6 +111,12 @@ namespace MB.FramePacing.Charts
           + $"{Ms(chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
+      // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
+      var (steps0, steps1) = section.Data.DisplaySteps.Of(section.Start, section.End);
+      var (counted0, counted1) = section.Data.FrameRateSteps.Of(section.Start, section.End);
+      int excluded = (steps1 - steps0) - (counted1 - counted0);
+      if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
+        description.Add($"Frame rates and display time steps {staticFrames}: nothing animates in them.");
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
       // The section's own numbers only when a tile shows them

@@ -127,6 +127,7 @@ def _summary(summary: AnalysisSummary) -> dict[str, JsonValue]:
                 "displayDeltaP50": run.statistics.display_delta_ms.p50,
                 "animationErrorMax": run.statistics.animation_error_ms.max,
                 "averageFps": run.statistics.average_fps,
+                "excludedStaticFrames": run.statistics.excluded_static_frames,
                 "cpuBusyCount": run.statistics.cpu_busy_ms.count,
                 "pacingSource": run.pacing.source if run.pacing else None,
                 "lateFrames": run.pacing.late_frames if run.pacing else 0,

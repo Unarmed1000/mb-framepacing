@@ -33,5 +33,11 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>From the marker: nothing animates in this frame, so the animation error of a step from or to it is not judged.</summary>
     Static = 16,
+
+    /// <summary>
+    /// The frame before it is static: this frame's display time step is that static frame's time on screen, which the frame rate numbers
+    /// (average fps, the lows, the display time step statistics and histogram) leave out.
+    /// </summary>
+    StaticBefore = 32,
   }
 }

@@ -161,6 +161,12 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>A step from or to a static frame is not judged: it has no animation error (frame 1 on).</summary>
     public bool IsJudged(int frame) => !IsStatic(frame) && !IsStatic(frame - 1);
 
+    /// <summary>
+    /// The display time step counts toward the frame rate numbers: it is the previous frame's time on screen, left out when that frame is
+    /// static (frame 1 on).
+    /// </summary>
+    public bool CountsTowardFrameRate(int frame) => !IsStatic(frame - 1);
+
     public long? AnimationErrorTicks(int frame) => IsJudged(frame) ? AnimationStepTicks(frame) - DisplayStepTicks(frame) : null;
 
     public bool IsLate(int frame) => RenderedLate[Presented[frame]] > 0;

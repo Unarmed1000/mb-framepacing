@@ -138,6 +138,7 @@ namespace MB.FramePacing.Data.UnitTest
                   ["displayDeltaP50"] = r.Statistics.DisplayDeltaMs.P50,
                   ["animationErrorMax"] = r.Statistics.AnimationErrorMs.Max,
                   ["averageFps"] = r.Statistics.AverageFps,
+                  ["excludedStaticFrames"] = r.Statistics.ExcludedStaticFrames,
                   ["cpuBusyCount"] = r.Statistics.CpuBusyMs?.Count ?? 0,
                   ["pacingSource"] = r.Pacing?.Source,
                   ["lateFrames"] = r.Pacing?.LateFrames ?? 0,

@@ -169,8 +169,10 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (manifest, report, _) = Analyze(clip);
       var section = RunSection.Whole(AnalysisOutput.Read(report.CaptureDirectory).Single().Chart);
-      // The frames with an animation error (a step from or to a static frame is not judged); the display time step histogram counts the same
+      // The frames with an animation error (a step from or to a static frame is not judged); the display time step histogram counts the
+      // steps toward the frame rate (all but a static frame's time on screen)
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.IsJudged).ToArray();
+      var counted = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.CountsTowardFrameRate).ToArray();
 
       var errors = DistributionCard.Build(DistributionCard.ErrorHistogram, section);
       AssertCardBars(errors, measured.Select(i => manifest.AnimationErrorTicks(i)!.Value), clip + ": animation error histogram");
@@ -182,8 +184,8 @@ namespace MB.FramePacing.Charts.UnitTest
       );
 
       var display = DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section);
-      AssertCardBars(display, measured.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
-      double median = Analysis.Statistics.FromTicks(measured.Select(manifest.DisplayStepTicks)).P50;
+      AssertCardBars(display, counted.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
+      double median = Analysis.Statistics.FromTicks(counted.Select(manifest.DisplayStepTicks)).P50;
       var medianLine = display.FlatShapes.OfType<LineShape>().Single(l => l.Class == "average-line");
       Assert.That(display.Plots.Single().ValueX(medianLine.X1.Value), Is.EqualTo(median).Within(1e-9), $"{clip}: median display time step");
 
@@ -373,10 +375,10 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       var s = chart.Run.Statistics;
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
-      // The frame rates cover the frames with an animation error (static steps are left out); the clip's refreshes give the fps and the
-      // nearest-rank lows
+      // The frame rates cover the steps toward the frame rate (a static frame's time on screen is left out); the clip's refreshes give the
+      // fps and the nearest-rank lows
       var judged = measured.Where(manifest.IsJudged).ToArray();
-      var steps = judged.Select(manifest.DisplayStepTicks).OrderBy(t => t).ToArray();
+      var steps = measured.Where(manifest.CountsTowardFrameRate).Select(manifest.DisplayStepTicks).OrderBy(t => t).ToArray();
       double averageFps = steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum();
       Assert.That(tiles.Single(t => t.Caption == "Average fps").Value, Is.EqualTo(averageFps.ToString("0.0", CultureInfo.InvariantCulture)));
       long p99 = steps[(int)Math.Ceiling(0.99 * steps.Length) - 1];
@@ -393,6 +395,38 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(late.Warning, Is.EqualTo(measured.Any(manifest.IsLate)));
       double worst = judged.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i)!.Value)));
       Assert.That(tiles.Single(t => t.Caption == "Worst error").Value, Is.EqualTo(worst.ToString("0.0", CultureInfo.InvariantCulture) + " ms"));
+    }
+
+    /// <summary>
+    /// The frame rate numbers leave out the static frames' time on screen, and say so: the average fps tile's detail, the report's
+    /// description; a clip without static frames says nothing.
+    /// </summary>
+    [TestCase("60-naive-5ms-static-rests")]
+    [TestCase("60-idle-1fps")]
+    [TestCase("60-busy-swappy")]
+    public void FrameRates_SayHowManyStaticFramesTheyExclude(string clip)
+    {
+      var (manifest, _, chart) = Analyze(clip);
+      int excluded = Enumerable.Range(1, manifest.FrameCount - 1).Count(i => !manifest.CountsTowardFrameRate(i));
+      Assert.That(chart.Run.Statistics.ExcludedStaticFrames, Is.EqualTo(excluded));
+      var fps = RunHeadline.Tiles(chart).Single(t => t.Id == ReportItem.AverageFps);
+      var texts = ReportCard.Build(RunSection.Whole(chart)).FlatShapes.OfType<TextShape>().Select(t => t.Content).ToList();
+      if (excluded > 0)
+      {
+        Assert.That(fps.Detail, Does.EndWith($" · {excluded} static excluded"));
+        Assert.That(texts, Has.One.EqualTo($"Frame rates and display time steps excluding {excluded} static frames: nothing animates in them."));
+      }
+      else
+      {
+        Assert.That(fps.Detail, Does.EndWith($" · {manifest.FrameCount} frames"));
+        Assert.That(texts, Has.None.Contains("static frame"));
+      }
+      // A section counts its own
+      var half = RunSection.Create(chart, 0, RunSection.Whole(chart).ToSeconds / 2);
+      Assert.That(
+        half.Section.Run.Statistics.ExcludedStaticFrames,
+        Is.EqualTo(half.Section.Run.Frames.Count(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0))
+      );
     }
 
     private (ClipManifest Manifest, AnalysisReport Report, ChartRun Chart) Analyze(string clip)

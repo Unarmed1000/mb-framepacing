@@ -3,7 +3,8 @@
 //* ----------------
 //* Statistics of one run: display delta, animation delta, animation error (signed and absolute), drift and time on screen, the
 //* animation error summarised the way Gamers Nexus do (error per frame and percent error), and the frame rate the way benchmarks report
-//* it: average fps and the 1 % / 0.1 % lows.
+//* it: average fps and the 1 % / 0.1 % lows. The frame rate numbers describe the frames that animate: a static frame's time on screen is
+//* left out (PresentedFrameFlags.StaticBefore) and counted.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -28,7 +29,7 @@ namespace MB.FramePacing.Analysis
     double ErrorPerFrameMs,
     // Gamers Nexus's "percent error": the sum of |animation error| as a percentage of the time those frames measure (their display time steps)
     double PercentError,
-    // Frames with a display time step over the time those steps cover
+    // Frames with a display time step over the time those steps cover, static frames left out
     double AverageFps,
     // The frame rate at the 99th / 99.9th percentile display time step (nearest rank, so it is a step that happened); null with fewer
     // than MinFramesForOnePercentLow / MinFramesForPointOnePercentLow frames
@@ -38,22 +39,26 @@ namespace MB.FramePacing.Analysis
     // frame's) and CPU wait (frametime - CPU busy), named as PresentMon's MsCPUBusy, MsBetweenAppStart and MsCPUWait
     Statistics CpuBusyMs,
     Statistics FrameTimeMs,
-    Statistics CpuWaitMs
+    Statistics CpuWaitMs,
+    // The display time steps the frame rate numbers leave out: each is a static frame's time on screen
+    long ExcludedStaticFrames
   )
   {
     /// <summary>
-    /// The statistics of <paramref name="frames"/> (a run, or a section of one): the frames with an animation error give the display and
-    /// animation time steps and the errors; every frame the drift and time on screen. <paramref name="thresholdTicks"/> is the error
-    /// threshold, <paramref name="capturePeriodTicks"/> the capture period (no frame counts as off without one).
+    /// The statistics of <paramref name="frames"/> (a run, or a section of one): the frames with an animation error give the animation time
+    /// steps and the errors, the frames that count toward the frame rate (<see cref="CountsTowardFrameRate"/>) the display time steps and the
+    /// frame rates; every frame the drift and time on screen. <paramref name="thresholdTicks"/> is the error threshold,
+    /// <paramref name="capturePeriodTicks"/> the capture period (no frame counts as off without one).
     /// </summary>
     public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, long thresholdTicks, long capturePeriodTicks)
     {
       var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
+      var frameRate = frames.Where(CountsTowardFrameRate).ToList();
       var (errorPerFrameMs, percentError) = ErrorSummary(
         withMetrics.Select(f => (f.AnimationErrorTicks!.Value, f.DisplayDeltaTicks!.Value)).ToList()
       );
       return new RunStatistics(
-        Statistics.FromTicks(withMetrics.Select(f => f.DisplayDeltaTicks!.Value)),
+        Statistics.FromTicks(frameRate.Select(f => f.DisplayDeltaTicks!.Value)),
         Statistics.FromTicks(withMetrics.Select(f => f.AnimationDeltaTicks!.Value)),
         Statistics.FromTicks(withMetrics.Select(f => f.AnimationErrorTicks!.Value)),
         Statistics.FromTicks(withMetrics.Select(f => Math.Abs(f.AnimationErrorTicks!.Value))),
@@ -62,14 +67,21 @@ namespace MB.FramePacing.Analysis
         withMetrics.LongCount(f => capturePeriodTicks > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > thresholdTicks),
         errorPerFrameMs,
         percentError,
-        AverageFpsOf(withMetrics),
-        LowFps(withMetrics, 0.99, MinFramesForOnePercentLow),
-        LowFps(withMetrics, 0.999, MinFramesForPointOnePercentLow),
+        AverageFpsOf(frameRate),
+        LowFps(frameRate, 0.99, MinFramesForOnePercentLow),
+        LowFps(frameRate, 0.999, MinFramesForPointOnePercentLow),
         Statistics.FromTicks(frames.Where(f => f.CpuBusyTicks != 0).Select(f => (long)f.CpuBusyTicks)),
         Statistics.FromTicks(frames.Where(f => f.FrameTimeTicks.HasValue).Select(f => f.FrameTimeTicks!.Value)),
-        Statistics.FromTicks(frames.Where(f => f.CpuWaitTicks.HasValue).Select(f => f.CpuWaitTicks!.Value))
+        Statistics.FromTicks(frames.Where(f => f.CpuWaitTicks.HasValue).Select(f => f.CpuWaitTicks!.Value)),
+        frames.LongCount(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)
       );
     }
+
+    /// <summary>
+    /// The frame's display time step counts toward the frame rate numbers: it has one, and it is not a static frame's time on screen.
+    /// </summary>
+    public static bool CountsTowardFrameRate(PresentedFrame frame) =>
+      frame.DisplayDeltaTicks.HasValue && (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
 
     /// <summary>A 1 % low needs at least this many frames to rest on more than the single slowest one.</summary>
     public const int MinFramesForOnePercentLow = 100;

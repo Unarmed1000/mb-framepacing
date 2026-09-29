@@ -70,7 +70,11 @@ namespace MB.FramePacing.Gui.ViewModels
       }
       var statistics = new List<StatisticsRow>
       {
-        StatisticsRow.From("Display time step", s.DisplayDeltaMs),
+        // The display time steps describe the frames that animate, as the frame rates do
+        StatisticsRow.From(
+          "Display time step" + (RunHeadline.ExcludedStatic(s.ExcludedStaticFrames) is { } excluded ? $" ({excluded})" : string.Empty),
+          s.DisplayDeltaMs
+        ),
         StatisticsRow.From("Animation time step", s.AnimationDeltaMs),
         StatisticsRow.From("Animation error", s.AnimationErrorMs),
         StatisticsRow.From("|Animation error|", s.AbsoluteAnimationErrorMs),

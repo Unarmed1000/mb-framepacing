@@ -610,6 +610,8 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.Torn;
         if (b.Static)
           flags |= PresentedFrameFlags.Static;
+        if (previous is { Static: true })
+          flags |= PresentedFrameFlags.StaticBefore;
 
         frames.Add(
           new PresentedFrame(

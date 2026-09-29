@@ -181,6 +181,7 @@ namespace MB.FramePacing.Analysis
         s.AverageFps,
         s.OnePercentLowFps,
         s.PointOnePercentLowFps,
+        s.ExcludedStaticFrames,
         s.CpuBusyMs.ToSummary(),
         s.FrameTimeMs.ToSummary(),
         s.CpuWaitMs.ToSummary()
@@ -202,7 +203,8 @@ namespace MB.FramePacing.Analysis
         s.PointOnePercentLowFps,
         s.CpuBusyMs.ToStatistics(),
         s.FrameTimeMs.ToStatistics(),
-        s.CpuWaitMs.ToStatistics()
+        s.CpuWaitMs.ToStatistics(),
+        s.ExcludedStaticFrames
       );
 
     private static SummaryPacing ToSummary(this RunPacing p) =>

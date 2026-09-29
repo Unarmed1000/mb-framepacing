@@ -188,6 +188,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     time "desired": that is Vulkan's and Swappy's word for a present time point.
   - **Flags:** bit 0 `Static` (nothing animates: the steps to and from it get no animation error, and the drift sums only judged
     errors); bits 1 to 7 are reserved (write 0, decoders keep them).
+  - **Frame rates describe the frames that animate:** a static frame's time on screen (the next frame's display time step, flag
+    `StaticBefore`) is left out of average fps, the lows and the display time step statistics and histogram
+    (`RunStatistics.CountsTowardFrameRate`, `RunChartData.FrameRateSteps`), and counted (`excludedStaticFrames`); the tile, the report's
+    description and the statistics tables say "excluding N static frames" (`RunHeadline.ExcludedStatic`).
   - **Late share:** amber = on screen at least half a refresh longer than the preferred frame time (the marker's, else
     `--target-fps`, else one refresh) without being late; never for static or on-demand frames (`LateShareData`, `PresentedFrame.PreferredTicks`).
   - The start marker (77 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at

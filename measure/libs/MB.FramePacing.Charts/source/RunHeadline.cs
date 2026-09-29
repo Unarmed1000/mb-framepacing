@@ -43,10 +43,12 @@ namespace MB.FramePacing.Charts
           ReportItem.AverageFps,
           "Average fps",
           s.AverageFps > 0 ? Invariant(s.AverageFps, "0.0") : "-",
-          (s.AverageFps > 0 ? Invariant(1000 / s.AverageFps, "0.00") + " ms · " : string.Empty) + Number(run.Counts.PresentedFrames) + " frames",
+          (s.AverageFps > 0 ? Invariant(1000 / s.AverageFps, "0.00") + " ms · " : string.Empty)
+            + (s.ExcludedStaticFrames > 0 ? Number(s.ExcludedStaticFrames) + " static excluded" : Number(run.Counts.PresentedFrames) + " frames"),
           false,
           "Presented frames per second: the frames with a display time step over the time those steps cover (what the display showed); "
-            + "underneath, the mean display time step and the number of presented frames.",
+            + "underneath, the mean display time step and the number of presented frames, or with static frames how many are left out. "
+            + StaticNote,
           s.AverageFps > 0
         ),
         Low(ReportItem.OnePercentLow, "1 % low", s.OnePercentLowFps, "99", RunStatistics.MinFramesForOnePercentLow),
@@ -97,7 +99,8 @@ namespace MB.FramePacing.Charts
         fps is { } shown ? Invariant(1000 / shown, "0.0") + " ms" : $"needs {Number(minFrames)} frames",
         false,
         $"The frame rate at the {percentile}th percentile display time step (nearest rank): {percentile} % of the frames stayed on screen "
-          + "no longer than the step underneath.",
+          + "no longer than the step underneath. "
+          + StaticNote,
         fps.HasValue
       );
 
@@ -126,6 +129,15 @@ namespace MB.FramePacing.Charts
         _ => "no animation error above the threshold.",
       };
     }
+
+    /// <summary>
+    /// The frame rate numbers describe the frames that animate: "excluding 48 static frames" when a section has any, else null. Every frame
+    /// rate number and the display time step histogram leave those display time steps out.
+    /// </summary>
+    public static string? ExcludedStatic(long count) =>
+      count > 0 ? $"excluding {Number(count)} static frame{(count == 1 ? string.Empty : "s")}" : null;
+
+    private const string StaticNote = "A static frame's time on screen (the marker says nothing animates) is left out.";
 
     private static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
 

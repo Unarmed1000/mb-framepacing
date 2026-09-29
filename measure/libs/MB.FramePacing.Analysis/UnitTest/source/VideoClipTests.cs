@@ -144,8 +144,14 @@ namespace MB.FramePacing.Analysis.UnitTest
         {
           // The manifest measures its first frame against the last frame of the previous loop, which the capture does not hold
           Assert.That(frame.DisplayDeltaTicks, Is.Null, where + ": no display time step");
+          Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.StaticBefore), Is.False, where + ": nothing before it");
           continue;
         }
+        Assert.That(
+          frame.Flags.HasFlag(PresentedFrameFlags.StaticBefore),
+          Is.EqualTo(!manifest.CountsTowardFrameRate(i)),
+          where + ": the frame before it is static"
+        );
         Assert.That(frame.DisplayDeltaTicks, Is.EqualTo(manifest.DisplayStepTicks(i)), where + ": display time step");
         Assert.That(frame.AnimationDeltaTicks, Is.EqualTo(manifest.AnimationStepTicks(i)), where + ": animation time step");
         Assert.That(frame.AnimationErrorTicks, Is.EqualTo(manifest.AnimationErrorTicks(i)), where + ": animation error");
@@ -169,6 +175,26 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Statistics.ErrorPerFrameMs, Is.EqualTo(errorPerFrameMs).Within(1e-9), $"{clip}: error per frame");
       Assert.That(run.Statistics.PercentError, Is.EqualTo(percentError).Within(1e-9), $"{clip}: percent error");
       TestContext.Out.WriteLine($"{clip}: error per frame {errorPerFrameMs:0.00} ms, percent error {percentError:0.0} %");
+
+      // The frame rate numbers describe the frames that animate: every display time step but a static frame's time on screen
+      var steps = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.CountsTowardFrameRate).Select(manifest.DisplayStepTicks).ToArray();
+      Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(steps.Length), $"{clip}: display time steps");
+      Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(manifest.FrameCount - 1 - steps.Length), $"{clip}: static frames left out");
+      Assert.That(
+        run.Statistics.AverageFps,
+        Is.EqualTo(steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum()).Within(1e-9),
+        $"{clip}: average fps"
+      );
+      var sortedSteps = steps.Order().ToArray();
+      Assert.That(
+        run.Statistics.OnePercentLowFps,
+        Is.EqualTo(
+          sortedSteps.Length >= RunStatistics.MinFramesForOnePercentLow
+            ? TimeSpan.TicksPerSecond / (double)sortedSteps[(int)Math.Ceiling(0.99 * sortedSteps.Length) - 1]
+            : (double?)null
+        ),
+        $"{clip}: 1 % low"
+      );
     }
 
     /// <summary>

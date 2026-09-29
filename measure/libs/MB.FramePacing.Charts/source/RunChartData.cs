@@ -25,7 +25,7 @@ namespace MB.FramePacing.Charts
 
     private readonly Lazy<FrameSequence> m_errors;
     private readonly Lazy<FrameSequence> m_absoluteErrors;
-    private readonly Lazy<FrameSequence> m_errorDisplaySteps;
+    private readonly Lazy<FrameSequence> m_frameRateSteps;
     private readonly Lazy<FrameSequence> m_displaySteps;
     private readonly Lazy<FrameSequence> m_holds;
     private readonly Lazy<FrameSequence> m_lateHolds;
@@ -54,7 +54,9 @@ namespace MB.FramePacing.Charts
       bool HasNext(int i) => i + 1 < count && Frames[i + 1].Segment == Frames[i].Segment;
       m_errors = Once(() => new FrameSequence(count, i => Frames[i].AnimationErrorTicks));
       m_absoluteErrors = Once(() => new FrameSequence(count, i => Frames[i].AnimationErrorTicks is { } e ? Math.Abs(e) : null));
-      m_errorDisplaySteps = Once(() => new FrameSequence(count, i => Frames[i].AnimationErrorTicks.HasValue ? Frames[i].DisplayDeltaTicks : null));
+      m_frameRateSteps = Once(() =>
+        new FrameSequence(count, i => RunStatistics.CountsTowardFrameRate(Frames[i]) ? Frames[i].DisplayDeltaTicks : null)
+      );
       m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDeltaTicks));
       m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDeltaTicks : null));
       m_lateHolds = Once(() =>
@@ -97,8 +99,8 @@ namespace MB.FramePacing.Charts
 
     public FrameSequence AbsoluteErrors => m_absoluteErrors.Value;
 
-    /// <summary>The display time steps of the frames with an animation error (the histogram's frames).</summary>
-    public FrameSequence ErrorDisplaySteps => m_errorDisplaySteps.Value;
+    /// <summary>The display time steps that count toward the frame rate (a static frame's time on screen does not): the histogram's.</summary>
+    public FrameSequence FrameRateSteps => m_frameRateSteps.Value;
 
     public FrameSequence DisplaySteps => m_displaySteps.Value;
 

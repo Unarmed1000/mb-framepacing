@@ -140,6 +140,7 @@ namespace MB::FramePacingData
       s.AverageFps = OrDefault<double>(statistics, "averageFps", 0.0);
       s.OnePercentLowFps = Optional<double>(statistics, "onePercentLowFps");
       s.PointOnePercentLowFps = Optional<double>(statistics, "pointOnePercentLowFps");
+      s.ExcludedStaticFrames = Required<int64_t>(statistics, "excludedStaticFrames");
       s.CpuBusyMs = ToStatistics(Field(statistics, "cpuBusyMs"));
       s.FrameTimeMs = ToStatistics(Field(statistics, "frameTimeMs"));
       s.CpuWaitMs = ToStatistics(Field(statistics, "cpuWaitMs"));
