@@ -189,7 +189,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       entry and lists only what the section shows. A key, a tile's value with its detail and the display box's rate line are one
       `TextRunsShape` (pieces of text, each in its own classes) that the renderer lays out end to end (a `<text>` with `<tspan>`s in SVG,
       measured pieces in `CardView`), so no width is guessed. Swatches are coloured characters in the `key-*` classes (■ fill, ━ line,
-      ┅ refresh line, ▾ mark, ▐▌ for colours that alternate per frame).
+      ┅ refresh and reference lines, ▐▌ for colours that alternate per frame).
     - **Holds and strip cells by kind** (`RunChartData.HoldKinds`, `HoldKind`): unknown (a capture gap, dashed grey), late (red), an
       older frame came back (out of order, pink), frames dropped by the target (orange), as planned (green). Dropped = skipped frame
       indices over a gap-free capture that never came back out of order (`DroppedBeforeFrame`); the strip colours the refreshes where

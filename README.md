@@ -311,8 +311,8 @@ in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them 
 
 **The report** is the run as one SVG card, in the style of
 [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained)'s charts: the headline numbers, the animation
-error, the display time step, the late share, the refresh strip, and the events: what the frames did (dropped, out of order, torn)
-and what the capture missed, in two lanes. `--charts` and **Save charts** write it for the whole run
+error, the display time step and the frametime with the target and preferred frame time as dashed lines, the late share, the
+refresh strip, and the events: what the frames did (dropped, out of order, torn) and what the capture missed, in two lanes. `--charts` and **Save charts** write it for the whole run
 (`run-<id>-report.svg`); `mb-framepacing render` draws it from an analysis (no capture needed) for the whole run or any section
 (`--from`/`--to`, in seconds on the Timeline's axis), the worst moments (`--details`), and as PNG too (`--png`, through Edge or
 Chrome). A section of a few seconds shows every frame and refresh; a long run shows each pixel column's frames, the whole range faint
