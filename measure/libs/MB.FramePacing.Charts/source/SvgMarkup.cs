@@ -64,13 +64,15 @@ namespace MB.FramePacing.Charts
       + "  .average-text { fill: #d29922; font-size: 12px; }\n";
 
     /// <summary>
-    /// The report's own classes, in the same palette: the error threshold band, the held steps of the display time step (after the web page's
+    /// The report's own classes, in the same palette: the error threshold band, the refresh lines the animation errors reach, the held steps of the display time step (after the web page's
     /// frame chart: green as planned, red held too long, faint risers), the frametime (the web page's step-line blue) and CPU busy, the late
     /// share, the late strip cells and the marks above the strip, the distribution cards' bars and curves, the marks of values beyond a scale,
     /// and warning values.
     /// </summary>
     public const string ReportStyle =
       "\n  .band { fill: #ffffff; fill-opacity: 0.06; }\n"
+      + "  .error-refresh { stroke: #d29922; stroke-opacity: 0.8; stroke-width: 1; stroke-dasharray: 3 4; }\n"
+      + "  .error-refresh-text { font-size: 11px; fill: #d29922; letter-spacing: 0.04em; }\n"
       + "  .held { stroke: #2ea043; stroke-width: 2.5; fill: none; }\n"
       + "  .held-late { stroke: #e5534b; stroke-width: 2.5; fill: none; }\n"
       + "  .bar-range { fill: #e5534b; fill-opacity: 0.3; }\n"

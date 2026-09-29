@@ -47,6 +47,28 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
+    public void ErrorRefreshTicks_AreTheWholeRefreshesAnErrorReaches()
+    {
+      const double Refresh60 = 1000.0 / 60;
+      Assert.That(ChartScale.ErrorRefreshTicks(Refresh60, 10, -9, 9), Is.Empty, "no error reaches a refresh");
+      Assert.That(ChartScale.ErrorRefreshTicks(Refresh60, 20, -3, 17), Is.EqualTo(new[] { Refresh60 }), "only the side reached");
+      Assert.That(
+        ChartScale.ErrorRefreshTicks(Refresh60, 40, -33.3, 16.6),
+        Is.EqualTo(new[] { Refresh60, -Refresh60, -2 * Refresh60 }),
+        "within a tenth of a refresh counts as reached"
+      );
+      Assert.That(ChartScale.ErrorRefreshTicks(Refresh60, 16, -100, 100), Is.Empty, "a line the scale does not show is not drawn");
+      Assert.That(ChartScale.ErrorRefreshTicks(20, 45, -41, 0), Is.EqualTo(new[] { -20.0, -40 }), "20 ms at 50 Hz");
+    }
+
+    [Test]
+    public void ErrorRefreshTicks_ThinOutForLargeErrors()
+    {
+      // 20 refreshes of 4 ms reached: more than four lines, so the first and every 8th refresh (1, 8 and 16)
+      Assert.That(ChartScale.ErrorRefreshTicks(4, 100, 0, 80), Is.EqualTo(new[] { 4.0, 32, 64 }));
+    }
+
+    [Test]
     public void ErrorTicks_AreZeroAndTheStepEitherWay()
     {
       Assert.That(ChartScale.ErrorTicks(5.75), Is.EquivalentTo(new[] { 0.0, 2, -2, 4, -4 }));

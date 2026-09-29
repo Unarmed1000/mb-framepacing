@@ -44,6 +44,8 @@
   .average-text { fill: #d29922; font-size: 12px; }
 
   .band { fill: #ffffff; fill-opacity: 0.06; }
+  .error-refresh { stroke: #d29922; stroke-opacity: 0.8; stroke-width: 1; stroke-dasharray: 3 4; }
+  .error-refresh-text { font-size: 11px; fill: #d29922; letter-spacing: 0.04em; }
   .held { stroke: #2ea043; stroke-width: 2.5; fill: none; }
   .held-late { stroke: #e5534b; stroke-width: 2.5; fill: none; }
   .bar-range { fill: #e5534b; fill-opacity: 0.3; }
@@ -119,6 +121,10 @@
 <text x="100.0" y="331.4" text-anchor="end" class="vsync-n">+16 ms</text>
 <line class="grid" x1="110" y1="452.6" x2="1140" y2="452.6"/>
 <text x="100.0" y="456.6" text-anchor="end" class="vsync-n">−16 ms</text>
+<line class="error-refresh" x1="110" y1="324.8" x2="1140" y2="324.8"/>
+<text x="1136.0" y="320.8" text-anchor="end" class="error-refresh-text">+1 refresh (16.7 ms)</text>
+<line class="error-refresh" x1="110" y1="455.2" x2="1140" y2="455.2"/>
+<text x="1136.0" y="467.2" text-anchor="end" class="error-refresh-text">−1 refresh (16.7 ms)</text>
 <rect class="bar" x="307.42" y="390.0" width="2.47" height="65.2"/>
 <rect class="bar" x="309.56" y="324.8" width="2.47" height="65.2"/>
 <rect class="bar" x="316.00" y="390.0" width="2.47" height="65.2"/>

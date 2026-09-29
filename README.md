@@ -218,7 +218,9 @@ like a capture card.
 
 A capture card captures at the display's refresh rate, so every capture is one refresh. The analysis relies on that: the refresh
 period is the capture period, and display time steps are whole refreshes, measured exactly. The animation error (the marker's animation
-time step against the display time step) is then exact too, to the 100 ns tick. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
+time step against the display time step) is then exact too, to the 100 ns tick. The report's animation error panel marks every
+whole refresh an error reaches with a dashed amber line (±16.7 ms at 60 Hz, ±20 ms at 50 Hz): an error that size is a frame shown a
+whole refresh early or late. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
 from the frames, and compared with the display rate you expect when you give one (`--display-hz`, **Display refresh rate**).
 
 **Late frames** are shown later than the application meant. When its frame pacer writes the **intended display time** into the

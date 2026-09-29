@@ -126,7 +126,7 @@ namespace MB.FramePacing.Charts
       var panels = new List<Action<List<CardShape>, List<CardPlot>>>();
       var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, plotX1, viewFrom, viewTo, pixelsPerFrame);
       if (layout.ErrorY is { } errorY)
-        panels.Add((shapes, plots) => ErrorPanel(shapes, plots, view, errorY));
+        panels.Add((shapes, plots) => ErrorPanel(shapes, plots, view, refreshMs, errorY));
       if (layout.StepY is { } stepY)
         panels.Add((shapes, plots) => StepPanel(shapes, plots, view, refreshMs, stepY));
       if (layout.FrameTimeY is { } frameTimeY)
@@ -312,7 +312,7 @@ namespace MB.FramePacing.Charts
 
     private static double MaxMs(WaveletMatrix values, int start, int end) => TicksMs(values.KthSmallest(start, end, end - start - 1));
 
-    private static void ErrorPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double errorY)
+    private static void ErrorPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double errorY)
     {
       var section = view.Section;
       var data = view.Data;
@@ -342,7 +342,23 @@ namespace MB.FramePacing.Charts
         parts.Add(new TextShape(PlotX0 - 10, y + 4, $"{Ms(position, sign: true)} ms", "vsync-n", "end"));
       }
 
+      // A line at every whole number of refreshes an error reaches, over the frames the scale covers: an error of a refresh or more is a
+      // frame shown a whole refresh early or late
       var errors = data.Errors;
+      var (rangeStart, rangeEnd) = errors.Of(view.ScaleFrames.Start, view.ScaleFrames.End);
+      if (rangeEnd > rangeStart)
+      {
+        double lowest = TicksMs(errors.Values.KthSmallest(rangeStart, rangeEnd, 0));
+        double highest = MaxMs(errors.Values, rangeStart, rangeEnd);
+        foreach (double position in ChartScale.ErrorRefreshTicks(refreshMs, limit, lowest, highest))
+        {
+          double y = YOf(position);
+          int refreshes = (int)Math.Round(Math.Abs(position) / refreshMs);
+          string text = $"{(position > 0 ? "+" : "−")}{refreshes} refresh{(refreshes == 1 ? string.Empty : "es")} ({Ms(Math.Abs(position))} ms)";
+          parts.Add(new LineShape("error-refresh", N(PlotX0, 0), N(y, 1), N(view.PlotX1, 0), N(y, 1)));
+          parts.Add(new TextShape(view.PlotX1 - 4, position > 0 ? y - 4 : y + 12, text, "error-refresh-text", "end"));
+        }
+      }
       var clipped = new List<(double X, double Value, bool Top)>();
       if (view.PerFrame)
       {

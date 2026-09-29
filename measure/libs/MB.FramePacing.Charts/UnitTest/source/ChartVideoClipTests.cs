@@ -68,6 +68,18 @@ namespace MB.FramePacing.Charts.UnitTest
       var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
       double largest = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
       Assert.That((error.YFrom, error.YTo), Is.EqualTo((-Math.Max(2, largest * 1.15), Math.Max(2, largest * 1.15))), $"{clip}: symmetric scale");
+      // A refresh line at every whole refresh an error reaches (within a tenth of one), inside the scale
+      double refreshMs = chart.Run.Pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
+      var expectedLines = new List<double>();
+      foreach (int sign in new[] { 1, -1 })
+      {
+        double reach = measured.Select(i => sign * Ms(manifest.AnimationErrorTicks(i))).Max();
+        for (int k = 1; k * refreshMs < error.YTo && k * refreshMs <= reach + (0.1 * refreshMs); ++k)
+          expectedLines.Add(sign * k * refreshMs);
+      }
+      var lines = drawing.FlatShapes.OfType<LineShape>().Where(l => l.Class == "error-refresh").Select(l => error.ValueY(l.Y1.Value)).ToArray();
+      if (expectedLines.Count <= 8)
+        Assert.That(lines, Is.EqualTo(expectedLines).Within(0.05 * (error.YTo - error.YFrom) / (error.Bottom - error.Top)), $"{clip}: refresh lines");
       var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "band");
       Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
       var withError = measured.Where(i => manifest.AnimationErrorTicks(i) != 0).ToArray();

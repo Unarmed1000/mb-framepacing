@@ -154,6 +154,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, so add or change
       a number there, not in the GUI.
+    - The animation error panel draws a refresh line (`error-refresh`, dashed amber, labelled "+1 refresh (16.7 ms)") at every whole
+      refresh an error reaches within a tenth of a refresh, over the frames the scale covers, and only inside the scale
+      (`ChartScale.ErrorRefreshTicks`, at most four per side).
     - The error and display time step charts cover every value unless a few are more than 8 times beyond the 99th percentile (a hitch);
       those get a mark with their value at the edge (`ChartScale` decides the scales, `ReportCard.ClipMarks` draws the marks).
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed

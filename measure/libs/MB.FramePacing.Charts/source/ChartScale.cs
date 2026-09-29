@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The scales of the report's time panels: the animation error's symmetric limit and grid, and the display time step's (and frametime's)
-//* top and whole-refresh grid. Each covers every value unless a few are far beyond the rest (a hitch): those are left beyond the scale
+//* The scales of the report's time panels: the animation error's symmetric limit, grid and the refresh lines its errors reach, and the
+//* display time step's (and frametime's) top and whole-refresh grid. Each covers every value unless a few are far beyond the rest (a hitch): those are left beyond the scale
 //* and marked at its edge (ReportCard).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -30,7 +30,10 @@ namespace MB.FramePacing.Charts
     /// <summary>The bulk: the values up to this percentile.</summary>
     public const double BulkPercentile = 0.99;
 
-    // At most this many error grid lines on each side of zero, and display time step grid lines above the first refresh
+    /// <summary>An error reaches a refresh line when it is within this share of a refresh of it.</summary>
+    public const double RefreshReachFraction = 0.1;
+
+    // At most this many error grid lines (and refresh lines) on each side of zero, and display time step grid lines above the first refresh
     private const int MaxErrorTicksPerSide = 4;
     private const int MaxStepTicks = 8;
 
@@ -73,6 +76,35 @@ namespace MB.FramePacing.Charts
       {
         ticks.Add(value);
         ticks.Add(-value);
+      }
+      return ticks;
+    }
+
+    /// <summary>
+    /// The animation error's refresh lines: every whole number of refreshes either way (±16.7 ms at 60 Hz, ±20 ms at 50 Hz) that an error
+    /// reaches (<paramref name="lowestMs"/> below zero, <paramref name="highestMs"/> above, within <see cref="RefreshReachFraction"/> of a
+    /// refresh) and the scale shows (inside <paramref name="limitMs"/>). When more than four would be drawn on a side, the first refresh and
+    /// every 2nd, 4th, 8th... refresh after it. Positive lines first.
+    /// </summary>
+    public static IReadOnlyList<double> ErrorRefreshTicks(double refreshMs, double limitMs, double lowestMs, double highestMs)
+    {
+      var ticks = new List<double>();
+      if (refreshMs <= 0)
+        return ticks;
+      foreach (int sign in new[] { 1, -1 })
+      {
+        double reach = sign > 0 ? highestMs : -lowestMs;
+        int reached = (int)Math.Floor((reach / refreshMs) + RefreshReachFraction);
+        int shown = (int)Math.Ceiling(limitMs / refreshMs) - 1;
+        int count = Math.Min(reached, shown);
+        int step = 1;
+        while (count / step > MaxErrorTicksPerSide)
+          step *= 2;
+        for (int refreshes = 1; refreshes <= count; ++refreshes)
+        {
+          if (refreshes == 1 || refreshes % step == 0)
+            ticks.Add(sign * refreshes * refreshMs);
+        }
       }
       return ticks;
     }
