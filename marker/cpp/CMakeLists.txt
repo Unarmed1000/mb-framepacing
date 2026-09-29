@@ -43,6 +43,7 @@ set_target_properties(mb_framemarker PROPERTIES EXPORT_NAME framemarker)
 target_sources(mb_framemarker
   PRIVATE
     src/FrameMarker.cpp
+    src/LibraryVersion.cpp
     src/Payload.cpp
     third_party/qrcodegen/qrcodegen.c
     third_party/qrcodegen/qrcodegen.h
@@ -53,6 +54,7 @@ target_sources(mb_framemarker
       include/mb/framemarker/Constants.hpp
       include/mb/framemarker/FrameMarker.hpp
       include/mb/framemarker/IndexedCount.hpp
+      include/mb/framemarker/LibraryVersion.hpp
       include/mb/framemarker/MarkerKind.hpp
       include/mb/framemarker/ModuleMatrix.hpp
       include/mb/framemarker/Options.hpp

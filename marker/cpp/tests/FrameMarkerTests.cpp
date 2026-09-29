@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include <mb/framemarker/FrameMarker.hpp>
+#include <mb/framemarker/Version.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
@@ -864,6 +865,15 @@ TEST(Version, MatchesTheVersionFile)
   EXPECT_EQ(FM::VersionString, std::string_view(MB_FRAMEMARKER_EXPECTED_VERSION));
   EXPECT_EQ(std::to_string(FM::VersionMajor) + "." + std::to_string(FM::VersionMinor) + "." + std::to_string(FM::VersionPatch),
             std::string(FM::VersionString));
+}
+
+TEST(Version, TheLinkedLibraryHasTheVersionOfTheHeader)
+{
+  const FM::LibraryVersion version = FM::GetLibraryVersion();
+  EXPECT_EQ(version.Text, FM::VersionString);
+  EXPECT_EQ(version.Major, FM::VersionMajor);
+  EXPECT_EQ(version.Minor, FM::VersionMinor);
+  EXPECT_EQ(version.Patch, FM::VersionPatch);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------

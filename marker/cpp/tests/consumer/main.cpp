@@ -5,6 +5,7 @@
 #include <mb/framemarker/FrameMarker.hpp>
 #include <array>
 #include <cstdio>
+#include <string_view>
 
 namespace FM = MB::FrameMarker;
 
@@ -16,6 +17,7 @@ int main()
   FM::ModuleMatrix matrix;
   const bool encoded = FM::GenerateModules({1u, FM::TicksPerSecond / 60, 1u, FM::MarkerKind::Frame}, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
-  std::printf("mb_framemarker %.*s: %zu vertices\n", static_cast<int>(FM::VersionString.size()), FM::VersionString.data(), count);
+  const std::string_view version = FM::GetLibraryVersion().Text;
+  std::printf("mb_framemarker %.*s: %zu vertices\n", static_cast<int>(version.size()), version.data(), count);
   return count > 0 ? 0 : 1;
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // summary.json and the CSVs: the format version, columns by name, whole ticks.
 #include <mb/framepacingdata/FramePacingData.hpp>
+#include <mb/framepacingdata/Version.hpp>
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
@@ -25,6 +26,11 @@ namespace
 TEST(AnalysisOutput, TheVersionIsTheDataLibraries)
 {
   EXPECT_EQ(FD::VersionString, MB_FRAMEPACINGDATA_EXPECTED_VERSION);
+  const FD::LibraryVersion version = FD::GetLibraryVersion();
+  EXPECT_EQ(version.Text, FD::VersionString);
+  EXPECT_EQ(version.Major, FD::VersionMajor);
+  EXPECT_EQ(version.Minor, FD::VersionMinor);
+  EXPECT_EQ(version.Patch, FD::VersionPatch);
 }
 
 TEST(AnalysisOutput, ASummaryWithoutAFormatVersionIsFormatOne)

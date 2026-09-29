@@ -172,6 +172,7 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       written += FM::ModulesToGridIndices(g_matrix, g_indices, 32u);
       written += FM::GenerateModules(endPayload, g_matrix) ? 1u : 0u;
       written += FM::EncodePayload(framePayload, metadata, g_payloadBytes);
+      written += FM::GetLibraryVersion().Text.size();
 
 
       FM::Payload decoded;

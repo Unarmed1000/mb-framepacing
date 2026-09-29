@@ -20,8 +20,8 @@
 #include <mb/framepacingdata/DataFormatError.hpp>
 #include <mb/framepacingdata/DataRect.hpp>
 #include <mb/framepacingdata/FrameRow.hpp>
+#include <mb/framepacingdata/LibraryVersion.hpp>
 #include <mb/framepacingdata/MarkerLocation.hpp>
-#include <mb/framepacingdata/Version.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -31,6 +31,10 @@
 
 namespace MB::FramePacingData
 {
+  //! The linked library's version. Version.hpp has it at compile time; this header does not include it, so a version bump does not
+  //! rebuild every file that includes the library.
+  LibraryVersion GetLibraryVersion() noexcept;
+
   //! Read summary.json. Throws DataFormatError for a newer format version or content that is not a summary.
   AnalysisSummary ReadSummary(const std::filesystem::path& path);
 

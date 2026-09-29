@@ -45,7 +45,7 @@ CONSUMER_SOURCE = """#include <mb/framepacingdata/FramePacingData.hpp>
 
 int main()
 {
-  std::printf("mb_framepacingdata %s: %lld ticks\\n", MB::FramePacingData::VersionString.data(),
+  std::printf("mb_framepacingdata %s: %lld ticks\\n", MB::FramePacingData::GetLibraryVersion().Text.data(),
               static_cast<long long>(MB::FramePacingData::ParseTicks("16.6667")));
   return MB::FramePacingData::ParseTicks("16.6667") == 166'667 ? 0 : 1;
 }

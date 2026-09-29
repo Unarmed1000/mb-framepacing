@@ -15,6 +15,7 @@
 
 #include <mb/framemarker/Constants.hpp>
 #include <mb/framemarker/IndexedCount.hpp>
+#include <mb/framemarker/LibraryVersion.hpp>
 #include <mb/framemarker/MarkerKind.hpp>
 #include <mb/framemarker/ModuleMatrix.hpp>
 #include <mb/framemarker/Options.hpp>
@@ -24,7 +25,6 @@
 #include <mb/framemarker/Quad.hpp>
 #include <mb/framemarker/SequenceId.hpp>
 #include <mb/framemarker/StartMetadata.hpp>
-#include <mb/framemarker/Version.hpp>
 #include <mb/framemarker/Vertex.hpp>
 #include <array>
 #include <chrono>
@@ -149,6 +149,10 @@ namespace MB::FrameMarker
     }
     return {inset, inset};
   }
+
+  //! The linked library's version. Version.hpp has it at compile time; this header does not include it, so a version bump does not
+  //! rebuild every file that includes the library.
+  LibraryVersion GetLibraryVersion() noexcept;
 
   //! Serialize a complete payload into dst (MaxEncodedPayloadByteCount bytes is always enough). Start markers append the metadata, other
   //! kinds ignore it. A frame or end marker is PayloadByteCount bytes, a start marker StartPayloadByteCount, a sync marker

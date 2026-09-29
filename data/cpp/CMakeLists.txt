@@ -62,6 +62,7 @@ target_sources(mb_framepacingdata
   PRIVATE
     src/AnalysisOutput.cpp
     src/CaptureData.cpp
+    src/LibraryVersion.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -78,6 +79,7 @@ target_sources(mb_framepacingdata
       include/mb/framepacingdata/DataRect.hpp
       include/mb/framepacingdata/FramePacingData.hpp
       include/mb/framepacingdata/FrameRow.hpp
+      include/mb/framepacingdata/LibraryVersion.hpp
       include/mb/framepacingdata/MarkerLocation.hpp
       include/mb/framepacingdata/SummaryCamera.hpp
       include/mb/framepacingdata/SummaryCounts.hpp

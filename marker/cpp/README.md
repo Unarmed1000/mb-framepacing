@@ -98,6 +98,7 @@ Everything is declared by `<mb/framemarker/FrameMarker.hpp>` in `MB::FrameMarker
 | `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |
 | `MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                 | Module size for a capture's scaling                                                  |
 | `EncodePayload`, `TryDecodePayload`, `ToDateTimeTicks`                                                         | The wire format and its time units                                                   |
+| `GetLibraryVersion`, `LibraryVersion`; `Version.hpp` (include it yourself)                                     | The linked library's version; at compile time, for `#if` and `static_assert`         |
 
 Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the options are invalid, the matrix is empty or a
 buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).

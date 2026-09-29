@@ -229,7 +229,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   seen on screen; **display time step** is how long it stayed (the time to the next frame). Animation error = animation time step -
   display time step.
 - **Versions:** there are two version files.
-  - `marker/VERSION`: the marker libraries. CMake reads it into `Version.hpp`.
+  - `marker/VERSION`: the marker libraries. CMake reads it into `Version.hpp` (and `data/VERSION` into the data library's), which only
+    `src/LibraryVersion.cpp` and the tests include: the umbrella headers declare `GetLibraryVersion()`, so a version bump rebuilds one file.
   - `measure/VERSION`: the tools. `measure/Directory.Build.props` reads it.
 - **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested). The C++ public API
   has one header per type; `FrameMarker.hpp` includes them all and declares the functions. CI runs `tools/check_one_type_per_file.py`.
