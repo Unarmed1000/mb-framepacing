@@ -15,11 +15,14 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Capture;
+using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
   public sealed partial class MainWindowViewModel : ObservableObject
   {
+    private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
+
     public const int CaptureTab = 0;
     public const int AnalysisTab = 1;
     public const int SettingsTab = 2;
@@ -124,8 +127,9 @@ namespace MB.FramePacing.Gui.ViewModels
       {
         return FramePacingConfig.Load();
       }
-      catch (Exception)
+      catch (Exception ex)
       {
+        g_logger.Warn("Could not read the configuration file, using the defaults: {0}", ex.Message);
         return new FramePacingConfig();
       }
     }

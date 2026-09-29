@@ -313,6 +313,9 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a
   row in `licenses/README.md`, in the same change.
 - **Two counters:** the capture index (capture card) and the marker frame index (application) are unrelated; never compare them.
+- **GUI log:** `GuiLogging` configures NLog in code: a file per day (`gui-yyyy-MM-dd.log`, the last 7 days kept) in `logs` next to
+  the GUI settings, or under the output root for `--output-root` and DocImages runs (DocImages checks it). It also logs the exceptions
+  nothing else handles (UI thread, tasks, app domain); catch blocks that show an error also log it.
 - **Settings files** (configuration, GUI settings, saved cameras) are written and deleted through `SettingsFile`: a unique temporary
   file, flushed to the disk, then renamed over the target. Before that, the `backup` folder next to it gets `<file>.bak` (the version
   replaced, or the deleted file) and, when the format version changes, `<file>.v<N>.bak` (the last file in format N). Only those; no

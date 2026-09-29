@@ -12,11 +12,14 @@ using System;
 using System.IO;
 using System.Text.Json;
 using MB.FramePacing.Capture;
+using NLog;
 
 namespace MB.FramePacing.Gui
 {
   public sealed class GuiSettings
   {
+    private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
+
     private static readonly string g_path = Path.Combine(
       Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
       "mb-framepacing",
@@ -99,9 +102,10 @@ namespace MB.FramePacing.Gui
             return new GuiSettings { m_keepFile = true };
           return settings;
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-        catch (JsonException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+          g_logger.Warn("Could not read the GUI settings {0}: {1}", path, ex.Message);
+        }
       }
       return new GuiSettings();
     }
@@ -117,8 +121,10 @@ namespace MB.FramePacing.Gui
         // The previous version is kept in the backup folder next to it
         SettingsFile.Write(g_path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }), CurrentFormatVersion);
       }
-      catch (IOException) { }
-      catch (UnauthorizedAccessException) { }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+      {
+        g_logger.Warn("Could not save the GUI settings {0}: {1}", g_path, ex.Message);
+      }
     }
   }
 }

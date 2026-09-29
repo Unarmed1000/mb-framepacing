@@ -26,11 +26,14 @@ using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Capture.Ffmpeg;
 using MB.FramePacing.Capture.Synthetic;
 using MB.FramePacing.Marker;
+using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
   public sealed partial class CaptureViewModel : ObservableObject
   {
+    private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
+
     private const string SyntheticTitle = "Synthetic test game";
 
     private static readonly DeviceItem[] g_otherSources =
@@ -359,8 +362,9 @@ namespace MB.FramePacing.Gui.ViewModels
         foreach (var item in OtherSources())
           Devices.Add(item);
       }
-      catch (Exception)
+      catch (Exception ex)
       {
+        g_logger.Warn("ffmpeg is not set up: {0}", ex.Message);
         m_ffmpeg = null;
         FfmpegReady = false;
         FfmpegSummary = "ffmpeg not set up";

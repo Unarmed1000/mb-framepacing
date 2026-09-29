@@ -27,6 +27,7 @@ namespace MB.FramePacing.Gui
       int outputIndex = Array.IndexOf(args, "--output-root");
       if (outputIndex >= 0 && outputIndex + 1 < args.Length)
         OutputRoot = System.IO.Path.GetFullPath(args[outputIndex + 1]);
+      GuiLogging.Configure();
       BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
@@ -35,6 +36,7 @@ namespace MB.FramePacing.Gui
     {
       Demo = true;
       OutputRoot = outputRoot;
+      GuiLogging.Configure();
     }
 
     // Also used by the Avalonia designer

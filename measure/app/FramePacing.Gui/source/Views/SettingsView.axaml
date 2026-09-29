@@ -57,14 +57,29 @@
       <Border Classes="card">
         <StackPanel Spacing="10">
           <TextBlock Classes="cardTitle" Text="About" />
-          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
             <TextBlock Classes="subtle" Text="Version" />
             <TextBlock Grid.Column="1" Classes="value" Text="{Binding Version}" />
             <TextBlock Grid.Row="1" Classes="subtle" Text="Configuration" />
             <TextBlock Grid.Row="1" Grid.Column="1" Classes="value" Text="{Binding ConfigPath}" TextWrapping="Wrap" />
             <TextBlock Grid.Row="2" Classes="subtle" Text="GUI settings" />
             <TextBlock Grid.Row="2" Grid.Column="1" Classes="value" Text="{Binding GuiSettingsPath}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="3" Classes="subtle" Text="Log files" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="value" Text="{Binding LogDirectory}" TextWrapping="Wrap" />
           </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+              Content="Open the log folder"
+              Command="{Binding OpenLogFolderCommand}"
+              ToolTip.Tip="The GUI writes a log file per day here, the last 7 days kept: attach it when reporting a problem"
+            />
+          </StackPanel>
+          <TextBlock
+            Classes="error"
+            Text="{Binding LogStatusText}"
+            TextWrapping="Wrap"
+            IsVisible="{Binding LogStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+          />
         </StackPanel>
       </Border>
     </StackPanel>

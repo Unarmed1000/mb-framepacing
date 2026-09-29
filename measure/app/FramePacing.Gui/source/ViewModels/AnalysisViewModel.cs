@@ -23,11 +23,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Charts;
+using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
   public sealed partial class AnalysisViewModel : ObservableObject
   {
+    private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
+
     private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
     private AnalysisReport? m_report;
@@ -348,8 +351,9 @@ namespace MB.FramePacing.Gui.ViewModels
           Follow(chart, view);
         UpdateBuilding();
       }
-      catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+      catch (Exception ex)
       {
+        g_logger.Error(ex, "Building the charts failed");
         ErrorText = "Could not draw the charts: " + ex.Message;
         m_building = false;
         UpdateBuilding();
@@ -364,12 +368,22 @@ namespace MB.FramePacing.Gui.ViewModels
         return;
       m_following = true;
       IsBuildingCards = true;
-      var followed = await m_follows.Run(token => cards.Follow(ViewSection(chart, view), token));
-      if (followed == null)
-        return;
-      m_following = false;
-      Show(followed);
-      UpdateBuilding();
+      try
+      {
+        var followed = await m_follows.Run(token => cards.Follow(ViewSection(chart, view), token));
+        if (followed == null)
+          return;
+        m_following = false;
+        Show(followed);
+        UpdateBuilding();
+      }
+      catch (Exception ex)
+      {
+        g_logger.Error(ex, "Building the distribution cards failed");
+        ErrorText = "Could not draw the charts: " + ex.Message;
+        m_following = false;
+        UpdateBuilding();
+      }
     }
 
     /// <summary>Put the view in the Timeline's plots: the window on screen moved by the view's distance from where it was built to show.</summary>

@@ -12,6 +12,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -44,11 +45,16 @@ namespace MB.FramePacing.DocImages
       var work = Path.Combine(Path.GetTempPath(), "mb-framepacing-docimages-" + Guid.NewGuid().ToString("N"));
       try
       {
+        // A log file from long ago: starting the GUI deletes it
+        string oldLog = Path.Combine(work, "logs", GuiLogging.FilePrefix + "2000-01-01.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(oldLog)!);
+        File.WriteAllText(oldLog, string.Empty);
         // Drive the GUI like --demo --output-root: captures go to a temporary folder and no user setting is ever saved
         MB.FramePacing.Gui.Program.ConfigureForAutomation(work);
         using var session = HeadlessUnitTestSession.StartNew(typeof(HeadlessApp));
         session.Dispatch(() => RenderGuiAsync(output), CancellationToken.None).GetAwaiter().GetResult();
         Console.WriteLine($"GUI screenshots written to {output}");
+        CheckLog(work, oldLog);
         WriteReportExamples(output, Path.Combine(work, "reports"));
         return 0;
       }
@@ -66,6 +72,24 @@ namespace MB.FramePacing.DocImages
         }
         catch (IOException) { }
       }
+    }
+
+    /// <summary>The GUI logged into the output root's logs folder (never the user's), and deleted the log files older than a week there.</summary>
+    private static void CheckLog(string work, string oldLog)
+    {
+      string directory = Path.Combine(work, "logs");
+      if (GuiLogging.Directory != directory)
+        throw new InvalidOperationException($"The GUI logs to {GuiLogging.Directory}, not to the output root's {directory}");
+      NLog.LogManager.Shutdown(); // closes the file the log keeps open
+      string today = Path.Combine(
+        directory,
+        GuiLogging.FilePrefix + DateTime.Now.ToString(GuiLogging.DateFormat, CultureInfo.InvariantCulture) + ".log"
+      );
+      if (!File.Exists(today) || !File.ReadAllText(today).Contains("mb-framepacing-gui", StringComparison.Ordinal))
+        throw new InvalidOperationException($"No log in {today}");
+      if (File.Exists(oldLog))
+        throw new InvalidOperationException($"The old log file {oldLog} was not deleted");
+      Console.WriteLine($"GUI log checked: {today}");
     }
 
     private static async Task<bool> RenderGuiAsync(string output)

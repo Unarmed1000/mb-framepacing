@@ -10,6 +10,7 @@
 
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -59,6 +60,12 @@ namespace MB.FramePacing.Gui.ViewModels
 
     public string GuiSettingsPath => GuiSettings.FilePath;
 
+    /// <summary>The folder of the GUI's log files (<see cref="GuiLogging"/>).</summary>
+    public string LogDirectory => GuiLogging.Directory;
+
+    [ObservableProperty]
+    public partial string LogStatusText { get; set; } = string.Empty;
+
     public string Version => MainWindowViewModel.Version;
 
     /// <summary>Read the configuration file again (after the setup dialog saved it).</summary>
@@ -87,6 +94,21 @@ namespace MB.FramePacing.Gui.ViewModels
       catch (Exception ex)
       {
         StatusText = "Could not open the configuration file: " + ex.Message;
+      }
+    }
+
+    [RelayCommand]
+    private void OpenLogFolder()
+    {
+      try
+      {
+        Directory.CreateDirectory(GuiLogging.Directory);
+        m_dialogs.ShowInFileManager(GuiLogging.Directory);
+        LogStatusText = string.Empty;
+      }
+      catch (Exception ex)
+      {
+        LogStatusText = "Could not open the log folder: " + ex.Message;
       }
     }
 

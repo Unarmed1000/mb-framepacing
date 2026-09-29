@@ -7,7 +7,7 @@ Auto-detects the current OS/CPU into a .NET runtime identifier (RID) and runs
 `dotnet publish` for the command line tool, the GUI or both. Pass --rid to build
 for a different target. The version comes from measure/VERSION.
 
-Output: measure/publish/<rid>/<app>/ (the executable, NLog.config and licenses/).
+Output: measure/publish/<rid>/<app>/ (the executable and licenses/; the command line tool also NLog.config).
 """
 
 import argparse
