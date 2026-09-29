@@ -24,9 +24,10 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// Run <paramref name="work"/> on the thread pool: its result, or null when a newer request (or <see cref="Cancel"/>) came in meanwhile.
-    /// The work gets a token that is cancelled then; it may stop early by throwing <see cref="OperationCanceledException"/>.
+    /// The work gets a token that is cancelled then; it should stop early by returning null. Cancelling is the normal case here, so nothing
+    /// on this path throws for it (an <see cref="OperationCanceledException"/> the work throws anyway is still taken as cancelled).
     /// </summary>
-    public async Task<T?> Run(Func<CancellationToken, T> work)
+    public async Task<T?> Run(Func<CancellationToken, T?> work)
     {
       CancellationTokenSource source;
       long generation;
@@ -39,7 +40,8 @@ namespace MB.FramePacing.Charts
       try
       {
         // Back on the caller's context before the check: nothing can overtake between the check and the caller applying the result there
-        var result = await Task.Run(() => work(source.Token), source.Token);
+        // No token for Task.Run: a request cancelled before it starts runs, sees the token and returns at once, without an exception
+        var result = await Task.Run(() => work(source.Token));
         lock (m_lock)
           return generation == m_generation ? result : null;
       }

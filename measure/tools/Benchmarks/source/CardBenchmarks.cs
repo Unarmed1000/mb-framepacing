@@ -62,7 +62,7 @@ namespace MB.FramePacing.Benchmarks
       if (Seconds > 0)
         return null!;
       var run = m_run with { };
-      return SectionCards.Build(RunSection.Whole(run), g_panels);
+      return SectionCards.Build(RunSection.Whole(run), g_panels)!;
     }
   }
 }

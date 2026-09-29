@@ -96,7 +96,7 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       foreach (var section in new[] { RunSection.Whole(run), RunSection.Create(run, 2, 3) })
       {
-        var cards = SectionCards.Build(section, options);
+        var cards = SectionCards.Build(section, options)!;
         Assert.That(cards.Section, Is.SameAs(section));
         Assert.That(SvgCardWriter.Write(cards.Timeline), Is.EqualTo(ReportCard.Render(section, options)));
         Assert.That(SvgCardWriter.Write(cards.ErrorHistogram), Is.EqualTo(DistributionCard.Render(DistributionCard.ErrorHistogram, section)));
@@ -109,7 +109,7 @@ namespace MB.FramePacing.Charts.UnitTest
       }
       using var cancelled = new CancellationTokenSource();
       cancelled.Cancel();
-      Assert.That(() => SectionCards.Build(RunSection.Whole(run), options, cancelled.Token), Throws.InstanceOf<OperationCanceledException>());
+      Assert.That(SectionCards.Build(RunSection.Whole(run), options, cancelled.Token), Is.Null, "cancelled: nothing, and no exception");
     }
   }
 }
