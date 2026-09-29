@@ -196,16 +196,21 @@ namespace MB.FramePacing.Charts
         var frame = frames[i];
         int from = shownAt[i];
         int to = i + 1 < frames.Count ? shownAt[i + 1] : endRefresh;
-        // How long the frame is meant to stay: the next frame's target (its swap interval), the last frame's own
-        long intendedHold = (i + 1 < frames.Count ? frames[i + 1].TargetTicks : frame.TargetTicks) ?? refresh;
+        // How long the frame is meant to stay: the next frame's target (its swap interval), the last frame's own. A frame presented on
+        // demand has no interval to aim for: the wait for it is never late
+        var next = i + 1 < frames.Count ? frames[i + 1] : frame;
+        long intendedHold = OnDemand(next) ? long.MaxValue : next.TargetTicks ?? refresh;
+        // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
+        bool isStatic = (frame.Flags & PresentedFrameFlags.Static) != 0;
         for (int k = from; k < to; ++k)
         {
           bool firstRefresh = k == from;
           string kind =
-            firstRefresh ? (frame.AnimationErrorTicks is { } e && Math.Abs(e) > threshold ? "off" : "ok")
+            isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
+            : firstRefresh ? (frame.AnimationErrorTicks is { } e && Math.Abs(e) > threshold ? "off" : "ok")
             : (k - from) * refresh < intendedHold - (refresh / 2) ? "hold"
             : "again";
-          used.Add(kind);
+          used.Add(kind == "strip-static-b" ? "strip-static-a" : kind);
           double x0 = XOf(first + (k * refresh));
           double x1 = XOf(first + ((k + 1) * refresh));
           parts.Add(new RectShape(kind, N(x0 + 2, 1), N(displayY, 1), N(x1 - x0 - 4, 1), N(DisplayH, 0), "6"));
@@ -213,6 +218,16 @@ namespace MB.FramePacing.Charts
         }
 
         double cx = (XOf(first + (from * refresh)) + XOf(first + ((from + 1) * refresh))) / 2;
+        // A step from or to a static frame has no animation error: the steps it has, and "static" for the error
+        if (frame.AnimationErrorTicks is null && (frame.Flags & (PresentedFrameFlags.Static | PresentedFrameFlags.StaticBefore)) != 0)
+        {
+          parts.Add(new TextShape(cx, rowsY, frame.AnimationDeltaTicks is { } a ? $"{Ms(a / (double)TimeSpan.TicksPerMillisecond)} ms" : "–"));
+          parts.Add(
+            new TextShape(cx, rowsY + RowStep, frame.DisplayDeltaTicks is { } d ? $"{Ms(d / (double)TimeSpan.TicksPerMillisecond)} ms" : "–")
+          );
+          parts.Add(new TextShape(cx, rowsY + (2 * RowStep), "static", "zero"));
+          continue;
+        }
         if (
           frame.DisplayDeltaTicks is not { } display
           || frame.AnimationDeltaTicks is not { } animation
@@ -261,6 +276,13 @@ namespace MB.FramePacing.Charts
       return presented.Count > 0 ? (presented.Min(), false) : (null, false);
     }
 
+    /// <summary>The frame is presented on demand: its target (or, without one, its preferred frame time) says so, as the analysis reads it.</summary>
+    private static bool OnDemand(PresentedFrame frame)
+    {
+      const uint OnDemandTicks = MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
+      return frame.MarkerTargetFrameTicks == OnDemandTicks || (frame.MarkerTargetFrameTicks == 0 && frame.MarkerPreferredFrameTicks == OnDemandTicks);
+    }
+
     /// <summary>A frame's short name in the boxes and cells: the last three digits of its frame index.</summary>
     private static string Label(PresentedFrame frame) => "#" + (frame.FrameIndex % 1000).ToString("000", CultureInfo.InvariantCulture);
 
@@ -270,6 +292,7 @@ namespace MB.FramePacing.Charts
       ("off", "the frame's first refresh, off by more than the error threshold"),
       ("hold", "held as intended (the next frame's target)"),
       ("again", "held longer: the next frame is late"),
+      ("strip-static-a", "static: nothing animates"),
     };
 
     private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, long thresholdTicks)

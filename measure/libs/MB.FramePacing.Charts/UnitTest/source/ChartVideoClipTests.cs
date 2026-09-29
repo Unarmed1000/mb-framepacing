@@ -477,6 +477,50 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
     }
 
+    /// <summary>
+    /// The frame timeline card of static frames: every refresh of a static frame is violet (nothing animates: not on time, off, held or late)
+    /// and says "static" for its error, every other frame's refreshes are not; a frame presented on demand is never held longer than intended.
+    /// </summary>
+    [TestCase("60-idle-1fps", 1.0, 1.75)]
+    [TestCase("60-naive-5ms-static-rests", 0.9, 1.2)]
+    [TestCase("60-on-demand", 0.9, 1.25)]
+    public void FrameTimeline_StaticFramesAreViolet_OnDemandIsNeverLate(string clip, double from, double to)
+    {
+      var (_, report, _) = Analyze(clip);
+      var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
+      var section = RunSection.Create(chart, from, to);
+      var frames = section.Section.Run.Frames;
+      Assert.That(frames.Any(f => (f.Flags & PresentedFrameFlags.Static) != 0), $"{clip}: the section has static frames");
+      string Label(PresentedFrame f) => "#" + (f.FrameIndex % 1000).ToString("000", CultureInfo.InvariantCulture);
+      var staticLabels = frames.Where(f => (f.Flags & PresentedFrameFlags.Static) != 0).Select(Label).ToHashSet();
+
+      // Each display cell (40 high) is followed by its frame's label
+      var document = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section));
+      var elements = document.Descendants().ToList();
+      var cells = elements
+        .Select((e, i) => (Element: e, Next: i + 1 < elements.Count ? elements[i + 1] : null))
+        .Where(p => p.Element.Name.LocalName == "rect" && (string?)p.Element.Attribute("height") == "40" && p.Next?.Name.LocalName == "text")
+        .Select(p => (Class: (string)p.Element.Attribute("class")!, Label: p.Next!.Value))
+        .ToList();
+      var texts = elements.Where(e => e.Name.LocalName == "text").Select(e => e.Value).ToList();
+      Assert.That(cells, Is.Not.Empty);
+      foreach (var (cls, label) in cells)
+      {
+        bool violet = cls is "strip-static-a" or "strip-static-b";
+        Assert.That(violet, Is.EqualTo(staticLabels.Contains(label)), $"{clip}: {label}'s cell {cls}");
+      }
+      if (clip == "60-on-demand")
+        Assert.That(cells.Select(c => c.Class), Has.None.EqualTo("again"), "a frame presented on demand is never late for waiting");
+      Assert.That(
+        texts.Count(t => t == "static"),
+        Is.EqualTo(
+          frames.Count(f => f.AnimationErrorTicks is null && (f.Flags & (PresentedFrameFlags.Static | PresentedFrameFlags.StaticBefore)) != 0)
+        ),
+        $"{clip}: \"static\" for each step from or to a static frame"
+      );
+      Assert.That(texts, Does.Contain("static: nothing animates"), $"{clip}: the key");
+    }
+
     /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers.</summary>
     [Test]
     public void Headline_ShowsTheRunsNumbers()

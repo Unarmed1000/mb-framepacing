@@ -175,7 +175,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `DistributionCard` builds the error and display time step histograms, the error percentiles and the drift (`render --cards`).
     - The frame timeline (`FrameTimelineCard`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
-      - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells.
+      - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells. A
+        static frame's cells are violet (`strip-static-a`/`-b`) and its error row says "static"; a frame presented on demand is never
+        "held longer" (no interval to be late for).
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, so add or change
       a number there, not in the GUI. A tile without a number shows "-" with `HasValue` false.
     - The animation error panel draws a refresh line (`error-refresh`, dashed amber, labelled "+1 refresh (16.7 ms)") at every whole
