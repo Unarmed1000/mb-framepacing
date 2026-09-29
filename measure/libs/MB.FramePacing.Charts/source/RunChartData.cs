@@ -92,7 +92,7 @@ namespace MB.FramePacing.Charts
       m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTimeTicks is > 0 and var t ? t : null));
       m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null));
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTimeTicks is > 0 || Frames[i].CpuBusyTicks > 0));
-      m_droppedBefore = Once(() => DroppedBefore(Frames));
+      m_droppedBefore = Once(() => DroppedFrames.Before(Frames));
       m_holdKinds = Once(() =>
       {
         // A hold's kind, the first that applies: not known (a capture gap made the next step uncertain), late, an older frame came back
@@ -198,52 +198,6 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The frames whose display time step is a static frame's time on screen (RunStatistics.ExcludedStaticFrames).</summary>
     public RankBits StaticSteps => m_staticSteps.Value;
-
-    private static long[] DroppedBefore(IReadOnlyList<PresentedFrame> frames)
-    {
-      var dropped = new long[frames.Count];
-      int segmentStart = 0;
-      for (int i = 0; i <= frames.Count; ++i)
-      {
-        if (i < frames.Count && frames[i].Segment == frames[segmentStart].Segment)
-          continue;
-        // The segment's frames segmentStart to i: the older frames it showed out of order, sorted, count out of the skipped indices
-        var older = new List<ulong>();
-        for (int k = segmentStart; k < i; ++k)
-        {
-          if (frames[k].OlderFrames is { } shown)
-            older.AddRange(shown.Select(o => o.FrameIndex));
-        }
-        var shownOlder = older.Distinct().Order().ToArray();
-        for (int k = segmentStart + 1; k < i; ++k)
-        {
-          var frame = frames[k];
-          if (frame.SkippedBefore == 0 || (frame.Flags & PresentedFrameFlags.UncertainStart) != 0)
-            continue;
-          ulong from = frames[k - 1].FrameIndex + 1;
-          int lo = LowerBound(shownOlder, from);
-          int hi = LowerBound(shownOlder, frame.FrameIndex);
-          dropped[k] = (long)frame.SkippedBefore - (hi - lo);
-        }
-        segmentStart = i;
-      }
-      return dropped;
-    }
-
-    private static int LowerBound(ulong[] sorted, ulong value)
-    {
-      int lo = 0;
-      int hi = sorted.Length;
-      while (lo < hi)
-      {
-        int mid = (lo + hi) / 2;
-        if (sorted[mid] < value)
-          lo = mid + 1;
-        else
-          hi = mid;
-      }
-      return lo;
-    }
 
     /// <summary>The holds whose next frame is late (held too long).</summary>
     public FrameSequence LateHolds => m_lateHolds.Value;

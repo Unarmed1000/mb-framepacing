@@ -193,7 +193,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     summary.json). Every frame's target comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`:
     lateness against the schedule, and the animation error split into pacing and prediction error), its target frame time in the
     markers, the target frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time),
-    and otherwise one refresh (the native rate). The synthetic game writes a schedule; its prediction error is 0 by construction.
+    and otherwise one refresh (the native rate). Without a schedule, a frame after frames the target dropped (`DroppedFrames`) is due one
+    target per frame later (1 + dropped): dropped, not late. The synthetic game writes a schedule; its prediction error is 0 by construction.
 - **Markers (format version 1, `doc/marker-format.md`):** a 53 byte header shared by frame, start and end, its fields grouped by
   category: format (magic, version, kind), which run and frame (run id, frame index), what the frame shows (flags, animation time),
   pacing (preferred frame time, target frame time, intended display time), the CPU's work (CPU start time and CPU busy, named as

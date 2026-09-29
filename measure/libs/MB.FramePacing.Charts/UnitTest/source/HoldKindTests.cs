@@ -26,7 +26,9 @@ namespace MB.FramePacing.Charts.UnitTest
     /// Capture rows of a 60 Hz capture card: each entry is a frame index shown for one capture, or null for a capture not recorded. The pacer
     /// intends frame n for refresh n (its schedule in the markers), so a hold is only late when its next frame came after its intended time.
     /// </summary>
-    private static RunChartData Data(params ulong?[] shown)
+    private static RunChartData Data(params ulong?[] shown) => Data(schedule: true, shown);
+
+    private static RunChartData Data(bool schedule, params ulong?[] shown)
     {
       var rows = new List<CaptureRow>();
       void Add(CaptureStatus status, MarkerPayload payload) =>
@@ -36,7 +38,10 @@ namespace MB.FramePacing.Charts.UnitTest
       foreach (var index in shown)
       {
         if (index is { } frame)
-          Add(CaptureStatus.Decoded, new MarkerPayload(frame, (long)frame * Period, 1, IntendedDisplayTicks: 1_000_000 + ((long)frame * Period)));
+          Add(
+            CaptureStatus.Decoded,
+            new MarkerPayload(frame, (long)frame * Period, 1, IntendedDisplayTicks: schedule ? 1_000_000 + ((long)frame * Period) : 0)
+          );
         else
           Add(CaptureStatus.NotRecorded, default);
       }
@@ -56,6 +61,21 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(data.DroppedBeforeFrame[3], Is.EqualTo(1), "frame 4 was never shown before frame 5");
       Assert.That(data.HoldKinds[2], Is.EqualTo(HoldKind.FramesDropped));
       Assert.That(data.HoldKinds.Where((_, i) => i != 2 && i < 5), Is.All.EqualTo(HoldKind.AsPlanned));
+    }
+
+    /// <summary>
+    /// Without the pacer's schedule the frame after a dropped one is measured against two frame times (one refresh each): it is not late, and
+    /// the hold before it says frames were dropped, as with a schedule.
+    /// </summary>
+    [Test]
+    public void SkippedFrame_WithoutASchedule_IsDroppedNotLate()
+    {
+      var data = Data(schedule: false, 1, 2, 3, 3, 5, 6, 7);
+
+      Assert.That(data.Run.Run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
+      Assert.That(data.Frames[3].TargetTicks, Is.EqualTo(2 * Period), "frame 5 is due two refreshes after frame 3");
+      Assert.That(data.Frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.All.False);
+      Assert.That(data.HoldKinds[2], Is.EqualTo(HoldKind.FramesDropped));
     }
 
     /// <summary>

@@ -62,6 +62,8 @@ namespace MB.FramePacing.Analysis
         scheduleOffset = OnTimeOffset(offsets, half);
       }
 
+      // Frames the target dropped before each frame: without a schedule, the frame after them is due their frame times later too
+      var dropped = DroppedFrames.Before(frames);
       var pacingErrors = new List<long>();
       var predictionErrors = new List<long>();
       long late = 0;
@@ -76,7 +78,8 @@ namespace MB.FramePacing.Analysis
             : null;
         // What the frame is measured against: the schedule's step, the pacer's target, else the rate the application wants (a game that
         // wants 30 fps on 60 Hz aims for two refreshes), else the rate given to the tools, else one refresh. An application that presents on
-        // demand has no interval to aim for: no target, so only a schedule can make its frames late
+        // demand has no interval to aim for: no target, so only a schedule can make its frames late. Without a schedule, a frame after
+        // frames the target dropped is due one frame time per frame later (1 + dropped): the drop explains the longer step, not lateness
         uint markerTarget = frame.MarkerTargetFrameTicks;
         uint markerWants = frame.MarkerPreferredFrameTicks;
         const uint OnDemand = MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
@@ -84,9 +87,12 @@ namespace MB.FramePacing.Analysis
         long? target =
           intendedStep is { } step ? WholeRefreshes(step, refreshTicks)
           : onDemand ? null
-          : markerTarget != 0 ? WholeRefreshes(markerTarget, refreshTicks)
-          : markerWants != 0 ? WholeRefreshes(markerWants, refreshTicks)
-          : givenTarget;
+          : (1 + dropped[i])
+            * (
+              markerTarget != 0 ? WholeRefreshes(markerTarget, refreshTicks)
+              : markerWants != 0 ? WholeRefreshes(markerWants, refreshTicks)
+              : givenTarget
+            );
         // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
         // to the tools, else one refresh
         uint markerPreferred = frame.MarkerPreferredFrameTicks;
