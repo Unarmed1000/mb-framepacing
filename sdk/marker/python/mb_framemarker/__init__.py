@@ -20,7 +20,7 @@ it against the golden images the C++ library writes (test-data/markers). The for
     sync = generate_modules(Payload(frame_index, 0, kind=MarkerKind.SYNC))
     modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelFormat.RGB24)
 
-Standard library only, Python 3.11 or later.
+Standard library only, Python 3.12 or later.
 """
 
 from .bitmap import modules_to_bitmap

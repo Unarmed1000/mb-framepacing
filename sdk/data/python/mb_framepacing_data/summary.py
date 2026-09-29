@@ -9,14 +9,14 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TypeAlias, cast
+from typing import cast
 
 from .errors import DataFormatError
 
 FORMAT_VERSION = 1
 """The analysis output format this library reads."""
 
-JsonValue: TypeAlias = "None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]"
+type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 
 
 class _Object:

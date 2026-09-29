@@ -15,7 +15,7 @@ Times are 100 ns ticks (TimeSpan ticks); a value a file does not have is None.
         frames = read_frames(analysis / run.frames_file)
         errors_ms = [f.animation_error_ticks / 10_000 for f in frames if f.animation_error_ticks is not None]
 
-Standard library only, Python 3.11 or later. Decoding a marker's payload in the capture data (CaptureDataRecord.try_decode_main) uses the
+Standard library only, Python 3.12 or later. Decoding a marker's payload in the capture data (CaptureDataRecord.try_decode_main) uses the
 mb_framemarker package.
 """
 

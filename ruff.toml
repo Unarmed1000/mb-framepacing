@@ -14,7 +14,7 @@ extend-exclude = [
 line-length = 160
 
 # The scripts run on the Python 3 of the supported platforms (Ubuntu 24.04, current Homebrew and Windows installers)
-target-version = "py311"
+target-version = "py312"
 
 [lint]
 select = [

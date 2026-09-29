@@ -2,7 +2,7 @@
 
 `mb_framepacing_data` reads the data of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) tools: the capture data
 (`captures.mbcd`, [format](../../doc/capture-data-format.md)) and the analysis output (`summary.json`, `captures.csv`,
-`run-<id>-frames.csv`, [format](../../doc/analysis-output-format.md)). Standard library only, Python 3.11 or later. It reads what the
+`run-<id>-frames.csv`, [format](../../doc/analysis-output-format.md)). Standard library only, Python 3.12 or later. It reads what the
 C# library reads: the tests check it against the same golden data ([`test-data/data`](../../test-data/data)).
 
 ## Quick start

@@ -25,7 +25,7 @@ allocate nothing per frame:
 | C++ (any engine or graphics API) | [`sdk/marker/cpp`](sdk/marker/cpp): C++20, CMake, no dependencies                              | [Integrating the marker](sdk/doc/integrating.md) |
 | C# / .NET                        | [`sdk/marker/csharp`](sdk/marker/csharp): `MB.FrameMarker`, .NET Standard 2.1, no dependencies | [Integrating the marker](sdk/doc/integrating.md) |
 | Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component   | [Unity](sdk/doc/unity.md)                        |
-| Python 3.11+                     | [`sdk/marker/python`](sdk/marker/python): `mb_framemarker`, standard library only              | [Python library](sdk/marker/python/README.md)    |
+| Python 3.12+                     | [`sdk/marker/python`](sdk/marker/python): `mb_framemarker`, standard library only              | [Python library](sdk/marker/python/README.md)    |
 
 **Get started:** install on [Windows](measure/doc/install/windows.md) · [Ubuntu](measure/doc/install/ubuntu.md) ·
 [macOS (Homebrew)](measure/doc/install/macos.md), add the marker with [Integrating the marker](sdk/doc/integrating.md) (C++ or C#) or the

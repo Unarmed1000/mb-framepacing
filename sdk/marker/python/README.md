@@ -6,7 +6,7 @@ tools, then shows the **animation error**: how far what the application animated
 
 It draws exactly the same pixels as the C++ and C# libraries: the tests check it against the golden images the C++ library writes
 (`test-data/markers`). The format is specified in [doc/marker-format.md](../../doc/marker-format.md); what to write in each field is
-in [Filling the marker fields](../../doc/marker-fields.md). Standard library only, Python 3.11 or later.
+in [Filling the marker fields](../../doc/marker-fields.md). Standard library only, Python 3.12 or later.
 
 ## Quick start
 

@@ -12,7 +12,7 @@ what was actually shown on screen.
 | C++ (any engine or graphics API) | [C++20](cpp/README.md)                     | Release archive via CMake `FetchContent`, git, `add_subdirectory` or an install |
 | Unity 2021.3+                    | [Unity package](unity/README.md)           | Package Manager, git URL (`#upm/v<version>`)                                    |
 | Other C# / .NET                  | [C# (.NET Standard 2.1)](csharp/README.md) | The source at a `marker-v*` tag, as a project reference or a copy               |
-| Python 3.11+                     | [Python](python/README.md)                 | The `mb_framemarker` package (standard library only)                            |
+| Python 3.12+                     | [Python](python/README.md)                 | The `mb_framemarker` package (standard library only)                            |
 
 The Unity package contains the C# library plus Unity helpers (an overlay component that does everything for you).
 

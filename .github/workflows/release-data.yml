@@ -147,7 +147,7 @@ jobs:
           target_link_libraries(my_tool PRIVATE mb::framepacingdata)
           \`\`\`
 
-          ## Python (3.11+)
+          ## Python (3.12+)
 
           \`\`\`text
           pip install "git+https://github.com/${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}#subdirectory=sdk/data/python"

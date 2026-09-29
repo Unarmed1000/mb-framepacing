@@ -24,10 +24,10 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/marker/cpp/`                                 | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                                            |
 | `sdk/marker/csharp/`                              | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |
 | `sdk/marker/unity/`                               | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                                   |
-| `sdk/marker/python/`                              | Python library `mb_framemarker` (standard library only, Python 3.11) + unittest tests                           |
+| `sdk/marker/python/`                              | Python library `mb_framemarker` (standard library only, Python 3.12) + unittest tests                           |
 | `sdk/marker/shaders/`                             | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan  |
 | `sdk/data/VERSION`                                | Version of the data libraries (released with `data-v*` tags)                                                    |
-| `sdk/data/python/`                                | Python data library `mb_framepacing_data` (reads; standard library, Python 3.11) + unittest tests               |
+| `sdk/data/python/`                                | Python data library `mb_framepacing_data` (reads; standard library, Python 3.12) + unittest tests               |
 | `sdk/data/cpp/`                                   | C++20 data library `mb_framepacingdata` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests |
 | `sdk/data/csharp/`                                | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output         |
 | `sdk/conan/`                                      | Conan 2 recipes of both C++ libraries (conan-center-index layout, a local-recipes-index remote)                 |

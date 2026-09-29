@@ -9,7 +9,7 @@ name = "mb-framepacing-data"
 version = "0.1.0"
 description = "Read the mb-framepacing tools' data: the capture data (captures.mbcd) and the analysis output (summary.json, CSVs)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "BSD-3-Clause"
 license-files = ["mb_framepacing_data/LICENSE"]
 authors = [{ name = "Mana Battery ApS" }]
