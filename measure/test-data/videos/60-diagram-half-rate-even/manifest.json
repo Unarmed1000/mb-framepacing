@@ -37,7 +37,7 @@
     "web": false,
     "single": true,
     "marker": {
-      "format": "mb-framepacing frame marker (doc/marker-format.md)",
+      "format": "mb-framepacing frame marker (sdk/doc/marker-format.md)",
       "moduleSizePx": 3,
       "quietZoneModules": 4,
       "origin": [
