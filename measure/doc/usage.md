@@ -169,8 +169,10 @@ is presented after it first appears.
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
-`error-p99`, `error-p999`, `worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
-`events`.
+`error-p99`, `error-p999`, `worst-error`, `late-frames`), the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
+`events`, and `frame-time-lines`: the target and preferred frame time as dashed lines on the display time step and frametime panels
+(light grey the target, in whole refreshes on the display time step as the analysis compares; amber the preferred frame time, only
+where it differs from the target: the stretch the late share shows amber; none on demand).
 The tiles `frames-dropped` and `out-of-order` are left out together when the run (or section) has neither; `--show
 frames-dropped,out-of-order` keeps them anyway, `--hide` leaves them out. Overlays are opt-in: `--show animation-time-step` draws the animation time step as a blue line over the display time step (an even
 display with an uneven animation is delta time jitter; the scale covers both). For a card in a document: `--title "..."` replaces

@@ -521,6 +521,41 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(texts, Does.Contain("static: nothing animates"), $"{clip}: the key");
     }
 
+    /// <summary>
+    /// The reference lines follow the manifest: each hold at the swap interval and preferred interval of the frame that ends it (the display
+    /// time step panel in whole refreshes), none on demand; the preferred line only where it differs from the target.
+    /// </summary>
+    [TestCase("30")]
+    [TestCase("60-busy-swappy")]
+    [TestCase("60-on-demand")]
+    public void ReferenceLines_FollowTheManifestsTargetAndPreferred(string clip)
+    {
+      var (manifest, _, chart) = Analyze(clip);
+      var data = RunChartData.Of(chart);
+      long refresh = RefreshTicks(chart);
+      var byHold = new Dictionary<int, (long? Target, long? Preferred)>();
+      foreach (var stretch in data.StepReferences)
+      {
+        for (int i = stretch.Start; i < stretch.End; ++i)
+          byHold[i] = (stretch.TargetTicks, stretch.PreferredTicks);
+      }
+      int differing = 0;
+      for (int i = 0; i + 1 < manifest.FrameCount; ++i)
+      {
+        long? target = manifest.SwapIntervalRefreshes(i + 1) * refresh;
+        long? preferred = manifest.PreferredRefreshes(i + 1) * refresh;
+        var expected = target == null && preferred == null ? ((long?, long?)?)null : (target, preferred);
+        Assert.That(byHold.TryGetValue(i, out var actual) ? actual : ((long?, long?)?)null, Is.EqualTo(expected), $"{clip}: hold {i}");
+        if (preferred != null && preferred != target)
+          ++differing;
+      }
+      var paths = ReportCard.Build(RunSection.Whole(chart)).FlatShapes.OfType<PathShape>().Select(p => p.Class).ToList();
+      Assert.That(paths.Contains("ref-target"), Is.EqualTo(byHold.Values.Any(v => v.Target != null)), $"{clip}: the target line");
+      Assert.That(paths.Contains("ref-preferred"), Is.EqualTo(differing > 0), $"{clip}: the preferred line only where it differs");
+      if (clip == "60-busy-swappy")
+        Assert.That(differing, Is.GreaterThan(0), "the pacer ran slower than the game wanted");
+    }
+
     /// <summary>The headline tiles (the GUI's and the report's) show the run's numbers.</summary>
     [Test]
     public void Headline_ShowsTheRunsNumbers()

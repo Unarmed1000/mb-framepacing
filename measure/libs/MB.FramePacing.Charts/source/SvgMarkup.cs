@@ -131,7 +131,10 @@ namespace MB.FramePacing.Charts
       + "  .event-gap { fill: #768390; }\n"
       + "  .event-undecoded { fill: #545d68; }\n"
       + "  .key-cyan { fill: #39c5cf; }\n"
-      + "  .key-undecoded { fill: #545d68; }\n";
+      + "  .key-undecoded { fill: #545d68; }\n"
+      + "  .ref-target { stroke: #adbac7; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }\n"
+      + "  .ref-preferred { stroke: #d29922; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }\n"
+      + "  .key-light { fill: #adbac7; }\n";
 
     private const double Epsilon = 1e-9;
 

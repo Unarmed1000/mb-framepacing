@@ -157,10 +157,11 @@ namespace MB.FramePacing.Charts
       if (layout.StepY is { } stepY)
       {
         bool animation = options.IsShown(ReportItem.AnimationTimeStep);
-        panels.Add((shapes, plots) => StepPanel(shapes, plots, view, refreshMs, stepY, animation));
+        bool lines = options.IsShown(ReportItem.FrameTimeLines);
+        panels.Add((shapes, plots) => StepPanel(shapes, plots, view, refreshMs, stepY, animation, lines));
       }
       if (layout.FrameTimeY is { } frameTimeY)
-        panels.Add((shapes, plots) => FrameTimePanel(shapes, plots, view, refreshMs, frameTimeY));
+        panels.Add((shapes, plots) => FrameTimePanel(shapes, plots, view, refreshMs, frameTimeY, options.IsShown(ReportItem.FrameTimeLines)));
       if (layout.LateY is { } lateY)
         panels.Add((shapes, plots) => LatePanel(shapes, plots, view, lateY));
       if (layout.StripY is { } stripY)
@@ -454,7 +455,7 @@ namespace MB.FramePacing.Charts
         else
         {
           string glyph =
-            classes[0] == "error-refresh" ? "┅"
+            classes[0] is "error-refresh" or "ref-target" or "ref-preferred" ? "┅"
             : line ? "━"
             : "■";
           runs.Add(new TextRun(glyph, g_keyColours[classes[0]]));
@@ -510,6 +511,8 @@ namespace MB.FramePacing.Charts
       ["strip-static-a"] = "key-violet-a",
       ["strip-static-b"] = "key-violet-b",
       ["neutral"] = "key-grey",
+      ["ref-target"] = "key-light",
+      ["ref-preferred"] = "key-amber",
       ["event-dropped"] = "key-orange",
       ["event-older"] = "key-pink",
       ["event-torn"] = "key-cyan",
@@ -719,7 +722,15 @@ namespace MB.FramePacing.Charts
     /// The display time step as held steps (green as planned, red held too long). With <paramref name="animation"/>, the animation time step
     /// under it as a blue line on the same holds and scale: an even display with an uneven animation is delta time jitter.
     /// </summary>
-    private static void StepPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double stepY, bool animation)
+    private static void StepPanel(
+      List<CardShape> parts,
+      List<CardPlot> plots,
+      PanelView view,
+      double refreshMs,
+      double stepY,
+      bool animation,
+      bool frameTimeLines
+    )
     {
       // Each frame's hold: from its first sighting to the next frame of its segment (in the section), at the next frame's display time step
       var section = view.Section;
@@ -736,10 +747,19 @@ namespace MB.FramePacing.Charts
         if (scaleEnd > scaleStart)
           scales.Add((MaxMs(sequence.Values, scaleStart, scaleEnd), sequence.Values.PercentileMs(scaleStart, scaleEnd, ChartScale.BulkPercentile)));
       }
+      // And the reference lines of the holds that animate
+      double referenceLongest = 0;
+      if (frameTimeLines)
+      {
+        var references = data.AnimatingStepReferences;
+        var (referenceStart, referenceEnd) = references.Of(scaleFrom, scaleTo);
+        if (referenceEnd > referenceStart)
+          referenceLongest = MaxMs(references.Values, referenceStart, referenceEnd);
+      }
       double top =
         scales.Count > 0
-          ? ChartScale.StepTop(scales.Max(s => s.Longest), scales.Max(s => s.Bulk), refreshMs)
-          : ChartScale.StepTop(Array.Empty<double>(), refreshMs);
+          ? ChartScale.StepTop(Math.Max(scales.Max(s => s.Longest), referenceLongest), scales.Max(s => s.Bulk), refreshMs)
+          : ChartScale.StepTop(referenceLongest > 0 ? new[] { referenceLongest } : Array.Empty<double>(), refreshMs);
       // An animation time step can be 0 or less (the animation clock stood still or went back): drawn at 0
       double YOf(double ms) => stepY + StepH - (Math.Clamp(ms, 0, top) / top * StepH);
       double X1(int frame) => Math.Min(view.EndX, view.XOfFrame(frame + 1));
@@ -774,11 +794,16 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
       if (StaticBands(parts, view, stepY, stepY + StepH, label: false))
         panelKey.Add(g_staticKey);
+      // The reference lines under the holds; the key names them when they are drawn
+      var clipped = new List<(double X, double Value, bool Top)>();
+      var lines = new List<CardShape>();
+      if (frameTimeLines)
+        ReferenceKey(panelKey, ReferenceLines(lines, view, data.StepReferences, holdEnd, YOf, top, stepY, stepY + StepH, clipped));
       parts.AddRange(Key(view.PlotX1, stepY - 16, panelKey));
+      parts.AddRange(lines);
       if (animation)
         AnimationSteps(parts, view, holdEnd, YOf, X1, stepY);
 
-      var clipped = new List<(double X, double Value, bool Top)>();
       if (view.PerFrame)
       {
         var risers = new StringBuilder();
@@ -859,6 +884,72 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
+    /// The target and preferred frame time as dashed stepped lines over the holds <paramref name="stretches"/> cover in the section (up to
+    /// <paramref name="holdEnd"/>): the target where there is one (not on demand), the preferred frame time only where it differs from the
+    /// target (the pacer runs slower than the application wants). A line above the scale stays at its edge with a mark. Returns which lines
+    /// were drawn, for the key.
+    /// </summary>
+    private static (bool Target, bool Preferred) ReferenceLines(
+      List<CardShape> parts,
+      PanelView view,
+      IReadOnlyList<ReferenceStretch> stretches,
+      int holdEnd,
+      Func<double, double> yOf,
+      double top,
+      double panelTop,
+      double panelBottom,
+      List<(double X, double Value, bool Top)> clipped
+    )
+    {
+      var section = view.Section;
+      var target = new StringBuilder();
+      var preferred = new StringBuilder();
+      double? targetEnd = null;
+      double? preferredEnd = null;
+      void Add(StringBuilder path, ref double? end, double x0, double x1, long ticks)
+      {
+        double ms = TicksMs(ticks);
+        double y = yOf(ms);
+        // Joined to the stretch before when it ends where this one starts
+        path.Append(
+          end is { } before && Math.Abs(before - x0) < 1e-6 ? $"V{Fixed(y, 1)}H{Fixed(x1, 1)}" : $"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}"
+        );
+        end = x1;
+        if (ms > top)
+          clipped.Add(((x0 + x1) / 2, ms, true));
+      }
+      int first = RunChartData.FirstWhere(0, stretches.Count, k => stretches[k].End > section.Start);
+      for (int k = first; k < stretches.Count && stretches[k].Start < holdEnd; ++k)
+      {
+        var stretch = stretches[k];
+        double x0 = view.XOfFrame(Math.Max(stretch.Start, section.Start));
+        double x1 = Math.Min(view.EndX, view.XOfFrame(Math.Min(stretch.End, holdEnd)));
+        if (x1 <= x0)
+          continue;
+        if (stretch.TargetTicks is { } targetTicks)
+          Add(target, ref targetEnd, x0, x1, targetTicks);
+        else
+          targetEnd = null;
+        if (stretch.PreferredTicks is { } preferredTicks && preferredTicks != stretch.TargetTicks)
+          Add(preferred, ref preferredEnd, x0, x1, preferredTicks);
+        else
+          preferredEnd = null;
+      }
+      view.MovePath(parts, "ref-target", target, panelTop, panelBottom);
+      view.MovePath(parts, "ref-preferred", preferred, panelTop, panelBottom);
+      return (target.Length > 0, preferred.Length > 0);
+    }
+
+    /// <summary>The key entries of the reference lines drawn.</summary>
+    private static void ReferenceKey(List<(string[] Classes, string Text, bool Line)> panelKey, (bool Target, bool Preferred) drawn)
+    {
+      if (drawn.Target)
+        panelKey.Add((new[] { "ref-target" }, "target", true));
+      if (drawn.Preferred)
+        panelKey.Add((new[] { "ref-preferred" }, "preferred", true));
+    }
+
+    /// <summary>
     /// The animation time step on the display time step's holds (under them): per frame one blue line, stepping at each hold's start; per pixel
     /// column the range faint and the lower middle value as the line. Values beyond the scale stay at its edge (the display's marks tell).
     /// </summary>
@@ -919,7 +1010,14 @@ namespace MB.FramePacing.Charts
     /// next frame's) as a step, and its CPU busy (from its CPU start until it was presented) as a faint bar, held from the frame's display time
     /// to the next frame's.
     /// </summary>
-    private static void FrameTimePanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double frameTimeY)
+    private static void FrameTimePanel(
+      List<CardShape> parts,
+      List<CardPlot> plots,
+      PanelView view,
+      double refreshMs,
+      double frameTimeY,
+      bool frameTimeLines
+    )
     {
       var section = view.Section;
       var data = view.Data;
@@ -943,10 +1041,23 @@ namespace MB.FramePacing.Charts
       int scaleStart = Combined(scaleFrom);
       int scaleEnd = Combined(scaleTo);
       var both = data.FrameTimesAndCpuBusy;
+      // And the reference lines of the frames that animate
+      double referenceLongest = 0;
+      if (frameTimeLines)
+      {
+        var references = data.AnimatingFrameTimeReferences;
+        var (referenceStart, referenceEnd) = references.Of(scaleFrom, scaleTo);
+        if (referenceEnd > referenceStart)
+          referenceLongest = MaxMs(references.Values, referenceStart, referenceEnd);
+      }
       double top =
         scaleEnd > scaleStart
-          ? ChartScale.StepTop(MaxMs(both, scaleStart, scaleEnd), both.PercentileMs(scaleStart, scaleEnd, ChartScale.BulkPercentile), refreshMs)
-          : ChartScale.StepTop(Array.Empty<double>(), refreshMs);
+          ? ChartScale.StepTop(
+            Math.Max(MaxMs(both, scaleStart, scaleEnd), referenceLongest),
+            both.PercentileMs(scaleStart, scaleEnd, ChartScale.BulkPercentile),
+            refreshMs
+          )
+          : ChartScale.StepTop(referenceLongest > 0 ? new[] { referenceLongest } : Array.Empty<double>(), refreshMs);
       double YOf(double ms) => frameTimeY + FrameTimeH - (Math.Min(ms, top) / top * FrameTimeH);
       // A span ends at the next frame of its segment in the section, else after the frame's time on screen
       double X1(int i) =>
@@ -967,9 +1078,19 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
       if (StaticBands(parts, view, frameTimeY, frameTimeY + FrameTimeH, label: false))
         panelKey.Add(g_staticKey);
-      parts.AddRange(Key(view.PlotX1, frameTimeY - 16, panelKey));
-
       var clipped = new List<(double X, double Value, bool Top)>();
+      var lines = new List<CardShape>();
+      if (frameTimeLines)
+      {
+        int spanEnd = Math.Max(section.Start, section.End - 1);
+        ReferenceKey(
+          panelKey,
+          ReferenceLines(lines, view, data.FrameTimeReferences, spanEnd, YOf, top, frameTimeY, frameTimeY + FrameTimeH, clipped)
+        );
+      }
+      parts.AddRange(Key(view.PlotX1, frameTimeY - 16, panelKey));
+      parts.AddRange(lines);
+
       var busy = new StringBuilder();
       double bottom = YOf(0);
       if (view.PerFrame)

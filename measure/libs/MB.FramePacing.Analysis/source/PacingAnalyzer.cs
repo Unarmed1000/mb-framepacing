@@ -16,9 +16,6 @@ namespace MB.FramePacing.Analysis
 {
   internal static class PacingAnalyzer
   {
-    // A target just below a whole number of refreshes (59.9 fps on 60 Hz) still means one refresh
-    private const double TargetRoundingSlack = 0.05;
-
     // The on-time frames set where the pacer's clock lines up with the capture clock: the earliest group of at least this share of the frames.
     // Frames shown early (the one after a dropped frame, say) are rarer than that, and frames that stay late after a hitch come after it
     private const double OnTimeShare = 0.25;
@@ -187,9 +184,7 @@ namespace MB.FramePacing.Analysis
       return sorted[0];
     }
 
-    /// <summary>A frame time in whole refreshes, rounded up (a 60 fps target on 144 Hz alternates 2 and 3 refreshes: 3 is the target).</summary>
-    private static long WholeRefreshes(double ticks, long refreshTicks) =>
-      Math.Max(1, (long)Math.Ceiling((ticks / refreshTicks) - TargetRoundingSlack)) * refreshTicks;
+    private static long WholeRefreshes(double ticks, long refreshTicks) => FrameTimeRounding.WholeRefreshes(ticks, refreshTicks);
 
     /// <summary>
     /// Which cause each frame with an error counts for: bad pacing (uneven) or delta time jitter (even).

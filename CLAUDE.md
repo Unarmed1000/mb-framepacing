@@ -194,6 +194,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       older frame came back (out of order, pink), frames dropped by the target (orange), as planned (green). Dropped = skipped frame
       indices over a gap-free capture that never came back out of order (`DroppedBeforeFrame`); the strip colours the refreshes where
       they were due orange and the out-of-order refreshes (`PresentedFrame.OlderFrames`, CSV `olderFrames`) pink (anywhere in a frame's cells).
+    - **Reference lines** (`frame-time-lines`, shown by default): the target (light grey) and preferred frame time (amber, only where it
+      differs) as dashed stepped lines on the display time step panel (whole refreshes, `FrameTimeRounding.WholeRefreshes`, the
+      analysis's rule) and the frametime panel (as written). Per hold, the values of the frame that ends it (`FrameReference`: the
+      marker's, else the analysis's fallbacks, without the schedule's step or the 1 + dropped multiple); `RunChartData.StepReferences`
+      / `FrameTimeReferences` are stretches of equal values, and the scales take the animating frames' values (static ones stay out).
     - **Events panel** (`events`, under the strip, at every zoom): two lanes never mixed up, **frames** (dropped by the target, out of
       order, torn) and **capture** (not recorded, dropped by the source, missed, not decoded), one mark per pixel column and lane, the
       first kind of `RunEvents.FrameKinds` / `CaptureKinds` that the column has. `RunEvents` (`RunChartData.Events`) holds each kind's

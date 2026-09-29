@@ -36,6 +36,7 @@ namespace MB.FramePacing.Charts
     public const string LateShare = "late-share";
     public const string RefreshStrip = "refresh-strip";
     public const string Events = "events";
+    public const string FrameTimeLines = "frame-time-lines";
     public const string AnimationTimeStep = "animation-time-step";
 
     /// <summary>Every item, in the order the card shows them, with what it is.</summary>
@@ -61,6 +62,7 @@ namespace MB.FramePacing.Charts
       (LateShare, "panel: share of late frames in the last 2 s"),
       (RefreshStrip, "panel: refresh strip"),
       (Events, "panel: events: frames dropped, out of order or torn, and what the capture missed"),
+      (FrameTimeLines, "lines: the target and preferred frame time on the display time step and frametime panels"),
       (AnimationTimeStep, "overlay (opt-in): the animation time step on the display time step panel"),
     };
 

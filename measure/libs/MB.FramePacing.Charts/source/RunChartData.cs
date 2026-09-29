@@ -46,6 +46,10 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<LateShareData?> m_lateShare;
     private readonly Lazy<int[]> m_segmentEnds;
     private readonly Lazy<RunEvents> m_events;
+    private readonly Lazy<ReferenceStretch[]> m_stepReferences;
+    private readonly Lazy<ReferenceStretch[]> m_frameTimeReferences;
+    private readonly Lazy<FrameSequence> m_animatingStepReferences;
+    private readonly Lazy<FrameSequence> m_animatingFrameTimeReferences;
 
     private RunChartData(ChartRun run)
     {
@@ -152,6 +156,46 @@ namespace MB.FramePacing.Charts
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
       m_events = Once(() => RunEvents.Of(this));
+
+      // What each hold was aimed at: the target and preferred frame time of the frame that ends it. The display time step panel draws them
+      // in whole refreshes, as the analysis compares; the frametime panel as written. Without pacing (no refresh rate) there are none
+      long refresh = run.Run.Pacing is { } pacing ? (long)Math.Round(pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond) : 0;
+      long? Rounded(long? ticks) => ticks is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
+      ReferenceStretch[] Stretches(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred)
+      {
+        var stretches = new List<ReferenceStretch>();
+        for (int i = 0; refresh > 0 && i < count; ++i)
+        {
+          if (!HasNext(i))
+            continue;
+          var next = Frames[i + 1];
+          var (t, p) = (target(next), preferred(next));
+          if (t == null && p == null)
+            continue;
+          if (stretches.Count > 0 && stretches[^1] is var last && last.End == i && last.TargetTicks == t && last.PreferredTicks == p)
+            stretches[^1] = last with { End = i + 1 };
+          else
+            stretches.Add(new ReferenceStretch(i, i + 1, t, p));
+        }
+        return stretches.ToArray();
+      }
+      // The scales take the lines of the holds that animate (an idle screen's aim would squash them, as its hold would)
+      FrameSequence Animating(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred) =>
+        new FrameSequence(
+          count,
+          i =>
+            refresh > 0 && HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.Static) == 0
+              ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
+              {
+                (null, null) => null,
+                var (t, p) => Math.Max(t ?? 0, p ?? 0),
+              }
+              : null
+        );
+      m_stepReferences = Once(() => Stretches(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f))));
+      m_frameTimeReferences = Once(() => Stretches(FrameReference.Target, FrameReference.Preferred));
+      m_animatingStepReferences = Once(() => Animating(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f))));
+      m_animatingFrameTimeReferences = Once(() => Animating(FrameReference.Target, FrameReference.Preferred));
     }
 
     /// <summary>The prepared data of <paramref name="run"/>: made on first use and kept as long as the run is.</summary>
@@ -227,6 +271,18 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The late share over the whole run, when it has pacing information.</summary>
     public LateShareData? LateShare => m_lateShare.Value;
+
+    /// <summary>The display time step panel's reference lines: stretches of holds with one target and preferred frame time, in whole refreshes.</summary>
+    public IReadOnlyList<ReferenceStretch> StepReferences => m_stepReferences.Value;
+
+    /// <summary>The frametime panel's reference lines: the same stretches with the frame times as written.</summary>
+    public IReadOnlyList<ReferenceStretch> FrameTimeReferences => m_frameTimeReferences.Value;
+
+    /// <summary>Per frame that animates, the higher of its hold's target and preferred frame time in whole refreshes: for the step scale.</summary>
+    public FrameSequence AnimatingStepReferences => m_animatingStepReferences.Value;
+
+    /// <summary>Per frame that animates, the higher of its frametime's target and preferred frame time as written: for the frametime scale.</summary>
+    public FrameSequence AnimatingFrameTimeReferences => m_animatingFrameTimeReferences.Value;
 
     /// <summary>What went wrong when, in the frames and in the capture: the events lanes'.</summary>
     public RunEvents Events => m_events.Value;

@@ -1,0 +1,27 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* A frame time in whole refreshes, as the display shows frames: rounded up, with a little slack so a target just below a whole number of
+//* refreshes (59.9 fps on 60 Hz) still means one. The analysis measures every frame against it, and the charts draw the same values.
+//*
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+//* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
+//****************************************************************************************************************************************************
+
+using System;
+
+namespace MB.FramePacing.Analysis
+{
+  public static class FrameTimeRounding
+  {
+    /// <summary>A frame time this share of a refresh above a whole number of refreshes still rounds down to it.</summary>
+    public const double Slack = 0.05;
+
+    /// <summary>
+    /// <paramref name="ticks"/> in whole refreshes of <paramref name="refreshTicks"/>, rounded up, at least one (a 60 fps target on 144 Hz
+    /// alternates 2 and 3 refreshes: 3 is the target).
+    /// </summary>
+    public static long WholeRefreshes(double ticks, long refreshTicks) =>
+      Math.Max(1, (long)Math.Ceiling((ticks / refreshTicks) - Slack)) * refreshTicks;
+  }
+}

@@ -192,6 +192,9 @@ namespace MB.FramePacing.Analysis.UnitTest
         ? (FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value) - (FirstRefresh(frame - 1) - RenderedLate[Presented[frame - 1]]!.Value)
         : RenderedSwapInterval[Presented[frame]];
 
+    /// <summary>The pacer's swap interval before the frame (the marker's target frame time), in refreshes; null on demand.</summary>
+    public long? SwapIntervalRefreshes(int frame) => RenderedSwapInterval[Presented[frame]];
+
     /// <summary>The frame time the application prefers, in refreshes; null on demand.</summary>
     public long? PreferredRefreshes(int frame) => RenderedPreferredInterval[Presented[frame]];
 

@@ -103,6 +103,9 @@
   .event-undecoded { fill: #545d68; }
   .key-cyan { fill: #39c5cf; }
   .key-undecoded { fill: #545d68; }
+  .ref-target { stroke: #adbac7; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+  .ref-preferred { stroke: #d29922; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+  .key-light { fill: #adbac7; }
 </style>
 <rect class="card" x="0.5" y="0.5" width="1691" height="515" rx="14"/>
 <text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a', frames 493–505 (1.90–2.25 s)</text>
