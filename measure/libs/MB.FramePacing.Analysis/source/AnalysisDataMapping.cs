@@ -28,11 +28,13 @@ namespace MB.FramePacing.Analysis
         hasMarker ? row.Payload.RunId : null,
         hasMarker ? row.Payload.FrameIndex : null,
         hasMarker ? row.Payload.AnimationTicks : null,
-        row.SourceDropBefore,
+        row.SourceDrops,
+        row.MissedBefore,
+        row.Sync?.RunId,
+        row.Sync?.FrameIndex,
         row.HostTicks,
         row.DeviceTicks,
-        row.MarkerBytes,
-        row.Secondary?.FrameIndex
+        row.MarkerBytes
       );
     }
 
@@ -148,7 +150,8 @@ namespace MB.FramePacing.Analysis
         c.Undecodable,
         c.Torn,
         c.NotRecorded,
-        c.SourceDropEvents,
+        c.SourceDroppedFrames,
+        c.MissedCaptures,
         c.PresentedFrames,
         c.SkippedFrameIndices,
         c.DroppedFrames,
@@ -163,7 +166,8 @@ namespace MB.FramePacing.Analysis
         c.Undecodable,
         c.Torn,
         c.NotRecorded,
-        c.SourceDropEvents,
+        c.SourceDroppedFrames,
+        c.MissedCaptures,
         c.PresentedFrames,
         c.SkippedFrameIndices,
         c.DroppedFrames,

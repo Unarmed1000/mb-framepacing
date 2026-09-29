@@ -56,8 +56,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         MarkerPayload? second = secondary.TryGetValue(c, out var s) ? new MarkerPayload(s.Index, 0, s.RunId, MarkerKind.Sync) : null;
         rows.Add(
           primary.TryGetValue(c, out var p)
-            ? new CaptureRow(c, c * Period, CaptureStatus.Decoded, new MarkerPayload(p, (long)(p - 100) * 16 * Period, 1), null, false, second)
-            : new CaptureRow(c, c * Period, CaptureStatus.Undecodable, default, null, false, second)
+            ? new CaptureRow(c, c * Period, CaptureStatus.Decoded, new MarkerPayload(p, (long)(p - 100) * 16 * Period, 1), null, 0, second)
+            : new CaptureRow(c, c * Period, CaptureStatus.Undecodable, default, null, 0, second)
         );
       }
       return rows;

@@ -17,7 +17,8 @@ namespace MB.FramePacing.Capture
   /// <param name="CaptureIndex">The capture card's frame counter. Unrelated to the frame index encoded in the marker.</param>
   /// <param name="HostTicks">TimeSpan ticks since capture start when the frame arrived in this process.</param>
   /// <param name="DeviceTicks">TimeSpan ticks from the device/driver timestamp, <see cref="UnknownTicks"/> if not available.</param>
-  public readonly record struct CaptureRecordHeader(long CaptureIndex, long HostTicks, long DeviceTicks, CaptureRecordFlags Flags, int PixelByteCount)
+  /// <param name="SourceDrops">How many frames the source reported dropping since the previous record.</param>
+  public readonly record struct CaptureRecordHeader(long CaptureIndex, long HostTicks, long DeviceTicks, uint SourceDrops, int PixelByteCount)
   {
     public const long UnknownTicks = long.MinValue;
 
@@ -28,7 +29,7 @@ namespace MB.FramePacing.Capture
       BinaryPrimitives.WriteInt64LittleEndian(dst.Slice(0), CaptureIndex);
       BinaryPrimitives.WriteInt64LittleEndian(dst.Slice(8), HostTicks);
       BinaryPrimitives.WriteInt64LittleEndian(dst.Slice(16), DeviceTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(dst.Slice(24), (uint)Flags);
+      BinaryPrimitives.WriteUInt32LittleEndian(dst.Slice(24), SourceDrops);
       BinaryPrimitives.WriteUInt32LittleEndian(dst.Slice(28), (uint)PixelByteCount);
     }
 
@@ -37,7 +38,7 @@ namespace MB.FramePacing.Capture
         BinaryPrimitives.ReadInt64LittleEndian(src.Slice(0)),
         BinaryPrimitives.ReadInt64LittleEndian(src.Slice(8)),
         BinaryPrimitives.ReadInt64LittleEndian(src.Slice(16)),
-        (CaptureRecordFlags)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(24)),
+        BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(24)),
         (int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(28))
       );
   }

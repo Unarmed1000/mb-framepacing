@@ -186,7 +186,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
     (`TimelineAnalyzer.RefreshTolerance`) is a warning.
-  - **Capture gaps** (a capture card's captures not decoded, not recorded, or dropped by the source: `SourceDropBefore` too): the next
+  - **Capture gaps** (a capture card's captures not decoded, not recorded, dropped by the source (`CaptureRow.SourceDrops`, a count), or
+    missed without a word: `MissedCaptures`, a step of 1.5 periods or more on the device clock, never the host clock): the next
     frame's first sighting is uncertain (`UncertainStart`), so the steps into and out of it are not judged (`UncertainStep`: no animation
     error, no late verdict, not in the frame rates; `RunStatistics.UncertainSteps`), and frame indices skipped across the gap are never
     called dropped. A camera decides uncertain starts itself. Out-of-order captures are kept with the newest frame

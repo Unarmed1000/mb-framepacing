@@ -53,7 +53,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var pixels = recorder.BeginFrame();
         pixels.Fill((byte)(i & 0xFF));
-        recorder.EndFrame(i * 100, deviceTicks == DeviceTimestamps.PendingTicks ? deviceTicks : i * 7, CaptureRecordFlags.None);
+        recorder.EndFrame(i * 100, deviceTicks == DeviceTimestamps.PendingTicks ? deviceTicks : i * 7, 0);
       }
     }
 
@@ -72,7 +72,7 @@ namespace MB.FramePacing.Capture.UnitTest
             Thread.Sleep(0);
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)i);
-          recorder.EndFrame(i, i * 3, CaptureRecordFlags.None);
+          recorder.EndFrame(i, i * 3, 0);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);
@@ -117,6 +117,40 @@ namespace MB.FramePacing.Capture.UnitTest
       }
     }
 
+    /// <summary>The source drops reported with frames a full ring could not keep are carried by the next record written: none is lost.</summary>
+    [Test]
+    public void FullRing_SourceDropsOfDroppedFrames_GoToTheNextRecord()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("frames.mbfc");
+      var gate = new GatedTimestamps();
+      const int RingFrames = 16;
+      using (var writer = new CaptureFileWriter(path, g_header))
+      using (var recorder = new FrameRecorder(writer, new FrameRecorderOptions { RingFrames = RingFrames }, new CaptureClock(), gate))
+      {
+        for (int i = 0; i < RingFrames + 5; ++i)
+        {
+          recorder.BeginFrame();
+          // Every frame the ring drops says the source dropped 2 before it
+          recorder.EndFrame(i * 100, DeviceTimestamps.PendingTicks, i >= RingFrames ? 2u : 0u);
+        }
+        Assert.That(recorder.Stats.FramesDropped, Is.EqualTo(5));
+        gate.Release();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (recorder.Stats.RingFill > 0 && DateTime.UtcNow < deadline)
+          Thread.Sleep(1);
+        recorder.BeginFrame();
+        recorder.EndFrame((RingFrames + 5) * 100, DeviceTimestamps.PendingTicks, 1u);
+        recorder.Complete();
+      }
+
+      using var reader = new CaptureFileReader(path);
+      Assert.That(reader.RecordCount, Is.EqualTo(RingFrames + 1));
+      var last = reader.ReadRecordHeader(RingFrames);
+      Assert.That(last.CaptureIndex, Is.EqualTo(RingFrames + 5));
+      Assert.That(last.SourceDrops, Is.EqualTo(5 * 2 + 1), "the dropped frames' source drops and its own");
+    }
+
     /// <summary>The capture data alone: a record per frame with its index and timestamps (no marker in these frames), and no frames file.</summary>
     [Test]
     public void DataOnly_WritesARecordPerFrame()
@@ -133,7 +167,7 @@ namespace MB.FramePacing.Capture.UnitTest
             Thread.Sleep(0);
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)i);
-          recorder.EndFrame(i * 100, i * 3, i == 5 ? CaptureRecordFlags.SourceDropBefore : CaptureRecordFlags.None);
+          recorder.EndFrame(i * 100, i * 3, i == 5 ? 3u : 0u);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);
@@ -145,7 +179,7 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(records.Select(r => r.CaptureIndex), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long)i)));
       Assert.That(records.Select(r => r.HostTicks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
       Assert.That(records.Select(r => r.DeviceTicks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 3L)));
-      Assert.That(records.Select(r => r.Flags != CaptureRecordFlags.None), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i == 5)));
+      Assert.That(records.Select(r => r.SourceDrops), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i == 5 ? 3u : 0u)));
       Assert.That(records.All(r => r.Status == CaptureDataStatus.Undecodable && r.MainBytes == null), "no marker in these frames");
       Assert.That(System.IO.File.Exists(temp.File("frames.mbfc")), Is.False);
     }
@@ -200,7 +234,7 @@ namespace MB.FramePacing.Capture.UnitTest
         for (int i = 0; i < 10; ++i)
         {
           recorder.BeginFrame();
-          recorder.EndFrame(clock.NowTicks, DeviceTimestamps.PendingTicks, CaptureRecordFlags.None);
+          recorder.EndFrame(clock.NowTicks, DeviceTimestamps.PendingTicks, 0);
         }
         recorder.Complete();
       }
@@ -275,7 +309,7 @@ namespace MB.FramePacing.Capture.UnitTest
         for (int i = 0; i < 50; ++i)
         {
           recorder.BeginFrame();
-          recorder.EndFrame(i, i, CaptureRecordFlags.None);
+          recorder.EndFrame(i, i, 0);
           // Give the writer a chance to trim so the ring never fills
           if (i % 8 == 0)
             Thread.Sleep(5);
@@ -289,7 +323,7 @@ namespace MB.FramePacing.Capture.UnitTest
         for (int i = 50; i < 60; ++i)
         {
           recorder.BeginFrame();
-          recorder.EndFrame(i, i, CaptureRecordFlags.None);
+          recorder.EndFrame(i, i, 0);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);
@@ -351,7 +385,7 @@ namespace MB.FramePacing.Capture.UnitTest
         {
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)(i & 0xFF));
-          recorder.EndFrame(i * 100, i * 7, CaptureRecordFlags.None);
+          recorder.EndFrame(i * 100, i * 7, 0);
           // A live source cannot run ahead of the inspector without dropping; give it the time real frames would take
           if (!waitWhenFull && i % 16 == 0)
             Thread.Sleep(1);

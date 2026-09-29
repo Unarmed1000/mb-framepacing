@@ -170,7 +170,7 @@ namespace MB.FramePacing.Analysis
     private static void WriteReports(AnalysisReport report, AnalysisOptions options)
     {
       bool camera = report.Session?.Camera != null;
-      WriteCaptures(Path.Combine(report.OutputDirectory, CapturesFileName), report.Capture.Rows, camera);
+      WriteCaptures(Path.Combine(report.OutputDirectory, CapturesFileName), report.Capture.Rows);
       var ordinals = new Dictionary<uint, int>();
       var runFiles = new List<string>();
       foreach (var run in report.Timeline.Runs)
@@ -184,8 +184,7 @@ namespace MB.FramePacing.Analysis
       WriteSummary(Path.Combine(report.OutputDirectory, SummaryFileName), report, options, runFiles);
     }
 
-    private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows, bool camera) =>
-      CapturesCsv.Write(path, rows.Select(r => r.ToCsvRow()), camera);
+    private static void WriteCaptures(string path, IReadOnlyList<CaptureRow> rows) => CapturesCsv.Write(path, rows.Select(r => r.ToCsvRow()));
 
     private static void WriteFrames(string path, IReadOnlyList<PresentedFrame> frames, bool camera) =>
       FramesCsv.Write(path, frames.Select(f => f.ToRow()), camera);

@@ -87,7 +87,7 @@ namespace
     int64_t hostTicksSum = 0;
     int64_t deviceTicksCount = 0;
     int64_t deviceTicksSum = 0;
-    int64_t sourceDropCount = 0;
+    int64_t sourceDropsSum = 0;
     int64_t mainByteCount = 0;
     int64_t secondByteCount = 0;
     int64_t decodedPayloads = 0;
@@ -103,10 +103,7 @@ namespace
         ++deviceTicksCount;
         deviceTicksSum += record.DeviceTicks;
       }
-      if ((record.Flags & FD::CaptureRecordFlags::SourceDropBefore) != 0u)
-      {
-        ++sourceDropCount;
-      }
+      sourceDropsSum += record.SourceDrops;
       statuses.push_back(StatusName(record.Status));
       mainByteCount += static_cast<int64_t>(record.MainBytes.size());
       secondByteCount += static_cast<int64_t>(record.SecondBytes.size());
@@ -135,7 +132,7 @@ namespace
       {"hostTicksSum", hostTicksSum},
       {"deviceTicksCount", deviceTicksCount},
       {"deviceTicksSum", deviceTicksSum},
-      {"sourceDropCount", sourceDropCount},
+      {"sourceDropsSum", sourceDropsSum},
       {"statusCounts", Counts(statuses)},
       {"mainByteCount", mainByteCount},
       {"secondByteCount", secondByteCount},
@@ -163,6 +160,8 @@ namespace
         {"hasEndMarker", run.HasEndMarker},
         {"presentedFrames", run.Counts.PresentedFrames},
         {"droppedFrames", run.Counts.DroppedFrames},
+        {"sourceDroppedFrames", run.Counts.SourceDroppedFrames},
+        {"missedCaptures", run.Counts.MissedCaptures},
         {"captures", run.Counts.Captures},
         {"displayDeltaCount", run.Statistics.DisplayDeltaMs.Count},
         {"displayDeltaP50", run.Statistics.DisplayDeltaMs.P50},
@@ -257,7 +256,10 @@ namespace
     int64_t captureTicksSum = 0;
     int64_t frameIndexSum = 0;
     int64_t hostTicksSum = 0;
-    int64_t sourceDropCount = 0;
+    int64_t sourceDropsSum = 0;
+    int64_t missedSum = 0;
+    int64_t syncCount = 0;
+    int64_t syncFrameIndexSum = 0;
     int64_t payloadByteCount = 0;
     for (const auto& row : rows)
     {
@@ -269,7 +271,13 @@ namespace
       captureTicksSum += row.CaptureTicks.value_or(0);
       frameIndexSum += static_cast<int64_t>(row.FrameIndex.value_or(0));
       hostTicksSum += row.HostTicks.value_or(0);
-      sourceDropCount += row.SourceDropBefore ? 1 : 0;
+      sourceDropsSum += row.SourceDropsBefore;
+      missedSum += row.MissedBefore;
+      if (row.SyncFrameIndex)
+      {
+        ++syncCount;
+        syncFrameIndexSum += static_cast<int64_t>(*row.SyncFrameIndex);
+      }
       payloadByteCount += static_cast<int64_t>(row.Payload.size());
     }
     return {
@@ -279,7 +287,10 @@ namespace
       {"captureTicksSum", captureTicksSum},
       {"frameIndexSum", frameIndexSum},
       {"hostTicksSum", hostTicksSum},
-      {"sourceDropCount", sourceDropCount},
+      {"sourceDropsSum", sourceDropsSum},
+      {"missedSum", missedSum},
+      {"syncCount", syncCount},
+      {"syncFrameIndexSum", syncFrameIndexSum},
       {"payloadByteCount", payloadByteCount},
     };
   }

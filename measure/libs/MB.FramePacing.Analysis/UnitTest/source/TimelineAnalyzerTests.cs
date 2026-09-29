@@ -154,7 +154,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
       int dropped = rows.Rows.Count;
       rows.Show(4, 48, 3);
-      rows.Rows[dropped] = rows.Rows[dropped] with { SourceDropBefore = true };
+      rows.Rows[dropped] = rows.Rows[dropped] with { SourceDrops = 2 };
       rows.Show(5, 64, 4).Show(6, 80, 4);
       rows.End(1);
 
@@ -162,7 +162,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       Assert.That(run.Frames[3].Flags.HasFlag(PresentedFrameFlags.UncertainStart));
       Assert.That(run.Frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStep)), Is.EqualTo(2));
-      Assert.That(run.Counts.SourceDropEvents, Is.EqualTo(1));
+      Assert.That(run.Counts.SourceDroppedFrames, Is.EqualTo(2));
     }
 
     /// <summary>A capture that shows an older frame again is kept with the newest frame (the one presented), at its capture's time.</summary>

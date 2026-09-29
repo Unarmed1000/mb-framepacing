@@ -61,15 +61,15 @@ version, whose message says to update), `std::runtime_error` for a file it canno
 
 Everything is declared by `<mb/framepacingdata/FramePacingData.hpp>` in `MB::FramePacingData`, one header per type.
 
-| Function or type                                                                        | What it does                                                                 |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                           | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...)           |
-| `CaptureDataStatus`, `CaptureRecordFlags`, `DataRect`, `MarkerLocation`, `UnknownTicks` | A record's status and flags, where the markers are, a missing device time    |
-| `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs             | `summary.json` (capture.json inside it as JSON text)                         |
-| `ReadFrames`, `FrameRow`                                                                | A run's frames CSV, by column name                                           |
-| `ReadCaptures`, `CaptureCsvRow`                                                         | `captures.csv`, by column name                                               |
-| `FindAnalysis`, `FramesFileName`, `ParseTicks`, the file name constants                 | The analysis folder, the file names, the CSV time format                     |
-| `GetLibraryVersion`, `LibraryVersion`; `Version.hpp` (include it yourself)              | The linked library's version; at compile time, for `#if` and `static_assert` |
+| Function or type                                                            | What it does                                                                 |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`               | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...)           |
+| `CaptureDataStatus`, `DataRect`, `MarkerLocation`, `UnknownTicks`           | A record's status, where the markers are, a missing device time              |
+| `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs | `summary.json` (capture.json inside it as JSON text)                         |
+| `ReadFrames`, `FrameRow`                                                    | A run's frames CSV, by column name                                           |
+| `ReadCaptures`, `CaptureCsvRow`                                             | `captures.csv`, by column name                                               |
+| `FindAnalysis`, `FramesFileName`, `ParseTicks`, the file name constants     | The analysis folder, the file names, the CSV time format                     |
+| `GetLibraryVersion`, `LibraryVersion`; `Version.hpp` (include it yourself)  | The linked library's version; at compile time, for `#if` and `static_assert` |
 
 ## Build and test
 

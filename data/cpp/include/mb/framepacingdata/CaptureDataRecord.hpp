@@ -14,16 +14,16 @@
 namespace MB::FramePacingData
 {
   //! One capture of captures.mbcd: the source's frame counter (gaps are captures the recorder dropped), when it arrived on the host's
-  //! steady clock and the device's timestamp (100 ns ticks since the capture started), what the source reported, the status, and the
-  //! main and second markers' bytes as read (empty when not read).
+  //! steady clock and the device's timestamp (100 ns ticks since the capture started), how many frames the source reported dropping since
+  //! the previous record, the status, and the main and second markers' bytes as read (empty when not read).
   struct CaptureDataRecord
   {
     int64_t CaptureIndex{0};
     int64_t HostTicks{0};
     //! UnknownTicks when the device gave none.
     int64_t DeviceTicks{UnknownTicks};
-    //! CaptureRecordFlags bits.
-    uint32_t Flags{0};
+    //! How many frames the capture source reported dropping since the previous record (0: none).
+    uint32_t SourceDrops{0};
     CaptureDataStatus Status{CaptureDataStatus::Undecodable};
     std::vector<uint8_t> MainBytes;
     std::vector<uint8_t> SecondBytes;

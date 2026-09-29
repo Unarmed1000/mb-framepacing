@@ -12,9 +12,11 @@ using MB.FramePacing.Marker;
 namespace MB.FramePacing.Analysis
 {
   /// <param name="CaptureIndex">The capture card's frame counter. Unrelated to <see cref="MarkerPayload.FrameIndex"/>.</param>
-  /// <param name="Secondary">
-  /// EXPERIMENTAL camera captures: the sync marker the second (lower) zone shows, if it decoded: the run id and frame index of its frame.
+  /// <param name="Sync">
+  /// The sync marker, if it decoded: the run id and frame index of its frame. A capture card's tearing check (already in the status); an
+  /// EXPERIMENTAL camera's second (lower) zone, which times the frames.
   /// </param>
+  /// <param name="SourceDrops">How many frames the capture source reported dropping before this capture.</param>
   /// <param name="CaptureTicks">The capture time used for analysis (device or host clock, TimeSpan ticks). Unknown for NotRecorded rows.</param>
   public readonly record struct CaptureRow(
     long CaptureIndex,
@@ -22,8 +24,8 @@ namespace MB.FramePacing.Analysis
     CaptureStatus Status,
     MarkerPayload Payload,
     StartMetadata? Start = null,
-    bool SourceDropBefore = false,
-    MarkerPayload? Secondary = null
+    uint SourceDrops = 0,
+    MarkerPayload? Sync = null
   )
   {
     public bool IsDecoded => Status == CaptureStatus.Decoded;
@@ -33,6 +35,12 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>The capture data's device clock timestamp (TimeSpan ticks), when the row came from it and the device gave one.</summary>
     public long? DeviceTicks { get; init; }
+
+    /// <summary>
+    /// How many refreshes the capture's device clock says were missed since the previous capture (<see cref="MissedCaptures"/>); 0 on the
+    /// host clock.
+    /// </summary>
+    public long MissedBefore { get; init; }
 
     /// <summary>The main marker's encoded bytes as read, when the row came from the capture data.</summary>
     public byte[]? MarkerBytes { get; init; }

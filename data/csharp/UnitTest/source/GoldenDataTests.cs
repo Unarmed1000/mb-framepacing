@@ -81,7 +81,7 @@ namespace MB.FramePacing.Data.UnitTest
     {
       string path = Path.Combine(TestData.AnalysisDirectory, AnalysisFiles.CapturesFileName);
       using var writer = new StringWriter { NewLine = "\n" };
-      CapturesCsv.Write(writer, CapturesCsv.Read(path), camera: false);
+      CapturesCsv.Write(writer, CapturesCsv.Read(path));
       Assert.That(writer.ToString(), Is.EqualTo(TestData.ReadText(path)));
     }
 

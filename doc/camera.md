@@ -175,8 +175,8 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
   presented while the scanout was between them (vsync off).
 - **Sync marker only** (`secondZoneOnlyFrames`): frames only the sync marker ever showed. They were presented below the main
   marker and replaced before the next scanout reached it, so they appear as skipped frame indices in the timeline.
-- `captures.csv` gets `secondZoneFrameIndex`. Zones that disagree are normal for a camera and are **not** counted as torn
-  captures.
+- `captures.csv` has the second zone's marker in `syncRunId` and `syncFrameIndex`. Zones that disagree are normal for a camera and are
+  **not** counted as torn captures.
 - `UncertainStart` is only set when the gap before a frame is clearly longer than the usual scanout transition.
 - **The display's refresh rate** (`runs[].pacing.refreshPeriodMs`, `refreshCalculated: true`): a capture card captures at the
   refresh rate, a camera films faster, so the refresh is calculated from the frames. The first-seen intervals are whole refreshes

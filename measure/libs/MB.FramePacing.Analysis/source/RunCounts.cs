@@ -16,7 +16,9 @@ namespace MB.FramePacing.Analysis
     long Undecodable,
     long Torn,
     long NotRecorded,
-    long SourceDropEvents,
+    // Frames the capture source reported dropping, and refreshes the capture's device clock says were missed (MissedCaptures)
+    long SourceDroppedFrames,
+    long MissedCaptures,
     long PresentedFrames,
     long SkippedFrameIndices,
     // Frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order (DroppedFrames)

@@ -45,13 +45,7 @@ namespace MB.FramePacing.Capture.UnitTest
       for (int i = 0; i < 3; ++i)
       {
         var slot = record.AsSpan(i * header.RecordSize, header.RecordSize);
-        new CaptureRecordHeader(
-          100 + i,
-          1000 * i,
-          i == 1 ? CaptureRecordHeader.UnknownTicks : 5000 * i,
-          CaptureRecordFlags.None,
-          header.PixelByteCount
-        ).Write(slot);
+        new CaptureRecordHeader(100 + i, 1000 * i, i == 1 ? CaptureRecordHeader.UnknownTicks : 5000 * i, 0, header.PixelByteCount).Write(slot);
         slot.Slice(CaptureFileHeader.RecordHeaderSize, header.PixelByteCount).Fill((byte)(i + 1));
       }
 

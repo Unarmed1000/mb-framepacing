@@ -73,7 +73,6 @@ target_sources(mb_framepacingdata
       include/mb/framepacingdata/CaptureDataReader.hpp
       include/mb/framepacingdata/CaptureDataRecord.hpp
       include/mb/framepacingdata/CaptureDataStatus.hpp
-      include/mb/framepacingdata/CaptureRecordFlags.hpp
       include/mb/framepacingdata/Constants.hpp
       include/mb/framepacingdata/DataFormatError.hpp
       include/mb/framepacingdata/DataRect.hpp

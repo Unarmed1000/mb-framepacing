@@ -13,7 +13,6 @@ from .. import (
     CaptureDataHeader,
     CaptureDataReader,
     CaptureDataStatus,
-    CaptureRecordFlags,
     DataFormatError,
     DataRect,
 )
@@ -33,7 +32,7 @@ def header_bytes(version: int = 1, markers: int = 1) -> bytearray:
 
 def record_bytes(index: int, device: int, status: int, main: bytes, second: bytes) -> bytes:
     data = bytearray(RECORD_SIZE)
-    struct.pack_into("<qqqIBBB", data, 0, index, index * 100, device, 1 if index == 2 else 0, status, len(main), len(second))
+    struct.pack_into("<qqqIBBB", data, 0, index, index * 100, device, 3 if index == 2 else 0, status, len(main), len(second))
     data[32 : 32 + len(main)] = main
     data[112 : 112 + len(second)] = second
     return bytes(data)
@@ -69,7 +68,7 @@ class CaptureDataTests(unittest.TestCase):
                 self.assertEqual(reader.read_record(1), dropped)
         self.assertEqual((first.capture_index, first.host_ticks, first.device_ticks, first.status), (0, 0, 200, CaptureDataStatus.DECODED))
         self.assertEqual((first.main_bytes, first.second_bytes), (main, second))
-        self.assertEqual(dropped.flags, CaptureRecordFlags.SOURCE_DROP_BEFORE)
+        self.assertEqual(dropped.source_drops, 3)
         self.assertFalse(dropped.has_device_ticks)
         self.assertIsNone(dropped.main_bytes)
 

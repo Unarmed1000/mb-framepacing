@@ -7,7 +7,7 @@ the frames the markers were read from and where the markers are; a record holds 
 import struct
 from collections.abc import Iterator
 from dataclasses import dataclass
-from enum import IntEnum, IntFlag
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
@@ -43,12 +43,6 @@ class CaptureDataStatus(IntEnum):
     UNDECODABLE = 0
     DECODED = 1
     TORN = 2
-
-
-class CaptureRecordFlags(IntFlag):
-    NONE = 0
-    SOURCE_DROP_BEFORE = 1
-    """The capture source reported dropping frames between the previous record and this one."""
 
 
 @dataclass(frozen=True)
@@ -127,13 +121,13 @@ class CaptureDataHeader:
 @dataclass(frozen=True)
 class CaptureDataRecord:
     """One capture: the source's frame counter (gaps are captures the recorder dropped), when it arrived on the host's steady clock and the
-    device's timestamp (100 ns ticks since the capture started; UNKNOWN_TICKS when the device gave none), what the source reported, the
-    status, and the main and second markers' bytes as read (None when not read)."""
+    device's timestamp (100 ns ticks since the capture started; UNKNOWN_TICKS when the device gave none), how many frames the source
+    reported dropping since the previous record, the status, and the main and second markers' bytes as read (None when not read)."""
 
     capture_index: int
     host_ticks: int
     device_ticks: int
-    flags: CaptureRecordFlags
+    source_drops: int
     status: CaptureDataStatus
     main_bytes: bytes | None
     second_bytes: bytes | None
@@ -155,7 +149,9 @@ class CaptureDataRecord:
     def parse(data: bytes | memoryview) -> "CaptureDataRecord":
         if len(data) < RECORD_SIZE:
             raise DataFormatError("A capture data record is 192 bytes")
-        capture_index, host, device, flags, status, main_length, second_length = cast(tuple[int, int, int, int, int, int, int], _RECORD.unpack_from(data))
+        capture_index, host, device, source_drops, status, main_length, second_length = cast(
+            tuple[int, int, int, int, int, int, int], _RECORD.unpack_from(data)
+        )
         if status > CaptureDataStatus.TORN or main_length > MAIN_CAPACITY or second_length > SECOND_CAPACITY:
             raise DataFormatError("Invalid capture data record")
         main_offset = 32
@@ -164,7 +160,7 @@ class CaptureDataRecord:
             capture_index=capture_index,
             host_ticks=host,
             device_ticks=device,
-            flags=CaptureRecordFlags(flags),
+            source_drops=source_drops,
             status=CaptureDataStatus(status),
             main_bytes=bytes(data[main_offset : main_offset + main_length]) if main_length > 0 else None,
             second_bytes=bytes(data[second_offset : second_offset + second_length]) if second_length > 0 else None,

@@ -96,7 +96,7 @@ namespace MB.FramePacing.Capture
 
       public Span<byte> BeginFrame() => m_frame.Pixels.AsSpan(0, m_frame.Width * m_frame.Height);
 
-      public void EndFrame(long hostTicks, long deviceTicks, CaptureRecordFlags flags)
+      public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
       {
         ++FramesSeen;
         if (m_stop.IsCancellationRequested || (m_lastDecodeTicks != long.MinValue && hostTicks - m_lastDecodeTicks < m_intervalTicks))

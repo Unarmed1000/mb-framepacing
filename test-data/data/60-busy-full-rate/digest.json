@@ -29,10 +29,10 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1256954630,
+    "hostTicksSum": 1342329222,
     "deviceTicksCount": 486,
     "deviceTicksSum": 19642500000,
-    "sourceDropCount": 0,
+    "sourceDropsSum": 0,
     "statusCounts": {
       "Decoded": 486
     },
@@ -59,6 +59,8 @@
         "hasEndMarker": true,
         "presentedFrames": 388,
         "droppedFrames": 0,
+        "sourceDroppedFrames": 0,
+        "missedCaptures": 0,
         "captures": 480,
         "displayDeltaCount": 387,
         "displayDeltaP50": 16.6667,
@@ -198,8 +200,11 @@
     },
     "captureTicksSum": 19642500000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1256954630,
-    "sourceDropCount": 0,
+    "hostTicksSum": 1342329222,
+    "sourceDropsSum": 0,
+    "missedSum": 0,
+    "syncCount": 0,
+    "syncFrameIndexSum": 0,
     "payloadByteCount": 25830
   }
 }

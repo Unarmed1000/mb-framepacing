@@ -43,7 +43,7 @@ capture ends.
 | 0      | 8    | Capture index (`i64`): the source's frame counter. A gap is captures the recorder dropped                     |
 | 8      | 8    | Host time (`i64`): when the frame arrived, on the host's steady clock since the capture started               |
 | 16     | 8    | Device time (`i64`): the capture device's timestamp, `i64` minimum = none                                     |
-| 24     | 4    | Flags (`u32`): bit 0 = the source reported dropping frames before this one                                    |
+| 24     | 4    | Source drops (`u32`): how many frames the capture source reported dropping since the previous record          |
 | 28     | 1    | Status: 0 = undecodable, 1 = decoded, 2 = torn (the markers disagree, or only the sync marker was read)       |
 | 29     | 1    | Main marker byte count (0 = not read)                                                                         |
 | 30     | 1    | Second marker byte count (0 = not read)                                                                       |

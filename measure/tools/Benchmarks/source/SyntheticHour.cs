@@ -83,7 +83,7 @@ namespace MB.FramePacing.Benchmarks
         null,
         true,
         true,
-        new RunCounts(count, count, 0, 0, 0, 0, count, 0, 0, 0, 1),
+        new RunCounts(count, count, 0, 0, 0, 0, 0, count, 0, 0, 0, 1),
         RunStatistics.From(frames, TimeSpan.TicksPerMillisecond, Refresh),
         frames,
         Array.Empty<string>(),

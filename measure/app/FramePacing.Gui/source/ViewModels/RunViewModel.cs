@@ -34,7 +34,8 @@ namespace MB.FramePacing.Gui.ViewModels
       StartText = run.StartTimeUtc is { } start ? $"Started {start.ToLocalTime():yyyy-MM-dd HH:mm:ss}" : "No start time";
       CountsText =
         $"{c.PresentedFrames} presented frames from {c.Captures} captures: {c.Decoded} decoded, {c.Undecodable} undecodable, {c.Torn} torn, "
-        + $"{c.NotRecorded} not recorded. {c.SkippedFrameIndices} frame indices never captured, {c.Segments} segment(s).";
+        + $"{c.NotRecorded} not recorded; {c.SourceDroppedFrames} dropped by the source, {c.MissedCaptures} missed. "
+        + $"{c.SkippedFrameIndices} frame indices never captured, {c.Segments} segment(s).";
       ErrorFramesText =
         $"{run.Statistics.FramesWithAnimationError} frame(s) with |animation error| above {errorThresholdMs.ToString("0.###", CultureInfo.InvariantCulture)} ms";
       var s = run.Statistics;

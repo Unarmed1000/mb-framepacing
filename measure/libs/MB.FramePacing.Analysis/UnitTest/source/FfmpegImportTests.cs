@@ -81,7 +81,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       public Span<byte> BeginFrame() => m_pixels;
 
-      public void EndFrame(long hostTicks, long deviceTicks, CaptureRecordFlags flags) =>
+      public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops) =>
         PgmFile.Write(Path.Combine(directory, $"frame{Count++}.pgm"), new GrayImage(width, height, width, m_pixels));
     }
 

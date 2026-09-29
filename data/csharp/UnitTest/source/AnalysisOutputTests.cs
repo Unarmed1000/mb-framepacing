@@ -69,6 +69,24 @@ namespace MB.FramePacing.Data.UnitTest
     }
 
     [Test]
+    public void CapturesCsv_CarriesSourceDropsMissedRefreshesAndTheSyncMarker_AndWritesBackAsItWas()
+    {
+      const string csv = CapturesCsv.Header + "\r\n4,66.6667,Torn,Frame,7,12,200,3,1,7,11,70.1,66.6667,4D46\r\n" + "5,,NotRecorded,,,,,0,0,,,,,\r\n";
+      var rows = CapturesCsv.Read(new StringReader(csv));
+
+      Assert.That(rows, Has.Count.EqualTo(2));
+      var torn = rows[0];
+      Assert.That((torn.Status, torn.FrameIndex, torn.SyncRunId, torn.SyncFrameIndex), Is.EqualTo(("Torn", (ulong?)12, (uint?)7, (ulong?)11)));
+      Assert.That((torn.SourceDropsBefore, torn.MissedBefore), Is.EqualTo((3L, 1L)));
+      Assert.That(torn.Payload, Is.EqualTo(new byte[] { 0x4D, 0x46 }));
+      Assert.That((rows[1].CaptureTicks, rows[1].SyncFrameIndex), Is.EqualTo(((long?)null, (ulong?)null)));
+
+      var written = new StringWriter { NewLine = "\r\n" };
+      CapturesCsv.Write(written, rows);
+      Assert.That(written.ToString(), Is.EqualTo(csv));
+    }
+
+    [Test]
     public void Milliseconds_AreWholeTicks()
     {
       foreach (long ticks in new[] { 0L, 1L, 166_667L, -3L, 123_456_789_012L })

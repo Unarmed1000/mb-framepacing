@@ -29,15 +29,15 @@ with CaptureDataReader(capture_folder / "captures.mbcd") as reader:
 
 ## API
 
-| Python                                                                                   | What it is                                                                |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                            | `captures.mbcd`: the header, the records (`records()`, `read_all()`, ...) |
-| `CaptureDataStatus`, `CaptureRecordFlags`, `DataRect`, `MarkerLocation`, `UNKNOWN_TICKS` | A record's status and flags, where the markers are, a missing device time |
-| `read_summary`, `parse_summary`, `AnalysisSummary` and the `Summary…` classes            | `summary.json`                                                            |
-| `read_frames`, `FrameRow`                                                                | A run's frames CSV                                                        |
-| `read_captures`, `CaptureCsvRow`                                                         | `captures.csv`                                                            |
-| `find_analysis`, `frames_file_name`, `parse_ticks`, `ms_to_ticks`                        | The analysis folder, the file names, the CSV time format                  |
-| `DataFormatError`                                                                        | Raised for another kind of file or a newer format version ("update ...")  |
+| Python                                                                        | What it is                                                                |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                 | `captures.mbcd`: the header, the records (`records()`, `read_all()`, ...) |
+| `CaptureDataStatus`, `DataRect`, `MarkerLocation`, `UNKNOWN_TICKS`            | A record's status, where the markers are, a missing device time           |
+| `read_summary`, `parse_summary`, `AnalysisSummary` and the `Summary…` classes | `summary.json`                                                            |
+| `read_frames`, `FrameRow`                                                     | A run's frames CSV                                                        |
+| `read_captures`, `CaptureCsvRow`                                              | `captures.csv`                                                            |
+| `find_analysis`, `frames_file_name`, `parse_ticks`, `ms_to_ticks`             | The analysis folder, the file names, the CSV time format                  |
+| `DataFormatError`                                                             | Raised for another kind of file or a newer format version ("update ...")  |
 
 Decoding a marker's payload (`CaptureDataRecord.try_decode_main`) uses the `mb_framemarker` package
 ([`marker/python`](../../marker/python/README.md)); everything else needs only the standard library.

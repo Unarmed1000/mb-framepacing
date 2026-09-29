@@ -111,9 +111,12 @@ namespace MB.FramePacing.Analysis
       {
         for (; expectedIndex < record.CaptureIndex; ++expectedIndex)
           rows.Add(new CaptureRow(expectedIndex, 0, CaptureStatus.NotRecorded, default));
-        rows.Add(ToRow(record, effectiveTime, header.Camera));
+        rows.Add(ToRow(record, effectiveTime));
         expectedIndex = record.CaptureIndex + 1;
       }
+      // Only the device clock is exact enough to show a refresh the capture missed without saying so
+      if (effectiveTime == TimeSource.Device)
+        MissedCaptures.Mark(rows);
       return new DecodedCapture(header.ToFileHeader(), layout, effectiveTime, rows);
     }
 
@@ -122,18 +125,17 @@ namespace MB.FramePacing.Analysis
         header.CaptureIndex,
         header.HostTicks,
         header.DeviceTicks,
-        header.Flags,
+        header.SourceDrops,
         decode.Status,
         decode.MainBytes,
         decode.SecondBytes
       );
 
-    private static CaptureRow ToRow(CaptureDataRecord record, TimeSource time, bool camera)
+    private static CaptureRow ToRow(CaptureDataRecord record, TimeSource time)
     {
       long ticks = time == TimeSource.Device && record.HasDeviceTicks ? record.DeviceTicks : record.HostTicks;
-      bool sourceDrop = (record.Flags & CaptureRecordFlags.SourceDropBefore) != 0;
-      // Camera: the second zone's frame measures the scanout (capture cards: the sync marker only checked tearing, in the status)
-      MarkerPayload? secondary = camera && record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second : null;
+      // The sync marker: a camera's second zone measures the scanout with it; a capture card's tearing check is already in the status
+      MarkerPayload? sync = record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second : null;
 
       var status = record.Status switch
       {
@@ -151,7 +153,7 @@ namespace MB.FramePacing.Analysis
         if (status == CaptureStatus.Decoded)
           status = CaptureStatus.Undecodable;
       }
-      return new CaptureRow(record.CaptureIndex, ticks, status, payload, start, sourceDrop, secondary)
+      return new CaptureRow(record.CaptureIndex, ticks, status, payload, start, record.SourceDrops, sync)
       {
         HostTicks = record.HostTicks,
         DeviceTicks = record.HasDeviceTicks ? record.DeviceTicks : null,

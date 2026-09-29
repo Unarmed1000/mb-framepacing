@@ -355,7 +355,7 @@ namespace MB.FramePacing.Charts.UnitTest
         null,
         true,
         true,
-        new RunCounts(Count, Count, 0, 0, 0, 0, Count, 0, 0, 0, 1),
+        new RunCounts(Count, Count, 0, 0, 0, 0, 0, Count, 0, 0, 0, 1),
         RunStatistics.From(frames, TimeSpan.TicksPerMillisecond, Refresh),
         frames,
         Array.Empty<string>(),

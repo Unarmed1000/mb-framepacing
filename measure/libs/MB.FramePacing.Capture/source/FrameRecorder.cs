@@ -64,6 +64,9 @@ namespace MB.FramePacing.Capture
     private volatile bool m_inspectionDone;
     private long m_nextCaptureIndex;
     private bool m_currentFrameDropped;
+
+    // Frames the source dropped before frames whose records were not written (the ring was full): the next record carries them
+    private uint m_pendingSourceDrops;
     private long m_framesDropped;
     private long m_framesDiscarded;
     private volatile bool m_armed;
@@ -203,7 +206,7 @@ namespace MB.FramePacing.Capture
       return m_ring.AsSpan(SlotOffset(head) + CaptureFileHeader.RecordHeaderSize, m_pixelByteCount);
     }
 
-    public void EndFrame(long hostTicks, long deviceTicks, CaptureRecordFlags flags)
+    public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
     {
       long captureIndex = m_nextCaptureIndex;
       Volatile.Write(ref m_nextCaptureIndex, captureIndex + 1);
@@ -212,6 +215,8 @@ namespace MB.FramePacing.Capture
       if (m_currentFrameDropped)
       {
         Interlocked.Increment(ref m_framesDropped);
+        // Its record is not written: the next one carries the frames the source dropped before it
+        m_pendingSourceDrops = (uint)Math.Min(uint.MaxValue, (long)m_pendingSourceDrops + sourceDrops);
         if (g_logger.IsTraceEnabled)
           g_logger.Trace("Ring full, dropped capture index {0}", captureIndex);
         pixels = m_scratch;
@@ -221,7 +226,9 @@ namespace MB.FramePacing.Capture
         long head = m_head;
         int offset = SlotOffset(head);
         var slot = m_ring.AsSpan(offset, m_recordSize);
-        new CaptureRecordHeader(captureIndex, hostTicks, deviceTicks, flags, m_pixelByteCount).Write(slot);
+        uint drops = (uint)Math.Min(uint.MaxValue, (long)m_pendingSourceDrops + sourceDrops);
+        m_pendingSourceDrops = 0;
+        new CaptureRecordHeader(captureIndex, hostTicks, deviceTicks, drops, m_pixelByteCount).Write(slot);
         slot.Slice(CaptureFileHeader.RecordHeaderSize + m_pixelByteCount).Clear();
         pixels = slot.Slice(CaptureFileHeader.RecordHeaderSize, m_pixelByteCount);
         Volatile.Write(ref m_head, head + 1);
@@ -368,7 +375,7 @@ namespace MB.FramePacing.Capture
                 header.CaptureIndex,
                 header.HostTicks,
                 header.DeviceTicks,
-                header.Flags
+                header.SourceDrops
               );
             }
             m_data.WriteRecords(m_dataRing.AsSpan(DataSlotOffset(tail), resolved * CaptureDataRecord.Size));

@@ -201,7 +201,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           MarkerRenderer.Render(frame, new MarkerPayload(top, (long)top * 166_667, 1, kind), 12, 12, 3, metadata: start);
           if (kind == MarkerKind.Frame)
             MarkerRenderer.Render(frame, new MarkerPayload(bottom, 0, bottomRun, MarkerKind.Sync), 12, 200, 3);
-          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, CaptureRecordFlags.None, header.PixelByteCount).Write(record);
+          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }
@@ -235,7 +235,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           Array.Fill(frame.Pixels, (byte)96);
           if (i < Captures - lostCaptures)
             MarkerRenderer.Render(frame, new MarkerPayload((ulong)(i / 4), i / 4 * 166_667L, 1, MarkerKind.Frame), 8, 8, 3);
-          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, CaptureRecordFlags.None, header.PixelByteCount).Write(record);
+          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }

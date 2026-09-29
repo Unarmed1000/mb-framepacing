@@ -65,9 +65,9 @@ namespace MB.FramePacing.Data.UnitTest
       Array.Fill(second, (byte)0x5A);
       var records = new[]
       {
-        new CaptureDataRecord(0, 100, 200, CaptureRecordFlags.None, CaptureDataStatus.Decoded, main, second),
-        new CaptureDataRecord(2, 300, CaptureDataRecord.UnknownTicks, CaptureRecordFlags.SourceDropBefore, CaptureDataStatus.Undecodable, null, null),
-        new CaptureDataRecord(3, 400, 500, CaptureRecordFlags.None, CaptureDataStatus.Torn, null, second),
+        new CaptureDataRecord(0, 100, 200, 0, CaptureDataStatus.Decoded, main, second),
+        new CaptureDataRecord(2, 300, CaptureDataRecord.UnknownTicks, 2u, CaptureDataStatus.Undecodable, null, null),
+        new CaptureDataRecord(3, 400, 500, 0, CaptureDataStatus.Torn, null, second),
       };
       string path = Path.Combine(Path.GetTempPath(), $"mb-framepacing-data-{Guid.NewGuid():N}.mbcd");
       try
@@ -101,15 +101,7 @@ namespace MB.FramePacing.Data.UnitTest
     [Test]
     public void Records_RefuseMarkersTooLongForTheirSlot()
     {
-      var record = new CaptureDataRecord(
-        0,
-        0,
-        0,
-        CaptureRecordFlags.None,
-        CaptureDataStatus.Decoded,
-        new byte[CaptureDataRecord.MainCapacity + 1],
-        null
-      );
+      var record = new CaptureDataRecord(0, 0, 0, 0, CaptureDataStatus.Decoded, new byte[CaptureDataRecord.MainCapacity + 1], null);
       Assert.Throws<ArgumentException>(() => record.Write(new byte[CaptureDataRecord.Size]));
     }
   }

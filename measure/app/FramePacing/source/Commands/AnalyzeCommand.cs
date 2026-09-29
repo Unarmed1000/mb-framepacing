@@ -144,7 +144,7 @@ namespace MB.FramePacing.App.Commands
 
         var c = run.Counts;
         AnsiConsole.MarkupLineInterpolated(
-          $"{c.PresentedFrames} presented frames from {c.Captures} captures: {c.Decoded} decoded, {c.Undecodable} undecodable, {c.Torn} torn, {c.NotRecorded} not recorded; {c.SkippedFrameIndices} frame indices never seen, {c.Segments} segment(s)"
+          $"{c.PresentedFrames} presented frames from {c.Captures} captures: {c.Decoded} decoded, {c.Undecodable} undecodable, {c.Torn} torn, {c.NotRecorded} not recorded, {c.SourceDroppedFrames} dropped by the source, {c.MissedCaptures} missed; {c.SkippedFrameIndices} frame indices never seen, {c.Segments} segment(s)"
         );
 
         var s = run.Statistics;

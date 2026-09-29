@@ -47,7 +47,7 @@ namespace MB.FramePacing.Capture.Synthetic
         m_camera.Render(captureIndex, frame);
         var dst = sink.BeginFrame();
         frame.Pixels.AsSpan(0, Format.PixelByteCount).CopyTo(dst);
-        sink.EndFrame(clock.NowTicks, m_camera.CameraTicks(captureIndex), CaptureRecordFlags.None);
+        sink.EndFrame(clock.NowTicks, m_camera.CameraTicks(captureIndex), 0);
       }
     }
 

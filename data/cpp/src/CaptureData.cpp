@@ -143,7 +143,7 @@ namespace MB::FramePacingData
     record.CaptureIndex = ReadI64(bytes, 0);
     record.HostTicks = ReadI64(bytes, 8);
     record.DeviceTicks = ReadI64(bytes, 16);
-    record.Flags = ReadU32(bytes, 24);
+    record.SourceDrops = ReadU32(bytes, 24);
     record.Status = static_cast<CaptureDataStatus>(status);
     const auto main = bytes.subspan(OffsetMain, mainLength);
     const auto second = bytes.subspan(OffsetSecond, secondLength);

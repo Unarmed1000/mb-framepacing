@@ -136,19 +136,16 @@ namespace MB.FramePacing.Capture.Ffmpeg
           break;
         long hostTicks = clock.NowTicks;
 
-        var flags = CaptureRecordFlags.None;
+        // The frames ffmpeg reported dropping since the previous frame (its stderr runs on another thread: where it lands is approximate)
         long drops = m_parser.DroppedFrames;
-        if (drops != reportedDrops)
-        {
-          reportedDrops = drops;
-          flags |= CaptureRecordFlags.SourceDropBefore;
-        }
+        uint sourceDrops = (uint)Math.Min(uint.MaxValue, drops - reportedDrops);
+        reportedDrops = drops;
         long deviceTicks =
           knownTimestamps != null ? knownTimestamps[frameNumber]
           : Options.RecordedFps is > 0 ? (long)Math.Round(frameNumber * (double)TimeSpan.TicksPerSecond / Options.RecordedFps.Value)
           : DeviceTimestampsPending;
         ++frameNumber;
-        sink.EndFrame(hostTicks, deviceTicks, flags);
+        sink.EndFrame(hostTicks, deviceTicks, sourceDrops);
       }
 
       if (Volatile.Read(ref m_stopRequested) == 0)

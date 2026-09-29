@@ -15,7 +15,10 @@ namespace MB::FramePacingData
     int64_t Undecodable{0};
     int64_t Torn{0};
     int64_t NotRecorded{0};
-    int64_t SourceDropEvents{0};
+    //! Frames the capture source reported dropping.
+    int64_t SourceDroppedFrames{0};
+    //! Refreshes the capture's device clock says were missed.
+    int64_t MissedCaptures{0};
     int64_t PresentedFrames{0};
     int64_t SkippedFrameIndices{0};
     //! Frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order.

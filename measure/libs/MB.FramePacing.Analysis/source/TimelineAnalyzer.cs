@@ -221,6 +221,7 @@ namespace MB.FramePacing.Analysis
       long torn = 0;
       long notRecorded = 0;
       long sourceDrops = 0;
+      long missed = 0;
       long outOfOrder = 0;
 
       // Trailing undecodable rows after the last frame belong to the transition to the end marker; ignore them.
@@ -237,14 +238,16 @@ namespace MB.FramePacing.Analysis
       for (int i = 0; i <= lastDecoded; ++i)
       {
         var row = rows[i];
-        // The source dropped captures before this one: a gap in the capture, as a capture it could not record
-        if (row.SourceDropBefore)
+        // The source dropped captures before this one, or the capture's clock says refreshes were missed: a gap in the capture, as a
+        // capture it could not record
+        if (row.SourceDrops > 0 || row.MissedBefore > 0)
         {
-          ++sourceDrops;
+          sourceDrops += row.SourceDrops;
+          missed += row.MissedBefore;
           gapSinceLastFrame = true;
         }
         // The second zone may still show the previous run's frames: only this run's frame indices count
-        if (camera && row.Secondary is { } secondary && secondary.RunId == run.RunId && row.Status != CaptureStatus.NotRecorded)
+        if (camera && row.Sync is { } secondary && secondary.RunId == run.RunId && row.Status != CaptureStatus.NotRecorded)
           firstSecondary.TryAdd(secondary.FrameIndex, row.CaptureTicks);
         switch (row.Status)
         {
@@ -351,6 +354,7 @@ namespace MB.FramePacing.Analysis
         torn,
         notRecorded,
         sourceDrops,
+        missed,
         frames.Count,
         frames.Aggregate(0L, (sum, f) => sum + (long)f.SkippedBefore),
         DroppedFrames.Before(frames).Sum(),

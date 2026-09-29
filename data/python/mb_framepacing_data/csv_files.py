@@ -59,7 +59,9 @@ class FrameRow:
 @dataclass(frozen=True)
 class CaptureCsvRow:
     """One capture as the analysis read it. capture_ticks is None for a capture the recorder dropped (status NotRecorded); kind, run_id,
-    frame_index and animation_ticks are the main marker's, when one was read; payload its bytes."""
+    frame_index and animation_ticks are the main marker's, when one was read; payload its bytes. source_drops_before: frames the source
+    reported dropping before it; missed_before: refreshes the device clock says were missed since the previous capture (0 on the host
+    clock); sync_run_id and sync_frame_index: the sync marker's, when it was read."""
 
     capture_index: int
     capture_ticks: int | None
@@ -68,11 +70,13 @@ class CaptureCsvRow:
     run_id: int | None
     frame_index: int | None
     animation_ticks: int | None
-    source_drop_before: bool
+    source_drops_before: int
+    missed_before: int
+    sync_run_id: int | None
+    sync_frame_index: int | None
     host_ticks: int | None
     device_ticks: int | None
     payload: bytes | None
-    second_zone_frame_index: int | None = None
 
 
 class _Table:
@@ -173,11 +177,13 @@ def read_captures(path: str | Path) -> list[CaptureCsvRow]:
                 run_id=table.optional_integer(row, "runId"),
                 frame_index=table.optional_integer(row, "frameIndex"),
                 animation_ticks=table.optional_ticks(row, "animationMs"),
-                source_drop_before=table.cell(row, "sourceDropBefore") == "1",
+                source_drops_before=table.optional_integer(row, "sourceDropsBefore") or 0,
+                missed_before=table.optional_integer(row, "missedBefore") or 0,
+                sync_run_id=table.optional_integer(row, "syncRunId"),
+                sync_frame_index=table.optional_integer(row, "syncFrameIndex"),
                 host_ticks=table.optional_ticks(row, "hostMs"),
                 device_ticks=table.optional_ticks(row, "deviceMs"),
                 payload=bytes.fromhex(payload) if payload else None,
-                second_zone_frame_index=table.optional_integer(row, "secondZoneFrameIndex"),
             )
         )
     return captures

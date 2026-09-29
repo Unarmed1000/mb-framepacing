@@ -76,7 +76,8 @@ One JSON object, written indented, with camelCase names. Null values are left ou
 | `warnings`                       | array   | Warnings about the run (strings)                                                      |
 
 **`counts`** (integers): `captures`, `decoded`, `undecodable`, `torn`, `notRecorded` (captures the recorder dropped),
-`sourceDropEvents` (drops the source reported), `presentedFrames`, `skippedFrameIndices` (frame indices never seen),
+`sourceDroppedFrames` (frames the capture source reported dropping), `missedCaptures` (refreshes the capture device's clock says were
+missed: see `missedBefore` below), `presentedFrames`, `skippedFrameIndices` (frame indices never seen),
 `droppedFrames` (frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order),
 `outOfOrderCaptures` (captures that showed an older frame again), `segments` (parts of the run between gaps in the capture).
 
@@ -162,18 +163,19 @@ Camera captures (very experimental) add `mainMarkerFirstSeenMs` (when the main m
 
 One line per capture index, including the ones the recorder dropped.
 
-| Column             | Meaning                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------- |
-| `captureIndex`     | The capture source's frame counter (unrelated to the marker's frame index)                        |
-| `captureMs`        | When the capture was taken (the analysis's clock); empty for a dropped capture                    |
-| `status`           | `Decoded`, `Undecodable`, `Torn` or `NotRecorded` (dropped by the recorder)                       |
-| `kind`             | The main marker's kind: `Frame`, `SequenceStart`, `SequenceEnd` or `Sync`; empty without a marker |
-| `runId`            | The main marker's run id                                                                          |
-| `frameIndex`       | The main marker's frame index                                                                     |
-| `animationMs`      | The main marker's animation time                                                                  |
-| `sourceDropBefore` | `1` when the source reported dropping frames before this one, else `0`                            |
-| `hostMs`           | The host clock's time of the capture                                                              |
-| `deviceMs`         | The capture device's time of the capture; empty when it gave none                                 |
-| `payloadHex`       | The main marker's encoded bytes as read ([marker format](marker-format.md)), in hexadecimal       |
-
-Camera captures (very experimental) add `secondZoneFrameIndex`: the frame index the second zone showed.
+| Column              | Meaning                                                                                                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `captureIndex`      | The capture source's frame counter (unrelated to the marker's frame index)                                                                                                                                                                                                                             |
+| `captureMs`         | When the capture was taken (the analysis's clock); empty for a dropped capture                                                                                                                                                                                                                         |
+| `status`            | `Decoded`, `Undecodable`, `Torn` or `NotRecorded` (dropped by the recorder)                                                                                                                                                                                                                            |
+| `kind`              | The main marker's kind: `Frame`, `SequenceStart`, `SequenceEnd` or `Sync`; empty without a marker                                                                                                                                                                                                      |
+| `runId`             | The main marker's run id                                                                                                                                                                                                                                                                               |
+| `frameIndex`        | The main marker's frame index                                                                                                                                                                                                                                                                          |
+| `animationMs`       | The main marker's animation time                                                                                                                                                                                                                                                                       |
+| `sourceDropsBefore` | How many frames the capture source (driver, ffmpeg) reported dropping before this capture. Where the report lands is approximate: the source says it on its own schedule                                                                                                                               |
+| `missedBefore`      | How many refreshes the capture device's clock says were missed since the previous capture: a step of 1.5 capture periods or more between two consecutive captures, `round(step / period) − 1`. Only when the analysis uses the device clock; `0` on the host clock, whose arrival times are too coarse |
+| `syncRunId`         | The sync marker's run id, when it was read (a capture card's tearing check, a camera's second zone)                                                                                                                                                                                                    |
+| `syncFrameIndex`    | The sync marker's frame index, when it was read. A `Torn` capture's main and sync markers name the two frames it mixed                                                                                                                                                                                 |
+| `hostMs`            | The host clock's time of the capture                                                                                                                                                                                                                                                                   |
+| `deviceMs`          | The capture device's time of the capture; empty when it gave none                                                                                                                                                                                                                                      |
+| `payloadHex`        | The main marker's encoded bytes as read ([marker format](marker-format.md)), in hexadecimal                                                                                                                                                                                                            |

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from .. import DataFormatError, frames_file_name, parse_summary, parse_ticks, read_frames
+from .. import DataFormatError, frames_file_name, parse_summary, parse_ticks, read_captures, read_frames
 
 MINIMAL_SUMMARY = """
 {
@@ -49,6 +49,20 @@ class AnalysisOutputTests(unittest.TestCase):
         self.assertEqual(row.flags, ("SkippedBefore", "Late"))
         self.assertIsNone(row.cpu_busy_ticks, "an empty cell")
         self.assertIsNone(row.last_seen_ticks, "a column the file lacks")
+
+    def test_captures_carry_source_drops_missed_refreshes_and_the_sync_marker(self) -> None:
+        text = (
+            "captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostMs,deviceMs,payloadHex\r\n"
+            "4,66.6667,Torn,Frame,7,12,200,3,1,7,11,70.1,66.6667,4D46\r\n"
+            "5,,NotRecorded,,,,,0,0,,,,,\r\n"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "captures.csv"
+            _ = path.write_bytes(text.encode("utf-8"))
+            torn, dropped = read_captures(path)
+        self.assertEqual((torn.status, torn.frame_index, torn.sync_run_id, torn.sync_frame_index), ("Torn", 12, 7, 11))
+        self.assertEqual((torn.source_drops_before, torn.missed_before, torn.payload), (3, 1, bytes([0x4D, 0x46])))
+        self.assertEqual((dropped.capture_ticks, dropped.sync_frame_index, dropped.source_drops_before), (None, None, 0))
 
     def test_milliseconds_are_whole_ticks(self) -> None:
         self.assertEqual(parse_ticks("16.6667"), 166_667)

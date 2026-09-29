@@ -120,7 +120,8 @@ namespace MB::FramePacingData
       run.Counts.Undecodable = Required<int64_t>(counts, "undecodable");
       run.Counts.Torn = Required<int64_t>(counts, "torn");
       run.Counts.NotRecorded = Required<int64_t>(counts, "notRecorded");
-      run.Counts.SourceDropEvents = Required<int64_t>(counts, "sourceDropEvents");
+      run.Counts.SourceDroppedFrames = Required<int64_t>(counts, "sourceDroppedFrames");
+      run.Counts.MissedCaptures = Required<int64_t>(counts, "missedCaptures");
       run.Counts.PresentedFrames = Required<int64_t>(counts, "presentedFrames");
       run.Counts.SkippedFrameIndices = Required<int64_t>(counts, "skippedFrameIndices");
       run.Counts.DroppedFrames = Required<int64_t>(counts, "droppedFrames");
@@ -444,11 +445,13 @@ namespace MB::FramePacingData
       capture.RunId = OptionalInteger<uint32_t>(table.Cell(row, "runId"));
       capture.FrameIndex = OptionalInteger<uint64_t>(table.Cell(row, "frameIndex"));
       capture.AnimationTicks = OptionalTicks(table.Cell(row, "animationMs"));
-      capture.SourceDropBefore = table.Cell(row, "sourceDropBefore") == "1";
+      capture.SourceDropsBefore = OptionalInteger<int64_t>(table.Cell(row, "sourceDropsBefore")).value_or(0);
+      capture.MissedBefore = OptionalInteger<int64_t>(table.Cell(row, "missedBefore")).value_or(0);
+      capture.SyncRunId = OptionalInteger<uint32_t>(table.Cell(row, "syncRunId"));
+      capture.SyncFrameIndex = OptionalInteger<uint64_t>(table.Cell(row, "syncFrameIndex"));
       capture.HostTicks = OptionalTicks(table.Cell(row, "hostMs"));
       capture.DeviceTicks = OptionalTicks(table.Cell(row, "deviceMs"));
       capture.Payload = FromHex(table.Cell(row, "payloadHex"));
-      capture.SecondZoneFrameIndex = OptionalInteger<uint64_t>(table.Cell(row, "secondZoneFrameIndex"));
       captures.push_back(std::move(capture));
     }
     return captures;

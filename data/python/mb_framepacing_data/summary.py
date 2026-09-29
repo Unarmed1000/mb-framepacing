@@ -119,7 +119,8 @@ class SummaryCounts:
     undecodable: int
     torn: int
     not_recorded: int
-    source_drop_events: int
+    source_dropped_frames: int
+    missed_captures: int
     presented_frames: int
     skipped_frame_indices: int
     dropped_frames: int
@@ -318,7 +319,8 @@ def _counts(value: _Object) -> SummaryCounts:
         undecodable=value.integer("undecodable"),
         torn=value.integer("torn"),
         not_recorded=value.integer("notRecorded"),
-        source_drop_events=value.integer("sourceDropEvents"),
+        source_dropped_frames=value.integer("sourceDroppedFrames"),
+        missed_captures=value.integer("missedCaptures"),
         presented_frames=value.integer("presentedFrames"),
         skipped_frame_indices=value.integer("skippedFrameIndices"),
         dropped_frames=value.integer("droppedFrames"),

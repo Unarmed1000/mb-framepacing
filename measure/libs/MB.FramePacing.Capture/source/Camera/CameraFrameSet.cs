@@ -130,7 +130,7 @@ namespace MB.FramePacing.Capture.Camera
         return m_current.Pixels.AsSpan(0, m_width * m_height);
       }
 
-      public void EndFrame(long hostTicks, long deviceTicks, CaptureRecordFlags flags)
+      public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
       {
         if (m_current == null || Frames.Count >= m_maxFrames)
           return;

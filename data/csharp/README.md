@@ -37,16 +37,16 @@ foreach (var record in reader.ReadAll())
 
 ## API
 
-| Type                                                                                | What it is                                                                           |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `CaptureDataHeader`, `CaptureDataRecord`, `CaptureDataStatus`, `CaptureRecordFlags` | The header and records of `captures.mbcd`; `TryDecodeMain` decodes a record's marker |
-| `CaptureDataReader`, `CaptureDataWriter`                                            | Read and write `captures.mbcd`                                                       |
-| `DataRect`, `MarkerLocation`                                                        | Where the markers are                                                                |
-| `AnalysisSummary` and the `Summary…` records, `ValueStatistics`                     | `summary.json`: `Read`, `Parse`, `Write`, `ToJson`                                   |
-| `FramesCsv`, `FrameRow`                                                             | A run's frames CSV                                                                   |
-| `CapturesCsv`, `CaptureCsvRow`                                                      | `captures.csv`                                                                       |
-| `AnalysisFiles`                                                                     | The file names, and finding the analysis folder of a capture                         |
-| `Milliseconds`                                                                      | The CSV time format: milliseconds with at most four decimals, which are whole ticks  |
+| Type                                                            | What it is                                                                                                                                                     |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CaptureDataHeader`, `CaptureDataRecord`, `CaptureDataStatus`   | The header and records of `captures.mbcd` (a record's `SourceDrops`: frames the source reported dropping before it); `TryDecodeMain` decodes a record's marker |
+| `CaptureDataReader`, `CaptureDataWriter`                        | Read and write `captures.mbcd`                                                                                                                                 |
+| `DataRect`, `MarkerLocation`                                    | Where the markers are                                                                                                                                          |
+| `AnalysisSummary` and the `Summary…` records, `ValueStatistics` | `summary.json`: `Read`, `Parse`, `Write`, `ToJson`                                                                                                             |
+| `FramesCsv`, `FrameRow`                                         | A run's frames CSV                                                                                                                                             |
+| `CapturesCsv`, `CaptureCsvRow`                                  | `captures.csv`                                                                                                                                                 |
+| `AnalysisFiles`                                                 | The file names, and finding the analysis folder of a capture                                                                                                   |
+| `Milliseconds`                                                  | The CSV time format: milliseconds with at most four decimals, which are whole ticks                                                                            |
 
 Readers refuse a newer format version than they know (an `InvalidDataException` that says to update).
 

@@ -83,7 +83,7 @@ namespace MB.FramePacing.Capture.UnitTest
           if (position(i) is { } origin)
             MarkerRenderer.Render(image, new MarkerPayload((ulong)i, i * 41_667L, 1, MarkerKind.Frame), origin.X, origin.Y, ModulePx);
           image.Pixels.CopyTo(sink.BeginFrame());
-          sink.EndFrame(clock.NowTicks, i * 41_667L, CaptureRecordFlags.None);
+          sink.EndFrame(clock.NowTicks, i * 41_667L, 0);
         }
       }
 

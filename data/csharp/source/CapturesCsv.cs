@@ -18,20 +18,18 @@ namespace MB.FramePacing.Data
 {
   public static class CapturesCsv
   {
-    public const string Header = "captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropBefore,hostMs,deviceMs,payloadHex";
+    public const string Header =
+      "captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostMs,deviceMs,payloadHex";
 
-    /// <summary>The column an EXPERIMENTAL camera capture adds.</summary>
-    public const string CameraColumns = ",secondZoneFrameIndex";
-
-    public static void Write(string path, IEnumerable<CaptureCsvRow> rows, bool camera)
+    public static void Write(string path, IEnumerable<CaptureCsvRow> rows)
     {
       using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-      Write(writer, rows, camera);
+      Write(writer, rows);
     }
 
-    public static void Write(TextWriter writer, IEnumerable<CaptureCsvRow> rows, bool camera)
+    public static void Write(TextWriter writer, IEnumerable<CaptureCsvRow> rows)
     {
-      writer.WriteLine(Header + (camera ? CameraColumns : string.Empty));
+      writer.WriteLine(Header);
       foreach (var row in rows)
       {
         writer.WriteLine(
@@ -44,11 +42,14 @@ namespace MB.FramePacing.Data
             row.RunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.FrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.AnimationTicks is { } animation ? Milliseconds.Format(animation) : string.Empty,
-            row.SourceDropBefore ? "1" : "0",
+            row.SourceDropsBefore.ToString(CultureInfo.InvariantCulture),
+            row.MissedBefore.ToString(CultureInfo.InvariantCulture),
+            row.SyncRunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            row.SyncFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.HostTicks is { } host ? Milliseconds.Format(host) : string.Empty,
             row.DeviceTicks is { } device ? Milliseconds.Format(device) : string.Empty,
             row.Payload != null ? Convert.ToHexString(row.Payload) : string.Empty
-          ) + (camera ? "," + (row.SecondZoneFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty) : string.Empty)
+          )
         );
       }
     }
@@ -70,11 +71,13 @@ namespace MB.FramePacing.Data
       int runId = Column("runId");
       int frameIndex = Column("frameIndex");
       int animation = Column("animationMs");
-      int sourceDrop = Column("sourceDropBefore");
+      int sourceDrops = Column("sourceDropsBefore");
+      int missed = Column("missedBefore");
+      int syncRunId = Column("syncRunId");
+      int syncFrameIndex = Column("syncFrameIndex");
       int host = Column("hostMs");
       int device = Column("deviceMs");
       int payload = Column("payloadHex");
-      int secondZone = Column("secondZoneFrameIndex");
 
       var rows = new List<CaptureCsvRow>();
       string? line;
@@ -92,11 +95,13 @@ namespace MB.FramePacing.Data
             (uint?)row.Long(runId),
             row.ULong(frameIndex),
             row.Ticks(animation),
-            row.Cell(sourceDrop) == "1",
+            row.Long(sourceDrops) ?? 0,
+            row.Long(missed) ?? 0,
+            (uint?)row.Long(syncRunId),
+            row.ULong(syncFrameIndex),
             row.Ticks(host),
             row.Ticks(device),
-            row.Cell(payload) is { Length: > 0 } hex ? Convert.FromHexString(hex) : null,
-            row.ULong(secondZone)
+            row.Cell(payload) is { Length: > 0 } hex ? Convert.FromHexString(hex) : null
           )
         );
       }

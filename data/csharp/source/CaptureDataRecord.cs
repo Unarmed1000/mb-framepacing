@@ -18,7 +18,7 @@ namespace MB.FramePacing.Data
   /// <param name="CaptureIndex">The capture source's frame counter; gaps are captures the recorder dropped.</param>
   /// <param name="HostTicks">When the frame arrived, on the host's steady clock (TimeSpan ticks since the capture started).</param>
   /// <param name="DeviceTicks">The capture device's timestamp (TimeSpan ticks), <see cref="UnknownTicks"/> if none.</param>
-  /// <param name="Flags">What the source reported (a drop before this frame).</param>
+  /// <param name="SourceDrops">How many frames the capture source reported dropping since the previous record (0: none).</param>
   /// <param name="Status">Decoded, undecodable or torn.</param>
   /// <param name="MainBytes">The main marker's encoded bytes as read (frame, start or end marker), when it was read.</param>
   /// <param name="SecondBytes">The second marker's encoded bytes (sync marker, a camera's second zone), when it was read.</param>
@@ -26,7 +26,7 @@ namespace MB.FramePacing.Data
     long CaptureIndex,
     long HostTicks,
     long DeviceTicks,
-    CaptureRecordFlags Flags,
+    uint SourceDrops,
     CaptureDataStatus Status,
     byte[]? MainBytes,
     byte[]? SecondBytes
@@ -60,7 +60,7 @@ namespace MB.FramePacing.Data
       if (destination.Length < Size)
         throw new ArgumentException("Record buffer too small", nameof(destination));
       destination.Slice(0, Size).Clear();
-      WriteCapture(destination, CaptureIndex, HostTicks, DeviceTicks, Flags);
+      WriteCapture(destination, CaptureIndex, HostTicks, DeviceTicks, SourceDrops);
       WriteDecoded(destination, Status, MainBytes, SecondBytes);
     }
 
@@ -77,13 +77,13 @@ namespace MB.FramePacing.Data
       second.CopyTo(destination.Slice(SecondOffset));
     }
 
-    /// <summary>Write the capture part (index, host and device ticks, flags: bytes 0 to 27) of a record.</summary>
-    public static void WriteCapture(Span<byte> destination, long captureIndex, long hostTicks, long deviceTicks, CaptureRecordFlags flags)
+    /// <summary>Write the capture part (index, host and device ticks, source drops: bytes 0 to 27) of a record.</summary>
+    public static void WriteCapture(Span<byte> destination, long captureIndex, long hostTicks, long deviceTicks, uint sourceDrops)
     {
       BinaryPrimitives.WriteInt64LittleEndian(destination, captureIndex);
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(8), hostTicks);
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(16), deviceTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(24), (uint)flags);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(24), sourceDrops);
     }
 
     public static CaptureDataRecord Read(ReadOnlySpan<byte> source)
@@ -99,7 +99,7 @@ namespace MB.FramePacing.Data
         BinaryPrimitives.ReadInt64LittleEndian(source),
         BinaryPrimitives.ReadInt64LittleEndian(source.Slice(8)),
         BinaryPrimitives.ReadInt64LittleEndian(source.Slice(16)),
-        (CaptureRecordFlags)BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(24)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(24)),
         (CaptureDataStatus)status,
         mainLength > 0 ? source.Slice(MainOffset, mainLength).ToArray() : null,
         secondLength > 0 ? source.Slice(SecondOffset, secondLength).ToArray() : null

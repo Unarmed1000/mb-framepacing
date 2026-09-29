@@ -61,7 +61,7 @@ namespace
     Put(bytes, 0, static_cast<uint64_t>(index), 8);
     Put(bytes, 8, static_cast<uint64_t>(index * 100), 8);
     Put(bytes, 16, static_cast<uint64_t>(device), 8);
-    Put(bytes, 24, index == 2 ? FD::CaptureRecordFlags::SourceDropBefore : 0u, 4);
+    Put(bytes, 24, index == 2 ? 3u : 0u, 4);
     bytes[28] = status;
     bytes[29] = static_cast<uint8_t>(main.size());
     bytes[30] = static_cast<uint8_t>(second.size());
@@ -137,7 +137,7 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
   EXPECT_EQ(records[0].Status, FD::CaptureDataStatus::Decoded);
   EXPECT_EQ(records[0].MainBytes, main);
   EXPECT_EQ(records[0].SecondBytes, second);
-  EXPECT_EQ(records[1].Flags, FD::CaptureRecordFlags::SourceDropBefore);
+  EXPECT_EQ(records[1].SourceDrops, 3u);
   EXPECT_FALSE(records[1].HasDeviceTicks());
   EXPECT_TRUE(records[1].MainBytes.empty());
 }

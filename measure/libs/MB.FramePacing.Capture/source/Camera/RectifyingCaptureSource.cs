@@ -60,11 +60,11 @@ namespace MB.FramePacing.Capture.Camera
 
       public Span<byte> BeginFrame() => m_camera.Pixels.AsSpan(0, m_camera.Width * m_camera.Height);
 
-      public void EndFrame(long hostTicks, long deviceTicks, CaptureRecordFlags flags)
+      public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
       {
         m_rectifier.Rectify(m_camera, m_stored);
         m_stored.Pixels.AsSpan(0, m_stored.Width * m_stored.Height).CopyTo(m_target.BeginFrame());
-        m_target.EndFrame(hostTicks, deviceTicks, flags);
+        m_target.EndFrame(hostTicks, deviceTicks, sourceDrops);
       }
     }
   }

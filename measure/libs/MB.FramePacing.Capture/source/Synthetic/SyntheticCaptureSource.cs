@@ -72,7 +72,7 @@ namespace MB.FramePacing.Capture.Synthetic
 
         var dst = sink.BeginFrame();
         frame.Pixels.AsSpan(0, Format.PixelByteCount).CopyTo(dst);
-        sink.EndFrame(clock.NowTicks, deviceTicks, CaptureRecordFlags.None);
+        sink.EndFrame(clock.NowTicks, deviceTicks, 0);
       }
     }
 

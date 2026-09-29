@@ -42,7 +42,6 @@ from .capture_data import (
     CaptureDataReader,
     CaptureDataRecord,
     CaptureDataStatus,
-    CaptureRecordFlags,
     DataRect,
     MarkerLocation,
 )
@@ -85,7 +84,6 @@ __all__ = [
     "CaptureDataReader",
     "CaptureDataRecord",
     "CaptureDataStatus",
-    "CaptureRecordFlags",
     "DataFormatError",
     "DataRect",
     "FrameRow",

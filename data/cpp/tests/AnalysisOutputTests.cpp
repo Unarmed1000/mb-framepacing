@@ -83,6 +83,30 @@ TEST(AnalysisOutput, FramesAreReadByColumnNameWhateverTheOrder)
   EXPECT_FALSE(rows[0].LastSeenTicks.has_value()) << "a column the file lacks";
 }
 
+TEST(AnalysisOutput, CapturesCarrySourceDropsMissedRefreshesAndTheSyncMarker)
+{
+  const auto path = std::filesystem::temp_directory_path() / "mb_framepacingdata_test-captures.csv";
+  {
+    std::ofstream out(path, std::ios::binary);
+    out << "captureIndex,captureMs,status,kind,runId,frameIndex,animationMs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostMs,deviceMs,"
+           "payloadHex\r\n"
+        << "4,66.6667,Torn,Frame,7,12,200,3,1,7,11,70.1,66.6667,4D46\r\n"
+        << "5,,NotRecorded,,,,,0,0,,,,,\r\n";
+  }
+  const auto rows = FD::ReadCaptures(path);
+  std::filesystem::remove(path);
+  ASSERT_EQ(rows.size(), 2u);
+  EXPECT_EQ(rows[0].Status, "Torn");
+  EXPECT_EQ(rows[0].FrameIndex, 12u);
+  EXPECT_EQ(rows[0].SyncRunId, 7u);
+  EXPECT_EQ(rows[0].SyncFrameIndex, 11u);
+  EXPECT_EQ(rows[0].SourceDropsBefore, 3);
+  EXPECT_EQ(rows[0].MissedBefore, 1);
+  EXPECT_EQ(rows[0].Payload, (std::vector<uint8_t>{0x4D, 0x46}));
+  EXPECT_FALSE(rows[1].CaptureTicks.has_value()) << "a capture the recorder dropped";
+  EXPECT_FALSE(rows[1].SyncFrameIndex.has_value());
+}
+
 TEST(AnalysisOutput, MillisecondsAreWholeTicks)
 {
   EXPECT_EQ(FD::ParseTicks("16.6667"), 166'667);

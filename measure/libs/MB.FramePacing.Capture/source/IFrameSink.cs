@@ -25,6 +25,7 @@ namespace MB.FramePacing.Capture
     /// <param name="hostTicks">Capture clock ticks when the frame arrived.</param>
     /// <param name="deviceTicks">Device timestamp in TimeSpan ticks, <see cref="CaptureRecordHeader.UnknownTicks"/> or
     /// <see cref="DeviceTimestamps.PendingTicks"/> when the source resolves it later through <see cref="IDeviceTimestampSource"/>.</param>
-    void EndFrame(long hostTicks, long deviceTicks, CaptureRecordFlags flags);
+    /// <param name="sourceDrops">How many frames the source reported dropping since the previous frame (0: none).</param>
+    void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops);
   }
 }
