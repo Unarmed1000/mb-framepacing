@@ -41,7 +41,9 @@ namespace MB.FramePacing.Data
     public const int MainLengthOffset = 29;
     public const int SecondLengthOffset = 30;
     public const int MainOffset = 32;
-    public const int MainCapacity = 112;
+
+    // Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes)
+    public const int MainCapacity = 80;
     public const int SecondOffset = MainOffset + MainCapacity;
     public const int SecondCapacity = Size - SecondOffset;
 

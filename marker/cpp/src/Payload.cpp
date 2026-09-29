@@ -18,16 +18,20 @@ namespace MB::FrameMarker
     constexpr std::size_t OffsetTargetFrameTicks = 32;
     constexpr std::size_t OffsetCpuStartTicks = 36;
     constexpr std::size_t OffsetCpuBusyTicks = 44;
+    constexpr std::size_t OffsetPreferredFrameTicks = 48;
+    constexpr std::size_t OffsetFlags = 52;
     constexpr std::size_t OffsetStartUtcTicks = PayloadByteCount;
     constexpr std::size_t OffsetSequenceId = OffsetStartUtcTicks + 8;
 
     static_assert(OffsetTargetFrameTicks + 4 == OffsetCpuStartTicks);
     static_assert(OffsetCpuStartTicks + 8 == OffsetCpuBusyTicks);
-    static_assert(OffsetCpuBusyTicks + 4 == PayloadByteCount);
-    static_assert(PayloadByteCount == 48u);
+    static_assert(OffsetCpuBusyTicks + 4 == OffsetPreferredFrameTicks);
+    static_assert(OffsetPreferredFrameTicks + 4 == OffsetFlags);
+    static_assert(OffsetFlags + 1 == PayloadByteCount);
+    static_assert(PayloadByteCount == 53u);
     static_assert(OffsetFrameIndex + 8 == SyncPayloadByteCount);
     static_assert(OffsetSequenceId + SequenceId::ByteCount == StartPayloadByteCount);
-    static_assert(StartPayloadByteCount == 72u);
+    static_assert(StartPayloadByteCount == 77u);
     static_assert(MaxEncodedPayloadByteCount <= QrCapacityBytes);
 
     template <std::size_t TByteCount>
@@ -50,7 +54,7 @@ namespace MB::FrameMarker
       return value;
     }
 
-    //! The 48 byte header every kind starts with (a sync marker is its first 12 bytes).
+    //! The 53 byte header every kind starts with (a sync marker is its first 12 bytes).
     std::array<uint8_t, PayloadByteCount> EncodeHeader(const Payload& payload) noexcept
     {
       std::array<uint8_t, PayloadByteCount> bytes{};
@@ -66,6 +70,8 @@ namespace MB::FrameMarker
       WriteLE<4>(bytes, OffsetTargetFrameTicks, payload.TargetFrameTicks);
       WriteLE<8>(bytes, OffsetCpuStartTicks, static_cast<uint64_t>(payload.CpuStartTicks));
       WriteLE<4>(bytes, OffsetCpuBusyTicks, payload.CpuBusyTicks);
+      WriteLE<4>(bytes, OffsetPreferredFrameTicks, payload.PreferredFrameTicks);
+      bytes[OffsetFlags] = static_cast<uint8_t>(payload.Flags);
       return bytes;
     }
   }
@@ -139,6 +145,9 @@ namespace MB::FrameMarker
     rPayload.TargetFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetTargetFrameTicks));
     rPayload.CpuStartTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetCpuStartTicks));
     rPayload.CpuBusyTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetCpuBusyTicks));
+    rPayload.PreferredFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetPreferredFrameTicks));
+    // Every value is accepted: bits without a name are reserved and kept
+    rPayload.Flags = static_cast<MarkerFlags>(bytes[OffsetFlags]);
     if (pMetadata != nullptr)
     {
       *pMetadata = metadata;

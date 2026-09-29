@@ -112,6 +112,17 @@ namespace MB.FrameMarker.Unity
     public Func<uint> TargetFrameTicksProvider { get; set; }
 
     /// <summary>
+    /// The interval the game wants to run at, in ticks (100 ns): what it would aim for if nothing held it back. It differs from the target
+    /// frame time only while a pacer runs the game slower than it wants. <see cref="Marker.OnDemandFrameTicks"/> when the game presents only
+    /// when something changes. Null = the same default as the target frame time (Unity's Application.targetFrameRate is the rate the game
+    /// asks for, and Unity does not lower it on its own).
+    /// </summary>
+    public Func<uint> PreferredFrameTicksProvider { get; set; }
+
+    /// <summary>True on frames where nothing animates (an idle screen, a paused menu): the marker's Static flag. Null = never static.</summary>
+    public Func<bool> StaticProvider { get; set; }
+
+    /// <summary>
     /// CPU start time: when the CPU started working on the frame, in ticks (100 ns) on the same steady clock as
     /// <see cref="IntendedDisplayTicksProvider"/>. Null = Unity's unscaled time at the beginning of the frame while no
     /// IntendedDisplayTicksProvider is set (its clock is the game's own), otherwise 0 (unknown).
@@ -236,7 +247,9 @@ namespace MB.FrameMarker.Unity
         IntendedDisplayTicksProvider != null ? IntendedDisplayTicksProvider() : 0,
         TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks(),
         CpuStartTicks(),
-        CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks()
+        CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks(),
+        PreferredFrameTicksProvider != null ? PreferredFrameTicksProvider() : DefaultTargetFrameTicks(),
+        StaticProvider != null && StaticProvider() ? MarkerFlags.Static : MarkerFlags.None
       );
 
       DrawMarker(payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height, sync: false);

@@ -99,23 +99,67 @@ namespace MB.FramePacing.Marker
       return new MarkerDecodeResult(MarkerDecodeStatus.Decoded, payload, start, markerLock.Bounds, markerLock.ModuleSizePx, Bytes: bytes);
     }
 
-    /// <summary>Decode a single marker, optionally restricted to a region of the image.</summary>
+    /// <summary>
+    /// The largest region (in pixels) the search retries upscaled 2x: a marker with its search margin, not a whole frame, so frames without a
+    /// marker do not pay for it.
+    /// </summary>
+    public const int MaxUpscaledRetryPixels = 512 * 512;
+
+    /// <summary>
+    /// Decode a single marker, optionally restricted to a region of the image. ZXing's finder pattern detector steps in whole pixels and misses
+    /// the occasional symbol at a non-integer scale near 3 stored pixels per module; when nothing is found in a region of at most
+    /// <see cref="MaxUpscaledRetryPixels"/>, the same region upscaled 2x is searched again.
+    /// </summary>
     public MarkerDecodeResult Decode(GrayImage image, PixelRect? region = null)
     {
       var area = ClipRegion(image, region);
       if (area.IsEmpty)
         return MarkerDecodeResult.NotFound;
 
-      Result? result;
+      var result = Find(image, area);
+      if (result != null)
+        return ToDecodeResult(result, area);
+      return (long)area.Width * area.Height <= MaxUpscaledRetryPixels ? DecodeUpscaled(image, area) : MarkerDecodeResult.NotFound;
+    }
+
+    private Result? Find(GrayImage image, PixelRect area)
+    {
       try
       {
-        result = m_reader.decode(CreateBitmap(image, area), m_hints);
+        return m_reader.decode(CreateBitmap(image, area), m_hints);
       }
       catch (ReaderException)
       {
-        result = null;
+        return null;
       }
-      return result == null ? MarkerDecodeResult.NotFound : ToDecodeResult(result, area);
+    }
+
+    /// <summary>The search on <paramref name="area"/> upscaled 2x (bilinear), its result mapped back to the image.</summary>
+    private MarkerDecodeResult DecodeUpscaled(GrayImage image, PixelRect area)
+    {
+      var region = new GrayImage(area.Width, area.Height);
+      for (int y = 0; y < area.Height; ++y)
+        image.Row(area.Y + y).Slice(area.X, area.Width).CopyTo(region.Row(y));
+      var upscaled = region.ResizeBilinear(area.Width * 2, area.Height * 2);
+      var result = Find(upscaled, upscaled.Bounds);
+      if (result == null)
+        return MarkerDecodeResult.NotFound;
+      var decoded = ToDecodeResult(result, upscaled.Bounds);
+      // Pixel edges halve; an upscaled pixel centre u lies at u / 2 - 0.25 in the region (ResizeBilinear samples at pixel centres)
+      int left = (decoded.Bounds.X / 2) + area.X;
+      int top = (decoded.Bounds.Y / 2) + area.Y;
+      int right = ((decoded.Bounds.Right + 1) / 2) + area.X;
+      int bottom = ((decoded.Bounds.Bottom + 1) / 2) + area.Y;
+      ImagePoint Back(ImagePoint point) => new ImagePoint((point.X / 2) - 0.25 + area.X, (point.Y / 2) - 0.25 + area.Y);
+      var geometry = decoded.Geometry is { } g
+        ? new MarkerGeometry(Back(g.TopLeft), Back(g.TopRight), Back(g.BottomLeft), Back(g.Alignment))
+        : (MarkerGeometry?)null;
+      return decoded with
+      {
+        Bounds = new PixelRect(left, top, right - left, bottom - top),
+        ModuleSizePx = decoded.ModuleSizePx / 2,
+        Geometry = geometry,
+      };
     }
 
     /// <summary>

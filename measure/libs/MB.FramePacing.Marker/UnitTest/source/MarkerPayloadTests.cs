@@ -26,7 +26,9 @@ namespace MB.FramePacing.Marker.UnitTest
         0x3132333435363738L,
         0x41424344u,
         0x5152535455565758L,
-        0x61626364u
+        0x61626364u,
+        0x71727374u,
+        MB.FrameMarker.MarkerFlags.Static
       );
       byte[] expected =
       [
@@ -78,6 +80,11 @@ namespace MB.FramePacing.Marker.UnitTest
         0x63,
         0x62,
         0x61,
+        0x74,
+        0x73,
+        0x72,
+        0x71,
+        0x01,
       ];
       Assert.That(payload.Encode(), Is.EqualTo(expected));
     }

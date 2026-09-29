@@ -79,7 +79,7 @@
 <text x="874.0" y="33.0" text-anchor="start" class="label">DISPLAY</text>
 <text x="874.0" y="56.0" text-anchor="start" class="tile-value">60 Hz</text>
 <text x="939.5" y="56.0" text-anchor="start" class="vsync-n">fixed refresh (vsync)</text>
-<text x="874.0" y="74.0" text-anchor="start" class="vsync-n">16.7 ms per refresh, target 1–2 refreshes</text>
+<text x="874.0" y="74.0" text-anchor="start" class="vsync-n">16.7 ms per refresh, target 1–2 refreshes, preferred 60 fps</text>
 <rect class="tile" x="20.0" y="123" width="276.0" height="64" rx="10"/>
 <text x="34.0" y="143.0" text-anchor="start" class="label">AVERAGE FPS</text>
 <text x="34.0" y="167.0" text-anchor="start" class="tile-value">42.0</text>
@@ -194,7 +194,7 @@
 <text x="1011.2" y="883.0" text-anchor="middle" class="vsync-n">7 s</text>
 <text x="1140.0" y="883.0" text-anchor="middle" class="vsync-n">8 s</text>
 <text x="20.0" y="919.0" text-anchor="start" class="label">SHARE OF LATE FRAMES IN THE LAST 2 S</text>
-<text x="1140.0" y="919.0" text-anchor="end" class="vsync-n">amber: on screen longer than a refresh (16.7 ms) as the pacer intended; red: longer than it intended; whole run 3.6 %</text>
+<text x="1140.0" y="919.0" text-anchor="end" class="vsync-n">amber: on screen longer than the application prefers, as the pacer intended; red: longer than it intended; whole run 3.6 %</text>
 <line class="grid" x1="110" y1="1015.0" x2="1140" y2="1015.0"/>
 <text x="100.0" y="1019.0" text-anchor="end" class="vsync-n">0</text>
 <line class="grid" x1="110" y1="975.0" x2="1140" y2="975.0"/>

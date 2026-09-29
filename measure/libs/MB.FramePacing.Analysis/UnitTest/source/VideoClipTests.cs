@@ -75,6 +75,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(payload.TargetFrameTicks, Is.EqualTo(expected.TargetFrameTicks), where + ": target frame time");
         Assert.That(payload.CpuStartTicks, Is.EqualTo(expected.CpuStartTicks), where + ": CPU start time");
         Assert.That(payload.CpuBusyTicks, Is.EqualTo(expected.CpuBusyTicks), where + ": CPU busy");
+        Assert.That(payload.PreferredFrameTicks, Is.EqualTo(expected.PreferredFrameTicks), where + ": preferred frame time");
+        Assert.That(payload.Flags, Is.EqualTo(expected.Flags), where + ": flags");
         if (expected.Kind == MarkerKind.SequenceStart)
         {
           Assert.That(actual.Start, Is.Not.Null, where + ": start metadata");
@@ -85,9 +87,10 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// The analysis of the decoded clip, frame by frame and to the tick: display time step, animation time step and error, drift, the late flag and
-    /// how late, the target, the pacing and prediction errors against the pacer's schedule in the markers, and the CPU start time, CPU busy,
-    /// frametime and CPU wait.
+    /// The analysis of the decoded clip, frame by frame and to the tick: the presented frames (dropped frames never appear, a frame shown out of
+    /// order is not presented again) with their frame index and the indices skipped before them, display time step, animation time step and
+    /// error (not judged from or to a static frame), drift, the late flag and how late, the target and preferred frame time, the pacing and
+    /// prediction errors against the pacer's schedule in the markers, and the CPU start time, CPU busy, frametime and CPU wait.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
     public void Clip_AnalysisMatchesItsManifest(string clip)
@@ -95,17 +98,26 @@ namespace MB.FramePacing.Analysis.UnitTest
       var manifest = VideoClips.Manifest(clip);
       var run = CaptureAnalyzer.Analyze(Import(clip), new AnalysisOptions()).Timeline.Runs.Single();
 
-      Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), "every frame of the clip is presented");
+      Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), "the manifest's presented frames");
+      Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(manifest.ExpectedSkippedFrameIndices), $"{clip}: frame indices never presented");
+      Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(manifest.ExpectedOutOfOrderCaptures), $"{clip}: captures out of order");
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule), "the markers carry the pacer's schedule");
       long refresh = (long)Math.Round(run.Pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond);
       Assert.That(refresh, Is.AnyOf(166666L, 166667L), "the refresh is the capture period: 1/60 s in whole ticks");
 
-      // Lateness is measured from the run's on-time frames: the earliest (shown - intended) of the frames with an intended time
-      long onTime = Enumerable.Range(0, manifest.FrameCount).Where(i => manifest.IntendedTicks(i) != 0).Min(i => Behind(manifest, i));
+      // Lateness is measured from the run's on-time frames: the earliest (shown - intended) of the frames on time (an out-of-order frame is early)
+      long onTime = Enumerable
+        .Range(0, manifest.FrameCount)
+        .Where(i => manifest.IntendedTicks(i) != 0 && manifest.LateRefreshes(i) == 0)
+        .Min(i => Behind(manifest, i));
       for (int i = 0; i < manifest.FrameCount; ++i)
       {
         var frame = run.Frames[i];
         string where = $"{clip}: frame {i}";
+        Assert.That(frame.FrameIndex, Is.EqualTo(manifest.FrameIndex(i)), where + ": frame index");
+        Assert.That(frame.SkippedBefore, Is.EqualTo(manifest.SkippedBefore(i)), where + ": frame indices skipped before it");
+        Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Static), Is.EqualTo(manifest.IsStatic(i)), where + ": static");
+        Assert.That(frame.PreferredTicks, Is.EqualTo(manifest.PreferredRefreshes(i) * refresh), where + ": preferred frame time (null on demand)");
         Assert.That(frame.DriftTicks, Is.EqualTo(manifest.DriftTicks(i)), where + ": drift");
         Assert.That(
           frame.LatenessTicks,
@@ -114,10 +126,16 @@ namespace MB.FramePacing.Analysis.UnitTest
         );
         // The application side: CPU start and CPU busy from the marker; the frametime to the next frame's CPU start (the clip's last frame
         // is followed by the end marker, not a measured frame) and CPU wait = frametime - CPU busy
-        long cpuStart = manifest.CpuStartTicks[i];
-        long cpuBusy = manifest.CpuBusyTicks[i];
+        long cpuStart = manifest.CpuStartTicks(i);
+        long cpuBusy = manifest.CpuBusyTicks(i);
+        // Only to the next frame index: after dropped or out-of-order frames the next presented frame is not the next one rendered
         long? frameTime =
-          i + 1 < manifest.FrameCount && cpuStart != 0 && manifest.CpuStartTicks[i + 1] != 0 ? manifest.CpuStartTicks[i + 1] - cpuStart : null;
+          i + 1 < manifest.FrameCount
+          && manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1
+          && cpuStart != 0
+          && manifest.CpuStartTicks(i + 1) != 0
+            ? manifest.CpuStartTicks(i + 1) - cpuStart
+            : null;
         Assert.That(frame.CpuStartTicks, Is.EqualTo(cpuStart), where + ": CPU start time");
         Assert.That(frame.CpuBusyTicks, Is.EqualTo((uint)cpuBusy), where + ": CPU busy");
         Assert.That(frame.FrameTimeTicks, Is.EqualTo(frameTime), where + ": frametime");
@@ -135,13 +153,17 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.TargetTicks, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
         long? intended = manifest.IntendedStepTicks(i);
         Assert.That(frame.PacingErrorTicks, Is.EqualTo(manifest.DisplayStepTicks(i) - intended), where + ": pacing error");
-        Assert.That(frame.PredictionErrorTicks, Is.EqualTo(manifest.AnimationStepTicks(i) - intended), where + ": prediction error");
+        Assert.That(
+          frame.PredictionErrorTicks,
+          Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepTicks(i) - intended : null),
+          where + ": prediction error (not judged from or to a static frame)"
+        );
       }
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(Enumerable.Range(1, manifest.FrameCount - 1).Count(manifest.IsLate)), $"{clip}: late frames");
 
-      // Gamers Nexus's summaries: the |animation error| per frame, and as a percentage of the display time
-      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
-      long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorTicks(i)));
+      // Gamers Nexus's summaries over the judged frames: the |animation error| per frame, and as a percentage of their display time
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.IsJudged).ToArray();
+      long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorTicks(i)!.Value));
       double errorPerFrameMs = absolute / (double)measured.Length / TimeSpan.TicksPerMillisecond;
       double percentError = absolute * 100.0 / measured.Sum(manifest.DisplayStepTicks);
       Assert.That(run.Statistics.ErrorPerFrameMs, Is.EqualTo(errorPerFrameMs).Within(1e-9), $"{clip}: error per frame");

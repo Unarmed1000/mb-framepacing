@@ -24,9 +24,10 @@ namespace MB::FrameMarker
 
   //! Payload header, shared by every marker kind (little endian):
   //! magic "MF" (2) | format version (1) | kind (1) | frame index u64 (8) | animation ticks i64 (8) | run id u32 (4) |
-  //! intended display ticks i64 (8) | target frame ticks u32 (4) | cpu start ticks i64 (8) | cpu busy ticks u32 (4)
+  //! intended display ticks i64 (8) | target frame ticks u32 (4) | cpu start ticks i64 (8) | cpu busy ticks u32 (4) |
+  //! preferred frame ticks u32 (4) | flags (1)
   //! Start and end markers carry the values of the frame that shows them.
-  inline constexpr std::size_t PayloadByteCount = 48;
+  inline constexpr std::size_t PayloadByteCount = 53;
   inline constexpr uint8_t PayloadMagic0 = 'M';
   inline constexpr uint8_t PayloadMagic1 = 'F';
   inline constexpr uint8_t PayloadFormatVersion = 1;
@@ -34,7 +35,10 @@ namespace MB::FrameMarker
   //! The start marker's sequence id: 16 opaque bytes (see SequenceId).
   inline constexpr std::size_t SequenceIdByteCount = 16;
 
-  //! Start marker payload: header (48) | start time UTC i64 (8) | sequence id (16)
+  //! The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.
+  inline constexpr uint32_t OnDemandFrameTicks = 0xFFFF'FFFFu;
+
+  //! Start marker payload: header (53) | start time UTC i64 (8) | sequence id (16)
   inline constexpr std::size_t StartPayloadByteCount = PayloadByteCount + 8u + SequenceIdByteCount;
 
   //! The longest payload of any kind: the start marker's.

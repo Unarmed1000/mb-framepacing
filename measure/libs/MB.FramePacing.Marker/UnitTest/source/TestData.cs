@@ -41,7 +41,9 @@ namespace MB.FramePacing.Marker.UnitTest
           long.Parse(Field("intendedDisplayTicks"), CultureInfo.InvariantCulture),
           uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture),
           long.Parse(Field("cpuStartTicks"), CultureInfo.InvariantCulture),
-          uint.Parse(Field("cpuBusyTicks"), CultureInfo.InvariantCulture)
+          uint.Parse(Field("cpuBusyTicks"), CultureInfo.InvariantCulture),
+          uint.Parse(Field("preferredFrameTicks"), CultureInfo.InvariantCulture),
+          (MB.FrameMarker.MarkerFlags)byte.Parse(Field("flags"), CultureInfo.InvariantCulture)
         );
         StartMetadata? start = null;
         if (kind == MarkerKind.SequenceStart)

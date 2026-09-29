@@ -66,7 +66,7 @@ namespace
     bytes[29] = static_cast<uint8_t>(main.size());
     bytes[30] = static_cast<uint8_t>(second.size());
     std::copy(main.begin(), main.end(), bytes.begin() + 32);
-    std::copy(second.begin(), second.end(), bytes.begin() + 144);
+    std::copy(second.begin(), second.end(), bytes.begin() + 112);
     return bytes;
   }
 }

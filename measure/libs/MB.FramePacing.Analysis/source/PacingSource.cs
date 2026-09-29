@@ -18,6 +18,12 @@ namespace MB.FramePacing.Analysis
     /// <summary>The markers carry the pacer's target frame time (no schedule): every frame against its own target.</summary>
     TargetFrameTime,
 
+    /// <summary>
+    /// The markers carry only the frame time the application wants to run at (no schedule, no target): every frame against its preferred
+    /// frame time, so a game that wants 30 fps on a 60 Hz display is measured against two refreshes.
+    /// </summary>
+    PreferredFrameTime,
+
     /// <summary>No pacing information in the markers; the target frame rate given to the tools (--target-fps).</summary>
     GivenTarget,
 

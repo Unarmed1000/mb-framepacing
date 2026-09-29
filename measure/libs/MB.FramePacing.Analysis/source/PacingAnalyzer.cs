@@ -49,6 +49,7 @@ namespace MB.FramePacing.Analysis
       var source =
         schedule ? PacingSource.Schedule
         : frames.Any(f => f.MarkerTargetFrameTicks != 0) ? PacingSource.TargetFrameTime
+        : frames.Any(f => f.MarkerPreferredFrameTicks != 0) ? PacingSource.PreferredFrameTime
         : targetFps is > 0 ? PacingSource.GivenTarget
         : PacingSource.NativeRefresh;
       long givenTarget = targetFps is { } fps && fps > 0 ? WholeRefreshes(TimeSpan.TicksPerSecond / fps, refreshTicks) : refreshTicks;
@@ -73,19 +74,40 @@ namespace MB.FramePacing.Analysis
           schedule && previous != null && frame.IntendedDisplayTicks != 0 && previous.IntendedDisplayTicks != 0
             ? frame.IntendedDisplayTicks - previous.IntendedDisplayTicks
             : null;
-        long target =
+        // What the frame is measured against: the schedule's step, the pacer's target, else the rate the application wants (a game that
+        // wants 30 fps on 60 Hz aims for two refreshes), else the rate given to the tools, else one refresh. An application that presents on
+        // demand has no interval to aim for: no target, so only a schedule can make its frames late
+        uint markerTarget = frame.MarkerTargetFrameTicks;
+        uint markerWants = frame.MarkerPreferredFrameTicks;
+        const uint OnDemand = MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
+        bool onDemand = markerTarget == OnDemand || (markerTarget == 0 && markerWants == OnDemand);
+        long? target =
           intendedStep is { } step ? WholeRefreshes(step, refreshTicks)
-          : frame.MarkerTargetFrameTicks != 0 ? WholeRefreshes(frame.MarkerTargetFrameTicks, refreshTicks)
+          : onDemand ? null
+          : markerTarget != 0 ? WholeRefreshes(markerTarget, refreshTicks)
+          : markerWants != 0 ? WholeRefreshes(markerWants, refreshTicks)
           : givenTarget;
+        // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
+        // to the tools, else one refresh
+        uint markerPreferred = frame.MarkerPreferredFrameTicks;
+        long? preferred =
+          markerPreferred == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks ? null
+          : markerPreferred != 0 ? WholeRefreshes(markerPreferred, refreshTicks)
+          : givenTarget;
+        // A step from or to a static frame animates nothing, so it has no prediction error (its pacing error still counts)
+        bool animates = (frame.Flags & PresentedFrameFlags.Static) == 0 && (previous == null || (previous.Flags & PresentedFrameFlags.Static) == 0);
 
         long? pacingError = null;
         long? predictionError = null;
         if (intendedStep is { } intended && frame.DisplayDeltaTicks is { } displayStep && frame.AnimationDeltaTicks is { } animationStep)
         {
           pacingError = displayStep - intended;
-          predictionError = animationStep - intended;
           pacingErrors.Add(pacingError.Value);
-          predictionErrors.Add(predictionError.Value);
+          if (animates)
+          {
+            predictionError = animationStep - intended;
+            predictionErrors.Add(predictionError.Value);
+          }
         }
         long? lateness =
           scheduleOffset is { } offset && frame.IntendedDisplayTicks != 0 ? frame.FirstSeenTicks - frame.IntendedDisplayTicks - offset : null;
@@ -94,7 +116,7 @@ namespace MB.FramePacing.Analysis
         if (frame.DisplayDeltaTicks is { } display)
         {
           ++counted;
-          isLate = lateness is { } behind ? behind >= half : display >= target + half;
+          isLate = lateness is { } behind ? behind >= half : target is { } aim && display >= aim + half;
           if (isLate)
             ++late;
         }
@@ -102,6 +124,7 @@ namespace MB.FramePacing.Analysis
         {
           Flags = isLate ? frame.Flags | PresentedFrameFlags.Late : frame.Flags,
           TargetTicks = target,
+          PreferredTicks = preferred,
           PacingErrorTicks = pacingError,
           PredictionErrorTicks = predictionError,
           LatenessTicks = lateness,
@@ -109,7 +132,11 @@ namespace MB.FramePacing.Analysis
       }
 
       var (uneven, even) = Split(frames, half, errorThresholdTicks);
-      var targets = frames.Where(f => f.DisplayDeltaTicks.HasValue).Select(f => (double)f.TargetTicks!.Value).Order().ToArray();
+      var targets = frames
+        .Where(f => f.DisplayDeltaTicks.HasValue && f.TargetTicks.HasValue)
+        .Select(f => (double)f.TargetTicks!.Value)
+        .Order()
+        .ToArray();
       return new RunPacing(
         refreshTicks / (double)TimeSpan.TicksPerMillisecond,
         refreshCalculated,
@@ -165,7 +192,8 @@ namespace MB.FramePacing.Analysis
     private static (long Uneven, long Even) Split(List<PresentedFrame> frames, long half, long errorThresholdTicks)
     {
       bool OffTarget(PresentedFrame f) =>
-        f.Flags.HasFlag(PresentedFrameFlags.Torn) || (f.DisplayDeltaTicks is { } display && Math.Abs(display - f.TargetTicks!.Value) >= half);
+        f.Flags.HasFlag(PresentedFrameFlags.Torn)
+        || (f.DisplayDeltaTicks is { } display && f.TargetTicks is { } target && Math.Abs(display - target) >= half);
       long uneven = 0;
       long even = 0;
       for (int i = 0; i < frames.Count; ++i)

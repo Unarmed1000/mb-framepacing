@@ -98,18 +98,18 @@ field is then 0.
 
 **`pacing`:**
 
-| Field                                                             | Meaning                                                                                      |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `refreshPeriodMs`, `refreshHz`                                    | The display's refresh (a capture card's capture period; calculated from a camera's frames)   |
-| `refreshCalculated`                                               | True when the refresh was calculated from a camera capture's frames                          |
-| `targetFrameMs`                                                   | The frame time the run is measured against, in whole refreshes                               |
-| `source`                                                          | Where the targets come from: `Schedule`, `TargetFrameTime`, `GivenTarget` or `NativeRefresh` |
-| `lateFrames`, `lateShare`                                         | Frames shown late, and their share of the presented frames with a display time step (0..1)   |
-| `worstLateShare`                                                  | The highest share of late frames in any 2 s window (0..1)                                    |
-| `errorFramesWithUnevenDisplay`, `errorFramesWithEvenDisplay`      | Frames with an animation error on an uneven or an even display                               |
-| `verdict`                                                         | `None`, `BadPacing`, `DeltaTimeJitter` or `Both`                                             |
-| `expectedRefreshHz`, `refreshDeviation`, `matchesExpectedRefresh` | The refresh rate the user expects, and how the measured one compares; absent without one     |
-| `pacingErrorMs`, `predictionErrorMs`                              | With a schedule (statistics): display / animation time step minus the intended step          |
+| Field                                                             | Meaning                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `refreshPeriodMs`, `refreshHz`                                    | The display's refresh (a capture card's capture period; calculated from a camera's frames)                         |
+| `refreshCalculated`                                               | True when the refresh was calculated from a camera capture's frames                                                |
+| `targetFrameMs`                                                   | The frame time the run is measured against, in whole refreshes                                                     |
+| `source`                                                          | Where the targets come from: `Schedule`, `TargetFrameTime`, `PreferredFrameTime`, `GivenTarget` or `NativeRefresh` |
+| `lateFrames`, `lateShare`                                         | Frames shown late, and their share of the presented frames with a display time step (0..1)                         |
+| `worstLateShare`                                                  | The highest share of late frames in any 2 s window (0..1)                                                          |
+| `errorFramesWithUnevenDisplay`, `errorFramesWithEvenDisplay`      | Frames with an animation error on an uneven or an even display                                                     |
+| `verdict`                                                         | `None`, `BadPacing`, `DeltaTimeJitter` or `Both`                                                                   |
+| `expectedRefreshHz`, `refreshDeviation`, `matchesExpectedRefresh` | The refresh rate the user expects, and how the measured one compares; absent without one                           |
+| `pacingErrorMs`, `predictionErrorMs`                              | With a schedule (statistics): display / animation time step minus the intended step                                |
 
 **`histograms`:** `animationErrorMs` and `displayDeltaMs`, each `{ "binWidthMs", "total", "bins": [{ "centerMs", "count" }] }`. Bin
 _k_ covers [(k − 0.5) × width, (k + 0.5) × width); the bins are listed by their centre, from the lowest to the highest used.
@@ -121,32 +121,34 @@ _k_ covers [(k − 0.5) × width, (k + 0.5) × width); the bins are listed by th
 
 One line per presented frame (an application frame that was seen at least once), in display order.
 
-| Column              | Meaning                                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `segment`           | The part of the run between two gaps in the capture (0 first)                                                   |
-| `frameIndex`        | The marker's frame index                                                                                        |
-| `animationMs`       | The marker's animation time                                                                                     |
-| `firstCaptureIndex` | The first capture that showed the frame                                                                         |
-| `firstSeenMs`       | The frame's display time: when it was first seen                                                                |
-| `onScreenMs`        | How long it stayed on screen                                                                                    |
-| `captures`          | How many captures showed it                                                                                     |
-| `skippedBefore`     | Frame indices before this one that were never seen                                                              |
-| `displayDeltaMs`    | The display time step: from the previous frame's display time to this one's                                     |
-| `animationDeltaMs`  | The animation time step                                                                                         |
-| `animationErrorMs`  | The animation time step minus the display time step                                                             |
-| `driftMs`           | Since the segment's first frame: the animation time that passed minus the display time that passed              |
-| `flags`             | `\|`-separated: `SkippedBefore`, `UncertainStart`, `Torn`, `Late`; empty when none                              |
-| `intendedDisplayMs` | From the marker: when the pacer intended the frame to be shown (its own clock)                                  |
-| `markerTargetMs`    | From the marker: the pacer's target frame time                                                                  |
-| `targetMs`          | The frame time this frame is measured against, in whole refreshes                                               |
-| `pacingErrorMs`     | With a schedule: the display time step minus the intended step                                                  |
-| `predictionErrorMs` | With a schedule: the animation time step minus the intended step                                                |
-| `latenessMs`        | With a schedule: how long after its intended time the frame appeared, relative to the run's on-time frames      |
-| `lastSeenMs`        | When the last capture that showed it was taken                                                                  |
-| `cpuStartMs`        | From the marker: the CPU start time (PresentMon's CPUStartTime, on the pacer's clock)                           |
-| `cpuBusyMs`         | From the marker: CPU busy (PresentMon's MsCPUBusy)                                                              |
-| `frameTimeMs`       | The frametime: this frame's CPU start to the next frame's, when both are known (PresentMon's MsBetweenAppStart) |
-| `cpuWaitMs`         | The frametime minus CPU busy (PresentMon's MsCPUWait)                                                           |
+| Column              | Meaning                                                                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `segment`           | The part of the run between two gaps in the capture (0 first)                                                                                                                    |
+| `frameIndex`        | The marker's frame index                                                                                                                                                         |
+| `animationMs`       | The marker's animation time                                                                                                                                                      |
+| `firstCaptureIndex` | The first capture that showed the frame                                                                                                                                          |
+| `firstSeenMs`       | The frame's display time: when it was first seen                                                                                                                                 |
+| `onScreenMs`        | How long it stayed on screen                                                                                                                                                     |
+| `captures`          | How many captures showed it                                                                                                                                                      |
+| `skippedBefore`     | Frame indices before this one that were never seen                                                                                                                               |
+| `displayDeltaMs`    | The display time step: from the previous frame's display time to this one's                                                                                                      |
+| `animationDeltaMs`  | The animation time step                                                                                                                                                          |
+| `animationErrorMs`  | The animation time step minus the display time step; empty for a step from or to a static frame (nothing animates)                                                               |
+| `driftMs`           | Since the segment's first frame: the sum of the animation errors (the animation time that passed minus the display time that passed, without the steps from or to static frames) |
+| `flags`             | `\|`-separated: `SkippedBefore`, `UncertainStart`, `Torn`, `Late`, `Static` (the marker says nothing animates); empty when none                                                  |
+| `intendedDisplayMs` | From the marker: when the pacer intended the frame to be shown (its own clock)                                                                                                   |
+| `markerTargetMs`    | From the marker: the pacer's target frame time; `429496.7295` (the marker's `0xFFFFFFFF` ticks) = on demand                                                                      |
+| `targetMs`          | The frame time this frame is measured against, in whole refreshes; empty on demand                                                                                               |
+| `markerPreferredMs` | From the marker: the frame time the application wants to run at; `429496.7295` = on demand                                                                                       |
+| `preferredMs`       | The preferred frame time the late share is measured against, in whole refreshes: the marker's, else the target frame rate given to the tools, else one refresh; empty on demand  |
+| `pacingErrorMs`     | With a schedule: the display time step minus the intended step                                                                                                                   |
+| `predictionErrorMs` | With a schedule: the animation time step minus the intended step                                                                                                                 |
+| `latenessMs`        | With a schedule: how long after its intended time the frame appeared, relative to the run's on-time frames                                                                       |
+| `lastSeenMs`        | When the last capture that showed it was taken                                                                                                                                   |
+| `cpuStartMs`        | From the marker: the CPU start time (PresentMon's CPUStartTime, on the pacer's clock)                                                                                            |
+| `cpuBusyMs`         | From the marker: CPU busy (PresentMon's MsCPUBusy)                                                                                                                               |
+| `frameTimeMs`       | The frametime: this frame's CPU start to the next frame's, when both are known (PresentMon's MsBetweenAppStart)                                                                  |
+| `cpuWaitMs`         | The frametime minus CPU busy (PresentMon's MsCPUWait)                                                                                                                            |
 
 Camera captures (very experimental) add `mainMarkerFirstSeenMs` (when the main marker first showed the frame) and `scanoutDelayMs`
 (`firstSeenMs` minus it).

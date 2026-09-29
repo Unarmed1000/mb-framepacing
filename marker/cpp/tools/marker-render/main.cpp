@@ -177,8 +177,8 @@ namespace
   //! text, empty and all 0xFF sequence ids; both symbol versions use every mask). Other implementations of the marker (C#, Python) must
   //! reproduce every row exactly.
   //! Columns: kind, run id, frame index, animation ticks, intended display ticks, target frame ticks, CPU start ticks, CPU busy ticks,
-  //! start UTC ticks, sequence id (32 hex digits, start markers only), symbol size, modules (hex): row major, one bit
-  //! per module (1 = dark), most significant bit first, the last byte zero padded.
+  //! preferred frame ticks, flags (the byte, reserved bits included), start UTC ticks, sequence id (32 hex digits, start markers only), symbol size,
+  //! modules (hex): row major, one bit per module (1 = dark), most significant bit first, the last byte zero padded.
   void WriteModuleDigest(const std::filesystem::path& directory)
   {
     constexpr int32_t RowCount = 512;
@@ -187,11 +187,11 @@ namespace
     {
       throw std::runtime_error("Failed to create modules.csv in '" + directory.string() + "'");
     }
-    digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,startUtcTicks,"
-              "sequenceIdHex,size,modulesHex\n";
+    digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,preferredFrameTicks,"
+              "flags,startUtcTicks,sequenceIdHex,size,modulesHex\n";
 
-    // "mb-frame" + 4: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
-    uint64_t state = 0x6D622D6672616D69u;
+    // "mb-frame" + 1: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
+    uint64_t state = 0x6D622D6672616D66u;
     for (int32_t row = 0; row < RowCount; ++row)
     {
       FM::Payload payload;
@@ -203,6 +203,8 @@ namespace
       payload.TargetFrameTicks = static_cast<uint32_t>(NextRandom(state));
       payload.CpuStartTicks = static_cast<int64_t>(NextRandom(state));
       payload.CpuBusyTicks = static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu);
+      payload.PreferredFrameTicks = static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu);
+      payload.Flags = static_cast<FM::MarkerFlags>(NextRandom(state) & 0xFFu);
       FM::StartMetadata start;
       if (payload.Kind == FM::MarkerKind::SequenceStart)
       {
@@ -242,7 +244,8 @@ namespace
       const std::vector<uint8_t> bits(matrix.Bits().begin(), matrix.Bits().end());
       digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
              << payload.IntendedDisplayTicks << ',' << payload.TargetFrameTicks << ',' << payload.CpuStartTicks << ',' << payload.CpuBusyTicks << ','
-             << start.UtcTicks << ',' << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
+             << payload.PreferredFrameTicks << ',' << static_cast<uint32_t>(payload.Flags) << ',' << start.UtcTicks << ','
+             << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
     }
   }
 
@@ -263,18 +266,19 @@ namespace
     constexpr std::array<GoldenCase, 11> Cases{{
       {{0u, 0, 0u, FM::MarkerKind::Frame}, {}},
       {{1u, 166'667, 1u, FM::MarkerKind::Frame}, {}},
-      {{123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame, 987'654'321'000, 166'667u, 987'653'987'666, 123'456u}, {}},
+      {{123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame, 987'654'321'000, 333'333u, 987'653'987'666, 123'456u, 166'667u}, {}},
       {{42u, -1, 2u, FM::MarkerKind::Frame}, {}},
       {{7u, std::numeric_limits<int64_t>::min(), 3u, FM::MarkerKind::Frame}, {}},
       {{std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
         std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max(), std::numeric_limits<int64_t>::max(),
-        std::numeric_limits<uint32_t>::max()},
+        std::numeric_limits<uint32_t>::max(), FM::OnDemandFrameTicks, static_cast<FM::MarkerFlags>(0xFFu)},
        {}},
-      {{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u, 0x5152535455565758,
-        0x61626364u},
+      {{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u, 0x5152535455565758, 0x61626364u,
+        0x71727374u, FM::MarkerFlags::Static},
        {}},
       // Start and end markers carry the frame's values too
-      {{600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 80'000u}, {0, TextSequenceId("golden-run")}},
+      {{600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 80'000u, 10'000'000u, FM::MarkerFlags::Static},
+       {0, TextSequenceId("golden-run")}},
       {{601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 120'000u}, {GoldenStartUtcTicks, GoldenBytesId}},
       {{900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd, 0, 0u, 0, 80'000u}, {}},
       {{0x0102030405060708u, 0, 0u, FM::MarkerKind::Sync}, {}},
@@ -286,8 +290,8 @@ namespace
     {
       throw std::runtime_error("Failed to create manifest in '" + directory.string() + "'");
     }
-    manifest << "file,kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,startUtcTicks,"
-                "sequenceIdHex,moduleSizePx,quietZoneModules,originX,originY,width,height\n";
+    manifest << "file,kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,"
+                "preferredFrameTicks,flags,startUtcTicks,sequenceIdHex,moduleSizePx,quietZoneModules,originX,originY,width,height\n";
 
     for (std::size_t payloadIndex = 0; payloadIndex < Cases.size(); ++payloadIndex)
     {
@@ -313,8 +317,9 @@ namespace
         manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind) << ',' << request.Payload.RunId << ','
                  << request.Payload.FrameIndex << ',' << request.Payload.AnimationTicks << ',' << request.Payload.IntendedDisplayTicks << ','
                  << request.Payload.TargetFrameTicks << ',' << request.Payload.CpuStartTicks << ',' << request.Payload.CpuBusyTicks << ','
-                 << request.Start.UtcTicks << ',' << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx
-                 << ',' << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
+                 << request.Payload.PreferredFrameTicks << ',' << static_cast<uint32_t>(request.Payload.Flags) << ',' << request.Start.UtcTicks << ','
+                 << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx << ','
+                 << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
                  << image.Height << '\n';
       }
     }
@@ -325,6 +330,7 @@ namespace
     std::cout << "Usage:\n"
                  "  marker-render --frame <u64> --ticks <i64> [--run <u32>] [--kind frame|start|end|sync]\n"
                  "                [--intended-ticks <i64>] [--target-ticks <u32>] [--cpu-start-ticks <i64>] [--cpu-busy-ticks <u32>]\n"
+                 "                [--preferred-ticks <u32>] [--flags <0-255>]\n"
                  "                [--utc-ticks <i64>] [--sequence-id <text, 1-16 printable ASCII> | --sequence-id-hex <32 hex digits>]\n"
                  "                [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]\n"
                  "                [--background <0-255>] -o <file.pgm>\n"
@@ -380,6 +386,14 @@ int main(int argc, char* argv[])
       else if (arg == "--cpu-busy-ticks")
       {
         request.Payload.CpuBusyTicks = ParseNumber<uint32_t>(next(), arg);
+      }
+      else if (arg == "--preferred-ticks")
+      {
+        request.Payload.PreferredFrameTicks = ParseNumber<uint32_t>(next(), arg);
+      }
+      else if (arg == "--flags")
+      {
+        request.Payload.Flags = static_cast<FM::MarkerFlags>(ParseNumber<uint8_t>(next(), arg));
       }
       else if (arg == "--sequence-id")
       {

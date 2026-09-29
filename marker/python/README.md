@@ -25,7 +25,11 @@ modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelForm
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`seconds_to_ticks`).
 - **Frame pacing (optional):** when the application paces its frames, `Payload(..., intended_display_ticks=..., target_frame_ticks=...)`
   carries when the pacer intends the frame to be shown (100 ns ticks on its steady clock, any epoch) and the interval it aims for
-  (`166_667` for 60 fps). Both default to `0` (unknown).
+  (`166_667` for 60 fps); `preferred_frame_ticks=...` the interval the application wants to run at (it differs from the target only
+  while the pacer runs slower than wanted). All default to `0` (unknown); `ON_DEMAND_FRAME_TICKS` = frames only when something
+  changes.
+- **Flags (optional):** `flags=MarkerFlags.STATIC` on frames where nothing animates (the analysis does not judge their animation
+  error).
 - **CPU start time and CPU busy (optional):** `Payload(..., cpu_start_ticks=..., cpu_busy_ticks=...)` carries when the CPU started
   working on the frame (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on
   it before presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's

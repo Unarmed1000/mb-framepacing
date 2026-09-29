@@ -25,7 +25,13 @@ namespace MB.FramePacing.Analysis
     /// <summary>EXPERIMENTAL camera captures: the frame reached the second (lower) zone before the timing zone, so it was presented mid-scanout.</summary>
     Torn = 4,
 
-    /// <summary>Shown at least one refresh later than the target frame time after the previous frame (see <see cref="RunPacing"/>).</summary>
+    /// <summary>
+    /// Shown half a refresh or more after its intended display time, or without a schedule half a refresh or more beyond its target frame
+    /// time after the previous frame (see <see cref="RunPacing"/>).
+    /// </summary>
     Late = 8,
+
+    /// <summary>From the marker: nothing animates in this frame, so the animation error of a step from or to it is not judged.</summary>
+    Static = 16,
   }
 }

@@ -27,11 +27,17 @@ namespace MB::FramePacingData
     std::optional<int64_t> AnimationDeltaTicks;
     std::optional<int64_t> AnimationErrorTicks;
     int64_t DriftTicks{0};
-    //! SkippedBefore, UncertainStart, Torn, Late.
+    //! SkippedBefore, UncertainStart, Torn, Late, Static.
     std::vector<std::string> Flags;
     std::optional<int64_t> IntendedDisplayTicks;
+    //! OnDemandFrameTicks on demand.
     std::optional<int64_t> MarkerTargetTicks;
+    //! In whole refreshes; empty on demand.
     std::optional<int64_t> TargetTicks;
+    //! The frame time the application wants to run at; OnDemandFrameTicks on demand.
+    std::optional<int64_t> MarkerPreferredTicks;
+    //! The preferred frame time the late share is measured against, in whole refreshes; empty on demand.
+    std::optional<int64_t> PreferredTicks;
     std::optional<int64_t> PacingErrorTicks;
     std::optional<int64_t> PredictionErrorTicks;
     std::optional<int64_t> LatenessTicks;

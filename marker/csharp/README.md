@@ -41,7 +41,10 @@ This is the most efficient way without a dedicated shader; the shaders (1 and 2 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`Marker.SecondsToTicks`).
 - **Frame pacing (optional):** `intendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady
-  clock, any epoch) and `targetFrameTicks` (the interval it aims for: `166_667` for 60 fps). `0` = unknown.
+  clock, any epoch), `targetFrameTicks` (the interval it aims for: `166_667` for 60 fps) and `preferredFrameTicks` (the interval the
+  application wants to run at; it differs from the target only while the pacer runs slower than wanted). `0` = unknown,
+  `Marker.OnDemandFrameTicks` = frames only when something changes.
+- **Flags (optional):** `MarkerFlags.Static` on frames where nothing animates (the analysis does not judge their animation error).
 - **CPU start time and CPU busy (optional):** `cpuStartTicks` (when the CPU started working on the frame, on the same clock,
   PresentMon's `CPUStartTime`) and `cpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind.SequenceStart`, encoded with its metadata

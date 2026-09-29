@@ -215,7 +215,8 @@ Below the tiles, **Cause** tells whether the animation error comes mostly from *
 early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it
 the target frame time and the refresh rate used, compared with the expected display rate when one was given. What "late" is
 measured against, in order: the intended display times the application's frame pacer writes into the marker (then **Detailed
-statistics** also shows the pacing and prediction error), its target frame time in the marker, the **target frame rate** given at
+statistics** also shows the pacing and prediction error), its target frame time in the marker, its preferred frame time in the marker
+(a game that wants 30 fps on a 60 Hz display is measured against two refreshes), the **target frame rate** given at
 capture or analysis time (rounded up to whole refreshes), and otherwise the display's native refresh rate.
 
 The charts are explained in the README under [Reading the results](../README.md#reading-the-results). To analyse again, for

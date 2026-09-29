@@ -77,6 +77,12 @@ namespace MB.FramePacing.Charts
         lines.Add($"frametime {Ms(frameTime)} ms");
       if (frame.CpuBusyTicks > 0)
         lines.Add($"CPU busy {Ms(frame.CpuBusyTicks)} ms");
+      if (frame.MarkerPreferredFrameTicks == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks)
+        lines.Add("preferred: on demand");
+      else if (frame.MarkerPreferredFrameTicks > 0)
+        lines.Add(
+          $"preferred {Ms(frame.MarkerPreferredFrameTicks)} ms ({Invariant(TimeSpan.TicksPerSecond / (double)frame.MarkerPreferredFrameTicks, "0.#")} fps)"
+        );
       return string.Join('\n', lines);
     }
 
@@ -89,6 +95,8 @@ namespace MB.FramePacing.Charts
         notes.Add("late");
       if ((frame.Flags & PresentedFrameFlags.Torn) != 0)
         notes.Add("torn");
+      if ((frame.Flags & PresentedFrameFlags.Static) != 0)
+        notes.Add("static: nothing animates");
       if (frame.SkippedBefore > 0)
         notes.Add($"{frame.SkippedBefore} frame indices skipped before it");
       return $"Frame {frame.FrameIndex} at {Invariant(seconds, "0.000")} s" + (notes.Count > 0 ? $" ({string.Join(", ", notes)})" : string.Empty);

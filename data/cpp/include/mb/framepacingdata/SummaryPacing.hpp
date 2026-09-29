@@ -16,7 +16,7 @@ namespace MB::FramePacingData
     double RefreshPeriodMs{0.0};
     bool RefreshCalculated{false};
     double TargetFrameMs{0.0};
-    //! Schedule, TargetFrameTime, GivenTarget or NativeRefresh.
+    //! Schedule, TargetFrameTime, PreferredFrameTime, GivenTarget or NativeRefresh.
     std::string Source;
     int64_t LateFrames{0};
     double LateShare{0.0};

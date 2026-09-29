@@ -63,17 +63,20 @@ namespace MB.FramePacing.Charts.UnitTest
         ReportOptions.ShowOnly(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.LateShare })
       );
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
+      // The frames with an animation error: a step from or to a static frame is not judged
+      var judged = measured.Where(manifest.IsJudged).ToArray();
       double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
+      double Error(int i) => Ms(manifest.AnimationErrorTicks(i)!.Value);
 
       var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
-      double largest = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
+      double largest = judged.Max(i => Math.Abs(Error(i)));
       Assert.That((error.YFrom, error.YTo), Is.EqualTo((-Math.Max(2, largest * 1.15), Math.Max(2, largest * 1.15))), $"{clip}: symmetric scale");
       // A refresh line at every whole refresh an error reaches (within a tenth of one), inside the scale
       double refreshMs = chart.Run.Pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
       var expectedLines = new List<double>();
       foreach (int sign in new[] { 1, -1 })
       {
-        double reach = measured.Select(i => sign * Ms(manifest.AnimationErrorTicks(i))).Max();
+        double reach = judged.Select(i => sign * Error(i)).Max();
         for (int k = 1; k * refreshMs < error.YTo && k * refreshMs <= reach + (0.1 * refreshMs); ++k)
           expectedLines.Add(sign * k * refreshMs);
       }
@@ -82,13 +85,13 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(lines, Is.EqualTo(expectedLines).Within(0.05 * (error.YTo - error.YFrom) / (error.Bottom - error.Top)), $"{clip}: refresh lines");
       var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "band");
       Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
-      var withError = measured.Where(i => manifest.AnimationErrorTicks(i) != 0).ToArray();
+      var withError = judged.Where(i => manifest.AnimationErrorTicks(i) != 0).ToArray();
       var bars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class == "bar").ToArray();
       Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
       double zeroY = error.PixelY(0);
       for (int k = 0; k < bars.Length; ++k)
       {
-        double expected = Ms(manifest.AnimationErrorTicks(withError[k]));
+        double expected = Error(withError[k]);
         bool up = bars[k].Y.Value < zeroY - 1e-9;
         Assert.That(up, Is.EqualTo(expected > 0), $"{clip}: frame {withError[k]} shown too soon or too late");
         if (Math.Abs(error.PixelY(expected) - zeroY) >= 1)
@@ -166,10 +169,11 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (manifest, report, _) = Analyze(clip);
       var section = RunSection.Whole(AnalysisOutput.Read(report.CaptureDirectory).Single().Chart);
-      var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
+      // The frames with an animation error (a step from or to a static frame is not judged); the display time step histogram counts the same
+      var measured = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.IsJudged).ToArray();
 
       var errors = DistributionCard.Build(DistributionCard.ErrorHistogram, section);
-      AssertCardBars(errors, measured.Select(manifest.AnimationErrorTicks), clip + ": animation error histogram");
+      AssertCardBars(errors, measured.Select(i => manifest.AnimationErrorTicks(i)!.Value), clip + ": animation error histogram");
       var errorPlot = errors.Plots.Single();
       Assert.That(
         errors.FlatShapes.OfType<LineShape>().Where(l => l.Class == "average-line").Select(l => errorPlot.ValueX(l.X1.Value)),
@@ -184,7 +188,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(display.Plots.Single().ValueX(medianLine.X1.Value), Is.EqualTo(median).Within(1e-9), $"{clip}: median display time step");
 
       var percentiles = DistributionCard.Build(DistributionCard.ErrorPercentiles, section);
-      var sorted = measured.Select(i => Ms(Math.Abs(manifest.AnimationErrorTicks(i)))).Order().ToArray();
+      var sorted = measured.Select(i => Ms(Math.Abs(manifest.AnimationErrorTicks(i)!.Value))).Order().ToArray();
       AssertCurve(
         percentiles,
         DistributionCard.CurvePercentiles.Select(p => (p, Analysis.Statistics.Percentile(sorted, p / 100))),
@@ -262,25 +266,38 @@ namespace MB.FramePacing.Charts.UnitTest
       IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
 
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
-      Assert.That(Of("bar").Count(), Is.EqualTo(measured.Count(i => manifest.AnimationErrorTicks(i) != 0)), $"{clip}: a bar per frame with an error");
+      Assert.That(
+        Of("bar").Count(),
+        Is.EqualTo(measured.Count(i => manifest.AnimationErrorTicks(i) is { } e && e != 0)),
+        $"{clip}: a bar per frame with an error"
+      );
       int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
       Assert.That(Segments("held") + Segments("held-late"), Is.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
       Assert.That(Segments("held-late"), Is.EqualTo(measured.Count(manifest.IsLate)), $"{clip}: held too long when the next frame is late");
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
+      // A cell per refresh a frame was seen in, red for a late frame; refreshes after that showed an older frame out of order (grey for now)
       Assert.That(
         Of("strip-late").Count(),
-        Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(i => (int)manifest.RefreshesOnScreen(i))),
+        Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(i => (int)manifest.SeenRefreshes(i))),
         $"{clip}: a red cell per refresh of every late frame"
       );
       Assert.That(
         Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count(),
+        Is.EqualTo(all.Sum(i => (int)manifest.SeenRefreshes(i))),
+        $"{clip}: a cell per refresh a frame was seen in"
+      );
+      Assert.That(
+        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + Of("neutral").Count(),
         Is.EqualTo(all.Sum(i => (int)manifest.RefreshesOnScreen(i))),
         $"{clip}: a cell per refresh"
       );
-      // The application side: a frametime step per frame whose next frame carries a CPU start too, a CPU busy bar per frame that has one
-      int frameTimes = Enumerable.Range(0, manifest.FrameCount - 1).Count(i => manifest.CpuStartTicks[i] != 0 && manifest.CpuStartTicks[i + 1] != 0);
+      // The application side: a frametime step per frame whose next frame (the next frame index) carries a CPU start too, a CPU busy bar per
+      // frame that has one
+      int frameTimes = Enumerable
+        .Range(0, manifest.FrameCount - 1)
+        .Count(i => manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1 && manifest.CpuStartTicks(i) != 0 && manifest.CpuStartTicks(i + 1) != 0);
       Assert.That(Segments("frametime"), Is.EqualTo(frameTimes), $"{clip}: a frametime step per frame with a frametime");
-      Assert.That(Segments("cpu-busy"), Is.EqualTo(all.Count(i => manifest.CpuBusyTicks[i] != 0)), $"{clip}: a CPU busy bar per frame with CPU busy");
+      Assert.That(Segments("cpu-busy"), Is.EqualTo(all.Count(i => manifest.CpuBusyTicks(i) != 0)), $"{clip}: a CPU busy bar per frame with CPU busy");
     }
 
     /// <summary>
@@ -356,8 +373,10 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       var s = chart.Run.Statistics;
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
-      // Every presented frame after the first has a display time step; the clip's refreshes give the fps and the nearest-rank lows
-      var steps = measured.Select(manifest.DisplayStepTicks).OrderBy(t => t).ToArray();
+      // The frame rates cover the frames with an animation error (static steps are left out); the clip's refreshes give the fps and the
+      // nearest-rank lows
+      var judged = measured.Where(manifest.IsJudged).ToArray();
+      var steps = judged.Select(manifest.DisplayStepTicks).OrderBy(t => t).ToArray();
       double averageFps = steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum();
       Assert.That(tiles.Single(t => t.Caption == "Average fps").Value, Is.EqualTo(averageFps.ToString("0.0", CultureInfo.InvariantCulture)));
       long p99 = steps[(int)Math.Ceiling(0.99 * steps.Length) - 1];
@@ -372,7 +391,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var late = tiles.Single(t => t.Caption == "Late frames");
       Assert.That(late.Value, Is.EqualTo(measured.Count(manifest.IsLate).ToString(CultureInfo.InvariantCulture)));
       Assert.That(late.Warning, Is.EqualTo(measured.Any(manifest.IsLate)));
-      double worst = measured.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i))));
+      double worst = judged.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i)!.Value)));
       Assert.That(tiles.Single(t => t.Caption == "Worst error").Value, Is.EqualTo(worst.ToString("0.0", CultureInfo.InvariantCulture) + " ms"));
     }
 
@@ -381,7 +400,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var manifest = VideoClips.Manifest(clip);
       var report = CaptureAnalyzer.Analyze(VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, "capture")), new AnalysisOptions());
       var run = report.Timeline.Runs.Single();
-      Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), $"{clip}: every frame of the clip is presented");
+      Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), $"{clip}: the manifest's presented frames");
       return (manifest, report, ChartRun.From(report, run));
     }
 
@@ -399,7 +418,8 @@ namespace MB.FramePacing.Charts.UnitTest
     /// </summary>
     private static double[] ExpectedLateShare(ClipManifest manifest)
     {
-      bool Longer(int frame) => manifest.Refresh[frame] - manifest.Refresh[frame - 1] > 1;
+      bool Longer(int frame) =>
+        !manifest.IsStatic(frame) && manifest.PreferredRefreshes(frame) is { } preferred && manifest.DisplayStepRefreshes(frame) > preferred;
       var shares = new double[manifest.FrameCount];
       int start = 0;
       for (int i = 0; i < manifest.FrameCount; ++i)

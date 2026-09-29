@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* One application frame as it reached the display: when it was first seen, how long it stayed, its display and animation delta, animation
-//* error and drift.
+//* error and drift. The animation error is not judged (null) for a step from or to a static frame (nothing animates in it), and the drift
+//* adds up only the judged errors.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -27,6 +28,14 @@ namespace MB.FramePacing.Analysis
   /// and both carry a CPU start time.
   /// </param>
   /// <param name="CpuWaitTicks">CPU wait (PresentMon's MsCPUWait): the frametime minus CPU busy, when both are known.</param>
+  /// <param name="MarkerPreferredFrameTicks">
+  /// From the marker: the frame time the application wants to run at, 0 = unknown, <c>MarkerPayload.OnDemandFrameTicks</c> = frames only
+  /// when something changes.
+  /// </param>
+  /// <param name="PreferredTicks">
+  /// The frame time the application wants, in whole refreshes: the marker's preferred frame time, else the target frame rate given to the
+  /// tools, else one refresh (<see cref="RunPacing"/>). Null when the application presents on demand.
+  /// </param>
   public sealed record PresentedFrame(
     int Segment,
     ulong FrameIndex,
@@ -52,6 +61,8 @@ namespace MB.FramePacing.Analysis
     long CpuStartTicks = 0,
     uint CpuBusyTicks = 0,
     long? FrameTimeTicks = null,
-    long? CpuWaitTicks = null
+    long? CpuWaitTicks = null,
+    uint MarkerPreferredFrameTicks = 0,
+    long? PreferredTicks = null
   );
 }

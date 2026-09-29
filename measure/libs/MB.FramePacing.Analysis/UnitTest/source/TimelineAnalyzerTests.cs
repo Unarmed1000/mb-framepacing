@@ -34,11 +34,23 @@ namespace MB.FramePacing.Analysis.UnitTest
         int captures,
         uint runId = 1,
         MarkerKind kind = MarkerKind.Frame,
-        StartMetadata? start = null
+        StartMetadata? start = null,
+        uint targetFrameTicks = 0,
+        uint preferredFrameTicks = 0,
+        MB.FrameMarker.MarkerFlags flags = MB.FrameMarker.MarkerFlags.None
       )
       {
+        var payload = new MarkerPayload(
+          frameIndex,
+          animationMs * Ms,
+          runId,
+          kind,
+          TargetFrameTicks: targetFrameTicks,
+          PreferredFrameTicks: preferredFrameTicks,
+          Flags: flags
+        );
         for (int i = 0; i < captures; ++i)
-          Rows.Add(new CaptureRow(Next, Next * Period, CaptureStatus.Decoded, new MarkerPayload(frameIndex, animationMs * Ms, runId, kind), start));
+          Rows.Add(new CaptureRow(Next, Next * Period, CaptureStatus.Decoded, payload, start));
         return this;
       }
 
@@ -99,6 +111,72 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(frames[3].AnimationErrorTicks, Is.EqualTo(-16 * Ms));
       Assert.That(frames[3].DriftTicks, Is.EqualTo(-16 * Ms));
       Assert.That(frames[4].AnimationErrorTicks, Is.EqualTo(0));
+    }
+
+    /// <summary>
+    /// A second of idle screen (a static frame) between animated frames: the steps into and out of it are not judged, whether the
+    /// application's animation clock paused while nothing animated (48 ms) or kept running (1048 ms), and the drift does not jump.
+    /// </summary>
+    [TestCase(64L)]
+    [TestCase(1064L)]
+    public void StaticFrame_ItsStepsAreNotJudged(long animationAfterIdleMs)
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
+      rows.Show(4, 48, 250, flags: MB.FrameMarker.MarkerFlags.Static);
+      rows.Show(5, animationAfterIdleMs, 4).Show(6, animationAfterIdleMs + 16, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+      var frames = run.Frames;
+
+      Assert.That(frames[3].Flags.HasFlag(PresentedFrameFlags.Static));
+      Assert.That(frames[4].Flags.HasFlag(PresentedFrameFlags.Static), Is.False);
+      Assert.That(frames[3].AnimationErrorTicks, Is.Null, "the step to the static frame");
+      Assert.That(frames[4].AnimationErrorTicks, Is.Null, "the step from it");
+      Assert.That(frames[4].DisplayDeltaTicks, Is.EqualTo(1000 * Ms), "its display time step still counts");
+      Assert.That(frames[5].AnimationErrorTicks, Is.EqualTo(0));
+      Assert.That(frames.Select(f => f.DriftTicks), Is.All.EqualTo(0L), "the drift adds up only the judged steps");
+      Assert.That(run.Statistics.FramesWithAnimationError, Is.Zero);
+    }
+
+    /// <summary>An application that presents on demand has no interval to be late against: a long wait for its next frame is not late.</summary>
+    [Test]
+    public void OnDemand_IsNeverLateByTheTargetRule()
+    {
+      const uint OnDemand = MarkerPayload.OnDemandFrameTicks;
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
+      rows.Show(2, 16, 500, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
+      rows.Show(3, 2016, 4, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
+      rows.End(1);
+
+      var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
+
+      Assert.That(frames.Any(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.False);
+      Assert.That(frames.Select(f => f.TargetTicks), Is.All.Null);
+      Assert.That(frames.Select(f => f.PreferredTicks), Is.All.Null);
+      Assert.That(frames.Select(f => f.MarkerPreferredFrameTicks), Is.All.EqualTo(OnDemand));
+    }
+
+    /// <summary>
+    /// The frame time the application wants comes from its marker, in whole refreshes; without it the one refresh the display shows each
+    /// frame for (no target frame rate given to the tools).
+    /// </summary>
+    [Test]
+    public void PreferredFrameTime_IsTheMarkersElseOneRefresh()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 8, targetFrameTicks: 32 * (uint)Ms, preferredFrameTicks: 16 * (uint)Ms)
+        .Show(2, 32, 8, targetFrameTicks: 32 * (uint)Ms, preferredFrameTicks: 16 * (uint)Ms);
+      rows.Show(3, 64, 4).Show(4, 80, 4);
+      rows.End(1);
+
+      var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
+
+      Assert.That(frames[1].PreferredTicks, Is.EqualTo(16 * Ms), "the marker's: the pacer runs slower than the application wants");
+      Assert.That(frames[1].TargetTicks, Is.EqualTo(32 * Ms));
+      Assert.That(frames[3].PreferredTicks, Is.EqualTo(Period), "without one: one refresh");
     }
 
     [Test]

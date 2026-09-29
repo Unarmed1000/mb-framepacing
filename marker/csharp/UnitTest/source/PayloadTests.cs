@@ -29,7 +29,9 @@ namespace MB.FrameMarker.UnitTest
           0x3132333435363738,
           0x41424344u,
           0x5152535455565758,
-          0x61626364u
+          0x61626364u,
+          0x71727374u,
+          MarkerFlags.Static
         ),
         default,
         bytes
@@ -85,6 +87,11 @@ namespace MB.FrameMarker.UnitTest
         0x63,
         0x62,
         0x61,
+        0x74,
+        0x73,
+        0x72,
+        0x71,
+        0x01,
       };
       Assert.That(bytes.AsSpan(0, count).ToArray(), Is.EqualTo(expected));
     }
@@ -131,6 +138,35 @@ namespace MB.FrameMarker.UnitTest
       }
     }
 
+    [TestCase(166_667u, MarkerFlags.None)]
+    [TestCase(Marker.OnDemandFrameTicks, MarkerFlags.Static)]
+    [TestCase(10_000_000u, MarkerFlags.Static)]
+    [TestCase(0u, (MarkerFlags)0x81)]
+    public void PreferredFrameTimeAndFlags_RoundTrip(uint preferredFrameTicks, MarkerFlags flags)
+    {
+      foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.SequenceStart, MarkerKind.SequenceEnd })
+      {
+        var payload = new Payload(7, 8, 9, kind, 10, 333_333, 11, 12, preferredFrameTicks, flags);
+        var bytes = new byte[Marker.MaxEncodedPayloadByteCount];
+        int count = Marker.EncodePayload(payload, new StartMetadata(1, new SequenceId(1, 2)), bytes);
+        Assert.That(bytes[52], Is.EqualTo((byte)flags), "the flags byte, reserved bits included");
+        Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
+        Assert.That(decoded, Is.EqualTo(payload));
+        Assert.That((decoded.PreferredFrameTicks, decoded.Flags), Is.EqualTo((preferredFrameTicks, flags)));
+      }
+    }
+
+    [Test]
+    public void OldHeaderLengths_AreRejected()
+    {
+      var bytes = new byte[Marker.MaxEncodedPayloadByteCount + 1];
+      int count = Marker.EncodePayload(new Payload(1, 2, 3), default, bytes);
+      Assert.That(count, Is.EqualTo(53));
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, 52), out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, 54), out _, out _), Is.False);
+      Assert.That(Marker.TryDecodePayload(bytes.AsSpan(0, 48), out _, out _), Is.False, "the older 48 byte header");
+    }
+
     [Test]
     public void SyncMarker_CarriesOnlyTheFrameIndex()
     {
@@ -151,10 +187,10 @@ namespace MB.FrameMarker.UnitTest
       var id = new SequenceId(0x0011_2233_4455_6677, 0x8899_AABB_CCDD_EEFF);
       int count = Marker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), bytes.AsSpan(5));
       Assert.That(count, Is.EqualTo(Marker.StartPayloadByteCount));
-      Assert.That(count, Is.EqualTo(72));
-      // The sequence id's 16 bytes as they are, at offset 56
+      Assert.That(count, Is.EqualTo(77));
+      // The sequence id's 16 bytes as they are, at offset 61
       Assert.That(
-        bytes.AsSpan(5 + 56, 16).ToArray(),
+        bytes.AsSpan(5 + 61, 16).ToArray(),
         Is.EqualTo(new byte[] { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF })
       );
 

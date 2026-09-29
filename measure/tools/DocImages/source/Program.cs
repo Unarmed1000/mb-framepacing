@@ -229,7 +229,7 @@ namespace MB.FramePacing.DocImages
         }
         catch (TimeoutException)
         {
-          throw new InvalidOperationException($"Timeline card: {what}: no new card ({analysis.SectionText})");
+          throw new InvalidOperationException($"Timeline card: {what}: no new card ({analysis.SectionText}; {analysis.ErrorText})");
         }
         return Shown();
       }
@@ -263,10 +263,11 @@ namespace MB.FramePacing.DocImages
       Expect(Math.Abs(zoomed.ValueX((zoomed.Left + zoomed.Right) / 2) - atPointer) < 1e-6, "the time under the pointer stays there");
       Expect(analysis.CanScroll && Math.Abs(analysis.ScrollValue - zoomed.XFrom) < 1e-9, "the scrollbar shows where the view is");
 
-      // Zoomed in further, the window is a small part of the run
+      // Zoomed in further, the window is a small part of the run (the card before the input: the new one may arrive with it)
+      var beforeFurther = card.Drawing;
       for (int i = 0; i < 10; ++i)
         window.MouseWheel(middle, new Vector(0, 1));
-      zoomed = await Built(card.Drawing, "the wheel zooms in further");
+      zoomed = await Built(beforeFurther, "the wheel zooms in further");
       length = zoomed.XTo - zoomed.XFrom;
       var window0 = card.Drawing;
 

@@ -46,7 +46,7 @@ from .capture_data import (
     DataRect,
     MarkerLocation,
 )
-from .csv_files import CaptureCsvRow, FrameRow, read_captures, read_frames
+from .csv_files import ON_DEMAND_FRAME_TICKS, CaptureCsvRow, FrameRow, read_captures, read_frames
 from .errors import DataFormatError
 from .summary import (
     FORMAT_VERSION as ANALYSIS_FORMAT_VERSION,
@@ -75,6 +75,7 @@ __all__ = [
     "CAPTURE_DATA_FILE_NAME",
     "CAPTURE_DATA_FORMAT_VERSION",
     "DIRECTORY_NAME",
+    "ON_DEMAND_FRAME_TICKS",
     "SUMMARY_FILE_NAME",
     "TICKS_PER_MILLISECOND",
     "UNKNOWN_TICKS",

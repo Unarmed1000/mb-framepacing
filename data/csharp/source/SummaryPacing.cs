@@ -11,7 +11,9 @@ namespace MB.FramePacing.Data
 {
   /// <param name="RefreshPeriodMs">The display's refresh period (a capture card's capture period, or calculated from a camera's frames).</param>
   /// <param name="TargetFrameMs">The frame time the run is measured against, in whole refreshes.</param>
-  /// <param name="Source">"Schedule", "TargetFrameTime", "GivenTarget" or "NativeRefresh": where the targets come from.</param>
+  /// <param name="Source">
+  /// "Schedule", "TargetFrameTime", "PreferredFrameTime", "GivenTarget" or "NativeRefresh": where the targets come from.
+  /// </param>
   /// <param name="LateShare">Late frames as a share of the presented frames with a display time step (0..1).</param>
   /// <param name="WorstLateShare">The highest share of late frames in any 2 s window (0..1).</param>
   /// <param name="Verdict">"None", "BadPacing", "DeltaTimeJitter" or "Both".</param>

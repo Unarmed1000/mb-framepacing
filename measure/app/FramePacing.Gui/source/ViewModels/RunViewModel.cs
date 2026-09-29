@@ -45,9 +45,11 @@ namespace MB.FramePacing.Gui.ViewModels
           PacingSource.Schedule =>
             $"Late = shown half a refresh or more after the frame's intended display time (the pacer's schedule in the markers, typically {target} ms per frame).",
           PacingSource.TargetFrameTime =>
-            $"Late = shown at least one refresh after each frame's target frame time (the pacer's target in the markers, typically {target} ms).",
-          PacingSource.GivenTarget => $"Late = shown at least one refresh after the {target} ms target (the given target frame rate).",
-          _ => $"Late = shown at least one refresh after the {target} ms target (no pacing information: the display's native refresh rate).",
+            $"Late = on screen half a refresh or more beyond each frame's target frame time (the pacer's target in the markers, typically {target} ms).",
+          PacingSource.PreferredFrameTime =>
+            $"Late = on screen half a refresh or more beyond the frame time the application wants (its preferred frame time in the markers, typically {target} ms).",
+          PacingSource.GivenTarget => $"Late = on screen half a refresh or more beyond the {target} ms target (the given target frame rate).",
+          _ => $"Late = on screen half a refresh or more beyond the {target} ms target (no pacing information: the display's native refresh rate).",
         };
         RefreshText =
           string.Create(

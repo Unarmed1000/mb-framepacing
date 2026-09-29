@@ -11,13 +11,18 @@ from pathlib import Path
 from .analysis_files import parse_ticks
 from .errors import DataFormatError
 
+ON_DEMAND_FRAME_TICKS = 0xFFFF_FFFF
+"""The marker's target and preferred frame time of an application that presents only when something changes (429496.7295 ms)."""
+
 
 @dataclass(frozen=True)
 class FrameRow:
     """One presented frame. first_seen_ticks is its display time (the capture's clock), display_delta_ticks the display time step,
-    animation_error_ticks the animation time step minus the display time step. flags holds SkippedBefore, UncertainStart, Torn or Late.
-    The pacing and CPU fields come from the markers (CPU start time, CPU busy, frametime and CPU wait as PresentMon names them). The last
-    two are EXPERIMENTAL camera captures' only."""
+    animation_error_ticks the animation time step minus the display time step (None for a step from or to a static frame). flags holds
+    SkippedBefore, UncertainStart, Torn, Late or Static. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
+    frametime and CPU wait as PresentMon names them); marker_target_ticks and marker_preferred_ticks are ON_DEMAND_FRAME_TICKS on demand,
+    target_ticks and preferred_ticks (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
+    camera captures' only."""
 
     segment: int
     frame_index: int
@@ -35,6 +40,8 @@ class FrameRow:
     intended_display_ticks: int | None
     marker_target_ticks: int | None
     target_ticks: int | None
+    marker_preferred_ticks: int | None
+    preferred_ticks: int | None
     pacing_error_ticks: int | None
     prediction_error_ticks: int | None
     lateness_ticks: int | None
@@ -120,6 +127,8 @@ def read_frames(path: str | Path) -> list[FrameRow]:
                 intended_display_ticks=table.optional_ticks(row, "intendedDisplayMs"),
                 marker_target_ticks=table.optional_ticks(row, "markerTargetMs"),
                 target_ticks=table.optional_ticks(row, "targetMs"),
+                marker_preferred_ticks=table.optional_ticks(row, "markerPreferredMs"),
+                preferred_ticks=table.optional_ticks(row, "preferredMs"),
                 pacing_error_ticks=table.optional_ticks(row, "pacingErrorMs"),
                 prediction_error_ticks=table.optional_ticks(row, "predictionErrorMs"),
                 lateness_ticks=table.optional_ticks(row, "latenessMs"),

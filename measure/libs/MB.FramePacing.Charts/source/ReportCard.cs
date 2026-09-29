@@ -259,12 +259,13 @@ namespace MB.FramePacing.Charts
 
       // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate, like Swappy,
       // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
+      static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
       var refreshes = frames
-        .Where(f => f.DisplayDeltaTicks.HasValue && (f.MarkerTargetFrameTicks > 0 || f.TargetTicks.HasValue))
+        .Where(f => f.DisplayDeltaTicks.HasValue && (Known(f.MarkerTargetFrameTicks) || f.TargetTicks.HasValue))
         .Select(f =>
           (int)
             Math.Round(
-              (f.MarkerTargetFrameTicks > 0 ? f.MarkerTargetFrameTicks : f.TargetTicks!.Value) / (double)TimeSpan.TicksPerMillisecond / refreshMs
+              (Known(f.MarkerTargetFrameTicks) ? f.MarkerTargetFrameTicks : f.TargetTicks!.Value) / (double)TimeSpan.TicksPerMillisecond / refreshMs
             )
         )
         .Distinct()
@@ -275,7 +276,26 @@ namespace MB.FramePacing.Charts
         : refreshes.Length == 1
           ? $", target {Refreshes(refreshes[0])} ({(1000 / (refreshes[0] * refreshMs)).ToString("0.#", CultureInfo.InvariantCulture)} fps)"
         : $", target {refreshes[0]}\u2013{Refreshes(refreshes[^1])}";
-      parts.Add(new TextShape(X + 14, Y + 60, $"{Ms1(refreshMs)} ms per refresh{target}", "vsync-n", "start"));
+      // What the application wants, when its markers say so
+      var preferredFps = frames
+        .Where(f => Known(f.MarkerPreferredFrameTicks))
+        .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTicks, 1))
+        .Distinct()
+        .Order()
+        .ToArray();
+      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTicks == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks);
+      var wants = new List<string>();
+      if (preferredFps.Length > 0)
+      {
+        string Fps(double fps) => fps.ToString("0.#", CultureInfo.InvariantCulture);
+        wants.Add(
+          preferredFps.Length == 1 ? $"preferred {Fps(preferredFps[0])} fps" : $"preferred {Fps(preferredFps[0])}\u2013{Fps(preferredFps[^1])} fps"
+        );
+      }
+      if (onDemand)
+        wants.Add("on demand");
+      string preferred = wants.Count > 0 ? ", " + string.Join(", ", wants) : string.Empty;
+      parts.Add(new TextShape(X + 14, Y + 60, $"{Ms1(refreshMs)} ms per refresh{target}{preferred}", "vsync-n", "start"));
     }
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
@@ -805,7 +825,7 @@ namespace MB.FramePacing.Charts
       string note = $"whole run {Percent(pacing.LateShare)}";
       if (late.AnyHeldLonger)
         note =
-          $"amber: on screen longer than a refresh ({Ms1(pacing.RefreshPeriodMs)} ms) as the pacer intended; red: longer than it intended; "
+          $"amber: on screen longer than the application prefers, as the pacer intended; red: longer than it intended; "
           + $"whole run {Percent(pacing.LateShare)}";
       parts.Add(new TextShape(view.PlotX1, lateY - 16, note, "vsync-n", "end"));
       var (scaleStart, scaleEnd) = view.ScaleFrames;

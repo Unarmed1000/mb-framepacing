@@ -96,7 +96,9 @@ namespace MB.FrameMarker.UnitTest
         row.Long("intendedDisplayTicks"),
         uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture),
         row.Long("cpuStartTicks"),
-        uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture)
+        uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture),
+        uint.Parse(row.Text("preferredFrameTicks"), CultureInfo.InvariantCulture),
+        (MarkerFlags)byte.Parse(row.Text("flags"), CultureInfo.InvariantCulture)
       );
 
     private static StartMetadata Start(Row row) =>

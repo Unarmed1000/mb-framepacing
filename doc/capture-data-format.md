@@ -48,8 +48,8 @@ capture ends.
 | 29     | 1    | Main marker byte count (0 = not read)                                                                         |
 | 30     | 1    | Second marker byte count (0 = not read)                                                                       |
 | 31     | 1    | Reserved (0)                                                                                                  |
-| 32     | 112  | The main marker's encoded bytes exactly as read from the QR code ([marker format](marker-format.md)), then 0s |
-| 144    | 48   | The second marker's encoded bytes (the sync marker, or a camera's second zone), then 0s                       |
+| 32     | 80   | The main marker's encoded bytes exactly as read from the QR code ([marker format](marker-format.md)), then 0s |
+| 112    | 80   | The second marker's encoded bytes (the sync marker, or a camera's second zone), then 0s                       |
 
 The first 28 bytes have the layout of a `frames.mbfc` record header, so a record's capture part is the same in both files. A capture
 that was stopped mid-write may end with a partial record; readers ignore it.

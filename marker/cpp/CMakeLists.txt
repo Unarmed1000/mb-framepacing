@@ -55,6 +55,7 @@ target_sources(mb_framemarker
       include/mb/framemarker/FrameMarker.hpp
       include/mb/framemarker/IndexedCount.hpp
       include/mb/framemarker/LibraryVersion.hpp
+      include/mb/framemarker/MarkerFlags.hpp
       include/mb/framemarker/MarkerKind.hpp
       include/mb/framemarker/ModuleMatrix.hpp
       include/mb/framemarker/Options.hpp

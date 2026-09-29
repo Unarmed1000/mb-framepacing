@@ -391,6 +391,8 @@ namespace MB::FramePacingData
       frame.IntendedDisplayTicks = OptionalTicks(table.Cell(row, "intendedDisplayMs"));
       frame.MarkerTargetTicks = OptionalTicks(table.Cell(row, "markerTargetMs"));
       frame.TargetTicks = OptionalTicks(table.Cell(row, "targetMs"));
+      frame.MarkerPreferredTicks = OptionalTicks(table.Cell(row, "markerPreferredMs"));
+      frame.PreferredTicks = OptionalTicks(table.Cell(row, "preferredMs"));
       frame.PacingErrorTicks = OptionalTicks(table.Cell(row, "pacingErrorMs"));
       frame.PredictionErrorTicks = OptionalTicks(table.Cell(row, "predictionErrorMs"));
       frame.LatenessTicks = OptionalTicks(table.Cell(row, "latenessMs"));

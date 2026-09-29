@@ -23,16 +23,18 @@ namespace MB.FramePacing.Analysis.UnitTest
     private const long Refresh = 16 * Ms; // 62.5 Hz display, captured at 62.5 fps
 
     /// <summary>A run of frames: each shown for its number of refreshes, with its animation time step (ms) from the previous frame.</summary>
-    private static List<CaptureRow> Rows(IEnumerable<(int Refreshes, long StepMs)> frames, long refresh = Refresh) =>
-      PacedRows(frames.Select(f => (f.Refreshes, f.StepMs, 0L, 0u)), refresh);
+    private static List<CaptureRow> Rows(IEnumerable<(int Refreshes, long StepMs)> frames, long refresh = Refresh, uint preferredTicks = 0) =>
+      PacedRows(frames.Select(f => (f.Refreshes, f.StepMs, 0L, 0u)), refresh, preferredTicks);
 
     /// <summary>
     /// A run of frames with pacing information: each shown for its number of refreshes, with its animation time step (ms), the pacer's
-    /// intended display time (ms on its own clock, 0 = none) and target frame time (ticks, 0 = none).
+    /// intended display time (ms on its own clock, 0 = none) and target frame time (ticks, 0 = none); every frame's preferred frame time
+    /// is <paramref name="preferredTicks"/> (0 = none).
     /// </summary>
     private static List<CaptureRow> PacedRows(
       IEnumerable<(int Refreshes, long StepMs, long IntendedMs, uint TargetTicks)> frames,
-      long refresh = Refresh
+      long refresh = Refresh,
+      uint preferredTicks = 0
     )
     {
       var rows = new List<CaptureRow>();
@@ -47,7 +49,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       {
         animationMs += step;
         for (int c = 0; c < refreshes; ++c)
-          Add(new MarkerPayload(index, animationMs * Ms, 1, MarkerKind.Frame, intendedMs * Ms, target));
+          Add(new MarkerPayload(index, animationMs * Ms, 1, MarkerKind.Frame, intendedMs * Ms, target, PreferredFrameTicks: preferredTicks));
         ++index;
       }
       for (int i = 0; i < 3; ++i)
@@ -132,6 +134,21 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
       Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(16));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(19));
+    }
+
+    [Test]
+    public void HalfRate_ThatTheGamePrefers_IsNotLate()
+    {
+      // The markers say only that the game wants 31.25 fps on this 62.5 Hz display: two refreshes per frame are its target, three are late
+      var frames = Steady(20, refreshes: 2).ToList();
+      frames[9] = (3, 32);
+      var run = Analyze(Rows(frames, preferredTicks: 320_000));
+
+      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.PreferredFrameTime));
+      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(32));
+      Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
+      Assert.That(IsLate(run.Frames[10]));
+      Assert.That(run.Frames.Skip(1).All(f => f.PreferredTicks == 32 * Ms));
     }
 
     [Test]

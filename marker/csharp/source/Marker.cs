@@ -35,12 +35,15 @@ namespace MB.FrameMarker
     public const int SyncPayloadByteCount = 12;
 
     /// <summary>Payload header, shared by every marker kind (little endian): magic "MF" | format version | kind | frame index u64 |
-    /// animation ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32 | CPU start ticks i64 | CPU busy ticks u32.
-    /// Start and end markers carry the values of the frame that shows them.</summary>
-    public const int PayloadByteCount = 48;
+    /// animation ticks i64 | run id u32 | intended display ticks i64 | target frame ticks u32 | CPU start ticks i64 | CPU busy ticks u32 |
+    /// preferred frame ticks u32 | flags u8. Start and end markers carry the values of the frame that shows them.</summary>
+    public const int PayloadByteCount = 53;
     public const byte PayloadMagic0 = (byte)'M';
     public const byte PayloadMagic1 = (byte)'F';
     public const byte PayloadFormatVersion = 1;
+
+    /// <summary>The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.</summary>
+    public const uint OnDemandFrameTicks = uint.MaxValue;
 
     /// <summary>Start marker payload: header | start time UTC i64 | sequence id (16 bytes).</summary>
     public const int StartPayloadByteCount = PayloadByteCount + 8 + SequenceId.ByteCount;
@@ -86,6 +89,8 @@ namespace MB.FrameMarker
     private const int OffsetTargetFrameTicks = 32;
     private const int OffsetCpuStartTicks = 36;
     private const int OffsetCpuBusyTicks = 44;
+    private const int OffsetPreferredFrameTicks = 48;
+    private const int OffsetFlags = 52;
     private const int OffsetStartUtcTicks = PayloadByteCount;
     private const int OffsetSequenceId = OffsetStartUtcTicks + 8;
 
@@ -159,6 +164,8 @@ namespace MB.FrameMarker
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetTargetFrameTicks), payload.TargetFrameTicks);
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetCpuStartTicks), payload.CpuStartTicks);
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetCpuBusyTicks), payload.CpuBusyTicks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetPreferredFrameTicks), payload.PreferredFrameTicks);
+      destination[OffsetFlags] = (byte)payload.Flags;
       if (isStart)
       {
         BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetStartUtcTicks), metadata.UtcTicks);
@@ -216,7 +223,10 @@ namespace MB.FrameMarker
         BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetIntendedDisplayTicks)),
         BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetTargetFrameTicks)),
         BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetCpuStartTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetCpuBusyTicks))
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetCpuBusyTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetPreferredFrameTicks)),
+        // Every value is accepted: bits without a name are reserved and kept
+        (MarkerFlags)source[OffsetFlags]
       );
       return true;
     }

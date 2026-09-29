@@ -154,7 +154,8 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
     for (uint64_t frame = 0; frame < 200u; ++frame)
     {
       const auto ticks = static_cast<int64_t>(frame) * (FM::TicksPerSecond / 60);
-      const FM::Payload framePayload{frame, ticks, 7u, FM::MarkerKind::Frame, ticks + 50'000, 166'667u, ticks - 10'000, 80'000u};
+      const FM::Payload framePayload{frame,          ticks,   7u,       FM::MarkerKind::Frame,  ticks + 50'000, 166'667u,
+                                     ticks - 10'000, 80'000u, 166'667u, FM::MarkerFlags::Static};
       const FM::Payload endPayload{frame, ticks, 7u, FM::MarkerKind::SequenceEnd};
       const FM::Payload startPayload{frame, ticks, 7u, FM::MarkerKind::SequenceStart};
       written += FM::SequenceId::TryFromText("allocation-test", metadata.Id) ? 1u : 0u;

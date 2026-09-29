@@ -2,8 +2,9 @@
 
 The frame marker is a QR code that the application under test draws into every frame. It carries the application's **frame
 index**, the **animation time** the frame was rendered for, a **run id**, when the application paces its frames **when it intends
-the frame to be shown** and its **target frame time**, and optionally the frame's **CPU start time** and **CPU busy**: when the CPU
-started working on the frame and how long it worked on it before presenting it. `mb-framepacing` captures the display output with an
+the frame to be shown**, its **target frame time** and the **preferred frame time** it wants to run at, and optionally the frame's
+**CPU start time** and **CPU busy**: when the CPU started working on the frame and how long it worked on it before presenting it. A
+**flags** byte says more about the frame: **static** when nothing animates in it. `mb-framepacing` captures the display output with an
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
@@ -19,7 +20,7 @@ Both implement this document; if they disagree, this document is the reference.
 
 ## Payload
 
-Frame, start and end markers start with the same 48 byte header, little endian:
+Frame, start and end markers start with the same 53 byte header, little endian:
 
 | Offset | Size | Field                 | Notes                                                                                                                                                                                 |
 | ------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -33,15 +34,17 @@ Frame, start and end markers start with the same 48 byte header, little endian:
 | 32     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                             |
 | 36     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                    |
 | 44     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                     |
+| 48     | 4    | Preferred frame time  | `u32` ticks (100 ns), `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `166'667` for 60 fps, also while the pacer runs slower (see below).      |
+| 52     | 1    | Flags                 | Bit 0 = **static**: nothing animates in this frame (see below). Bits 1 to 7 are reserved: write `0`; decoders ignore them.                                                            |
 
 Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
-carries the same frame index. Frame and end markers are exactly these 48 bytes. A **start marker** appends its metadata, 72 bytes
+carries the same frame index. Frame and end markers are exactly these 53 bytes. A **start marker** appends its metadata, 77 bytes
 in all:
 
 | Offset | Size | Field       | Notes                                                                                                                                                     |
 | ------ | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 48     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
-| 56     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).   |
+| 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
+| 61     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).   |
 
 The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
 8-4-4-4-12 form of a UUID.
@@ -61,24 +64,49 @@ Decoders reject a payload with the wrong length for its kind, the wrong magic or
 wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `static_cast<int64_t>(t * 10'000'000.0)` in C++, or
 `std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(d).count()`.
 
-### Frame pacing: intended display time and target frame time
+### Frame pacing: intended display time, target frame time and preferred frame time
 
 Only the application's frame pacer knows what it is aiming for. A capture cannot tell a pacer that deliberately runs at 30 fps
-(Swappy dropping to 30 for a busy stretch, a 30 fps cap) from a game that fails to hold 60, and it cannot see that every frame after
-a hitch stays a refresh late in a full frame queue. The two pacing fields tell the analysis:
+(Swappy dropping to 30 for a busy stretch, a 30 fps cap) from a game that fails to hold 60, it cannot tell a game that wants 30 fps from
+one that was forced down to it, and it cannot see that every frame after a hitch stays a refresh late in a full frame queue. The
+pacing fields tell the analysis:
 
-- **Intended display time:** the time the pacer schedules the frame to become visible: the vsync it targets, or the desired
-  present time it passes to a present timing API (`VK_GOOGLE_display_timing`, `VK_EXT_present_timing`, Swappy, DXGI frame
-  statistics). Use a steady clock (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) converted to 100 ns ticks;
-  its epoch does not matter, only the differences between frames. The analysis lines the clock up with the capture clock itself.
-  A frame shown a refresh or more after its intended time is **late**; that also finds frames that stay late after a hitch.
+- **Intended display time:** the time the pacer aims for this frame to become visible: the vsync it targets, the present time it
+  requests from a present timing API (`desiredPresentTime` in `VK_GOOGLE_display_timing`, the target present time of
+  `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`, Swappy), or the **predicted display time** the platform gives it and it
+  adopts (OpenXR `predictedDisplayTime`, Android Choreographer's expected presentation time, `CADisplayLink.targetTimestamp`). It is the
+  pacer's plan; what the game animated the frame for is its animation time, and in a well paced game the two agree. Use a steady clock
+  (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) converted to 100 ns ticks; its epoch does not matter, only the
+  differences between frames. The analysis lines the clock up with the capture clock itself. A frame shown half a refresh or more
+  after its intended time is **late**; that also finds frames that stay late after a hitch.
 - **Target frame time:** the interval the pacer aims for before this frame (`1 / target frame rate`). Fill it even without an
   intended display time, for example from a frame limiter. It changes on the frame where the pacer changes its rate.
-- Leave both `0` when the application does not pace its frames. The analysis then measures against a target frame rate given to
-  the tools, or against the display's native refresh rate (one frame per refresh).
+- **Preferred frame time:** the interval the application wants to run at: what it would aim for if nothing held it back. It differs
+  from the target frame time only while the pacer runs slower than it wants:
+  - A game locked to 30 fps: preferred and target `333'333`. It runs as it wants.
+  - Swappy or another adaptive pacer that drops from 60 to 30 fps for a busy stretch: preferred `166'667`, target `333'333` while
+    lowered. The analysis shows that stretch as below its preferred rate.
+  - A device that saves power while idle and presents 1 frame per second: preferred and target `10'000'000` while idle. Idle at the
+    rate it wants is not a problem.
+  - A renderer that presents only when something changes: `0xFFFFFFFF` (**on demand**) in both. There is no interval to aim for, so
+    no wait for the next frame is late. The value is allowed in the target frame time too.
+  - With variable refresh (VRR) the rates need not be whole refreshes: a pacer on a 144 Hz display can drop from 60 to 48 fps
+    (`208'333`) or cap at 117 fps. The fields are intervals, so nothing changes.
+- Without a target frame time the analysis measures each frame against the preferred frame time: a game that writes only that it
+  wants 30 fps on a 60 Hz display is measured against two refreshes, not one.
+- Leave the fields `0` when the application does not pace its frames. The analysis then measures against a target frame rate given
+  to the tools, or against the display's native refresh rate (one frame per refresh), and takes the target as the preferred rate.
 - With intended display times the analysis splits every frame's animation error exactly: **pacing error** (the display time step
   minus the intended step: the frame was shown off the plan) and **prediction error** (the animation time step minus the intended step:
   the frame was animated for another moment than planned). The animation error is prediction minus pacing error.
+
+### Flags
+
+- **Bit 0, static:** nothing animates in this frame; it looks the same whatever time it is shown at (an idle screen, a paused menu
+  with nothing moving). Set it on every such frame. The analysis does not judge the animation error of a step from or to a static
+  frame, because there is no motion to be off: an animation clock that pauses while nothing animates would otherwise make the first
+  frame after an idle stretch look as far off as the stretch was long. The frame's display time step still counts.
+- **Bits 1 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
 
 ### CPU start time and CPU busy
 
@@ -103,7 +131,7 @@ where the next frame index was captured too. Leave the fields `0` when the appli
 
 - QR code, **ECC level M**, **byte mode**, mask chosen automatically.
 - **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
-  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 48 of them and a start marker 72, which leaves room
+  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 53 of them and a start marker 77, which leaves room
   for future fields.
 - **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 12.
 - The Reed-Solomon error correction is the integrity check. A capture that mixes two frames (tearing, or a capture taken
@@ -273,10 +301,11 @@ FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, after all post-processing and UI
-// Pacing: when the pacer intends this frame to be shown (steady clock ticks) and its target frame time. When the CPU started this
-// frame (the same clock) and how long it has worked on it until now (the marker is drawn last, just before Present). 0 = unknown
-const FM::Payload payload{frameIndex, animationTicks, runId, kind, intendedDisplayTicks, targetFrameTicks,
-                          cpuStartTicks, cpuBusyTicks};
+// Pacing: when the pacer intends this frame to be shown (steady clock ticks), its target frame time and the frame time the
+// application wants to run at. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
+// marker is drawn last, just before Present). 0 = unknown. MarkerFlags::Static when nothing animates in this frame
+const FM::Payload payload{frameIndex,   animationTicks, runId,          kind,              intendedDisplayTicks, targetFrameTicks,
+                          cpuStartTicks, cpuBusyTicks,  preferredFrameTicks, FM::MarkerFlags::None};
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
 // FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
 // FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.

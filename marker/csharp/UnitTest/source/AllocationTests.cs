@@ -55,7 +55,18 @@ namespace MB.FrameMarker.UnitTest
       Span<byte> stackBits = stackalloc byte[Marker.MaxPackedModuleByteCount];
       for (int frame = 0; frame < frames; ++frame)
       {
-        var payload = new Payload((ulong)frame, Marker.SecondsToTicks(frame / 60.0), 7, MarkerKind.Frame, 1000 + frame, 166_667, 900 + frame, 80_000);
+        var payload = new Payload(
+          (ulong)frame,
+          Marker.SecondsToTicks(frame / 60.0),
+          7,
+          MarkerKind.Frame,
+          1000 + frame,
+          166_667,
+          900 + frame,
+          80_000,
+          166_667,
+          MarkerFlags.Static
+        );
         if (m_generator.TryGenerateModules(payload, m_bits, out var matrix))
         {
           written += Marker.ModulesToTriangles(matrix, options, origin, m_triangles);

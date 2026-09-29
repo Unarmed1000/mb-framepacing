@@ -199,6 +199,8 @@ namespace MB.FramePacing.Analysis
       public uint TargetFrameTicks;
       public long CpuStartTicks;
       public uint CpuBusyTicks;
+      public uint PreferredFrameTicks;
+      public bool Static;
       public long FirstCaptureIndex;
       public long FirstSeenTicks;
       public long LastSeenTicks;
@@ -296,6 +298,8 @@ namespace MB.FramePacing.Analysis
           TargetFrameTicks = payload.TargetFrameTicks,
           CpuStartTicks = payload.CpuStartTicks,
           CpuBusyTicks = payload.CpuBusyTicks,
+          PreferredFrameTicks = payload.PreferredFrameTicks,
+          Static = payload.IsStatic,
           FirstCaptureIndex = row.CaptureIndex,
           FirstSeenTicks = row.CaptureTicks,
           LastSeenTicks = row.CaptureTicks,
@@ -570,18 +574,25 @@ namespace MB.FramePacing.Analysis
     {
       var frames = new List<PresentedFrame>(builders.Count);
       int segmentStart = 0;
+      long drift = 0;
       for (int i = 0; i < builders.Count; ++i)
       {
         var b = builders[i];
         if (i > 0 && b.Segment != builders[i - 1].Segment)
+        {
           segmentStart = i;
-        var first = builders[segmentStart];
+          drift = 0;
+        }
         bool hasPrevious = i > segmentStart;
         var previous = hasPrevious ? builders[i - 1] : null;
         bool hasNext = i + 1 < builders.Count && builders[i + 1].Segment == b.Segment;
 
         long? displayDelta = previous != null ? b.FirstSeenTicks - previous.FirstSeenTicks : null;
         long? animationDelta = previous != null ? b.AnimationTicks - previous.AnimationTicks : null;
+        // A step from or to a static frame has no motion to be off (an animation clock may pause while nothing animates): not judged, and
+        // the drift adds up only the judged errors (without static frames that is animation time minus display time since the segment began)
+        long? error = displayDelta.HasValue && !b.Static && !previous!.Static ? animationDelta!.Value - displayDelta.Value : null;
+        drift += error ?? 0;
         long onScreen = hasNext ? builders[i + 1].FirstSeenTicks - b.FirstSeenTicks : b.LastSeenTicks - b.FirstSeenTicks + period;
         // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured
         long? frameTime =
@@ -596,6 +607,8 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.UncertainStart;
         if (b.Torn)
           flags |= PresentedFrameFlags.Torn;
+        if (b.Static)
+          flags |= PresentedFrameFlags.Static;
 
         frames.Add(
           new PresentedFrame(
@@ -610,8 +623,8 @@ namespace MB.FramePacing.Analysis
             b.SkippedBefore,
             displayDelta,
             animationDelta,
-            displayDelta.HasValue ? animationDelta!.Value - displayDelta.Value : null,
-            (b.AnimationTicks - first.AnimationTicks) - (b.FirstSeenTicks - first.FirstSeenTicks),
+            error,
+            drift,
             flags,
             b.FirstSeenSecondaryTicks,
             b.IntendedDisplayTicks,
@@ -619,7 +632,8 @@ namespace MB.FramePacing.Analysis
             CpuStartTicks: b.CpuStartTicks,
             CpuBusyTicks: b.CpuBusyTicks,
             FrameTimeTicks: frameTime,
-            CpuWaitTicks: cpuWait
+            CpuWaitTicks: cpuWait,
+            MarkerPreferredFrameTicks: b.PreferredFrameTicks
           )
         );
       }

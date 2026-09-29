@@ -54,6 +54,8 @@ namespace MB.FramePacing.Analysis
         frame.IntendedDisplayTicks != 0 ? frame.IntendedDisplayTicks : null,
         frame.MarkerTargetFrameTicks != 0 ? frame.MarkerTargetFrameTicks : null,
         frame.TargetTicks,
+        frame.MarkerPreferredFrameTicks != 0 ? frame.MarkerPreferredFrameTicks : null,
+        frame.PreferredTicks,
         frame.PacingErrorTicks,
         frame.PredictionErrorTicks,
         frame.LatenessTicks,
@@ -93,7 +95,9 @@ namespace MB.FramePacing.Analysis
         row.CpuStartTicks ?? 0,
         (uint)(row.CpuBusyTicks ?? 0),
         row.FrameTimeTicks,
-        row.CpuWaitTicks
+        row.CpuWaitTicks,
+        (uint)(row.MarkerPreferredTicks ?? 0),
+        row.PreferredTicks
       );
 
     public static SummaryRun ToSummary(this RunAnalysis run, string framesFile) =>

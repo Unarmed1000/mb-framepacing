@@ -17,8 +17,12 @@ namespace MB::FramePacingData
   inline constexpr std::size_t CaptureDataHeaderSize = 256;
   inline constexpr std::size_t CaptureDataRecordSize = 192;
   inline constexpr std::size_t MaxMarkerLocations = 4;
-  inline constexpr std::size_t MainMarkerCapacity = 112;
-  inline constexpr std::size_t SecondMarkerCapacity = 48;
+  //! Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes).
+  inline constexpr std::size_t MainMarkerCapacity = 80;
+  inline constexpr std::size_t SecondMarkerCapacity = 80;
+
+  //! The marker's target and preferred frame time of an application that presents only when something changes (429496.7295 ms).
+  inline constexpr int64_t OnDemandFrameTicks = 0xFFFF'FFFF;
 
   //! A device timestamp the capture source did not give.
   inline constexpr int64_t UnknownTicks = std::numeric_limits<int64_t>::min();

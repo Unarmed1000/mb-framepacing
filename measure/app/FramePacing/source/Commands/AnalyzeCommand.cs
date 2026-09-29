@@ -213,6 +213,7 @@ namespace MB.FramePacing.App.Commands
       {
         PacingSource.Schedule => "the pacer's schedule in the markers",
         PacingSource.TargetFrameTime => "the pacer's target frame time in the markers",
+        PacingSource.PreferredFrameTime => "the preferred frame time in the markers",
         PacingSource.GivenTarget => "the given target frame rate",
         _ => "no pacing information: the display's native refresh rate",
       };

@@ -226,9 +226,10 @@ from the frames, and compared with the display rate you expect when you give one
 **Late frames** are shown later than the application meant. When its frame pacer writes the **intended display time** into the
 marker, a frame is late when it appears half a refresh or more after that time, which also catches frames that stay late after a
 hitch; the animation error then splits into **pacing error** (shown off the plan) and **prediction error** (animated for another
-moment than planned). With only a **target frame time** in the marker, or a target frame rate given to the tools (`--target-fps`,
-**Target frame rate** in the GUI, for example 30 for a game locked to 30 fps on a 60 Hz display), a frame is late when it appears a
-refresh or more after its target. Without any of them the target is the display's native refresh rate. Under the headline numbers, **Cause** tells which
+moment than planned). With only a **target frame time** in the marker, or only a **preferred frame time** (the rate the game wants:
+a game that wants 30 fps on a 60 Hz display is measured against two refreshes), or a target frame rate given to the tools
+(`--target-fps`, **Target frame rate** in the GUI, for example 30 for a game locked to 30 fps on a 60 Hz display), a frame is late
+when it appears half a refresh or more beyond its target. Without any of them the target is the display's native refresh rate. Under the headline numbers, **Cause** tells which
 of the two causes of animation error dominates: frames with an error where the display time step jumps are **bad pacing** (late,
 early or dropped frames); frames with an error while the display time step stays even are **delta time jitter** (uneven animation
 steps).
@@ -253,10 +254,11 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
   bad pacing; an error bar while the steps stay flat is delta time jitter.
 - **Frametime and CPU busy** (when the markers carry the CPU start time and CPU busy): the application side on the same grid, each
   frame's frametime (its CPU start to the next frame's) as a blue step and its CPU busy (until it was presented) as a faint bar.
-- **Share of late frames in the last 2 s:** the frames of the 2 s before each frame that were on screen longer than one refresh of the
-  display. Amber where they all stayed as long as the pacer intended (its target in the markers is longer than a refresh); red where
-  one was late, later than its target (without pacing information in the markers, one refresh); green where every frame took one
-  refresh.
+- **Share of late frames in the last 2 s:** the frames of the 2 s before each frame that were late, or on screen longer than the
+  application prefers (its preferred frame time in the markers; else the target frame rate given to the tools, else one refresh). Red
+  where one was late; amber where they only stayed longer than preferred, as the pacer intended (a pacer running slower than the game
+  wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. Static frames and
+  frames presented on demand are never amber.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red; grey where a capture card's captures
   could not be decoded, and a mark above frames with skipped frame indices before them (or a tear). Zoom in to see hold patterns
   such as 3-then-1.
@@ -313,8 +315,8 @@ cumulative drift; `--cards` picks them (`--cards none` for the report only).
 
 The test clips (`test-data/videos`, made by mb-framepacing-explained) as reports. The busy stretch at the full rate is the example
 above: the frames that miss a refresh are late, and each is off by a whole refresh. Its companion adapts its rate like Android's
-Swappy: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says) for a while, then 60
-again:
+Swappy: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says, while their preferred
+frame time stays 60 fps) for a while, then 60 again:
 
 ![The report of a game adapting its rate like Swappy](doc/images/report-example-swappy.svg)
 

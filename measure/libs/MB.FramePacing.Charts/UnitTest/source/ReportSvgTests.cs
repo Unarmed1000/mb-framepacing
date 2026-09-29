@@ -212,33 +212,8 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public void LateShare_IsAmberWhenHeldLongerAsIntended_AndRedWhenLate()
     {
-      var run = Synthetic(2400, lateEvery: 0);
-      var frames = new List<PresentedFrame>();
-      long time = 0;
-      foreach (var (f, i) in run.Run.Frames.Select((f, i) => (f, i)))
-      {
-        // From frame 1400 the markers ask for two refreshes per frame, and the frames stay two; frame 1800 stays three
-        long display =
-          i < 1400 ? Refresh
-          : i == 1800 ? 3 * Refresh
-          : 2 * Refresh;
-        if (i > 0)
-          time += display;
-        frames.Add(
-          f with
-          {
-            FirstSeenTicks = time,
-            LastSeenTicks = time,
-            DisplayDeltaTicks = i > 0 ? display : null,
-            MarkerTargetFrameTicks = (uint)(i < 1400 ? Refresh : 2 * Refresh),
-            Flags = i == 1800 ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
-          }
-        );
-      }
-      var drawing = ReportCard.Build(
-        RunSection.Whole(run with { Run = run.Run with { Frames = frames } }),
-        ReportOptions.ShowOnly(new[] { ReportItem.LateShare })
-      );
+      // The application prefers one refresh per frame; from frame 1400 its pacer runs at two
+      var (drawing, frames) = LateShareCard(i => Refresh);
       var plot = drawing.Plots.Single();
       double Seconds(int i) => (frames[i].FirstSeenTicks - frames[0].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
       (double X, double Y)[] Points(string cls) =>
@@ -271,8 +246,58 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(
         drawing
           .FlatShapes.OfType<TextShape>()
-          .Any(t => t.Content.StartsWith("amber: on screen longer than a refresh (4.2 ms) as the pacer intended", StringComparison.Ordinal))
+          .Any(t => t.Content.StartsWith("amber: on screen longer than the application prefers, as the pacer intended", StringComparison.Ordinal))
       );
+    }
+
+    /// <summary>
+    /// The same frames, but from frame 1400 the application prefers two refreshes per frame (a 30 fps lock): it runs as it wants, so the line
+    /// stays green until the late frame, red for its window, then green again.
+    /// </summary>
+    [Test]
+    public void LateShare_IsGreenWhenTheApplicationPrefersTheLowerRate()
+    {
+      var (drawing, _) = LateShareCard(i => i < 1400 ? Refresh : 2 * Refresh);
+      var amber = drawing.FlatShapes.OfType<PathShape>().Where(p => p.Class == "late-line-adapted");
+      Assert.That(amber, Is.Empty, "no frame stayed longer than the application prefers without being late");
+      Assert.That(drawing.FlatShapes.OfType<PathShape>().Any(p => p.Class == "late-line"), "the late frame is still red");
+      Assert.That(drawing.FlatShapes.OfType<PathShape>().Any(p => p.Class == "late-line-none"));
+    }
+
+    /// <summary>
+    /// The late share card of 2400 frames: one refresh each until frame 1400, then two (the markers target two), frame 1800 three and late.
+    /// <paramref name="preferred"/> gives each frame's preferred frame time.
+    /// </summary>
+    private static (CardDrawing Drawing, List<PresentedFrame> Frames) LateShareCard(Func<int, long> preferred)
+    {
+      var run = Synthetic(2400, lateEvery: 0);
+      var frames = new List<PresentedFrame>();
+      long time = 0;
+      foreach (var (f, i) in run.Run.Frames.Select((f, i) => (f, i)))
+      {
+        long display =
+          i < 1400 ? Refresh
+          : i == 1800 ? 3 * Refresh
+          : 2 * Refresh;
+        if (i > 0)
+          time += display;
+        frames.Add(
+          f with
+          {
+            FirstSeenTicks = time,
+            LastSeenTicks = time,
+            DisplayDeltaTicks = i > 0 ? display : null,
+            MarkerTargetFrameTicks = (uint)(i < 1400 ? Refresh : 2 * Refresh),
+            PreferredTicks = preferred(i),
+            Flags = i == 1800 ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
+          }
+        );
+      }
+      var drawing = ReportCard.Build(
+        RunSection.Whole(run with { Run = run.Run with { Frames = frames } }),
+        ReportOptions.ShowOnly(new[] { ReportItem.LateShare })
+      );
+      return (drawing, frames);
     }
 
     internal static ChartRun Synthetic(int Count, int lateEvery = 97)

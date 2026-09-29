@@ -78,7 +78,13 @@ steady clock, and may give its own CPU busy:
 overlay.IntendedDisplayTicksProvider = () => pacer.IntendedDisplayTicks;
 overlay.CpuStartTicksProvider = () => pacer.CpuStartTicks;
 overlay.CpuBusyTicksProvider = () => pacer.CpuBusyTicks; // optional
+overlay.PreferredFrameTicksProvider = () => pacer.PreferredFrameTicks; // the rate the game wants; default: as the target
+overlay.StaticProvider = () => nothingAnimates; // optional: the Static flag on idle frames
 ```
+
+The **preferred frame time** is the rate the game wants to run at. Without a provider it is the same as the target frame time
+(`Application.targetFrameRate`, which Unity does not lower on its own); a pacer that runs the game slower than it wants gives its
+preferred rate here. `Marker.OnDemandFrameTicks` says the game presents only when something changes.
 
 With only an `IntendedDisplayTicksProvider`, the CPU start time is left unknown (0) rather than mixing two clocks; CPU busy still
 comes from Unity.

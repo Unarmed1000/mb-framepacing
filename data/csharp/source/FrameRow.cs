@@ -19,10 +19,17 @@ namespace MB.FramePacing.Data
   /// <param name="SkippedBefore">Frame indices before this one that were never seen.</param>
   /// <param name="DisplayDeltaTicks">The display time step: from the previous frame's display time to this one's.</param>
   /// <param name="AnimationErrorTicks">The animation time step minus the display time step.</param>
-  /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late"; empty when none.</param>
+  /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late", "Static"; empty when none.</param>
   /// <param name="IntendedDisplayTicks">From the marker: when the pacer intended the frame to be shown (its own clock).</param>
-  /// <param name="MarkerTargetTicks">From the marker: the pacer's target frame time.</param>
-  /// <param name="TargetTicks">The frame time this frame is measured against, in whole refreshes.</param>
+  /// <param name="MarkerTargetTicks">From the marker: the pacer's target frame time; <see cref="OnDemandFrameTicks"/> = on demand.</param>
+  /// <param name="TargetTicks">The frame time this frame is measured against, in whole refreshes; null on demand.</param>
+  /// <param name="MarkerPreferredTicks">
+  /// From the marker: the frame time the application wants to run at; <see cref="OnDemandFrameTicks"/> = on demand.
+  /// </param>
+  /// <param name="PreferredTicks">
+  /// The preferred frame time the late share is measured against, in whole refreshes: the marker's, else the target frame rate given to the
+  /// tools, else one refresh; null on demand.
+  /// </param>
   /// <param name="LastSeenTicks">When the last capture showing it was taken; null in output written before it existed.</param>
   /// <param name="CpuStartTicks">From the marker: the CPU start time (PresentMon's CPUStartTime, the pacer's clock).</param>
   /// <param name="CpuBusyTicks">From the marker: CPU busy (PresentMon's MsCPUBusy).</param>
@@ -47,6 +54,8 @@ namespace MB.FramePacing.Data
     long? IntendedDisplayTicks,
     long? MarkerTargetTicks,
     long? TargetTicks,
+    long? MarkerPreferredTicks,
+    long? PreferredTicks,
     long? PacingErrorTicks,
     long? PredictionErrorTicks,
     long? LatenessTicks,
@@ -57,5 +66,9 @@ namespace MB.FramePacing.Data
     long? CpuWaitTicks,
     long? MainMarkerFirstSeenTicks = null,
     long? ScanoutDelayTicks = null
-  );
+  )
+  {
+    /// <summary>The marker's target and preferred frame time of an application that presents only when something changes (429496.7295 ms).</summary>
+    public const long OnDemandFrameTicks = uint.MaxValue;
+  }
 }

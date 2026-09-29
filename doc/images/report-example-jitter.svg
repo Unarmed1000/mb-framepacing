@@ -79,7 +79,7 @@
 <text x="874.0" y="33.0" text-anchor="start" class="label">DISPLAY</text>
 <text x="874.0" y="56.0" text-anchor="start" class="tile-value">60 Hz</text>
 <text x="939.5" y="56.0" text-anchor="start" class="vsync-n">fixed refresh (vsync)</text>
-<text x="874.0" y="74.0" text-anchor="start" class="vsync-n">16.7 ms per refresh, target 1 refresh (60 fps)</text>
+<text x="874.0" y="74.0" text-anchor="start" class="vsync-n">16.7 ms per refresh, target 1 refresh (60 fps), preferred 60 fps</text>
 <rect class="tile" x="20.0" y="123" width="276.0" height="64" rx="10"/>
 <text x="34.0" y="143.0" text-anchor="start" class="label">AVERAGE FPS</text>
 <text x="34.0" y="167.0" text-anchor="start" class="tile-value">60.0</text>

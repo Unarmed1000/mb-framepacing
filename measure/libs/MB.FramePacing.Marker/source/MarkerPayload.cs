@@ -22,6 +22,11 @@ namespace MB.FramePacing.Marker
   /// <param name="TargetFrameTicks">The interval the frame pacer aims for before this frame, in ticks (100ns); 0 = unknown.</param>
   /// <param name="CpuStartTicks">CPU start time: when the CPU started working on the frame, in ticks (100ns) on the frame pacer's steady clock; 0 = unknown.</param>
   /// <param name="CpuBusyTicks">CPU busy: how long the CPU worked on the frame before presenting it, in ticks (100ns); 0 = unknown.</param>
+  /// <param name="PreferredFrameTicks">
+  /// The interval the application wants to run at, in ticks (100ns); 0 = unknown, <see cref="OnDemandFrameTicks"/> = frames only when
+  /// something changes.
+  /// </param>
+  /// <param name="Flags">The marker's flags: <see cref="FM.MarkerFlags.Static"/> when nothing animates in the frame.</param>
   public readonly record struct MarkerPayload(
     ulong FrameIndex,
     long AnimationTicks,
@@ -30,7 +35,9 @@ namespace MB.FramePacing.Marker
     long IntendedDisplayTicks = 0,
     uint TargetFrameTicks = 0,
     long CpuStartTicks = 0,
-    uint CpuBusyTicks = 0
+    uint CpuBusyTicks = 0,
+    uint PreferredFrameTicks = 0,
+    FM.MarkerFlags Flags = FM.MarkerFlags.None
   )
   {
     /// <summary>Size of the header, which is the complete payload of frame and end markers.</summary>
@@ -40,6 +47,12 @@ namespace MB.FramePacing.Marker
     public const byte Magic0 = FM.Marker.PayloadMagic0;
     public const byte Magic1 = FM.Marker.PayloadMagic1;
     public const byte FormatVersion = FM.Marker.PayloadFormatVersion;
+
+    /// <summary>The target and preferred frame time of an application that presents only when something changes.</summary>
+    public const uint OnDemandFrameTicks = FM.Marker.OnDemandFrameTicks;
+
+    /// <summary>Nothing animates in this frame: the analysis does not judge the animation error of a step from or to it.</summary>
+    public bool IsStatic => (Flags & FM.MarkerFlags.Static) != 0;
 
     public TimeSpan AnimationTime => TimeSpan.FromTicks(AnimationTicks);
 
@@ -67,7 +80,9 @@ namespace MB.FramePacing.Marker
         decoded.IntendedDisplayTicks,
         decoded.TargetFrameTicks,
         decoded.CpuStartTicks,
-        decoded.CpuBusyTicks
+        decoded.CpuBusyTicks,
+        decoded.PreferredFrameTicks,
+        decoded.Flags
       );
       if (decoded.Kind == FM.MarkerKind.SequenceStart)
         metadata = new StartMetadata(start.UtcTicks, start.SequenceId);
@@ -78,6 +93,17 @@ namespace MB.FramePacing.Marker
 
     /// <summary>The same payload as the marker library's type.</summary>
     public FM.Payload ToFrameMarker() =>
-      new FM.Payload(FrameIndex, AnimationTicks, RunId, (FM.MarkerKind)Kind, IntendedDisplayTicks, TargetFrameTicks, CpuStartTicks, CpuBusyTicks);
+      new FM.Payload(
+        FrameIndex,
+        AnimationTicks,
+        RunId,
+        (FM.MarkerKind)Kind,
+        IntendedDisplayTicks,
+        TargetFrameTicks,
+        CpuStartTicks,
+        CpuBusyTicks,
+        PreferredFrameTicks,
+        Flags
+      );
   }
 }

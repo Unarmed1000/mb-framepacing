@@ -25,7 +25,8 @@ MAX_MARKERS = 4
 UNKNOWN_TICKS = -(2**63)
 """A device timestamp the capture source did not give (i64 minimum)."""
 
-MAIN_CAPACITY = 112
+MAIN_CAPACITY = 80
+"""Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes)."""
 SECOND_CAPACITY = RECORD_SIZE - 32 - MAIN_CAPACITY
 
 _HEADER = struct.Struct("<IHHIIiiIIiiiiii8xI")

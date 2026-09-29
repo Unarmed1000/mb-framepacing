@@ -20,7 +20,7 @@ namespace MB.FramePacing.Data
   {
     public const string Header =
       "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags,"
-      + "intendedDisplayMs,markerTargetMs,targetMs,pacingErrorMs,predictionErrorMs,latenessMs,lastSeenMs,cpuStartMs,cpuBusyMs,frameTimeMs,cpuWaitMs";
+      + "intendedDisplayMs,markerTargetMs,targetMs,markerPreferredMs,preferredMs,pacingErrorMs,predictionErrorMs,latenessMs,lastSeenMs,cpuStartMs,cpuBusyMs,frameTimeMs,cpuWaitMs";
 
     /// <summary>The columns an EXPERIMENTAL camera capture adds.</summary>
     public const string CameraColumns = ",mainMarkerFirstSeenMs,scanoutDelayMs";
@@ -55,6 +55,8 @@ namespace MB.FramePacing.Data
             Optional(row.IntendedDisplayTicks),
             Optional(row.MarkerTargetTicks),
             Optional(row.TargetTicks),
+            Optional(row.MarkerPreferredTicks),
+            Optional(row.PreferredTicks),
             Optional(row.PacingErrorTicks),
             Optional(row.PredictionErrorTicks),
             Optional(row.LatenessTicks),
@@ -94,6 +96,8 @@ namespace MB.FramePacing.Data
       int intended = Column("intendedDisplayMs");
       int markerTarget = Column("markerTargetMs");
       int target = Column("targetMs");
+      int markerPreferred = Column("markerPreferredMs");
+      int preferred = Column("preferredMs");
       int pacing = Column("pacingErrorMs");
       int prediction = Column("predictionErrorMs");
       int lateness = Column("latenessMs");
@@ -131,6 +135,8 @@ namespace MB.FramePacing.Data
             row.Ticks(intended),
             row.Ticks(markerTarget),
             row.Ticks(target),
+            row.Ticks(markerPreferred),
+            row.Ticks(preferred),
             row.Ticks(pacing),
             row.Ticks(prediction),
             row.Ticks(lateness),

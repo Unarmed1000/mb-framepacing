@@ -150,7 +150,8 @@ class SummaryStatistics:
 
 @dataclass(frozen=True)
 class SummaryPacing:
-    """The refresh, the target the frames are measured against (source: Schedule, TargetFrameTime, GivenTarget or NativeRefresh), late
+    """The refresh, the target the frames are measured against (source: Schedule, TargetFrameTime, PreferredFrameTime, GivenTarget or
+    NativeRefresh), late
     frames and the verdict (None, BadPacing, DeltaTimeJitter or Both)."""
 
     refresh_period_ms: float

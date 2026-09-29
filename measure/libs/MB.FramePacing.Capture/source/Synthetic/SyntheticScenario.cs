@@ -136,9 +136,20 @@ namespace MB.FramePacing.Capture.Synthetic
           : displayTicks < startEnd ? MarkerKind.SequenceStart
           : displayTicks < runEnd ? MarkerKind.Frame
           : MarkerKind.SequenceEnd;
-        // The pacer's clock has its own epoch: intended display times never start at 0 (which means unknown)
+        // The pacer's clock has its own epoch: intended display times never start at 0 (which means unknown). The game aims for one frame
+        // per refresh, and that is also the rate it prefers
         var payload = o.PacingInformation
-          ? new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind, intendedTicks, (uint)refresh, cpuStartTicks, (uint)cpuBusyTicks)
+          ? new MarkerPayload(
+            frameIndex,
+            animationTicks,
+            idle ? 0u : o.RunId,
+            kind,
+            intendedTicks,
+            (uint)refresh,
+            cpuStartTicks,
+            (uint)cpuBusyTicks,
+            (uint)refresh
+          )
           : new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
       }

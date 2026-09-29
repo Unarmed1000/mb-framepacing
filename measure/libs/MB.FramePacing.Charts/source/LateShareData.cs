@@ -52,13 +52,19 @@ namespace MB.FramePacing.Charts
 
     public static LateShareData Create(IReadOnlyList<PresentedFrame> frames, RunPacing pacing)
     {
-      // Held longer: on screen half a refresh or more beyond one refresh without being late (the pacer intended it)
-      double longer = pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond * 1.5;
+      // Held longer: on screen half a refresh or more beyond the frame time the application wants (its preferred frame time, else one
+      // refresh) without being late: the pacer intended it, but runs slower than the application wants. Never for a static frame or on demand
+      double half = pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond / 2;
       var held = new bool[frames.Count];
       bool anyHeldLonger = false;
       for (int i = 0; i < frames.Count; ++i)
       {
-        held[i] = (frames[i].Flags & PresentedFrameFlags.Late) == 0 && frames[i].DisplayDeltaTicks is { } display && display >= longer;
+        var frame = frames[i];
+        held[i] =
+          (frame.Flags & (PresentedFrameFlags.Late | PresentedFrameFlags.Static)) == 0
+          && frame.DisplayDeltaTicks is { } display
+          && frame.PreferredTicks is { } preferred
+          && display >= preferred + half;
         anyHeldLonger |= held[i];
       }
 

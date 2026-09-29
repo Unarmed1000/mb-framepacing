@@ -85,13 +85,19 @@ namespace MB.FramePacing.Marker.UnitTest
     public void DecodesAfterBilinearScaleAtRecommendedSize(GoldenMarker golden)
     {
       var image = PgmFile.Read(golden.Path);
-      foreach (double scale in new[] { 0.75, 0.6, 0.5 })
+      // Non-integer and integer downscales, down to the recommended 3 stored pixels per module
+      foreach (double scale in new[] { 0.9, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5 })
       {
         if (golden.ModuleSizePx * scale < 3.0)
           continue;
         var scaled = image.ResizeBilinear((int)Math.Round(image.Width * scale), (int)Math.Round(image.Height * scale));
         var result = new MarkerDecoder().Decode(scaled);
         Assert.That(result.Payload, Is.EqualTo(golden.Payload), $"scale {scale}, {golden.ModuleSizePx * scale:0.##} stored px/module");
+        // Where it was found, also when only the upscaled retry found it: the golden markers sit at (36, 36), quiet zone included
+        double module = golden.ModuleSizePx * scale;
+        Assert.That(result.ModuleSizePx, Is.EqualTo(module).Within(10).Percent, $"scale {scale}: module size");
+        Assert.That(result.Bounds.X, Is.EqualTo(36 * scale).Within(module), $"scale {scale}: left edge");
+        Assert.That(result.Bounds.Y, Is.EqualTo(36 * scale).Within(module), $"scale {scale}: top edge");
       }
     }
 

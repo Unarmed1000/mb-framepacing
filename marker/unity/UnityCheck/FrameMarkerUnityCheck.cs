@@ -77,16 +77,18 @@ public static class FrameMarkerUnityCheck
         long.Parse(f[4], CultureInfo.InvariantCulture),
         uint.Parse(f[5], CultureInfo.InvariantCulture),
         long.Parse(f[6], CultureInfo.InvariantCulture),
-        uint.Parse(f[7], CultureInfo.InvariantCulture)
+        uint.Parse(f[7], CultureInfo.InvariantCulture),
+        uint.Parse(f[8], CultureInfo.InvariantCulture),
+        (MarkerFlags)byte.Parse(f[9], CultureInfo.InvariantCulture)
       );
       // Columns: kind, runId, frameIndex, animationTicks, intendedDisplayTicks, targetFrameTicks, cpuStartTicks, cpuBusyTicks,
-      // startUtcTicks, sequenceIdHex (empty for other kinds), size, modulesHex
-      var sequenceId = f[9].Length > 0 ? SequenceId.FromBytes(FromHex(f[9])) : default;
-      var start = new StartMetadata(long.Parse(f[8], CultureInfo.InvariantCulture), sequenceId);
+      // preferredFrameTicks, flags, startUtcTicks, sequenceIdHex (empty for other kinds), size, modulesHex
+      var sequenceId = f[11].Length > 0 ? SequenceId.FromBytes(FromHex(f[11])) : default;
+      var start = new StartMetadata(long.Parse(f[10], CultureInfo.InvariantCulture), sequenceId);
       if (
         !generator.TryGenerateModules(payload, start, bits, out var matrix)
-        || matrix.Size != int.Parse(f[10], CultureInfo.InvariantCulture)
-        || Hex(matrix.Bits) != f[11]
+        || matrix.Size != int.Parse(f[12], CultureInfo.InvariantCulture)
+        || Hex(matrix.Bits) != f[13]
       )
       {
         if (++mismatches <= 5)

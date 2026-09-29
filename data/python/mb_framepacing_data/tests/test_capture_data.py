@@ -35,7 +35,7 @@ def record_bytes(index: int, device: int, status: int, main: bytes, second: byte
     data = bytearray(RECORD_SIZE)
     struct.pack_into("<qqqIBBB", data, 0, index, index * 100, device, 1 if index == 2 else 0, status, len(main), len(second))
     data[32 : 32 + len(main)] = main
-    data[144 : 144 + len(second)] = second
+    data[112 : 112 + len(second)] = second
     return bytes(data)
 
 
@@ -56,8 +56,8 @@ class CaptureDataTests(unittest.TestCase):
             _ = CaptureDataHeader.parse(bytes(header_bytes(markers=5)))
 
     def test_records_read_back_and_a_partial_last_record_is_ignored(self) -> None:
-        main = bytes(range(112))
-        second = bytes([0x5A] * 48)
+        main = bytes(range(80))
+        second = bytes([0x5A] * 80)
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "captures.mbcd"
             _ = path.write_bytes(
