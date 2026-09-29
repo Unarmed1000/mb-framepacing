@@ -128,6 +128,7 @@ def _summary(summary: AnalysisSummary) -> dict[str, JsonValue]:
                 "animationErrorMax": run.statistics.animation_error_ms.max,
                 "averageFps": run.statistics.average_fps,
                 "excludedStaticFrames": run.statistics.excluded_static_frames,
+                "uncertainSteps": run.statistics.uncertain_steps,
                 "cpuBusyCount": run.statistics.cpu_busy_ms.count,
                 "pacingSource": run.pacing.source if run.pacing else None,
                 "lateFrames": run.pacing.late_frames if run.pacing else 0,
@@ -149,6 +150,8 @@ def _frames(path: Path) -> dict[str, JsonValue]:
         "rowCount": len(rows),
         "columns": columns,
         "flagCounts": _counts(flag for row in rows for flag in row.flags),
+        "olderFrameCount": sum(len(row.older_frames) for row in rows),
+        "olderFrameIndexSum": sum(index for row in rows for index, _ in row.older_frames),
     }
 
 

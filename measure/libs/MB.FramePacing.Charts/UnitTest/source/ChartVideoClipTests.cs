@@ -109,13 +109,17 @@ namespace MB.FramePacing.Charts.UnitTest
       // The scale covers the display time steps of the frames that animate: a static frame's hold (the next frame's step) is left out
       var animating = measured.Where(manifest.CountsTowardFrameRate).Select(i => Ms(manifest.DisplayStepTicks(i))).ToArray();
       Assert.That(step.YTo, Is.EqualTo(ChartScale.StepTop(animating, refreshMs)).Within(1e-9), $"{clip}: the step scale leaves static holds out");
-      var holds = Segments(drawing, "held").Select(h => (h, Late: false)).Concat(Segments(drawing, "held-late").Select(h => (h, Late: true)));
+      // Each hold in its kind's class: late, an older frame came back while it was the newest, frames the target dropped before the next,
+      // as planned (a clip has no capture gap)
+      var holds = new[] { "held", "held-late", "held-older", "held-dropped", "held-unknown" }.SelectMany(cls =>
+        Segments(drawing, cls).Select(h => (h, Class: cls))
+      );
       var drawn = holds.OrderBy(h => h.h.X0).ToArray();
       Assert.That(drawn, Has.Length.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
       for (int k = 0; k < measured.Length; ++k)
       {
         int i = measured[k];
-        var (hold, late) = drawn[k];
+        var (hold, holdClass) = drawn[k];
         Assert.That(step.ValueX(hold.X0), Is.EqualTo(Seconds(i - 1)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} starts");
         Assert.That(step.ValueX(hold.X1), Is.EqualTo(Seconds(i)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} ends at the next frame");
         Assert.That(
@@ -123,7 +127,12 @@ namespace MB.FramePacing.Charts.UnitTest
           Is.EqualTo(Math.Min(Ms(manifest.DisplayStepTicks(i)), step.YTo)).Within(0.051 * pixelMs),
           $"{clip}: display time step {i} (at the top edge beyond the scale)"
         );
-        Assert.That(late, Is.EqualTo(manifest.IsLate(i)), $"{clip}: hold {i} too long");
+        string expectedClass =
+          manifest.IsLate(i) ? "held-late"
+          : manifest.OlderFramesAfter(i - 1).Count > 0 ? "held-older"
+          : manifest.DroppedBefore(i) > 0 ? "held-dropped"
+          : "held";
+        Assert.That(holdClass, Is.EqualTo(expectedClass), $"{clip}: hold {i}'s kind");
       }
 
       // Every frame's point, once: a stretch in a new colour starts at the point the previous one ended on
@@ -319,7 +328,14 @@ namespace MB.FramePacing.Charts.UnitTest
         (back.CapturePeriodTicks, back.ErrorThresholdTicks, back.Camera),
         Is.EqualTo((chart.CapturePeriodTicks, chart.ErrorThresholdTicks, chart.Camera))
       );
-      Assert.That(back.Run.Frames, Is.EqualTo(chart.Run.Frames), $"{clip}: every frame to the tick");
+      // Every frame to the tick; the older frames shown out of order after it compared by their content (a list compares by reference)
+      static PresentedFrame WithoutLists(PresentedFrame f) => f with { OlderFrames = null };
+      Assert.That(back.Run.Frames.Select(WithoutLists), Is.EqualTo(chart.Run.Frames.Select(WithoutLists)), $"{clip}: every frame to the tick");
+      Assert.That(
+        back.Run.Frames.Select(f => f.OlderFrames ?? Array.Empty<OlderFrameCapture>()),
+        Is.EqualTo(chart.Run.Frames.Select(f => f.OlderFrames ?? Array.Empty<OlderFrameCapture>())),
+        $"{clip}: the older frames shown out of order"
+      );
       Assert.That(back.Run.Pacing, Is.EqualTo(chart.Run.Pacing), $"{clip}: pacing");
       Assert.That(back.Run.Statistics, Is.EqualTo(chart.Run.Statistics), $"{clip}: statistics");
       Assert.That(back.Run.Counts, Is.EqualTo(chart.Run.Counts), $"{clip}: counts");
@@ -346,31 +362,47 @@ namespace MB.FramePacing.Charts.UnitTest
         $"{clip}: a bar per frame with an error"
       );
       int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
-      Assert.That(Segments("held") + Segments("held-late"), Is.EqualTo(measured.Length), $"{clip}: a hold per frame until the next");
+      Assert.That(
+        new[] { "held", "held-late", "held-older", "held-dropped", "held-unknown" }.Sum(Segments),
+        Is.EqualTo(measured.Length),
+        $"{clip}: a hold per frame until the next"
+      );
       Assert.That(Segments("held-late"), Is.EqualTo(measured.Count(manifest.IsLate)), $"{clip}: held too long when the next frame is late");
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      // A cell per refresh a frame was seen in, red for a late frame, violet for a static one; refreshes after that showed an older frame out
-      // of order (grey for now). The key's swatches carry the class "key" too, so they are not counted
+      // Per frame: the refreshes it was seen in, the last ones orange where frames the target dropped before the next were due (each a
+      // target frame time after the one before), the rest red for a late frame, violet for a static one; then pink refreshes that showed an
+      // older frame out of order; any others the capture did not tell (grey)
+      long Repeats(int i) =>
+        i + 1 < manifest.FrameCount
+          ? Math.Min(manifest.SeenRefreshes(i) - 1, manifest.DroppedBefore(i + 1) * Math.Max(1, manifest.TargetRefreshes(i + 1) ?? 1))
+          : 0;
+      long Own(int i) => manifest.SeenRefreshes(i) - Repeats(i);
       int StaticCells() => Of("strip-static-a").Count() + Of("strip-static-b").Count();
+      Assert.That(Of("strip-dropped").Count(), Is.EqualTo(all.Sum(Repeats)), $"{clip}: an orange cell where a dropped frame was due");
+      Assert.That(
+        Of("strip-older").Count(),
+        Is.EqualTo(all.Sum(i => manifest.OlderFramesAfter(i).Count)),
+        $"{clip}: a pink cell per refresh that showed an older frame"
+      );
       Assert.That(
         StaticCells(),
-        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !(i > 0 && manifest.IsLate(i))).Sum(i => (int)manifest.SeenRefreshes(i))),
+        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !(i > 0 && manifest.IsLate(i))).Sum(Own)),
         $"{clip}: a violet cell per refresh of every static frame"
       );
       Assert.That(
         Of("strip-late").Count(),
-        Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(i => (int)manifest.SeenRefreshes(i))),
+        Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(Own)),
         $"{clip}: a red cell per refresh of every late frame"
       );
       Assert.That(
-        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + StaticCells(),
+        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + StaticCells() + Of("strip-dropped").Count(),
         Is.EqualTo(all.Sum(i => (int)manifest.SeenRefreshes(i))),
         $"{clip}: a cell per refresh a frame was seen in"
       );
       Assert.That(
-        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + StaticCells() + Of("neutral").Count(),
-        Is.EqualTo(all.Sum(i => (int)manifest.RefreshesOnScreen(i))),
-        $"{clip}: a cell per refresh"
+        Of("neutral").Count(),
+        Is.EqualTo(all.Sum(i => manifest.RefreshesOnScreen(i) - manifest.SeenRefreshes(i) - manifest.OlderFramesAfter(i).Count)),
+        $"{clip}: the refreshes the capture did not tell"
       );
       // The application side: a frametime step per frame whose next frame (the next frame index) carries a CPU start too, a CPU busy bar per
       // frame that has one

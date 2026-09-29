@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacingdata/OlderFrame.hpp>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -46,6 +47,8 @@ namespace MB::FramePacingData
     std::optional<int64_t> CpuBusyTicks;
     std::optional<int64_t> FrameTimeTicks;
     std::optional<int64_t> CpuWaitTicks;
+    //! The captures that showed an older frame out of order while this frame was the newest, in capture order.
+    std::vector<OlderFrame> OlderFrames;
     std::optional<int64_t> MainMarkerFirstSeenTicks;
     std::optional<int64_t> ScanoutDelayTicks;
   };

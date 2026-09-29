@@ -188,9 +188,16 @@ Every panel says in its title what it shows; its key on the right names each col
 refresh strip has no key at all).
 
 The **refresh strip** draws one cell per refresh from each frame's first capture, a new shade with every frame, late frames red and
-static frames violet. With a capture card, the refreshes between a frame's last capture and the next frame (captures that could not be
-decoded) are grey; a camera sees each frame until the next one. A mark above the strip shows a frame with skipped frame indices before
+static frames violet. Where frames the application rendered never reached the display (dropped, over a capture without gaps), the
+refreshes where they were due repeat the frame before and are orange. A refresh that showed an older frame out of order is pink. With a
+capture card, the other refreshes between a frame's last capture and the next frame (captures that could not be decoded or were not
+recorded) are grey; a camera sees each frame until the next one. A mark above the strip shows a frame with skipped frame indices before
 it, or a tear.
+
+**Capture gaps** (captures not decoded, not recorded, or dropped by the capture source) leave the display time of the next frame
+uncertain: the steps into and out of it are not judged (no animation error, no late verdict, not in the frame rates), drawn dashed grey
+in the display time step panel, counted (`statistics.uncertainSteps`) and named in the report's description. A frame index skipped
+across a gap is never called dropped: the frame may have been shown in the refresh the capture missed.
 
 **Static stretches** (the marker's `Static` flag: nothing animates) are a violet band behind every time panel. The display time step
 and frametime scales leave a static frame's hold and frametime out (idle waits), so an idle second does not squash the panel; those

@@ -103,8 +103,8 @@ namespace MB.FramePacing.Charts
     /// <summary>The run's pacing with the late frames, their share and the worst 2 s of the section's frames.</summary>
     private static RunPacing SectionPacing(RunPacing pacing, IReadOnlyList<PresentedFrame> frames)
     {
-      int measured = frames.Count(f => f.DisplayDeltaTicks.HasValue);
-      long late = frames.LongCount(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.Late) != 0);
+      int measured = frames.Count(LateShare.Counts);
+      long late = frames.LongCount(f => LateShare.Counts(f) && (f.Flags & PresentedFrameFlags.Late) != 0);
       return pacing with
       {
         LateFrames = frames.LongCount(f => (f.Flags & PresentedFrameFlags.Late) != 0),

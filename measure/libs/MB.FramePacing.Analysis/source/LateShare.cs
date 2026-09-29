@@ -53,9 +53,14 @@ namespace MB.FramePacing.Analysis
       return worst >= 0 ? worst : Rolling(frames, long.MaxValue)[^1];
     }
 
+    /// <summary>
+    /// The frame counts in a late share: it has a display time step, and no capture gap made it uncertain (such a step gets no late verdict).
+    /// </summary>
+    public static bool Counts(PresentedFrame frame) => frame.DisplayDeltaTicks.HasValue && (frame.Flags & PresentedFrameFlags.UncertainStep) == 0;
+
     private static void Add(PresentedFrame frame, int sign, ref int counted, ref int late)
     {
-      if (!frame.DisplayDeltaTicks.HasValue)
+      if (!Counts(frame))
         return;
       counted += sign;
       if ((frame.Flags & PresentedFrameFlags.Late) != 0)

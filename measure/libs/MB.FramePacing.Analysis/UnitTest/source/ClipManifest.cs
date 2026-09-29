@@ -15,6 +15,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -213,6 +214,27 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
       return last - first + 1;
     }
+
+    /// <summary>
+    /// The refreshes after the frame was first seen, before the next presented frame, that showed an older frame out of order: the refresh
+    /// and the frame index it showed.
+    /// </summary>
+    public IReadOnlyList<(long Refresh, ulong FrameIndex)> OlderFramesAfter(int frame)
+    {
+      long first = FirstRefresh(frame);
+      long end = frame + 1 < FrameCount ? FirstRefresh(frame + 1) : RefreshCount;
+      var older = new List<(long Refresh, ulong FrameIndex)>();
+      for (long r = first; r < end; ++r)
+      {
+        if (Screen[r] < Presented[frame])
+          older.Add((r, FirstFrameIndex + (ulong)Screen[r]));
+      }
+      return older;
+    }
+
+    /// <summary>The frame indices skipped before the frame that were never on screen, not even out of order: the target dropped them.</summary>
+    public long DroppedBefore(int frame) =>
+      frame > 0 ? Enumerable.Range(Presented[frame - 1] + 1, Presented[frame] - Presented[frame - 1] - 1).Count(o => !Screen.Contains(o)) : 0;
 
     /// <summary>The judged animation errors up to the frame, since the clip's first frame (animation minus display time without static steps).</summary>
     public long DriftTicks(int frame) => Enumerable.Range(1, frame).Sum(f => AnimationErrorTicks(f) ?? 0);

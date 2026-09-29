@@ -64,6 +64,7 @@ namespace MB.FramePacing.Analysis
         frame.CpuBusyTicks != 0 ? frame.CpuBusyTicks : null,
         frame.FrameTimeTicks,
         frame.CpuWaitTicks,
+        frame.OlderFrames is { } older ? older.Select(o => new OlderFrame(o.FrameIndex, o.CaptureTicks)).ToArray() : Array.Empty<OlderFrame>(),
         frame.FirstSeenMainTicks,
         frame.FirstSeenMainTicks is { } main ? frame.FirstSeenTicks - main : null
       );
@@ -97,7 +98,8 @@ namespace MB.FramePacing.Analysis
         row.FrameTimeTicks,
         row.CpuWaitTicks,
         (uint)(row.MarkerPreferredTicks ?? 0),
-        row.PreferredTicks
+        row.PreferredTicks,
+        row.OlderFrames.Count > 0 ? row.OlderFrames.Select(o => new OlderFrameCapture(o.CaptureTicks, o.FrameIndex)).ToArray() : null
       );
 
     public static SummaryRun ToSummary(this RunAnalysis run, string framesFile) =>
@@ -182,6 +184,7 @@ namespace MB.FramePacing.Analysis
         s.OnePercentLowFps,
         s.PointOnePercentLowFps,
         s.ExcludedStaticFrames,
+        s.UncertainSteps,
         s.CpuBusyMs.ToSummary(),
         s.FrameTimeMs.ToSummary(),
         s.CpuWaitMs.ToSummary()
@@ -204,7 +207,8 @@ namespace MB.FramePacing.Analysis
         s.CpuBusyMs.ToStatistics(),
         s.FrameTimeMs.ToStatistics(),
         s.CpuWaitMs.ToStatistics(),
-        s.ExcludedStaticFrames
+        s.ExcludedStaticFrames,
+        s.UncertainSteps
       );
 
     private static SummaryPacing ToSummary(this RunPacing p) =>

@@ -29,7 +29,7 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1233434083,
+    "hostTicksSum": 1219907087,
     "deviceTicksCount": 486,
     "deviceTicksSum": 19642500000,
     "sourceDropCount": 0,
@@ -64,6 +64,7 @@
         "animationErrorMax": 16.6667,
         "averageFps": 48.47599185167429,
         "excludedStaticFrames": 0,
+        "uncertainSteps": 0,
         "cpuBusyCount": 388,
         "pacingSource": "Schedule",
         "lateFrames": 92,
@@ -179,7 +180,9 @@
       },
       "flagCounts": {
         "Late": 92
-      }
+      },
+      "olderFrameCount": 0,
+      "olderFrameIndexSum": 0
     }
   ],
   "captures": {
@@ -194,7 +197,7 @@
     },
     "captureTicksSum": 19642500000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1233434083,
+    "hostTicksSum": 1219907087,
     "sourceDropCount": 0,
     "payloadByteCount": 25830
   }

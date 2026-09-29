@@ -79,6 +79,7 @@ target_sources(mb_framepacingdata
       include/mb/framepacingdata/DataRect.hpp
       include/mb/framepacingdata/FramePacingData.hpp
       include/mb/framepacingdata/FrameRow.hpp
+      include/mb/framepacingdata/OlderFrame.hpp
       include/mb/framepacingdata/LibraryVersion.hpp
       include/mb/framepacingdata/MarkerLocation.hpp
       include/mb/framepacingdata/SummaryCamera.hpp

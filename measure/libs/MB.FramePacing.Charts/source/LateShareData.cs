@@ -62,6 +62,7 @@ namespace MB.FramePacing.Charts
         var frame = frames[i];
         held[i] =
           (frame.Flags & (PresentedFrameFlags.Late | PresentedFrameFlags.Static)) == 0
+          && Analysis.LateShare.Counts(frame)
           && frame.DisplayDeltaTicks is { } display
           && frame.PreferredTicks is { } preferred
           && display >= preferred + half;
@@ -77,7 +78,7 @@ namespace MB.FramePacing.Charts
       int heldCount = 0;
       void Add(int index, int sign)
       {
-        if (!frames[index].DisplayDeltaTicks.HasValue)
+        if (!Analysis.LateShare.Counts(frames[index]))
           return;
         counted += sign;
         if ((frames[index].Flags & PresentedFrameFlags.Late) != 0)

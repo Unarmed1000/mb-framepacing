@@ -41,7 +41,9 @@ namespace MB.FramePacing.Analysis
     Statistics FrameTimeMs,
     Statistics CpuWaitMs,
     // The display time steps the frame rate numbers leave out: each is a static frame's time on screen
-    long ExcludedStaticFrames
+    long ExcludedStaticFrames,
+    // The display time steps a capture gap made uncertain (PresentedFrameFlags.UncertainStep), not judged; not counted again when static
+    long UncertainSteps
   )
   {
     /// <summary>
@@ -73,15 +75,20 @@ namespace MB.FramePacing.Analysis
         Statistics.FromTicks(frames.Where(f => f.CpuBusyTicks != 0).Select(f => (long)f.CpuBusyTicks)),
         Statistics.FromTicks(frames.Where(f => f.FrameTimeTicks.HasValue).Select(f => f.FrameTimeTicks!.Value)),
         Statistics.FromTicks(frames.Where(f => f.CpuWaitTicks.HasValue).Select(f => f.CpuWaitTicks!.Value)),
-        frames.LongCount(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)
+        frames.LongCount(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0),
+        frames.LongCount(f =>
+          f.DisplayDeltaTicks.HasValue
+          && (f.Flags & (PresentedFrameFlags.UncertainStep | PresentedFrameFlags.StaticBefore)) == PresentedFrameFlags.UncertainStep
+        )
       );
     }
 
     /// <summary>
-    /// The frame's display time step counts toward the frame rate numbers: it has one, and it is not a static frame's time on screen.
+    /// The frame's display time step counts toward the frame rate numbers: it has one, it is not a static frame's time on screen, and no
+    /// capture gap made it uncertain.
     /// </summary>
     public static bool CountsTowardFrameRate(PresentedFrame frame) =>
-      frame.DisplayDeltaTicks.HasValue && (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
+      frame.DisplayDeltaTicks.HasValue && (frame.Flags & (PresentedFrameFlags.StaticBefore | PresentedFrameFlags.UncertainStep)) == 0;
 
     /// <summary>A 1 % low needs at least this many frames to rest on more than the single slowest one.</summary>
     public const int MinFramesForOnePercentLow = 100;

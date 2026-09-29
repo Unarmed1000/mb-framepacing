@@ -169,6 +169,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `TextRunsShape` (pieces of text, each in its own classes) that the renderer lays out end to end (a `<text>` with `<tspan>`s in SVG,
       measured pieces in `CardView`), so no width is guessed. Swatches are coloured characters in the `key-*` classes (■ fill, ━ line,
       ┅ refresh line, ▾ mark, ▐▌ for colours that alternate per frame).
+    - **Holds and strip cells by kind** (`RunChartData.HoldKinds`, `HoldKind`): unknown (a capture gap, dashed grey), late (red), an
+      older frame came back (out of order, pink), frames dropped by the target (orange), as planned (green). Dropped = skipped frame
+      indices over a gap-free capture that never came back out of order (`DroppedBeforeFrame`); the strip colours the refreshes where
+      they were due orange and the out-of-order refreshes (`PresentedFrame.OlderFrames`, CSV `olderFrames`) pink.
     - **Static stretches:** a violet band (`static-band`) behind every time panel from the first static frame's display time to the next
       frame's (`RunChartData.StaticStretches`), violet strip cells (`strip-static-a`/`-b`). The display time step and frametime scales
       leave static frames' holds and frametimes out (`RunChartData.AnimatingHolds`, `AnimatingFrameTimes`); they get edge marks.
@@ -180,6 +184,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
     (`TimelineAnalyzer.RefreshTolerance`) is a warning.
+  - **Capture gaps** (a capture card's captures not decoded, not recorded, or dropped by the source: `SourceDropBefore` too): the next
+    frame's first sighting is uncertain (`UncertainStart`), so the steps into and out of it are not judged (`UncertainStep`: no animation
+    error, no late verdict, not in the frame rates; `RunStatistics.UncertainSteps`), and frame indices skipped across the gap are never
+    called dropped. A camera decides uncertain starts itself. Out-of-order captures are kept with the newest frame
+    (`PresentedFrame.OlderFrames`).
   - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
     summary.json). Every frame's target comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`:
     lateness against the schedule, and the animation error split into pacing and prediction error), its target frame time in the

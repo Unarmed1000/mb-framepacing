@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace MB.FramePacing.Data
@@ -20,7 +21,7 @@ namespace MB.FramePacing.Data
   {
     public const string Header =
       "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,displayDeltaMs,animationDeltaMs,animationErrorMs,driftMs,flags,"
-      + "intendedDisplayMs,markerTargetMs,targetMs,markerPreferredMs,preferredMs,pacingErrorMs,predictionErrorMs,latenessMs,lastSeenMs,cpuStartMs,cpuBusyMs,frameTimeMs,cpuWaitMs";
+      + "intendedDisplayMs,markerTargetMs,targetMs,markerPreferredMs,preferredMs,pacingErrorMs,predictionErrorMs,latenessMs,lastSeenMs,cpuStartMs,cpuBusyMs,frameTimeMs,cpuWaitMs,olderFrames";
 
     /// <summary>The columns an EXPERIMENTAL camera capture adds.</summary>
     public const string CameraColumns = ",mainMarkerFirstSeenMs,scanoutDelayMs";
@@ -64,7 +65,11 @@ namespace MB.FramePacing.Data
             Optional(row.CpuStartTicks),
             Optional(row.CpuBusyTicks),
             Optional(row.FrameTimeTicks),
-            Optional(row.CpuWaitTicks)
+            Optional(row.CpuWaitTicks),
+            string.Join(
+              '|',
+              row.OlderFrames.Select(o => o.FrameIndex.ToString(CultureInfo.InvariantCulture) + "@" + Milliseconds.Format(o.CaptureTicks))
+            )
           ) + (camera ? "," + Optional(row.MainMarkerFirstSeenTicks) + "," + Optional(row.ScanoutDelayTicks) : string.Empty)
         );
       }
@@ -106,6 +111,7 @@ namespace MB.FramePacing.Data
       int cpuBusy = Column("cpuBusyMs");
       int frameTime = Column("frameTimeMs");
       int cpuWait = Column("cpuWaitMs");
+      int older = Column("olderFrames");
       int mainSeen = Column("mainMarkerFirstSeenMs");
       int scanoutDelay = Column("scanoutDelayMs");
 
@@ -145,6 +151,7 @@ namespace MB.FramePacing.Data
             row.Ticks(cpuBusy),
             row.Ticks(frameTime),
             row.Ticks(cpuWait),
+            OlderFrames(row.Cell(older)),
             row.Ticks(mainSeen),
             row.Ticks(scanoutDelay)
           )
@@ -152,6 +159,20 @@ namespace MB.FramePacing.Data
       }
       return rows;
     }
+
+    /// <summary>The olderFrames cell: <c>frameIndex@captureMs</c> entries separated by <c>|</c>, empty when none.</summary>
+    private static IReadOnlyList<OlderFrame> OlderFrames(string cell) =>
+      cell.Length == 0
+        ? Array.Empty<OlderFrame>()
+        : cell.Split('|')
+          .Select(entry =>
+          {
+            int at = entry.IndexOf('@', StringComparison.Ordinal);
+            if (at <= 0)
+              throw new InvalidDataException($"Invalid olderFrames entry '{entry}'");
+            return new OlderFrame(ulong.Parse(entry.AsSpan(0, at), CultureInfo.InvariantCulture), Milliseconds.ParseTicks(entry.Substring(at + 1)));
+          })
+          .ToArray();
 
     private static string Optional(long? ticks) => ticks is { } value ? Milliseconds.Format(value) : string.Empty;
   }

@@ -139,6 +139,7 @@ namespace MB.FramePacing.Data.UnitTest
                   ["animationErrorMax"] = r.Statistics.AnimationErrorMs.Max,
                   ["averageFps"] = r.Statistics.AverageFps,
                   ["excludedStaticFrames"] = r.Statistics.ExcludedStaticFrames,
+                  ["uncertainSteps"] = r.Statistics.UncertainSteps,
                   ["cpuBusyCount"] = r.Statistics.CpuBusyMs?.Count ?? 0,
                   ["pacingSource"] = r.Pacing?.Source,
                   ["lateFrames"] = r.Pacing?.LateFrames ?? 0,
@@ -164,6 +165,8 @@ namespace MB.FramePacing.Data.UnitTest
         ["rowCount"] = rows.Count,
         ["columns"] = columns,
         ["flagCounts"] = Counts(rows.SelectMany(r => r.Flags)),
+        ["olderFrameCount"] = rows.Sum(r => r.OlderFrames.Count),
+        ["olderFrameIndexSum"] = rows.SelectMany(r => r.OlderFrames).Aggregate(0UL, (sum, o) => sum + o.FrameIndex),
       };
     }
 

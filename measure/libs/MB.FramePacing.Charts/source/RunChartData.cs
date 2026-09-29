@@ -31,6 +31,11 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<FrameSequence> m_animatingHolds;
     private readonly Lazy<(int Start, int End)[]> m_staticStretches;
     private readonly Lazy<FrameSequence> m_lateHolds;
+    private readonly Lazy<HoldKind[]> m_holdKinds;
+    private readonly Lazy<Dictionary<HoldKind, FrameSequence>> m_holdsByKind;
+    private readonly Lazy<long[]> m_droppedBefore;
+    private readonly Lazy<RankBits> m_uncertainSteps;
+    private readonly Lazy<RankBits> m_staticSteps;
     private readonly Lazy<FrameSequence> m_animationHolds;
     private readonly Lazy<FrameSequence> m_frameTimes;
     private readonly Lazy<FrameSequence> m_cpuBusy;
@@ -87,6 +92,44 @@ namespace MB.FramePacing.Charts
       m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTimeTicks is > 0 and var t ? t : null));
       m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null));
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTimeTicks is > 0 || Frames[i].CpuBusyTicks > 0));
+      m_droppedBefore = Once(() => DroppedBefore(Frames));
+      m_holdKinds = Once(() =>
+      {
+        // A hold's kind, the first that applies: not known (a capture gap made the next step uncertain), late, an older frame came back
+        // while it was the newest, frames never shown before the next, as planned
+        var kinds = new HoldKind[count];
+        for (int i = 0; i + 1 < count; ++i)
+        {
+          if (!HasNext(i))
+            continue;
+          var next = Frames[i + 1];
+          kinds[i] =
+            (next.Flags & PresentedFrameFlags.UncertainStep) != 0 ? HoldKind.Unknown
+            : (next.Flags & PresentedFrameFlags.Late) != 0 ? HoldKind.Late
+            : Frames[i].OlderFrames is { Count: > 0 } ? HoldKind.OlderFrameBack
+            : DroppedBeforeFrame[i + 1] > 0 ? HoldKind.FramesDropped
+            : HoldKind.AsPlanned;
+        }
+        return kinds;
+      });
+      m_holdsByKind = Once(() =>
+        Enum.GetValues<HoldKind>()
+          .ToDictionary(
+            kind => kind,
+            kind => new FrameSequence(count, i => HasNext(i) && HoldKinds[i] == kind ? Frames[i + 1].DisplayDeltaTicks : null)
+          )
+      );
+      m_uncertainSteps = Once(() =>
+        new RankBits(
+          count,
+          i =>
+            Frames[i].DisplayDeltaTicks.HasValue
+            && (Frames[i].Flags & (PresentedFrameFlags.UncertainStep | PresentedFrameFlags.StaticBefore)) == PresentedFrameFlags.UncertainStep
+        )
+      );
+      m_staticSteps = Once(() =>
+        new RankBits(count, i => Frames[i].DisplayDeltaTicks.HasValue && (Frames[i].Flags & PresentedFrameFlags.StaticBefore) != 0)
+      );
       m_animatingFrameTimes = Once(() =>
         new FrameSequence(count, i => (Frames[i].Flags & PresentedFrameFlags.Static) == 0 && Frames[i].FrameTimeTicks is > 0 and var t ? t : null)
       );
@@ -137,6 +180,70 @@ namespace MB.FramePacing.Charts
 
     /// <summary>Runs of consecutive static frames of one segment, as frame ranges (start, end), in display order.</summary>
     public IReadOnlyList<(int Start, int End)> StaticStretches => m_staticStretches.Value;
+
+    /// <summary>Each frame's hold kind (<see cref="HoldKind"/>): how the display time step panel draws it.</summary>
+    public IReadOnlyList<HoldKind> HoldKinds => m_holdKinds.Value;
+
+    /// <summary>The holds of one kind: for the columns of a zoomed out panel.</summary>
+    public FrameSequence HoldsOf(HoldKind kind) => m_holdsByKind.Value[kind];
+
+    /// <summary>
+    /// Per frame, the frames the target dropped just before it: frame indices it skipped that never reached the display (not even out of
+    /// order later in the segment), 0 when a capture gap came before it (they may have been shown in the refreshes the capture missed).
+    /// </summary>
+    public IReadOnlyList<long> DroppedBeforeFrame => m_droppedBefore.Value;
+
+    /// <summary>The frames whose display time step a capture gap made uncertain (not judged); a static frame's is counted as static.</summary>
+    public RankBits UncertainSteps => m_uncertainSteps.Value;
+
+    /// <summary>The frames whose display time step is a static frame's time on screen (RunStatistics.ExcludedStaticFrames).</summary>
+    public RankBits StaticSteps => m_staticSteps.Value;
+
+    private static long[] DroppedBefore(IReadOnlyList<PresentedFrame> frames)
+    {
+      var dropped = new long[frames.Count];
+      int segmentStart = 0;
+      for (int i = 0; i <= frames.Count; ++i)
+      {
+        if (i < frames.Count && frames[i].Segment == frames[segmentStart].Segment)
+          continue;
+        // The segment's frames segmentStart to i: the older frames it showed out of order, sorted, count out of the skipped indices
+        var older = new List<ulong>();
+        for (int k = segmentStart; k < i; ++k)
+        {
+          if (frames[k].OlderFrames is { } shown)
+            older.AddRange(shown.Select(o => o.FrameIndex));
+        }
+        var shownOlder = older.Distinct().Order().ToArray();
+        for (int k = segmentStart + 1; k < i; ++k)
+        {
+          var frame = frames[k];
+          if (frame.SkippedBefore == 0 || (frame.Flags & PresentedFrameFlags.UncertainStart) != 0)
+            continue;
+          ulong from = frames[k - 1].FrameIndex + 1;
+          int lo = LowerBound(shownOlder, from);
+          int hi = LowerBound(shownOlder, frame.FrameIndex);
+          dropped[k] = (long)frame.SkippedBefore - (hi - lo);
+        }
+        segmentStart = i;
+      }
+      return dropped;
+    }
+
+    private static int LowerBound(ulong[] sorted, ulong value)
+    {
+      int lo = 0;
+      int hi = sorted.Length;
+      while (lo < hi)
+      {
+        int mid = (lo + hi) / 2;
+        if (sorted[mid] < value)
+          lo = mid + 1;
+        else
+          hi = mid;
+      }
+      return lo;
+    }
 
     /// <summary>The holds whose next frame is late (held too long).</summary>
     public FrameSequence LateHolds => m_lateHolds.Value;

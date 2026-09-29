@@ -115,6 +115,13 @@ namespace MB.FramePacing.Analysis.UnitTest
         var frame = run.Frames[i];
         string where = $"{clip}: frame {i}";
         Assert.That(frame.FrameIndex, Is.EqualTo(manifest.FrameIndex(i)), where + ": frame index");
+        // The refreshes after it that showed an older frame out of order: kept with the frame, at their capture's time
+        Assert.That(
+          (frame.OlderFrames ?? Array.Empty<OlderFrameCapture>()).Select(o => (o.FrameIndex, o.CaptureTicks)),
+          Is.EqualTo(manifest.OlderFramesAfter(i).Select(o => (o.FrameIndex, manifest.VideoFrameTicks(o.Refresh)))),
+          where + ": older frames shown out of order after it"
+        );
+        Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.UncertainStep), Is.False, where + ": the clip's capture has no gap");
         Assert.That(frame.SkippedBefore, Is.EqualTo(manifest.SkippedBefore(i)), where + ": frame indices skipped before it");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Static), Is.EqualTo(manifest.IsStatic(i)), where + ": static");
         Assert.That(frame.PreferredTicks, Is.EqualTo(manifest.PreferredRefreshes(i) * refresh), where + ": preferred frame time (null on demand)");
@@ -180,6 +187,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var steps = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.CountsTowardFrameRate).Select(manifest.DisplayStepTicks).ToArray();
       Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(steps.Length), $"{clip}: display time steps");
       Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(manifest.FrameCount - 1 - steps.Length), $"{clip}: static frames left out");
+      Assert.That(run.Statistics.UncertainSteps, Is.Zero, $"{clip}: no step across a capture gap");
       Assert.That(
         run.Statistics.AverageFps,
         Is.EqualTo(steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum()).Within(1e-9),

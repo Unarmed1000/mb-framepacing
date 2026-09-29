@@ -114,6 +114,76 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
+    /// A capture the recorder dropped right before a frame's first sighting: the frame may have appeared in it, so its display time is
+    /// uncertain. The steps into and out of it are not judged (no animation error, no late verdict, not in the frame rates) and counted.
+    /// </summary>
+    [Test]
+    public void CaptureGap_TheStepsAroundItAreNotJudged()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
+      rows.Status(CaptureStatus.NotRecorded).Show(4, 48, 3);
+      rows.Show(5, 64, 4).Show(6, 80, 4).Show(7, 96, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+      var frames = run.Frames;
+
+      Assert.That(
+        frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStep)),
+        Is.EqualTo(new[] { false, false, false, true, true, false, false })
+      );
+      Assert.That(frames[3].AnimationErrorTicks, Is.Null, "the step into the frame after the gap");
+      Assert.That(frames[4].AnimationErrorTicks, Is.Null, "the step out of it");
+      Assert.That(frames[3].DisplayDeltaTicks, Is.EqualTo(20 * Ms), "what the capture saw is still stored");
+      Assert.That(
+        frames.Where(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStep)).Select(f => f.Flags.HasFlag(PresentedFrameFlags.Late)),
+        Is.All.False
+      );
+      Assert.That(run.Statistics.UncertainSteps, Is.EqualTo(2));
+      Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(4), "the frame rates leave the two steps out");
+      Assert.That(run.Statistics.FramesWithAnimationError, Is.Zero, "no error made up by the gap");
+      Assert.That(run.Counts.NotRecorded, Is.EqualTo(1));
+    }
+
+    /// <summary>A capture source that reports dropping frames before a capture leaves the same gap as a recorder that could not record one.</summary>
+    [Test]
+    public void SourceDrop_IsACaptureGapToo()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
+      int dropped = rows.Rows.Count;
+      rows.Show(4, 48, 3);
+      rows.Rows[dropped] = rows.Rows[dropped] with { SourceDropBefore = true };
+      rows.Show(5, 64, 4).Show(6, 80, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+
+      Assert.That(run.Frames[3].Flags.HasFlag(PresentedFrameFlags.UncertainStart));
+      Assert.That(run.Frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStep)), Is.EqualTo(2));
+      Assert.That(run.Counts.SourceDropEvents, Is.EqualTo(1));
+    }
+
+    /// <summary>A capture that shows an older frame again is kept with the newest frame (the one presented), at its capture's time.</summary>
+    [Test]
+    public void OutOfOrderCapture_IsKeptWithTheNewestFrame()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(3, 32, 4);
+      int older = rows.Rows.Count;
+      rows.Show(2, 16, 1).Show(4, 48, 4).Show(5, 64, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+
+      Assert.That(run.Frames.Select(f => f.FrameIndex), Is.EqualTo(new ulong[] { 1, 3, 4, 5 }));
+      Assert.That(run.Frames[1].OlderFrames, Is.EqualTo(new[] { new OlderFrameCapture(older * Period, 2) }));
+      Assert.That(run.Frames.Where((_, i) => i != 1).Select(f => f.OlderFrames), Is.All.Null);
+      Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(1));
+    }
+
+    /// <summary>
     /// A second of idle screen (a static frame) between animated frames: the steps into and out of it are not judged, whether the
     /// application's animation clock paused while nothing animated (48 ms) or kept running (1048 ms), and the drift does not jump. The
     /// frame rate numbers leave out the static frame's time on screen, and count it.

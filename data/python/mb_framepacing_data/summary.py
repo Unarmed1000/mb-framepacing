@@ -146,6 +146,7 @@ class SummaryStatistics:
     one_percent_low_fps: float | None
     point_one_percent_low_fps: float | None
     excluded_static_frames: int
+    uncertain_steps: int
     cpu_busy_ms: ValueStatistics
     frame_time_ms: ValueStatistics
     cpu_wait_ms: ValueStatistics
@@ -342,6 +343,7 @@ def _statistics(value: _Object) -> SummaryStatistics:
         one_percent_low_fps=value.optional_number("onePercentLowFps"),
         point_one_percent_low_fps=value.optional_number("pointOnePercentLowFps"),
         excluded_static_frames=value.integer("excludedStaticFrames"),
+        uncertain_steps=value.integer("uncertainSteps"),
         cpu_busy_ms=stats("cpuBusyMs"),
         frame_time_ms=stats("frameTimeMs"),
         cpu_wait_ms=stats("cpuWaitMs"),

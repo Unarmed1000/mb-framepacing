@@ -112,11 +112,15 @@ namespace MB.FramePacing.Charts
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
-      var (steps0, steps1) = section.Data.DisplaySteps.Of(section.Start, section.End);
-      var (counted0, counted1) = section.Data.FrameRateSteps.Of(section.Start, section.End);
-      int excluded = (steps1 - steps0) - (counted1 - counted0);
+      int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
         description.Add($"Frame rates and display time steps {staticFrames}: nothing animates in them.");
+      // Capture gaps: the steps they made uncertain are not judged
+      int uncertain = section.Data.UncertainSteps.CountIn(section.Start, section.End);
+      if (uncertain > 0)
+        description.Add(
+          $"{uncertain.ToString("N0", CultureInfo.InvariantCulture)} display time step{(uncertain == 1 ? string.Empty : "s")} across capture gaps (not decoded, not recorded or dropped by the source) not judged."
+        );
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
       // The section's own numbers only when a tile shows them
@@ -434,6 +438,29 @@ namespace MB.FramePacing.Charts
       return runs.Count > 0 ? new List<CardShape> { new TextRunsShape(right, y, runs, "vsync-n", "end") } : new List<CardShape>();
     }
 
+    /// <summary>The kinds that colour a column of holds, the first one the column has: a late hold outweighs the others.</summary>
+    private static readonly HoldKind[] g_holdPriority = { HoldKind.Late, HoldKind.OlderFrameBack, HoldKind.FramesDropped, HoldKind.Unknown };
+
+    /// <summary>The key entries of the hold kinds besides "as planned", in the key's order.</summary>
+    private static readonly (HoldKind Kind, string Text)[] g_holdKeys =
+    {
+      (HoldKind.Late, "held too long: the next frame was late"),
+      (HoldKind.OlderFrameBack, "held: an older frame came back"),
+      (HoldKind.FramesDropped, "held: frames never shown before the next"),
+      (HoldKind.Unknown, "not known: a capture gap"),
+    };
+
+    /// <summary>A hold's class: <paramref name="prefix"/> (held, held-range, held-fill) and its kind's suffix.</summary>
+    private static string HoldClass(string prefix, HoldKind kind) =>
+      kind switch
+      {
+        HoldKind.Late => prefix + "-late",
+        HoldKind.OlderFrameBack => prefix + "-older",
+        HoldKind.FramesDropped => prefix + "-dropped",
+        HoldKind.Unknown => prefix + "-unknown",
+        _ => prefix,
+      };
+
     /// <summary>The key colour of each kind of data a panel draws: its fill or stroke as a text fill.</summary>
     private static readonly Dictionary<string, string> g_keyColours = new Dictionary<string, string>
     {
@@ -442,6 +469,11 @@ namespace MB.FramePacing.Charts
       ["static-band"] = "key-violet-a",
       ["held"] = "key-green",
       ["held-late"] = "key-red",
+      ["held-older"] = "key-pink",
+      ["held-dropped"] = "key-orange",
+      ["held-unknown"] = "key-unknown",
+      ["strip-older"] = "key-pink",
+      ["strip-dropped"] = "key-orange",
       ["step-line"] = "key-blue",
       ["frametime"] = "key-blue",
       ["cpu-busy"] = "key-blue-faint",
@@ -692,11 +724,14 @@ namespace MB.FramePacing.Charts
           "start"
         )
       );
-      // The key: as planned, held too long (the next frame was late) where the section has it, the animation time step when drawn
+      // The key: as planned, and every other kind of hold the section has; the animation time step when drawn
       var panelKey = new List<(string[] Classes, string Text, bool Line)> { (new[] { "held" }, "as planned", true) };
-      var (lateHoldsStart, lateHoldsEnd) = data.LateHolds.Of(section.Start, holdEnd);
-      if (lateHoldsEnd > lateHoldsStart)
-        panelKey.Add((new[] { "held-late" }, "held too long: the next frame was late", true));
+      foreach (var (kind, text) in g_holdKeys)
+      {
+        var (kindStart, kindEnd) = data.HoldsOf(kind).Of(section.Start, holdEnd);
+        if (kindEnd > kindStart)
+          panelKey.Add((new[] { HoldClass("held", kind) }, text, true));
+      }
       if (animation)
         panelKey.Add((new[] { "step-line" }, "animation time step", true));
       foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
@@ -717,8 +752,7 @@ namespace MB.FramePacing.Charts
       if (view.PerFrame)
       {
         var risers = new StringBuilder();
-        var onTime = new StringBuilder();
-        var late = new StringBuilder();
+        var byKind = Enum.GetValues<HoldKind>().ToDictionary(kind => kind, _ => new StringBuilder());
         (double X1, double Level)? previous = null;
         foreach (int i in holds.FramesIn(section.Start, holdEnd))
         {
@@ -729,25 +763,22 @@ namespace MB.FramePacing.Charts
           double y = YOf(level);
           if (previous is { } before && Math.Abs(before.X1 - x0) < 1e-6 && Math.Abs(before.Level - level) > 1e-9)
             risers.Append($"M{Fixed(x0, 1)} {Fixed(YOf(before.Level), 1)}V{Fixed(y, 1)}");
-          ((next.Flags & PresentedFrameFlags.Late) != 0 ? late : onTime).Append($"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}");
+          byKind[data.HoldKinds[i]].Append($"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}");
           if (level > top)
             clipped.Add(((x0 + x1) / 2, level, true));
           previous = (x1, level);
         }
         view.MovePath(parts, "riser", risers, stepY, stepY + StepH);
-        view.MovePath(parts, "held", onTime, stepY, stepY + StepH);
-        view.MovePath(parts, "held-late", late, stepY, stepY + StepH);
+        foreach (var kind in Enum.GetValues<HoldKind>())
+          view.MovePath(parts, HoldClass("held", kind), byKind[kind], stepY, stepY + StepH);
       }
       else
       {
-        // Per pixel column: the range of its holds faint (red if any was held too long), and its median hold as the solid line
-        var onTimeRange = new StringBuilder();
-        var lateRange = new StringBuilder();
-        var median = new StringBuilder();
-        var medianLate = new StringBuilder();
-        var solid = new StringBuilder();
-        var solidLate = new StringBuilder();
-        var lateHolds = data.LateHolds;
+        // Per pixel column: the range of its holds faint, in the colour of the first kind it holds (red if any was held too long), and its
+        // median hold as the solid line in that hold's kind
+        var ranges = Enum.GetValues<HoldKind>().ToDictionary(kind => kind, _ => new StringBuilder());
+        var medians = Enum.GetValues<HoldKind>().ToDictionary(kind => kind, _ => new StringBuilder());
+        var solids = Enum.GetValues<HoldKind>().ToDictionary(kind => kind, _ => new StringBuilder());
         foreach (var (key, frameStart, frameEnd) in view.Columns(section.Start, holdEnd))
         {
           var (start, end) = holds.Of(frameStart, frameEnd);
@@ -761,31 +792,37 @@ namespace MB.FramePacing.Charts
           double columnEnd = Math.Max(key + 1, X1(last));
           double lowest = TicksMs(holds.Values.KthSmallest(start, end, 0));
           double highest = MaxMs(holds.Values, start, end);
-          bool anyLate = lateHolds.Frames.CountIn(frameStart, frameEnd) > 0;
+          var boxKind = g_holdPriority.FirstOrDefault(kind => data.HoldsOf(kind).Frames.CountIn(frameStart, frameEnd) > 0, HoldKind.AsPlanned);
           string box = $"M{Fixed(key, 0)} {Fixed(YOf(highest) - 1.25, 1)}H{Fixed(columnEnd, 1)}V{Fixed(YOf(lowest) + 1.25, 1)}H{Fixed(key, 0)}Z";
           if (highest > top)
             clipped.Add((key + 0.5, highest, true));
           if (count < MinFramesForTypical)
           {
             // Few holds: all of them solid
-            (anyLate ? solidLate : solid).Append(box);
+            solids[boxKind].Append(box);
             continue;
           }
-          (anyLate ? lateRange : onTimeRange).Append(box);
-          // A hold that happened (the lower middle one), not an interpolation between two levels; red when a hold of that level was late
+          ranges[boxKind].Append(box);
+          // A hold that happened (the lower middle one), not an interpolation between two levels, in the kind of a hold of that level
           long middle = holds.Values.KthSmallest(start, end, (count - 1) / 2);
-          var (lateStart, lateEnd) = lateHolds.Of(frameStart, frameEnd);
-          bool middleLate =
-            lateEnd > lateStart
-            && lateHolds.Values.CountBelow(lateStart, lateEnd, middle + 1) > lateHolds.Values.CountBelow(lateStart, lateEnd, middle);
-          (middleLate ? medianLate : median).Append($"M{Fixed(key, 0)} {Fixed(YOf(TicksMs(middle)), 1)}H{Fixed(columnEnd, 1)}");
+          var middleKind = g_holdPriority.FirstOrDefault(
+            kind =>
+            {
+              var sequence = data.HoldsOf(kind);
+              var (kindStart, kindEnd) = sequence.Of(frameStart, frameEnd);
+              return kindEnd > kindStart
+                && sequence.Values.CountBelow(kindStart, kindEnd, middle + 1) > sequence.Values.CountBelow(kindStart, kindEnd, middle);
+            },
+            HoldKind.AsPlanned
+          );
+          medians[middleKind].Append($"M{Fixed(key, 0)} {Fixed(YOf(TicksMs(middle)), 1)}H{Fixed(columnEnd, 1)}");
         }
-        view.MovePath(parts, "held-range", onTimeRange, stepY, stepY + StepH);
-        view.MovePath(parts, "held-range-late", lateRange, stepY, stepY + StepH);
-        view.MovePath(parts, "held", median, stepY, stepY + StepH);
-        view.MovePath(parts, "held-late", medianLate, stepY, stepY + StepH);
-        view.MovePath(parts, "held-fill", solid, stepY, stepY + StepH);
-        view.MovePath(parts, "held-fill-late", solidLate, stepY, stepY + StepH);
+        foreach (var kind in Enum.GetValues<HoldKind>())
+        {
+          view.MovePath(parts, HoldClass("held-range", kind), ranges[kind], stepY, stepY + StepH);
+          view.MovePath(parts, HoldClass("held", kind), medians[kind], stepY, stepY + StepH);
+          view.MovePath(parts, HoldClass("held-fill", kind), solids[kind], stepY, stepY + StepH);
+        }
       }
       ClipMarks(shape => view.Move(parts, shape, stepY, stepY + StepH), clipped, stepY, stepY + StepH, v => $"{Ms(v)} ms", view.PlotX1);
       view.Ticks(parts, stepY + StepH);
@@ -1128,6 +1165,8 @@ namespace MB.FramePacing.Charts
       bool anyUnknown = false;
       bool anyStatic = false;
       bool anyLate = false;
+      bool anyOlder = false;
+      bool anyDropped = false;
       for (int i = section.Start; i < section.End; ++i)
       {
         var frame = frames[i];
@@ -1149,22 +1188,33 @@ namespace MB.FramePacing.Charts
           : i % 2 == 0 ? "strip-a"
           : "strip-b";
         double x0 = view.XOfFrame(i);
+        // Frames the target dropped before the next one: the refreshes at the end of this frame's hold where they were due repeat this
+        // frame; each dropped frame was due one target frame time (in whole refreshes) after the one before it
+        int repeats = 0;
+        if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment && view.Data.DroppedBeforeFrame[i + 1] is > 0 and var dropped)
+        {
+          long target = frames[i + 1].TargetTicks is > 0 and var t ? t : refreshTicks;
+          repeats = (int)Math.Min(seen - 1, dropped * Math.Max(1, Cells(target)));
+        }
         for (int c = 0; c < cells; ++c)
         {
           double x = x0 + (c * cellW);
           if (x >= view.EndX)
             break;
-          anyUnknown |= c >= seen;
+          // After the frame's last sighting: a refresh that showed an older frame out of order, else one the capture did not tell
+          string cell = c >= seen - repeats && c < seen ? "strip-dropped" : cls;
+          anyDropped |= cell == "strip-dropped";
+          if (c >= seen)
+          {
+            long at = frame.FirstSeenTicks + (c * refreshTicks);
+            bool older = frame.OlderFrames is { } shown && shown.Any(o => Math.Abs(o.CaptureTicks - at) * 2 < refreshTicks);
+            cell = older ? "strip-older" : "neutral";
+            anyOlder |= older;
+            anyUnknown |= !older;
+          }
           view.Move(
             parts,
-            new RectShape(
-              c < seen ? cls : "neutral",
-              N(x + 0.5, 1),
-              N(stripY, 0),
-              N(Math.Max(0.5, Math.Min(cellW - 1, view.EndX - x - 0.5)), 1),
-              N(StripH, 0),
-              "2"
-            ),
+            new RectShape(cell, N(x + 0.5, 1), N(stripY, 0), N(Math.Max(0.5, Math.Min(cellW - 1, view.EndX - x - 0.5)), 1), N(StripH, 0), "2"),
             stripY - 10,
             stripY + StripH
           );
@@ -1179,8 +1229,12 @@ namespace MB.FramePacing.Charts
         panelKey.Add((new[] { "strip-late" }, "late", false));
       if (anyStatic)
         panelKey.Add((new[] { "strip-static-a", "strip-static-b" }, "static", false));
+      if (anyDropped)
+        panelKey.Add((new[] { "strip-dropped" }, "a dropped frame was due (repeat)", false));
+      if (anyOlder)
+        panelKey.Add((new[] { "strip-older" }, "an older frame (out of order)", false));
       if (anyUnknown)
-        panelKey.Add((new[] { "neutral" }, "not decoded", false));
+        panelKey.Add((new[] { "neutral" }, "not decoded or not recorded", false));
       if (marks.Length > 0)
         panelKey.Add((new[] { "strip-mark" }, "skipped frame indices or torn", false));
       parts.RemoveAt(legend);

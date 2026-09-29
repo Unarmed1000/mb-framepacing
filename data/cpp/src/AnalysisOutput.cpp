@@ -141,6 +141,7 @@ namespace MB::FramePacingData
       s.OnePercentLowFps = Optional<double>(statistics, "onePercentLowFps");
       s.PointOnePercentLowFps = Optional<double>(statistics, "pointOnePercentLowFps");
       s.ExcludedStaticFrames = Required<int64_t>(statistics, "excludedStaticFrames");
+      s.UncertainSteps = Required<int64_t>(statistics, "uncertainSteps");
       s.CpuBusyMs = ToStatistics(Field(statistics, "cpuBusyMs"));
       s.FrameTimeMs = ToStatistics(Field(statistics, "frameTimeMs"));
       s.CpuWaitMs = ToStatistics(Field(statistics, "cpuWaitMs"));
@@ -402,6 +403,21 @@ namespace MB::FramePacingData
       frame.CpuBusyTicks = OptionalTicks(table.Cell(row, "cpuBusyMs"));
       frame.FrameTimeTicks = OptionalTicks(table.Cell(row, "frameTimeMs"));
       frame.CpuWaitTicks = OptionalTicks(table.Cell(row, "cpuWaitMs"));
+      // olderFrames: frameIndex@captureMs entries separated by |
+      const std::string_view older = table.Cell(row, "olderFrames");
+      for (std::size_t start = 0; start < older.size();)
+      {
+        const std::size_t bar = older.find('|', start);
+        const std::size_t stop = bar == std::string_view::npos ? older.size() : bar;
+        const std::string_view entry = older.substr(start, stop - start);
+        const std::size_t at = entry.find('@');
+        if (at == std::string_view::npos || at == 0)
+        {
+          throw DataFormatError("Invalid olderFrames entry '" + std::string(entry) + "'");
+        }
+        frame.OlderFrames.push_back({ParseInteger<uint64_t>(entry.substr(0, at)), ParseTicks(entry.substr(at + 1))});
+        start = stop + 1;
+      }
       frame.MainMarkerFirstSeenTicks = OptionalTicks(table.Cell(row, "mainMarkerFirstSeenMs"));
       frame.ScanoutDelayTicks = OptionalTicks(table.Cell(row, "scanoutDelayMs"));
       frames.push_back(std::move(frame));

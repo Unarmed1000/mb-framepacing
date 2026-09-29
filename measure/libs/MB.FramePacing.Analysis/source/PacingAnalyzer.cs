@@ -97,9 +97,16 @@ namespace MB.FramePacing.Analysis
         // A step from or to a static frame animates nothing, so it has no prediction error (its pacing error still counts)
         bool animates = (frame.Flags & PresentedFrameFlags.Static) == 0 && (previous == null || (previous.Flags & PresentedFrameFlags.Static) == 0);
 
+        // A step a capture gap made uncertain is not judged: no pacing or prediction error, no late verdict
+        bool uncertain = (frame.Flags & PresentedFrameFlags.UncertainStep) != 0;
         long? pacingError = null;
         long? predictionError = null;
-        if (intendedStep is { } intended && frame.DisplayDeltaTicks is { } displayStep && frame.AnimationDeltaTicks is { } animationStep)
+        if (
+          !uncertain
+          && intendedStep is { } intended
+          && frame.DisplayDeltaTicks is { } displayStep
+          && frame.AnimationDeltaTicks is { } animationStep
+        )
         {
           pacingError = displayStep - intended;
           pacingErrors.Add(pacingError.Value);
@@ -113,7 +120,7 @@ namespace MB.FramePacing.Analysis
           scheduleOffset is { } offset && frame.IntendedDisplayTicks != 0 ? frame.FirstSeenTicks - frame.IntendedDisplayTicks - offset : null;
 
         bool isLate = false;
-        if (frame.DisplayDeltaTicks is { } display)
+        if (!uncertain && frame.DisplayDeltaTicks is { } display)
         {
           ++counted;
           isLate = lateness is { } behind ? behind >= half : target is { } aim && display >= aim + half;

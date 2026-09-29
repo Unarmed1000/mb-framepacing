@@ -688,7 +688,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(cells.Count(c => c.Class == "neutral"), Is.EqualTo(2), "the two refreshes after frame 5's last capture are unknown");
       var marks = drawing.FlatShapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
       Assert.That(marks.Data.Count(c => c == 'M'), Is.EqualTo(2), "frame 10 (skipped indices before it) and frame 12 (torn)");
-      Assert.That(KeyWords(drawing), Does.Contain("not decoded"), "the key names the unknown refreshes");
+      Assert.That(KeyWords(drawing), Does.Contain("not decoded or not recorded"), "the key names the unknown refreshes");
       Assert.That(
         drawing.FlatShapes.OfType<TextRunsShape>().SelectMany(t => t.Runs).Count(r => r.Class == "key-grey"),
         Is.EqualTo(1),

@@ -252,7 +252,9 @@ Every panel says in its title what it shows, and its key on the right names each
 - **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
   nothing. Everything inside the shaded band counts as no error.
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
-  when the frame was held too long because the next one was late. An error bar over a red step is
+  when the frame was held too long because the next one was late, orange when frames the application rendered after it never reached
+  the display (dropped), pink when an older frame came back out of order while it was the newest, and dashed grey where a capture gap
+  leaves the step unknown. An error bar over a red step is
   bad pacing; an error bar while the steps stay flat is delta time jitter.
 - **Frametime and CPU busy** (when the markers carry the CPU start time and CPU busy): the application side on the same grid, each
   frame's frametime (its CPU start to the next frame's) as a blue step and its CPU busy (until it was presented) as a faint bar.
@@ -261,8 +263,10 @@ Every panel says in its title what it shows, and its key on the right names each
   where one was late; amber where they only stayed longer than preferred, as the pacer intended (a pacer running slower than the game
   wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. Static frames and
   frames presented on demand are never amber.
-- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, static frames in violet; grey where a
-  capture card's captures could not be decoded, and a mark above frames with skipped frame indices before them (or a tear). Zoom in to
+- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, static frames in violet; orange where a
+  dropped frame was due (the display repeated the frame before), pink where an older frame came back out of order, grey where a capture
+  card's captures could not be decoded or were not recorded, and a mark above frames with skipped frame indices before them (or a
+  tear). Zoom in to
   see hold patterns such as 3-then-1.
 - **Static stretches** (frames whose marker says nothing animates, such as an idle screen): a violet band behind every panel. The
   display time step and frametime scales leave their idle waits out, so a second of idle screen does not squash the rest; those values

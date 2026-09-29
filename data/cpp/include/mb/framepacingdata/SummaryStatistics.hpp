@@ -28,6 +28,8 @@ namespace MB::FramePacingData
     std::optional<double> OnePercentLowFps;
     std::optional<double> PointOnePercentLowFps;
     int64_t ExcludedStaticFrames{0};
+    //! Display time steps a capture gap made uncertain (flag UncertainStep): not judged, left out of the frame rates.
+    int64_t UncertainSteps{0};
     ValueStatistics CpuBusyMs;
     ValueStatistics FrameTimeMs;
     ValueStatistics CpuWaitMs;

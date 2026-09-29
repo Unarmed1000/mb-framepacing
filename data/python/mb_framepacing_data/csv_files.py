@@ -22,7 +22,8 @@ class FrameRow:
     SkippedBefore, UncertainStart, Torn, Late or Static. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
     frametime and CPU wait as PresentMon names them); marker_target_ticks and marker_preferred_ticks are ON_DEMAND_FRAME_TICKS on demand,
     target_ticks and preferred_ticks (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
-    camera captures' only."""
+    camera captures' only. older_frames are the captures that showed an older frame out of order while this frame was the newest:
+    (frame index, capture ticks) in capture order."""
 
     segment: int
     frame_index: int
@@ -50,6 +51,7 @@ class FrameRow:
     cpu_busy_ticks: int | None
     frame_time_ticks: int | None
     cpu_wait_ticks: int | None
+    older_frames: tuple[tuple[int, int], ...]
     main_marker_first_seen_ticks: int | None = None
     scanout_delay_ticks: int | None = None
 
@@ -137,11 +139,23 @@ def read_frames(path: str | Path) -> list[FrameRow]:
                 cpu_busy_ticks=table.optional_ticks(row, "cpuBusyMs"),
                 frame_time_ticks=table.optional_ticks(row, "frameTimeMs"),
                 cpu_wait_ticks=table.optional_ticks(row, "cpuWaitMs"),
+                older_frames=_older_frames(table.cell(row, "olderFrames")),
                 main_marker_first_seen_ticks=table.optional_ticks(row, "mainMarkerFirstSeenMs"),
                 scanout_delay_ticks=table.optional_ticks(row, "scanoutDelayMs"),
             )
         )
     return frames
+
+
+def _older_frames(cell: str) -> tuple[tuple[int, int], ...]:
+    """The olderFrames cell: frameIndex@captureMs entries separated by |, empty when none."""
+    older: list[tuple[int, int]] = []
+    for entry in cell.split("|") if cell else []:
+        index, at, ms = entry.partition("@")
+        if not at or not index:
+            raise DataFormatError(f"Invalid olderFrames entry '{entry}'")
+        older.append((int(index), parse_ticks(ms)))
+    return tuple(older)
 
 
 def read_captures(path: str | Path) -> list[CaptureCsvRow]:

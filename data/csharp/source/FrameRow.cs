@@ -35,6 +35,7 @@ namespace MB.FramePacing.Data
   /// <param name="CpuBusyTicks">From the marker: CPU busy (PresentMon's MsCPUBusy).</param>
   /// <param name="FrameTimeTicks">From this frame's CPU start to the next frame's (PresentMon's MsBetweenAppStart).</param>
   /// <param name="CpuWaitTicks">The frametime minus CPU busy (PresentMon's MsCPUWait).</param>
+  /// <param name="OlderFrames">The captures that showed an older frame out of order while this frame was the newest, in capture order.</param>
   /// <param name="MainMarkerFirstSeenTicks">EXPERIMENTAL camera captures: when the main marker first showed the frame.</param>
   /// <param name="ScanoutDelayTicks">EXPERIMENTAL camera captures: first seen minus the main marker's first seen.</param>
   public sealed record FrameRow(
@@ -64,6 +65,7 @@ namespace MB.FramePacing.Data
     long? CpuBusyTicks,
     long? FrameTimeTicks,
     long? CpuWaitTicks,
+    IReadOnlyList<OlderFrame> OlderFrames,
     long? MainMarkerFirstSeenTicks = null,
     long? ScanoutDelayTicks = null
   )

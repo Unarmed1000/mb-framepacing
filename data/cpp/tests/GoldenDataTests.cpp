@@ -168,6 +168,7 @@ namespace
         {"animationErrorMax", run.Statistics.AnimationErrorMs.Max},
         {"averageFps", run.Statistics.AverageFps},
         {"excludedStaticFrames", run.Statistics.ExcludedStaticFrames},
+        {"uncertainSteps", run.Statistics.UncertainSteps},
         {"cpuBusyCount", run.Statistics.CpuBusyMs.Count},
         {"pacingSource", run.Pacing ? Json(run.Pacing->Source) : Json(nullptr)},
         {"lateFrames", run.Pacing ? run.Pacing->LateFrames : 0},
@@ -233,7 +234,18 @@ namespace
     {
       flags.insert(flags.end(), row.Flags.begin(), row.Flags.end());
     }
-    return {{"file", path.filename().string()}, {"rowCount", rows.size()}, {"columns", result}, {"flagCounts", Counts(flags)}};
+    std::size_t olderCount = 0;
+    uint64_t olderIndexSum = 0;
+    for (const auto& row : rows)
+    {
+      olderCount += row.OlderFrames.size();
+      for (const auto& older : row.OlderFrames)
+      {
+        olderIndexSum += older.FrameIndex;
+      }
+    }
+    return {{"file", path.filename().string()}, {"rowCount", rows.size()},       {"columns", result},
+            {"flagCounts", Counts(flags)},      {"olderFrameCount", olderCount}, {"olderFrameIndexSum", olderIndexSum}};
   }
 
   Json Captures(const std::filesystem::path& path)

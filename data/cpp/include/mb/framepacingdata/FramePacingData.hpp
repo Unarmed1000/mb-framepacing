@@ -22,6 +22,7 @@
 #include <mb/framepacingdata/FrameRow.hpp>
 #include <mb/framepacingdata/LibraryVersion.hpp>
 #include <mb/framepacingdata/MarkerLocation.hpp>
+#include <mb/framepacingdata/OlderFrame.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <optional>

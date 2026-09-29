@@ -39,5 +39,12 @@ namespace MB.FramePacing.Analysis
     /// (average fps, the lows, the display time step statistics and histogram) leave out.
     /// </summary>
     StaticBefore = 32,
+
+    /// <summary>
+    /// A capture card missed a moment this display time step depends on: this frame or the one before it was first seen after captures
+    /// that were not decoded, not recorded or dropped by the source, so it may have appeared earlier. The step is not judged: no animation
+    /// error, no late verdict, and the frame rate numbers leave it out.
+    /// </summary>
+    UncertainStep = 64,
   }
 }

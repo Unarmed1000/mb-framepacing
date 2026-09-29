@@ -36,6 +36,10 @@ namespace MB.FramePacing.Analysis
   /// The frame time the application wants, in whole refreshes: the marker's preferred frame time, else the target frame rate given to the
   /// tools, else one refresh (<see cref="RunPacing"/>). Null when the application presents on demand.
   /// </param>
+  /// <param name="OlderFrames">
+  /// The captures that showed an older frame out of order while this frame was the newest (before the next presented frame), in capture
+  /// order; null when none did.
+  /// </param>
   public sealed record PresentedFrame(
     int Segment,
     ulong FrameIndex,
@@ -63,6 +67,7 @@ namespace MB.FramePacing.Analysis
     long? FrameTimeTicks = null,
     long? CpuWaitTicks = null,
     uint MarkerPreferredFrameTicks = 0,
-    long? PreferredTicks = null
+    long? PreferredTicks = null,
+    System.Collections.Generic.IReadOnlyList<OlderFrameCapture>? OlderFrames = null
   );
 }
