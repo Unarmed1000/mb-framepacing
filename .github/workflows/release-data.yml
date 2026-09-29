@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-# Release the data libraries (C++, C# and Python readers of the tools' data): push a tag data-v<version> that matches data/VERSION.
-#   1. verify   the tag is semantic versioning and matches data/VERSION, and the version bump covers the API changes since the
+# Release the data libraries (C++, C# and Python readers of the tools' data): push a tag data-v<version> that matches sdk/data/VERSION.
+#   1. verify   the tag is semantic versioning and matches sdk/data/VERSION, and the version bump covers the API changes since the
 #               previous release (tools/check_semver.py)
 #   2. test     the C++, C# and Python libraries on Windows, Ubuntu and macOS, against the golden data
 #   3. package  the C++ source archives (tar.gz, zip) and SHA256SUMS; the extracted archive must build, pass its tests, install and work
@@ -32,16 +32,16 @@ jobs:
         with:
           fetch-depth: 0 # the previous release is the API baseline
       - id: version
-        name: Tag is data-v<semver> and matches data/VERSION
+        name: Tag is data-v<semver> and matches sdk/data/VERSION
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#data-v}"
           if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "::error::$GITHUB_REF_NAME is not data-v<major>.<minor>.<patch>"; exit 1
           fi
-          expected="$(tr -d '[:space:]' < data/VERSION)"
+          expected="$(tr -d '[:space:]' < sdk/data/VERSION)"
           if [ "$version" != "$expected" ]; then
-            echo "::error::the tag says $version, data/VERSION says $expected"; exit 1
+            echo "::error::the tag says $version, sdk/data/VERSION says $expected"; exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-dotnet@v6
@@ -71,16 +71,16 @@ jobs:
       - name: C++ library
         shell: bash
         run: |
-          cmake -S data/cpp -B data/cpp/build/release -DCMAKE_BUILD_TYPE=Release
-          cmake --build data/cpp/build/release --config Release --parallel
-          ctest --test-dir data/cpp/build/release -C Release --output-on-failure
+          cmake -S sdk/data/cpp -B sdk/data/cpp/build/release -DCMAKE_BUILD_TYPE=Release
+          cmake --build sdk/data/cpp/build/release --config Release --parallel
+          ctest --test-dir sdk/data/cpp/build/release -C Release --output-on-failure
       - name: C# library
-        run: dotnet test data/csharp/UnitTest/MB.FramePacing.Data.UnitTest.csproj -c Release
+        run: dotnet test sdk/data/csharp/UnitTest/MB.FramePacing.Data.UnitTest.csproj -c Release
       - name: Python library
         shell: bash
         run: |
           # Windows runners have 'python', Linux and macOS 'python3'
-          "$(command -v python3 || command -v python)" -m unittest discover -s data/python -t data/python
+          "$(command -v python3 || command -v python)" -m unittest discover -s sdk/data/python -t sdk/data/python
 
   package:
     name: package C++ archives
@@ -92,7 +92,7 @@ jobs:
       - name: CMake 4
         uses: lukka/get-cmake@v4.4.2
       - name: Create and verify the archives
-        run: python3 data/cpp/package_release.py --output dist --verify
+        run: python3 sdk/data/cpp/package_release.py --output dist --verify
       - uses: actions/upload-artifact@v7
         with:
           name: data-release
@@ -120,7 +120,7 @@ jobs:
         run: |
           sha256="$(grep "mb-framepacingdata-cpp-$VERSION.tar.gz" dist/SHA256SUMS | cut -d' ' -f1)"
           major_minor="${VERSION%.*}"
-          marker="$(tr -d '[:space:]' < marker/VERSION)"
+          marker="$(tr -d '[:space:]' < sdk/marker/VERSION)"
           cat > notes.md <<EOF
           ## C++ (CMake 4.0+, C++20)
 
@@ -143,11 +143,11 @@ jobs:
           ## Python (3.11+)
 
           \`\`\`text
-          pip install "git+https://github.com/${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}#subdirectory=data/python"
+          pip install "git+https://github.com/${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}#subdirectory=sdk/data/python"
           \`\`\`
 
           ## C# (.NET 10)
 
-          The library is \`data/csharp\` at this tag (it references \`marker/csharp\`).
+          The library is \`sdk/data/csharp\` at this tag (it references \`sdk/marker/csharp\`).
           EOF
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Data libraries $VERSION" --notes-file notes.md --generate-notes

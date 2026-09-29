@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* How an application should draw the marker for one capture setup (see MarkerSizing.Advise and doc/marker-format.md "Sizing").
+//* How an application should draw the marker for one capture setup (see MarkerSizing.Advise and sdk/doc/marker-format.md "Sizing").
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1

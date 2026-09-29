@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The report cards of the test clips in test-data/videos (the GUI draws them, the command line and the GUI write them as SVG): every
+//* The report cards of the test clips in measure/test-data/videos (the GUI draws them, the command line and the GUI write them as SVG): every
 //* series each card draws is read back through its shapes and plot areas and compared with the values the clip's manifest gives, point by
 //* point: exactly where the shape holds the number, within the SVG's rounding where a path holds it. The x axis is seconds since the run's
 //* first frame and the values are milliseconds, both converted from whole ticks the same way. Skipped when ffmpeg is not installed.

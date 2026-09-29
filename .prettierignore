@@ -5,14 +5,14 @@ node_modules/
 **/build/
 **/publish/
 **/TestResults/
-marker/cpp/third_party/
+sdk/marker/cpp/third_party/
 test-data/
 licenses/*.txt
 package-lock.json
-doc/images/
+measure/doc/images/
 
 # clang tool configs (clang-tidy accepts YAML that Prettier rejects)
-marker/cpp/.clang-format
+sdk/marker/cpp/.clang-format
 **/.clang-tidy
 
 # Rewritten by Dependabot in its own JSON style on every update

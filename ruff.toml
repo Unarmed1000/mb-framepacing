@@ -1,4 +1,4 @@
-# Ruff: lint and format rules for the repository's Python scripts (measure/build_standalone.py, marker/unity/build_upm.py, tools/).
+# Ruff: lint and format rules for the repository's Python scripts (measure/build_standalone.py, sdk/marker/unity/build_upm.py, tools/).
 # See https://docs.astral.sh/ruff/configuration/. Versions are pinned in requirements-dev.txt; CI runs:
 #   ruff check .
 #   ruff format --check .
@@ -6,8 +6,8 @@
 
 # Ruff's default excludes (.git, build, dist, node_modules, .venv, ...) stay in place; these are the repository's own output folders
 extend-exclude = [
-    "marker/cpp/build",
-    "marker/cpp/third_party",
+    "sdk/marker/cpp/build",
+    "sdk/marker/cpp/third_party",
     "measure/publish",
 ]
 

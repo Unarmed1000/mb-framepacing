@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* One golden marker image listed in test-data/markers/manifest.csv: its file, payload, start metadata and placement.
+//* One golden marker image listed in sdk/test-data/markers/manifest.csv: its file, payload, start metadata and placement.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1

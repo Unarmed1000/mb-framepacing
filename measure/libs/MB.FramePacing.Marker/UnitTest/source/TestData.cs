@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Locates test-data/markers (golden images written by marker/cpp/tools/marker-render --golden) and parses its manifest.
+//* Locates sdk/test-data/markers (golden images written by sdk/marker/cpp/tools/marker-render --golden) and parses its manifest.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -17,7 +17,7 @@ namespace MB.FramePacing.Marker.UnitTest
 {
   public static class TestData
   {
-    public static string MarkerDirectory => System.IO.Path.Combine(FindRepositoryRoot(), "test-data", "markers");
+    public static string MarkerDirectory => System.IO.Path.Combine(FindRepositoryRoot(), "sdk", "test-data", "markers");
 
     public static IReadOnlyList<GoldenMarker> LoadGoldenMarkers()
     {
@@ -71,11 +71,11 @@ namespace MB.FramePacing.Marker.UnitTest
       var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
       while (directory != null)
       {
-        if (File.Exists(System.IO.Path.Combine(directory.FullName, "test-data", "markers", "manifest.csv")))
+        if (File.Exists(System.IO.Path.Combine(directory.FullName, "sdk", "test-data", "markers", "manifest.csv")))
           return directory.FullName;
         directory = directory.Parent;
       }
-      throw new DirectoryNotFoundException("Could not locate test-data/markers/manifest.csv above " + TestContext.CurrentContext.TestDirectory);
+      throw new DirectoryNotFoundException("Could not locate sdk/test-data/markers/manifest.csv above " + TestContext.CurrentContext.TestDirectory);
     }
   }
 }

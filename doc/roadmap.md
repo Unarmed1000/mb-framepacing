@@ -20,7 +20,7 @@ The work:
 1. **Decoder tests at reduced contrast:** the golden markers decoded with black at 16 and white at 125 or 100, in limited range, and
    through a gamma curve: what an HDR recording or a card's HDR-to-SDR conversion delivers.
 2. **Docs:** "turn HDR off" becomes "match HDR to what the capture path carries", with the splitter trap, and a section in
-   [Integrating the marker](integrating.md) on which white to write in scRGB and in PQ (a set brightness, such as the BT.2408
+   [Integrating the marker](../sdk/doc/integrating.md) on which white to write in scRGB and in PQ (a set brightness, such as the BT.2408
    reference white of 203 nits).
 3. **Unity:** with HDR output active, the overlay writes a white of that set brightness instead of 1.0, and its warning says the
    capture card must capture or convert HDR.

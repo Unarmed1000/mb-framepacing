@@ -20,16 +20,16 @@ error**.
 The marker libraries put the marker into your application. All of them draw exactly the same pixels; the C++ and C# libraries
 allocate nothing per frame:
 
-| Your application                 | Marker library                                                                               | Guide                                        |
-| -------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| C++ (any engine or graphics API) | [`marker/cpp`](marker/cpp): C++20, CMake, no dependencies                                    | [Integrating the marker](doc/integrating.md) |
-| C# / .NET                        | [`marker/csharp`](marker/csharp): `MB.FrameMarker`, .NET Standard 2.1, no dependencies       | [Integrating the marker](doc/integrating.md) |
-| Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component | [Unity](doc/unity.md)                        |
-| Python 3.11+                     | [`marker/python`](marker/python): `mb_framemarker`, standard library only                    | [Python library](marker/python/README.md)    |
+| Your application                 | Marker library                                                                                 | Guide                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| C++ (any engine or graphics API) | [`sdk/marker/cpp`](sdk/marker/cpp): C++20, CMake, no dependencies                              | [Integrating the marker](sdk/doc/integrating.md) |
+| C# / .NET                        | [`sdk/marker/csharp`](sdk/marker/csharp): `MB.FrameMarker`, .NET Standard 2.1, no dependencies | [Integrating the marker](sdk/doc/integrating.md) |
+| Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component   | [Unity](sdk/doc/unity.md)                        |
+| Python 3.11+                     | [`sdk/marker/python`](sdk/marker/python): `mb_framemarker`, standard library only              | [Python library](sdk/marker/python/README.md)    |
 
-**Get started:** install on [Windows](doc/install/windows.md) · [Ubuntu](doc/install/ubuntu.md) ·
-[macOS (Homebrew)](doc/install/macos.md), add the marker with [Integrating the marker](doc/integrating.md) (C++ or C#) or the
-[Unity package](doc/unity.md), then measure with [Using mb-framepacing](doc/usage.md).
+**Get started:** install on [Windows](measure/doc/install/windows.md) · [Ubuntu](measure/doc/install/ubuntu.md) ·
+[macOS (Homebrew)](measure/doc/install/macos.md), add the marker with [Integrating the marker](sdk/doc/integrating.md) (C++ or C#) or the
+[Unity package](sdk/doc/unity.md), then measure with [Using mb-framepacing](measure/doc/usage.md).
 
 ## Why this exists
 
@@ -72,18 +72,18 @@ as long, torn frames, and the overall drift between the game's clock and the dis
 [Intel PresentMon](https://game.intel.com/story/intel-presentmon/)); positive: shown too soon, negative: shown too late.
 The difference is where the numbers come from. The application writes its exact animation time into each frame, instead of it
 being estimated. The display time comes from the captured video signal, instead of software flip events, and is precise to one
-capture period. **[Vocabulary](doc/vocabulary.md)** lists where each term appears in the CSV and the charts;
+capture period. **[Vocabulary](sdk/doc/vocabulary.md)** lists where each term appears in the CSV and the charts;
 [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) explains the terms, with their other names,
 diagrams and sources.
 
-![The Analyze page: every presented frame, its animation error and the headline numbers](doc/images/gui-analysis.png)
+![The Analyze page: every presented frame, its animation error and the headline numbers](measure/doc/images/gui-analysis.png)
 
 ## How it works
 
 There are two halves, and both are needed:
 
-- **Inside your application:** a marker library: C++20 ([`marker/cpp/`](marker/cpp)), C# ([`marker/csharp/`](marker/csharp)) or
-  the [Unity package](doc/unity.md). Every frame, it turns "frame index + animation time + run id" into pixel aligned black and white
+- **Inside your application:** a marker library: C++20 ([`sdk/marker/cpp/`](sdk/marker/cpp)), C# ([`sdk/marker/csharp/`](sdk/marker/csharp)) or
+  the [Unity package](sdk/doc/unity.md). Every frame, it turns "frame index + animation time + run id" into pixel aligned black and white
   triangles (or rectangles) that your renderer draws on top of the finished image. No dependencies, no allocations per frame, any
   graphics API.
 - **On the recording side:** the `mb-framepacing` tools ([`measure/`](measure), command line and GUI). They record the display
@@ -104,7 +104,7 @@ flowchart LR
     G --> H["Animation error, display time steps,<br/>drops, tearing: GUI, CSV, JSON"]
 ```
 
-![A marker drawn into a game frame at the recommended position](doc/images/marker-in-frame.png)
+![A marker drawn into a game frame at the recommended position](measure/doc/images/marker-in-frame.png)
 
 ## The process
 
@@ -126,15 +126,15 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
 
 `frameIndex` counts rendered frames, `animationTicks` is the time the frame was animated for (100 ns ticks).
 
-- **C++:** see **[Integrating the marker](doc/integrating.md)** for adding the library with CMake (a release archive, git,
+- **C++:** see **[Integrating the marker](sdk/doc/integrating.md)** for adding the library with CMake (a release archive, git,
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
-- **C#:** the general library [`marker/csharp`](marker/csharp/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `Marker.ModulesToTriangles`).
-- **Unity:** the **[Unity package](doc/unity.md)** adds an overlay component that does all of this for you.
-- **Every field:** **[Filling the marker fields](doc/marker-fields.md)** says where each value comes from, when it changes and what
+- **C#:** the general library [`sdk/marker/csharp`](sdk/marker/csharp/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `Marker.ModulesToTriangles`).
+- **Unity:** the **[Unity package](sdk/doc/unity.md)** adds an overlay component that does all of this for you.
+- **Every field:** **[Filling the marker fields](sdk/doc/marker-fields.md)** says where each value comes from, when it changes and what
   the analysis does with it, with examples for typical frame pacers.
-- **Python:** [`marker/python`](marker/python/README.md) (`mb_framemarker`), which also draws into pixel buffers.
+- **Python:** [`sdk/marker/python`](sdk/marker/python/README.md) (`mb_framemarker`), which also draws into pixel buffers.
 
-[`marker/README.md`](marker/README.md) compares the four libraries; each has its own README with a quick start and its API.
+[`sdk/marker/README.md`](sdk/marker/README.md) compares the four libraries; each has its own README with a quick start and its API.
 
 ### 2. Every test: record, run, analyse
 
@@ -165,7 +165,7 @@ sequenceDiagram
 3. Run the test in your application. It shows the **start** marker, then the normal frame markers, then the **end** marker.
 4. The recording stops by itself at the end marker and the analysis opens. Record with other equipment instead (a lossless video,
    a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. Filming the screen
-   with a calibrated high speed camera is **very experimental**: see [doc/camera.md](doc/camera.md).
+   with a calibrated high speed camera is **very experimental**: see [measure/doc/camera.md](measure/doc/camera.md).
 
 The start and end markers bracket exactly the part you want measured. The start marker also carries a sequence id (a UUID, or a
 short text tag) and the wall clock time, so every report knows what it measured:
@@ -177,24 +177,24 @@ flowchart LR
     style E fill:#c62828,color:#fff
 ```
 
-| Start (with sequence id and time)            | Frame                                        | End                                      |
-| -------------------------------------------- | -------------------------------------------- | ---------------------------------------- |
-| ![Start marker](doc/images/marker-start.png) | ![Frame marker](doc/images/marker-frame.png) | ![End marker](doc/images/marker-end.png) |
+| Start (with sequence id and time)                    | Frame                                                | End                                              |
+| ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| ![Start marker](measure/doc/images/marker-start.png) | ![Frame marker](measure/doc/images/marker-frame.png) | ![End marker](measure/doc/images/marker-end.png) |
 
 For tearing checks, also draw the small **sync marker** at the bottom left. It carries the run id and frame index; when it disagrees with
 the main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
 
-![The main marker top-left and the sync marker bottom-left](doc/images/marker-tearing.png)
+![The main marker top-left and the sync marker bottom-left](measure/doc/images/marker-tearing.png)
 
-The exact format, sizing rules and placement are in [`doc/marker-format.md`](doc/marker-format.md).
+The exact format, sizing rules and placement are in [`sdk/doc/marker-format.md`](sdk/doc/marker-format.md).
 
 ## Getting started
 
-| Step                               | Guide                                                                                                                                                    |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Install and build, per platform | **[Windows](doc/install/windows.md)** · **[Ubuntu](doc/install/ubuntu.md)** · **[macOS (Homebrew)](doc/install/macos.md)**                               |
-| 2. Put the marker into your app    | **[Integrating the marker](doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](doc/marker-fields.md)** |
-| 3. Take a measurement and read it  | **[Using mb-framepacing](doc/usage.md)** (test game, capture card, video/image import, results, troubleshooting)                                         |
+| Step                               | Guide                                                                                                                                                            |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Install and build, per platform | **[Windows](measure/doc/install/windows.md)** · **[Ubuntu](measure/doc/install/ubuntu.md)** · **[macOS (Homebrew)](measure/doc/install/macos.md)**               |
+| 2. Put the marker into your app    | **[Integrating the marker](sdk/doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](sdk/doc/marker-fields.md)** |
+| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (test game, capture card, video/image import, results, troubleshooting)                                         |
 
 The platform guides cover ffmpeg, building the tools and putting them on your PATH, capture card devices and permissions, and
 building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).
@@ -203,9 +203,9 @@ building the C++ library. The short version is below. What is planned next (HDR 
 
 Run `mb-framepacing-gui`. The first time, a short setup dialog helps you get ffmpeg and choose where captures go.
 
-| Capture                                                          | Setup                                                   |
-| ---------------------------------------------------------------- | ------------------------------------------------------- |
-| ![Capturing the synthetic test game](doc/images/gui-capture.png) | ![The first-run setup dialog](doc/images/gui-setup.png) |
+| Capture                                                                  | Setup                                                           |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| ![Capturing the synthetic test game](measure/doc/images/gui-capture.png) | ![The first-run setup dialog](measure/doc/images/gui-setup.png) |
 
 - **Capture:** pick a capture card, a video file, an image folder or a stream, and press **Start capture**. Pick _Synthetic test
   game_ to try everything without any hardware.
@@ -247,7 +247,7 @@ only moves it; the next window is drawn in the background before you reach its e
 
 The same panels as a report (below) of a test clip, a busy stretch at the full rate:
 
-![The report of a busy stretch at the full rate: animation error, display time step, frametime and CPU busy, late share, refresh strip and events](doc/images/report-example-busy.svg)
+![The report of a busy stretch at the full rate: animation error, display time step, frametime and CPU busy, late share, refresh strip and events](measure/doc/images/report-example-busy.svg)
 
 Every panel says in its title what it shows, and its key on the right names each colour, listing only what the section shows.
 
@@ -277,7 +277,7 @@ Every panel says in its title what it shows, and its key on the right names each
 The start of its busy stretch as a frame timeline (`render --timeline`): each frame's CPU work from its CPU start time for its CPU
 busy, when it was presented, and what every refresh showed:
 
-![The frame timeline of the busy stretch: CPU boxes, present arrows, display cells and each frame's values](doc/images/timeline-example-busy.svg)
+![The frame timeline of the busy stretch: CPU boxes, present arrows, display cells and each frame's values](measure/doc/images/timeline-example-busy.svg)
 
 When a few frames are far off everything else (a hitch of hundreds of milliseconds among errors of a few), the error and display
 time step scales cover the rest, and each frame beyond the scale gets a mark at the edge with its value; zoom out to see it whole.
@@ -286,9 +286,9 @@ The other tabs show how the values are distributed (`render` writes them as `run
 logarithmic, so a handful of bad frames stays visible next to hundreds of good ones. The examples are test clips: a naive 5 ms timer's
 errors, and the display time steps of a game adapting its rate.
 
-| Animation error distribution                                       | Display time step distribution                                                   |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| ![Animation error histogram](doc/images/chart-error-histogram.svg) | ![Display time step histogram](doc/images/chart-display-time-step-histogram.svg) |
+| Animation error distribution                                               | Display time step distribution                                                           |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| ![Animation error histogram](measure/doc/images/chart-error-histogram.svg) | ![Display time step histogram](measure/doc/images/chart-display-time-step-histogram.svg) |
 
 - **Animation error distribution:** how often each error occurred, in 0.1 ms bars for every capture source. Everything between the
   dashed lines (the error threshold, ±1 ms unless `--error-threshold-ms` changes it) counts as no error. Bars further out are real
@@ -299,7 +299,7 @@ errors, and the display time steps of a game adapting its rate.
 - **Animation error by percentile:** every frame's absolute error, sorted. The flat part is the typical frame; the rise on the
   right shows how bad the worst 5 % and 1 % are, and makes two runs easy to compare.
 
-![Animation error by percentile](doc/images/chart-error-percentiles.svg)
+![Animation error by percentile](measure/doc/images/chart-error-percentiles.svg)
 
 The charts can also be written as SVG cards next to the reports (`run-<id>-report.svg`, `-error-histogram.svg`,
 `-error-percentiles.svg`, `-display-time-step-histogram.svg`, `-drift.svg`): `--charts` on the command line, **Save charts** in the
@@ -307,7 +307,7 @@ GUI (`render --png` makes PNGs of them). The
 histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`; the error per frame and
 percent error in `runs[].statistics`), and late frames carry `Late`
 in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools: the files are specified in
-[doc/analysis-output-format.md](doc/analysis-output-format.md), and the [data libraries](data/README.md) read them.
+[sdk/doc/analysis-output-format.md](sdk/doc/analysis-output-format.md), and the [data libraries](sdk/data/README.md) read them.
 
 **The report** is the run as one SVG card, in the style of
 [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained)'s charts: the headline numbers, the animation
@@ -325,17 +325,17 @@ have its own title (`--title`), a refresh strip of only the first seconds (`--st
 animation error and display time step histograms (0.1 ms bins, counts on a log scale), the |animation error| by percentile and the
 cumulative drift; `--cards` picks them (`--cards none` for the report only).
 
-The test clips (`test-data/videos`, made by mb-framepacing-explained) as reports. The busy stretch at the full rate is the example
+The test clips (`measure/test-data/videos`, made by mb-framepacing-explained) as reports. The busy stretch at the full rate is the example
 above: the frames that miss a refresh are late, and each is off by a whole refresh. Its companion adapts its rate like Android's
 Swappy: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says, while their preferred
 frame time stays 60 fps) for a while, then 60 again:
 
-![The report of a game adapting its rate like Swappy](doc/images/report-example-swappy.svg)
+![The report of a game adapting its rate like Swappy](measure/doc/images/report-example-swappy.svg)
 
 A naive delta time timer: every frame is shown on time, but the timer is off by up to 5 ms either way, so the animation steps
 are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing):
 
-![The report of delta time jitter from a naive timer](doc/images/report-example-jitter.svg)
+![The report of delta time jitter from a naive timer](measure/doc/images/report-example-jitter.svg)
 
 ### The command line
 
@@ -354,7 +354,7 @@ mb-framepacing import rtsp://camera/stream -t 30s         # a live network strea
 mb-framepacing analyze <capture folder>                   # (re)analyse
 mb-framepacing analyze <capture folder> --target-fps 30   # ... measuring late frames against a 30 fps target
 mb-framepacing render <capture folder> --from 120 --to 125 --png  # the report of 5 s of the run, as SVG and PNG
-# VERY EXPERIMENTAL: a high speed camera filming the screen (doc/camera.md)
+# VERY EXPERIMENTAL: a high speed camera filming the screen (measure/doc/camera.md)
 mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
 mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --display-hz 60 --analyze  # later: checks the camera and the display rate
 mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
@@ -380,12 +380,12 @@ There is no built-in frame rate limit: mb-framepacing records whatever the sourc
 - **Capture cards:** the card's own modes decide (`mb-framepacing devices --modes`). 1080p at 240 fps is common, some cards go
   higher at lower resolutions. The live path is then limited by the card's USB/PCIe link, ffmpeg's decoding and scaling, and
   decoding the markers of every frame as it arrives (a locked marker decodes in well under a millisecond). Only the decoded
-  markers and timestamps are stored (the capture data, [doc/capture-data-format.md](doc/capture-data-format.md)); with
+  markers and timestamps are stored (the capture data, [sdk/doc/capture-data-format.md](sdk/doc/capture-data-format.md)); with
   `--keep-frames` the frames are stored too, width × height bytes (grey) each, so 960×540 at 500 fps is about 250 MiB/s. When
   decoding or the disk falls behind, frames are counted as dropped, never silently lost.
 - **Video files and image folders:** any rate. They are read as fast as the disk allows and nothing is dropped; the times come
   from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works. Footage of a
-  camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [doc/camera.md](doc/camera.md)).
+  camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [measure/doc/camera.md](measure/doc/camera.md)).
 - **Precision:** a capture card captures at the display's refresh rate, so display time steps are whole refreshes and exact; a camera
   filming the screen is good to about one camera period (1 ms at 1000 fps), which shows as noise in its errors.
 
@@ -438,12 +438,12 @@ mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 
 # C++ marker library (presets: windows, linux, linux-clang, macos); the tests fetch GoogleTest
-cd marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
-python marker/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
+cd sdk/marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
+python sdk/marker/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
 
 # Unity package: assemble and validate; check it in a real Unity editor (batch mode, needs a Unity license)
-python marker/unity/build_upm.py --output dist/upm --check
-python marker/unity/check_in_unity.py
+python sdk/marker/unity/build_upm.py --output dist/upm --check
+python sdk/marker/unity/check_in_unity.py
 
 # Self-contained single-file executables for this machine (or --rid linux-x64, osx-arm64, ...)
 python measure/build_standalone.py
@@ -453,21 +453,21 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.
 .venv/Scripts/activate                                                                  # Linux/macOS: source .venv/bin/activate
 ruff check . && ruff format --check . && basedpyright
 
-# Docs: formatting (Prettier) and the images in doc/images (rendered offscreen)
+# Docs: formatting (Prettier) and the images in measure/doc/images (rendered offscreen)
 npm install && npm run format
 dotnet run --project measure/tools/DocImages
 ```
 
-The marker libraries are versioned in [`marker/VERSION`](marker/VERSION) and the tools in [`measure/VERSION`](measure/VERSION);
+The marker libraries are versioned in [`sdk/marker/VERSION`](sdk/marker/VERSION) and the tools in [`measure/VERSION`](measure/VERSION);
 [Releasing](doc/releasing.md) describes both release streams. The pieces fit together like this:
 
 ```mermaid
 flowchart TB
-    subgraph marker["marker/: goes into your application"]
-        L["marker/cpp: mb_framemarker<br/>C++20 library"]
+    subgraph marker["sdk/marker/: goes into your application"]
+        L["sdk/marker/cpp: mb_framemarker<br/>C++20 library"]
         R["marker-render<br/>golden test images"]
-        CS["marker/csharp: MB.FrameMarker<br/>C# library (.NET Standard 2.1)"]
-        U["marker/unity<br/>Unity package + helpers"]
+        CS["sdk/marker/csharp: MB.FrameMarker<br/>C# library (.NET Standard 2.1)"]
+        U["sdk/marker/unity<br/>Unity package + helpers"]
     end
     subgraph dotnet["measure/ (.NET 10): records and analyses"]
         M["MB.FramePacing.Marker<br/>QR decoding"]
@@ -484,27 +484,33 @@ flowchart TB
     AN --> GUI
 ```
 
-| Path                      | Contents                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------- |
-| `marker/`                 | **Goes into your application**: the marker libraries and their version                            |
-| `marker/cpp/`             | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check |
-| `marker/csharp/`          | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests      |
-| `marker/unity/`           | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)      |
-| `marker/python/`          | The Python marker library `mb_framemarker` (standard library only) and its unittest tests         |
-| `data/`                   | **Reads the results**: the data libraries (C#) for the capture data and the analysis output       |
-| `measure/`                | **Measures it**: the recording and analysis tools and their version                               |
-| `measure/libs/`           | Marker, Capture and Analysis libraries with their NUnit tests                                     |
-| `measure/app/`            | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                               |
-| `measure/tools/DocImages` | Renders `doc/images` (GUI screenshots offscreen, marker examples)                                 |
-| `doc/`                    | Platform, usage, integration, Unity and release guides, marker specification, images              |
-| `test-data/markers/`      | Golden marker images and module digest written by the C++ library, checked by the C# libraries    |
-| `licenses/`               | Licenses of every third-party component                                                           |
+| Path                        | Contents                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `sdk/`                      | **BSD 3-Clause**: everything applications embed or use to read the results                               |
+| `sdk/marker/`               | **Goes into your application**: the marker libraries and their version                                   |
+| `sdk/marker/cpp/`           | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check        |
+| `sdk/marker/csharp/`        | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests             |
+| `sdk/marker/unity/`         | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)             |
+| `sdk/marker/python/`        | The Python marker library `mb_framemarker` (standard library only) and its unittest tests                |
+| `sdk/marker/shaders/`       | Reference shaders that draw the marker as one quad                                                       |
+| `sdk/data/`                 | **Reads the results**: the data libraries (C#, C++, Python) for the capture data and the analysis output |
+| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats               |
+| `sdk/test-data/`            | Golden marker images (checked by every marker library) and the data libraries' golden data               |
+| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                      |
+| `measure/libs/`             | Marker, Capture, Analysis and Charts libraries with their NUnit tests                                    |
+| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                      |
+| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                |
+| `measure/doc/`              | Platform, usage and camera guides, images                                                                |
+| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                          |
+| `doc/`                      | Release guide and roadmap                                                                                |
+| `tools/`                    | Repository scripts: checks, golden data                                                                  |
+| `licenses/`                 | Licenses of every third-party component                                                                  |
 
 ## License
 
-Two licenses, by path (see [`LICENSE`](LICENSE)): the frame marker libraries that applications embed (`marker/`), the
-marker format specification, the integration guide and the golden marker images are BSD 3-Clause, and so are the data
-libraries (`data/`), the formats they read and their golden data. Everything else,
+Two licenses, by path (see [`LICENSE`](LICENSE)): everything under `sdk/` is BSD 3-Clause: the frame marker libraries that
+applications embed, the marker format specification, the integration guides and the golden marker images, and the data
+libraries, the formats they read and their golden data. Everything else,
 including the measurement tools, is PolyForm Perimeter 1.0.1: free to use, change and share for any purpose, including
 inside companies, but not to provide others a product that competes with it. Every source file names its license on an
 `SPDX-License-Identifier` line (`BSD-3-Clause`, or `LicenseRef-PolyForm-Perimeter-1.0.1`), and every code file its copyright

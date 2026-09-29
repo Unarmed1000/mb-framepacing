@@ -40,7 +40,7 @@ namespace MB.FramePacing.DocImages
 
     private static int Main(string[] args)
     {
-      var output = Path.GetFullPath(args.Length > 0 ? args[0] : Path.Combine(FindRepositoryRoot(), "doc", "images"));
+      var output = Path.GetFullPath(args.Length > 0 ? args[0] : Path.Combine(FindRepositoryRoot(), "measure", "doc", "images"));
       Directory.CreateDirectory(output);
       var work = Path.Combine(Path.GetTempPath(), "mb-framepacing-docimages-" + Guid.NewGuid().ToString("N"));
       try
@@ -367,7 +367,7 @@ namespace MB.FramePacing.DocImages
     }
 
     /// <summary>
-    /// The SVG report examples of the README, from test clips made by mb-framepacing-explained (test-data/videos): a game adapting its rate like
+    /// The SVG report examples of the README, from test clips made by mb-framepacing-explained (measure/test-data/videos): a game adapting its rate like
     /// Swappy, a busy stretch at the full rate, and delta time jitter from a naive timer. Imported through ffmpeg; skipped without it.
     /// </summary>
     private static void WriteReportExamples(string output, string work)
@@ -384,7 +384,7 @@ namespace MB.FramePacing.DocImages
       }
       foreach (var (clip, name) in new[] { ("60-busy-swappy", "swappy"), ("60-busy-full-rate", "busy"), ("60-naive-5ms", "jitter") })
       {
-        string video = Path.Combine(FindRepositoryRoot(), "test-data", "videos", clip, "video.mp4");
+        string video = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "videos", clip, "video.mp4");
         string imported = Path.Combine(work, clip);
         var media = MB.FramePacing.Capture.Ffmpeg.MediaInput.Create(video, new MB.FramePacing.Capture.Ffmpeg.MediaInputOptions(), imported);
         using (var source = MB.FramePacing.Capture.Ffmpeg.FfmpegCaptureSource.Start(media.ToCaptureOptions(ffmpeg), TimeSpan.FromSeconds(30)))

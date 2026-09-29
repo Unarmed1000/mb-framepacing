@@ -51,22 +51,22 @@ jobs:
       - name: C++ marker library
         shell: bash
         run: |
-          cmake -S marker/cpp -B marker/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
-          cmake --build marker/cpp/build/ci --config Release --parallel
-          ctest --test-dir marker/cpp/build/ci -C Release --output-on-failure
+          cmake -S sdk/marker/cpp -B sdk/marker/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
+          cmake --build sdk/marker/cpp/build/ci --config Release --parallel
+          ctest --test-dir sdk/marker/cpp/build/ci -C Release --output-on-failure
 
       - name: C++ data library
         shell: bash
         run: |
-          cmake -S data/cpp -B data/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
-          cmake --build data/cpp/build/ci --config Release --parallel
-          ctest --test-dir data/cpp/build/ci -C Release --output-on-failure
+          cmake -S sdk/data/cpp -B sdk/data/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
+          cmake --build sdk/data/cpp/build/ci --config Release --parallel
+          ctest --test-dir sdk/data/cpp/build/ci -C Release --output-on-failure
 
       - name: CMake consumers (FetchContent, add_subdirectory, find_package)
         shell: bash
         run: |
           # Windows runners have 'python', Linux and macOS 'python3'
-          "$(command -v python3 || command -v python)" marker/cpp/tests/consumer/check_consumers.py
+          "$(command -v python3 || command -v python)" sdk/marker/cpp/tests/consumer/check_consumers.py
 
       - name: .NET build and tests
         run: dotnet test mb-framepacing.slnx -c Release
@@ -112,9 +112,9 @@ jobs:
           ruff format --check .
           basedpyright
       - name: Python marker library (against the golden set)
-        run: python3 -m unittest discover -s marker/python -t marker/python
+        run: python3 -m unittest discover -s sdk/marker/python -t sdk/marker/python
       - name: Python data library (against the golden data)
-        run: python3 -m unittest discover -s data/python -t data/python
+        run: python3 -m unittest discover -s sdk/data/python -t sdk/data/python
       - name: Reference shaders (glslang; drawing them needs a GPU, see tools/check_shaders.py --render)
         run: |
           sudo apt-get update && sudo apt-get install -y glslang-tools
@@ -122,7 +122,7 @@ jobs:
       - name: Workflows (actionlint)
         run: actionlint
       - name: Unity package (assemble and validate; Unity itself is not available in CI)
-        run: python3 marker/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
+        run: python3 sdk/marker/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
 
   dotnet-lint:
     name: .NET lint (CSharpier, dotnet format, vulnerable packages)
@@ -169,7 +169,7 @@ jobs:
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Tests with AddressSanitizer and UndefinedBehaviorSanitizer
         run: |
-          for library in marker/cpp data/cpp; do
+          for library in sdk/marker/cpp sdk/data/cpp; do
             (cd "$library" && cmake --preset linux-sanitize && cmake --build --preset linux-sanitize --parallel && ctest --preset linux-sanitize)
           done
       - name: clang-format and clang-tidy

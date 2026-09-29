@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-# Release the marker libraries (C++, C# and the Unity package): push a tag marker-v<version> that matches marker/VERSION.
-#   1. verify   the tag is semantic versioning and matches marker/VERSION, and the version bump covers the API changes since the
+# Release the marker libraries (C++, C# and the Unity package): push a tag marker-v<version> that matches sdk/marker/VERSION.
+#   1. verify   the tag is semantic versioning and matches sdk/marker/VERSION, and the version bump covers the API changes since the
 #               previous release (tools/check_semver.py)
 #   2. test     C++ and C# libraries on Windows, Ubuntu and macOS, and the documented CMake consumer setups
 #   3. package  the C++ source archives (tar.gz, zip) and SHA256SUMS; the extracted archive must build, pass its tests and work through
@@ -33,16 +33,16 @@ jobs:
         with:
           fetch-depth: 0 # the previous release is the API baseline
       - id: version
-        name: Tag is marker-v<semver> and matches marker/VERSION
+        name: Tag is marker-v<semver> and matches sdk/marker/VERSION
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#marker-v}"
           if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "::error::$GITHUB_REF_NAME is not marker-v<major>.<minor>.<patch>"; exit 1
           fi
-          expected="$(tr -d '[:space:]' < marker/VERSION)"
+          expected="$(tr -d '[:space:]' < sdk/marker/VERSION)"
           if [ "$version" != "$expected" ]; then
-            echo "::error::the tag says $version, marker/VERSION says $expected"; exit 1
+            echo "::error::the tag says $version, sdk/marker/VERSION says $expected"; exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-dotnet@v6
@@ -72,16 +72,16 @@ jobs:
       - name: C++ library
         shell: bash
         run: |
-          cmake -S marker/cpp -B marker/cpp/build/release -DCMAKE_BUILD_TYPE=Release
-          cmake --build marker/cpp/build/release --config Release --parallel
-          ctest --test-dir marker/cpp/build/release -C Release --output-on-failure
+          cmake -S sdk/marker/cpp -B sdk/marker/cpp/build/release -DCMAKE_BUILD_TYPE=Release
+          cmake --build sdk/marker/cpp/build/release --config Release --parallel
+          ctest --test-dir sdk/marker/cpp/build/release -C Release --output-on-failure
       - name: C# library
-        run: dotnet test marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj -c Release
+        run: dotnet test sdk/marker/csharp/UnitTest/MB.FrameMarker.UnitTest.csproj -c Release
       - name: CMake consumers (FetchContent, add_subdirectory, find_package)
         shell: bash
         run: |
           # Windows runners have 'python', Linux and macOS 'python3'
-          "$(command -v python3 || command -v python)" marker/cpp/tests/consumer/check_consumers.py
+          "$(command -v python3 || command -v python)" sdk/marker/cpp/tests/consumer/check_consumers.py
 
   package:
     name: package C++ archives
@@ -93,7 +93,7 @@ jobs:
       - name: CMake 4
         uses: lukka/get-cmake@v4.4.2
       - name: Create and verify the archives
-        run: python3 marker/cpp/package_release.py --output dist --verify
+        run: python3 sdk/marker/cpp/package_release.py --output dist --verify
       - uses: actions/upload-artifact@v7
         with:
           name: marker-release
@@ -142,7 +142,7 @@ jobs:
 
           ## C# (.NET Standard 2.1)
 
-          The general library is \`marker/csharp\` at this tag.
+          The general library is \`sdk/marker/csharp\` at this tag.
           EOF
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Marker libraries $VERSION" --notes-file notes.md --generate-notes
 
@@ -158,7 +158,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Assemble the package
-        run: python3 marker/unity/build_upm.py --output "$RUNNER_TEMP/package" --check
+        run: python3 sdk/marker/unity/build_upm.py --output "$RUNNER_TEMP/package" --check
       - name: Commit it to the upm branch and tag it
         env:
           VERSION: ${{ needs.verify.outputs.version }}

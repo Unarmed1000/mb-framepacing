@@ -67,7 +67,7 @@ namespace MB.FramePacing.Capture.Camera
             CameraCheckLevel.Fail,
             $"Found {(main != null ? "the main marker" : "no main marker")} and {(sync != null ? "the sync marker" : "no sync marker")} in "
               + $"{Math.Min(frames.Count, options.GeometryFrames)} frames. The application must draw the main marker and the sync marker "
-              + "(doc/marker-format.md, Location) and the camera must see both, sharp and not too small."
+              + "(sdk/doc/marker-format.md, Location) and the camera must see both, sharp and not too small."
           )
         );
         return CreateRig(frames, options, cameraFps, Array.Empty<CameraZone>(), null, null, checks);

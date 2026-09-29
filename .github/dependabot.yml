@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # Dependabot opens pull requests for outdated dependencies (free for public repositories). One grouped pull request per ecosystem
-# and week keeps the noise down; CI checks every update. GoogleTest (a FetchContent URL in marker/cpp/CMakeLists.txt) and the
+# and week keeps the noise down; CI checks every update. GoogleTest (a FetchContent URL in sdk/marker/cpp/CMakeLists.txt) and the
 # vendored qrcodegen are not covered and are updated by hand. A new license or license change needs a row in licenses/README.md.
 version: 2
 

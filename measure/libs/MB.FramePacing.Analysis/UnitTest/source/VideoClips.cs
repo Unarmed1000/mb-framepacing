@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The test clips in test-data/videos: where they are, their names, finding ffmpeg (tests are ignored without it) and importing a clip as a
+//* The test clips in measure/test-data/videos: where they are, their names, finding ffmpeg (tests are ignored without it) and importing a clip as a
 //* capture through the real import path. Shared by the VideoClip tests of the analysis and of the charts.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -32,7 +32,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         directory = directory.Parent;
       return directory != null
         ? Path.Combine(directory.FullName, "test-data", "videos")
-        : throw new DirectoryNotFoundException("Could not locate test-data/videos above " + TestContext.CurrentContext.TestDirectory);
+        : throw new DirectoryNotFoundException("Could not locate measure/test-data/videos above " + TestContext.CurrentContext.TestDirectory);
     }
 
     public static ClipManifest Manifest(string clip) => ClipManifest.Load(Path.Combine(Directory(), clip));

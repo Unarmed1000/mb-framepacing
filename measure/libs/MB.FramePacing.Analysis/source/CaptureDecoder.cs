@@ -69,7 +69,7 @@ namespace MB.FramePacing.Analysis
       var layout =
         live.Finish()
         ?? throw new InvalidOperationException(
-          "No frame markers were found in the capture. Check that the application draws the marker, and see doc/marker-format.md 'Sizing'."
+          "No frame markers were found in the capture. Check that the application draws the marker, and see sdk/doc/marker-format.md 'Sizing'."
         );
 
       Parallel.For(
@@ -99,7 +99,7 @@ namespace MB.FramePacing.Analysis
       var locks = header.ToLocks();
       if (locks.Count == 0)
         throw new InvalidOperationException(
-          "No frame markers were found in the capture. Check that the application draws the marker, and see doc/marker-format.md 'Sizing'."
+          "No frame markers were found in the capture. Check that the application draws the marker, and see sdk/doc/marker-format.md 'Sizing'."
         );
       var layout = MarkerLayout.For(locks, header.Camera);
       var effectiveTime =

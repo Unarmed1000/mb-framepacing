@@ -45,7 +45,7 @@ namespace MB.FramePacing.Capture
       if (sink.Hits.Count == 0)
         throw new TimeoutException(
           $"No marker was found in {sink.FramesSeen} frames ({timeout.TotalSeconds:0.#} s). Check that the application is running and draws the "
-            + "marker (see doc/marker-format.md 'Sizing')."
+            + "marker (see sdk/doc/marker-format.md 'Sizing')."
         );
       return new MarkerLock(
         new PixelRect(

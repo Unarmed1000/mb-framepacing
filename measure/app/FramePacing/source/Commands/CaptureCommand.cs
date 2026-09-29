@@ -257,7 +257,7 @@ namespace MB.FramePacing.App.Commands
 
     private static string Highlight(long value) => value > 0 ? $"[red]{value}[/]" : value.ToString();
 
-    /// <summary>doc/marker-format.md "Sizing": warn below 3 stored pixels per module, error below 2.</summary>
+    /// <summary>sdk/doc/marker-format.md "Sizing": warn below 3 stored pixels per module, error below 2.</summary>
     private static void CheckModuleSize(int? moduleSizePx, CaptureFormat format)
     {
       if (moduleSizePx is not { } module)

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Regenerate the data libraries' golden data (test-data/data): a test clip imported and analysed by the tools.
+"""Regenerate the data libraries' golden data (sdk/test-data/data): a test clip imported and analysed by the tools.
 
-Imports test-data/videos/<clip>/video.mp4 with `mb-framepacing import --analyze` (needs ffmpeg), copies capture.json, captures.mbcd and the
-analysis output into test-data/data/<clip>, and replaces the machine specific paths in the JSON files. Then it runs the C# data library's
+Imports measure/test-data/videos/<clip>/video.mp4 with `mb-framepacing import --analyze` (needs ffmpeg), copies capture.json, captures.mbcd and the
+analysis output into sdk/test-data/data/<clip>, and replaces the machine specific paths in the JSON files. Then it runs the C# data library's
 golden tests with MB_FRAMEPACING_UPDATE_TEST_DATA=1, which write digest.json: the values every language's reader must read.
 
     python tools/update_test_data.py
@@ -22,9 +22,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT = ROOT / "measure" / "app" / "FramePacing" / "FramePacing.csproj"
-TESTS = ROOT / "data" / "csharp" / "UnitTest" / "MB.FramePacing.Data.UnitTest.csproj"
+TESTS = ROOT / "sdk" / "data" / "csharp" / "UnitTest" / "MB.FramePacing.Data.UnitTest.csproj"
 CLIP = "60-busy-full-rate"
-TARGET = ROOT / "test-data" / "data" / CLIP
+TARGET = ROOT / "sdk" / "test-data" / "data" / CLIP
 
 
 def json_text(path: str) -> str:
@@ -40,7 +40,7 @@ def neutralise(path: Path, replacements: dict[str, str]) -> None:
 
 
 def main() -> int:
-    video = ROOT / "test-data" / "videos" / CLIP / "video.mp4"
+    video = ROOT / "measure" / "test-data" / "videos" / CLIP / "video.mp4"
     with tempfile.TemporaryDirectory(prefix="mb-framepacing-test-data-") as temporary:
         capture = Path(temporary) / CLIP
         command = ["dotnet", "run", "--project", str(PROJECT), "-c", "Release", "--", "import", str(video), "-o", str(capture), "--analyze"]
@@ -56,7 +56,7 @@ def main() -> int:
             _ = shutil.copy2(file, TARGET / "analysis" / file.name)
 
     # The clip's path in ffmpeg's command line, and the capture folder in summary.json
-    replacements = {str(video): f"test-data/videos/{CLIP}/video.mp4", str(capture): CLIP}
+    replacements = {str(video): f"measure/test-data/videos/{CLIP}/video.mp4", str(capture): CLIP}
     neutralise(TARGET / "capture.json", replacements)
     neutralise(TARGET / "analysis" / "summary.json", replacements)
 

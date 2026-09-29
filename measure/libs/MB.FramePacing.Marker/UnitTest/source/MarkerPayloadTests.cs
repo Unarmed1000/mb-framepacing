@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Wire format tests. The expected bytes are the same as the C++ test (marker/cpp/tests/FrameMarkerTests.cpp) so both sides agree byte for byte.
+//* Wire format tests. The expected bytes are the same as the C++ test (sdk/marker/cpp/tests/FrameMarkerTests.cpp) so both sides agree byte for byte.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1

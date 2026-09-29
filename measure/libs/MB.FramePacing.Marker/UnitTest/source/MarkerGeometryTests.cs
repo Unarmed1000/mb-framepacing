@@ -22,7 +22,7 @@ namespace MB.FramePacing.Marker.UnitTest
     private static readonly ImagePoint[] g_moderateView = { new(30, 22), new(610, 40), new(40, 460), new(600, 440) };
 
     // A steeper view: ZXing's finder search predicts the alignment pattern too far off across a 41 module symbol and misses about half the
-    // markers (doc/camera-status.md, known issues). Run explicitly while working on the camera detector.
+    // markers (measure/doc/camera-status.md, known issues). Run explicitly while working on the camera detector.
     private static readonly ImagePoint[] g_steepView = { new(30, 22), new(610, 64), new(52, 452), new(588, 418) };
 
     [Test]

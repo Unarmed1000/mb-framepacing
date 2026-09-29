@@ -11,7 +11,7 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "marker" / "python"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "marker" / "python"))
 from mb_framemarker import (  # noqa: E402
     MarkerKind,
     ModuleMatrix,

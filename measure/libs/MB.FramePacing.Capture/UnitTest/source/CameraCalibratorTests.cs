@@ -106,7 +106,14 @@ namespace MB.FramePacing.Capture.UnitTest
     /// view). The finder search misses many 41 module main markers at such angles, but calibration only needs some detections of each.
     /// </summary>
     [TestCase(0.13, 0.10, 0.85, "about 20 degrees")]
-    [TestCase(0.18, 0.12, 0.80, "about 30 degrees", Explicit = true, Reason = "Known limit: ZXing misses the main marker (doc/camera-status.md)")]
+    [TestCase(
+      0.18,
+      0.12,
+      0.80,
+      "about 30 degrees",
+      Explicit = true,
+      Reason = "Known limit: ZXing misses the main marker (measure/doc/camera-status.md)"
+    )]
     public void Calibrate_AtASteepAngle_FindsBothMarkers(double topRightY, double bottomLeftX, double bottomRightY, string angle)
     {
       var probe = new SyntheticCameraOptions();

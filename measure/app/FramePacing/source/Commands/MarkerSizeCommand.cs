@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* 'marker-size': the marker module size and position an application should use for a capture setup (doc/marker-format.md "Sizing"),
+//* 'marker-size': the marker module size and position an application should use for a capture setup (sdk/doc/marker-format.md "Sizing"),
 //* with the settings for the C++, C# and Unity libraries.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS

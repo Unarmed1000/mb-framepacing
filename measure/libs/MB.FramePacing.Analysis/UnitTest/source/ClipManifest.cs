@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* What a test clip's manifest (test-data/videos/<clip>/manifest.json, written by mb-framepacing-explained) says, and the exact values that
+//* What a test clip's manifest (measure/test-data/videos/<clip>/manifest.json, written by mb-framepacing-explained) says, and the exact values that
 //* follow from it: every video frame's marker, and per presented frame its display time step, animation time step, animation error,
 //* lateness, target, preferred frame time and drift, all in whole ticks. The VideoClip tests of the analysis and of the charts compare with it.
 //*

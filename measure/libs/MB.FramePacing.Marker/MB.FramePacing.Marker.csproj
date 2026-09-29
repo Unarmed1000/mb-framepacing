@@ -10,6 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\marker\csharp\MB.FrameMarker.csproj" />
+    <ProjectReference Include="..\..\..\sdk\marker\csharp\MB.FrameMarker.csproj" />
   </ItemGroup>
 </Project>

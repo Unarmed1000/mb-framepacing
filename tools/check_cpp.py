@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Check the C++ libraries (the marker library, marker/cpp, and the data library, data/cpp) with clang-format and clang-tidy (config: each
+"""Check the C++ libraries (the marker library, sdk/marker/cpp, and the data library, sdk/data/cpp) with clang-format and clang-tidy (config: each
 library's .clang-format and .clang-tidy, the same rules).
 
 Only our sources are checked, never third_party/ or fetched dependencies. clang-tidy needs a configured build of each library (GoogleTest
@@ -12,7 +12,7 @@ and nlohmann/json headers, the generated Version.hpp), found at <library>/build/
 
   python tools/check_cpp.py                          # clang-format, then clang-tidy with the windows preset's builds
   python tools/check_cpp.py --preset linux-sanitize
-  python tools/check_cpp.py --library data           # only data/cpp
+  python tools/check_cpp.py --library data           # only sdk/data/cpp
   python tools/check_cpp.py --format-only
 The CI versions are pinned in requirements-dev.txt (installed into .venv, see CLAUDE.md). The clang tools of the Python that runs
 this script win (.venv/Scripts or .venv/bin), so '.venv/Scripts/python tools/check_cpp.py' uses the pinned versions without activating
@@ -42,24 +42,24 @@ class Library:
     build_includes: tuple[str, ...]
 
 
-# The consumer project (marker/cpp/tests/consumer) is its own CMake project, so clang-tidy only formats it.
+# The consumer project (sdk/marker/cpp/tests/consumer) is its own CMake project, so clang-tidy only formats it.
 LIBRARIES = {
     "marker": Library(
-        folder="marker/cpp",
+        folder="sdk/marker/cpp",
         format_globs=("include/mb/framemarker/*.hpp", "src/*.cpp", "tests/*.cpp", "tests/consumer/*.cpp", "tools/*/*.cpp"),
         tidy_globs=("src/*.cpp", "tests/*.cpp", "tools/*/*.cpp"),
         header_filter=".*mb/framemarker/.*",
-        version_file="marker/VERSION",
+        version_file="sdk/marker/VERSION",
         version_define="MB_FRAMEMARKER_EXPECTED_VERSION",
         includes=("include", "third_party/qrcodegen"),
         build_includes=("include",),
     ),
     "data": Library(
-        folder="data/cpp",
+        folder="sdk/data/cpp",
         format_globs=("include/mb/framepacingdata/*.hpp", "src/*.cpp", "tests/*.cpp"),
         tidy_globs=("src/*.cpp", "tests/*.cpp"),
         header_filter=".*mb/framepacingdata/.*",
-        version_file="data/VERSION",
+        version_file="sdk/data/VERSION",
         version_define="MB_FRAMEPACINGDATA_EXPECTED_VERSION",
         includes=("include", "../../marker/cpp/include"),
         build_includes=("include", "mb_framemarker/include"),

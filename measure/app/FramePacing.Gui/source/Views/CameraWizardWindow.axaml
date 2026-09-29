@@ -103,7 +103,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBlock Classes="caption" TextWrapping="Wrap" Text="doc/camera.md explains every requirement and check." />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="measure/doc/camera.md explains every requirement and check." />
           </StackPanel>
         </Border>
 

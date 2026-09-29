@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Cross-language tests: the C++ library renders the golden markers (marker/cpp/tools/marker-render --golden), the C# decoder must read them back
-//* exactly - at native size and after the capture scaling described in doc/marker-format.md "Sizing".
+//* Cross-language tests: the C++ library renders the golden markers (sdk/marker/cpp/tools/marker-render --golden), the C# decoder must read them back
+//* exactly - at native size and after the capture scaling described in sdk/doc/marker-format.md "Sizing".
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1

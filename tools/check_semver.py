@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the semantic versions of the three release streams (see doc/releasing.md).
 
-1. marker/VERSION, measure/VERSION and data/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their
+1. sdk/marker/VERSION, measure/VERSION and sdk/data/VERSION are MAJOR.MINOR.PATCH and never lower than the newest release tag of their
    stream (marker-v*, tools-v*, data-v*).
 2. The public API of the C# marker library MB.FrameMarker is compared with the newest marker-v* release, and that of the C# data
    library MB.FramePacing.Data with the newest data-v* release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool
@@ -13,7 +13,7 @@
    Without a release tag of the stream there is nothing to compare with, and its API check is skipped. A tag on the checked out commit itself
    (the release run of that tag) is not a baseline; the release before it is.
 
-marker/VERSION and data/VERSION are the versions of the next releases, so raise them in the same change that alters the API.
+sdk/marker/VERSION and sdk/data/VERSION are the versions of the next releases, so raise them in the same change that alters the API.
 
 Run from anywhere inside the repository (needs the release tags: git fetch --tags):
   python tools/check_semver.py
@@ -46,8 +46,8 @@ class ApiStream:
 
 
 API_STREAMS = (
-    ApiStream("MB.FrameMarker", Path("marker/csharp/MB.FrameMarker.csproj"), "marker/VERSION", "marker-v"),
-    ApiStream("MB.FramePacing.Data", Path("data/csharp/MB.FramePacing.Data.csproj"), "data/VERSION", "data-v"),
+    ApiStream("MB.FrameMarker", Path("sdk/marker/csharp/MB.FrameMarker.csproj"), "sdk/marker/VERSION", "marker-v"),
+    ApiStream("MB.FramePacing.Data", Path("sdk/data/csharp/MB.FramePacing.Data.csproj"), "sdk/data/VERSION", "data-v"),
 )
 
 Version = tuple[int, int, int]
@@ -180,9 +180,9 @@ def check_api(root: Path, stream: ApiStream, version: Version) -> bool:
 
 def main() -> int:
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
-    marker = check_stream(root, "marker/VERSION", "marker-v")
+    marker = check_stream(root, "sdk/marker/VERSION", "marker-v")
     tools = check_stream(root, "measure/VERSION", "tools-v")
-    data = check_stream(root, "data/VERSION", "data-v")
+    data = check_stream(root, "sdk/data/VERSION", "data-v")
     if marker is None or tools is None or data is None:
         return 1
     results = [check_api(root, stream, version) for stream, version in zip(API_STREAMS, (marker, data), strict=True)]

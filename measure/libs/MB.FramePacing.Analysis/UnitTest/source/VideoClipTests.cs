@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The test clips in test-data/videos (made by mb-framepacing-explained, with the marker baked in): import each video through a real ffmpeg
+//* The test clips in measure/test-data/videos (made by mb-framepacing-explained, with the marker baked in): import each video through a real ffmpeg
 //* and compare with the generator's manifest (ClipManifest), exactly. First the decoding: every video frame's marker must hold the payload
 //* the generator drew (see marker_payload in its generate_videos.py). Then the analysis, frame by frame. Skipped when ffmpeg is not installed.
 //*
