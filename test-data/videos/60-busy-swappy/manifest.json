@@ -77,7 +77,7 @@
         "timer": "ideal",
         "noise": null,
         "noiseWindowMs": null,
-        "label": "60 Hz, a busy stretch, adapting like Swappy",
+        "label": "60 Hz, a busy stretch, adapting like the Swappy frame pacer",
         "targetFps": 60,
         "frames": {
           "refresh": [
