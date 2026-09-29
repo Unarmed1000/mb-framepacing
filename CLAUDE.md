@@ -54,8 +54,9 @@ dotnet test  mb-framepacing.slnx
 cd sdk/marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # linux / linux-clang / macos too
 cd sdk/data/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows     # the C++ data library, the same way
 dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fps 500  # end to end without hardware
-python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Python data library against sdk/test-data/data
-.venv\Scripts\python tools/check_conan.py        # both Conan recipes built from this checkout, in a temporary Conan home
+uv sync                                          # the Python dev tools in .venv, on the Python of .python-version (3.12)
+uv run python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Python data library against sdk/test-data/data
+uv run tools/check_conan.py                      # both Conan recipes built from this checkout, in a temporary Conan home
 ```
 
 - **mb-quality**
@@ -75,7 +76,7 @@ python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Pytho
     both copies equal. Suppress a finding only with `NOLINTNEXTLINE(<check>)` and a comment line saying why (the MSVC standard
     library makes `bugprone-exception-escape` report allocation failures that are caught).
   - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of both C++ libraries
-    (`--library marker|data` for one), with the versions CI pins in `requirements-dev.txt`. clang-tidy needs a configured build of
+    (`--library marker|data` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a configured build of
     each: `<library>/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
     include paths); `--preset` takes another one. To apply formatting: `clang-format -i` on the files the script lists.
   - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
@@ -84,11 +85,13 @@ python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Pytho
     and clang-tidy with.
   - `cmake/Version.hpp.in` is guarded with `// clang-format off`, because formatting breaks its `@VAR@` placeholders.
 - **Python scripts** (`measure/build_standalone.py`, `tools/`, later `sdk/marker/unity/build_upm.py`): standard library only. They must pass
-  `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode; tools
-  pinned in `requirements-dev.txt`, installed into the project's `.venv`: `python -m venv .venv`, then
-  `.venv\Scripts\python -m pip install -r requirements-dev.txt`; activate it or call `.venv\Scripts\<tool>`). CI runs all three.
-  `tools/check_cpp.py` uses the clang tools next to the Python that runs it, so `.venv\Scripts\python tools/check_cpp.py` gets the
-  pinned versions.
+  `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode). CI runs
+  all three.
+- **uv manages the Python dev tools:** the root `pyproject.toml` (not a package) pins them in its `dev` group, `uv.lock` pins
+  everything they bring, and `.python-version` is the minimum Python (3.12). `uv sync` creates `.venv` on it; `uv run <tool or
+script>` runs inside it, and CI runs `uv sync --locked`. `tools/check_cpp.py` and `tools/check_conan.py` use the tools next to the
+  Python that runs them, so `uv run tools/check_cpp.py` gets the pinned versions. Raise a tool: change its pin in `pyproject.toml`,
+  then `uv lock` (Dependabot's `uv` ecosystem does this weekly). A one-off extra: `uv run --with <package> ...`.
 - **Unity package** (`com.manabattery.framemarker`):
   - It isn't stored as one folder: `sdk/marker/unity/build_upm.py` assembles it from `sdk/marker/csharp/source` (core) plus
     `sdk/marker/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
@@ -283,7 +286,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - `tools/check_conan.py` (CI `conan` job, Windows/Ubuntu/macOS) builds both recipes from this checkout's archives, using a copy of
     `sdk/conan` as a local-recipes-index remote, then `conan test` of each test package with `compiler.cppstd=20`.
   - **Every Conan run uses a temporary `CONAN_HOME`**: never touch the user's cache (their global Conan may be another version;
-    running a newer one migrates the cache). Conan is pinned in `requirements-dev.txt`.
+    running a newer one migrates the cache). Conan is pinned in `pyproject.toml`'s dev group.
   - basedpyright excludes `sdk/conan` (Conan's API is untyped); ruff still checks the recipes. The test packages' C++ is formatted by
     `check_cpp.py` (`sdk/conan/.clang-format`, a copy).
 - **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks the three VERSION files and compares the
@@ -320,7 +323,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   (`Bits()` as constants; the fastest way to draw the marker) or a texel per module. One folder per API: `hlsl/` (`FrameMarker.hlsl` is
   the lookup, also included by the Unity shaders; `build_upm.py` copies it into the package), `gl/`, `gles2/` (GLSL ES 1.00: no
   integers, so float arithmetic, and `#error` without `highp`: not 100 % exact with `mediump`), `vulkan/`. `python
-tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs it); `--render` (needs `pip install moderngl` and a
+tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs it); `--render` (`uv run --with moderngl tools/check_shaders.py --render`, needs a
   GPU; `VULKAN_SDK` for DXC and SPIRV-Cross) draws every one and compares every pixel with `modules_to_bitmap`. Run it after touching
   a shader, and `check_in_unity.py` (also `--graphics glcore|gles|vulkan`) after touching the Unity ones.
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the

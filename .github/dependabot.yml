@@ -31,8 +31,8 @@ updates:
       npm:
         patterns: ["*"]
 
-  # requirements-dev.txt: ruff, basedpyright, clang-format, clang-tidy, actionlint
-  - package-ecosystem: pip
+  # pyproject.toml's dev group and uv.lock: ruff, basedpyright, clang-format, clang-tidy, actionlint, Conan
+  - package-ecosystem: uv
     directory: /
     schedule:
       interval: weekly

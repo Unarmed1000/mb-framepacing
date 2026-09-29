@@ -448,10 +448,9 @@ python sdk/marker/unity/check_in_unity.py
 # Self-contained single-file executables for this machine (or --rid linux-x64, osx-arm64, ...)
 python measure/build_standalone.py
 
-# Python scripts: lint, format and type check (ruff, basedpyright; pinned in requirements-dev.txt)
-python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt   # once (Linux/macOS: .venv/bin/python)
-.venv/Scripts/activate                                                                  # Linux/macOS: source .venv/bin/activate
-ruff check . && ruff format --check . && basedpyright
+# Python scripts: lint, format and type check (ruff, basedpyright; pinned in pyproject.toml and uv.lock, https://docs.astral.sh/uv/)
+uv sync                                                  # once: .venv with the dev tools, on Python 3.12 (.python-version)
+uv run ruff check . && uv run ruff format --check . && uv run basedpyright
 
 # Docs: formatting (Prettier) and the images in measure/doc/images (rendered offscreen)
 npm install && npm run format

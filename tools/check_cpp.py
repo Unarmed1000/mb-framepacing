@@ -14,9 +14,9 @@ and nlohmann/json headers, the generated Version.hpp), found at <library>/build/
   python tools/check_cpp.py --preset linux-sanitize
   python tools/check_cpp.py --library data           # only sdk/data/cpp
   python tools/check_cpp.py --format-only
-The CI versions are pinned in requirements-dev.txt (installed into .venv, see CLAUDE.md). The clang tools of the Python that runs
-this script win (.venv/Scripts or .venv/bin), so '.venv/Scripts/python tools/check_cpp.py' uses the pinned versions without activating
-the environment; otherwise they come from PATH.
+The CI versions are pinned in pyproject.toml and uv.lock (uv sync installs them into .venv, see CLAUDE.md). The clang tools of the
+Python that runs this script win (.venv/Scripts or .venv/bin), so 'uv run tools/check_cpp.py' uses the pinned versions; otherwise they
+come from PATH.
 """
 
 import argparse

@@ -64,7 +64,7 @@ def render_all(shaders: Path, through_spirv: dict[str, dict[str, str]]) -> bool:
     try:
         import moderngl  # pyright: ignore[reportMissingImports]
     except ImportError:
-        print("FAIL --render needs moderngl: pip install moderngl")
+        print("FAIL --render needs moderngl: uv run --with moderngl tools/check_shaders.py --render")
         return False
     context = moderngl.create_standalone_context(require=410)
     framebuffer = context.simple_framebuffer((WIDTH, HEIGHT), components=4)

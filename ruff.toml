@@ -1,5 +1,5 @@
 # Ruff: lint and format rules for the repository's Python scripts (measure/build_standalone.py, sdk/marker/unity/build_upm.py, tools/).
-# See https://docs.astral.sh/ruff/configuration/. Versions are pinned in requirements-dev.txt; CI runs:
+# See https://docs.astral.sh/ruff/configuration/. Versions are pinned in pyproject.toml and uv.lock; CI runs:
 #   ruff check .
 #   ruff format --check .
 # Type checking is done by basedpyright (pyrightconfig.json).

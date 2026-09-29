@@ -7,7 +7,7 @@
   - vulkan/  to SPIR-V for Vulkan 1.0;
   - hlsl/    every entry point, and with DXC also as DXIL (shader model 6.0) and, when that DXC supports it, as SPIR-V.
 
-With --render it also draws them with OpenGL (moderngl and a 4.1 context: pip install moderngl) and compares every pixel with the Python
+With --render it also draws them with OpenGL (moderngl and a 4.1 context: uv run --with moderngl tools/check_shaders.py --render) and compares every pixel with the Python
 marker library's bitmap, for every marker kind at several module sizes, quiet zones and origins: gl/ and gles2/ directly, vulkan/ and
 hlsl/ compiled to SPIR-V (glslang, DXC) and translated to OpenGL GLSL by SPIRV-Cross (skipped without them).
 

@@ -10,7 +10,7 @@ recipes are used as they are: the versions and archives in their conandata.yml (
 tools/add_conan_version.py).
 
 Everything runs in a temporary CONAN_HOME, so the user's Conan cache and remotes are never touched. Conan comes from next to the Python
-that runs this script (requirements-dev.txt), otherwise from PATH.
+that runs this script (uv run: the version pyproject.toml pins), otherwise from PATH.
 
   python tools/check_conan.py                               # both recipes, built from this checkout
   python tools/check_conan.py --library marker

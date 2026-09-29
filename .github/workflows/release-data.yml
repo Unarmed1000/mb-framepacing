@@ -172,15 +172,13 @@ jobs:
       - uses: actions/checkout@v7
       - name: CMake 4 (the test package builds with it)
         uses: lukka/get-cmake@v4.4.2
+      - name: uv (Python from .python-version, the dev tools from uv.lock)
+        uses: astral-sh/setup-uv@v10.2.0
       - name: The released archive through the recipe (the version is added here only; commit it with tools/add_conan_version.py)
         shell: bash
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
-          python="$(command -v python3 || command -v python)"
-          "$python" -m venv .venv
-          venv_python=.venv/bin/python
-          [ -x "$venv_python" ] || venv_python=.venv/Scripts/python
-          "$venv_python" -m pip install --quiet "$(grep '^conan==' requirements-dev.txt)"
-          "$venv_python" tools/add_conan_version.py data "$VERSION" --repository "$GITHUB_REPOSITORY"
-          "$venv_python" tools/check_conan.py --released --library data --version "$VERSION"
+          uv sync --locked
+          uv run tools/add_conan_version.py data "$VERSION" --repository "$GITHUB_REPOSITORY"
+          uv run tools/check_conan.py --released --library data --version "$VERSION"
