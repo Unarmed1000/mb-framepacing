@@ -168,7 +168,8 @@ is presented after it first appears.
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
-`error-p99`, `error-p999`, `worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`.
+`error-p99`, `error-p999`, `worst-error`, `late-frames`), and the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
+`events`.
 The tiles `frames-dropped` and `out-of-order` are left out together when the run (or section) has neither; `--show
 frames-dropped,out-of-order` keeps them anyway, `--hide` leaves them out. Overlays are opt-in: `--show animation-time-step` draws the animation time step as a blue line over the display time step (an even
 display with an uneven animation is delta time jitter; the scale covers both). For a card in a document: `--title "..."` replaces
@@ -192,8 +193,14 @@ The **refresh strip** draws one cell per refresh from each frame's first capture
 static frames violet. Where frames the application rendered never reached the display (dropped, over a capture without gaps), the
 refreshes where they were due repeat the frame before and are orange. A refresh that showed an older frame out of order is pink. With a
 capture card, the other refreshes between a frame's last capture and the next frame (captures that could not be decoded or were not
-recorded) are grey; a camera sees each frame until the next one. A mark above the strip shows a frame with skipped frame indices before
-it, or a tear.
+recorded) are grey; a camera sees each frame until the next one.
+
+The **events** panel under it shows what went wrong where, at every zoom (the strip needs a section of a few seconds to draw its cells),
+in two lanes that are never mixed up: **frames**, what the application and the display did (frames the target dropped orange, an
+older frame shown out of order pink, a torn refresh cyan), and **capture**, what the capture missed (a capture not recorded, frames the
+capture source reported dropping, refreshes its timestamps say it missed: grey; a capture whose marker could not be decoded: dark
+grey). Each pixel column shows one mark per lane, the kind that outweighs the others there; hovering it in the GUI lists everything in
+it, with the frames it names. The key counts each kind in the section. The capture lane needs `captures.csv` next to the frames.
 
 **Capture gaps** (captures not decoded, not recorded, or dropped by the capture source) leave the display time of the next frame
 uncertain: the steps into and out of it are not judged (no animation error, no late verdict, not in the frame rates), drawn dashed grey

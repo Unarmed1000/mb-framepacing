@@ -45,6 +45,7 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<FrameSequence> m_drift;
     private readonly Lazy<LateShareData?> m_lateShare;
     private readonly Lazy<int[]> m_segmentEnds;
+    private readonly Lazy<RunEvents> m_events;
 
     private RunChartData(ChartRun run)
     {
@@ -150,6 +151,7 @@ namespace MB.FramePacing.Charts
       m_drift = Once(() => new FrameSequence(count, i => Frames[i].DriftTicks));
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
+      m_events = Once(() => RunEvents.Of(this));
     }
 
     /// <summary>The prepared data of <paramref name="run"/>: made on first use and kept as long as the run is.</summary>
@@ -225,6 +227,9 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The late share over the whole run, when it has pacing information.</summary>
     public LateShareData? LateShare => m_lateShare.Value;
+
+    /// <summary>What went wrong when, in the frames and in the capture: the events lanes'.</summary>
+    public RunEvents Events => m_events.Value;
 
     /// <summary>The frames without a next frame in their segment, in order.</summary>
     public IReadOnlyList<int> SegmentEnds => m_segmentEnds.Value;

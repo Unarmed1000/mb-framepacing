@@ -36,6 +36,9 @@ namespace MB.FramePacing.Charts
       long capturePeriod = Milliseconds.ToTicks(summary.CapturePeriodMs);
       long threshold = Milliseconds.ToTicks(summary.ErrorThresholdMs);
       bool camera = summary.Scanout == nameof(ScanoutModel.Camera);
+      // What the capture missed, for every run's events (an analysis without the file draws its capture lane as not known)
+      string capturesPath = Path.Combine(directory, AnalysisFiles.CapturesFileName);
+      var captures = File.Exists(capturesPath) ? CapturesCsv.Read(capturesPath) : null;
 
       var runs = new List<AnalysisOutputRun>();
       foreach (var run in summary.Runs)
@@ -45,7 +48,7 @@ namespace MB.FramePacing.Charts
         string prefix = run.FramesFile.EndsWith("-frames.csv", StringComparison.Ordinal)
           ? run.FramesFile[..^"-frames.csv".Length]
           : $"run-{analysis.RunId}";
-        runs.Add(new AnalysisOutputRun(new ChartRun(analysis, capturePeriod, threshold, camera), prefix));
+        runs.Add(new AnalysisOutputRun(new ChartRun(analysis, capturePeriod, threshold, camera) { Captures = captures }, prefix));
       }
       return runs;
     }

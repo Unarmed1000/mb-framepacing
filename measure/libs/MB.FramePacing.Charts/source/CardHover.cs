@@ -48,9 +48,46 @@ namespace MB.FramePacing.Charts
         }
         case DistributionCard.Drift:
           return FrameAt(x) is { } frame ? $"{Heading(frame)}\ndrift {Ms(frame.DriftTicks, sign: true)} ms" : null;
+        case ReportItem.Events:
+          return Events(plot, x);
         default:
           return FrameAt(x) is { } shown ? Describe(shown) : null;
       }
+    }
+
+    /// <summary>
+    /// The events of the pixel column at <paramref name="seconds"/>, both lanes, each covering its refresh as the lanes draw it: what happened
+    /// and the frames it names. Null when the column has none.
+    /// </summary>
+    private string? Events(CardPlot plot, double seconds)
+    {
+      var data = m_section.Data;
+      double column = Math.Floor(plot.PixelX(seconds));
+      long Ticks(double s) => data.OriginTicks + (long)Math.Round(s * TimeSpan.TicksPerSecond);
+      long from = Ticks(plot.ValueX(column)) - Math.Max(1, data.Run.CapturePeriodTicks) + 1;
+      long to = Ticks(plot.ValueX(column + 1));
+      var lines = new List<string>();
+      foreach (var kind in RunEvents.FrameKinds.Concat(RunEvents.CaptureKinds))
+      {
+        foreach (var e in data.Events.In(kind, from, to))
+          lines.Add(EventText(kind, e));
+      }
+      return lines.Count > 0 ? $"At {Invariant(plot.ValueX(column), "0.000")} s\n{string.Join('\n', lines)}" : null;
+    }
+
+    private static string EventText(RunEventKind kind, RunEvent e)
+    {
+      string Count(string one, string many) => e.Count == 1 ? one : $"{e.Count.ToString("N0", CultureInfo.InvariantCulture)} {many}";
+      return kind switch
+      {
+        RunEventKind.FramesDropped => $"{Count("a frame", "frames")} dropped before frame {e.FrameIndex}",
+        RunEventKind.OutOfOrder => $"an older frame, {e.FrameIndex}, shown again (out of order)",
+        RunEventKind.Torn => e.OtherFrameIndex is { } other ? $"torn: frames {e.FrameIndex} and {other}" : $"torn: frame {e.FrameIndex}",
+        RunEventKind.NotRecorded => "a capture not recorded",
+        RunEventKind.SourceDropped => $"{Count("a frame", "frames")} dropped by the capture source",
+        RunEventKind.Missed => $"{Count("a refresh", "refreshes")} the capture missed",
+        _ => "a capture not decoded",
+      };
     }
 
     /// <summary>The section's frame shown at <paramref name="seconds"/> (since the run's first frame): the last one first seen by then.</summary>

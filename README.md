@@ -247,7 +247,7 @@ only moves it; the next window is drawn in the background before you reach its e
 
 The same panels as a report (below) of a test clip, a busy stretch at the full rate:
 
-![The report of a busy stretch at the full rate: animation error, display time step, frametime and CPU busy, late share and refresh strip](doc/images/report-example-busy.svg)
+![The report of a busy stretch at the full rate: animation error, display time step, frametime and CPU busy, late share, refresh strip and events](doc/images/report-example-busy.svg)
 
 Every panel says in its title what it shows, and its key on the right names each colour, listing only what the section shows.
 
@@ -311,7 +311,8 @@ in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them 
 
 **The report** is the run as one SVG card, in the style of
 [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained)'s charts: the headline numbers, the animation
-error, the display time step, the late share and the refresh strip. `--charts` and **Save charts** write it for the whole run
+error, the display time step, the late share, the refresh strip, and the events: what the frames did (dropped, out of order, torn)
+and what the capture missed, in two lanes. `--charts` and **Save charts** write it for the whole run
 (`run-<id>-report.svg`); `mb-framepacing render` draws it from an analysis (no capture needed) for the whole run or any section
 (`--from`/`--to`, in seconds on the Timeline's axis), the worst moments (`--details`), and as PNG too (`--png`, through Edge or
 Chrome). A section of a few seconds shows every frame and refresh; a long run shows each pixel column's frames, the whole range faint

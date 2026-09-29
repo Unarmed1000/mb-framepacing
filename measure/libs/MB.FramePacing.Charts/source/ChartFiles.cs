@@ -26,12 +26,13 @@ namespace MB.FramePacing.Charts
     {
       var written = new List<string>();
       var ordinals = new Dictionary<uint, int>();
+      var captures = ChartRun.CapturesOf(report);
       foreach (var run in report.Timeline.Runs)
       {
         int ordinal = ordinals.TryGetValue(run.RunId, out int seen) ? seen : 0;
         ordinals[run.RunId] = ordinal + 1;
         string prefix = CaptureAnalyzer.RunFilePrefix(run, ordinal);
-        var chart = ChartRun.From(report, run);
+        var chart = ChartRun.From(report, run, captures);
         written.AddRange(ReportFiles.Write(chart, prefix, report.OutputDirectory));
         written.AddRange(ReportFiles.WriteCards(chart, prefix, report.OutputDirectory, DistributionCard.All.Select(card => card.Id)));
       }

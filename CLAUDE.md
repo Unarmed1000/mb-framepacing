@@ -174,7 +174,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - **Holds and strip cells by kind** (`RunChartData.HoldKinds`, `HoldKind`): unknown (a capture gap, dashed grey), late (red), an
       older frame came back (out of order, pink), frames dropped by the target (orange), as planned (green). Dropped = skipped frame
       indices over a gap-free capture that never came back out of order (`DroppedBeforeFrame`); the strip colours the refreshes where
-      they were due orange and the out-of-order refreshes (`PresentedFrame.OlderFrames`, CSV `olderFrames`) pink.
+      they were due orange and the out-of-order refreshes (`PresentedFrame.OlderFrames`, CSV `olderFrames`) pink (anywhere in a frame's cells).
+    - **Events panel** (`events`, under the strip, at every zoom): two lanes never mixed up, **frames** (dropped by the target, out of
+      order, torn) and **capture** (not recorded, dropped by the source, missed, not decoded), one mark per pixel column and lane, the
+      first kind of `RunEvents.FrameKinds` / `CaptureKinds` that the column has. `RunEvents` (`RunChartData.Events`) holds each kind's
+      events sorted with running totals; the capture's come from `ChartRun.Captures` (the capture rows as captures.csv has them: live from
+      the report, `ChartRun.CapturesOf` once per capture; from files, `AnalysisOutput` reads captures.csv), so the report from the files
+      is the live one (`ChartVideoClipTests`). The key counts each kind in the section, the description names the capture gaps by kind,
+      and `CardHover` lists a column's events with the frames they name. The strip has no marks.
     - **Static stretches:** a violet band (`static-band`) behind every time panel from the first static frame's display time to the next
       frame's (`RunChartData.StaticStretches`), violet strip cells (`strip-static-a`/`-b`). The display time step and frametime scales
       leave static frames' holds and frametimes out (`RunChartData.AnimatingHolds`, `AnimatingFrameTimes`); they get edge marks.

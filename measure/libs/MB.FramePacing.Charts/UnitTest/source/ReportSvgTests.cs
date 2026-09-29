@@ -683,10 +683,11 @@ namespace MB.FramePacing.Charts.UnitTest
 
     /// <summary>
     /// The refresh strip: a capture card's refreshes between a frame's last capture and the next frame (not decoded) are unknown cells, a
-    /// camera's frame lasts until the next one; frames with skipped frame indices before them, or torn, get a mark above the strip.
+    /// camera's frame lasts until the next one. The strip has no marks: the events panel shows the frames dropped before frame 10 and, for a
+    /// camera, the torn frame 12 (a capture card's tears are its torn captures, which these frames without capture rows do not have).
     /// </summary>
     [Test]
-    public void Strip_ShowsUnknownRefreshesAndMarksSkippedOrTornFrames()
+    public void Strip_ShowsUnknownRefreshes_TheEventsPanelDroppedAndTornFrames()
     {
       var run = Synthetic(40, lateEvery: 0);
       var frames = run
@@ -714,8 +715,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var cells = drawing.FlatShapes.OfType<RectShape>().ToList();
       Assert.That(cells, Has.Count.EqualTo(42), "a cell per refresh: 39 frames of one, one of three");
       Assert.That(cells.Count(c => c.Class == "neutral"), Is.EqualTo(2), "the two refreshes after frame 5's last capture are unknown");
-      var marks = drawing.FlatShapes.OfType<PathShape>().Single(p => p.Class == "strip-mark");
-      Assert.That(marks.Data.Count(c => c == 'M'), Is.EqualTo(2), "frame 10 (skipped indices before it) and frame 12 (torn)");
+      Assert.That(drawing.FlatShapes.OfType<PathShape>(), Is.Empty, "no marks on the strip");
       Assert.That(KeyWords(drawing), Does.Contain("not decoded or not recorded"), "the key names the unknown refreshes");
       Assert.That(
         drawing.FlatShapes.OfType<TextRunsShape>().SelectMany(t => t.Runs).Count(r => r.Class == "key-grey"),
@@ -729,9 +729,20 @@ namespace MB.FramePacing.Charts.UnitTest
 
       var clean = ReportCard.Build(RunSection.Whole(run), only);
       Assert.That(clean.FlatShapes.OfType<RectShape>().Count(c => c.Class == "neutral"), Is.Zero);
-      Assert.That(clean.FlatShapes.OfType<PathShape>().Any(p => p.Class == "strip-mark"), Is.False);
       // A clean strip has nothing to explain: no key
       Assert.That(KeyWords(clean), Is.Empty);
+
+      var events = ReportOptions.ShowOnly(new[] { ReportItem.Events });
+      var lanes = ReportCard.Build(RunSection.Whole(card), events);
+      Assert.That(
+        lanes.FlatShapes.OfType<RectShape>().Count(r => r.Class == "event-dropped"),
+        Is.EqualTo(1),
+        "the two frames dropped before frame 10"
+      );
+      Assert.That(lanes.FlatShapes.OfType<RectShape>().Any(r => r.Class == "event-torn"), Is.False, "a capture card's tears are its torn captures");
+      Assert.That(KeyWords(lanes), Is.EqualTo(new[] { "frames:", "2 dropped", "capture:", "not known" }), "no capture rows: not known");
+      var cameraLanes = ReportCard.Build(RunSection.Whole(card with { Camera = true }), events);
+      Assert.That(cameraLanes.FlatShapes.OfType<RectShape>().Count(r => r.Class == "event-torn"), Is.EqualTo(1), "a camera's torn frame 12");
     }
 
     /// <summary>The words of a card's keys (text runs without a class of their own; swatches have their key colour).</summary>
@@ -753,7 +764,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var drawing = ReportCard.Build(section);
       Assert.That(
         drawing.Plots.Select(p => p.Id),
-        Is.EqualTo(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.LateShare, ReportItem.RefreshStrip }),
+        Is.EqualTo(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.LateShare, ReportItem.RefreshStrip, ReportItem.Events }),
         "no frametime panel plot: the synthetic markers carry no CPU times"
       );
       foreach (var plot in drawing.Plots)

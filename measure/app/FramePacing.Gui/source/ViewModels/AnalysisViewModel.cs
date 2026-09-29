@@ -518,8 +518,9 @@ namespace MB.FramePacing.Gui.ViewModels
           + $"{layout.Locks.Count} marker(s) at {layout.ModuleSizePx.ToString("0.0", CultureInfo.InvariantCulture)} px/module";
         foreach (var warning in report.Warnings)
           Warnings.Add(warning);
+        var captures = ChartRun.CapturesOf(report);
         foreach (var run in report.Timeline.Runs)
-          Runs.Add(new RunViewModel(ChartRun.From(report, run)));
+          Runs.Add(new RunViewModel(ChartRun.From(report, run, captures)));
         SelectedRun = Runs.Count > 0 ? Runs[0] : null;
         ReportDirectory = report.OutputDirectory;
         m_report = report;

@@ -340,6 +340,9 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(back.Run.Statistics, Is.EqualTo(chart.Run.Statistics), $"{clip}: statistics");
       Assert.That(back.Run.Counts, Is.EqualTo(chart.Run.Counts), $"{clip}: counts");
       Assert.That((back.Run.RunId, back.Run.SequenceId), Is.EqualTo((chart.Run.RunId, chart.Run.SequenceId)));
+      // The capture rows (for the events) read back too: the report from the files is the report the analysis drew
+      Assert.That(back.Captures, Has.Count.EqualTo(chart.Captures!.Count), $"{clip}: capture rows");
+      Assert.That(ReportCard.Render(RunSection.Whole(back)), Is.EqualTo(ReportCard.Render(RunSection.Whole(chart))), $"{clip}: the report");
     }
 
     /// <summary>
@@ -576,6 +579,12 @@ namespace MB.FramePacing.Charts.UnitTest
         Has.Count.EqualTo(dropped + older > 0 ? 10 : 8),
         $"{clip}: the pair only when needed"
       );
+      // The events lanes count the same, and the clips are captured whole: nothing in the capture lane
+      var events = RunChartData.Of(chart).Events;
+      Assert.That(events.Count(RunEventKind.FramesDropped, long.MinValue, long.MaxValue), Is.EqualTo(dropped), $"{clip}: dropped events");
+      Assert.That(events.Count(RunEventKind.OutOfOrder, long.MinValue, long.MaxValue), Is.EqualTo(older), $"{clip}: out-of-order events");
+      Assert.That(RunEvents.CaptureKinds.Sum(k => events.Count(k, long.MinValue, long.MaxValue)), Is.Zero, $"{clip}: capture events");
+      Assert.That(events.CapturesKnown, $"{clip}: the capture rows are there");
     }
 
     private (ClipManifest Manifest, AnalysisReport Report, ChartRun Chart) Analyze(string clip)

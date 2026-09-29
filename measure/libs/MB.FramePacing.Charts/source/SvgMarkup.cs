@@ -105,7 +105,6 @@ namespace MB.FramePacing.Charts
       + "  .key-violet-a { fill: #a371f7; fill-opacity: 0.55; }\n"
       + "  .key-violet-b { fill: #a371f7; fill-opacity: 0.85; }\n"
       + "  .key-grey { fill: #3d444d; }\n"
-      + "  .key-mark { fill: #e6edf3; }\n"
       + "  .held-fill { fill: #2ea043; }\n"
       + "  .held-fill-late { fill: #e5534b; }\n"
       + "  .held-range { fill: #2ea043; fill-opacity: 0.3; }\n"
@@ -120,12 +119,19 @@ namespace MB.FramePacing.Charts
       + "  .frametime-fill { fill: #58a6ff; }\n"
       + "  .cpu-busy { fill: #58a6ff; fill-opacity: 0.22; }\n"
       + "  .strip-late { fill: #e5534b; }\n"
-      + "  .strip-mark { fill: #e6edf3; }\n"
       + "  .hist-bar { fill: #58a6ff; }\n"
       + "  .curve { stroke: #58a6ff; stroke-width: 2; fill: none; stroke-linejoin: round; }\n"
       + "  .clip-mark { fill: #e5534b; }\n"
       + "  .clip-text { font-size: 11px; fill: #e6edf3; }\n"
-      + "  .warn { fill: #d29922; }\n";
+      + "  .warn { fill: #d29922; }\n"
+      + "  .event-track { fill: #ffffff; fill-opacity: 0.05; }\n"
+      + "  .event-dropped { fill: #f0883e; }\n"
+      + "  .event-older { fill: #db61a2; }\n"
+      + "  .event-torn { fill: #39c5cf; }\n"
+      + "  .event-gap { fill: #768390; }\n"
+      + "  .event-undecoded { fill: #545d68; }\n"
+      + "  .key-cyan { fill: #39c5cf; }\n"
+      + "  .key-undecoded { fill: #545d68; }\n";
 
     private const double Epsilon = 1e-9;
 

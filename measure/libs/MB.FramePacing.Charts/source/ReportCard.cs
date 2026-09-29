@@ -42,6 +42,11 @@ namespace MB.FramePacing.Charts
     private const double LateH = 80;
     private const double StripH = 28;
 
+    // The events panel: the frames lane over the capture lane
+    private const double LaneH = 10;
+    private const double LaneGap = 6;
+    private const double EventsH = (2 * LaneH) + LaneGap;
+
     // The layout flows: each shown item takes its height. Space above a panel (its label, and the time axis of the panel before), after the
     // header or the tiles, at the top of a card without either, and below the last item
     private const double PanelGap = 70;
@@ -115,11 +120,17 @@ namespace MB.FramePacing.Charts
       int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
         description.Add($"Frame rates and display time steps {staticFrames}: nothing animates in them.");
-      // Capture gaps: the steps they made uncertain are not judged
+      // Capture gaps, by kind when the capture rows are known: the steps they made uncertain are not judged
       int uncertain = section.Data.UncertainSteps.CountIn(section.Start, section.End);
-      if (uncertain > 0)
+      string gaps = CaptureGaps(section);
+      if (uncertain > 0 || gaps.Length > 0)
         description.Add(
-          $"{uncertain.ToString("N0", CultureInfo.InvariantCulture)} display time step{(uncertain == 1 ? string.Empty : "s")} across capture gaps (not decoded, not recorded or dropped by the source) not judged."
+          (gaps.Length > 0 ? $"Capture: {gaps}" : "Capture gaps (not decoded, not recorded, dropped by the source or missed)")
+            + (
+              uncertain > 0
+                ? $"; {uncertain.ToString("N0", CultureInfo.InvariantCulture)} display time step{(uncertain == 1 ? string.Empty : "s")} across them not judged."
+                : "."
+            )
         );
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
@@ -157,6 +168,8 @@ namespace MB.FramePacing.Charts
         var (stripView, stripLabel) = StripView(view, options.StripSeconds);
         panels.Add((shapes, plots) => StripPanel(shapes, plots, stripView, refreshMs, chart, stripY, stripLabel));
       }
+      if (layout.EventsY is { } eventsY)
+        panels.Add((shapes, plots) => EventsPanel(shapes, plots, view, chart, eventsY));
       var drawn = panels.Select(_ => (Shapes: new List<CardShape>(), Plots: new List<CardPlot>())).ToArray();
       Parallel.For(0, panels.Count, i => panels[i](drawn[i].Shapes, drawn[i].Plots));
       foreach (var (shapes, _) in drawn)
@@ -194,7 +207,16 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
-    private sealed record Layout(double TilesY, double? ErrorY, double? StepY, double? FrameTimeY, double? LateY, double? StripY, double Height)
+    private sealed record Layout(
+      double TilesY,
+      double? ErrorY,
+      double? StepY,
+      double? FrameTimeY,
+      double? LateY,
+      double? StripY,
+      double? EventsY,
+      double Height
+    )
     {
       public static Layout For(ReportOptions options, int descriptionLines, int tiles, double displayH = DisplayBoxH)
       {
@@ -241,8 +263,9 @@ namespace MB.FramePacing.Charts
         var frameTimeY = Panel(ReportItem.FrameTime, FrameTimeH);
         var lateY = Panel(ReportItem.LateShare, LateH);
         var stripY = Panel(ReportItem.RefreshStrip, StripH);
+        var eventsY = Panel(ReportItem.Events, EventsH);
         double height = previous == "panel" ? cursor + BottomAfterPanel : cursor + BottomMargin;
-        return new Layout(tilesY, errorY, stepY, frameTimeY, lateY, stripY, height);
+        return new Layout(tilesY, errorY, stepY, frameTimeY, lateY, stripY, eventsY, height);
       }
     }
 
@@ -418,6 +441,11 @@ namespace MB.FramePacing.Charts
       {
         if (runs.Count > 0)
           runs.Add(new TextRun("  "));
+        if (classes.Length == 0)
+        {
+          runs.Add(new TextRun(text));
+          continue;
+        }
         if (classes.Length == 2)
         {
           runs.Add(new TextRun("▐", g_keyColours[classes[0]]));
@@ -426,8 +454,7 @@ namespace MB.FramePacing.Charts
         else
         {
           string glyph =
-            classes[0] == "strip-mark" ? "▾"
-            : classes[0] == "error-refresh" ? "┅"
+            classes[0] == "error-refresh" ? "┅"
             : line ? "━"
             : "■";
           runs.Add(new TextRun(glyph, g_keyColours[classes[0]]));
@@ -483,7 +510,11 @@ namespace MB.FramePacing.Charts
       ["strip-static-a"] = "key-violet-a",
       ["strip-static-b"] = "key-violet-b",
       ["neutral"] = "key-grey",
-      ["strip-mark"] = "key-mark",
+      ["event-dropped"] = "key-orange",
+      ["event-older"] = "key-pink",
+      ["event-torn"] = "key-cyan",
+      ["event-gap"] = "key-unknown",
+      ["event-undecoded"] = "key-undecoded",
     };
 
     /// <summary>The key item of the static bands: what a band behind a panel's data means.</summary>
@@ -1129,7 +1160,7 @@ namespace MB.FramePacing.Charts
     /// <summary>
     /// One cell per refresh, from each frame's first capture: a new shade with every frame, late frames red. A capture card sees whole refreshes,
     /// so the refreshes between a frame's last capture and the next frame (captures that could not be decoded) are unknown cells; a camera sees
-    /// each frame until the next one. Frames with skipped frame indices before them, or torn, get a mark above the strip.
+    /// each frame until the next one. What the frames and the capture missed is in the events panel below.
     /// </summary>
     private static void StripPanel(
       List<CardShape> parts,
@@ -1160,7 +1191,6 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(view.PlotX1, stripY - 16, string.Empty, "vsync-n", "end"));
       long refreshTicks = (long)Math.Round(refreshMs * TimeSpan.TicksPerMillisecond);
       int Cells(long ticks) => refreshTicks > 0 ? (int)Math.Max(0, (ticks + (refreshTicks / 2)) / refreshTicks) : 1;
-      var marks = new StringBuilder();
       bool anyUnknown = false;
       bool anyStatic = false;
       bool anyLate = false;
@@ -1200,17 +1230,18 @@ namespace MB.FramePacing.Charts
           double x = x0 + (c * cellW);
           if (x >= view.EndX)
             break;
-          // After the frame's last sighting: a refresh that showed an older frame out of order, else one the capture did not tell
-          string cell = c >= seen - repeats && c < seen ? "strip-dropped" : cls;
+          // A refresh that showed an older frame out of order (also between two sightings of this frame); after the frame's last
+          // sighting, else one the capture did not tell; the refreshes where dropped frames were due repeat this frame
+          long at = frame.FirstSeenTicks + (c * refreshTicks);
+          bool older = frame.OlderFrames is { } shown && shown.Any(o => Math.Abs(o.CaptureTicks - at) * 2 < refreshTicks);
+          string cell =
+            older ? "strip-older"
+            : c >= seen ? "neutral"
+            : c >= seen - repeats ? "strip-dropped"
+            : cls;
           anyDropped |= cell == "strip-dropped";
-          if (c >= seen)
-          {
-            long at = frame.FirstSeenTicks + (c * refreshTicks);
-            bool older = frame.OlderFrames is { } shown && shown.Any(o => Math.Abs(o.CaptureTicks - at) * 2 < refreshTicks);
-            cell = older ? "strip-older" : "neutral";
-            anyOlder |= older;
-            anyUnknown |= !older;
-          }
+          anyOlder |= older;
+          anyUnknown |= cell == "neutral";
           view.Move(
             parts,
             new RectShape(cell, N(x + 0.5, 1), N(stripY, 0), N(Math.Max(0.5, Math.Min(cellW - 1, view.EndX - x - 0.5)), 1), N(StripH, 0), "2"),
@@ -1218,10 +1249,7 @@ namespace MB.FramePacing.Charts
             stripY + StripH
           );
         }
-        if (frame.SkippedBefore > 0 || (frame.Flags & PresentedFrameFlags.Torn) != 0)
-          marks.Append($"M{Fixed(x0 + 0.5, 1)} {Fixed(stripY - 2, 1)}L{Fixed(x0 - 3, 1)} {Fixed(stripY - 8, 1)}H{Fixed(x0 + 4, 1)}Z");
       }
-      view.MovePath(parts, "strip-mark", marks, stripY - 10, stripY + StripH);
       // The key: the exceptions the section shows
       var panelKey = new List<(string[] Classes, string Text, bool Line)>();
       if (anyLate)
@@ -1234,11 +1262,126 @@ namespace MB.FramePacing.Charts
         panelKey.Add((new[] { "strip-older" }, "an older frame (out of order)", false));
       if (anyUnknown)
         panelKey.Add((new[] { "neutral" }, "not decoded or not recorded", false));
-      if (marks.Length > 0)
-        panelKey.Add((new[] { "strip-mark" }, "skipped frame indices or torn", false));
       parts.RemoveAt(legend);
       parts.InsertRange(legend, Key(view.PlotX1, stripY - 16, panelKey));
       view.Ticks(parts, stripY + StripH);
+    }
+
+    /// <summary>Each event kind's class (its colour in the lanes and the key) and its word in the key.</summary>
+    private static readonly Dictionary<RunEventKind, (string Class, string Text)> g_eventKinds = new Dictionary<RunEventKind, (string, string)>
+    {
+      [RunEventKind.FramesDropped] = ("event-dropped", "dropped"),
+      [RunEventKind.OutOfOrder] = ("event-older", "out of order"),
+      [RunEventKind.Torn] = ("event-torn", "torn"),
+      [RunEventKind.NotRecorded] = ("event-gap", "not recorded"),
+      [RunEventKind.SourceDropped] = ("event-gap", "dropped by the source"),
+      [RunEventKind.Missed] = ("event-gap", "missed"),
+      [RunEventKind.NotDecoded] = ("event-undecoded", "not decoded"),
+    };
+
+    /// <summary>The section's time on the capture's clock, for its events: from its start to its end, and the last frame's refresh.</summary>
+    private static (long From, long To) EventTicks(RunSection section) =>
+      (
+        section.Data.OriginTicks + (long)Math.Round(section.FromSeconds * TimeSpan.TicksPerSecond),
+        section.Data.OriginTicks + (long)Math.Round(section.ToSeconds * TimeSpan.TicksPerSecond) + section.Data.Run.CapturePeriodTicks
+      );
+
+    /// <summary>What the capture missed in the section, by kind ("2 not decoded, 1 missed"); empty when nothing, or the rows are not known.</summary>
+    private static string CaptureGaps(RunSection section)
+    {
+      var events = section.Data.Events;
+      var (from, to) = EventTicks(section);
+      return string.Join(
+        ", ",
+        RunEvents
+          .CaptureKinds.Select(kind => (Kind: kind, Count: events.Count(kind, from, to)))
+          .Where(k => k.Count > 0)
+          .Select(k => $"{k.Count.ToString("N0", CultureInfo.InvariantCulture)} {g_eventKinds[k.Kind].Text}")
+      );
+    }
+
+    /// <summary>
+    /// Two lanes of events at every zoom: the frames (dropped by the target, out of order, torn) over the capture (not recorded, dropped by the
+    /// source, missed, not decoded). One mark per pixel column and lane, of the kind that outweighs the others there; an event covers its
+    /// refresh. The key counts each kind in the section.
+    /// </summary>
+    private static void EventsPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, ChartRun chart, double eventsY)
+    {
+      var events = view.Data.Events;
+      long origin = view.Data.OriginTicks;
+      long period = Math.Max(1, chart.CapturePeriodTicks);
+      var (from, to) = EventTicks(view.Section);
+      parts.Add(new TextShape(20, eventsY - 16, "EVENTS: WHAT THE FRAMES DID, WHAT THE CAPTURE MISSED", "label", "start"));
+      plots.Add(new CardPlot(ReportItem.Events, PlotX0, eventsY, view.PlotX1, eventsY + EventsH, view.ViewFrom, view.ViewTo, 0, 1));
+
+      // The time axis is linear: a pixel column's time on the capture's clock
+      double x0 = view.XOf(0);
+      double pixelsPerSecond = view.XOf(1) - x0;
+      long TicksAt(double x) => origin + (long)Math.Round((x - x0) / pixelsPerSecond * TimeSpan.TicksPerSecond);
+      int firstColumn = (int)Math.Floor(Math.Max(view.XOf(view.From), 0));
+      int lastColumn = (int)Math.Ceiling(view.EndX);
+
+      var key = new List<(string[] Classes, string Text, bool Line)>();
+      foreach (var (lane, kinds, name) in new[] { (0, RunEvents.FrameKinds, "frames"), (1, RunEvents.CaptureKinds, "capture") })
+      {
+        double y = eventsY + (lane * (LaneH + LaneGap));
+        parts.Add(new TextShape(PlotX0 - 8, y + LaneH - 1, name, "vsync-n", "end"));
+        parts.Add(new RectShape("event-track", N(PlotX0, 1), N(y, 0), N(view.PlotX1 - PlotX0, 1), N(LaneH, 0), "2"));
+
+        // Runs of columns of one kind are one mark, at least two pixels wide
+        string? runClass = null;
+        int runStart = 0;
+        void EndRun(int end)
+        {
+          if (runClass == null)
+            return;
+          double x = Math.Min(runStart, end - 2);
+          view.Move(parts, new RectShape(runClass, N(x, 1), N(y, 0), N(Math.Max(2, end - x), 1), N(LaneH, 0), "1"), y, y + LaneH);
+          runClass = null;
+        }
+        for (int column = firstColumn; column < lastColumn; ++column)
+        {
+          // An event covers its refresh: it shows in every column that refresh reaches
+          long start = Math.Max(from, TicksAt(column) - period + 1);
+          long end = Math.Min(to, TicksAt(column + 1));
+          string? cls = null;
+          foreach (var kind in kinds)
+          {
+            if (start < end && events.Any(kind, start, end))
+            {
+              cls = g_eventKinds[kind].Class;
+              break;
+            }
+          }
+          if (cls != runClass)
+          {
+            EndRun(column);
+            if (cls != null)
+            {
+              runClass = cls;
+              runStart = column;
+            }
+          }
+        }
+        EndRun(lastColumn);
+
+        key.Add((Array.Empty<string>(), name + ":", false));
+        var counted = kinds.Select(kind => (Kind: kind, Count: events.Count(kind, from, to))).Where(k => k.Count > 0).ToList();
+        foreach (var (kind, count) in counted)
+          key.Add((new[] { g_eventKinds[kind].Class }, $"{count.ToString("N0", CultureInfo.InvariantCulture)} {g_eventKinds[kind].Text}", false));
+        if (counted.Count == 0)
+          key.Add(
+            (
+              Array.Empty<string>(),
+              lane == 0 ? "none"
+              : events.CapturesKnown ? "nothing missed"
+              : "not known",
+              false
+            )
+          );
+      }
+      parts.AddRange(Key(view.PlotX1, eventsY - 16, key));
+      view.Ticks(parts, eventsY + EventsH);
     }
 
     // ------------------------------------------------------------------------------------------------------------------------------------------
