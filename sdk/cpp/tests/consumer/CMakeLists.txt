@@ -17,15 +17,15 @@ set(MB_FRAMEPACING_SOURCE_DIR "" CACHE PATH "Source tree for the subdirectory mo
 if(MB_CONSUMER_MODE STREQUAL "subdirectory")
   add_subdirectory(${MB_FRAMEPACING_SOURCE_DIR} mb_framepacing)
 elseif(MB_CONSUMER_MODE STREQUAL "package")
-  find_package(mb_framepacing ${MB_CONSUMER_VERSION} CONFIG REQUIRED COMPONENTS marker data)
+  find_package(mb_framepacing ${MB_CONSUMER_VERSION} CONFIG REQUIRED COMPONENTS marker data pacer)
 else()
   include(FetchContent)
   FetchContent_Declare(mb_framepacing
     URL ${MB_FRAMEPACING_URL}
     URL_HASH SHA256=${MB_FRAMEPACING_SHA256}
-    FIND_PACKAGE_ARGS ${MB_CONSUMER_VERSION} CONFIG COMPONENTS marker data)
+    FIND_PACKAGE_ARGS ${MB_CONSUMER_VERSION} CONFIG COMPONENTS marker data pacer)
   FetchContent_MakeAvailable(mb_framepacing)
 endif()
 
 add_executable(consumer main.cpp)
-target_link_libraries(consumer PRIVATE mb_framepacing::marker mb_framepacing::data)
+target_link_libraries(consumer PRIVATE mb_framepacing::marker mb_framepacing::data mb_framepacing::pacer)

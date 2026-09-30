@@ -55,10 +55,10 @@ jobs:
           cmake --build sdk/cpp/build/ci --config Release --parallel
           ctest --test-dir sdk/cpp/build/ci -C Release --output-on-failure
 
-      - name: C++ library without the data module (no nlohmann/json)
+      - name: C++ library with the core and marker modules only (no nlohmann/json)
         shell: bash
         run: |
-          cmake -S sdk/cpp -B sdk/cpp/build/ci-no-data -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_DATA=OFF
+          cmake -S sdk/cpp -B sdk/cpp/build/ci-no-data -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_DATA=OFF -DMB_FRAMEPACING_BUILD_PACER=OFF
           cmake --build sdk/cpp/build/ci-no-data --config Release --parallel
           ctest --test-dir sdk/cpp/build/ci-no-data -C Release --output-on-failure
           if [ -d sdk/cpp/build/ci-no-data/_deps/nlohmann_json-src ]; then echo "::error::nlohmann/json was fetched without the data module"; exit 1; fi

@@ -8,6 +8,7 @@ own static library target, like Boost's and Poco's.
 | `core`   | `mb_framepacing::core`   | `<mb/framepacing/Core.hpp>`   | What every module shares: the library version, the tick units and conversions, `Rectangle`  |
 | `marker` | `mb_framepacing::marker` | `<mb/framepacing/Marker.hpp>` | Draws the frame marker into every frame of an application; no dependencies, no allocations  |
 | `data`   | `mb_framepacing::data`   | `<mb/framepacing/Data.hpp>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json |
+| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/Pacer.hpp>`  | Plans frames on the display's refreshes and adapts the swap interval; uses only the core    |
 
 The **marker** draws a small QR code into every frame that carries the frame index and the animation time. A capture of the display
 output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the application animated is from
@@ -47,6 +48,7 @@ Or git (`GIT_TAG sdk-v0.1.0`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of th
 | ----------------------------------- | ---------------------------------------------------------------------- |
 | `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                     |
 | `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched |
+| `MB_FRAMEPACING_BUILD_PACER`        | on                                                                     |
 | `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                      |
 | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                               |
 | `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                 |
@@ -160,6 +162,38 @@ version, whose message says to update), `std::runtime_error` for a file it canno
 | `ReadCaptures`, `CaptureCsvRow`                                             | `captures.csv`, by column name                                     |
 | `FindAnalysis`, `FramesFileName`, `ParseTicks`, the file name constants     | The analysis folder, the file names, the CSV time format           |
 
+## The pacer
+
+```cpp
+#include <mb/framepacing/Pacer.hpp>
+namespace PC = MB::FramePacing::Pacer;
+
+const PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));   // required: the display's refresh period
+PC::FramePacer pacer(settings);                                       // allocates its window, once
+PC::AnimationClock clock(settings.Refresh());
+
+// Every frame: what the platform knows (NowTicks required; the rest 0 = unknown), then what to apply and the marker's values
+PC::FrameInput input;
+input.NowTicks = nowTicks;
+const PC::FrameSchedule schedule = pacer.BeginFrame(input);   // SwapInterval, IntendedDisplayTicks, EarliestPresentTicks, ...
+const PC::AnimationTime animation = clock.Advance(schedule);  // the frame's animation time
+const uint32_t cpuBusy = pacer.EndFrame({presentTicks});      // as you draw the marker, just before Present
+```
+
+The pacer is values in, values out: it calls no platform API and never reads a clock. `BeginFrame`, `EndFrame` and the
+`AnimationClock` never allocate. [The frame pacer](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/pacer.md) (a
+release archive's `doc/pacer.md`) has the frame loop for every way of presenting, the platform values, the rule and every setting.
+Everything is declared by `<mb/framepacing/Pacer.hpp>` in `MB::FramePacing::Pacer`, one header per type (`<mb/framepacing/pacer/…>`):
+
+| Type                                                    | What it is                                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `FramePacer`                                            | Plans every frame (`BeginFrame`, `EndFrame`, `SetRefreshPeriod`, `Reset`, `Window`)                          |
+| `PacerSettings`, `SlowDownRule`                         | The refresh period (required) and the rule's settings; always valid                                          |
+| `RefreshPeriod`                                         | The refresh period exact to 2⁻³² tick (`FromRate`, `FromNanoseconds`, `FromTicks`); always valid, no default |
+| `FrameInput`, `FrameSchedule`, `FrameEnd`               | What goes in and comes out every frame                                                                       |
+| `SwapIntervalRule`, `SwapIntervalChange`, `WindowState` | The adaptive swap interval rule on its own, for a frame loop of your own                                     |
+| `AnimationClock`, `AnimationTime`                       | The animation time in whole refreshes: with the pacer (`Advance`) or measured (`AdvanceMeasured`)            |
+
 ## The core
 
 `<mb/framepacing/Core.hpp>` in `MB::FramePacing` (every module's header includes it):
@@ -179,7 +213,9 @@ cmake --preset windows && cmake --build --preset windows && ctest --preset windo
 
 Every module has its tests (`<module>/tests`); they fetch GoogleTest (an installed or Conan GTest wins). `marker-render`
 (`marker/tools/marker-render`) writes marker images (PGM) for any payload, to compare your renderer's output pixel by pixel;
-`marker-render --golden <dir>` writes the golden set the other libraries are tested against. `tests/consumer` is a project that uses
+`marker-render --golden <dir>` writes the golden set the other libraries are tested against. The pacer's tests hold a simulation of a
+frame loop (`pacer/tests/simulation`, test code, not part of the library) and `pacer-sim` (`pacer/tests/pacer-sim`, built with the
+tests), which paces a scenario with it; `pacer-sim --golden <dir>` writes the pacer's golden results. `tests/consumer` is a project that uses
 the library every documented way (`tests/consumer/check_consumers.py`).
 
 ## License

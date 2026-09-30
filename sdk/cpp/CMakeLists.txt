@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 4.0)
 #   core    mb_framepacing::core    shared types: the library version, tick units, Rectangle
 #   marker  mb_framepacing::marker  the frame marker: encode it and draw it (links core)
 #   data    mb_framepacing::data    reads the tools' capture data and analysis output (links marker; nlohmann/json inside)
+#   pacer   mb_framepacing::pacer   paces frames with an adaptive swap interval, aligns the animation timer to refreshes (links core)
 # Every module has its folder (include/, src/, tests/); the headers install into one tree, <mb/framepacing/...>.
 
 # Inside the repository the version and LICENSE live in sdk/ (shared with the C#, Python and Unity libraries), the reference shaders in
@@ -35,12 +36,13 @@ endif()
 set(MB_FRAMEPACING_VERSION_NUMBERS "${CMAKE_MATCH_1}")
 set(MB_FRAMEPACING_VERSION_PRERELEASE "${CMAKE_MATCH_3}")
 
-project(mb_framepacing VERSION ${MB_FRAMEPACING_VERSION_NUMBERS} DESCRIPTION "The mb-framepacing SDK: frame marker and data" LANGUAGES C CXX)
+project(mb_framepacing VERSION ${MB_FRAMEPACING_VERSION_NUMBERS} DESCRIPTION "The mb-framepacing SDK: frame marker, data and frame pacer" LANGUAGES C CXX)
 
 # The core is always built; the other modules can be left out. Tests and tools only build by default when this is the top level
 # project, so engines that add_subdirectory/FetchContent the library never download GoogleTest.
 option(MB_FRAMEPACING_BUILD_MARKER "Build the marker module (mb_framepacing::marker)" ON)
 option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; needs the marker module, fetches nlohmann/json unless one is installed)" ON)
+option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer)" ON)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})
@@ -88,6 +90,10 @@ endif()
 if(MB_FRAMEPACING_BUILD_DATA)
   add_subdirectory(data)
   list(APPEND MB_FRAMEPACING_COMPONENTS data)
+endif()
+if(MB_FRAMEPACING_BUILD_PACER)
+  add_subdirectory(pacer)
+  list(APPEND MB_FRAMEPACING_COMPONENTS pacer)
 endif()
 
 # Install + export so projects can use find_package(mb_framepacing CONFIG) as an alternative to add_subdirectory/FetchContent.

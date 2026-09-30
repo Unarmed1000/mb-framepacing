@@ -1,0 +1,5 @@
+# Test code inherits the project configuration.
+# AllocationTests.cpp replaces the global operator new/delete to count allocations; their declarations in the standard library
+# headers use reserved parameter names (MSVC: _Block/_Size), which readability-inconsistent-declaration-parameter-name reports.
+InheritParentConfig: true
+Checks: '-readability-inconsistent-declaration-parameter-name'

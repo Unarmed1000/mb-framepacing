@@ -3,8 +3,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_package LANGUAGES CXX)
 
-find_package(mb_framepacing CONFIG REQUIRED COMPONENTS marker data)
+find_package(mb_framepacing CONFIG REQUIRED COMPONENTS marker data pacer)
 
 add_executable(test_package test_package.cpp)
-target_link_libraries(test_package PRIVATE mb_framepacing::marker mb_framepacing::data)
+target_link_libraries(test_package PRIVATE mb_framepacing::marker mb_framepacing::data mb_framepacing::pacer)
 target_compile_features(test_package PRIVATE cxx_std_20)

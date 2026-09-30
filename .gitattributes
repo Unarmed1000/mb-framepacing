@@ -6,6 +6,9 @@
 *.cmd  text eol=crlf
 *.bat  text eol=crlf
 
+# The pacer's golden data is compared byte for byte, with the LF line ends pacer-sim writes, on every OS
+sdk/test-data/pacer/*.csv text eol=lf
+
 # Binary files: never convert line endings or show text diffs
 *.png  binary
 *.pgm  binary

@@ -4,9 +4,10 @@
 """Create the C++ release archives of mb_framepacing (every module) and prove they work on their own.
 
   mb-framepacing-cpp-<version>.tar.gz and .zip, each holding one folder mb-framepacing-cpp-<version>/ with
-    the library source tree (sdk/cpp without build output: core, marker, data), VERSION, LICENSE,
+    the library source tree (sdk/cpp without build output: core, marker, data, pacer), VERSION, LICENSE,
     licenses/ (qrcodegen and nlohmann/json: compiled in; GoogleTest: fetched by the tests), doc/ (the marker format, the integration
-    guide, the data formats), shaders/ (the reference shaders) and test-data/data/ (the golden data the data module's tests read)
+    guide, the data formats, the pacer), shaders/ (the reference shaders) and test-data/data/ and test-data/pacer/ (the golden data the
+    data and pacer modules' tests read)
   SHA256SUMS
 
 With --verify the extracted archive is configured, built and tested standalone, and the consumer project (tests/consumer) is built
@@ -43,12 +44,14 @@ EXTRA_FILES = {
     "doc/marker-fields.md": SDK_DIR / "doc" / "marker-fields.md",
     "doc/capture-data-format.md": SDK_DIR / "doc" / "capture-data-format.md",
     "doc/analysis-output-format.md": SDK_DIR / "doc" / "analysis-output-format.md",
+    "doc/pacer.md": SDK_DIR / "doc" / "pacer.md",
 }
 EXTRA_DIRECTORIES = {
     # The reference shaders (HLSL, GLSL for OpenGL, OpenGL ES 2.0 and Vulkan) that draw the marker as one quad
     "shaders": SDK_DIR / "shaders",
-    # The golden data the data module's tests read (found above data/ in the archive, as in the repository)
+    # The golden data the data and pacer modules' tests read (found above data/ and pacer/ in the archive, as in the repository)
     "test-data/data": SDK_DIR / "test-data" / "data",
+    "test-data/pacer": SDK_DIR / "test-data" / "pacer",
 }
 
 

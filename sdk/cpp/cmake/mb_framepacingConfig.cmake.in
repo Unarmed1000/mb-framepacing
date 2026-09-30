@@ -4,7 +4,7 @@
 
 include("${CMAKE_CURRENT_LIST_DIR}/mb_framepacingTargets.cmake")
 # A module is a component: find_package(mb_framepacing CONFIG REQUIRED COMPONENTS marker) fails when the installed copy was built without it
-foreach(mb_framepacing_component IN ITEMS core marker data)
+foreach(mb_framepacing_component IN ITEMS core marker data pacer)
   if(TARGET mb_framepacing::${mb_framepacing_component})
     set(mb_framepacing_${mb_framepacing_component}_FOUND TRUE)
   endif()

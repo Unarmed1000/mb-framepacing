@@ -5,7 +5,7 @@
 
 - C#: every tracked .cs file declares at most one namespace-level type (nested types are fine).
 - C++: every public header of a module (sdk/cpp/<module>/include) declares at most one type; the umbrella headers (Core.hpp,
-  Marker.hpp, Data.hpp) hold only functions.
+  Marker.hpp, Data.hpp, Pacer.hpp) hold only functions.
 
 Run from anywhere inside the repository: python tools/check_one_type_per_file.py
 Exits with 1 and lists the offending files when the convention is broken.

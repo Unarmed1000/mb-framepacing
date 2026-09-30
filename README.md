@@ -491,7 +491,7 @@ flowchart TB
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                    |
 | `sdk/VERSION`               | The SDK's version: every module, every language                                                                               |
-| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`), its Conan recipe                     |
+| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, `pacer/`), its Conan recipe           |
 | `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10) |
 | `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                       |
 | `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                  |

@@ -15,7 +15,7 @@ whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precis
 
 ## 1. Add the C++ library
 
-CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`); the marker
+CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`, `::pacer`); the marker
 module needs only the core and has no dependencies. Pick one of five ways:
 
 **a) The release archive (recommended):** a small download, no git, and pinned by its hash. The release page lists the hash for
@@ -180,7 +180,9 @@ the static frame, so an animation clock that pauses while idle does not look lik
 the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock ticks, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
 does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
-presents only when something changes writes `FM::OnDemandFrameTicks` for both frame times.
+presents only when something changes writes `FM::OnDemandFrameTicks` for both frame times. Without a pacer of your own, the SDK's
+[frame pacer](pacer.md) (`mb_framepacing::pacer`) plans every frame and hands you these values, and an animation time in whole
+refreshes.
 
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the

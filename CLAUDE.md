@@ -10,6 +10,8 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
+  - **pacer** (C++ `MB::FramePacing::Pacer`): plans every frame on the display's refreshes with the adaptive swap interval rule
+    (Swappy's, and mb-framepacing-explained's fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
     `MB::FramePacing` with the library version and the tick units and conversions, C# assembly `MB.FramePacing`, Python
     `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
@@ -30,6 +32,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, tick units and conversions, `Rectangle` + tests              |
 | `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker`, vendored qrcodegen, `marker-render` tool, GoogleTest tests                |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
+| `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulation and `pacer-sim` (`tests/`, test code)  |
 | `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote) |
 | `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Rectangle`; .NET Standard 2.1, C# 9, no dependencies) + NUnit tests             |
 | `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                 |
@@ -40,6 +43,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, capture data and analysis output formats                |
 | `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                       |
 | `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
+| `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames from test clips and every scenario's result (`pacer-sim --golden`)       |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
 | `measure/doc/`                                    | Usage, camera, install guides, and the README images (`measure/doc/images`)                                       |
@@ -81,14 +85,14 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     `NOLINTNEXTLINE(<check>)` and a comment line saying why (the MSVC standard library makes `bugprone-exception-escape` report
     allocation failures that are caught).
   - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of every module
-    (`--module core|marker|data` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a
+    (`--module core|marker|data|pacer` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a
     configured build: `sdk/cpp/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
     include paths); `--preset` takes another one. To apply formatting: `clang-format -i` on the files the script lists.
   - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,src,tests}`),
     each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<Module>.hpp>`
     (the umbrella: includes the module's types and declares its functions) and `<mb/framepacing/<module>/<Type>.hpp>`, namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
-COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` leave modules out (no data module: nlohmann/json is never fetched).
+COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
     Each module's tests are their own executable (the marker's allocation test replaces the global `operator new`).
   - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
     pass: shift and combine small unsigned types after casting them to `uint32_t`.
@@ -127,6 +131,21 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
+- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):**
+  - Values in, values out: `FrameInput` (the platform's values) → `FrameSchedule` (what to apply, the marker's pacing values), `FrameEnd`
+    → CPU busy. No platform API, no callbacks, no clock reads; made once (the rule's window), no allocation after that.
+  - `FrameInput`'s optional platform values (vsync, previous display, predicted display, `RefreshPeriodNanoseconds`) use **0 =
+    unknown**, as the marker fields do (agreed with the user over `std::optional`: one convention, plain blittable structs).
+  - **Always valid:** `RefreshPeriod` (1 tick to 1 s, no default: the application gives its display's period) and `PacerSettings`
+    (constructed from the period; setters assert, then clamp). The ranges keep the rule's Q32 arithmetic within 64 bits; nothing
+    downstream sanitizes. A reported period of another nanosecond, or `SetRefreshPeriod` with another period, restarts the pacer.
+  - Integer arithmetic only (periods and grids in 2⁻³² ticks), so the C# pacer (to come) decides alike to the byte.
+  - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the
+    tests only: never part of the library.
+  - Golden data: `python tools/update_pacer_test_data.py` writes the scenarios' frames from the test clips and runs `pacer-sim --golden`;
+    the tests compare every scenario's result byte for byte, and cross-check the clips (`60-busy`: Swappy's rule reproduces the
+    sister repo's swap intervals and refreshes; `60-busy-full-rate`: at a fixed swap interval every frame is on the clip's refresh).
+    Run it after a change to the rule or the planning and review the difference.
 - **Capture data (the default):** a capture decodes every frame's markers live and stores only them, with the timestamps, in
   `captures.mbcd` (`sdk/doc/capture-data-format.md`); the frames themselves (`frames.mbfc`) only with `--keep-frames` / the GUI's "Store
   video frames".
@@ -312,14 +331,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - `.github/dependabot.yml` opens weekly grouped updates for GitHub Actions, NuGet (packages and dotnet tools), npm and pip.
     GoogleTest and nlohmann/json (FetchContent URLs) and qrcodegen (vendored) are updated by hand.
 - **Conan recipe (`sdk/cpp/conan`):**
-  - `recipes/mb-framepacing/all/` holds `conanfile.py` (a component per module; options `with_marker`, `with_data`), `conandata.yml`
+  - `recipes/mb-framepacing/all/` holds `conanfile.py` (a component per module; options `with_marker`, `with_data`, `with_pacer`), `conandata.yml`
     (each version's release archive URL and SHA-256) and `test_package/`; `recipes/mb-framepacing/config.yml` lists the versions. It
     builds the release archive (`package_release.py`), never the checkout.
   - A version is added after its release: `python tools/add_conan_version.py <version>` (reads the release's `SHA256SUMS`), then
     commit. The release workflow tests the new archive through the recipe (`check_conan.py --released`).
   - `tools/check_conan.py` (CI `conan` job, Windows/Ubuntu/macOS) builds the recipe from this checkout's archive, using a copy of
-    `sdk/cpp/conan` as a local-recipes-index remote: `conan test` of the test package with `compiler.cppstd=20`, and a build without
-    the data module.
+    `sdk/cpp/conan` as a local-recipes-index remote: `conan test` of the test package with `compiler.cppstd=20`, and a build with the
+    core and marker modules only.
   - **Every Conan run uses a temporary `CONAN_HOME`**: never touch the user's cache (their global Conan may be another version;
     running a newer one migrates the cache). Conan is pinned in `pyproject.toml`'s dev group.
   - basedpyright excludes `sdk/cpp/conan` (Conan's API is untyped); ruff still checks the recipe. The test package's C++ is formatted
