@@ -68,8 +68,11 @@ jobs:
           # Windows runners have 'python', Linux and macOS 'python3'
           "$(command -v python3 || command -v python)" sdk/marker/cpp/tests/consumer/check_consumers.py
 
+      # A test that runs 5 minutes is hung: the runner ends it and names it. The step's own limit catches a hang after the tests, and
+      # unlike the job's limit it ends the step with its log
       - name: .NET build and tests
-        run: dotnet test mb-framepacing.slnx -c Release
+        timeout-minutes: 20
+        run: dotnet test mb-framepacing.slnx -c Release --blame-hang-timeout 5m
 
       - name: Self-contained tools
         if: startsWith(github.ref, 'refs/tags/tools-v')
