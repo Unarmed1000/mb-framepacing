@@ -279,5 +279,6 @@ The frame timeline card draws the overlapping CPU boxes in further lanes.
 - The frame index counts something other than rendered frames, or restarts without a new run id.
 - The payload built by position in the wrong order: every library takes the fields in the order of the wire format (kind, run id,
   frame index, flags and animation time, then the optional preferred frame time, target frame time, intended display time, CPU start
-  time and CPU busy). Name the optional ones (C# named arguments, Python keywords, C++ designated initializers).
+  time and CPU busy). Name the optional ones where the language can (C# named arguments, Python keywords); in C++ check their order against the
+  constructor.
 - CPU busy not clamped to `u32`.

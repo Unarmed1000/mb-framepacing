@@ -116,7 +116,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
   const int64_t ticks = std::llround(animationSeconds * FM::TicksPerSecond); // the time your animation used
-  FM::GenerateModules({.RunId = runId, .FrameIndex = frameIndex, .AnimationTicks = ticks}, matrix);
+  FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, ticks}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 }
@@ -176,19 +176,13 @@ presents only when something changes writes `FM::OnDemandFrameTicks` for both fr
 
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the
-application side, including frames that took several refreshes or overlap the next one. The payload's fields are in the order of the
-wire format; designated initializers name them:
+application side, including frames that took several refreshes or overlap the next one. The constructor takes the payload's fields
+in the order of the wire format: the kind, run id, frame index, flags and animation time, then the optional timing fields:
 
 ```cpp
-const FM::Payload payload{.RunId = runId,
-                          .FrameIndex = frameIndex,
-                          .Flags = nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None,
-                          .AnimationTicks = ticks,
-                          .PreferredFrameTicks = preferredFrameTicks,
-                          .TargetFrameTicks = targetFrameTicks,
-                          .IntendedDisplayTicks = intendedDisplayTicks,
-                          .CpuStartTicks = cpuStartTicks,
-                          .CpuBusyTicks = cpuBusyTicks};
+// Kind, run id, frame index, flags, animation time; then preferred and target frame time, intended display time, CPU start and busy
+const FM::Payload payload(FM::MarkerKind::Frame, runId, frameIndex, nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None,
+                          ticks, preferredFrameTicks, targetFrameTicks, intendedDisplayTicks, cpuStartTicks, cpuBusyTicks);
 ```
 
 What to write in each field, for typical frame pacers, is in [Filling the marker fields](marker-fields.md).
@@ -199,7 +193,7 @@ and frame index. The analysis flags tearing when the two disagree, and a camera 
 ```cpp
 const FM::Point syncOrigin = FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 2);
 FM::ModuleMatrix sync;
-FM::GenerateModules({.Kind = FM::MarkerKind::Sync, .RunId = runId, .FrameIndex = frameIndex}, sync);
+FM::GenerateModules({FM::MarkerKind::Sync, runId, frameIndex, FM::MarkerFlags::None, 0}, sync);
 const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);
 ```
 
@@ -233,10 +227,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload{.Kind = kind,
-                            .RunId = 7,
-                            .FrameIndex = frameIndex,
-                            .AnimationTicks = std::llround(animationSeconds * FM::TicksPerSecond)};
+  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, std::llround(animationSeconds * FM::TicksPerSecond));
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }

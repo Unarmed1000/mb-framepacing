@@ -9,10 +9,29 @@
 
 namespace MB::FrameMarker
 {
-  //! The data every marker carries, its fields in the order of the wire format (doc/marker-format.md). Only the kind, run id, frame index,
-  //! flags and animation time are always written; the timing fields are optional (0 = unknown).
+  //! The data every marker carries, its fields in the order of the wire format (doc/marker-format.md). The kind, run id, frame index,
+  //! flags and animation time are required; the timing fields are optional (0 = unknown). Trivially copyable and standard layout.
   struct Payload
   {
+    //! An empty payload (a frame marker, everything 0), for decoding into.
+    constexpr Payload() noexcept = default;
+
+    constexpr Payload(const MarkerKind kind, const uint32_t runId, const uint64_t frameIndex, const MarkerFlags flags, const int64_t animationTicks,
+                      const uint32_t preferredFrameTicks = 0, const uint32_t targetFrameTicks = 0, const int64_t intendedDisplayTicks = 0,
+                      const int64_t cpuStartTicks = 0, const uint32_t cpuBusyTicks = 0) noexcept
+      : Kind(kind)
+      , RunId(runId)
+      , FrameIndex(frameIndex)
+      , Flags(flags)
+      , AnimationTicks(animationTicks)
+      , PreferredFrameTicks(preferredFrameTicks)
+      , TargetFrameTicks(targetFrameTicks)
+      , IntendedDisplayTicks(intendedDisplayTicks)
+      , CpuStartTicks(cpuStartTicks)
+      , CpuBusyTicks(cpuBusyTicks)
+    {
+    }
+
     MarkerKind Kind{MarkerKind::Frame};
     //! Identifies one test run. The start marker, every frame marker and the end marker of a run carry the same id.
     uint32_t RunId{0};

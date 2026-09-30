@@ -45,7 +45,7 @@ FM::ModuleMatrix matrix;
 std::array<uint32_t, FM::MaxIndexCount()> indices;
 
 // Every frame, last (after post effects and UI), without blending:
-const FM::Payload payload{.RunId = 1, .FrameIndex = frameIndex, .AnimationTicks = animationTicks};
+const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::None, animationTicks);
 FM::GenerateModules(payload, matrix);                                      // encode once
 const std::size_t count = FM::ModulesToGridIndices(matrix, indices);       // only the indices change
 DrawIndexed(indices.data(), count);      // triangles over the static vertices
