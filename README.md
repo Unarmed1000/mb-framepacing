@@ -115,8 +115,8 @@ It writes pixel aligned triangles straight into your vertex buffer, without allo
 
 ```cpp
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
 namespace FM = MB::FramePacing::Marker;
 
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once

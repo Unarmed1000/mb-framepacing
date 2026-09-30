@@ -7,12 +7,12 @@
 // shown at the first refresh after it is done, and no sooner than its swap interval after the previous one. The vsync timer animates it
 // for the previous frame's display plus its swap interval.
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/pacer/AnimationClock.hpp>
-#include <mb/framepacing/pacer/AnimationTime.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
-#include <mb/framepacing/pacer/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
+#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>

@@ -5,7 +5,7 @@
 
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/SlowDownRule.hpp>
+#include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>

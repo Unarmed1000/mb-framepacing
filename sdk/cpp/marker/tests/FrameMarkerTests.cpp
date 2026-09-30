@@ -3,17 +3,18 @@
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/IndexedCount.hpp>
-#include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <mb/framepacing/marker/MarkerQuad.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/PixelFormat.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
-#include <mb/framepacing/marker/StartMetadata.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/geometry/IndexedCount.hpp>
+#include <mb/framepacing/marker/geometry/MarkerQuad.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormat.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormatUtil.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
+#include <mb/framepacing/marker/payload/MarkerFlags.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/SequenceId.hpp>
+#include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
@@ -323,7 +324,7 @@ TEST(Payload, TryDecodeRejectsBadInput)
   bytes[2] = 2u;
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[2] = 1u;
-  bytes[3] = FM::MaxMarkerKindValue + 1u;
+  bytes[3] = FM::Detail::MaxMarkerKindValue + 1u;
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[3] = 0u;
   EXPECT_TRUE(FM::TryDecodePayload(bytes, decoded));
@@ -489,7 +490,7 @@ TEST(Symbol, SyncMarkersAreVersion2)
 {
   FM::ModuleMatrix matrix;
   ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, 2, 0, 5u, 4}, matrix));
-  EXPECT_EQ(matrix.Size(), FM::SyncQrModuleCount);
+  EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::SyncSize);
   EXPECT_EQ(matrix.Size(), 25);
 
   const FM::Options options{3, 4};
@@ -530,7 +531,7 @@ TEST(Symbol, EveryMarkerIsVersion6)
   FM::SequenceId id;
   ASSERT_TRUE(FM::SequenceId::TryFromText("0123456789abcdef", id));
   ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::None, 2, 0, 5u, 4, 6, 7u}, matrix, {123, id}));
-  EXPECT_EQ(matrix.Size(), FM::QrModuleCount);
+  EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::MainSize);
 
   // Version 6-M holds 106 bytes: the start marker leaves room for future fields
   EXPECT_EQ(FM::Payload::MaxEncodedByteCount, 77u);
@@ -658,8 +659,8 @@ TEST(Symbol, FinderPatternsArePresent)
   }
   EXPECT_FALSE(matrix.IsDark(1, 1));
   EXPECT_TRUE(matrix.IsDark(3, 3));
-  EXPECT_TRUE(matrix.IsDark(FM::QrModuleCount - 1, 0));
-  EXPECT_TRUE(matrix.IsDark(0, FM::QrModuleCount - 1));
+  EXPECT_TRUE(matrix.IsDark(FM::ModuleMatrix::MainSize - 1, 0));
+  EXPECT_TRUE(matrix.IsDark(0, FM::ModuleMatrix::MainSize - 1));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -925,13 +926,13 @@ TEST(Sizing, RecommendedOrigins)
 {
   const FM::Options options{};
   // The main marker top-left, the sync marker bottom-left
-  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080), (FP::Point{32, 32}));
-  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::SequenceStart, 1920, 1080), (FP::Point{32, 32}));
-  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080), (FP::Point{32, 1080 - 32 - 198}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Frame, 1080), (FP::Point{32, 32}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::SequenceStart, 1080), (FP::Point{32, 32}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Sync, 1080), (FP::Point{32, 1080 - 32 - 198}));
   // Aligned to a 3:1 downscale ratio
-  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 3), (FP::Point{33, 33}));
-  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, 3), (FP::Point{33, 849}));
-  static_assert(FM::Options{}.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 4) == FP::Point{32, 32});
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Frame, 1080, 3), (FP::Point{33, 33}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Sync, 1080, 3), (FP::Point{33, 849}));
+  static_assert(FM::Options{}.RecommendedOrigin(FM::MarkerKind::Frame, 1080, 4) == FP::Point{32, 32});
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -956,8 +957,8 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
       }
     }
   }
-  EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(FM::QrModuleCount), 211u);
-  EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(FM::SyncQrModuleCount), 79u);
+  EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(FM::ModuleMatrix::MainSize), 211u);
+  EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(FM::ModuleMatrix::SyncSize), 79u);
 }
 
 TEST(ModuleMatrix, TryFromBitsTakesQrSizesAndIgnoresThePadding)
@@ -1030,7 +1031,7 @@ TEST(Bitmap, EqualsTheRasterizedQuadsInEveryPixelFormat)
 
     for (const FM::PixelFormat format : {FM::PixelFormat::R8, FM::PixelFormat::R8G8B8, FM::PixelFormat::R8G8B8A8})
     {
-      const auto bytesPerPixel = static_cast<std::size_t>(FM::BytesPerPixel(format));
+      const auto bytesPerPixel = static_cast<std::size_t>(FM::PixelFormatUtil::BytesPerPixel(format));
       const std::size_t stride = (static_cast<std::size_t>(Width) * bytesPerPixel) + 5u;    // padded rows
       std::vector<uint8_t> pixels(stride * static_cast<std::size_t>(Height), 128u);
       ASSERT_TRUE(FM::ModulesToBitmap(matrix, testCase.Options, testCase.Origin, pixels, Width, Height, format, stride));
@@ -1096,9 +1097,9 @@ TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
 
 TEST(Bitmap, BytesPerPixel)
 {
-  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::R8), 1);
-  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::R8G8B8), 3);
-  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::R8G8B8A8), 4);
+  EXPECT_EQ(FM::PixelFormatUtil::BytesPerPixel(FM::PixelFormat::R8), 1);
+  EXPECT_EQ(FM::PixelFormatUtil::BytesPerPixel(FM::PixelFormat::R8G8B8), 3);
+  EXPECT_EQ(FM::PixelFormatUtil::BytesPerPixel(FM::PixelFormat::R8G8B8A8), 4);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------

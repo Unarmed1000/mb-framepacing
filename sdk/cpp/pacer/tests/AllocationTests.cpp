@@ -4,13 +4,13 @@
 // The pacer runs every frame, so it must never allocate after it is made. This test binary replaces the global operator new/delete with
 // counting versions and checks that every per-frame call stays at zero allocations.
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/pacer/AnimationClock.hpp>
-#include <mb/framepacing/pacer/FrameInput.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
-#include <mb/framepacing/pacer/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/SlowDownRule.hpp>
+#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
+#include <mb/framepacing/pacer/frame/FrameInput.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <atomic>

@@ -64,16 +64,16 @@ likewise, only for the tests.
 ```cpp
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 // Once: output 1920x1080, capture stored at 960x540 (2:1)
 const auto options = FM::Options::Recommended(1080, 540);   // 6 px modules, the recommended quiet zone
-const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, /*alignPx*/ 2);
+const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080, /*alignPx*/ 2);
 std::array<FM::Vertex, FM::MaxGridVertexCount()> grid;
 const std::size_t gridCount = FM::GridVertices(FM::MarkerKind::Frame, options, origin, grid);
 UploadVertices(grid.data(), gridCount);   // your renderer: a static vertex buffer, (X, Y) in pixels, color (Luma, Luma, Luma)
@@ -118,10 +118,10 @@ In `MB::FramePacing::Marker`: the functions in `<mb/framepacing/marker/FrameMark
 | `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                                     | Size and place: always valid (a value outside its range asserts, else is clamped)    |
 | `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                                 | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
 | `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                              | A static grid uploaded once, and per frame only the indices                          |
-| `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                                            | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil::BytesPerPixel`                                                           | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
 | `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark)              | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
 | `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix::MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
-| `QrModuleCountFor`                                                                                                           | Modules per side of a kind's symbol                                                  |
+| `ModuleMatrix::SizeFor`, `MainSize`, `SyncSize`                                                                              | Modules per side of a kind's symbol                                                  |
 | `EncodePayload`, `TryDecodePayload`                                                                                          | The wire format                                                                      |
 
 Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the matrix is empty or a buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
@@ -129,12 +129,11 @@ Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false)
 ## The data
 
 ```cpp
-#include <mb/framepacing/data/AnalysisFiles.hpp>
-#include <mb/framepacing/data/AnalysisSummary.hpp>
-#include <mb/framepacing/data/CaptureDataReader.hpp>
-#include <mb/framepacing/data/Constants.hpp>
-#include <mb/framepacing/data/FramesCsv.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
+#include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
+#include <mb/framepacing/data/capture/CaptureDataReader.hpp>
+#include <mb/framepacing/data/analysis/FramesCsv.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
 namespace FD = MB::FramePacing::Data;
 
 const auto analysis = FD::FindAnalysis(captureFolder);   // the capture folder's analysis folder (or the folder itself)
@@ -151,7 +150,7 @@ for (const FD::SummaryRun& run : summary.Runs)
   }
 }
 
-FD::CaptureDataReader reader(captureFolder / FD::CaptureDataFileName);
+FD::CaptureDataReader reader(captureFolder / FD::CaptureDataReader::FileName);
 for (const FD::CaptureDataRecord& record : reader.ReadAll())
 {
   MB::FramePacing::Marker::Payload payload;
@@ -170,7 +169,7 @@ each group of functions in its own header (`<mb/framepacing/data/…>`: `Analysi
 | Function or type                                                            | What it does                                                       |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`               | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...) |
-| `CaptureDataStatus`, `MarkerLocation`, `UnknownTicks`                       | A record's status, where the markers are, a missing device time    |
+| `CaptureDataStatus`, `MarkerLocation`, `CaptureDataRecord::UnknownTicks`    | A record's status, where the markers are, a missing device time    |
 | `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs | `summary.json` (capture.json inside it as JSON text)               |
 | `ReadFrames`, `FrameRow`                                                    | A run's frames CSV, by column name                                 |
 | `ReadCaptures`, `CaptureCsvRow`                                             | `captures.csv`, by column name                                     |
@@ -179,7 +178,7 @@ each group of functions in its own header (`<mb/framepacing/data/…>`: `Analysi
 ## The pacer
 
 ```cpp
-#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 namespace PC = MB::FramePacing::Pacer;

@@ -12,14 +12,14 @@
 //   marker-render --golden <directory>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/PixelFormat.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
-#include <mb/framepacing/marker/StartMetadata.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormat.hpp>
+#include <mb/framepacing/marker/payload/MarkerFlags.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/SequenceId.hpp>
+#include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <algorithm>
 #include <array>
 #include <charconv>

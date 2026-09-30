@@ -6,17 +6,18 @@
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/IndexedCount.hpp>
-#include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <mb/framepacing/marker/MarkerQuad.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/PixelFormat.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
-#include <mb/framepacing/marker/StartMetadata.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/geometry/IndexedCount.hpp>
+#include <mb/framepacing/marker/geometry/MarkerQuad.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormat.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormatUtil.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
+#include <mb/framepacing/marker/payload/MarkerFlags.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/SequenceId.hpp>
+#include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -74,7 +75,7 @@ namespace MB::FramePacing::Marker
     constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(QrVersion);
 
     static_assert(Payload::MaxEncodedByteCount <= QrBufferLength);
-    static_assert(QrModuleCount == 41);
+    static_assert(ModuleMatrix::MainSize == 41);
     static_assert(MaxQuadCount() == 862u);
     static_assert(MaxTriangleVertexCount() == std::size_t{862} * 6u);
 
@@ -406,7 +407,7 @@ namespace MB::FramePacing::Marker
     {
       return 0;
     }
-    const int32_t modules = QrModuleCountFor(kind);
+    const int32_t modules = ModuleMatrix::SizeFor(kind);
     const int32_t moduleSize = options.ModuleSizePx();
     const int32_t markerSize = options.MarkerSizePx(kind);
     dst[0] = Vertex{origin.X, origin.Y, 255u};
@@ -469,7 +470,7 @@ namespace MB::FramePacing::Marker
     {
       return false;
     }
-    const auto bytesPerPixel = static_cast<std::size_t>(BytesPerPixel(format));
+    const auto bytesPerPixel = static_cast<std::size_t>(PixelFormatUtil::BytesPerPixel(format));
     const std::size_t rowBytes = static_cast<std::size_t>(width) * bytesPerPixel;
     const std::size_t rowStride = stride == 0 ? rowBytes : stride;
     const std::size_t required = height == 0 ? 0u : (rowStride * static_cast<std::size_t>(height - 1)) + rowBytes;

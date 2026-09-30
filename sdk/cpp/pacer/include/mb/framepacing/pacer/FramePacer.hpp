@@ -3,13 +3,13 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/pacer/FrameEnd.hpp>
-#include <mb/framepacing/pacer/FrameInput.hpp>
-#include <mb/framepacing/pacer/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/SwapIntervalRule.hpp>
-#include <mb/framepacing/pacer/WindowState.hpp>
+#include <mb/framepacing/pacer/frame/FrameEnd.hpp>
+#include <mb/framepacing/pacer/frame/FrameInput.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
+#include <mb/framepacing/pacer/rule/WindowState.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer

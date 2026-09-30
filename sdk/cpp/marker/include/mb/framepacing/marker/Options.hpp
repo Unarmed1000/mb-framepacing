@@ -5,6 +5,7 @@
 
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -76,16 +77,14 @@ namespace MB::FramePacing::Marker
     //! smaller.
     [[nodiscard]] constexpr int32_t MarkerSizePx(const MarkerKind kind = MarkerKind::Frame) const noexcept
     {
-      return (QrModuleCountFor(kind) + (2 * m_quietZoneModules)) * m_moduleSizePx;
+      return (ModuleMatrix::SizeFor(kind) + (2 * m_quietZoneModules)) * m_moduleSizePx;
     }
 
-    //! Recommended origin of a marker in a sourceWidth x sourceHeight output: the main marker (frame, start and end) top-left, the sync
-    //! marker bottom-left, RecommendedInsetPx from the edges. alignPx should be the capture's integer downscale ratio (1 if none) so module
-    //! edges land on stored pixel edges.
-    [[nodiscard]] constexpr Point RecommendedOrigin(const MarkerKind kind, const int32_t sourceWidth, const int32_t sourceHeight,
-                                                    const int32_t alignPx = 1) const noexcept
+    //! Recommended origin of a marker in an output sourceHeight pixels high: the main marker (frame, start and end) top-left, the sync
+    //! marker bottom-left, RecommendedInsetPx from the edges (both on the left edge, so the output's width does not matter). alignPx
+    //! should be the capture's integer downscale ratio (1 if none) so module edges land on stored pixel edges.
+    [[nodiscard]] constexpr Point RecommendedOrigin(const MarkerKind kind, const int32_t sourceHeight, const int32_t alignPx = 1) const noexcept
     {
-      (void)sourceWidth;
       const int32_t inset = AlignUp(RecommendedInsetPx, alignPx);
       if (kind == MarkerKind::Sync)
       {

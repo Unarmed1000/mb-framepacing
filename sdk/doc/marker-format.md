@@ -306,7 +306,7 @@ multiple of the downscale ratio.
 the main marker. Optional for a capture card, where it checks tearing: when the two markers show different frames, the analyzer flags the
 capture as _torn_ and uses the main marker for timing. Required for camera capture.
 
-`options.RecommendedOrigin(kind, sourceWidth, sourceHeight, alignPx)` (`MB::FramePacing::Marker::Options`) returns these positions: bottom-left for
+`options.RecommendedOrigin(kind, sourceHeight, alignPx)` (`MB::FramePacing::Marker::Options`) returns these positions: bottom-left for
 `MarkerKind::Sync`, top-left for every other kind.
 
 ## Example (C++)
@@ -314,15 +314,15 @@ capture as _torn_ and uses the main marker for timing. Required for camera captu
 ```cpp
 #include <mb/framepacing/core/time/ChronoConversion.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
-#include <mb/framepacing/marker/StartMetadata.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/SequenceId.hpp>
+#include <mb/framepacing/marker/payload/StartMetadata.hpp>
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 // Once: 1080p output captured and stored at 540p (2:1)
 const auto options = FM::Options::Recommended(1080, 540);   // 6 px
-const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 2);
+const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080, 2);
 
 FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;

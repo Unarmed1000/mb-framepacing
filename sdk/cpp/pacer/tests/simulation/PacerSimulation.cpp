@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "PacerSimulation.hpp"
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/pacer/AnimationClock.hpp>
-#include <mb/framepacing/pacer/AnimationTime.hpp>
-#include <mb/framepacing/pacer/FrameEnd.hpp>
-#include <mb/framepacing/pacer/FrameInput.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
-#include <mb/framepacing/pacer/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
+#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
+#include <mb/framepacing/pacer/frame/FrameEnd.hpp>
+#include <mb/framepacing/pacer/frame/FrameInput.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>

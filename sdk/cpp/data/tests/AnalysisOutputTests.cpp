@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // summary.json and the CSVs: the format version, columns by name, whole ticks.
-#include <mb/framepacing/data/AnalysisFiles.hpp>
-#include <mb/framepacing/data/AnalysisSummary.hpp>
-#include <mb/framepacing/data/CapturesCsv.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
-#include <mb/framepacing/data/FramesCsv.hpp>
-#include <mb/framepacing/data/Milliseconds.hpp>
+#include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
+#include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
+#include <mb/framepacing/data/analysis/CapturesCsv.hpp>
+#include <mb/framepacing/data/analysis/FramesCsv.hpp>
+#include <mb/framepacing/data/analysis/Milliseconds.hpp>
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>

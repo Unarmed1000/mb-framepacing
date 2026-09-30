@@ -9,7 +9,7 @@
 // shows it). pacer-sim writes the golden results with it (sdk/test-data/pacer); the C++ and C# tests compare with them.
 
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/pacer/SlowDownRule.hpp>
+#include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <filesystem>
 #include <string>
 #include <string_view>

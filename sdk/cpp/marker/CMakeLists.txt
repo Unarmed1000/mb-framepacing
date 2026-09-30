@@ -17,17 +17,18 @@ target_sources(mb_framepacing_marker
     BASE_DIRS include
     FILES
       include/mb/framepacing/marker/FrameMarker.hpp
-      include/mb/framepacing/marker/IndexedCount.hpp
-      include/mb/framepacing/marker/MarkerFlags.hpp
+      include/mb/framepacing/marker/geometry/IndexedCount.hpp
+      include/mb/framepacing/marker/payload/MarkerFlags.hpp
       include/mb/framepacing/marker/MarkerKind.hpp
-      include/mb/framepacing/marker/ModuleMatrix.hpp
+      include/mb/framepacing/marker/geometry/ModuleMatrix.hpp
       include/mb/framepacing/marker/Options.hpp
-      include/mb/framepacing/marker/Payload.hpp
-      include/mb/framepacing/marker/PixelFormat.hpp
-      include/mb/framepacing/marker/MarkerQuad.hpp
-      include/mb/framepacing/marker/SequenceId.hpp
-      include/mb/framepacing/marker/StartMetadata.hpp
-      include/mb/framepacing/marker/Vertex.hpp)
+      include/mb/framepacing/marker/payload/Payload.hpp
+      include/mb/framepacing/marker/geometry/PixelFormat.hpp
+      include/mb/framepacing/marker/geometry/PixelFormatUtil.hpp
+      include/mb/framepacing/marker/geometry/MarkerQuad.hpp
+      include/mb/framepacing/marker/payload/SequenceId.hpp
+      include/mb/framepacing/marker/payload/StartMetadata.hpp
+      include/mb/framepacing/marker/geometry/Vertex.hpp)
 target_compile_features(mb_framepacing_marker PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_marker PUBLIC mb_framepacing::core)
 target_include_directories(mb_framepacing_marker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/qrcodegen)

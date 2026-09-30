@@ -3,14 +3,14 @@
 // The golden data (test-data/data): this library reads what digest.json says, the same values as the C# and Python libraries. The digest
 // is computed as sdk/csharp/data/UnitTest/source/DataDigest.cs does: counts and sums of what a reader reads from every file.
 #include <mb/framepacing/core/Rectangle.hpp>
-#include <mb/framepacing/data/AnalysisSummary.hpp>
-#include <mb/framepacing/data/CaptureDataReader.hpp>
-#include <mb/framepacing/data/CaptureDataStatus.hpp>
-#include <mb/framepacing/data/CapturesCsv.hpp>
-#include <mb/framepacing/data/Constants.hpp>
-#include <mb/framepacing/data/FrameRow.hpp>
-#include <mb/framepacing/data/FramesCsv.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
+#include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
+#include <mb/framepacing/data/analysis/CapturesCsv.hpp>
+#include <mb/framepacing/data/analysis/FrameRow.hpp>
+#include <mb/framepacing/data/analysis/FramesCsv.hpp>
+#include <mb/framepacing/data/capture/CaptureDataReader.hpp>
+#include <mb/framepacing/data/capture/CaptureDataStatus.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <filesystem>
@@ -318,7 +318,7 @@ TEST(GoldenData, TheDigestMatchesTheCSharpLibrary)
     frames.push_back(Frames(analysis / run.FramesFile));
   }
   const Json digest = {
-    {"captureData", CaptureData(*clip / FD::CaptureDataFileName)},
+    {"captureData", CaptureData(*clip / FD::CaptureDataReader::FileName)},
     {"summary", Summary(summary)},
     {"frames", frames},
     {"captures", Captures(analysis / FD::CapturesFileName)},

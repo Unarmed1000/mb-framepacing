@@ -77,7 +77,7 @@ The remote holds recipes only, no prebuilt binaries, and the library needs C++20
 What your project gets:
 
 - A static library target per module in every way above: **`mb_framepacing::marker`** for the marker (it links
-  `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. Each type has its own header (`<mb/framepacing/marker/Payload.hpp>`,
+  `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. Each type has its own header (`<mb/framepacing/marker/payload/Payload.hpp>`,
   `<mb/framepacing/core/time/TimeSpan.hpp>`, ...) and the marker's functions are in `<mb/framepacing/marker/FrameMarker.hpp>`.
 - When the library is not the top-level project, its tests, tools and warnings-as-errors are off, so GoogleTest is never downloaded.
   The options, if you want to change them:
@@ -111,7 +111,7 @@ namespace FM = MB::FramePacing::Marker;
 
 // Output 1920x1080, capture stored at 960x540 (2:1)
 const auto options = FM::Options::Recommended(1080, 540);                                  // 6 px modules
-const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, /*alignPx*/ 2); // (32, 32)
+const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080, /*alignPx*/ 2); // (32, 32)
 ```
 
 ## 3. Draw it every frame
@@ -203,7 +203,7 @@ What to write in each field, for typical frame pacers, is in [Filling the marker
 and frame index. The analysis flags tearing when the two disagree, and a camera filming the screen times the frames by it:
 
 ```cpp
-const FP::Point syncOrigin = options.RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, 2);
+const FP::Point syncOrigin = options.RecommendedOrigin(FM::MarkerKind::Sync, 1080, 2);
 FM::ModuleMatrix sync;
 FM::GenerateModules({FM::MarkerKind::Sync, runId, frameIndex, FM::MarkerFlags::None, 0}, sync);
 const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);

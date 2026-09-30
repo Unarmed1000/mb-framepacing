@@ -19,7 +19,7 @@ names are the same (`FrameInput`'s optional values are constructor parameters, t
 ## The frame loop
 
 ```cpp
-#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 namespace FP = MB::FramePacing;

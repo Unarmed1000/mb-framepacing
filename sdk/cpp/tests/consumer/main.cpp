@@ -6,18 +6,18 @@
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/data/Milliseconds.hpp>
+#include <mb/framepacing/data/analysis/Milliseconds.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
+#include <mb/framepacing/marker/payload/MarkerFlags.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
-#include <mb/framepacing/pacer/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <array>
 #include <cstdio>
 #include <string_view>
@@ -32,7 +32,7 @@ int main()
   const PC::FrameSchedule schedule = pacer.BeginFrame({FP::TimeSpan::TicksPerSecond});
   std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices{};
   const FM::Options options{};
-  const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080);
+  const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080);
   FM::ModuleMatrix matrix;
   const FM::Payload payload{FM::MarkerKind::Frame,         1u,
                             schedule.FrameIndex,           FM::MarkerFlags::None,

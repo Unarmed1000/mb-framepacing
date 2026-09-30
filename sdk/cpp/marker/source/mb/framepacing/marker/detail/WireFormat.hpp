@@ -6,13 +6,24 @@
 // Private to the marker module: the payload's wire format (doc/marker-format.md, the reference; C# must match it byte for byte). Only
 // the encoder, the decoder and the tests use it.
 
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
+#include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/SequenceId.hpp>
 #include <cstddef>
 #include <cstdint>
 
 namespace MB::FramePacing::Marker::Detail
 {
+  //! Every main marker (frame, start and end) is QR version 6 (41x41 modules), ECC level M, byte mode, so it never changes size; the
+  //! sync marker is QR version 2 (25x25 modules), ECC level M.
+  inline constexpr int32_t QrVersion = 6;
+  inline constexpr int32_t SyncQrVersion = 2;
+  static_assert((4 * QrVersion) + 17 == ModuleMatrix::MainSize && (4 * SyncQrVersion) + 17 == ModuleMatrix::SyncSize);
+
+  //! The highest kind byte a payload may carry.
+  inline constexpr uint8_t MaxMarkerKindValue = static_cast<uint8_t>(MarkerKind::Sync);
+
   //! QR version 6-M in byte mode holds 106 bytes: a frame or end marker uses PayloadByteCount of them, a start marker
   //! StartPayloadByteCount; the rest is room for future fields.
   inline constexpr std::size_t QrCapacityBytes = 106;

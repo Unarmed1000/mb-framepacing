@@ -7,16 +7,16 @@
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <mb/framepacing/marker/MarkerQuad.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/PixelFormat.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
-#include <mb/framepacing/marker/StartMetadata.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/geometry/MarkerQuad.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormat.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
+#include <mb/framepacing/marker/payload/MarkerFlags.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/SequenceId.hpp>
+#include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <gtest/gtest.h>
 #include <array>
 #include <atomic>
@@ -159,7 +159,7 @@ TEST(Allocations, CountingWorks)
 TEST(Allocations, GeneratingMarkersDoesNotAllocate)
 {
   const FM::Options options{};
-  const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 2);
+  const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080, 2);
   FM::StartMetadata metadata{int64_t{621'355'968'000'000'000}, {}};
 
   std::size_t written = 0;

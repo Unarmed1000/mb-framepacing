@@ -11,15 +11,15 @@
 // Every quad edge lies on an integer pixel edge and a quad covers exactly the pixels [Left(),Right()) x [Top(),Bottom()).
 
 #include <mb/framepacing/core/Point.hpp>
-#include <mb/framepacing/marker/IndexedCount.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <mb/framepacing/marker/MarkerQuad.hpp>
-#include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
-#include <mb/framepacing/marker/Payload.hpp>
-#include <mb/framepacing/marker/PixelFormat.hpp>
-#include <mb/framepacing/marker/StartMetadata.hpp>
-#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/marker/geometry/IndexedCount.hpp>
+#include <mb/framepacing/marker/geometry/MarkerQuad.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormat.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
+#include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -29,7 +29,7 @@ namespace MB::FramePacing::Marker
   //! Upper bound on the number of quads for any marker: one background quad plus at most one quad per dark run.
   constexpr std::size_t MaxQuadCount() noexcept
   {
-    return 1u + (static_cast<std::size_t>(QrModuleCount) * ((static_cast<std::size_t>(QrModuleCount) + 1u) / 2u));
+    return 1u + (static_cast<std::size_t>(ModuleMatrix::MainSize) * ((static_cast<std::size_t>(ModuleMatrix::MainSize) + 1u) / 2u));
   }
 
   constexpr std::size_t MaxTriangleVertexCount() noexcept
@@ -51,7 +51,7 @@ namespace MB::FramePacing::Marker
   //! main marker, 680 for the sync marker; both fit 16-bit indices.
   constexpr std::size_t GridVertexCount(const MarkerKind kind) noexcept
   {
-    const auto corners = static_cast<std::size_t>(QrModuleCountFor(kind)) + 1u;
+    const auto corners = static_cast<std::size_t>(ModuleMatrix::SizeFor(kind)) + 1u;
     return 4u + (corners * corners);
   }
 
@@ -103,23 +103,8 @@ namespace MB::FramePacing::Marker
   //! Returns the number of indices written, or 0 if the matrix is empty or dst is too small.
   std::size_t ModulesToGridIndices(const ModuleMatrix& matrix, std::span<uint32_t> dst, uint32_t baseVertex = 0) noexcept;
 
-  //! Bytes per pixel of a PixelFormat.
-  constexpr int32_t BytesPerPixel(const PixelFormat format) noexcept
-  {
-    switch (format)
-    {
-    case PixelFormat::R8G8B8:
-      return 3;
-    case PixelFormat::R8G8B8A8:
-      return 4;
-    case PixelFormat::R8:
-      break;
-    }
-    return 1;
-  }
-
-  //! Draw the marker into a width x height pixel buffer, rows stride bytes apart (0 = width x BytesPerPixel(format)): the light background
-  //! (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in every colour channel and alpha 255. The marker is clipped to
+  //! Draw the marker into a width x height pixel buffer, rows stride bytes apart (0 = width x PixelFormatUtil::BytesPerPixel(format)): the light
+  //! background (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in every colour channel and alpha 255. The marker is clipped to
   //! the buffer; other pixels are left as they are. With a module size of 1 and origin (0,0) this is a module-resolution image (a texture to
   //! scale up with point filtering). Does not allocate.
   //! Returns false, writing nothing, if the matrix is empty, the stride is shorter than a row or dst is too small.

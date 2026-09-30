@@ -4,17 +4,17 @@
 // The pacer module: the refresh period's exact arithmetic, the swap interval rule's decisions at their edges, the pacer's planning (the
 // grid, the inferred and reported display, vsync and predicted times, pauses) and the animation clock (catch-up, pause, no drift).
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/pacer/AnimationClock.hpp>
-#include <mb/framepacing/pacer/AnimationTime.hpp>
-#include <mb/framepacing/pacer/FrameInput.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
-#include <mb/framepacing/pacer/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/SlowDownRule.hpp>
-#include <mb/framepacing/pacer/SwapIntervalChange.hpp>
-#include <mb/framepacing/pacer/SwapIntervalRule.hpp>
-#include <mb/framepacing/pacer/WindowState.hpp>
+#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
+#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
+#include <mb/framepacing/pacer/frame/FrameInput.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
+#include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
+#include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
+#include <mb/framepacing/pacer/rule/WindowState.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
