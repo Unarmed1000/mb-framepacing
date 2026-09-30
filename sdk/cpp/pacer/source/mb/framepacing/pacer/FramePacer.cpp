@@ -68,9 +68,17 @@ namespace MB::FramePacing::Pacer
           displayTicks = input.PreviousDisplayTicks;
           Anchor(input.PreviousDisplayTicks, displayed);
         }
-        else
+        else if (IsNearGrid(m_presentTicks))
         {
           displayed = std::max(m_targetSlot, SlotAtOrAfter(m_presentTicks + Settings().PresentLatencyTicks()));
+          displayTicks = SlotTicks(displayed);
+          MoveOrigin(displayed);
+        }
+        else
+        {
+          // Its Present is unknown (0, another clock's time) or long ago (no EndFrame before a long pause): no refresh can be computed
+          // from it this far from the grid, so it counts as shown at its target
+          displayed = m_targetSlot;
           displayTicks = SlotTicks(displayed);
           MoveOrigin(displayed);
         }
@@ -125,7 +133,8 @@ namespace MB::FramePacing::Pacer
     {
       return 0;
     }
-    const int64_t busy = std::max(end.PresentTicks - m_cpuStartTicks, int64_t{0});
+    // A present time far from the grid is unknown (0, another clock's time): so is the CPU busy time
+    const int64_t busy = IsNearGrid(end.PresentTicks) ? std::max(end.PresentTicks - m_cpuStartTicks, int64_t{0}) : 0;
     m_presentTicks = end.PresentTicks;
     m_workTicks = end.WorkTicks > 0 ? end.WorkTicks : busy;
     m_frameEnded = true;

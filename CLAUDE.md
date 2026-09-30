@@ -134,7 +134,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
-- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):**
+- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):** the C++ module is off (`MB_FRAMEPACING_BUILD_PACER` and Conan's
+  `with_pacer` default to off) until it is reworked; build it with `-DMB_FRAMEPACING_BUILD_PACER=ON` to work on it.
   - Values in, values out: `FrameInput` (the platform's values) → `FrameSchedule` (what to apply, the marker's pacing values), `FrameEnd`
     → CPU busy. No platform API, no callbacks, no clock reads; made once (the rule's window), no allocation after that.
   - `FrameInput`'s optional platform values (vsync, previous display, predicted display, `RefreshPeriodNanoseconds`) use **0 =

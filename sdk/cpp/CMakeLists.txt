@@ -42,7 +42,8 @@ project(mb_framepacing VERSION ${MB_FRAMEPACING_VERSION_NUMBERS} DESCRIPTION "Th
 # project, so engines that add_subdirectory/FetchContent the library never download GoogleTest.
 option(MB_FRAMEPACING_BUILD_MARKER "Build the marker module (mb_framepacing::marker)" ON)
 option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; needs the marker module, fetches nlohmann/json unless one is installed)" ON)
-option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer)" ON)
+# The pacer is off until it is reworked (its time inputs and the Q32 grid need to be made right first)
+option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer); off until it is reworked" OFF)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})

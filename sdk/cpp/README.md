@@ -8,7 +8,7 @@ own static library target, like Boost's and Poco's.
 | `core`   | `mb_framepacing::core`   | `<mb/framepacing/core/…>`   | What every module shares: the library version, the time types, `Point`, `Rectangle`         |
 | `marker` | `mb_framepacing::marker` | `<mb/framepacing/marker/…>` | Draws the frame marker into every frame of an application; no dependencies, no allocations  |
 | `data`   | `mb_framepacing::data`   | `<mb/framepacing/data/…>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json |
-| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/pacer/…>`  | Plans frames on the display's refreshes and adapts the swap interval; uses only the core    |
+| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/pacer/…>`  | Off until it is reworked (`MB_FRAMEPACING_BUILD_PACER`): plans frames on the refreshes      |
 
 No header includes a whole module: include the header of each type you use (one type per header) and the header of the functions
 (`marker/FrameMarker.hpp`, `data/FramesCsv.hpp`, ...).
@@ -51,7 +51,7 @@ Or git (`GIT_TAG sdk-v0.1.0`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of th
 | ----------------------------------- | ---------------------------------------------------------------------- |
 | `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                     |
 | `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched |
-| `MB_FRAMEPACING_BUILD_PACER`        | on                                                                     |
+| `MB_FRAMEPACING_BUILD_PACER`        | off (the pacer is off until it is reworked)                            |
 | `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                      |
 | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                               |
 | `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                 |
@@ -176,6 +176,8 @@ each group of functions in its own header (`<mb/framepacing/data/…>`: `Analysi
 | `FindAnalysis`, `FramesFileName`, `ParseTicks`, the file name constants     | The analysis folder, the file names, the CSV time format           |
 
 ## The pacer
+
+The pacer module is off (`MB_FRAMEPACING_BUILD_PACER` defaults to `OFF`, Conan's `with_pacer` to `False`) until it is reworked.
 
 ```cpp
 #include <mb/framepacing/pacer/animation/AnimationClock.hpp>

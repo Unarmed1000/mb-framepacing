@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Conan recipe for mb_framepacing, the C++20 library of the mb-framepacing SDK: it builds the C++ release archive of the sdk-v<version>
 tag (conandata.yml has its URL and SHA-256). Every module is a component (mb_framepacing::core, ::marker, ::data, ::pacer); with_marker,
-with_data and with_pacer leave modules out. Laid out as conan-center-index recipes are, so the same folder can go there."""
+with_data leaves a module out; with_pacer (off by default: the pacer is off until it is reworked) adds one. Laid out as conan-center-index recipes are, so the same folder can go there."""
 
 import os
 
@@ -29,7 +29,7 @@ class MbFramePacingConan(ConanFile):
     package_type = "static-library"
     settings = "os", "arch", "compiler", "build_type"
     options = {"fPIC": [True, False], "with_marker": [True, False], "with_data": [True, False], "with_pacer": [True, False]}
-    default_options = {"fPIC": True, "with_marker": True, "with_data": True, "with_pacer": True}
+    default_options = {"fPIC": True, "with_marker": True, "with_data": True, "with_pacer": False}
     implements = ["auto_shared_fpic"]
 
     def layout(self):

@@ -1,5 +1,7 @@
 # The frame pacer
 
+> The C++ pacer module is off (`MB_FRAMEPACING_BUILD_PACER` defaults to `OFF`) until it is reworked.
+
 The pacer module plans every frame on the display's grid of refreshes and adapts the **swap interval** (how many refreshes each frame
 stays on screen) to how long the frames take. It hands the application what to apply and what to write into the frame marker: the
 intended display time, the target and preferred frame time and the CPU start time. `AnimationClock` gives each frame the animation

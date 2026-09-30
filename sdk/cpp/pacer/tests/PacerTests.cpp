@@ -526,6 +526,37 @@ TEST(FramePacer, ALongPauseStartsANewGrid)
   EXPECT_EQ(pacer.Window().Frames, 0u);
 }
 
+TEST(FramePacer, ALongPauseWithoutEndFrameStartsANewGrid)
+{
+  // The frame before the pause is taken as presented at the next BeginFrame, 10 minutes later: far beyond the refreshes the grid's
+  // fixed point reaches, so it counts as shown at its target
+  PC::FramePacer pacer(Settings());
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
+  (void)pacer.BeginFrame({start});
+  const int64_t resumed = start + (600 * FP::TimeSpan::TicksPerSecond) + 777;
+  const PC::FrameSchedule next = pacer.BeginFrame({resumed});
+  EXPECT_EQ(next.IntendedDisplayTicks, resumed + 166'667);
+  EXPECT_EQ(pacer.Window().Frames, 0u);
+}
+
+TEST(FramePacer, APresentTimeFarFromTheGridIsUnknown)
+{
+  // 0 (the unknown value of the other time fields) or nanoseconds instead of ticks: no CPU busy time, and the frame counts as shown at
+  // its target
+  for (const int64_t present : {int64_t{0}, int64_t{3'600} * FP::TimeSpan::TicksPerSecond * 100})
+  {
+    PC::FramePacer pacer(Settings());
+    const int64_t start = 3'600 * FP::TimeSpan::TicksPerSecond;
+    const PC::FrameSchedule first = pacer.BeginFrame({start});
+    EXPECT_EQ(pacer.EndFrame({present}), 0u) << present;
+    const PC::FrameSchedule next = pacer.BeginFrame({start + (2 * Ms)});
+    // The next refresh: 166'666.67 ticks later on the exact grid, each end rounded to a tick (166'666 or 166'667)
+    EXPECT_NEAR(static_cast<double>(next.IntendedDisplayTicks - first.IntendedDisplayTicks), 166'666.67, 1.0) << present;
+    EXPECT_EQ(pacer.Window().Frames, 1u) << present;
+    EXPECT_EQ(pacer.Window().LateFrames, 0u) << present;
+  }
+}
+
 TEST(FramePacer, ANewRefreshPeriodStartsAgainAtThePreferredInterval)
 {
   PC::FramePacer pacer(Settings());
