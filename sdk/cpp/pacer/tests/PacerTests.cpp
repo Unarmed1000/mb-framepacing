@@ -3,7 +3,18 @@
 //
 // The pacer module: the refresh period's exact arithmetic, the swap interval rule's decisions at their edges, the pacer's planning (the
 // grid, the inferred and reported display, vsync and predicted times, pauses) and the animation clock (catch-up, pause, no drift).
-#include <mb/framepacing/Pacer.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/AnimationTime.hpp>
+#include <mb/framepacing/pacer/FrameInput.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/SlowDownRule.hpp>
+#include <mb/framepacing/pacer/SwapIntervalChange.hpp>
+#include <mb/framepacing/pacer/SwapIntervalRule.hpp>
+#include <mb/framepacing/pacer/WindowState.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
@@ -15,7 +26,7 @@ namespace PC = MB::FramePacing::Pacer;
 
 namespace
 {
-  constexpr int64_t Ms = FP::TicksPerMillisecond;
+  constexpr int64_t Ms = FP::TimeSpan::TicksPerMillisecond;
   constexpr PC::RefreshPeriod Hz60 = PC::RefreshPeriod::FromRate(60);
 
   PC::PacerSettings Settings(const PC::RefreshPeriod period = Hz60, const PC::SlowDownRule rule = PC::SlowDownRule::LateCount)
@@ -51,16 +62,16 @@ TEST(RefreshPeriod, ARationalRateIsExactOverAnHour)
 {
   static_assert(Hz60.Ticks() == 166'667);
   // 60 Hz for an hour is 216 000 refreshes of exactly 1/60 s: no drift, where whole ticks would be 72 ms off
-  EXPECT_EQ(Hz60.TicksFor(216'000), 3'600 * FP::TicksPerSecond);
+  EXPECT_EQ(Hz60.TicksFor(216'000), 3'600 * FP::TimeSpan::TicksPerSecond);
   EXPECT_EQ(Hz60.TicksFor(3), 500'000);
   EXPECT_EQ(Hz60.TicksFor(1), 166'667);
   EXPECT_EQ(Hz60.TicksFor(2), 333'333);
   // 59.94 Hz as DXGI states it: 60000 refreshes take 1001 s
   const PC::RefreshPeriod ntsc = PC::RefreshPeriod::FromRate(60'000, 1'001);
-  EXPECT_EQ(ntsc.TicksFor(60'000), 1'001 * FP::TicksPerSecond);
+  EXPECT_EQ(ntsc.TicksFor(60'000), 1'001 * FP::TimeSpan::TicksPerSecond);
   EXPECT_EQ(ntsc.Ticks(), 166'833);
   // wl_output's mHz
-  EXPECT_EQ(PC::RefreshPeriod::FromRate(59'940, 1'000).TicksFor(59'940), 1'000 * FP::TicksPerSecond);
+  EXPECT_EQ(PC::RefreshPeriod::FromRate(59'940, 1'000).TicksFor(59'940), 1'000 * FP::TimeSpan::TicksPerSecond);
 }
 
 TEST(RefreshPeriod, OtherUnits)
@@ -82,7 +93,7 @@ TEST(RefreshPeriod, ItIsAlwaysValid)
   static_assert(PC::RefreshPeriod::FromTicks(1).TicksQ32() == Min);
   static_assert(PC::RefreshPeriod::FromRate(10'000'000).TicksQ32() == Min);
   static_assert(PC::RefreshPeriod::FromNanoseconds(100).TicksQ32() == Min);
-  static_assert(PC::RefreshPeriod::FromTicks(FP::TicksPerSecond).TicksQ32() == Max);
+  static_assert(PC::RefreshPeriod::FromTicks(FP::TimeSpan::TicksPerSecond).TicksQ32() == Max);
   static_assert(PC::RefreshPeriod::FromRate(1).TicksQ32() == Max);
   static_assert(PC::RefreshPeriod::FromNanoseconds(1'000'000'000).TicksQ32() == Max);
 #ifdef NDEBUG
@@ -118,7 +129,7 @@ TEST(PacerSettings, TheRefreshIsRequiredAndTheRestAreSwappysDefaults)
   static_assert(Defaults.Refresh() == Hz60);
   static_assert(Defaults.PreferredSwapInterval() == 1u && Defaults.AutoSwapInterval());
   static_assert(Defaults.SlowDown() == PC::SlowDownRule::LateCount);
-  static_assert(Defaults.WindowTicks() == 2 * FP::TicksPerSecond && Defaults.SlowDownLatePercent() == 10u);
+  static_assert(Defaults.WindowTicks() == 2 * FP::TimeSpan::TicksPerSecond && Defaults.SlowDownLatePercent() == 10u);
   static_assert(Defaults.FrameMarginTicks() == Ms && Defaults.SlowestFrameTicks() == 50 * Ms);
   static_assert(Defaults.PresentLatencyTicks() == 0 && Defaults.WindowCapacity() == 0u);
 }
@@ -179,7 +190,7 @@ TEST(RefreshPeriod, RefreshesInATime)
 {
   EXPECT_EQ(Hz60.FloorRefreshes(166'666), 0);
   EXPECT_EQ(Hz60.FloorRefreshes(166'667), 1);
-  EXPECT_EQ(Hz60.FloorRefreshes(3'600 * FP::TicksPerSecond), 216'000);
+  EXPECT_EQ(Hz60.FloorRefreshes(3'600 * FP::TimeSpan::TicksPerSecond), 216'000);
   EXPECT_EQ(Hz60.NearestRefreshes(83'333), 0);
   EXPECT_EQ(Hz60.NearestRefreshes(83'334), 1);
   EXPECT_EQ(Hz60.NearestRefreshes(250'000), 2);    // a tie: the later refresh
@@ -351,22 +362,22 @@ TEST(SwapIntervalRule, TheWindowReportsWhatItHolds)
 TEST(FramePacer, TheFirstFrameAimsOneIntervalAfterTheRefreshItStartsIn)
 {
   PC::FramePacer pacer(Settings());
-  const PC::FrameSchedule schedule = pacer.BeginFrame({10 * FP::TicksPerSecond});
+  const PC::FrameSchedule schedule = pacer.BeginFrame({10 * FP::TimeSpan::TicksPerSecond});
   EXPECT_EQ(schedule.FrameIndex, 0u);
-  EXPECT_EQ(schedule.IntendedDisplayTicks, (10 * FP::TicksPerSecond) + 166'667);
-  EXPECT_EQ(schedule.EarliestPresentTicks, 10 * FP::TicksPerSecond);
+  EXPECT_EQ(schedule.IntendedDisplayTicks, (10 * FP::TimeSpan::TicksPerSecond) + 166'667);
+  EXPECT_EQ(schedule.EarliestPresentTicks, 10 * FP::TimeSpan::TicksPerSecond);
   EXPECT_EQ(schedule.SwapInterval, 1u);
   EXPECT_EQ(schedule.TargetFrameTicks, 166'667u);
   EXPECT_EQ(schedule.PreferredFrameTicks, 166'667u);
-  EXPECT_EQ(schedule.CpuStartTicks, 10 * FP::TicksPerSecond);
+  EXPECT_EQ(schedule.CpuStartTicks, 10 * FP::TimeSpan::TicksPerSecond);
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::None);
-  EXPECT_EQ(pacer.EndFrame({(10 * FP::TicksPerSecond) + 90'000}), 90'000u);
+  EXPECT_EQ(pacer.EndFrame({(10 * FP::TimeSpan::TicksPerSecond) + 90'000}), 90'000u);
 }
 
 TEST(FramePacer, FramesOnTimeFollowTheGridForAnHourWithoutDrift)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   int64_t now = start;
   PC::FrameSchedule schedule;
   for (int64_t frame = 0; frame < 216'000; ++frame)
@@ -382,7 +393,7 @@ TEST(FramePacer, FramesOnTimeFollowTheGridForAnHourWithoutDrift)
 TEST(FramePacer, ALateFrameIsInferredFromItsPresentAndTheNextFrameCatchesUp)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   // Presented after its refresh: shown one refresh later
   (void)pacer.EndFrame({first.IntendedDisplayTicks + Ms});
@@ -396,7 +407,7 @@ TEST(FramePacer, PresentLatencyMakesAPresentJustBeforeTheRefreshLate)
   PC::PacerSettings settings = Settings();
   settings.SetPresentLatencyTicks(2 * Ms);
   PC::FramePacer pacer(settings);
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   (void)pacer.EndFrame({first.IntendedDisplayTicks - Ms});
   const PC::FrameSchedule second = pacer.BeginFrame({first.IntendedDisplayTicks});
@@ -407,7 +418,7 @@ TEST(FramePacer, PresentLatencyMakesAPresentJustBeforeTheRefreshLate)
 TEST(FramePacer, AReportedDisplayTimeWinsOverTheInference)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   (void)pacer.EndFrame({start + (5 * Ms)});
   // Presented in time, but the platform says it was shown a refresh late, 30 µs after the vsync
@@ -421,7 +432,7 @@ TEST(FramePacer, AReportedDisplayTimeWinsOverTheInference)
 TEST(FramePacer, AReportedVsyncPutsTheGridOnTheDisplays)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t vsync = (5 * FP::TicksPerSecond) + 1'234;
+  const int64_t vsync = (5 * FP::TimeSpan::TicksPerSecond) + 1'234;
   const PC::FrameSchedule schedule = pacer.BeginFrame({vsync + (3 * Ms), vsync});
   EXPECT_EQ(schedule.IntendedDisplayTicks, vsync + 166'667);
   EXPECT_EQ(schedule.EarliestPresentTicks, vsync);
@@ -430,7 +441,7 @@ TEST(FramePacer, AReportedVsyncPutsTheGridOnTheDisplays)
 TEST(FramePacer, APredictedDisplayTimeIsTheEarliestTarget)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const int64_t predicted = start + Hz60.TicksFor(3);
   const PC::FrameSchedule schedule = pacer.BeginFrame({start, 0, 0, predicted});
   EXPECT_EQ(schedule.IntendedDisplayTicks, predicted);
@@ -439,7 +450,7 @@ TEST(FramePacer, APredictedDisplayTimeIsTheEarliestTarget)
 TEST(FramePacer, AFrameStartedAfterItsPlannedRefreshAimsAtTheNextOne)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   (void)pacer.EndFrame({start + Ms});
   // The next frame should aim one refresh after the first's display, but it starts two refreshes later
@@ -451,7 +462,7 @@ TEST(FramePacer, AFrameStartedAfterItsPlannedRefreshAimsAtTheNextOne)
 TEST(FramePacer, WithoutEndFrameTheFrameCountsAsPresentedAtTheNextBeginFrame)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   const PC::FrameSchedule second = pacer.BeginFrame({first.IntendedDisplayTicks + Ms});
   EXPECT_EQ(pacer.Window().Frames, 1u);
@@ -464,7 +475,7 @@ TEST(FramePacer, TheScheduleCarriesTheRulesChangeAndTheNewInterval)
   // The simulation's frame model: a frame starts when the previous one is shown, and is shown at its target or the first refresh after
   // it is done
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   int64_t now = start;
   PC::FrameSchedule schedule;
   std::vector<int64_t> changedAt;
@@ -493,10 +504,10 @@ TEST(FramePacer, TheScheduleCarriesTheRulesChangeAndTheNewInterval)
 TEST(FramePacer, ResetPlansTheNextFrameAsTheFirst)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   (void)pacer.BeginFrame({start});
   pacer.Reset();
-  const int64_t later = start + (7 * FP::TicksPerSecond) + 123;
+  const int64_t later = start + (7 * FP::TimeSpan::TicksPerSecond) + 123;
   const PC::FrameSchedule schedule = pacer.BeginFrame({later});
   EXPECT_EQ(schedule.IntendedDisplayTicks, later + 166'667);
   EXPECT_EQ(schedule.FrameIndex, 1u);
@@ -506,10 +517,10 @@ TEST(FramePacer, ResetPlansTheNextFrameAsTheFirst)
 TEST(FramePacer, ALongPauseStartsANewGrid)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   (void)pacer.EndFrame({start + Ms});
-  const int64_t resumed = first.IntendedDisplayTicks + (60 * FP::TicksPerSecond) + 777;
+  const int64_t resumed = first.IntendedDisplayTicks + (60 * FP::TimeSpan::TicksPerSecond) + 777;
   const PC::FrameSchedule next = pacer.BeginFrame({resumed});
   EXPECT_EQ(next.IntendedDisplayTicks, resumed + 166'667);
   EXPECT_EQ(pacer.Window().Frames, 0u);
@@ -518,7 +529,7 @@ TEST(FramePacer, ALongPauseStartsANewGrid)
 TEST(FramePacer, ANewRefreshPeriodStartsAgainAtThePreferredInterval)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   (void)pacer.BeginFrame({start});
   pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(120));
   const PC::FrameSchedule schedule = pacer.BeginFrame({start + (5 * Ms)});
@@ -532,7 +543,7 @@ TEST(FramePacer, ThePeriodItHasChangesNothing)
   // One pacer is told its own period every frame, by SetRefreshPeriod and as the platform reports it: it plans as the other one
   PC::FramePacer told(Settings());
   PC::FramePacer plain(Settings());
-  int64_t now = FP::TicksPerSecond;
+  int64_t now = FP::TimeSpan::TicksPerSecond;
   for (int frame = 0; frame < 20; ++frame)
   {
     told.SetRefreshPeriod(Hz60);
@@ -550,7 +561,7 @@ TEST(FramePacer, ThePeriodItHasChangesNothing)
 TEST(FramePacer, APeriodThePlatformReportsIsADisplayModeChange)
 {
   PC::FramePacer pacer(Settings());
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   (void)pacer.BeginFrame({start});
   (void)pacer.EndFrame({start + Ms});
   PC::FrameInput input;
@@ -571,7 +582,7 @@ TEST(AnimationClock, WithThePacerItStepsByTheIntendedRefreshesAndCatchesUpAfterA
 {
   PC::FramePacer pacer(Settings());
   PC::AnimationClock clock(Hz60, 1'000);
-  const int64_t start = FP::TicksPerSecond;
+  const int64_t start = FP::TimeSpan::TicksPerSecond;
   const PC::FrameSchedule first = pacer.BeginFrame({start});
   EXPECT_EQ(clock.Advance(first).AnimationTicks, 1'000);
   EXPECT_EQ(clock.Current().StepRefreshes, 0);
@@ -588,7 +599,7 @@ TEST(AnimationClock, WithThePacerItStepsByTheIntendedRefreshesAndCatchesUpAfterA
 TEST(AnimationClock, MeasuredWakeUpsAreRoundedToWholeRefreshes)
 {
   PC::AnimationClock clock(Hz60);
-  int64_t wakeUp = FP::TicksPerSecond;
+  int64_t wakeUp = FP::TimeSpan::TicksPerSecond;
   (void)clock.AdvanceMeasured(wakeUp, 1);
   // Wake-ups after the vsync by anything under half a refresh still step one refresh each (the naive timer's jitter goes away)
   const std::vector<int64_t> lateness{30'000, 0, 75'000, 10'000, 60'000};
@@ -609,7 +620,7 @@ TEST(AnimationClock, MeasuredWakeUpsAreRoundedToWholeRefreshes)
 TEST(AnimationClock, APauseHoldsTheAnimationAndResumeGoesOnWithoutAJump)
 {
   PC::AnimationClock clock(Hz60);
-  int64_t now = FP::TicksPerSecond;
+  int64_t now = FP::TimeSpan::TicksPerSecond;
   (void)clock.AdvanceMeasured(now, 1);
   now += 166'667;
   const int64_t beforePause = clock.AdvanceMeasured(now, 1).AnimationTicks;
@@ -629,9 +640,9 @@ TEST(AnimationClock, APauseHoldsTheAnimationAndResumeGoesOnWithoutAJump)
 TEST(AnimationClock, TheLongestStepIsLimited)
 {
   PC::AnimationClock clock(Hz60, 0, 4);
-  (void)clock.AdvanceMeasured(FP::TicksPerSecond, 1);
+  (void)clock.AdvanceMeasured(FP::TimeSpan::TicksPerSecond, 1);
   // Suspended for 10 s: the animation steps 4 refreshes, not 600
-  const PC::AnimationTime resumed = clock.AdvanceMeasured(11 * FP::TicksPerSecond, 1);
+  const PC::AnimationTime resumed = clock.AdvanceMeasured(11 * FP::TimeSpan::TicksPerSecond, 1);
   EXPECT_EQ(resumed.StepRefreshes, 4);
   EXPECT_EQ(resumed.AnimationTicks, Hz60.TicksFor(4));
 }
@@ -639,7 +650,7 @@ TEST(AnimationClock, TheLongestStepIsLimited)
 TEST(AnimationClock, AnHourOfStepsDoesNotDrift)
 {
   PC::AnimationClock clock(Hz60);
-  int64_t now = FP::TicksPerSecond;
+  int64_t now = FP::TimeSpan::TicksPerSecond;
   // Every frame at swap interval 2 (a first frame at 1 would make the second frame's two refreshes one late, and the clock catch it up)
   (void)clock.AdvanceMeasured(now, 2);
   for (int64_t frame = 0; frame < 108'000; ++frame)
@@ -649,5 +660,5 @@ TEST(AnimationClock, AnHourOfStepsDoesNotDrift)
     (void)clock.AdvanceMeasured(now, 2);
   }
   // 216 000 refreshes: an hour exactly, the steps rounded to ticks never added up
-  EXPECT_EQ(clock.Current().AnimationTicks, 3'600 * FP::TicksPerSecond);
+  EXPECT_EQ(clock.Current().AnimationTicks, 3'600 * FP::TimeSpan::TicksPerSecond);
 }

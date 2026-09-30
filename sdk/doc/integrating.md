@@ -77,8 +77,8 @@ The remote holds recipes only, no prebuilt binaries, and the library needs C++20
 What your project gets:
 
 - A static library target per module in every way above: **`mb_framepacing::marker`** for the marker (it links
-  `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. The headers are `<mb/framepacing/Marker.hpp>`,
-  `<mb/framepacing/Data.hpp>` and `<mb/framepacing/Core.hpp>`.
+  `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. Each type has its own header (`<mb/framepacing/marker/Payload.hpp>`,
+  `<mb/framepacing/core/time/TimeSpan.hpp>`, ...) and the marker's functions are in `<mb/framepacing/marker/FrameMarker.hpp>`.
 - When the library is not the top-level project, its tests, tools and warnings-as-errors are off, so GoogleTest is never downloaded.
   The options, if you want to change them:
 
@@ -103,7 +103,9 @@ The marker must survive the capture's downscale: aim for at least 3 stored pixel
 `mb-framepacing marker-size --source <output> --stored <capture>` prints it for a setup:
 
 ```cpp
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/Options.hpp>
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
@@ -123,7 +125,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
-  const int64_t ticks = std::llround(animationSeconds * MB::FramePacing::TicksPerSecond); // the time your animation used
+  const int64_t ticks = std::llround(animationSeconds * MB::FramePacing::TimeSpan::TicksPerSecond); // the time your animation used
   FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, ticks}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
@@ -225,7 +227,7 @@ enum class Phase { Start, Measure, End, Done };
 
 void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
 {
-  static const int64_t startUtc = MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now());
+  static const int64_t startUtc = MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now());   // core/time/ChronoConversion.hpp
   static const FM::SequenceId sequenceId = NewUuidBytes();   // any 16 bytes unique to this run, or FM::SequenceId::TryFromText("camera pan", id)
   static std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
   static FM::ModuleMatrix matrix;
@@ -237,7 +239,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, std::llround(animationSeconds * MB::FramePacing::TicksPerSecond));
+  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, std::llround(animationSeconds * MB::FramePacing::TimeSpan::TicksPerSecond));
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }

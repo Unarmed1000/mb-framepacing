@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-// The core module: the library version, the tick conversions, Point and Rectangle.
-#include <mb/framepacing/Core.hpp>
+// The core module: the library version, Point and Rectangle (the time types: tests/time).
+#include <mb/framepacing/core/GetLibraryVersion.hpp>
+#include <mb/framepacing/core/LibraryVersion.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/core/Version.hpp>
 #include <gtest/gtest.h>
-#include <chrono>
 #include <cstdint>
-#include <limits>
 #include <string>
 #include <string_view>
 #include "SteadyClock.hpp"
@@ -30,63 +31,6 @@ TEST(Version, TheLinkedLibraryHasTheVersionOfTheHeader)
   EXPECT_EQ(version.Prerelease, FP::VersionPrerelease);
 }
 
-TEST(Ticks, NanosecondsRoundDownToTheTickTheyAreIn)
-{
-  static_assert(FP::NanosecondsToTicks(0) == 0);
-  static_assert(FP::NanosecondsToTicks(99) == 0);
-  static_assert(FP::NanosecondsToTicks(100) == 1);
-  static_assert(FP::NanosecondsToTicks(16'683'350) == 166'833);
-  static_assert(FP::NanosecondsToTicks(-1) == -1);
-  static_assert(FP::NanosecondsToTicks(-100) == -1);
-  static_assert(FP::NanosecondsToTicks(-101) == -2);
-  static_assert(FP::TicksToNanoseconds(166'667) == 16'666'700);
-  EXPECT_EQ(FP::NanosecondsToTicks(std::numeric_limits<int64_t>::max()), std::numeric_limits<int64_t>::max() / 100);
-}
-
-TEST(Ticks, ACounterConvertsExactlyAtAnyValue)
-{
-  // A 10 MHz counter (QueryPerformanceFrequency on current Windows) is in ticks already
-  static_assert(FP::CounterToTicks(123'456'789, 10'000'000) == 123'456'789);
-  // A 3 GHz counter: one second and a third of a tick
-  static_assert(FP::CounterToTicks(3'000'000'100, 3'000'000'000) == FP::TicksPerSecond);
-  static_assert(FP::CounterToTicks(3'000'000'300, 3'000'000'000) == FP::TicksPerSecond + 1);
-  // Nanoseconds as a counter agree with NanosecondsToTicks, negative values included
-  static_assert(FP::CounterToTicks(-150, 1'000'000'000) == FP::NanosecondsToTicks(-150));
-  // A counter near its limit does not overflow: 2^63 - 1 at 3 GHz is about 97 years
-  constexpr int64_t Max = std::numeric_limits<int64_t>::max();
-  constexpr int64_t Frequency = 3'000'000'000;
-  EXPECT_EQ(FP::CounterToTicks(Max, Frequency), ((Max / Frequency) * FP::TicksPerSecond) + (((Max % Frequency) * FP::TicksPerSecond) / Frequency));
-  // The fastest counter it takes, at its limit too
-  static_assert(FP::CounterToTicks(FP::MaxCounterFrequency, FP::MaxCounterFrequency) == FP::TicksPerSecond);
-  EXPECT_EQ(FP::CounterToTicks(Max, FP::MaxCounterFrequency), ((Max / FP::MaxCounterFrequency) * FP::TicksPerSecond) +
-                                                                (((Max % FP::MaxCounterFrequency) * FP::TicksPerSecond) / FP::MaxCounterFrequency));
-}
-
-TEST(Ticks, ACounterFrequencyOutsideItsRangeIsAsserted)
-{
-#ifdef NDEBUG
-  // Without asserts it gives 0, unknown
-  EXPECT_EQ(FP::CounterToTicks(123, 0), 0);
-  EXPECT_EQ(FP::CounterToTicks(123, -10'000'000), 0);
-  EXPECT_EQ(FP::CounterToTicks(123, FP::MaxCounterFrequency + 1), 0);
-#elif GTEST_HAS_DEATH_TEST
-  EXPECT_DEATH(static_cast<void>(FP::CounterToTicks(123, 0)), "");
-  EXPECT_DEATH(static_cast<void>(FP::CounterToTicks(123, -10'000'000)), "");
-  EXPECT_DEATH(static_cast<void>(FP::CounterToTicks(123, FP::MaxCounterFrequency + 1)), "");
-#else
-  GTEST_SKIP() << "asserts are on and death tests are not available";
-#endif
-}
-
-TEST(Ticks, ADateTimeIsTicksSinceYearOne)
-{
-  static_assert(FP::ToDateTimeTicks(std::chrono::system_clock::time_point{}) == FP::UnixEpochDateTimeTicks);
-  // 2026-01-01T00:00:00Z = unix 1767225600 s; C# new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks = 639028224000000000
-  const auto newYear = std::chrono::system_clock::time_point{std::chrono::seconds{1'767'225'600}};
-  EXPECT_EQ(FP::ToDateTimeTicks(newYear), 639'028'224'000'000'000);
-  EXPECT_EQ(FP::TickDuration{std::chrono::milliseconds{1}}.count(), FP::TicksPerMillisecond);
-}
-
 TEST(SteadyClock, NeverGoesBack)
 {
   int64_t previous = FP::SteadyClock::NowTicks();
@@ -103,6 +47,13 @@ TEST(Point, IsAPixelPositionThatComparesByValue)
   static_assert(FP::Point{} == FP::Point{0, 0});
   static_assert(FP::Point{3, -4}.X == 3 && FP::Point{3, -4}.Y == -4);
   static_assert(FP::Point{3, -4} != FP::Point{-4, 3});
+  // The same at run time (coverage counts what runs)
+  const FP::Point point{3, -4};
+  EXPECT_EQ(point.X, 3);
+  EXPECT_EQ(point.Y, -4);
+  EXPECT_TRUE(point == (FP::Point{3, -4}));
+  EXPECT_FALSE(point == (FP::Point{-4, 3}));
+  EXPECT_TRUE(FP::Point{} == (FP::Point{0, 0}));
 }
 
 TEST(Rectangle, ItsEdgesFollowFromItsPositionAndSize)
@@ -121,11 +72,31 @@ TEST(Rectangle, ItIsAlwaysValid)
   // A negative size is 0
   static_assert(FP::Rectangle(5, 6, -3, -4) == FP::Rectangle(5, 6, 0, 0));
   static_assert(FP::Rectangle::FromLeftTopRightBottom(40, 60, 10, 20) == FP::Rectangle(40, 60, 0, 0));
-  // A size that would put an edge beyond int32 is cut to fit
-  constexpr int32_t Max = std::numeric_limits<int32_t>::max();
-  static_assert(FP::Rectangle(Max - 10, Max - 5, 100, 100).Right() == Max);
-  static_assert(FP::Rectangle(Max - 10, Max - 5, 100, 100).Bottom() == Max);
-  static_assert(FP::Rectangle(-Max, 0, Max, 1).Right() == 0);
-  static_assert(FP::Rectangle::FromLeftTopRightBottom(std::numeric_limits<int32_t>::min(), 0, Max, 1).Width() == Max);
   EXPECT_EQ(FP::Rectangle(0, 0, 7, -1).Height(), 0);
+}
+
+TEST(Rectangle, EveryMemberAtRunTime)
+{
+  // The static_asserts above run at compile time; coverage counts what runs
+  const FP::Rectangle rect(10, 20, 30, 40);
+  EXPECT_EQ(rect.X(), 10);
+  EXPECT_EQ(rect.Y(), 20);
+  EXPECT_EQ(rect.Width(), 30);
+  EXPECT_EQ(rect.Height(), 40);
+  EXPECT_EQ(rect.Left(), 10);
+  EXPECT_EQ(rect.Top(), 20);
+  EXPECT_EQ(rect.Right(), 40);
+  EXPECT_EQ(rect.Bottom(), 60);
+  EXPECT_TRUE(rect.Contains(10, 20));
+  EXPECT_TRUE(rect.Contains(39, 59));
+  EXPECT_FALSE(rect.Contains(9, 20));
+  EXPECT_FALSE(rect.Contains(40, 20));
+  EXPECT_FALSE(rect.Contains(10, 19));
+  EXPECT_FALSE(rect.Contains(10, 60));
+  EXPECT_TRUE(FP::Rectangle::FromLeftTopRightBottom(10, 20, 40, 60) == rect);
+  EXPECT_FALSE(FP::Rectangle() == rect);
+  EXPECT_TRUE(FP::Rectangle() == FP::Rectangle(0, 0, 0, 0));
+  // Always valid: a negative size is 0
+  EXPECT_EQ(FP::Rectangle(5, 6, -3, -4), FP::Rectangle(5, 6, 0, 0));
+  EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(40, 60, 10, 20), FP::Rectangle(40, 60, 0, 0));
 }

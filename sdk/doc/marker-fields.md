@@ -27,7 +27,7 @@ exactly `0` (a counter that starts at the process start, say) must be offset, or
 Steady clock ticks in each language:
 
 ```cpp
-// C++: your steady clock in ticks (MB::FramePacing::TickDuration is the 100 ns std::chrono duration)
+// C++: your steady clock in ticks (MB::FramePacing::TickDuration, core/time/ChronoConversion.hpp, is the 100 ns std::chrono duration)
 const int64_t nowTicks =
   std::chrono::duration_cast<MB::FramePacing::TickDuration>(std::chrono::steady_clock::now().time_since_epoch()).count();
 ```
@@ -43,7 +43,7 @@ now_ticks = time.monotonic_ns() // 100
 ```
 
 An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `seconds_to_ticks` (Python) or
-`std::llround(seconds * MB::FramePacing::TicksPerSecond)` (C++).
+`std::llround(seconds * MB::FramePacing::TimeSpan::TicksPerSecond)` (C++).
 
 ## The fields
 
@@ -194,7 +194,7 @@ An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `
 
 ### Start time and sequence id (start marker only)
 
-- **Start time:** when the run started, as C# `DateTime` UTC ticks (`ToDateTimeTicks(std::chrono::system_clock::now())` in C++,
+- **Start time:** when the run started, as C# `DateTime` UTC ticks (`ToDateTimeTicks(std::chrono::system_clock::now())` from `core/time/ChronoConversion.hpp` in C++,
   `DateTime.UtcNow.Ticks` in C#). Read it once when the run starts, not per frame. The reports show it (`startTimeUtc` in
   `summary.json`); no measurement uses it.
 - **Sequence id:** 16 bytes unique to the run: a new UUID, or a text tag of at most 16 printable ASCII characters. The reports show it

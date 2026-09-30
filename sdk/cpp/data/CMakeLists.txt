@@ -19,15 +19,26 @@ add_library(mb_framepacing::data ALIAS mb_framepacing_data)
 set_target_properties(mb_framepacing_data PROPERTIES EXPORT_NAME data POSITION_INDEPENDENT_CODE ON)
 target_sources(mb_framepacing_data
   PRIVATE
-    src/AnalysisOutput.cpp
-    src/CaptureData.cpp
+    source/mb/framepacing/data/AnalysisFiles.cpp
+    source/mb/framepacing/data/AnalysisSummary.cpp
+    source/mb/framepacing/data/CaptureDataHeader.cpp
+    source/mb/framepacing/data/CaptureDataReader.cpp
+    source/mb/framepacing/data/CaptureDataRecord.cpp
+    source/mb/framepacing/data/CapturesCsv.cpp
+    source/mb/framepacing/data/FramesCsv.cpp
+    source/mb/framepacing/data/Milliseconds.cpp
+    source/mb/framepacing/data/detail/CsvCells.hpp
+    source/mb/framepacing/data/detail/CsvTable.cpp
+    source/mb/framepacing/data/detail/CsvTable.hpp
+    source/mb/framepacing/data/detail/LittleEndian.hpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/Data.hpp
+      include/mb/framepacing/data/AnalysisFiles.hpp
       include/mb/framepacing/data/AnalysisSummary.hpp
       include/mb/framepacing/data/CaptureCsvRow.hpp
+      include/mb/framepacing/data/CapturesCsv.hpp
       include/mb/framepacing/data/CaptureDataHeader.hpp
       include/mb/framepacing/data/CaptureDataReader.hpp
       include/mb/framepacing/data/CaptureDataRecord.hpp
@@ -35,7 +46,9 @@ target_sources(mb_framepacing_data
       include/mb/framepacing/data/Constants.hpp
       include/mb/framepacing/data/DataFormatError.hpp
       include/mb/framepacing/data/FrameRow.hpp
+      include/mb/framepacing/data/FramesCsv.hpp
       include/mb/framepacing/data/MarkerLocation.hpp
+      include/mb/framepacing/data/Milliseconds.hpp
       include/mb/framepacing/data/OlderFrame.hpp
       include/mb/framepacing/data/SummaryCamera.hpp
       include/mb/framepacing/data/SummaryCounts.hpp

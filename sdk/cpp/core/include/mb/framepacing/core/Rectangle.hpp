@@ -5,26 +5,17 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <limits>
 
 namespace MB::FramePacing
 {
   //! An integer pixel rectangle covering [X, X + Width) x [Y, Y + Height): [Left(),Right()) x [Top(),Bottom()). Origin at the top-left
-  //! corner, +x to the right, +y down. Always valid: the constructor makes a negative width or height 0 and cuts a size that would put
-  //! Right() or Bottom() beyond int32_t, so every Rectangle has a size of at least 0 and edges that fit.
+  //! corner, +x to the right, +y down. Always valid: the constructor makes a negative width or height 0. Its edges must fit int32_t.
   class Rectangle
   {
     int32_t m_x{0};
     int32_t m_y{0};
     int32_t m_width{0};
     int32_t m_height{0};
-
-    //! size, at least 0 and at most what keeps it and start + size within int32_t
-    static constexpr int32_t ValidSize(const int32_t start, const int64_t size) noexcept
-    {
-      constexpr int64_t Max = std::numeric_limits<int32_t>::max();
-      return static_cast<int32_t>(std::clamp(size, int64_t{0}, std::min(Max, Max - start)));
-    }
 
   public:
     //! The empty rectangle at (0, 0).
@@ -33,20 +24,15 @@ namespace MB::FramePacing
     constexpr Rectangle(const int32_t x, const int32_t y, const int32_t width, const int32_t height) noexcept
       : m_x(x)
       , m_y(y)
-      , m_width(ValidSize(x, width))
-      , m_height(ValidSize(y, height))
+      , m_width(std::max(width, 0))
+      , m_height(std::max(height, 0))
     {
     }
 
     //! The rectangle between the edges: an edge before the opposite one gives a size of 0.
     static constexpr Rectangle FromLeftTopRightBottom(const int32_t left, const int32_t top, const int32_t right, const int32_t bottom) noexcept
     {
-      Rectangle rectangle;
-      rectangle.m_x = left;
-      rectangle.m_y = top;
-      rectangle.m_width = ValidSize(left, int64_t{right} - left);
-      rectangle.m_height = ValidSize(top, int64_t{bottom} - top);
-      return rectangle;
+      return {left, top, right - left, bottom - top};
     }
 
     [[nodiscard]] constexpr int32_t X() const noexcept

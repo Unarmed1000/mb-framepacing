@@ -10,7 +10,7 @@ graphics or platform API, has no callbacks and never reads a clock. Made once (i
 
 | Language | Module                                                                                                    |
 | -------- | --------------------------------------------------------------------------------------------------------- |
-| C++20    | `mb_framepacing::pacer`, `<mb/framepacing/Pacer.hpp>`, namespace `MB::FramePacing::Pacer`                 |
+| C++20    | `mb_framepacing::pacer`, `<mb/framepacing/pacer/…>`, namespace `MB::FramePacing::Pacer`                   |
 | C#       | [`MB.FramePacing.Pacer`](../csharp/pacer/README.md) (.NET Standard 2.1), namespace `MB.FramePacing.Pacer` |
 
 Both have the same types and the same integer arithmetic: they plan every frame alike to the tick. The examples below are C++; the C#
@@ -19,7 +19,9 @@ names are the same (`FrameInput`'s optional values are constructor parameters, t
 ## The frame loop
 
 ```cpp
-#include <mb/framepacing/Pacer.hpp>
+#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;
 
@@ -66,9 +68,9 @@ ticks on the same steady clock as `NowTicks`, so a clock must not give a real ti
 A reported period that rounds to another nanosecond than the pacer's is a display mode change, as `SetRefreshPeriod` is: the pacer
 starts again on a new grid, with an empty window, at the preferred swap interval. The period it already has changes nothing.
 
-Platform clocks convert with the core: `FP::NanosecondsToTicks` (`CLOCK_MONOTONIC`, Vulkan and EGL present times, Choreographer),
-`FP::CounterToTicks(counter, frequency)` (`QueryPerformanceCounter` with `QueryPerformanceFrequency`), or a
-`std::chrono` clock through `FP::TickDuration`.
+Platform clocks convert with the core: `FP::TickCount64::FromNanoseconds` (`CLOCK_MONOTONIC`, Vulkan and EGL present times,
+Choreographer), `FP::TickCount64::FromCounter(counter, frequency)` (`QueryPerformanceCounter` with `QueryPerformanceFrequency`), or
+a `std::chrono` clock through `core/time/ChronoConversion.hpp` (`FP::ToTickCount64`).
 
 ### How a frame is planned
 

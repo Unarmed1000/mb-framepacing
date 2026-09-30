@@ -3,7 +3,21 @@
 //
 // The marker is generated every frame, so the library must never allocate. This test binary replaces the global operator new/delete
 // with counting versions and checks that every generate / encode / convert call stays at zero allocations.
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/core/GetLibraryVersion.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/marker/Constants.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/MarkerFlags.hpp>
+#include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/MarkerQuad.hpp>
+#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/Options.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/marker/PixelFormat.hpp>
+#include <mb/framepacing/marker/SequenceId.hpp>
+#include <mb/framepacing/marker/StartMetadata.hpp>
+#include <mb/framepacing/marker/Vertex.hpp>
 #include <gtest/gtest.h>
 #include <array>
 #include <atomic>
@@ -147,14 +161,14 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
 {
   const FM::Options options{};
   const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 2);
-  FM::StartMetadata metadata{MB::FramePacing::UnixEpochDateTimeTicks, {}};
+  FM::StartMetadata metadata{int64_t{621'355'968'000'000'000}, {}};
 
   std::size_t written = 0;
   {
     const AllocationCounter counter;
     for (uint64_t frame = 0; frame < 200u; ++frame)
     {
-      const auto ticks = static_cast<int64_t>(frame) * (MB::FramePacing::TicksPerSecond / 60);
+      const auto ticks = static_cast<int64_t>(frame) * (MB::FramePacing::TimeSpan::TicksPerSecond / 60);
       const FM::Payload framePayload{FM::MarkerKind::Frame, 7u,     frame, FM::MarkerFlags::StaticAfter, ticks, 166'667u, 166'667u, ticks + 50'000,
                                      ticks - 10'000,        80'000u};
       const FM::Payload endPayload{FM::MarkerKind::SequenceEnd, 7u, frame, FM::MarkerFlags::None, ticks};

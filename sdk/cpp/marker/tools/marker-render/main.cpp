@@ -10,7 +10,17 @@
 //                 [--sequence-id <text> | --sequence-id-hex <hex>] [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]
 //                 [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/marker/Constants.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/MarkerFlags.hpp>
+#include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/Options.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/marker/PixelFormat.hpp>
+#include <mb/framepacing/marker/SequenceId.hpp>
+#include <mb/framepacing/marker/StartMetadata.hpp>
 #include <algorithm>
 #include <array>
 #include <charconv>

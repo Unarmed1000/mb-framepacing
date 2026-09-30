@@ -3,6 +3,7 @@
 //
 // The frame pacer of sdk/doc/pacer.md. Refresh times come from an exact grid: an origin refresh (ticks and a 2^-32 fraction) and the
 // period in the same fixed point, so no refresh time drifts. Integer arithmetic only, so C++ and C# plan exactly alike.
+#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <algorithm>
 #include <limits>
@@ -14,7 +15,7 @@ namespace MB::FramePacing::Pacer
     constexpr int64_t OneTickQ32 = RefreshPeriod::OneTickQ32;
     //! The grid is used within this distance of its origin (30 s, so an offset times the period in 2^-32 ticks fits 62 bits); a frame
     //! further away starts a new grid, as after a pause
-    constexpr int64_t MaxGridTicks = 30 * TicksPerSecond;
+    constexpr int64_t MaxGridTicks = 30 * TimeSpan::TicksPerSecond;
 
     uint32_t ToTicks32(const int64_t ticks) noexcept
     {

@@ -8,14 +8,13 @@ add_library(mb_framepacing::pacer ALIAS mb_framepacing_pacer)
 set_target_properties(mb_framepacing_pacer PROPERTIES EXPORT_NAME pacer POSITION_INDEPENDENT_CODE ON)
 target_sources(mb_framepacing_pacer
   PRIVATE
-    src/AnimationClock.cpp
-    src/FramePacer.cpp
-    src/SwapIntervalRule.cpp
+    source/mb/framepacing/pacer/AnimationClock.cpp
+    source/mb/framepacing/pacer/FramePacer.cpp
+    source/mb/framepacing/pacer/SwapIntervalRule.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/Pacer.hpp
       include/mb/framepacing/pacer/AnimationClock.hpp
       include/mb/framepacing/pacer/AnimationTime.hpp
       include/mb/framepacing/pacer/FrameEnd.hpp

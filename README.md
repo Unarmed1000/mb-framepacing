@@ -114,7 +114,9 @@ Link the library and draw the marker as the very last thing in every frame, afte
 It writes pixel aligned triangles straight into your vertex buffer, without allocating:
 
 ```cpp
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/Vertex.hpp>
 namespace FM = MB::FramePacing::Marker;
 
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once

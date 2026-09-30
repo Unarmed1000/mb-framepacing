@@ -6,8 +6,10 @@
 #include <mb/framepacing/data/SummaryMarker.hpp>
 #include <mb/framepacing/data/SummaryRun.hpp>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace MB::FramePacing::Data
@@ -34,6 +36,14 @@ namespace MB::FramePacing::Data
     std::vector<std::string> Warnings;
     std::vector<SummaryRun> Runs;
   };
+
+  //! Read summary.json (C#'s AnalysisSummary.Read). Allocates; throws DataFormatError for a newer format version or content that is not a
+  //! summary.
+  AnalysisSummary ReadSummary(const std::filesystem::path& path);
+
+  //! Parse summary.json's text (C#'s AnalysisSummary.Parse). A file without formatVersion is format 1; fields it lacks keep their defaults,
+  //! unknown fields are ignored.
+  AnalysisSummary ParseSummary(std::string_view json);
 }
 
 #endif

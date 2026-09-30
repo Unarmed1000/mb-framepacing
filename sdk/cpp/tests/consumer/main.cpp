@@ -3,9 +3,21 @@
 //
 // The smallest program using mb_framepacing's modules: plan one frame at 60 Hz (pacer), encode its frame marker and draw it as a triangle
 // list (marker), parse a CSV time (data), and print what came out with the library version (core).
-#include <mb/framepacing/Data.hpp>
-#include <mb/framepacing/Marker.hpp>
-#include <mb/framepacing/Pacer.hpp>
+#include <mb/framepacing/core/GetLibraryVersion.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/data/Milliseconds.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/MarkerFlags.hpp>
+#include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/Options.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/marker/Vertex.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <array>
 #include <cstdio>
 #include <string_view>
@@ -17,7 +29,7 @@ namespace PC = MB::FramePacing::Pacer;
 int main()
 {
   PC::FramePacer pacer(PC::PacerSettings(PC::RefreshPeriod::FromRate(60)));
-  const PC::FrameSchedule schedule = pacer.BeginFrame({FP::TicksPerSecond});
+  const PC::FrameSchedule schedule = pacer.BeginFrame({FP::TimeSpan::TicksPerSecond});
   std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices{};
   const FM::Options options{};
   const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080);

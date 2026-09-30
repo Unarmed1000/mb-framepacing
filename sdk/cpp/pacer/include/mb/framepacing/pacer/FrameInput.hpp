@@ -8,8 +8,8 @@
 namespace MB::FramePacing::Pacer
 {
   //! What the application knows when it starts a frame (FramePacer::BeginFrame). All times are ticks on the application's steady clock
-  //! (the platform's clock converted with NanosecondsToTicks / CounterToTicks, or a std::chrono clock through TickDuration): the pacer
-  //! never reads a clock. NowTicks is required; everything else is what better platforms report, 0 = unknown (so a steady clock must not
+  //! (the platform's clock converted with TickCount64::FromNanoseconds / FromCounter, or a std::chrono clock through core/time/ChronoConversion.hpp):
+  //! the pacer never reads a clock. NowTicks is required; everything else is what better platforms report, 0 = unknown (so a steady clock must not
   //! give a real time of exactly 0; they count from boot).
   struct FrameInput
   {

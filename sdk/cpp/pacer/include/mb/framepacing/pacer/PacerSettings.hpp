@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/Ticks.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/SlowDownRule.hpp>
 #include <algorithm>
@@ -22,20 +22,20 @@ namespace MB::FramePacing::Pacer
     uint32_t m_preferredSwapInterval{1};
     bool m_autoSwapInterval{true};
     SlowDownRule m_slowDown{SlowDownRule::LateCount};
-    int64_t m_windowTicks{2 * TicksPerSecond};
+    int64_t m_windowTicks{2 * TimeSpan::TicksPerSecond};
     uint32_t m_slowDownLatePercent{10};
-    int64_t m_frameMarginTicks{TicksPerMillisecond};
-    int64_t m_slowestFrameTicks{50 * TicksPerMillisecond};
+    int64_t m_frameMarginTicks{TimeSpan::TicksPerMillisecond};
+    int64_t m_slowestFrameTicks{50 * TimeSpan::TicksPerMillisecond};
     int64_t m_presentLatencyTicks{0};
     uint32_t m_windowCapacity{0};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
-    static constexpr int64_t MaxWindowTicks = 60 * TicksPerSecond;
+    static constexpr int64_t MaxWindowTicks = 60 * TimeSpan::TicksPerSecond;
     static constexpr uint32_t MaxSlowDownLatePercent = 100;
-    static constexpr int64_t MaxFrameMarginTicks = TicksPerSecond;
-    static constexpr int64_t MaxSlowestFrameTicks = 10 * TicksPerSecond;
-    static constexpr int64_t MaxPresentLatencyTicks = TicksPerSecond;
+    static constexpr int64_t MaxFrameMarginTicks = TimeSpan::TicksPerSecond;
+    static constexpr int64_t MaxSlowestFrameTicks = 10 * TimeSpan::TicksPerSecond;
+    static constexpr int64_t MaxPresentLatencyTicks = TimeSpan::TicksPerSecond;
     static constexpr uint32_t MinWindowCapacity = 2;
     static constexpr uint32_t MaxWindowCapacity = 1u << 20u;
 

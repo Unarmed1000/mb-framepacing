@@ -1,6 +1,20 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/Rectangle.hpp>
+#include <mb/framepacing/marker/Constants.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/IndexedCount.hpp>
+#include <mb/framepacing/marker/MarkerFlags.hpp>
+#include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/MarkerQuad.hpp>
+#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/Options.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/marker/PixelFormat.hpp>
+#include <mb/framepacing/marker/SequenceId.hpp>
+#include <mb/framepacing/marker/StartMetadata.hpp>
+#include <mb/framepacing/marker/Vertex.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>

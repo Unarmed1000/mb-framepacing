@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // captures.mbcd: header fields at their offsets, newer and foreign files refused, records read back, a partial last record ignored.
-#include <mb/framepacing/Data.hpp>
+#include <mb/framepacing/core/Rectangle.hpp>
+#include <mb/framepacing/data/CaptureDataHeader.hpp>
+#include <mb/framepacing/data/CaptureDataReader.hpp>
+#include <mb/framepacing/data/CaptureDataRecord.hpp>
+#include <mb/framepacing/data/CaptureDataStatus.hpp>
+#include <mb/framepacing/data/Constants.hpp>
+#include <mb/framepacing/data/DataFormatError.hpp>
 #include <gtest/gtest.h>
 #include <array>
 #include <bit>

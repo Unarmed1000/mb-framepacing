@@ -312,7 +312,11 @@ capture as _torn_ and uses the main marker for timing. Required for camera captu
 ## Example (C++)
 
 ```cpp
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/core/time/ChronoConversion.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/marker/SequenceId.hpp>
+#include <mb/framepacing/marker/StartMetadata.hpp>
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 

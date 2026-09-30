@@ -3,7 +3,14 @@
 //
 // The pacer runs every frame, so it must never allocate after it is made. This test binary replaces the global operator new/delete with
 // counting versions and checks that every per-frame call stays at zero allocations.
-#include <mb/framepacing/Pacer.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/FrameInput.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/SlowDownRule.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <atomic>
@@ -143,7 +150,7 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
   int64_t written = 0;
   {
     const AllocationCounter counter;
-    int64_t now = FP::TicksPerSecond;
+    int64_t now = FP::TimeSpan::TicksPerSecond;
     for (int64_t frame = 0; frame < 10'000; ++frame)
     {
       // Calm frames, then a busy stretch (every third frame over a refresh), the rule slowing down and speeding up again

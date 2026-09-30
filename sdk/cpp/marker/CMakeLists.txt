@@ -8,16 +8,15 @@ add_library(mb_framepacing::marker ALIAS mb_framepacing_marker)
 set_target_properties(mb_framepacing_marker PROPERTIES EXPORT_NAME marker C_STANDARD 11 C_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
 target_sources(mb_framepacing_marker
   PRIVATE
-    src/FrameMarker.cpp
-    src/Payload.cpp
+    source/mb/framepacing/marker/FrameMarker.cpp
     third_party/qrcodegen/qrcodegen.c
     third_party/qrcodegen/qrcodegen.h
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/Marker.hpp
       include/mb/framepacing/marker/Constants.hpp
+      include/mb/framepacing/marker/FrameMarker.hpp
       include/mb/framepacing/marker/IndexedCount.hpp
       include/mb/framepacing/marker/MarkerFlags.hpp
       include/mb/framepacing/marker/MarkerKind.hpp

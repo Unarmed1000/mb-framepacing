@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/Ticks.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -32,7 +32,7 @@ namespace MB::FramePacing::Pacer
     //! The shortest period: 1 tick (100 ns)
     static constexpr int64_t MinTicksQ32 = OneTickQ32;
     //! The longest period: 1 s
-    static constexpr int64_t MaxTicksQ32 = TicksPerSecond * OneTickQ32;
+    static constexpr int64_t MaxTicksQ32 = TimeSpan::TicksPerSecond * OneTickQ32;
 
     //! A refresh rate of numerator / denominator Hz: a DXGI_RATIONAL (60000 / 1001), wl_output's mHz (59940 / 1000), a whole rate (60).
     //! From 1 Hz to 10 MHz; a numerator or denominator of 0 is outside.
@@ -44,8 +44,8 @@ namespace MB::FramePacing::Pacer
       }
       // TicksPerSecond * denominator / numerator, the whole ticks and the rest apart so nothing overflows (a period beyond the range
       // stops just past it)
-      const auto dividend = static_cast<uint64_t>(TicksPerSecond) * denominator;
-      const uint64_t whole = std::min(dividend / numerator, static_cast<uint64_t>(TicksPerSecond) + 1u);
+      const auto dividend = static_cast<uint64_t>(TimeSpan::TicksPerSecond) * denominator;
+      const uint64_t whole = std::min(dividend / numerator, static_cast<uint64_t>(TimeSpan::TicksPerSecond) + 1u);
       const uint64_t rest = dividend % numerator;
       const uint64_t fraction = ((rest << 32u) + (numerator / 2u)) / numerator;
       return RefreshPeriod(static_cast<int64_t>((whole << 32u) + fraction));
@@ -54,14 +54,14 @@ namespace MB::FramePacing::Pacer
     //! A period in whole ticks: 1 to TicksPerSecond.
     static constexpr RefreshPeriod FromTicks(const int64_t ticks) noexcept
     {
-      return RefreshPeriod(std::clamp(ticks, int64_t{-1}, TicksPerSecond + 1) * OneTickQ32);
+      return RefreshPeriod(std::clamp(ticks, int64_t{-1}, TimeSpan::TicksPerSecond + 1) * OneTickQ32);
     }
 
     //! A period in nanoseconds (Choreographer's vsync period, VK_GOOGLE_display_timing's refreshDuration), exact to 2^-32 tick: 100 ns
     //! to 1 s.
     static constexpr RefreshPeriod FromNanoseconds(const int64_t nanoseconds) noexcept
     {
-      const int64_t limited = std::clamp(nanoseconds, int64_t{-1}, TicksToNanoseconds(TicksPerSecond) + 1);
+      const int64_t limited = std::clamp(nanoseconds, int64_t{-1}, (TimeSpan::TicksPerSecond * TimeSpan::NanosecondsPerTick) + 1);
       const int64_t whole = limited / 100;
       const int64_t rest = limited % 100;
       return RefreshPeriod((whole * OneTickQ32) + (((rest * OneTickQ32) + 50) / 100));

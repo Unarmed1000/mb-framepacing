@@ -1,33 +1,26 @@
-#ifndef MB_FRAMEPACING_MARKER_HPP
-#define MB_FRAMEPACING_MARKER_HPP
+#ifndef MB_FRAMEPACING_MARKER_FRAMEMARKER_HPP
+#define MB_FRAMEPACING_MARKER_FRAMEMARKER_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// MB::FramePacing::Marker - the marker module: renders a machine readable frame marker (QR code) as pixel aligned geometry or a bitmap.
-//
-// The marker encodes a frame index and the animation time (C# TimeSpan ticks, 100ns) so a capture of the display output
-// can be compared against the capture timeline. See doc/marker-format.md for the full specification.
+// The marker module's functions (C#'s FrameMarker): encode a payload, generate its module matrix and draw it as pixel aligned geometry or a
+// bitmap. The marker encodes a frame index and the animation time (C# TimeSpan ticks, 100 ns) so a capture of the display output can be
+// compared against the capture timeline. See doc/marker-format.md for the full specification.
 //
 // Coordinate system: pixels, origin at the top-left corner, +x to the right, +y down.
 // Every quad edge lies on an integer pixel edge and a quad covers exactly the pixels [Left(),Right()) x [Top(),Bottom()).
-//
-// This is the header to include: it pulls in every type (one header per type), the core (Core.hpp: the library version, the tick units)
-// and declares the functions.
 
-#include <mb/framepacing/Core.hpp>
+#include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/IndexedCount.hpp>
-#include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/MarkerQuad.hpp>
 #include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
 #include <mb/framepacing/marker/Payload.hpp>
 #include <mb/framepacing/marker/PixelFormat.hpp>
-#include <mb/framepacing/marker/SequenceId.hpp>
 #include <mb/framepacing/marker/StartMetadata.hpp>
 #include <mb/framepacing/marker/Vertex.hpp>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>

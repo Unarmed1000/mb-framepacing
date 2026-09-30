@@ -6,7 +6,13 @@
 // the first frame starts 0.2 refresh into the refresh before it is shown, every other frame when the previous one is shown; a frame is
 // shown at the first refresh after it is done, and no sooner than its swap interval after the previous one. The vsync timer animates it
 // for the previous frame's display plus its swap interval.
-#include <mb/framepacing/Pacer.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/AnimationTime.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
@@ -24,7 +30,7 @@ namespace
   constexpr int64_t Period = 100;
   constexpr int64_t FirstStart = 20;
   //! Refresh 0 on the steady clock
-  constexpr int64_t Origin = 10 * FP::TicksPerSecond;
+  constexpr int64_t Origin = 10 * FP::TimeSpan::TicksPerSecond;
 
   //! A diagram's frame: its render time (units), its swap interval, and its clock reading's error (vsync timer diagrams, ticks)
   struct DiagramFrame

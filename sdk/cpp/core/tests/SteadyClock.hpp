@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/Ticks.hpp>
+#include <mb/framepacing/core/time/ChronoConversion.hpp>
 #include <chrono>
 #include <cstdint>
 

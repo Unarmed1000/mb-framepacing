@@ -28,8 +28,8 @@ from pathlib import Path
 LIBRARY = "sdk/cpp"
 MODULES = ("core", "marker", "data", "pacer")
 # Per module, relative to its folder: what to format, and what clang-tidy checks (it follows the headers they include)
-FORMAT_GLOBS = ("include/**/*.hpp", "src/*.cpp", "tests/*.cpp", "tests/*.hpp", "tests/*/*.cpp", "tests/*/*.hpp", "tools/*/*.cpp")
-TIDY_GLOBS = ("src/*.cpp", "tests/*.cpp", "tests/*/*.cpp", "tools/*/*.cpp")
+FORMAT_GLOBS = ("include/**/*.hpp", "source/**/*.cpp", "source/**/*.hpp", "tests/*.cpp", "tests/*.hpp", "tests/*/*.cpp", "tests/*/*.hpp", "tools/*/*.cpp")
+TIDY_GLOBS = ("source/**/*.cpp", "tests/*.cpp", "tests/*/*.cpp", "tools/*/*.cpp")
 HEADER_FILTER = ".*mb/framepacing/.*"
 # The consumer project is its own CMake project, so clang-tidy only formats it
 CONSUMER_GLOB = "tests/consumer/*.cpp"

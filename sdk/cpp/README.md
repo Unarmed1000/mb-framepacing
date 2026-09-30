@@ -3,12 +3,15 @@
 The C++20 library of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) SDK: one CMake project of modules, each its
 own static library target, like Boost's and Poco's.
 
-| Module   | Target                   | Header                        | What it does                                                                                |
-| -------- | ------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| `core`   | `mb_framepacing::core`   | `<mb/framepacing/Core.hpp>`   | What every module shares: the library version, the tick units and conversions, `Rectangle`  |
-| `marker` | `mb_framepacing::marker` | `<mb/framepacing/Marker.hpp>` | Draws the frame marker into every frame of an application; no dependencies, no allocations  |
-| `data`   | `mb_framepacing::data`   | `<mb/framepacing/Data.hpp>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json |
-| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/Pacer.hpp>`  | Plans frames on the display's refreshes and adapts the swap interval; uses only the core    |
+| Module   | Target                   | Headers                     | What it does                                                                                |
+| -------- | ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------- |
+| `core`   | `mb_framepacing::core`   | `<mb/framepacing/core/…>`   | What every module shares: the library version, the time types, `Point`, `Rectangle`         |
+| `marker` | `mb_framepacing::marker` | `<mb/framepacing/marker/…>` | Draws the frame marker into every frame of an application; no dependencies, no allocations  |
+| `data`   | `mb_framepacing::data`   | `<mb/framepacing/data/…>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json |
+| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/pacer/…>`  | Plans frames on the display's refreshes and adapts the swap interval; uses only the core    |
+
+No header includes a whole module: include the header of each type you use (one type per header) and the header of the functions
+(`marker/FrameMarker.hpp`, `data/FramesCsv.hpp`, ...).
 
 The **marker** draws a small QR code into every frame that carries the frame index and the animation time. A capture of the display
 output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the application animated is from
@@ -59,7 +62,12 @@ likewise, only for the tests.
 ## The marker
 
 ```cpp
-#include <mb/framepacing/Marker.hpp>
+#include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/Options.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
+#include <mb/framepacing/marker/Vertex.hpp>
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
@@ -86,11 +94,11 @@ faster still.
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Flags (optional):** `MarkerFlags::StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags::StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame).
-- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`MB::FramePacing::TicksPerSecond`).
+- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`MB::FramePacing::TimeSpan::TicksPerSecond`).
 - **Frame pacing (optional):** `PreferredFrameTicks` (the interval the application wants to run at; it differs from the target only
   while the pacer runs slower than wanted), `TargetFrameTicks` (the interval the pacer aims for: `166'667` for 60 fps) and
   `IntendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady clock, any epoch; the SDK never
-  reads a clock: `TickDuration` converts yours). `0` = unknown, `OnDemandFrameTicks` = frames only when something changes.
+  reads a clock: `TickCount64::FromNanoseconds`, `TickCount64::FromCounter` or `core/time/ChronoConversion.hpp` convert yours). `0` = unknown, `OnDemandFrameTicks` = frames only when something changes.
 - **CPU start time and CPU busy (optional):** `CpuStartTicks` (when the CPU started working on the frame, on the same clock,
   PresentMon's `CPUStartTime`) and `CpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
@@ -102,7 +110,7 @@ faster still.
 - **Size:** every main marker (frame, start, end) is QR version 6, 41×41 modules, so it never changes size:
   `options.MarkerSizePx()`. The sync marker is QR version 2, 25×25 modules.
 
-Everything is declared by `<mb/framepacing/Marker.hpp>` in `MB::FramePacing::Marker`, one header per type (`<mb/framepacing/marker/…>`):
+In `MB::FramePacing::Marker`: the functions in `<mb/framepacing/marker/FrameMarker.hpp>`, each type in its own header (`<mb/framepacing/marker/…>`):
 
 | Function or type                                                                                                | What it does                                                                         |
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -121,7 +129,12 @@ Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false)
 ## The data
 
 ```cpp
-#include <mb/framepacing/Data.hpp>
+#include <mb/framepacing/data/AnalysisFiles.hpp>
+#include <mb/framepacing/data/AnalysisSummary.hpp>
+#include <mb/framepacing/data/CaptureDataReader.hpp>
+#include <mb/framepacing/data/Constants.hpp>
+#include <mb/framepacing/data/FramesCsv.hpp>
+#include <mb/framepacing/marker/Payload.hpp>
 namespace FD = MB::FramePacing::Data;
 
 const auto analysis = FD::FindAnalysis(captureFolder);   // the capture folder's analysis folder (or the folder itself)
@@ -150,8 +163,9 @@ for (const FD::CaptureDataRecord& record : reader.ReadAll())
 ```
 
 Reading allocates and throws: `FD::DataFormatError` for a file it cannot read (another kind of file, damaged content, or a newer format
-version, whose message says to update), `std::runtime_error` for a file it cannot open. Everything is declared by
-`<mb/framepacing/Data.hpp>` in `MB::FramePacing::Data`, one header per type (`<mb/framepacing/data/…>`):
+version, whose message says to update), `std::runtime_error` for a file it cannot open. In `MB::FramePacing::Data`, each type and
+each group of functions in its own header (`<mb/framepacing/data/…>`: `AnalysisSummary.hpp` has `ReadSummary`, `FramesCsv.hpp`
+`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names, `Milliseconds.hpp` `ParseTicks`):
 
 | Function or type                                                            | What it does                                                       |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -165,7 +179,9 @@ version, whose message says to update), `std::runtime_error` for a file it canno
 ## The pacer
 
 ```cpp
-#include <mb/framepacing/Pacer.hpp>
+#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
 namespace PC = MB::FramePacing::Pacer;
 
 const PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));   // required: the display's refresh period
@@ -183,7 +199,7 @@ const uint32_t cpuBusy = pacer.EndFrame({presentTicks});      // as you draw the
 The pacer is values in, values out: it calls no platform API and never reads a clock. `BeginFrame`, `EndFrame` and the
 `AnimationClock` never allocate. [The frame pacer](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/pacer.md) (a
 release archive's `doc/pacer.md`) has the frame loop for every way of presenting, the platform values, the rule and every setting.
-Everything is declared by `<mb/framepacing/Pacer.hpp>` in `MB::FramePacing::Pacer`, one header per type (`<mb/framepacing/pacer/…>`):
+In `MB::FramePacing::Pacer`, each type in its own header (`<mb/framepacing/pacer/…>`):
 
 | Type                                                    | What it is                                                                                                   |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -196,14 +212,17 @@ Everything is declared by `<mb/framepacing/Pacer.hpp>` in `MB::FramePacing::Pace
 
 ## The core
 
-`<mb/framepacing/Core.hpp>` in `MB::FramePacing` (every module's header includes it):
+In `MB::FramePacing`, each in its own header (`<mb/framepacing/core/…>`, the time types in `core/time/`):
 
-| Function or type                                                                | What it does                                                                      |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp` (include it yourself) | The linked library's version; at compile time, for `#if` and `static_assert`      |
-| `TicksPerSecond`, `TicksPerMillisecond`, `TickDuration`                         | The SDK's time unit: 100 ns ticks (C# `TimeSpan` ticks)                           |
-| `NanosecondsToTicks`, `TicksToNanoseconds`, `CounterToTicks`, `ToDateTimeTicks` | Platform times (ns, a performance counter, the wall clock) as ticks               |
-| `Point`, `Rectangle`                                                            | A pixel position; an integer pixel rectangle, always valid (a negative size is 0) |
+| Function or type                                                                  | What it does                                                                                         |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp`                         | The linked library's version; at compile time, for `#if` and `static_assert`                         |
+| `TimeSpan`                                                                        | An interval in 100 ns ticks (the SDK's unit), C#'s `System.TimeSpan`: out of range throws, as in C#  |
+| `TickCount64`                                                                     | A point on your steady clock in ticks (`FromNanoseconds`, `FromCounter` for QueryPerformanceCounter) |
+| `TickCount32`                                                                     | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap      |
+| `TimeSpan32`                                                                      | An unsigned 32-bit interval of 0 to 429.5 s: the form of the marker's 32-bit intervals               |
+| `core/time/ChronoConversion.hpp` (optional): `TickDuration`, `ToDateTimeTicks`, … | `std::chrono` conversions, and the wall clock as C# `DateTime` ticks                                 |
+| `Point`, `Rectangle`                                                              | A pixel position; an integer pixel rectangle, always valid (a negative size is 0)                    |
 
 ## Build and test
 

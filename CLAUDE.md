@@ -13,13 +13,13 @@ The repository has two parts, and the license follows them (see Conventions):
   - **pacer** (C++ `MB::FramePacing::Pacer`, C# `MB.FramePacing.Pacer`): plans every frame on the display's refreshes with the adaptive swap interval rule
     (Swappy's, and mb-framepacing-explained's fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
-    `MB::FramePacing` with the library version and the tick units and conversions, C# assembly `MB.FramePacing`, Python
+    `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; 100 % test coverage, measured with llvm-cov, C# assembly `MB.FramePacing`, Python
     `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
     helper). The core's types hide same-named types that a `using` brings into `MB.FramePacing.*` code: the GUI writes `Avalonia.Point`.
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
 
 See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker specification. **The document is the reference**: C++
-(`sdk/cpp/marker/src/Payload.cpp`) and C# (`sdk/csharp/marker/source/FrameMarker.cs`) must match it byte for byte. The tools'
+(`sdk/cpp/marker/source/mb/framepacing/marker/FrameMarker.cpp`) and C# (`sdk/csharp/marker/source/FrameMarker.cs`) must match it byte for byte. The tools'
 `MarkerPayload` (`measure/libs/MB.FramePacing.MarkerDecoding`) delegates to the C# module; ZXing is only used for decoding.
 
 ## Layout
@@ -29,7 +29,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)       |
 | `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                   |
 | `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`          |
-| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, tick units and conversions, `Rectangle` + tests              |
+| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, time types, `Point`, `Rectangle` + tests                     |
 | `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker`, vendored qrcodegen, `marker-render` tool, GoogleTest tests                |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
 | `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulation and `pacer-sim` (`tests/`, test code)  |
@@ -89,9 +89,11 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     (`--module core|marker|data|pacer` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a
     configured build: `sdk/cpp/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
     include paths); `--preset` takes another one. To apply formatting: `clang-format -i` on the files the script lists.
-  - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,src,tests}`),
-    each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<Module>.hpp>`
-    (the umbrella: includes the module's types and declares its functions) and `<mb/framepacing/<module>/<Type>.hpp>`, namespaces
+  - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,source,tests}`),
+    each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`
+    (no umbrella headers: callers include each type's header; functions live in a header of their own, e.g. `marker/FrameMarker.hpp`, as
+    C#'s static classes), sources mirroring them (`source/mb/framepacing/<module>/<Name>.cpp`, one per header; private helpers in
+    `source/.../detail/`), namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
 COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
     Each module's tests are their own executable (the marker's allocation test replaces the global `operator new`).
@@ -376,12 +378,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   display time step.
 - **Versions:** there are two version files.
   - `sdk/VERSION`: the SDK, every module and language (C#: `sdk/Directory.Build.props`; Python: by hand in `pyproject.toml` and
-    `mb_framepacing.__version__`). CMake reads it into `mb/framepacing/core/Version.hpp`, which only `core/src/LibraryVersion.cpp` and the
-    tests include: `Core.hpp` declares `GetLibraryVersion()`, so a version bump rebuilds one file.
+    `mb_framepacing.__version__`). CMake reads it into `mb/framepacing/core/Version.hpp`, which only `core/source/mb/framepacing/core/GetLibraryVersion.cpp` and the
+    tests include: `core/GetLibraryVersion.hpp` declares `GetLibraryVersion()`, so a version bump rebuilds one file.
   - `measure/VERSION`: the tools. `measure/Directory.Build.props` reads it.
 - **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested). The C++ public API
-  has one header per type; each module's umbrella header (`Core.hpp`, `Marker.hpp`, `Data.hpp`) includes them all and declares the
-  functions. CI runs `tools/check_one_type_per_file.py`.
+  has one header per type and no umbrella headers (a header that includes a whole module is a god file:
+  `tools/check_one_type_per_file.py` rejects one); the functions have headers of their own. CI runs `tools/check_one_type_per_file.py`.
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
 - **Reference shaders (`sdk/shaders/`, BSD):** one quad whose fragment shader finds each pixel's module, from the packed bits
   (`Bits()` as constants; the fastest way to draw the marker) or a texel per module. One folder per API: `hlsl/` (`FrameMarker.hlsl` is

@@ -1,6 +1,15 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include "PacerSimulation.hpp"
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/AnimationClock.hpp>
+#include <mb/framepacing/pacer/AnimationTime.hpp>
+#include <mb/framepacing/pacer/FrameEnd.hpp>
+#include <mb/framepacing/pacer/FrameInput.hpp>
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +24,7 @@ namespace MB::FramePacing::Pacer::Simulation
   {
     constexpr int64_t Milliseconds(const int64_t milliseconds) noexcept
     {
-      return milliseconds * TicksPerMillisecond;
+      return milliseconds * TimeSpan::TicksPerMillisecond;
     }
 
     //! SplitMix64 (Steele, Lea and Flood, 2014): 64-bit integer arithmetic only, so C# draws the same numbers

@@ -4,8 +4,8 @@
 """Check the "one class/struct/enum per file" convention (see CLAUDE.md).
 
 - C#: every tracked .cs file declares at most one namespace-level type (nested types are fine).
-- C++: every public header of a module (sdk/cpp/<module>/include) declares at most one type; the umbrella headers (Core.hpp,
-  Marker.hpp, Data.hpp, Pacer.hpp) hold only functions.
+- C++: every public header of a module (sdk/cpp/<module>/include) declares at most one type, and there are no umbrella headers
+  (a header right in include/mb/framepacing/ that pulls in a module): callers include each type's header.
 
 Run from anywhere inside the repository: python tools/check_one_type_per_file.py
 Exits with 1 and lists the offending files when the convention is broken.
@@ -43,6 +43,8 @@ def main() -> int:
     for path in tracked_files(root, "sdk/cpp/*/include/*.hpp"):
         if (n := count_types(path, CPP_TYPE)) > 1:
             problems.append(f"{path.relative_to(root)}: {n} types")
+        if path.parent.name == "framepacing" and path.parent.parent.name == "mb":
+            problems.append(f"{path.relative_to(root)}: an umbrella header; include each type's header instead")
     if problems:
         print("One class/struct/enum per file (CLAUDE.md 'Conventions'):")
         for problem in problems:
