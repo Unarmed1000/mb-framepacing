@@ -37,11 +37,14 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<RankBits> m_uncertainSteps;
     private readonly Lazy<RankBits> m_staticSteps;
     private readonly Lazy<FrameSequence> m_animationHolds;
+    private readonly Lazy<FrameSequence> m_animatingAnimationHolds;
     private readonly Lazy<FrameSequence> m_frameTimes;
     private readonly Lazy<FrameSequence> m_cpuBusy;
     private readonly Lazy<FrameSequence> m_animatingFrameTimes;
     private readonly Lazy<RankBits> m_spans;
     private readonly Lazy<WaveletMatrix> m_frameTimesAndCpuBusy;
+    private readonly Lazy<FrameSequence> m_animatingCpuBusy;
+    private readonly Lazy<WaveletMatrix> m_allFrameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_drift;
     private readonly Lazy<LateShareData?> m_lateShare;
     private readonly Lazy<int[]> m_segmentEnds;
@@ -50,6 +53,8 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<ReferenceStretch[]> m_frameTimeReferences;
     private readonly Lazy<FrameSequence> m_animatingStepReferences;
     private readonly Lazy<FrameSequence> m_animatingFrameTimeReferences;
+    private readonly Lazy<FrameSequence> m_allStepReferences;
+    private readonly Lazy<FrameSequence> m_allFrameTimeReferences;
 
     private RunChartData(ChartRun run)
     {
@@ -94,6 +99,12 @@ namespace MB.FramePacing.Charts
         new FrameSequence(count, i => HasNext(i) && (Frames[i + 1].Flags & PresentedFrameFlags.Late) != 0 ? Frames[i + 1].DisplayDeltaTicks : null)
       );
       m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDeltaTicks : null));
+      m_animatingAnimationHolds = Once(() =>
+        new FrameSequence(
+          count,
+          i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDeltaTicks : null
+        )
+      );
       m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTimeTicks is > 0 and var t ? t : null));
       m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null));
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTimeTicks is > 0 || Frames[i].CpuBusyTicks > 0));
@@ -141,20 +152,30 @@ namespace MB.FramePacing.Charts
           i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTimeTicks is > 0 and var t ? t : null
         )
       );
-      m_frameTimesAndCpuBusy = Once(() =>
+      m_animatingCpuBusy = Once(() =>
+        new FrameSequence(
+          count,
+          i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null
+        )
+      );
+      // Per frame its frametime, then its CPU busy (each when above 0; a static frame's left out unless static values count: an application
+      // that waits for input inside its frame has an idle wait's CPU busy): a range of frames starts at its frametimes' plus its CPU busys' start
+      WaveletMatrix FrameTimesAndCpuBusyOf(bool withStatic)
       {
-        // Per frame its frametime (not a static frame's: an idle wait), then its CPU busy (each when above 0): a range of frames starts at its
-        // animating frametimes' plus its CPU busys' start
-        var values = new List<long>(AnimatingFrameTimes.Count + CpuBusy.Count);
+        var values = new List<long>(FrameTimes.Count + CpuBusy.Count);
         for (int i = 0; i < count; ++i)
         {
-          if ((Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTimeTicks is > 0 and var t)
+          if (!withStatic && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) != 0)
+            continue;
+          if (Frames[i].FrameTimeTicks is > 0 and var t)
             values.Add(t);
           if (Frames[i].CpuBusyTicks > 0)
             values.Add(Frames[i].CpuBusyTicks);
         }
         return new WaveletMatrix(values.ToArray());
-      });
+      }
+      m_frameTimesAndCpuBusy = Once(() => FrameTimesAndCpuBusyOf(withStatic: false));
+      m_allFrameTimesAndCpuBusy = Once(() => FrameTimesAndCpuBusyOf(withStatic: true));
       m_drift = Once(() => new FrameSequence(count, i => Frames[i].DriftTicks));
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
@@ -182,12 +203,13 @@ namespace MB.FramePacing.Charts
         }
         return stretches.ToArray();
       }
-      // The scales take the lines of the holds that animate (an idle screen's aim would squash them, as its hold would)
-      FrameSequence Animating(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred) =>
+      // The scales take the lines of the holds that animate: neither the frame holding nor the frame ending the hold, whose aim the line is,
+      // is static (an idle screen's aim, 1 s at 1 fps, would squash them, as its hold would). Unless static values count too
+      FrameSequence References(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred, bool withStatic) =>
         new FrameSequence(
           count,
           i =>
-            refresh > 0 && HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0
+            refresh > 0 && HasNext(i) && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
               ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
               {
                 (null, null) => null,
@@ -197,8 +219,14 @@ namespace MB.FramePacing.Charts
         );
       m_stepReferences = Once(() => Stretches(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f))));
       m_frameTimeReferences = Once(() => Stretches(FrameReference.Target, FrameReference.Preferred));
-      m_animatingStepReferences = Once(() => Animating(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f))));
-      m_animatingFrameTimeReferences = Once(() => Animating(FrameReference.Target, FrameReference.Preferred));
+      m_animatingStepReferences = Once(() =>
+        References(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f)), withStatic: false)
+      );
+      m_animatingFrameTimeReferences = Once(() => References(FrameReference.Target, FrameReference.Preferred, withStatic: false));
+      m_allStepReferences = Once(() =>
+        References(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f)), withStatic: true)
+      );
+      m_allFrameTimeReferences = Once(() => References(FrameReference.Target, FrameReference.Preferred, withStatic: true));
     }
 
     /// <summary>The prepared data of <paramref name="run"/>: made on first use and kept as long as the run is.</summary>
@@ -254,6 +282,9 @@ namespace MB.FramePacing.Charts
     /// <summary>Each frame's hold at the next frame's animation time step: the animation time step over the display time step.</summary>
     public FrameSequence AnimationHolds => m_animationHolds.Value;
 
+    /// <summary>The animation time steps of the holds that animate (not a static frame's): the overlay's part of the step scale.</summary>
+    public FrameSequence AnimatingAnimationHolds => m_animatingAnimationHolds.Value;
+
     public FrameSequence FrameTimes => m_frameTimes.Value;
 
     public FrameSequence CpuBusy => m_cpuBusy.Value;
@@ -264,11 +295,17 @@ namespace MB.FramePacing.Charts
     /// <summary>The frametimes of the frames that animate: a static frame's (an idle wait) is left out, as the frametime scale is.</summary>
     public FrameSequence AnimatingFrameTimes => m_animatingFrameTimes.Value;
 
+    /// <summary>The CPU busy of the frames that animate: a static frame's (an idle wait inside the frame) is left out, as the frametime scale is.</summary>
+    public FrameSequence AnimatingCpuBusy => m_animatingCpuBusy.Value;
+
     /// <summary>
-    /// The frametime panel's scale values: every frametime of a frame that animates and every CPU busy above 0, per frame in that order: frames
-    /// <c>a</c> to <c>b</c> are positions <c>AnimatingFrameTimes.Frames.Rank(a) + CpuBusy.Frames.Rank(a)</c> to the same at <c>b</c>.
+    /// The frametime panel's scale values: the frametime and CPU busy (above 0) of every frame that animates, per frame in that order: frames
+    /// <c>a</c> to <c>b</c> are positions <c>AnimatingFrameTimes.Frames.Rank(a) + AnimatingCpuBusy.Frames.Rank(a)</c> to the same at <c>b</c>.
     /// </summary>
     public WaveletMatrix FrameTimesAndCpuBusy => m_frameTimesAndCpuBusy.Value;
+
+    /// <summary>The same with every frame's, static ones included: positions <c>FrameTimes.Frames.Rank(a) + CpuBusy.Frames.Rank(a)</c>.</summary>
+    public WaveletMatrix AllFrameTimesAndCpuBusy => m_allFrameTimesAndCpuBusy.Value;
 
     public FrameSequence Drift => m_drift.Value;
 
@@ -281,11 +318,19 @@ namespace MB.FramePacing.Charts
     /// <summary>The frametime panel's reference lines: the same stretches with the frame times as written.</summary>
     public IReadOnlyList<ReferenceStretch> FrameTimeReferences => m_frameTimeReferences.Value;
 
-    /// <summary>Per frame that animates, the higher of its hold's target and preferred frame time in whole refreshes: for the step scale.</summary>
+    /// <summary>
+    /// Per hold that animates (neither frame static), the higher of its target and preferred frame time in whole refreshes: for the step scale.
+    /// </summary>
     public FrameSequence AnimatingStepReferences => m_animatingStepReferences.Value;
 
-    /// <summary>Per frame that animates, the higher of its frametime's target and preferred frame time as written: for the frametime scale.</summary>
+    /// <summary>Per frametime that animates (neither frame static), the higher of its target and preferred frame time as written: for the frametime scale.</summary>
     public FrameSequence AnimatingFrameTimeReferences => m_animatingFrameTimeReferences.Value;
+
+    /// <summary>The same as <see cref="AnimatingStepReferences"/> for every hold, static ones included (ReportOptions.ClampStatic off).</summary>
+    public FrameSequence AllStepReferences => m_allStepReferences.Value;
+
+    /// <summary>The same as <see cref="AnimatingFrameTimeReferences"/> for every frametime, static ones included.</summary>
+    public FrameSequence AllFrameTimeReferences => m_allFrameTimeReferences.Value;
 
     /// <summary>What went wrong when, in the frames and in the capture: the events lanes'.</summary>
     public RunEvents Events => m_events.Value;

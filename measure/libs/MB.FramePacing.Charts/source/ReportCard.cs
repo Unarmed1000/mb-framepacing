@@ -149,7 +149,7 @@ namespace MB.FramePacing.Charts
       Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRowFor(tiles.Count));
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
       var panels = new List<Action<List<CardShape>, List<CardPlot>>>();
-      var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, plotX1, viewFrom, viewTo, pixelsPerFrame);
+      var view = new PanelView(section, XOf, XOfFrame, perFrame, wholeRunScales, options.ClampStatic, plotX1, viewFrom, viewTo, pixelsPerFrame);
       if (layout.ErrorY is { } errorY)
         panels.Add((shapes, plots) => ErrorPanel(shapes, plots, view, refreshMs, errorY));
       if (layout.StepY is { } stepY)
@@ -321,6 +321,7 @@ namespace MB.FramePacing.Charts
       Func<int, double> XOfFrame,
       bool PerFrame,
       bool WholeRunScales,
+      bool ClampStatic,
       double PlotX1,
       double ViewFrom,
       double ViewTo,
@@ -673,9 +674,11 @@ namespace MB.FramePacing.Charts
       int holdEnd = Math.Max(section.Start, section.End - 1);
       var (scaleFrom, scaleTo) = view.WholeRunScales ? (0, data.Frames.Count) : (section.Start, holdEnd);
       // The scale covers the display time steps of the frames that animate (an idle screen's hold would squash them: it gets a mark at the
-      // edge), and the animation time steps when they are drawn too
+      // edge with its value), and the animation time steps when they are drawn too; every hold's when static values count (ClampStatic off)
+      var holdScale = view.ClampStatic ? data.AnimatingHolds : data.Holds;
+      var animationScale = view.ClampStatic ? data.AnimatingAnimationHolds : data.AnimationHolds;
       var scales = new List<(double Longest, double Bulk)>();
-      foreach (var sequence in animation ? new[] { data.AnimatingHolds, data.AnimationHolds } : new[] { data.AnimatingHolds })
+      foreach (var sequence in animation ? new[] { holdScale, animationScale } : new[] { holdScale })
       {
         var (scaleStart, scaleEnd) = sequence.Of(scaleFrom, scaleTo);
         if (scaleEnd > scaleStart)
@@ -685,7 +688,7 @@ namespace MB.FramePacing.Charts
       double referenceLongest = 0;
       if (frameTimeLines)
       {
-        var references = data.AnimatingStepReferences;
+        var references = view.ClampStatic ? data.AnimatingStepReferences : data.AllStepReferences;
         var (referenceStart, referenceEnd) = references.Of(scaleFrom, scaleTo);
         if (referenceEnd > referenceStart)
           referenceLongest = MaxMs(references.Values, referenceStart, referenceEnd);
@@ -969,17 +972,20 @@ namespace MB.FramePacing.Charts
       };
       var frameTimes = data.FrameTimes;
       var cpuBusy = data.CpuBusy;
-      // The scale leaves a static frame's frametime (an idle wait) out: it gets a mark at the edge
-      int Combined(int frame) => data.AnimatingFrameTimes.Frames.Rank(frame) + cpuBusy.Frames.Rank(frame);
+      // The scale leaves a static frame's frametime and CPU busy (an idle wait) out: they get a mark at the edge with their value. Unless
+      // static values count
+      var frameTimeScale = view.ClampStatic ? data.AnimatingFrameTimes : data.FrameTimes;
+      var cpuBusyScale = view.ClampStatic ? data.AnimatingCpuBusy : cpuBusy;
+      int Combined(int frame) => frameTimeScale.Frames.Rank(frame) + cpuBusyScale.Frames.Rank(frame);
       var (scaleFrom, scaleTo) = view.ScaleFrames;
       int scaleStart = Combined(scaleFrom);
       int scaleEnd = Combined(scaleTo);
-      var both = data.FrameTimesAndCpuBusy;
+      var both = view.ClampStatic ? data.FrameTimesAndCpuBusy : data.AllFrameTimesAndCpuBusy;
       // And the reference lines of the frames that animate
       double referenceLongest = 0;
       if (frameTimeLines)
       {
-        var references = data.AnimatingFrameTimeReferences;
+        var references = view.ClampStatic ? data.AnimatingFrameTimeReferences : data.AllFrameTimeReferences;
         var (referenceStart, referenceEnd) = references.Of(scaleFrom, scaleTo);
         if (referenceEnd > referenceStart)
           referenceLongest = MaxMs(references.Values, referenceStart, referenceEnd);

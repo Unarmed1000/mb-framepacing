@@ -340,8 +340,17 @@ namespace MB.FramePacing.DocImages
         analysis.HoverText(card.Drawing!.Plots[0], atPointer, 0)?.StartsWith($"Frame {frame!.FrameIndex} at", StringComparison.Ordinal) == true,
         "hovering names the frame under the pointer"
       );
+      // The Clamp static switch builds the Timeline again, and the setting comes back on
+      Expect(analysis.ClampStatic, "Clamp static is on by default");
+      before = card.Drawing;
+      analysis.ClampStatic = false;
+      _ = await Built(before, "switching Clamp static off builds the Timeline again");
+      before = card.Drawing;
+      analysis.ClampStatic = true;
+      _ = await Built(before, "switching Clamp static on builds the Timeline again");
       Console.WriteLine(
-        "  Timeline card: width, wheel zoom, sliding window (sideways scroll, scrollbar, drag, next window), double-click and hover work"
+        "  Timeline card: width, wheel zoom, sliding window (sideways scroll, scrollbar, drag, next window), double-click, hover and Clamp "
+          + "static work"
       );
     }
 

@@ -4,7 +4,8 @@
 //* Which items a report card shows (ReportItem ids): all of them by default; Hide switches some off, ShowOnly keeps just the ones named. A
 //* tile shows when neither it nor "tiles" is hidden. An overlay is opt-in: it shows when Show (or ShowOnly) names it and its panel shows.
 //* Also how the card is laid out, for a card in a document: its own title, the refresh strip over only the first seconds, tiles and panels
-//* with nothing to show left out, and the tiles per row. The defaults draw the standard card.
+//* with nothing to show left out, and the tiles per row; and whether static frames' values set the value scales. The defaults draw the
+//* standard card.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -48,6 +49,12 @@ namespace MB.FramePacing.Charts
 
     /// <summary>Leave out the tiles without a value (too few frames, no pacing) and the late share when no frame is late.</summary>
     public bool HideEmpty { get; init; }
+
+    /// <summary>
+    /// The display time step and frametime panels scale to the frames that animate (the default): a static frame's hold, frametime and aim
+    /// (an idle wait of a second) stop at the scale's edge with a mark and their value. Off, every value sets the scale, static ones too.
+    /// </summary>
+    public bool ClampStatic { get; init; } = true;
 
     /// <summary>
     /// How many headline tiles go in a row (1 to <see cref="MaxTilesPerRow"/>); null (the default): two rows, half the tiles each, at least

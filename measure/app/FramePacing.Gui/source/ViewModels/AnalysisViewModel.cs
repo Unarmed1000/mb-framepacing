@@ -56,7 +56,7 @@ namespace MB.FramePacing.Gui.ViewModels
     public const double MinCardWidth = 640;
 
     /// <summary>The Timeline card shows the panels only: the page has its own tiles and title.</summary>
-    public static readonly ReportOptions TimelineOptions = ReportOptions.ShowOnly(
+    private static readonly ReportOptions g_timelineItems = ReportOptions.ShowOnly(
       new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.FrameTime, ReportItem.LateShare, ReportItem.RefreshStrip }
     );
 
@@ -79,6 +79,26 @@ namespace MB.FramePacing.Gui.ViewModels
         SelectedTimeSource = timeSource;
       TargetFpsText = settings.AnalysisTargetFps ?? string.Empty;
       DisplayHzText = settings.AnalysisDisplayHz ?? string.Empty;
+      ClampStatic = settings.ClampStatic;
+    }
+
+    /// <summary>The Timeline's items, and whether static frames' values set its scales (the Clamp static switch).</summary>
+    public ReportOptions TimelineOptions => g_timelineItems with { ClampStatic = ClampStatic };
+
+    /// <summary>
+    /// The display time step and frametime scales follow the frames that animate: a static frame's hold, frametime and aim (an idle wait)
+    /// stop at the edge with their value. Off, they set the scales too. Save view and Save charts follow it.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ClampStatic { get; set; }
+
+    /// <summary>The scales changed: the Timeline is built again for the range shown.</summary>
+    partial void OnClampStaticChanged(bool value)
+    {
+      if (SelectedRun?.Chart is not { } chart)
+        return;
+      m_window = m_shownWindow = null;
+      Request(chart, m_requested);
     }
 
     /// <summary>Copy the current options into the settings (saved when the window closes).</summary>
@@ -87,6 +107,7 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings.TimeSource = SelectedTimeSource.ToString();
       m_settings.AnalysisTargetFps = TargetFpsText;
       m_settings.AnalysisDisplayHz = DisplayHzText;
+      m_settings.ClampStatic = ClampStatic;
       if (!string.IsNullOrWhiteSpace(CaptureDirectory))
         m_settings.LastCaptureDirectory = CaptureDirectory;
     }
@@ -469,7 +490,8 @@ namespace MB.FramePacing.Gui.ViewModels
         return;
       try
       {
-        var files = await Task.Run(() => ChartFiles.Write(report));
+        var options = ReportOptions.Default with { ClampStatic = ClampStatic };
+        var files = await Task.Run(() => ChartFiles.Write(report, options));
         ErrorText = string.Empty;
         SummaryText = $"{files.Count} chart(s) written to {report.OutputDirectory}";
       }

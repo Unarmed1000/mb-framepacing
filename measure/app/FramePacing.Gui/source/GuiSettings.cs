@@ -65,6 +65,9 @@ namespace MB.FramePacing.Gui
     /// <summary>Show the experimental features (camera capture). Off: they are hidden and never used.</summary>
     public bool ExperimentalFeatures { get; set; }
 
+    /// <summary>The Timeline's value scales follow the frames that animate (ReportOptions.ClampStatic); on by default.</summary>
+    public bool ClampStatic { get; set; } = true;
+
     /// <summary>EXPERIMENTAL camera capture: film the screen with the calibrated rig, its file, a slow motion clip's recorded fps.</summary>
     public bool UseCamera { get; set; }
     public string? CameraRig { get; set; }

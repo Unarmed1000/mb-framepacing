@@ -12,7 +12,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
         <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
         <ComboBox
@@ -43,6 +43,13 @@
           Command="{Binding SaveChartsCommand}"
           IsEnabled="{Binding HasRun}"
           ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
+        />
+        <CheckBox
+          Grid.Column="8"
+          Content="Clamp static"
+          IsChecked="{Binding ClampStatic}"
+          VerticalAlignment="Center"
+          ToolTip.Tip="Scale the Timeline's display time step and frametime panels to the frames that animate: static holds, frametimes, CPU busy and aims beyond it (an idle wait) stop at the edge with their value. Save view and Save charts follow it."
         />
       </Grid>
     </Border>

@@ -321,7 +321,8 @@ and the middle 90 % solid.
 Every item of the card can be left out (`--hide late-share,refresh-strip`) or kept alone (`--only animation-error`); `--help`
 lists the ids. `--show animation-time-step` adds the animation time step over the display time step, and a card for a document can
 have its own title (`--title`), a refresh strip of only the first seconds (`--strip-seconds`), no tiles without a value
-(`--hide-empty`) and more tiles per row (`--tiles-per-row`). Next to the report, `render` draws the distributions as cards in the same style (`run-<id>-<card>.svg`): the
+(`--hide-empty`) and more tiles per row (`--tiles-per-row`); `--no-static-clamp` lets idle stretches' values set the value scales
+(by default they stop at the edge, as the GUI's **Clamp static** check box does). Next to the report, `render` draws the distributions as cards in the same style (`run-<id>-<card>.svg`): the
 animation error and display time step histograms (0.1 ms bins, counts on a log scale), the |animation error| by percentile and the
 cumulative drift; `--cards` picks them (`--cards none` for the report only).
 

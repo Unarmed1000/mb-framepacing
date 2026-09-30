@@ -20,9 +20,10 @@ namespace MB.FramePacing.Charts
     /// <summary>
     /// Writes each run's charts into the report directory, named like its frames CSV (<see cref="CaptureAnalyzer.RunFilePrefix"/>):
     /// -report.svg (<see cref="ReportCard"/>) and -error-histogram.svg, -display-time-step-histogram.svg, -error-percentiles.svg and
-    /// -drift.svg (<see cref="DistributionCard"/>). Returns the files written.
+    /// -drift.svg (<see cref="DistributionCard"/>). The report card follows <paramref name="options"/> (the defaults: the standard card; the
+    /// GUI's Save charts passes its Clamp static switch). Returns the files written.
     /// </summary>
-    public static IReadOnlyList<string> Write(AnalysisReport report)
+    public static IReadOnlyList<string> Write(AnalysisReport report, ReportOptions? options = null)
     {
       var written = new List<string>();
       var ordinals = new Dictionary<uint, int>();
@@ -33,7 +34,7 @@ namespace MB.FramePacing.Charts
         ordinals[run.RunId] = ordinal + 1;
         string prefix = CaptureAnalyzer.RunFilePrefix(run, ordinal);
         var chart = ChartRun.From(report, run, captures);
-        written.AddRange(ReportFiles.Write(chart, prefix, report.OutputDirectory));
+        written.AddRange(ReportFiles.Write(chart, prefix, report.OutputDirectory, options: options));
         written.AddRange(ReportFiles.WriteCards(chart, prefix, report.OutputDirectory, DistributionCard.All.Select(card => card.Id)));
       }
       return written;

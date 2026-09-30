@@ -73,6 +73,12 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "Leave out the tiles without a value (too few frames, no pacing) and the late share when no frame is late.",
       };
+      var noStaticClampOption = new Option<bool>("--no-static-clamp")
+      {
+        Description =
+          "Let static frames' values set the display time step and frametime scales. By default the scales follow the frames that animate, and "
+          + "a static hold, frametime or aim (an idle wait) stops at the edge with its value.",
+      };
       var tilesPerRowOption = new Option<int?>("--tiles-per-row")
       {
         Description =
@@ -103,6 +109,7 @@ namespace MB.FramePacing.App.Commands
         titleOption,
         stripSecondsOption,
         hideEmptyOption,
+        noStaticClampOption,
         tilesPerRowOption,
         cardsOption,
       };
@@ -131,6 +138,7 @@ namespace MB.FramePacing.App.Commands
             Title = parseResult.GetValue(titleOption),
             StripSeconds = parseResult.GetValue(stripSecondsOption),
             HideEmpty = parseResult.GetValue(hideEmptyOption),
+            ClampStatic = !parseResult.GetValue(noStaticClampOption),
             TilesPerRow = parseResult.GetValue(tilesPerRowOption),
           };
           var cards = ParseCards(parseResult.GetValue(cardsOption)!);

@@ -212,7 +212,10 @@ across a gap is never called dropped: the frame may have been shown in the refre
 
 **Static stretches** (the marker's `StaticAfter` or `StaticBefore` flag: nothing animates while a frame is on screen) are a violet band behind every time panel. The display time step
 and frametime scales leave a static frame's hold and frametime out (idle waits), so an idle second does not squash the panel; those
-values get a mark with their value at the top edge.
+values get a mark with their value at the top edge. The same holds for a static frame's CPU busy (an application that waits for input
+inside its frame) and for the target and preferred frame time of an idle stretch (its reference lines). This is **Clamp static**, on by
+default: `render --no-static-clamp` and the GUI's **Clamp static** check box (next to Save charts, which follows it) let the static
+values set the scales too.
 
 The **distribution cards** are drawn next to the report for the same run or section: `run-<id>-error-histogram.svg`,
 `-display-time-step-histogram.svg`, `-error-percentiles.svg` and `-drift.svg` (with the section's `-<from>s-<to>s`). The histograms

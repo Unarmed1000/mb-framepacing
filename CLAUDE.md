@@ -169,7 +169,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       on purpose (`Show`); the tiles go in two rows, half of them each (`TilesPerRowFor`: 8 → 4, 10 → 5). The layout options are for a card in a
       document (explained's charts page): `Title`, `StripSeconds` (the strip over the first seconds, its own axis), `HideEmpty` (tiles
       without a value, `HeadlineTile.HasValue`, and the late share without late frames), `TilesPerRow`. The defaults are the standard
-      card: `--charts`, Save charts, the GUI and DocImages never set them.
+      card: `--charts`, Save charts, the GUI and DocImages never set them. `ClampStatic` (on by default) is the one the GUI switches:
+      its "Clamp static" check box, which Save view and Save charts follow (`ChartFiles.Write(report, options)`).
     - Cards are shapes (`CardDrawing`: `RectShape`, `LineShape`, `PathShape`, `TextShape`, `GroupShape`, plus `CardPlot` per plot
       area with its data range, for the GUI's zoom and hover and for tests that read values back); `SvgCardWriter` writes them.
       `DistributionCard` builds the error and display time step histograms, the error percentiles and the drift (`render --cards`).
@@ -208,8 +209,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       is the live one (`ChartVideoClipTests`). The key counts each kind in the section, the description names the capture gaps by kind,
       and `CardHover` lists a column's events with the frames they name. The strip has no marks.
     - **Static stretches:** a violet band (`static-band`) behind every time panel from the first static frame's display time to the next
-      frame's (`RunChartData.StaticStretches`), violet strip cells (`strip-static-a`/`-b`). The display time step and frametime scales
-      leave static frames' holds and frametimes out (`RunChartData.AnimatingHolds`, `AnimatingFrameTimes`); they get edge marks.
+      frame's (`RunChartData.StaticStretches`), violet strip cells (`strip-static-a`/`-b`). With `ReportOptions.ClampStatic` (the
+      default; `render --no-static-clamp`, the GUI's "Clamp static" check box, `GuiSettings.ClampStatic`) the display time step and
+      frametime scales leave static frames' values out: holds, the animation time step overlay, frametimes, CPU busy and the reference
+      lines of holds ending at a static frame (`RunChartData.AnimatingHolds`, `AnimatingAnimationHolds`, `AnimatingFrameTimes`,
+      `AnimatingCpuBusy`, `FrameTimesAndCpuBusy`, `AnimatingStepReferences`); they get edge marks with their value. Off, the `All…`
+      and unfiltered sequences set the scales.
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
     0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
     `TimelineOptions.ErrorThresholdTicks`), and a display time step is off its target from half a refresh on. A source's precision (a
