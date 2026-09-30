@@ -119,7 +119,7 @@ namespace MB.FramePacing.Charts
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
       int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
-        description.Add($"Frame rates and display time steps {staticFrames}: nothing animates in them.");
+        description.Add($"Frame rates and display time steps {staticFrames}: nothing animates while they are on screen.");
       // Capture gaps, by kind when the capture rows are known: the steps they made uncertain are not judged
       int uncertain = section.Data.UncertainSteps.CountIn(section.Start, section.End);
       string gaps = CaptureGaps(section);

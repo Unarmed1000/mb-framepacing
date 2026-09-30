@@ -11,7 +11,7 @@ one folder per scenario, each with its `video.mp4` and the generator's `manifest
 - how many refreshes late it was (negative: early, shown out of order);
 - the target frame rate and the preferred frame rate (`targetFps`, `preferredFps`; `null` on demand);
 - the frame's CPU start time and CPU busy (`cpuStartTicks`, `cpuBusyTicks`);
-- in the idle clips, whether it is `static` (nothing animates; its marker carries the Static flag).
+- in the idle clips, whether it is `static` (nothing animates while it is on screen; its marker carries the StaticAfter flag).
 
 **Every marker carries:**
 
@@ -35,7 +35,7 @@ The start marker also carries a sequence id: the mode's name, or a UUID made fro
 
 - `60-naive-5ms-static-rests`: frames at rest are static.
 - `60-on-demand`: nothing is rendered at rest.
-- `60-on-demand-paused-clock`: as `60-on-demand`, but the animation clock pauses while idle, so only the Static flag keeps the step
+- `60-on-demand-paused-clock`: as `60-on-demand`, but the animation clock pauses while idle, so only the StaticAfter flag keeps the step
   after a rest from being judged.
 - `60-idle-1fps`: one frame per second while idle, preferring 1 s.
 

@@ -89,7 +89,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>
     /// The analysis of the decoded clip, frame by frame and to the tick: the presented frames (dropped frames never appear, a frame shown out of
     /// order is not presented again) with their frame index and the indices skipped before them, display time step, animation time step and
-    /// error (not judged from or to a static frame), drift, the late flag and how late, the target and preferred frame time, the pacing and
+    /// error (not judged from a static frame), drift, the late flag and how late, the target and preferred frame time, the pacing and
     /// prediction errors against the pacer's schedule in the markers, and the CPU start time, CPU busy, frametime and CPU wait.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
@@ -169,7 +169,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(
           frame.PredictionErrorTicks,
           Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepTicks(i) - intended : null),
-          where + ": prediction error (not judged from or to a static frame)"
+          where + ": prediction error (not judged from a static frame)"
         );
       }
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(Enumerable.Range(1, manifest.FrameCount - 1).Count(manifest.IsLate)), $"{clip}: late frames");

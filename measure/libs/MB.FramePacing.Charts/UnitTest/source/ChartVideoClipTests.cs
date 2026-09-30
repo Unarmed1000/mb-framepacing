@@ -64,7 +64,7 @@ namespace MB.FramePacing.Charts.UnitTest
         ReportOptions.ShowOnly(new[] { ReportItem.AnimationError, ReportItem.DisplayTimeStep, ReportItem.FrameTime, ReportItem.LateShare })
       );
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
-      // The frames with an animation error: a step from or to a static frame is not judged
+      // The frames with an animation error: a step from a static frame is not judged
       var judged = measured.Where(manifest.IsJudged).ToArray();
       double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
       double Error(int i) => Ms(manifest.AnimationErrorTicks(i)!.Value);
@@ -250,7 +250,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (manifest, report, _) = Analyze(clip);
       var section = RunSection.Whole(AnalysisOutput.Read(report.CaptureDirectory).Single().Chart);
-      // The frames with an animation error (a step from or to a static frame is not judged); the display time step histogram counts the
+      // The frames with an animation error (a step from a static frame is not judged); the display time step histogram counts the
       // steps toward the frame rate (all but a static frame's time on screen)
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.IsJudged).ToArray();
       var counted = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.CountsTowardFrameRate).ToArray();
@@ -619,7 +619,7 @@ namespace MB.FramePacing.Charts.UnitTest
       if (excluded > 0)
       {
         Assert.That(fps.Detail, Does.EndWith($" · {excluded} static excluded"));
-        Assert.That(texts, Has.One.EqualTo($"Frame rates and display time steps excluding {excluded} static frames: nothing animates in them."));
+        Assert.That(texts, Has.One.EqualTo($"Frame rates and display time steps excluding {excluded} static frames: nothing animates while they are on screen."));
       }
       else
       {

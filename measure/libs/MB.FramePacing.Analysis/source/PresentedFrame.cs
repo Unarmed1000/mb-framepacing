@@ -2,8 +2,8 @@
 //* File Description
 //* ----------------
 //* One application frame as it reached the display: when it was first seen, how long it stayed, its display and animation delta, animation
-//* error and drift. The animation error is not judged (null) for a step from or to a static frame (nothing animates in it), and the drift
-//* adds up only the judged errors.
+//* error and drift. The animation error is not judged (null) for a step from a static frame (nothing animated while it was on screen), and
+//* the drift adds up only the judged errors.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1

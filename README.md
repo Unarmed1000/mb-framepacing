@@ -263,14 +263,14 @@ Every panel says in its title what it shows, and its key on the right names each
 - **Share of late frames in the last 2 s:** the frames of the 2 s before each frame that were late, or on screen longer than the
   application prefers (its preferred frame time in the markers; else the target frame rate given to the tools, else one refresh). Red
   where one was late; amber where they only stayed longer than preferred, as the pacer intended (a pacer running slower than the game
-  wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. Static frames and
-  frames presented on demand are never amber.
+  wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. A static frame's
+  time on screen and frames presented on demand are never amber.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, static frames in violet; orange where a
   dropped frame was due (the display repeated the frame before), pink where an older frame came back out of order, grey where a capture
-  card's captures could not be decoded or were not recorded, and a mark above frames with skipped frame indices before them (or a
-  tear). Zoom in to
+  card's captures could not be decoded or were not recorded; what happened to the frames and the capture is in the events panel
+  under it. Zoom in to
   see hold patterns such as 3-then-1.
-- **Static stretches** (frames whose marker says nothing animates, such as an idle screen): a violet band behind every panel. The
+- **Static stretches** (frames whose markers say nothing animates while they are on screen, such as an idle screen): a violet band behind every panel. The
   display time step and frametime scales leave their idle waits out, so a second of idle screen does not squash the rest; those values
   get a mark at the top edge.
 
