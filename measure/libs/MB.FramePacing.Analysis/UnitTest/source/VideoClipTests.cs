@@ -10,6 +10,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Capture;
@@ -232,6 +233,28 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(a.MainBytes, Is.EqualTo(b.MainBytes), where + ": main marker bytes");
         Assert.That(a.SecondBytes, Is.EqualTo(b.SecondBytes), where + ": second marker bytes");
       }
+    }
+
+    /// <summary>
+    /// The same rests said two ways: StaticAfter on the rest's frame (known in advance) or StaticBefore on the frame that wakes (known in
+    /// hindsight) analyse to the same frames. Only the last frame differs: its StaticAfter is in the clip, while the StaticBefore that would say
+    /// the same comes with the frame after the capture.
+    /// </summary>
+    [Test]
+    public void StaticInHindsight_AnalysesAsStaticInAdvance()
+    {
+      IReadOnlyList<PresentedFrame> Frames(string clip) =>
+        CaptureAnalyzer
+          .Analyze(VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, clip)), new AnalysisOptions())
+          .Timeline.Runs.Single()
+          .Frames;
+      var inAdvance = Frames("60-on-demand-paused-clock");
+      var inHindsight = Frames("60-on-demand-paused-clock-hindsight");
+
+      Assert.That(inHindsight, Has.Count.EqualTo(inAdvance.Count));
+      Assert.That(inAdvance.Count(f => (f.Flags & PresentedFrameFlags.StaticBefore) != 0), Is.GreaterThan(0), "the clips have static steps");
+      Assert.That(inHindsight.Take(inAdvance.Count - 1), Is.EqualTo(inAdvance.Take(inAdvance.Count - 1)), "every frame but the last");
+      Assert.That(inHindsight[^1] with { Flags = inHindsight[^1].Flags | PresentedFrameFlags.StaticAfter }, Is.EqualTo(inAdvance[^1]));
     }
 
     /// <summary>How long after its intended display time the frame is first shown (the pacer's and the video's clocks differ by a constant).</summary>

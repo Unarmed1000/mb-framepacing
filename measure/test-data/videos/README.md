@@ -1,6 +1,6 @@
 # Test clips
 
-Fifteen 60 Hz clips (1280×720, lossless H.264 4:4:4, 8 s plus 3 refreshes of start and end marker) with the frame marker baked in,
+Eighteen 60 Hz clips (1280×720, lossless H.264 4:4:4, 8 s plus 3 refreshes of start and end marker) with the frame marker baked in,
 one folder per scenario, each with its `video.mp4` and the generator's `manifest.json`.
 
 **Per rendered frame, the manifest gives:**
@@ -11,7 +11,8 @@ one folder per scenario, each with its `video.mp4` and the generator's `manifest
 - how many refreshes late it was (negative: early, shown out of order);
 - the target frame rate and the preferred frame rate (`targetFps`, `preferredFps`; `null` on demand);
 - the frame's CPU start time and CPU busy (`cpuStartTicks`, `cpuBusyTicks`);
-- in the idle clips, whether it is `static` (nothing animates while it is on screen; its marker carries the StaticAfter flag).
+- in the idle clips, its static flags (`staticAfter`: nothing animates while it is on screen; `staticBefore`: nothing animated while
+  the frame before it was, said one frame later), as its marker carries them.
 
 **Every marker carries:**
 
@@ -23,7 +24,7 @@ one folder per scenario, each with its `video.mp4` and the generator's `manifest
 The start marker also carries a sequence id: the mode's name, or a UUID made from it when the name is longer than 16 characters
 (`sequenceId`). The clips have no sync marker: they can not tear.
 
-**The fault clips** (`…-dropped-frames`, `…-out-of-order`) also give, per box:
+**The fault clips** (`…-dropped-frames`, `…-out-of-order`, `…-dropped-before-wake`) also give, per box:
 
 - `screen`: the frame on screen in every refresh;
 - `presented`: the frames the analysis counts. A frame is presented when it first appears with an index above every frame shown
@@ -37,6 +38,13 @@ The start marker also carries a sequence id: the mode's name, or a UUID made fro
 - `60-on-demand`: nothing is rendered at rest.
 - `60-on-demand-paused-clock`: as `60-on-demand`, but the animation clock pauses while idle, so only the StaticAfter flag keeps the step
   after a rest from being judged.
+- `60-on-demand-paused-clock-hindsight`: the same frames and clock, but the rest is said in hindsight: no flag on the rest's frame,
+  StaticBefore on the frame that wakes. It analyses as `60-on-demand-paused-clock` (only the last frame differs: its StaticBefore would
+  come with the frame after the capture).
+- `60-on-demand-paused-clock-hindsight-dropped-before-wake`: as the hindsight clip, but the first rest's frame is rendered and never
+  shown, so the wake frame's StaticBefore marks nothing and that step is judged (−100 ms).
+- `60-static-rests-paused-clock`: every frame rendered, the clock standing still through each rest: the frame that reaches the rest
+  pose carries StaticAfter, the frames inside the rest both flags.
 - `60-idle-1fps`: one frame per second while idle, preferring 1 s.
 
 `measure/libs/MB.FramePacing.Analysis/UnitTest/source/VideoClipTests.cs` imports every clip through ffmpeg and checks the analysis

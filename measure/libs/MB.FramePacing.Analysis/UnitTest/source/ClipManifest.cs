@@ -46,7 +46,8 @@ namespace MB.FramePacing.Analysis.UnitTest
     long?[] RenderedPreferredInterval,
     long[] RenderedCpuStartTicks,
     long[] RenderedCpuBusyTicks,
-    bool[] RenderedStatic,
+    bool[] RenderedStaticAfter,
+    bool[] RenderedStaticBefore,
     int[] Screen,
     int[] Presented,
     long ExpectedSkippedFrameIndices,
@@ -65,6 +66,11 @@ namespace MB.FramePacing.Analysis.UnitTest
       var frames = box.GetProperty("frames");
       decimal fps = video.GetProperty("fps").GetDecimal();
       T[] Array<T>(string name, Func<JsonElement, T> read) => frames.GetProperty(name).EnumerateArray().Select(read).ToArray();
+      // The static flags per rendered frame (the idle clips); all false when a clip has none
+      bool[] Flags(string name) =>
+        frames.TryGetProperty(name, out var element)
+          ? element.EnumerateArray().Select(e => e.GetBoolean()).ToArray()
+          : new bool[frames.GetProperty("refresh").GetArrayLength()];
       T? Nullable<T>(JsonElement element, Func<JsonElement, T> read)
         where T : struct => element.ValueKind == JsonValueKind.Null ? null : read(element);
 
@@ -96,9 +102,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         Array("preferredFps", e => Nullable(e, x => WholeNumber(fps / x.GetDecimal(), "preferred swap interval"))),
         Array("cpuStartTicks", e => e.GetInt64()),
         Array("cpuBusyTicks", e => e.GetInt64()),
-        frames.TryGetProperty("static", out var staticElement)
-          ? staticElement.EnumerateArray().Select(e => e.GetBoolean()).ToArray()
-          : new bool[refresh.Length],
+        Flags("staticAfter"),
+        Flags("staticBefore"),
         screen,
         presented,
         Expected("skippedFrameIndices"),
@@ -124,7 +129,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         kind,
         RunId,
         ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
-        RenderedStatic[frame] ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None,
+        (RenderedStaticAfter[frame] ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None)
+          | (RenderedStaticBefore[frame] ? MB.FrameMarker.MarkerFlags.StaticBefore : MB.FrameMarker.MarkerFlags.None),
         RenderedAnimationTicks[frame] + (loop * DurationTicks),
         PreferredFrameTicks: FrameTicks(RenderedPreferredInterval[frame]),
         TargetFrameTicks: FrameTicks(RenderedSwapInterval[frame]),
@@ -157,8 +163,13 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     public long AnimationStepTicks(int frame) => RenderedAnimationTicks[Presented[frame]] - RenderedAnimationTicks[Presented[frame - 1]];
 
-    /// <summary>Nothing animates while presented frame <paramref name="frame"/> is on screen: the clip's static frames carry StaticAfter.</summary>
-    public bool IsStatic(int frame) => RenderedStatic[Presented[frame]];
+    /// <summary>
+    /// Nothing animates while presented frame <paramref name="frame"/> is on screen: its own StaticAfter, or StaticBefore on the next presented
+    /// frame when that is the next rendered frame (a frame never shown marks nothing). The last one's next frame is after the capture.
+    /// </summary>
+    public bool IsStatic(int frame) =>
+      RenderedStaticAfter[Presented[frame]]
+      || (frame + 1 < FrameCount && Presented[frame + 1] == Presented[frame] + 1 && RenderedStaticBefore[Presented[frame + 1]]);
 
     /// <summary>A step from a static frame is not judged: it has no animation error (frame 1 on). The step into one is.</summary>
     public bool IsJudged(int frame) => !IsStatic(frame - 1);

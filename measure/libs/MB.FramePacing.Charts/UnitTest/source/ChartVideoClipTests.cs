@@ -70,8 +70,9 @@ namespace MB.FramePacing.Charts.UnitTest
       double Error(int i) => Ms(manifest.AnimationErrorTicks(i)!.Value);
 
       var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
-      double largest = judged.Max(i => Math.Abs(Error(i)));
-      Assert.That((error.YFrom, error.YTo), Is.EqualTo((-Math.Max(2, largest * 1.15), Math.Max(2, largest * 1.15))), $"{clip}: symmetric scale");
+      // Symmetric, covering every error unless a few are a hitch far beyond the rest (the report's rule, ChartScale): those reach the edge
+      double limit = ChartScale.ErrorLimit(judged.Select(Error).ToList());
+      Assert.That((error.YFrom, error.YTo), Is.EqualTo((-limit, limit)), $"{clip}: symmetric scale");
       // A refresh line at every whole refresh an error reaches (within a tenth of one), inside the scale
       double refreshMs = chart.Run.Pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
       var expectedLines = new List<double>();
@@ -98,7 +99,8 @@ namespace MB.FramePacing.Charts.UnitTest
         if (Math.Abs(error.PixelY(expected) - zeroY) >= 1)
         {
           double value = error.ValueY(up ? bars[k].Y.Value : bars[k].Y.Value + bars[k].Height.Value);
-          Assert.That(value, Is.EqualTo(expected).Within(1e-9), $"{clip}: frame {withError[k]}'s animation error");
+          // A hitch beyond the scale stops at its edge
+          Assert.That(value, Is.EqualTo(Math.Clamp(expected, -limit, limit)).Within(1e-9), $"{clip}: frame {withError[k]}'s animation error");
         }
       }
 
