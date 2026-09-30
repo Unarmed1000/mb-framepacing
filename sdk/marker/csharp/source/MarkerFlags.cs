@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The payload's flags byte. See doc/marker-format.md "Flags". Bits 1 to 7 are reserved: write 0; a decoded payload keeps whatever it
+//* The payload's flags byte. See doc/marker-format.md "Flags". Bits 2 to 7 are reserved: write 0; a decoded payload keeps whatever it
 //* carried, so values without a name here survive a round trip.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -18,9 +18,15 @@ namespace MB.FrameMarker
     None = 0,
 
     /// <summary>
-    /// Nothing animates in this frame (an idle screen, a paused menu with nothing moving): the analysis does not judge the animation error of
-    /// a step from or to it.
+    /// Nothing animates while this frame is on screen, until the next frame (the application has no pending work after it). Says nothing
+    /// about whether this frame itself animated. The analysis does not judge the step from it to the next frame.
     /// </summary>
-    Static = 1 << 0,
+    StaticAfter = 1 << 0,
+
+    /// <summary>
+    /// Nothing animated while the frame before this one was on screen: <see cref="StaticAfter"/> of the previous frame, for an application
+    /// that only knows it once it renders this frame.
+    /// </summary>
+    StaticBefore = 1 << 1,
   }
 }

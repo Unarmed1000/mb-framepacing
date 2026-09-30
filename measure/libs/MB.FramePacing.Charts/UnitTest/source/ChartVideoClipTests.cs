@@ -490,9 +490,9 @@ namespace MB.FramePacing.Charts.UnitTest
       var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
       var section = RunSection.Create(chart, from, to);
       var frames = section.Section.Run.Frames;
-      Assert.That(frames.Any(f => (f.Flags & PresentedFrameFlags.Static) != 0), $"{clip}: the section has static frames");
+      Assert.That(frames.Any(f => (f.Flags & PresentedFrameFlags.StaticAfter) != 0), $"{clip}: the section has static frames");
       string Label(PresentedFrame f) => "#" + (f.FrameIndex % 1000).ToString("000", CultureInfo.InvariantCulture);
-      var staticLabels = frames.Where(f => (f.Flags & PresentedFrameFlags.Static) != 0).Select(Label).ToHashSet();
+      var staticLabels = frames.Where(f => (f.Flags & PresentedFrameFlags.StaticAfter) != 0).Select(Label).ToHashSet();
 
       // Each display cell (40 high) is followed by its frame's label
       var document = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section));
@@ -513,10 +513,8 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(cells.Select(c => c.Class), Has.None.EqualTo("again"), "a frame presented on demand is never late for waiting");
       Assert.That(
         texts.Count(t => t == "static"),
-        Is.EqualTo(
-          frames.Count(f => f.AnimationErrorTicks is null && (f.Flags & (PresentedFrameFlags.Static | PresentedFrameFlags.StaticBefore)) != 0)
-        ),
-        $"{clip}: \"static\" for each step from or to a static frame"
+        Is.EqualTo(frames.Count(f => f.AnimationErrorTicks is null && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)),
+        $"{clip}: \"static\" for each step from a static frame"
       );
       Assert.That(texts, Does.Contain("static: nothing animates"), $"{clip}: the key");
     }
@@ -690,7 +688,9 @@ namespace MB.FramePacing.Charts.UnitTest
     private static double[] ExpectedLateShare(ClipManifest manifest)
     {
       bool Longer(int frame) =>
-        !manifest.IsStatic(frame) && manifest.PreferredRefreshes(frame) is { } preferred && manifest.DisplayStepRefreshes(frame) > preferred;
+        !(frame > 0 && manifest.IsStatic(frame - 1))
+        && manifest.PreferredRefreshes(frame) is { } preferred
+        && manifest.DisplayStepRefreshes(frame) > preferred;
       var shares = new double[manifest.FrameCount];
       int start = 0;
       for (int i = 0; i < manifest.FrameCount; ++i)

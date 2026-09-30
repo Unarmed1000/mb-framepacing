@@ -80,7 +80,8 @@ overlay.CpuStartTicksProvider = () => pacer.CpuStartTicks;
 overlay.CpuBusyTicksProvider = () => pacer.CpuBusyTicks; // optional
 overlay.TargetFrameTicksProvider = () => pacer.TargetFrameTicks; // the interval it aims for now; default: Unity's settings (below)
 overlay.PreferredFrameTicksProvider = () => pacer.PreferredFrameTicks; // the rate the game wants; default: as the target
-overlay.StaticProvider = () => nothingAnimates; // optional: the Static flag on idle frames
+overlay.StaticAfterProvider = () => nothingPending; // optional: nothing animates while this frame is on screen
+overlay.StaticBeforeProvider = () => wokeFromIdle; // optional: nothing animated while the previous frame was
 ```
 
 The **target frame time** without a provider is what Unity's settings aim for: on Android and iOS `Application.targetFrameRate`

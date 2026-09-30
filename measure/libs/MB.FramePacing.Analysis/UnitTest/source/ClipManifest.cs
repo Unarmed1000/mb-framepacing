@@ -26,7 +26,7 @@ namespace MB.FramePacing.Analysis.UnitTest
   /// <summary>
   /// Per rendered frame of the clip: the refresh it is first shown on (null: dropped), the animation time it shows, how many refreshes late
   /// it is (negative: early, out of order), the pacer's swap interval and the preferred one (the refresh rate over the target and the
-  /// preferred rate; null on demand), its CPU start and busy, and whether it is static. <paramref name="Screen"/> is the frame on screen
+  /// preferred rate; null on demand), its CPU start and busy, and whether it is static (nothing animates while it is on screen). <paramref name="Screen"/> is the frame on screen
   /// in each refresh, <paramref name="Presented"/> the frames the analysis counts. The clip loops; the lead-in and lead-out show the
   /// previous and next loop.
   /// </summary>
@@ -130,7 +130,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         RenderedCpuStartTicks[frame] + (loop * DurationTicks),
         (uint)RenderedCpuBusyTicks[frame],
         FrameTicks(RenderedPreferredInterval[frame]),
-        RenderedStatic[frame] ? MB.FrameMarker.MarkerFlags.Static : MB.FrameMarker.MarkerFlags.None
+        RenderedStatic[frame] ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None
       );
     }
 
@@ -157,10 +157,11 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     public long AnimationStepTicks(int frame) => RenderedAnimationTicks[Presented[frame]] - RenderedAnimationTicks[Presented[frame - 1]];
 
+    /// <summary>Nothing animates while presented frame <paramref name="frame"/> is on screen: the clip's static frames carry StaticAfter.</summary>
     public bool IsStatic(int frame) => RenderedStatic[Presented[frame]];
 
-    /// <summary>A step from or to a static frame is not judged: it has no animation error (frame 1 on).</summary>
-    public bool IsJudged(int frame) => !IsStatic(frame) && !IsStatic(frame - 1);
+    /// <summary>A step from a static frame is not judged: it has no animation error (frame 1 on). The step into one is.</summary>
+    public bool IsJudged(int frame) => !IsStatic(frame - 1);
 
     /// <summary>
     /// The display time step counts toward the frame rate numbers: it is the previous frame's time on screen, left out when that frame is

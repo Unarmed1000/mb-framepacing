@@ -176,7 +176,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The frame timeline (`FrameTimelineCard`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells. A
-        static frame's cells are violet (`strip-static-a`/`-b`) and its error row says "static"; a frame presented on demand is never
+        static frame's cells are violet (`strip-static-a`/`-b`) and the error row says "static" on the static step after it; a frame presented on demand is never
         "held longer" (no interval to be late for).
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, so add or change
       a number there, not in the GUI. A tile without a number shows "-" with `HasValue` false.
@@ -238,14 +238,17 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     animated for (`sdk/doc/vocabulary.md`). The target frame time is what the pacer aims for now, the **preferred frame time** what the
     application wants (it differs only while the pacer runs slower); `0xFFFFFFFF` in both = on demand. Never call the preferred frame
     time "desired": that is Vulkan's and Swappy's word for a present time point.
-  - **Flags:** bit 0 `Static` (nothing animates: the steps to and from it get no animation error, and the drift sums only judged
-    errors); bits 1 to 7 are reserved (write 0, decoders keep them).
+  - **Flags:** static is a frame's time on screen (nothing animates until the next frame; the frame itself may have moved). Bit 0
+    `StaticAfter` says it on the frame (known upfront: no pending work), bit 1 `StaticBefore` on the next frame (known in hindsight,
+    only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
+    `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
+    into the static frame is judged. Independent flags, not an enum; bits 2 to 7 are reserved (write 0, decoders keep them).
   - **Frame rates describe the frames that animate:** a static frame's time on screen (the next frame's display time step, flag
     `StaticBefore`) is left out of average fps, the lows and the display time step statistics and histogram
     (`RunStatistics.CountsTowardFrameRate`, `RunChartData.FrameRateSteps`), and counted (`excludedStaticFrames`); the tile, the report's
     description and the statistics tables say "excluding N static frames" (`RunHeadline.ExcludedStatic`).
   - **Late share:** amber = on screen at least half a refresh longer than the preferred frame time (the marker's, else
-    `--target-fps`, else one refresh) without being late; never for static or on-demand frames (`LateShareData`, `PresentedFrame.PreferredTicks`).
+    `--target-fps`, else one refresh) without being late; never for static steps or on-demand frames (`LateShareData`, `PresentedFrame.PreferredTicks`).
   - The start marker (77 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
     most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
     captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 16 bytes: the header's start, run id and frame index; matched to its main marker by both) is QR version 2 (25×25), drawn

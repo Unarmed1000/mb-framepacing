@@ -276,10 +276,10 @@ namespace
         std::numeric_limits<uint32_t>::max(), FM::OnDemandFrameTicks, static_cast<FM::MarkerFlags>(0xFFu)},
        {}},
       {{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u, 0x5152535455565758, 0x61626364u,
-        0x71727374u, FM::MarkerFlags::Static},
+        0x71727374u, FM::MarkerFlags::StaticAfter},
        {}},
       // Start and end markers carry the frame's values too
-      {{600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 80'000u, 10'000'000u, FM::MarkerFlags::Static},
+      {{600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 80'000u, 10'000'000u, FM::MarkerFlags::StaticAfter},
        {0, TextSequenceId("golden-run")}},
       {{601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 120'000u}, {GoldenStartUtcTicks, GoldenBytesId}},
       {{900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd, 0, 0u, 0, 80'000u}, {}},

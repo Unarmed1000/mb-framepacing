@@ -123,8 +123,17 @@ namespace MB.FrameMarker.Unity
     /// </summary>
     public Func<uint> PreferredFrameTicksProvider { get; set; }
 
-    /// <summary>True on frames where nothing animates (an idle screen, a paused menu): the marker's Static flag. Null = never static.</summary>
-    public Func<bool> StaticProvider { get; set; }
+    /// <summary>
+    /// True when nothing animates while this frame is on screen, until the next frame (no pending work after it: an idle screen, a paused
+    /// menu): the marker's StaticAfter flag. Null = never.
+    /// </summary>
+    public Func<bool> StaticAfterProvider { get; set; }
+
+    /// <summary>
+    /// True when nothing animated while the previous frame was on screen, for a game that only knows it once it renders this frame: the
+    /// marker's StaticBefore flag. Null = never.
+    /// </summary>
+    public Func<bool> StaticBeforeProvider { get; set; }
 
     /// <summary>
     /// CPU start time: when the CPU started working on the frame, in ticks (100 ns) on the same steady clock as
@@ -253,7 +262,8 @@ namespace MB.FrameMarker.Unity
         CpuStartTicks(),
         CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks(),
         PreferredFrameTicksProvider != null ? PreferredFrameTicksProvider() : DefaultTargetFrameTicks(),
-        StaticProvider != null && StaticProvider() ? MarkerFlags.Static : MarkerFlags.None
+        (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.None)
+          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.None)
       );
 
       DrawMarker(payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height, sync: false);

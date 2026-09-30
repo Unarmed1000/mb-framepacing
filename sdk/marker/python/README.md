@@ -28,8 +28,9 @@ modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelForm
   (`166_667` for 60 fps); `preferred_frame_ticks=...` the interval the application wants to run at (it differs from the target only
   while the pacer runs slower than wanted). All default to `0` (unknown); `ON_DEMAND_FRAME_TICKS` = frames only when something
   changes.
-- **Flags (optional):** `flags=MarkerFlags.STATIC` on frames where nothing animates (the analysis does not judge their animation
-  error).
+- **Flags (optional):** `flags=MarkerFlags.STATIC_AFTER` on a frame when nothing animates while it is on screen, or
+  `MarkerFlags.STATIC_BEFORE` on the next frame when that is only known then (the analysis does not judge the step out of the static
+  frame).
 - **CPU start time and CPU busy (optional):** `Payload(..., cpu_start_ticks=..., cpu_busy_ticks=...)` carries when the CPU started
   working on the frame (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on
   it before presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's

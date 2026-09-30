@@ -201,7 +201,7 @@ namespace MB.FramePacing.Charts
         var next = i + 1 < frames.Count ? frames[i + 1] : frame;
         long intendedHold = OnDemand(next) ? long.MaxValue : next.TargetTicks ?? refresh;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
-        bool isStatic = (frame.Flags & PresentedFrameFlags.Static) != 0;
+        bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         for (int k = from; k < to; ++k)
         {
           bool firstRefresh = k == from;
@@ -218,8 +218,8 @@ namespace MB.FramePacing.Charts
         }
 
         double cx = (XOf(first + (from * refresh)) + XOf(first + ((from + 1) * refresh))) / 2;
-        // A step from or to a static frame has no animation error: the steps it has, and "static" for the error
-        if (frame.AnimationErrorTicks is null && (frame.Flags & (PresentedFrameFlags.Static | PresentedFrameFlags.StaticBefore)) != 0)
+        // A static step (from a frame nothing animated after) has no animation error: the steps it has, and "static" for the error
+        if (frame.AnimationErrorTicks is null && (frame.Flags & PresentedFrameFlags.StaticBefore) != 0)
         {
           parts.Add(new TextShape(cx, rowsY, frame.AnimationDeltaTicks is { } a ? $"{Ms(a / (double)TimeSpan.TicksPerMillisecond)} ms" : "–"));
           parts.Add(

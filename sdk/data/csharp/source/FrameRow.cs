@@ -19,7 +19,7 @@ namespace MB.FramePacing.Data
   /// <param name="SkippedBefore">Frame indices before this one that were never seen.</param>
   /// <param name="DisplayDeltaTicks">The display time step: from the previous frame's display time to this one's.</param>
   /// <param name="AnimationErrorTicks">The animation time step minus the display time step.</param>
-  /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late", "Static"; empty when none.</param>
+  /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late", "StaticAfter", "StaticBefore", "UncertainStep"; empty when none.</param>
   /// <param name="IntendedDisplayTicks">From the marker: when the pacer intended the frame to be shown (its own clock).</param>
   /// <param name="MarkerTargetTicks">From the marker: the pacer's target frame time; <see cref="OnDemandFrameTicks"/> = on demand.</param>
   /// <param name="TargetTicks">The frame time this frame is measured against, in whole refreshes; null on demand.</param>

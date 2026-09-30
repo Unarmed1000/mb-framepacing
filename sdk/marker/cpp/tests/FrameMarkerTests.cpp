@@ -176,7 +176,7 @@ namespace
 TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
 {
   const FM::Payload payload{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::SequenceEnd, 0x3132333435363738, 0x41424344u,
-                            0x5152535455565758,  0x61626364u,        0x71727374u, FM::MarkerFlags::Static};
+                            0x5152535455565758,  0x61626364u,        0x71727374u, FM::MarkerFlags::StaticAfter};
   const auto bytes = PayloadBytes(payload);
   // magic, version, kind | run id | frame index | flags | animation time | preferred, target frame time | intended display time |
   // CPU start time | CPU busy
@@ -223,7 +223,7 @@ TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
 TEST(Payload, RoundTrips)
 {
   constexpr uint32_t U32Max = std::numeric_limits<uint32_t>::max();
-  const std::array<FM::Payload, 16> payloads{{
+  const std::array<FM::Payload, 18> payloads{{
     {0u, 0, 0u, FM::MarkerKind::Frame},
     {1u, 166'667, 7u, FM::MarkerKind::Frame},
     {2u, 333'334, 7u, FM::MarkerKind::Frame, 1'234'567'890'123, 166'667u},
@@ -238,8 +238,10 @@ TEST(Payload, RoundTrips)
     {42u, -1, 3u, FM::MarkerKind::SequenceEnd},
     {0u, 0, 0u, FM::MarkerKind::SequenceStart},
     {9u, 1, 2u, FM::MarkerKind::Frame, 3, 333'333u, 5, 6u, 166'667u},
-    {10u, 1, 2u, FM::MarkerKind::Frame, 0, FM::OnDemandFrameTicks, 0, 0u, FM::OnDemandFrameTicks, FM::MarkerFlags::Static},
-    {11u, 1, 2u, FM::MarkerKind::SequenceStart, 3, 4u, 5, 6u, 10'000'000u, FM::MarkerFlags::Static},
+    {10u, 1, 2u, FM::MarkerKind::Frame, 0, FM::OnDemandFrameTicks, 0, 0u, FM::OnDemandFrameTicks, FM::MarkerFlags::StaticAfter},
+    {11u, 1, 2u, FM::MarkerKind::SequenceStart, 3, 4u, 5, 6u, 10'000'000u, FM::MarkerFlags::StaticAfter},
+    {13u, 1, 2u, FM::MarkerKind::Frame, 3, 4u, 5, 6u, 7u, FM::MarkerFlags::StaticBefore},
+    {14u, 1, 2u, FM::MarkerKind::SequenceEnd, 3, 4u, 5, 6u, 7u, FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore},
     // A reserved bit survives the round trip
     {12u, 1, 2u, FM::MarkerKind::SequenceEnd, 3, 4u, 5, 6u, 7u, static_cast<FM::MarkerFlags>(0x81u)},
   }};
@@ -258,11 +260,14 @@ TEST(Payload, RoundTrips)
 TEST(Payload, MarkerFlagsCombine)
 {
   constexpr auto Reserved = static_cast<FM::MarkerFlags>(0x80u);
-  static_assert(FM::HasFlag(FM::MarkerFlags::Static | Reserved, FM::MarkerFlags::Static));
-  static_assert(!FM::HasFlag(Reserved, FM::MarkerFlags::Static));
-  static_assert((FM::MarkerFlags::Static & Reserved) == FM::MarkerFlags::None);
+  static_assert(FM::HasFlag(FM::MarkerFlags::StaticAfter | Reserved, FM::MarkerFlags::StaticAfter));
+  static_assert(!FM::HasFlag(Reserved, FM::MarkerFlags::StaticAfter));
+  static_assert((FM::MarkerFlags::StaticAfter & Reserved) == FM::MarkerFlags::None);
+  static_assert(!FM::HasFlag(FM::MarkerFlags::StaticAfter, FM::MarkerFlags::StaticBefore));
+  static_assert(FM::HasFlag(FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, FM::MarkerFlags::StaticBefore));
+  EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticBefore), 0x02u);
   static_assert(FM::OnDemandFrameTicks == std::numeric_limits<uint32_t>::max());
-  EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::Static | Reserved), 0x81u);
+  EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticAfter | Reserved), 0x81u);
 }
 
 TEST(Payload, StartMarkerNeedsItsMetadataBlock)

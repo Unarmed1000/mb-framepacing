@@ -1328,7 +1328,7 @@ namespace MB.FramePacing.Charts
           long shown = Math.Min(frame.LastSeenTicks + chart.CapturePeriodTicks, frames[i + 1].FirstSeenTicks) - frame.FirstSeenTicks;
           seen = Math.Clamp(Cells(shown), 1, cells);
         }
-        bool isStatic = (frame.Flags & PresentedFrameFlags.Static) != 0;
+        bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         bool isLate = (frame.Flags & PresentedFrameFlags.Late) != 0;
         anyStatic |= isStatic && !isLate;
         anyLate |= isLate;

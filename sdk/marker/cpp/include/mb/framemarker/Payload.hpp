@@ -36,7 +36,8 @@ namespace MB::FrameMarker
     //! TargetFrameTicks only while the pacer runs slower than it wants (Swappy lowered to 30 fps: preferred 166'667, target 333'333). A 30
     //! fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, OnDemandFrameTicks = frames only when something changes.
     uint32_t PreferredFrameTicks{0};
-    //! MarkerFlags::Static when nothing animates in this frame; the other bits are reserved (0).
+    //! MarkerFlags::StaticAfter when nothing animates while this frame is on screen, MarkerFlags::StaticBefore when nothing animated while
+    //! the frame before it was; the other bits are reserved (0).
     MarkerFlags Flags{MarkerFlags::None};
 
     constexpr bool operator==(const Payload&) const noexcept = default;

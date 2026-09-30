@@ -83,7 +83,10 @@ namespace MB.FrameMarker
     /// </summary>
     public uint PreferredFrameTicks { get; }
 
-    /// <summary><see cref="MarkerFlags.Static"/> when nothing animates in this frame; the other bits are reserved (0).</summary>
+    /// <summary>
+    /// <see cref="MarkerFlags.StaticAfter"/> when nothing animates while this frame is on screen, <see cref="MarkerFlags.StaticBefore"/> when
+    /// nothing animated while the frame before it was; the other bits are reserved (0).
+    /// </summary>
     public MarkerFlags Flags { get; }
 
     /// <summary>The same payload with another kind.</summary>

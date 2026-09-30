@@ -26,7 +26,10 @@ namespace MB.FramePacing.Marker
   /// The interval the application wants to run at, in ticks (100ns); 0 = unknown, <see cref="OnDemandFrameTicks"/> = frames only when
   /// something changes.
   /// </param>
-  /// <param name="Flags">The marker's flags: <see cref="FM.MarkerFlags.Static"/> when nothing animates in the frame.</param>
+  /// <param name="Flags">
+  /// The marker's flags: <see cref="FM.MarkerFlags.StaticAfter"/> when nothing animates while the frame is on screen,
+  /// <see cref="FM.MarkerFlags.StaticBefore"/> when nothing animated while the frame before it was.
+  /// </param>
   public readonly record struct MarkerPayload(
     ulong FrameIndex,
     long AnimationTicks,
@@ -51,8 +54,11 @@ namespace MB.FramePacing.Marker
     /// <summary>The target and preferred frame time of an application that presents only when something changes.</summary>
     public const uint OnDemandFrameTicks = FM.Marker.OnDemandFrameTicks;
 
-    /// <summary>Nothing animates in this frame: the analysis does not judge the animation error of a step from or to it.</summary>
-    public bool IsStatic => (Flags & FM.MarkerFlags.Static) != 0;
+    /// <summary>Nothing animates while this frame is on screen, until the next frame: the step from it to the next frame is not judged.</summary>
+    public bool IsStaticAfter => (Flags & FM.MarkerFlags.StaticAfter) != 0;
+
+    /// <summary>Nothing animated while the frame before this one was on screen: that frame is static after, known one frame later.</summary>
+    public bool IsStaticBefore => (Flags & FM.MarkerFlags.StaticBefore) != 0;
 
     public TimeSpan AnimationTime => TimeSpan.FromTicks(AnimationTicks);
 

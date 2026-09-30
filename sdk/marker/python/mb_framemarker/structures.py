@@ -27,13 +27,16 @@ class MarkerKind(IntEnum):
 
 
 class MarkerFlags(IntFlag):
-    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 1 to 7 are reserved: write 0; a decoded payload keeps whatever it
+    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 2 to 7 are reserved: write 0; a decoded payload keeps whatever it
     carried."""
 
     NONE = 0
-    STATIC = 1
-    """Nothing animates in this frame (an idle screen, a paused menu with nothing moving): the analysis does not judge the animation
-    error of a step from or to it."""
+    STATIC_AFTER = 1
+    """Nothing animates while this frame is on screen, until the next frame (the application has no pending work after it). Says nothing
+    about whether this frame itself animated. The analysis does not judge the step from it to the next frame."""
+    STATIC_BEFORE = 2
+    """Nothing animated while the frame before this one was on screen: STATIC_AFTER of the previous frame, for an application that only
+    knows it once it renders this frame."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +66,8 @@ class Payload:
     30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, ON_DEMAND_FRAME_TICKS = frames only when something
     changes (also allowed in target_frame_ticks)."""
     flags: MarkerFlags = MarkerFlags.NONE
-    """MarkerFlags.STATIC when nothing animates in this frame; the other bits are reserved (0)."""
+    """MarkerFlags.STATIC_AFTER when nothing animates while this frame is on screen, MarkerFlags.STATIC_BEFORE when nothing animated while
+    the frame before it was; the other bits are reserved (0)."""
 
     def with_kind(self, kind: MarkerKind) -> Self:
         return replace(self, kind=kind)

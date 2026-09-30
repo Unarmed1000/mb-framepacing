@@ -7,14 +7,17 @@
 
 namespace MB::FrameMarker
 {
-  //! The payload's flags byte. See doc/marker-format.md "Flags". Bits 1 to 7 are reserved: write 0; a decoded payload keeps whatever it
+  //! The payload's flags byte. See doc/marker-format.md "Flags". Bits 2 to 7 are reserved: write 0; a decoded payload keeps whatever it
   //! carried, so values without a name here survive a round trip.
   enum class MarkerFlags : uint8_t
   {
     None = 0,
-    //! Nothing animates in this frame (an idle screen, a paused menu with nothing moving): the analysis does not judge the animation
-    //! error of a step from or to it.
-    Static = 1u << 0u,
+    //! Nothing animates while this frame is on screen, until the next frame (the application has no pending work after it). Says nothing
+    //! about whether this frame itself animated. The analysis does not judge the step from it to the next frame.
+    StaticAfter = 1u << 0u,
+    //! Nothing animated while the frame before this one was on screen: StaticAfter of the previous frame, for an application that only
+    //! knows it once it renders this frame.
+    StaticBefore = 1u << 1u,
   };
 
   constexpr MarkerFlags operator|(const MarkerFlags lhs, const MarkerFlags rhs) noexcept

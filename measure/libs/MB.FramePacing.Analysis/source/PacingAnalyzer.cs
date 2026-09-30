@@ -97,8 +97,8 @@ namespace MB.FramePacing.Analysis
           markerPreferred == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks ? null
           : markerPreferred != 0 ? WholeRefreshes(markerPreferred, refreshTicks)
           : givenTarget;
-        // A step from or to a static frame animates nothing, so it has no prediction error (its pacing error still counts)
-        bool animates = (frame.Flags & PresentedFrameFlags.Static) == 0 && (previous == null || (previous.Flags & PresentedFrameFlags.Static) == 0);
+        // A static step (nothing animated while the frame before was on screen) has no prediction error; its pacing error still counts
+        bool animates = (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
 
         // A step a capture gap made uncertain is not judged: no pacing or prediction error, no late verdict
         bool uncertain = (frame.Flags & PresentedFrameFlags.UncertainStep) != 0;

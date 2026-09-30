@@ -4,7 +4,7 @@ The frame marker is a QR code that the application under test draws into every f
 index**, the **animation time** the frame was rendered for, a **run id**, when the application paces its frames **when it intends
 the frame to be shown**, its **target frame time** and the **preferred frame time** it wants to run at, and optionally the frame's
 **CPU start time** and **CPU busy**: when the CPU started working on the frame and how long it worked on it before presenting it. A
-**flags** byte says more about the frame: **static** when nothing animates in it. `mb-framepacing` captures the display output with an
+**flags** byte says when nothing animates: **static after** while this frame is on screen, **static before** while the frame before it was. `mb-framepacing` captures the display output with an
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
@@ -26,20 +26,20 @@ Frame, start and end markers start with the same 53 byte header, little endian. 
 which frame, what the frame shows, the frame pacing (what the application wants, what the pacer aims for now, when this frame should
 show) and the CPU's work:
 
-| Offset | Size | Field                 | Notes                                                                                                                                                                                 |
-| ------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | 2    | Magic                 | ASCII `"MF"` (`0x4D 0x46`)                                                                                                                                                            |
-| 2      | 1    | Format version        | `1`                                                                                                                                                                                   |
-| 3      | 1    | Kind                  | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd (`3` = Sync is the small sync marker, see below)                                                                                  |
-| 4      | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                   |
-| 8      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                        |
-| 16     | 1    | Flags                 | Bit 0 = **static**: nothing animates in this frame (see below). Bits 1 to 7 are reserved: write `0`; decoders ignore them.                                                            |
-| 17     | 8    | Animation time        | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.                                                                               |
-| 25     | 4    | Preferred frame time  | `u32` ticks (100 ns), `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `166'667` for 60 fps, also while the pacer runs slower (see below).      |
-| 29     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                             |
-| 33     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below). |
-| 41     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                    |
-| 49     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                     |
+| Offset | Size | Field                 | Notes                                                                                                                                                                                                |
+| ------ | ---- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | 2    | Magic                 | ASCII `"MF"` (`0x4D 0x46`)                                                                                                                                                                           |
+| 2      | 1    | Format version        | `1`                                                                                                                                                                                                  |
+| 3      | 1    | Kind                  | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd (`3` = Sync is the small sync marker, see below)                                                                                                 |
+| 4      | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                                  |
+| 8      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                                       |
+| 16     | 1    | Flags                 | Bit 0 = **static after**, bit 1 = **static before**: nothing animates while this frame, or the frame before it, is on screen (see below). Bits 2 to 7 are reserved: write `0`; decoders ignore them. |
+| 17     | 8    | Animation time        | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.                                                                                              |
+| 25     | 4    | Preferred frame time  | `u32` ticks (100 ns), `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `166'667` for 60 fps, also while the pacer runs slower (see below).                     |
+| 29     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                                            |
+| 33     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                |
+| 41     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                   |
+| 49     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                    |
 
 Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
 carries the same frame index. Frame and end markers are exactly these 53 bytes. A **start marker** appends its metadata, 77 bytes
@@ -110,12 +110,22 @@ pacing fields tell the analysis:
 
 ### Flags
 
-- **Bit 0, static:** nothing animates in this frame; it looks the same whatever time it is shown at (an idle screen, a paused menu
-  with nothing moving). Set it on every such frame. The analysis does not judge the animation error of a step from or to a static
-  frame, because there is no motion to be off: an animation clock that pauses while nothing animates would otherwise make the first
-  frame after an idle stretch look as far off as the stretch was long. The frame can still be late; its time on screen is left out
-  of the frame rates, which describe the frames that animate.
-- **Bits 1 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
+Static describes a frame's **time on screen**: nothing animates from the moment it is shown until the next frame is (an idle screen,
+a paused menu with nothing moving). The frame itself may still have moved: it is often the one that reaches the rest pose. Two bits
+say the same fact, for applications that know it at different moments:
+
+- **Bit 0, static after:** nothing animates while this frame is on screen. For an application that knows it while rendering the
+  frame (it has no pending work after it). Set it on every such frame.
+- **Bit 1, static before:** nothing animated while the frame before this one was on screen. For an application that only knows it
+  once it renders the next frame (it woke up on input after waiting); set it on that next frame. It speaks for the frame index before
+  it: when that frame was never shown, it marks nothing.
+- Either bit, or both, makes the step from that frame to the next a **static step**. The analysis does not judge its animation
+  error, because there is no motion to be off: an animation clock that pauses while nothing animates would otherwise make the first
+  frame after an idle stretch look as far off as the stretch was long. The step into the static frame is judged as usual. A static
+  step can still be late; the static frame's time on screen is left out of the frame rates, which describe the frames that animate.
+- The two bits are independent flags, not one value: every combination is valid (inside a static stretch rendered every refresh,
+  a frame carries both).
+- **Bits 2 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
 
 ### CPU start time and CPU busy
 
@@ -313,7 +323,8 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 // Every frame, after all post-processing and UI
 // Pacing: when the pacer intends this frame to be shown (steady clock ticks), its target frame time and the frame time the
 // application wants to run at. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
-// marker is drawn last, just before Present). 0 = unknown. MarkerFlags::Static when nothing animates in this frame
+// marker is drawn last, just before Present). 0 = unknown. MarkerFlags::StaticAfter when nothing animates while this frame is
+// on screen, MarkerFlags::StaticBefore when the application only now knows nothing animated while the previous frame was
 const FM::Payload payload{.FrameIndex = frameIndex,
                           .AnimationTicks = animationTicks,
                           .RunId = runId,

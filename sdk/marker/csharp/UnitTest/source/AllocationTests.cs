@@ -65,7 +65,7 @@ namespace MB.FrameMarker.UnitTest
           900 + frame,
           80_000,
           166_667,
-          MarkerFlags.Static
+          MarkerFlags.StaticAfter
         );
         if (m_generator.TryGenerateModules(payload, m_bits, out var matrix))
         {

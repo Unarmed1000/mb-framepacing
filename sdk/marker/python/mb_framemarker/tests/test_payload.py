@@ -52,7 +52,7 @@ class PayloadTests(unittest.TestCase):
             0x5152535455565758,
             0x61626364,
             0x71727374,
-            MarkerFlags.STATIC,
+            MarkerFlags.STATIC_AFTER,
         )
         data = encode_payload(payload)
         expected = (
@@ -71,7 +71,7 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(len(data), PAYLOAD_BYTE_COUNT)
 
     def test_start_marker_layout(self) -> None:
-        payload = Payload(1, 2, 3, MarkerKind.SEQUENCE_START, 4, 5, 6, 7, 9, MarkerFlags.STATIC)
+        payload = Payload(1, 2, 3, MarkerKind.SEQUENCE_START, 4, 5, 6, 7, 9, MarkerFlags.STATIC_AFTER)
         sequence_id = SequenceId(bytes(range(0xA0, 0xB0)))
         data = encode_payload(payload, StartMetadata(0x0102030405060708, sequence_id))
         self.assertEqual(len(data), START_PAYLOAD_BYTE_COUNT)
@@ -232,8 +232,10 @@ class PayloadTests(unittest.TestCase):
     def test_preferred_frame_time_and_flags_round_trip(self) -> None:
         for payload in (
             Payload(1, 2, 3, MarkerKind.FRAME, 4, 333_333, 6, 7, 166_667),
-            Payload(1, 2, 3, MarkerKind.FRAME, 0, ON_DEMAND_FRAME_TICKS, 0, 0, ON_DEMAND_FRAME_TICKS, MarkerFlags.STATIC),
-            Payload(1, 2, 3, MarkerKind.SEQUENCE_END, 4, 5, 6, 7, 10_000_000, MarkerFlags.STATIC),
+            Payload(1, 2, 3, MarkerKind.FRAME, 0, ON_DEMAND_FRAME_TICKS, 0, 0, ON_DEMAND_FRAME_TICKS, MarkerFlags.STATIC_AFTER),
+            Payload(1, 2, 3, MarkerKind.SEQUENCE_END, 4, 5, 6, 7, 10_000_000, MarkerFlags.STATIC_AFTER),
+            Payload(1, 2, 3, MarkerKind.FRAME, 4, 5, 6, 7, 166_667, MarkerFlags.STATIC_BEFORE),
+            Payload(1, 2, 3, MarkerKind.FRAME, 4, 5, 6, 7, 166_667, MarkerFlags.STATIC_AFTER | MarkerFlags.STATIC_BEFORE),
             # A reserved bit survives the round trip
             Payload(1, 2, 3, MarkerKind.FRAME, flags=MarkerFlags(0x81)),
         ):

@@ -210,7 +210,7 @@ uncertain: the steps into and out of it are not judged (no animation error, no l
 in the display time step panel, counted (`statistics.uncertainSteps`) and named in the report's description. A frame index skipped
 across a gap is never called dropped: the frame may have been shown in the refresh the capture missed.
 
-**Static stretches** (the marker's `Static` flag: nothing animates) are a violet band behind every time panel. The display time step
+**Static stretches** (the marker's `StaticAfter` or `StaticBefore` flag: nothing animates while a frame is on screen) are a violet band behind every time panel. The display time step
 and frametime scales leave a static frame's hold and frametime out (idle waits), so an idle second does not squash the panel; those
 values get a mark with their value at the top edge.
 
@@ -237,7 +237,7 @@ The headline numbers on the Analyze page (the report card shows the same):
 | Late frames        | Frames shown later than planned (see below), and their share of the run                                                                                                                                                             |
 
 The frame rate numbers (average fps, the lows) and the display time step statistics and histogram describe the frames that animate: a
-static frame's time on screen (the marker's `Static` flag) is left out, and the tile, the report's description and the statistics
+static frame's time on screen (the marker's `StaticAfter` or `StaticBefore` flag) is left out, and the tile, the report's description and the statistics
 table say how many ("excluding 48 static frames"; `statistics.excludedStaticFrames` in `summary.json`, `StaticBefore` in the frames
 CSV).
 

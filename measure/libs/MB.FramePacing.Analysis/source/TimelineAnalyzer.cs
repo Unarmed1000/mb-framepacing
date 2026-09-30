@@ -200,7 +200,8 @@ namespace MB.FramePacing.Analysis
       public long CpuStartTicks;
       public uint CpuBusyTicks;
       public uint PreferredFrameTicks;
-      public bool Static;
+      public bool StaticAfter;
+      public bool StaticBefore;
       public long FirstCaptureIndex;
       public long FirstSeenTicks;
       public long LastSeenTicks;
@@ -310,7 +311,8 @@ namespace MB.FramePacing.Analysis
           CpuStartTicks = payload.CpuStartTicks,
           CpuBusyTicks = payload.CpuBusyTicks,
           PreferredFrameTicks = payload.PreferredFrameTicks,
-          Static = payload.IsStatic,
+          StaticAfter = payload.IsStaticAfter,
+          StaticBefore = payload.IsStaticBefore,
           FirstCaptureIndex = row.CaptureIndex,
           FirstSeenTicks = row.CaptureTicks,
           LastSeenTicks = row.CaptureTicks,
@@ -586,6 +588,13 @@ namespace MB.FramePacing.Analysis
     private static List<PresentedFrame> BuildFrames(List<FrameBuilder> builders, long period, bool camera)
     {
       var frames = new List<PresentedFrame>(builders.Count);
+      // Static is a frame's time on screen, said by the frame itself (StaticAfter) or, when the application only knew it one frame later,
+      // by the next frame (StaticBefore). The next frame speaks only for the frame index before it: a frame never shown has no time on screen
+      for (int i = 1; i < builders.Count; ++i)
+      {
+        if (builders[i].StaticBefore && builders[i - 1].Segment == builders[i].Segment && builders[i - 1].FrameIndex + 1 == builders[i].FrameIndex)
+          builders[i - 1].StaticAfter = true;
+      }
       int segmentStart = 0;
       long drift = 0;
       for (int i = 0; i < builders.Count; ++i)
@@ -606,9 +615,11 @@ namespace MB.FramePacing.Analysis
         // an uncertain display time: the frame may have appeared in the refresh the capture missed. A capture card's gaps only; a camera
         // decides uncertain starts itself (AnalyzeCamera), where gaps are part of every scanout
         bool uncertainStep = !camera && previous != null && (b.UncertainStart || previous.UncertainStart);
-        // A step from or to a static frame has no motion to be off (an animation clock may pause while nothing animates): not judged, and
-        // the drift adds up only the judged errors (without static frames that is animation time minus display time since the segment began)
-        long? error = displayDelta.HasValue && !b.Static && !previous!.Static && !uncertainStep ? animationDelta!.Value - displayDelta.Value : null;
+        // A step from a static frame has no motion to be off (an animation clock may pause while nothing animates): not judged, and the drift
+        // adds up only the judged errors (without static steps that is animation time minus display time since the segment began). The step
+        // into a static frame is judged: that frame may still have moved (it often reaches the rest pose)
+        bool staticStep = previous is { StaticAfter: true };
+        long? error = displayDelta.HasValue && !staticStep && !uncertainStep ? animationDelta!.Value - displayDelta.Value : null;
         drift += error ?? 0;
         long onScreen = hasNext ? builders[i + 1].FirstSeenTicks - b.FirstSeenTicks : b.LastSeenTicks - b.FirstSeenTicks + period;
         // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured
@@ -624,9 +635,9 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.UncertainStart;
         if (b.Torn)
           flags |= PresentedFrameFlags.Torn;
-        if (b.Static)
-          flags |= PresentedFrameFlags.Static;
-        if (previous is { Static: true })
+        if (b.StaticAfter)
+          flags |= PresentedFrameFlags.StaticAfter;
+        if (staticStep)
           flags |= PresentedFrameFlags.StaticBefore;
         if (uncertainStep)
           flags |= PresentedFrameFlags.UncertainStep;

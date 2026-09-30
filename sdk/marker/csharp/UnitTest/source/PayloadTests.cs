@@ -31,7 +31,7 @@ namespace MB.FrameMarker.UnitTest
           0x5152535455565758,
           0x61626364u,
           0x71727374u,
-          MarkerFlags.Static
+          MarkerFlags.StaticAfter
         ),
         default,
         bytes
@@ -148,8 +148,10 @@ namespace MB.FrameMarker.UnitTest
     }
 
     [TestCase(166_667u, MarkerFlags.None)]
-    [TestCase(Marker.OnDemandFrameTicks, MarkerFlags.Static)]
-    [TestCase(10_000_000u, MarkerFlags.Static)]
+    [TestCase(Marker.OnDemandFrameTicks, MarkerFlags.StaticAfter)]
+    [TestCase(10_000_000u, MarkerFlags.StaticAfter)]
+    [TestCase(166_667u, MarkerFlags.StaticBefore)]
+    [TestCase(166_667u, MarkerFlags.StaticAfter | MarkerFlags.StaticBefore)]
     [TestCase(0u, (MarkerFlags)0x81)]
     public void PreferredFrameTimeAndFlags_RoundTrip(uint preferredFrameTicks, MarkerFlags flags)
     {

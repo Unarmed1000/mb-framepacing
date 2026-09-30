@@ -184,26 +184,36 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// A second of idle screen (a static frame) between animated frames: the steps into and out of it are not judged, whether the
-    /// application's animation clock paused while nothing animated (48 ms) or kept running (1048 ms), and the drift does not jump. The
-    /// frame rate numbers leave out the static frame's time on screen, and count it.
+    /// A second of idle screen after frame 4, said by frame 4 itself (StaticAfter: no pending work after it), by frame 5 (StaticBefore: the
+    /// application only knew it then) or by both: the same static step either way. The step into frame 4 is judged (it still moved to its
+    /// rest), the step out of it is not, whether the animation clock paused while nothing animated (64 ms) or kept running (1064 ms), and the
+    /// drift does not jump. The frame rate numbers leave out frame 4's time on screen, and count it.
     /// </summary>
-    [TestCase(64L)]
-    [TestCase(1064L)]
-    public void StaticFrame_ItsStepsAreNotJudged(long animationAfterIdleMs)
+    [TestCase(64L, MB.FrameMarker.MarkerFlags.StaticAfter, MB.FrameMarker.MarkerFlags.None)]
+    [TestCase(1064L, MB.FrameMarker.MarkerFlags.StaticAfter, MB.FrameMarker.MarkerFlags.None)]
+    [TestCase(64L, MB.FrameMarker.MarkerFlags.None, MB.FrameMarker.MarkerFlags.StaticBefore)]
+    [TestCase(1064L, MB.FrameMarker.MarkerFlags.None, MB.FrameMarker.MarkerFlags.StaticBefore)]
+    [TestCase(64L, MB.FrameMarker.MarkerFlags.StaticAfter, MB.FrameMarker.MarkerFlags.StaticBefore)]
+    public void StaticStep_SaidByEitherFrame_IsNotJudged(
+      long animationAfterIdleMs,
+      MB.FrameMarker.MarkerFlags fourth,
+      MB.FrameMarker.MarkerFlags fifth
+    )
     {
       var rows = new RowBuilder().Start(1);
       rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
-      rows.Show(4, 48, 250, flags: MB.FrameMarker.MarkerFlags.Static);
-      rows.Show(5, animationAfterIdleMs, 4).Show(6, animationAfterIdleMs + 16, 4);
+      rows.Show(4, 48, 250, flags: fourth);
+      rows.Show(5, animationAfterIdleMs, 4, flags: fifth).Show(6, animationAfterIdleMs + 16, 4);
       rows.End(1);
 
       var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
       var frames = run.Frames;
 
-      Assert.That(frames[3].Flags.HasFlag(PresentedFrameFlags.Static));
-      Assert.That(frames[4].Flags.HasFlag(PresentedFrameFlags.Static), Is.False);
-      Assert.That(frames[3].AnimationErrorTicks, Is.Null, "the step to the static frame");
+      Assert.That(
+        frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.StaticAfter)),
+        Is.EqualTo(new[] { false, false, false, true, false, false })
+      );
+      Assert.That(frames[3].AnimationErrorTicks, Is.EqualTo(0), "the step to the static frame: judged");
       Assert.That(frames[4].AnimationErrorTicks, Is.Null, "the step from it");
       Assert.That(frames[4].DisplayDeltaTicks, Is.EqualTo(1000 * Ms), "the static frame's time on screen");
       Assert.That(
@@ -218,6 +228,24 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(4));
       Assert.That(run.Statistics.DisplayDeltaMs.Max, Is.EqualTo(16));
       Assert.That(run.Statistics.AverageFps, Is.EqualTo(62.5).Within(1e-9));
+    }
+
+    /// <summary>
+    /// StaticBefore speaks for the frame index before it only: when that frame was never shown, the frame shown before it had motion after it
+    /// (the frame never shown), so nothing is static and the step is judged.
+    /// </summary>
+    [Test]
+    public void StaticBefore_AfterAFrameNeverShown_MarksNothing()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
+      rows.Show(5, 64, 4, flags: MB.FrameMarker.MarkerFlags.StaticBefore).Show(6, 80, 4);
+      rows.End(1);
+
+      var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
+
+      Assert.That(frames.Any(f => (f.Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticBefore)) != 0), Is.False);
+      Assert.That(frames[3].AnimationErrorTicks, Is.EqualTo(16 * Ms), "judged: frame 4's motion is in it");
     }
 
     /// <summary>An application that presents on demand has no interval to be late against: a long wait for its next frame is not late.</summary>

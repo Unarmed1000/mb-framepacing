@@ -28,7 +28,7 @@ namespace MB::FramePacingData
     std::optional<int64_t> AnimationDeltaTicks;
     std::optional<int64_t> AnimationErrorTicks;
     int64_t DriftTicks{0};
-    //! SkippedBefore, UncertainStart, Torn, Late, Static.
+    //! SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep.
     std::vector<std::string> Flags;
     std::optional<int64_t> IntendedDisplayTicks;
     //! OnDemandFrameTicks on demand.

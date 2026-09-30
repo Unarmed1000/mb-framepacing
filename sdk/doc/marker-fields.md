@@ -76,23 +76,32 @@ An animation clock in seconds converts with `Marker.SecondsToTicks` (C#), `secon
   - The application restarts with the same run id within 1000 frames of where it was: the new frames read as out of order. Use a
     new run id.
 
-### Flags: Static
+### Flags: static after and static before
 
-- **Means:** bit 0, **static**: nothing animates in this frame. It would look the same whatever time it was shown at (an idle
-  screen, a paused menu with nothing moving).
-- **Value:** set it on every frame where nothing animates, and only there. Bits 1 to 7 are reserved: write `0`.
-- **What the analysis does:**
-  - The animation error of the steps to and from a static frame is not judged (and has no prediction error), so an animation clock
-    that pauses while idle does not look like a huge error. The drift adds up only the judged errors.
-  - A static frame's time on screen (the next frame's display time step) is left out of the average fps, the 1 % and 0.1 % lows and
+- **Means:** nothing animates while a frame is on screen, from its display until the next frame's (an idle screen, a paused menu
+  with nothing moving). Static is about the frame's **time on screen**, not the frame: the frame itself may still have moved (it is
+  often the one that reaches the rest pose). Two bits say it, for the two moments an application can know it:
+  - bit 0, **static after**, on the frame itself: the application knows while rendering it that it has no pending work after it;
+  - bit 1, **static before**, on the next frame: the application only knows once it renders that frame (it woke up on input after
+    waiting).
+- **Value:** set whichever bit the application knows, or both; they are independent flags. Inside a static stretch that is rendered
+  every refresh, a frame carries both. Bits 2 to 7 are reserved: write `0`.
+- **What the analysis does:** either bit makes the step from the static frame to the next a **static step**.
+  - Its animation error is not judged (and it has no prediction error), so an animation clock that pauses while idle does not look like
+    a huge error. The drift adds up only the judged errors. The step **into** the static frame is judged as usual.
+  - The static frame's time on screen (the next frame's display time step) is left out of the average fps, the 1 % and 0.1 % lows and
     the display time step statistics and histogram; the report says how many (**excluding N static frames**).
   - The report draws static stretches in violet, and leaves them out of the display time step and frametime scales.
-  - A static frame is never in the late share's amber ("held longer than the preferred frame time").
+  - A static step is never in the late share's amber ("held longer than the preferred frame time"). It can still be late: see
+    "A renderer that sleeps until something changes" below for a renderer that stops presenting while static.
+  - Static before speaks for the frame index before it only: when that frame was never shown, it marks nothing.
 - **Goes wrong when:**
-  - The flag is set on a frame where something still moves (a spinner, a blinking cursor, a video): its errors are hidden and its
-    time is missing from the frame rates.
-  - It is missing while the animation clock pauses: every step of the pause shows an animation error of a whole display step. When
+  - A bit is set while something still moves (a spinner, a blinking cursor, a video): its errors are hidden and its time is missing
+    from the frame rates.
+  - Both are missing while the animation clock pauses: every step of the pause shows an animation error of a whole display step. When
     no frames are presented while idle, the first frame after it shows an error as long as the pause.
+  - The animation clock pauses one frame early: the frame that reaches the rest pose gets the paused time, and the step into it (which
+    is judged) shows an error. Pause the clock after the last frame that animates.
 
 ### Animation time
 
@@ -106,7 +115,7 @@ An animation clock in seconds converts with `Marker.SecondsToTicks` (C#), `secon
   - It comes from a separate wall clock read while drawing the marker instead of the animation's own clock: the report then measures
     the render loop's timing, not what the viewer saw.
   - A time scale other than 1 (slow motion) or a pause changes the animation clock: every step shows an error of the difference.
-    Measure at time scale 1, write the clock the visible motion follows, and flag paused frames as static.
+    Measure at time scale 1, write the clock the visible motion follows, and flag a pause as static.
   - A fixed-step simulation renders without interpolation: write the simulation time the frame shows, not the loop's time.
 
 ### Preferred frame time
@@ -122,7 +131,7 @@ An animation clock in seconds converts with `Marker.SecondsToTicks` (C#), `secon
 - **What the analysis does:**
   - The value is rounded up to whole refreshes, with 5 % slack (59.9 fps on 60 Hz is one refresh, 60 fps on 144 Hz three).
   - The **late share's amber**: a frame on screen at least half a refresh longer than the preferred frame time, without being late.
-    The pacer intended it, but the application runs slower than it wants. On demand and static frames are never amber.
+    The pacer intended it, but the application runs slower than it wants. On demand frames and static steps are never amber.
   - Without a target frame time and a schedule, frames are measured against it.
   - The report's display box says "preferred N fps" (or "on demand").
 - **Goes wrong when:** a game that deliberately runs at 30 fps writes the target but not the preferred frame time: the analysis
@@ -230,7 +239,7 @@ The late share shows the lowered stretch in amber and the frames shown after the
 fixed refresh rate, so the display refreshes every `83'333`: the target rounds up to one refresh (5 % slack), and the refreshes
 where the cap makes a frame wait a second refresh are measured as late.
 
-**An idle device at 1 fps.** While idle, preferred and target frame time `10'000'000`, and the static flag on the idle frames when
+**An idle device at 1 fps.** While idle, preferred and target frame time `10'000'000`, and static after on the idle frames when
 nothing moves. Steps of one second are on target and not amber; the idle frames' time is left out of the frame rates and drawn in
 violet. Back to 60 fps, both fields return to `166'667` on the first frame paced at 60.
 
@@ -238,9 +247,16 @@ violet. Back to 60 fps, both fields return to `166'667` on the first frame paced
 intended display time. No wait for the next frame is late and nothing is amber; the animation errors of the frames it does present
 are judged as usual.
 
-**A static menu in a game that keeps rendering at 60 fps.** Preferred and target frame time `166'667`, and the static flag on every
-frame of the menu while nothing in it moves. The animation clock may pause meanwhile; the steps into and out of the menu are not
-judged, and the menu's frames are left out of the frame rates ("excluding N static frames").
+**A renderer that sleeps until something changes.** It renders every refresh while an animation runs, then stops presenting until
+input arrives. When it knows, while rendering the frame that ends the animation, that nothing is pending, it sets static after on
+that frame. When it only knows on waking, it sets static before on the first frame it renders then. Either way the wait is a static
+step: left out of the frame rates, not judged, violet. The wait had no interval to meet, so that first frame also writes target frame
+time on demand, or it is late by the length of the wait.
+
+**A static menu in a game that keeps rendering at 60 fps.** Preferred and target frame time `166'667`, and static after on every
+frame of the menu while nothing in it moves (it knows each frame has no pending work). The animation clock may pause after the last
+frame that moves; the steps out of the menu's frames are not judged, and their time is left out of the frame rates ("excluding N
+static frames").
 
 **Several frames in flight.** The CPU starts frame 11 before frame 10 is presented; CPU busy runs from each frame's own start:
 
@@ -255,7 +271,7 @@ The frame timeline card draws the overlapping CPU boxes in further lanes.
 ## Common mistakes
 
 - The animation time comes from a wall clock instead of the clock the animation uses, or runs at a time scale other than 1.
-- The animation clock pauses without the static flag, or the static flag is set on frames that still move.
+- The animation clock pauses without static after or static before, or either is set while something still moves.
 - The intended display time and the CPU start time come from two different clocks.
 - A real time of exactly `0` (a steady clock started at 0): that frame reads as unknown.
 - A deliberate lower rate written as the target frame time without the preferred frame time: every frame is amber.

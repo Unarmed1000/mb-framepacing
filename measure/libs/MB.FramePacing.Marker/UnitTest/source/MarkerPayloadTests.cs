@@ -28,7 +28,7 @@ namespace MB.FramePacing.Marker.UnitTest
         0x5152535455565758L,
         0x61626364u,
         0x71727374u,
-        MB.FrameMarker.MarkerFlags.Static
+        MB.FrameMarker.MarkerFlags.StaticAfter
       );
       byte[] expected =
       [

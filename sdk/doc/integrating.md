@@ -170,9 +170,10 @@ does not count a rate you chose (30 fps for a busy stretch) as late, and shows w
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
 presents only when something changes writes `FM::OnDemandFrameTicks` for both frame times.
 
-**Static frames (optional).** Set `FM::MarkerFlags::Static` on frames where nothing animates (an idle screen, a paused menu). The
-analysis then does not judge the animation error of the steps to and from them, so an animation clock that pauses while idle does not
-look like a huge error.
+**Static frames (optional).** Set `FM::MarkerFlags::StaticAfter` on a frame when nothing animates while it is on screen (no pending
+work after it: an idle screen, a paused menu). An application that only knows it once it renders the next frame sets
+`FM::MarkerFlags::StaticBefore` on that next frame instead. The analysis then does not judge the animation error of the step out of
+the static frame, so an animation clock that pauses while idle does not look like a huge error ([the flags](marker-fields.md#flags-static-after-and-static-before)).
 
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the
@@ -188,7 +189,7 @@ const FM::Payload payload{.FrameIndex = frameIndex,
                           .CpuStartTicks = cpuStartTicks,
                           .CpuBusyTicks = cpuBusyTicks,
                           .PreferredFrameTicks = preferredFrameTicks,
-                          .Flags = nothingAnimates ? FM::MarkerFlags::Static : FM::MarkerFlags::None};
+                          .Flags = nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None};
 ```
 
 What to write in each field, for typical frame pacers, is in [Filling the marker fields](marker-fields.md).

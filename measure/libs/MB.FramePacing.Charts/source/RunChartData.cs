@@ -73,17 +73,17 @@ namespace MB.FramePacing.Charts
       m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDeltaTicks));
       m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDeltaTicks : null));
       m_animatingHolds = Once(() =>
-        new FrameSequence(count, i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.Static) == 0 ? Frames[i + 1].DisplayDeltaTicks : null)
+        new FrameSequence(count, i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDeltaTicks : null)
       );
       m_staticStretches = Once(() =>
       {
         var stretches = new List<(int Start, int End)>();
         for (int i = 0; i < count; ++i)
         {
-          if ((Frames[i].Flags & PresentedFrameFlags.Static) == 0)
+          if ((Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0)
             continue;
           int end = i + 1;
-          while (end < count && (Frames[end].Flags & PresentedFrameFlags.Static) != 0 && Frames[end].Segment == Frames[i].Segment)
+          while (end < count && (Frames[end].Flags & PresentedFrameFlags.StaticAfter) != 0 && Frames[end].Segment == Frames[i].Segment)
             ++end;
           stretches.Add((i, end));
           i = end - 1;
@@ -136,7 +136,10 @@ namespace MB.FramePacing.Charts
         new RankBits(count, i => Frames[i].DisplayDeltaTicks.HasValue && (Frames[i].Flags & PresentedFrameFlags.StaticBefore) != 0)
       );
       m_animatingFrameTimes = Once(() =>
-        new FrameSequence(count, i => (Frames[i].Flags & PresentedFrameFlags.Static) == 0 && Frames[i].FrameTimeTicks is > 0 and var t ? t : null)
+        new FrameSequence(
+          count,
+          i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTimeTicks is > 0 and var t ? t : null
+        )
       );
       m_frameTimesAndCpuBusy = Once(() =>
       {
@@ -145,7 +148,7 @@ namespace MB.FramePacing.Charts
         var values = new List<long>(AnimatingFrameTimes.Count + CpuBusy.Count);
         for (int i = 0; i < count; ++i)
         {
-          if ((Frames[i].Flags & PresentedFrameFlags.Static) == 0 && Frames[i].FrameTimeTicks is > 0 and var t)
+          if ((Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTimeTicks is > 0 and var t)
             values.Add(t);
           if (Frames[i].CpuBusyTicks > 0)
             values.Add(Frames[i].CpuBusyTicks);
@@ -184,7 +187,7 @@ namespace MB.FramePacing.Charts
         new FrameSequence(
           count,
           i =>
-            refresh > 0 && HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.Static) == 0
+            refresh > 0 && HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0
               ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
               {
                 (null, null) => null,

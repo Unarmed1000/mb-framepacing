@@ -123,7 +123,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         );
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.UncertainStep), Is.False, where + ": the clip's capture has no gap");
         Assert.That(frame.SkippedBefore, Is.EqualTo(manifest.SkippedBefore(i)), where + ": frame indices skipped before it");
-        Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Static), Is.EqualTo(manifest.IsStatic(i)), where + ": static");
+        Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.StaticAfter), Is.EqualTo(manifest.IsStatic(i)), where + ": static");
         Assert.That(frame.PreferredTicks, Is.EqualTo(manifest.PreferredRefreshes(i) * refresh), where + ": preferred frame time (null on demand)");
         Assert.That(frame.DriftTicks, Is.EqualTo(manifest.DriftTicks(i)), where + ": drift");
         Assert.That(
