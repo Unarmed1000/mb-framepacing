@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+# SPDX-License-Identifier: BSD-3-Clause
+"""Create the C++ release archives of mb_framepacing (every module) and prove they work on their own.
+
+  mb-framepacing-cpp-<version>.tar.gz and .zip, each holding one folder mb-framepacing-cpp-<version>/ with
+    the library source tree (sdk/cpp without build output: core, marker, data), VERSION, LICENSE,
+    licenses/ (qrcodegen and nlohmann/json: compiled in; GoogleTest: fetched by the tests), doc/ (the marker format, the integration
+    guide, the data formats), shaders/ (the reference shaders) and test-data/data/ (the golden data the data module's tests read)
+  SHA256SUMS
+
+With --verify the extracted archive is configured, built and tested standalone, and the consumer project (tests/consumer) is built
+against it every documented way: FetchContent of the tar.gz (URL + SHA256), add_subdirectory, and find_package with components after an
+install.
+
+  python sdk/cpp/package_release.py --output <folder> [--verify]
+"""
+
+import argparse
+import hashlib
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import zipfile
+from pathlib import Path
+
+CPP_DIR = Path(__file__).resolve().parent
+SDK_DIR = CPP_DIR.parent
+REPOSITORY_ROOT = SDK_DIR.parent
+EXCLUDED_DIRECTORIES = {"build", "out", ".vs", ".vscode", "__pycache__"}
+# Repository tooling inside sdk/cpp that is not part of the library: the Conan recipe downloads this very archive
+EXCLUDED_TOP_LEVEL = {"conan"}
+EXTRA_FILES = {
+    "VERSION": SDK_DIR / "VERSION",
+    "LICENSE": SDK_DIR / "LICENSE",
+    "licenses/qrcodegen-MIT.txt": REPOSITORY_ROOT / "licenses" / "qrcodegen-MIT.txt",
+    "licenses/nlohmann-json-MIT.txt": REPOSITORY_ROOT / "licenses" / "nlohmann-json-MIT.txt",
+    "licenses/googletest-BSD-3-Clause.txt": REPOSITORY_ROOT / "licenses" / "googletest-BSD-3-Clause.txt",
+    "doc/marker-format.md": SDK_DIR / "doc" / "marker-format.md",
+    "doc/integrating.md": SDK_DIR / "doc" / "integrating.md",
+    "doc/marker-fields.md": SDK_DIR / "doc" / "marker-fields.md",
+    "doc/capture-data-format.md": SDK_DIR / "doc" / "capture-data-format.md",
+    "doc/analysis-output-format.md": SDK_DIR / "doc" / "analysis-output-format.md",
+}
+EXTRA_DIRECTORIES = {
+    # The reference shaders (HLSL, GLSL for OpenGL, OpenGL ES 2.0 and Vulkan) that draw the marker as one quad
+    "shaders": SDK_DIR / "shaders",
+    # The golden data the data module's tests read (found above data/ in the archive, as in the repository)
+    "test-data/data": SDK_DIR / "test-data" / "data",
+}
+
+
+class Arguments(argparse.Namespace):
+    """The parsed command line."""
+
+    output: str = ""
+    verify: bool = False
+
+
+def parse_args() -> Arguments:
+    parser = argparse.ArgumentParser(description="Create (and verify) the C++ release archives of mb_framepacing.")
+    _ = parser.add_argument("--output", required=True, help="Folder for the archives and SHA256SUMS.")
+    _ = parser.add_argument("--verify", action="store_true", help="Build and test the extracted archive and consume it every documented way.")
+    return parser.parse_args(namespace=Arguments())
+
+
+def run(command: list[str]) -> None:
+    print("> " + " ".join(command), flush=True)
+    _ = subprocess.run(command, check=True)
+
+
+def stage(root: Path) -> None:
+    """Copy the library source tree and the extra files into root."""
+    for path in sorted(CPP_DIR.rglob("*")):
+        relative = path.relative_to(CPP_DIR)
+        # This script is repository tooling (it reads sdk/VERSION and the repository's licenses); the archive does not need it
+        excluded = any(part in EXCLUDED_DIRECTORIES for part in relative.parts) or relative.parts[0] in EXCLUDED_TOP_LEVEL
+        if excluded or path.is_dir() or path == Path(__file__).resolve():
+            continue
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _ = shutil.copy2(path, target)
+    for name, source in EXTRA_FILES.items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _ = shutil.copy2(source, target)
+    for name, source in EXTRA_DIRECTORIES.items():
+        _ = shutil.copytree(source, root / name)
+
+
+def create_archives(output: Path, version: str) -> list[Path]:
+    name = f"mb-framepacing-cpp-{version}"
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="mb-framepacing-stage-") as staging:
+        root = Path(staging) / name
+        stage(root)
+        tar_path = output / f"{name}.tar.gz"
+        with tarfile.open(tar_path, "w:gz") as archive:
+            archive.add(root, arcname=name)
+        zip_path = output / f"{name}.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            for file in sorted(root.rglob("*")):
+                if file.is_file():
+                    archive.write(file, f"{name}/{file.relative_to(root).as_posix()}")
+    return [tar_path, zip_path]
+
+
+def write_checksums(output: Path, archives: list[Path]) -> Path:
+    lines = [f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}" for path in archives]
+    checksums = output / "SHA256SUMS"
+    _ = checksums.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    return checksums
+
+
+def verify(tar_path: Path, version: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="mb-framepacing-verify-") as work:
+        with tarfile.open(tar_path) as archive:
+            archive.extractall(work, filter="data")
+        source = Path(work) / f"mb-framepacing-cpp-{version}"
+        build = Path(work) / "build"
+        run(["cmake", "-S", str(source), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release"])
+        run(["cmake", "--build", str(build), "--config", "Release", "--parallel"])
+        run(["ctest", "--test-dir", str(build), "-C", "Release", "--output-on-failure"])
+        run([sys.executable, str(CPP_DIR / "tests" / "consumer" / "check_consumers.py"), "--source", str(source), "--archive", str(tar_path)])
+
+
+def main() -> int:
+    args = parse_args()
+    version = (SDK_DIR / "VERSION").read_text(encoding="utf-8").strip()
+    output = Path(args.output).resolve()
+    archives = create_archives(output, version)
+    checksums = write_checksums(output, archives)
+    print(checksums.read_text(encoding="utf-8"), end="")
+    if args.verify:
+        try:
+            verify(archives[0], version)
+        except subprocess.CalledProcessError as error:
+            print(f"Verification failed: {error}")
+            return 1
+        print(f"Release archives verified: {', '.join(path.name for path in archives)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

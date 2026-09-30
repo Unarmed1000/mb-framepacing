@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # The repository's Python development tools, managed with uv (https://docs.astral.sh/uv/): `uv sync` creates .venv with them on the
 # Python of .python-version (the minimum the libraries support), and uv.lock pins every package they bring along. The scripts
-# themselves only need the standard library; the Python libraries have their own pyproject.toml (sdk/marker/python, sdk/data/python).
+# themselves only need the standard library; the SDK's Python library has its own pyproject.toml (sdk/python).
 #   uv sync                                    create or update .venv (CI: uv sync --locked)
 #   uv run ruff check . && uv run ruff format --check . && uv run basedpyright
 #   uv run tools/check_cpp.py                  C++ formatting and clang-tidy (python tools/check_cpp.py, see CLAUDE.md)
-#   uv run tools/check_conan.py                the Conan recipes
+#   uv run tools/check_conan.py                the Conan recipe
 #   uv lock --upgrade-package ruff             raise one tool (then update its pin below); Dependabot does this weekly
 [project]
 name = "mb-framepacing-dev"
@@ -16,7 +16,7 @@ dependencies = []
 
 [dependency-groups]
 # Pinned so every machine formats and lints alike: the linters CI runs (ruff, basedpyright, actionlint, clang-format, clang-tidy) and
-# Conan for the recipes in sdk/conan
+# Conan for the recipe in sdk/cpp/conan
 dev = [
     "actionlint-py==1.7.12.25",
     "basedpyright==1.40.1",

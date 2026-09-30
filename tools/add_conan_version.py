@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Add a released version to a Conan recipe (sdk/conan/recipes/<name>): config.yml gets the version, conandata.yml the URL and SHA-256
-of its release archive, read from the SHA256SUMS the release published. Run it after a marker-v<version> or data-v<version> release,
-then review and commit the change (see doc/releasing.md). The release workflows run it too, without committing, to test the release
-through the recipe (tools/check_conan.py --released).
+"""Add a released version to the Conan recipe (sdk/cpp/conan/recipes/mb-framepacing): config.yml gets the version, conandata.yml the URL
+and SHA-256 of its C++ release archive, read from the SHA256SUMS the release published. Run it after an sdk-v<version> release, then
+review and commit the change (see doc/releasing.md). The release workflow runs it too, without committing, to test the release through
+the recipe (tools/check_conan.py --released).
 
-  python tools/add_conan_version.py marker 0.2.0
-  python tools/add_conan_version.py marker 0.3.0-beta.1
-  python tools/add_conan_version.py data 0.2.0 --repository <owner>/<name>
+  python tools/add_conan_version.py 0.2.0
+  python tools/add_conan_version.py 0.3.0-beta.1
+  python tools/add_conan_version.py 0.2.0 --repository <owner>/<name>
 """
 
 import argparse
@@ -20,10 +20,9 @@ from pathlib import Path
 from typing import cast
 
 ROOT = Path(__file__).resolve().parent.parent
-LIBRARIES = {
-    "marker": ("mb-framemarker", "marker-v", "mb-framemarker-cpp"),
-    "data": ("mb-framepacingdata", "data-v", "mb-framepacingdata-cpp"),
-}
+RECIPE = "mb-framepacing"
+TAG_PREFIX = "sdk-v"
+ARCHIVE_PREFIX = "mb-framepacing-cpp"
 VERSION = re.compile(r"^\d+\.\d+\.\d+(-(alpha|beta|rc)\.[1-9]\d*)?$")
 # A pre-release sorts before its release, and alpha before beta before rc (as Conan orders them)
 PRERELEASE_LABELS = ("alpha", "beta", "rc")
@@ -33,7 +32,6 @@ FIELD = re.compile(r'^    (?P<key>\w+): "?(?P<value>[^"\n]*)"?$', re.MULTILINE)
 
 
 class Arguments(argparse.Namespace):
-    library: str = ""
     version: str = ""
     repository: str = "Unarmed1000/mb-framepacing"
 
@@ -75,26 +73,24 @@ def released_sha256(url: str, archive: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    _ = parser.add_argument("library", choices=list(LIBRARIES))
     _ = parser.add_argument("version", help="the released version, MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N")
     _ = parser.add_argument("--repository", help="the GitHub repository with the release (default: Unarmed1000/mb-framepacing)")
     args = parser.parse_args(namespace=Arguments())
     if not VERSION.match(args.version):
         parser.error(f"{args.version} is not MAJOR.MINOR.PATCH, optionally with -alpha.N, -beta.N or -rc.N")
 
-    name, tag_prefix, archive_prefix = LIBRARIES[args.library]
-    archive = f"{archive_prefix}-{args.version}.tar.gz"
-    release = f"https://github.com/{args.repository}/releases/download/{tag_prefix}{args.version}"
+    archive = f"{ARCHIVE_PREFIX}-{args.version}.tar.gz"
+    release = f"https://github.com/{args.repository}/releases/download/{TAG_PREFIX}{args.version}"
     sha256 = released_sha256(f"{release}/SHA256SUMS", archive)
 
-    folder = ROOT / "sdk" / "conan" / "recipes" / name
+    folder = ROOT / "sdk" / "cpp" / "conan" / "recipes" / RECIPE
     header, versions = read_entries(folder / "config.yml")
     versions[args.version] = {"folder": "all"}
     write_entries(folder / "config.yml", header, "versions", versions, quoted=False)
     header, sources = read_entries(folder / "all" / "conandata.yml")
     sources[args.version] = {"url": f"{release}/{archive}", "sha256": sha256}
     write_entries(folder / "all" / "conandata.yml", header, "sources", sources, quoted=True)
-    print(f"{name}/{args.version}: {release}/{archive} ({sha256})")
+    print(f"{RECIPE}/{args.version}: {release}/{archive} ({sha256})")
     return 0
 
 

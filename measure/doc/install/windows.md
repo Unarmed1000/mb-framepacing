@@ -102,7 +102,7 @@ Install Visual Studio 2026 (or 2022) with the "Desktop development with C++" wor
 (`winget install Kitware.CMake`), then:
 
 ```powershell
-cd sdk/marker/cpp
+cd sdk/cpp
 cmake --preset windows
 cmake --build --preset windows
 ctest --preset windows

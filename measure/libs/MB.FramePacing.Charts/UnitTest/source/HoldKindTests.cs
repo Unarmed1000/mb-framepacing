@@ -12,7 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Charts.UnitTest
@@ -34,7 +34,7 @@ namespace MB.FramePacing.Charts.UnitTest
       void Add(CaptureStatus status, MarkerPayload payload) =>
         rows.Add(new CaptureRow(rows.Count, status == CaptureStatus.NotRecorded ? 0 : rows.Count * Period, status, payload));
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FrameMarker.MarkerFlags.None, 0));
+        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, 0));
       foreach (var index in shown)
       {
         if (index is { } frame)
@@ -44,7 +44,7 @@ namespace MB.FramePacing.Charts.UnitTest
               MarkerKind.Frame,
               1,
               frame,
-              MB.FrameMarker.MarkerFlags.None,
+              MB.FramePacing.Marker.MarkerFlags.None,
               (long)frame * Period,
               IntendedDisplayTicks: schedule ? 1_000_000 + ((long)frame * Period) : 0
             )
@@ -53,7 +53,7 @@ namespace MB.FramePacing.Charts.UnitTest
           Add(CaptureStatus.NotRecorded, default);
       }
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FrameMarker.MarkerFlags.None, 0));
+        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.None, 0));
       var result = TimelineAnalyzer.Analyze(rows);
       return RunChartData.Of(new ChartRun(result.Runs.Single(), result.CapturePeriodTicks, result.ErrorThresholdTicks, Camera: false));
     }

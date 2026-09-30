@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mb-framepacing"
+# The SDK's version, sdk/VERSION as PEP 440 spells it (0.2.0-beta.1 is 0.2.0b1; a test checks that mb_framepacing.__version__ matches it)
+version = "0.1.0"
+description = "The mb-framepacing SDK: draw the frame marker into every frame (mb_framepacing.marker) and read the tools' capture data and analysis output (mb_framepacing.data)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "BSD-3-Clause"
+license-files = ["mb_framepacing/LICENSE"]
+authors = [{ name = "Mana Battery ApS" }]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Unarmed1000/mb-framepacing"
+
+[tool.setuptools.packages.find]
+include = ["mb_framepacing*"]

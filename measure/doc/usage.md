@@ -145,7 +145,7 @@ capture-20260924-153000/          (import-... for imports)
 ```
 
 `summary.json` and the CSV files are specified in [the analysis output format](../../sdk/doc/analysis-output-format.md), `captures.mbcd` in
-[the capture data format](../../sdk/doc/capture-data-format.md); the [data libraries](../../sdk/data/README.md) read them in your own code.
+[the capture data format](../../sdk/doc/capture-data-format.md); the SDK's [data modules](../../sdk/README.md#the-data-module) read them in your own code.
 
 The whole run's report and distribution cards are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or
 the GUI's **Save charts**; both write the same files, as SVG. `render` draws reports from an analysis (the capture itself is not needed):

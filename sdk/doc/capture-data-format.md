@@ -10,7 +10,7 @@ frame until the markers are located, then the locked decoder), so they give the 
 
 All numbers are little endian. Times are TimeSpan ticks (100 ns).
 
-The data libraries in [`sdk/data/`](../data/README.md) read this file in C#, Python and C++; the C# library also writes it, and the tools
+The SDK's data modules ([the SDK](../README.md#the-data-module)) read this file in C#, Python and C++; the C# module also writes it, and the tools
 write through it.
 
 ## Header (256 bytes)

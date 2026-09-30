@@ -10,7 +10,7 @@
 
 using System;
 using System.Collections.Generic;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Capture.Synthetic
 {
@@ -143,7 +143,7 @@ namespace MB.FramePacing.Capture.Synthetic
             kind,
             idle ? 0u : o.RunId,
             frameIndex,
-            MB.FrameMarker.MarkerFlags.None,
+            MB.FramePacing.Marker.MarkerFlags.None,
             animationTicks,
             PreferredFrameTicks: (uint)refresh,
             TargetFrameTicks: (uint)refresh,
@@ -151,7 +151,7 @@ namespace MB.FramePacing.Capture.Synthetic
             CpuStartTicks: cpuStartTicks,
             CpuBusyTicks: (uint)cpuBusyTicks
           )
-          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FrameMarker.MarkerFlags.None, animationTicks);
+          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, animationTicks);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
       }
     }

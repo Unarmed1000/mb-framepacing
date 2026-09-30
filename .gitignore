@@ -1,7 +1,6 @@
-# C++ (CMake presets build into sdk/marker/cpp/build/<preset>)
-/sdk/marker/cpp/build/
-/sdk/data/cpp/build/
-/sdk/marker/cpp/out/
+# C++ (CMake presets build into sdk/cpp/build/<preset>)
+/sdk/cpp/build/
+/sdk/cpp/out/
 CMakeUserPresets.json
 
 # .NET

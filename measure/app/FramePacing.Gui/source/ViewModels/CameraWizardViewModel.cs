@@ -23,7 +23,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Camera;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Gui.ViewModels
 {

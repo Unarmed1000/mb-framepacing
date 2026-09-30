@@ -12,7 +12,7 @@ using System;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Capture.UnitTest
@@ -57,8 +57,8 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Records_RoundTrip_WithTheLargestMarkers()
     {
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FrameMarker.MarkerFlags.None, 2).Encode(
-        new StartMetadata(123, new MB.FrameMarker.SequenceId(ulong.MaxValue, ulong.MaxValue))
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2).Encode(
+        new StartMetadata(123, new MB.FramePacing.Marker.SequenceId(ulong.MaxValue, ulong.MaxValue))
       );
       Assert.That(start, Has.Length.EqualTo(MarkerPayload.MaxEncodedByteCount));
       var sync = new byte[12];
@@ -102,7 +102,7 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(MarkerPayload.TryDecode(read[0].MainBytes, out var payload, out var metadata), Is.True);
       Assert.That(
         (payload.Kind, metadata!.SequenceId),
-        Is.EqualTo((MarkerKind.SequenceStart, new MB.FrameMarker.SequenceId(ulong.MaxValue, ulong.MaxValue)))
+        Is.EqualTo((MarkerKind.SequenceStart, new MB.FramePacing.Marker.SequenceId(ulong.MaxValue, ulong.MaxValue)))
       );
     }
 

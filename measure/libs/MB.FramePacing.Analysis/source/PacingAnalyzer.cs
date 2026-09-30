@@ -79,7 +79,7 @@ namespace MB.FramePacing.Analysis
         // frames the target dropped is due one frame time per frame later (1 + dropped): the drop explains the longer step, not lateness
         uint markerTarget = frame.MarkerTargetFrameTicks;
         uint markerWants = frame.MarkerPreferredFrameTicks;
-        const uint OnDemand = MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
+        const uint OnDemand = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTicks;
         bool onDemand = markerTarget == OnDemand || (markerTarget == 0 && markerWants == OnDemand);
         long? target =
           intendedStep is { } step ? WholeRefreshes(step, refreshTicks)
@@ -94,7 +94,7 @@ namespace MB.FramePacing.Analysis
         // to the tools, else one refresh
         uint markerPreferred = frame.MarkerPreferredFrameTicks;
         long? preferred =
-          markerPreferred == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks ? null
+          markerPreferred == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTicks ? null
           : markerPreferred != 0 ? WholeRefreshes(markerPreferred, refreshTicks)
           : givenTarget;
         // A static step (nothing animated while the frame before was on screen) has no prediction error; its pacing error still counts

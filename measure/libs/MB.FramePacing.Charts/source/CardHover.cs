@@ -117,7 +117,7 @@ namespace MB.FramePacing.Charts
       // What the step to this frame was aimed at, as the reference lines draw it (the preferred frame time below, as the marker says it)
       if (FrameReference.Target(frame) is { } target)
         lines.Add($"target {Ms(target)} ms ({Invariant(TimeSpan.TicksPerSecond / (double)target, "0.#")} fps)");
-      if (frame.MarkerPreferredFrameTicks == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks)
+      if (frame.MarkerPreferredFrameTicks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTicks)
         lines.Add("preferred: on demand");
       else if (frame.MarkerPreferredFrameTicks > 0)
         lines.Add(

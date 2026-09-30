@@ -18,7 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Analysis
 {

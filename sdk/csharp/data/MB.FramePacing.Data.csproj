@@ -1,0 +1,22 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The data module of the C# SDK: reads and writes mb-framepacing's capture data (captures.mbcd) and analysis output (summary.json and the CSVs).
+       .NET 10, the LTS the tools use (System.Text.Json is built in); the marker module decodes payloads. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>MB.FramePacing.Data</AssemblyName>
+    <RootNamespace>MB.FramePacing.Data</RootNamespace>
+    <Product>MB Frame Pacing Data</Product>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.Data.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\marker\MB.FramePacing.Marker.csproj" />
+  </ItemGroup>
+</Project>

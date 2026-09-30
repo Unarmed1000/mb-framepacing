@@ -11,7 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest
@@ -54,7 +54,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       for (long c = CapturesPerFrame; c < end; ++c)
       {
         MarkerPayload? second = secondary.TryGetValue(c, out var s)
-          ? new MarkerPayload(MarkerKind.Sync, s.RunId, s.Index, MB.FrameMarker.MarkerFlags.None, 0)
+          ? new MarkerPayload(MarkerKind.Sync, s.RunId, s.Index, MB.FramePacing.Marker.MarkerFlags.None, 0)
           : null;
         rows.Add(
           primary.TryGetValue(c, out var p)
@@ -62,7 +62,7 @@ namespace MB.FramePacing.Analysis.UnitTest
               c,
               c * Period,
               CaptureStatus.Decoded,
-              new MarkerPayload(MarkerKind.Frame, 1, p, MB.FrameMarker.MarkerFlags.None, (long)(p - 100) * 16 * Period),
+              new MarkerPayload(MarkerKind.Frame, 1, p, MB.FramePacing.Marker.MarkerFlags.None, (long)(p - 100) * 16 * Period),
               null,
               0,
               second

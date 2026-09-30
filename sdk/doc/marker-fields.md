@@ -27,9 +27,8 @@ exactly `0` (a counter that starts at the process start, say) must be offset, or
 Steady clock ticks in each language:
 
 ```cpp
-// C++: std::chrono has no 100 ns duration; define one
-using Ticks = std::chrono::duration<int64_t, std::ratio<1, FM::TicksPerSecond>>;
-const int64_t nowTicks = std::chrono::duration_cast<Ticks>(std::chrono::steady_clock::now().time_since_epoch()).count();
+// C++: the core module's steady clock in ticks (std::chrono::steady_clock; MB::FramePacing::TickDuration is the 100 ns duration)
+const int64_t nowTicks = MB::FramePacing::SteadyClock::NowTicks();
 ```
 
 ```csharp
@@ -42,8 +41,8 @@ long nowTicks = (long)(Stopwatch.GetTimestamp() * ((double)TimeSpan.TicksPerSeco
 now_ticks = time.monotonic_ns() // 100
 ```
 
-An animation clock in seconds converts with `Marker.SecondsToTicks` (C#), `seconds_to_ticks` (Python) or
-`std::llround(seconds * FM::TicksPerSecond)` (C++).
+An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `seconds_to_ticks` (Python) or
+`std::llround(seconds * MB::FramePacing::TicksPerSecond)` (C++).
 
 ## The fields
 

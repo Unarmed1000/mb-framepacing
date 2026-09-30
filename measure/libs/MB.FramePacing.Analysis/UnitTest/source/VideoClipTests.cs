@@ -15,7 +15,7 @@ using System.IO;
 using System.Linq;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest

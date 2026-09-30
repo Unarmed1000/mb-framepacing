@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Regenerate the data libraries' golden data (sdk/test-data/data): a test clip imported and analysed by the tools.
+"""Regenerate the data modules' golden data (sdk/test-data/data): a test clip imported and analysed by the tools.
 
 Imports measure/test-data/videos/<clip>/video.mp4 with `mb-framepacing import --analyze` (needs ffmpeg), copies capture.json, captures.mbcd and the
-analysis output into sdk/test-data/data/<clip>, and replaces the machine specific paths in the JSON files. Then it runs the C# data library's
+analysis output into sdk/test-data/data/<clip>, and replaces the machine specific paths in the JSON files. Then it runs the C# data module's
 golden tests with MB_FRAMEPACING_UPDATE_TEST_DATA=1, which write digest.json: the values every language's reader must read.
 
     python tools/update_test_data.py
 
-Run it after a change to the capture data or analysis output format; the C#, Python and C++ data library tests then check the new files.
+Run it after a change to the capture data or analysis output format; the C#, Python and C++ data module tests then check the new files.
 """
 
 import json
@@ -22,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT = ROOT / "measure" / "app" / "FramePacing" / "FramePacing.csproj"
-TESTS = ROOT / "sdk" / "data" / "csharp" / "UnitTest" / "MB.FramePacing.Data.UnitTest.csproj"
+TESTS = ROOT / "sdk" / "csharp" / "data" / "UnitTest" / "MB.FramePacing.Data.UnitTest.csproj"
 CLIP = "60-busy-full-rate"
 TARGET = ROOT / "sdk" / "test-data" / "data" / CLIP
 

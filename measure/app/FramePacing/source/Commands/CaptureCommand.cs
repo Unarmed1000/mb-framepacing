@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands

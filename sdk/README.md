@@ -1,8 +1,15 @@
 # mb-framepacing SDK
 
-The part of [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) that goes into your own code. The **marker libraries** draw
-a small QR code into every frame your application renders. The **data libraries** read what the mb-framepacing tools capture and
-analyse. Everything here is under the BSD 3-Clause License. The measuring tools themselves (capture, analysis, GUI) are in
+The part of [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) that goes into your own code, in C++, C#, Python and Unity.
+It has modules:
+
+- **marker**: draws a small QR code into every frame your application renders. It carries the frame index and the animation time.
+  A capture of the display output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the
+  application animated is from what was actually shown on screen.
+- **data**: reads what the mb-framepacing tools capture and analyse.
+- **core** (C++ only): what the modules share, such as the library version and the time units.
+
+Everything here is under the BSD 3-Clause License. The measuring tools themselves (capture, analysis, GUI) are in
 [`measure/`](../measure) under another license.
 
 ## Where to start
@@ -12,30 +19,98 @@ analyse. Everything here is under the BSD 3-Clause License. The measuring tools 
 | Put the marker into a C++, C# or Python app | [Integrating the marker](doc/integrating.md), then the library's README below                                                                                 |
 | Put the marker into a Unity game            | [Unity](doc/unity.md)                                                                                                                                         |
 | Know what to write in each marker field     | [Filling the marker fields](doc/marker-fields.md)                                                                                                             |
-| Read the tools' results in your own code    | [The data libraries](data/README.md), [the analysis output format](doc/analysis-output-format.md)                                                             |
+| Read the tools' results in your own code    | [The data module](#the-data-module), [the analysis output format](doc/analysis-output-format.md)                                                              |
 | Implement the marker or a reader yourself   | [The marker format](doc/marker-format.md), [the capture data format](doc/capture-data-format.md), [the analysis output format](doc/analysis-output-format.md) |
+
+## Pick a library
+
+| Your application                 | Library                                                                              | How to get it                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| C++ (any engine or graphics API) | [C++20](cpp/README.md): `mb_framepacing::core`, `::marker`, `::data`                 | Release archive via CMake `FetchContent`, git, `add_subdirectory`, an install or Conan |
+| Unity 2021.3+                    | [Unity package](unity/README.md) (`com.manabattery.framepacing`)                     | Package Manager, git URL (`#upm/v<version>`)                                           |
+| Other C# / .NET                  | [`MB.FramePacing.Marker`](csharp/marker/README.md) (.NET Standard 2.1)               | The source at an `sdk-v*` tag, as a project reference or a copy                        |
+|                                  | [`MB.FramePacing.Data`](csharp/data/README.md) (.NET 10, reads and writes)           |                                                                                        |
+| Python 3.12+                     | [`mb_framepacing`](python/README.md): `mb_framepacing.marker`, `mb_framepacing.data` | One package, standard library only                                                     |
+
+The Unity package contains the C# marker module plus Unity helpers (an overlay component that does everything for you).
 
 ## What is here
 
-| Path                          | Contents                                                                                                                                                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`marker/`](marker/README.md) | The marker libraries, which draw the same pixels: [C++20](marker/cpp/README.md), [C#](marker/csharp/README.md), [Unity](marker/unity/README.md), [Python](marker/python/README.md), and [reference shaders](marker/shaders/README.md) that draw it as one quad |
-| [`data/`](data/README.md)     | The data libraries, which read `captures.mbcd` and the analysis output: [C#](data/csharp/README.md) (also writes), [Python](data/python/README.md), [C++20](data/cpp/README.md)                                                                                |
-| [`doc/`](doc)                 | The formats, the integration guides and the [vocabulary](doc/vocabulary.md)                                                                                                                                                                                    |
-| [`conan/`](conan)             | Conan 2 recipes of both C++ libraries                                                                                                                                                                                                                          |
-| [`test-data/`](test-data)     | The golden data every language's tests check against: marker images (`markers/`) and an analysed test clip (`data/`)                                                                                                                                           |
+| Path                            | Contents                                                                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| [`cpp/`](cpp/README.md)         | The C++20 library: one CMake project, a folder per module (`core/`, `marker/`, `data/`), and its Conan recipe (`cpp/conan/`) |
+| [`csharp/`](csharp)             | The C# modules: [`marker/`](csharp/marker/README.md) and [`data/`](csharp/data/README.md)                                    |
+| [`python/`](python/README.md)   | The Python package `mb_framepacing`, with the `marker` and `data` subpackages                                                |
+| [`unity/`](unity/README.md)     | The Unity package's sources: helpers, samples, and the scripts that assemble and check it                                    |
+| [`shaders/`](shaders/README.md) | The reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 and Vulkan         |
+| [`doc/`](doc)                   | The formats, the integration guides and the [vocabulary](doc/vocabulary.md)                                                  |
+| [`test-data/`](test-data)       | The golden data every language's tests check against: marker images (`markers/`) and an analysed test clip (`data/`)         |
 
-## Versions
+## The marker module
 
-The marker libraries and the data libraries are versioned and released separately:
+- **The same pixels.** Every library draws exactly the same marker: the tests check each one against the golden images the C++
+  library writes ([`test-data/markers`](test-data/markers)).
+- **One format.** The payload and geometry are specified in [marker-format.md](doc/marker-format.md), the reference all languages
+  follow byte for byte.
+- **No allocations per frame** (C++ and C#): you give the buffers, the libraries fill them. Zero-allocation tests prove it.
+- **Renderer independent.** They encode the marker once per frame and draw it in the form your renderer takes: Direct3D, Vulkan,
+  Metal, OpenGL, a 2D API or a pixel buffer.
 
-- the marker libraries: [`marker/VERSION`](marker/VERSION), with `marker-v*` tags;
-- the data libraries: [`data/VERSION`](data/VERSION), with `data-v*` tags.
+### Ways to draw it, most efficient first
 
-The versions follow semantic versioning. While a version is 0.x, a new minor version may change the API.
+| #   | Option                                                                              | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                         |
+| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| 1   | **Shader, packed bits**: one quad; the shader reads each module's bit from `Bits()` | 211 bytes (the packed bits as constants), 4 vertices         | A shader of ours: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 or Vulkan |
+| 2   | **Shader, a texel per module**: one quad and a 41×41 texture                        | 1,681 bytes (the texture), 4 vertices                        | The same, and a single channel texture                                        |
+| 3   | **Static grid**: `GridVertices` once, then `ModulesToGridIndices`                   | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                     |
+| 4   | **Module texture scaled up**: `ModulesToBitmap` at 1 px per module                  | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact    |
+| 5   | **Triangles**: `ModulesToIndexed` or `ModulesToTriangles`                           | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                        |
+| 6   | **Rectangles**: `ModulesToQuads`                                                    | About 440 filled rectangles (`QuadRect`)                     | A 2D fill-rectangle API                                                       |
+| 7   | **Full-size bitmap**: `ModulesToBitmap`                                             | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images                  |
+
+Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shaders for 1 and 2 and how
+to draw them are in [`shaders/`](shaders/README.md). On OpenGL ES 2.0 they need `highp` floats in the fragment shader; without it,
+draw 3 or 5. The names above are C++ and C#; Python's are the same in snake case. Unity's overlay draws 1 (Render Mode **Shader
+Packed Bits**, the default), 2 (**Shader**), 4 (**Bitmap**) or 6 (**Geometry**, which works everywhere and is the fallback without
+shader model 3.5), and `FrameMarkerMesh` draws 3 from your own command buffers.
+
+How to put the marker into an application (size, place, start and end markers, the rules that keep it readable) is in
+[Integrating the marker](doc/integrating.md); Unity has its own [guide](doc/unity.md). What to write in each field, for typical frame
+pacers, is in [Filling the marker fields](doc/marker-fields.md).
+
+## The data module
+
+It reads what the tools write, in your own code:
+
+- **The capture data** (`captures.mbcd`): every captured frame's timestamps and the markers' bytes as read
+  ([format](doc/capture-data-format.md)).
+- **The analysis output** (`analysis/summary.json`, `captures.csv`, `run-<id>-frames.csv`): every run's counts, statistics, pacing and
+  histograms, and every presented frame's display time, display time step, animation error and pacing
+  ([format](doc/analysis-output-format.md)).
+
+| Language | Module                                                   | Reads | Writes |
+| -------- | -------------------------------------------------------- | ----- | ------ |
+| C#       | [`MB.FramePacing.Data`](csharp/data/README.md) (.NET 10) | yes   | yes    |
+| Python   | [`mb_framepacing.data`](python/README.md) (3.12+)        | yes   | no     |
+| C++      | [`mb_framepacing::data`](cpp/README.md) (C++20)          | yes   | no     |
+
+The C# module is the reference: the tools write every file through it. A marker payload inside the capture data is decoded with the
+marker module of the same language.
+
+- **Format versions.** `captures.mbcd` has a format version in its header, and `summary.json` a `formatVersion` that covers the CSV
+  files it names. A reader refuses a newer version than it knows. Within a version, fields and columns may be added; readers look CSV
+  columns up by name and ignore the ones they do not know.
+- **Golden data.** [`test-data/data`](test-data/data) holds a test clip imported and analysed by the tools, and `digest.json`: the
+  counts and sums every language's reader must read from it. `python tools/update_test_data.py` regenerates it after a format change.
+
+## Version
+
+The SDK has one version for every module and language, [`VERSION`](VERSION), released with `sdk-v<version>` tags (see
+[Releasing](../doc/releasing.md)). The version follows semantic versioning. While it is 0.x, a new minor version may change the API.
 
 ## License
 
-BSD 3-Clause, the same for everything under `sdk/`. [`marker/LICENSE`](marker/LICENSE) and [`data/LICENSE`](data/LICENSE) hold the text,
-and the release archives and packages ship it. Third-party code keeps its own notices next to it (the QR encoder the C++ and Python
-marker libraries vendor, in their `third_party/` folders).
+BSD 3-Clause, the same for everything under `sdk/`. [`LICENSE`](LICENSE) holds the text, and the release archives and packages ship
+it. The QR encoder in every marker library is based on the QR Code generator library by Project Nayuki (MIT): C++ and Python keep it in
+their own `third_party/` folder, and the C# port carries the notice in `QrEncoder.cs`. The C++ data module uses nlohmann/json (MIT)
+inside the library. The license texts are listed in [`licenses/`](../licenses/README.md).

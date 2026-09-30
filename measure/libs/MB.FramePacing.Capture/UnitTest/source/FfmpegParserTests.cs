@@ -9,7 +9,7 @@
 
 using System;
 using MB.FramePacing.Capture.Ffmpeg;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Capture.UnitTest

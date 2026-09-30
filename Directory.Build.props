@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
 <Project>
-  <!-- Shared settings for every .NET project in the repository (sdk/ and measure/). sdk/marker/Directory.Build.props and
+  <!-- Shared settings for every .NET project in the repository (sdk/ and measure/). sdk/Directory.Build.props and
        measure/Directory.Build.props import this file and add their own target framework and version.
-       MSBuild also imports this file into the Visual Studio C++ projects CMake generates (sdk/marker/cpp/build/...), so everything here is
+       MSBuild also imports this file into the Visual Studio C++ projects CMake generates (sdk/cpp/build/...), so everything here is
        limited to C# projects. -->
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <Company>Mana Battery ApS</Company>

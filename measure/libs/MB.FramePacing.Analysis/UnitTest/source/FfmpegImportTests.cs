@@ -18,7 +18,7 @@ using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
 using MB.FramePacing.Capture.Synthetic;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest

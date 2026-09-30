@@ -48,25 +48,26 @@ jobs:
           esac
           ffmpeg -version | head -1
 
-      - name: C++ marker library
+      - name: C++ library (every module)
         shell: bash
         run: |
-          cmake -S sdk/marker/cpp -B sdk/marker/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
-          cmake --build sdk/marker/cpp/build/ci --config Release --parallel
-          ctest --test-dir sdk/marker/cpp/build/ci -C Release --output-on-failure
+          cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
+          cmake --build sdk/cpp/build/ci --config Release --parallel
+          ctest --test-dir sdk/cpp/build/ci -C Release --output-on-failure
 
-      - name: C++ data library
+      - name: C++ library without the data module (no nlohmann/json)
         shell: bash
         run: |
-          cmake -S sdk/data/cpp -B sdk/data/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
-          cmake --build sdk/data/cpp/build/ci --config Release --parallel
-          ctest --test-dir sdk/data/cpp/build/ci -C Release --output-on-failure
+          cmake -S sdk/cpp -B sdk/cpp/build/ci-no-data -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_DATA=OFF
+          cmake --build sdk/cpp/build/ci-no-data --config Release --parallel
+          ctest --test-dir sdk/cpp/build/ci-no-data -C Release --output-on-failure
+          if [ -d sdk/cpp/build/ci-no-data/_deps/nlohmann_json-src ]; then echo "::error::nlohmann/json was fetched without the data module"; exit 1; fi
 
-      - name: CMake consumers (FetchContent, add_subdirectory, find_package)
+      - name: CMake consumers (FetchContent, add_subdirectory, find_package with components)
         shell: bash
         run: |
           # Windows runners have 'python', Linux and macOS 'python3'
-          "$(command -v python3 || command -v python)" sdk/marker/cpp/tests/consumer/check_consumers.py
+          "$(command -v python3 || command -v python)" sdk/cpp/tests/consumer/check_consumers.py
 
       # A test that runs 5 minutes is hung: the runner ends it and names it. The step's own limit catches a hang after the tests, and
       # unlike the job's limit it ends the step with its log
@@ -115,10 +116,8 @@ jobs:
           ruff check .
           ruff format --check .
           basedpyright
-      - name: Python marker library (against the golden set)
-        run: python3 -m unittest discover -s sdk/marker/python -t sdk/marker/python
-      - name: Python data library (against the golden data)
-        run: python3 -m unittest discover -s sdk/data/python -t sdk/data/python
+      - name: Python library (against the golden marker set and the golden data)
+        run: python3 -m unittest discover -s sdk/python -t sdk/python
       - name: Reference shaders (glslang; drawing them needs a GPU, see tools/check_shaders.py --render)
         run: |
           sudo apt-get update && sudo apt-get install -y glslang-tools
@@ -126,7 +125,7 @@ jobs:
       - name: Workflows (actionlint)
         run: actionlint
       - name: Unity package (assemble and validate; Unity itself is not available in CI)
-        run: python3 sdk/marker/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
+        run: python3 sdk/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
 
   dotnet-lint:
     name: .NET lint (CSharpier, dotnet format, vulnerable packages)
@@ -173,15 +172,13 @@ jobs:
           uv sync --locked
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Tests with AddressSanitizer and UndefinedBehaviorSanitizer
-        run: |
-          for library in sdk/marker/cpp sdk/data/cpp; do
-            (cd "$library" && cmake --preset linux-sanitize && cmake --build --preset linux-sanitize --parallel && ctest --preset linux-sanitize)
-          done
+        working-directory: sdk/cpp
+        run: cmake --preset linux-sanitize && cmake --build --preset linux-sanitize --parallel && ctest --preset linux-sanitize
       - name: clang-format and clang-tidy
         run: python3 tools/check_cpp.py --preset linux-sanitize
 
   conan:
-    name: Conan recipes ${{ matrix.os }}
+    name: Conan recipe ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -194,14 +191,14 @@ jobs:
         uses: lukka/get-cmake@v4.4.2
       - name: uv (Python from .python-version, the dev tools from uv.lock)
         uses: astral-sh/setup-uv@v10.2.0
-      - name: Both recipes, built from this checkout (sdk/conan as a local-recipes-index remote)
+      - name: The recipe, built from this checkout (sdk/cpp/conan as a local-recipes-index remote)
         shell: bash
         run: |
           uv sync --locked
           uv run tools/check_conan.py
 
   semver:
-    name: semantic versions (VERSION files, MB.FrameMarker API)
+    name: semantic versions (VERSION files, the SDK's C# API)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -11,7 +11,7 @@ using System;
 using System.Threading;
 using MB.FramePacing.Capture.Synthetic;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Capture.UnitTest
@@ -83,7 +83,7 @@ namespace MB.FramePacing.Capture.UnitTest
           if (position(i) is { } origin)
             MarkerRenderer.Render(
               image,
-              new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FrameMarker.MarkerFlags.None, i * 41_667L),
+              new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.None, i * 41_667L),
               origin.X,
               origin.Y,
               ModulePx

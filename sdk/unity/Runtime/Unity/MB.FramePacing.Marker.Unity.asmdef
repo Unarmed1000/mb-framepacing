@@ -1,0 +1,14 @@
+{
+  "name": "MB.FramePacing.Marker.Unity",
+  "rootNamespace": "MB.FramePacing.Marker.Unity",
+  "references": ["MB.FramePacing.Marker"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -97,7 +97,7 @@ The library needs CMake 4.0 or newer; Ubuntu's `cmake` package may be older. Get
 
 ```sh
 sudo apt install build-essential        # GCC 12+ (or clang-16+ for the linux-clang preset)
-cd sdk/marker/cpp
+cd sdk/cpp
 cmake --preset linux
 cmake --build --preset linux
 ctest --preset linux

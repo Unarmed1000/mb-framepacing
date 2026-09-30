@@ -12,7 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Charts.UnitTest
@@ -37,7 +37,7 @@ namespace MB.FramePacing.Charts.UnitTest
           rows.Add(new CaptureRow(rows.Count, rows.Count * Period, CaptureStatus.Decoded, payload));
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FrameMarker.MarkerFlags.None, 0), 1);
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, 0), 1);
       ulong index = 1;
       long animation = 0;
       void Frame(bool isIdle)
@@ -49,7 +49,7 @@ namespace MB.FramePacing.Charts.UnitTest
             MarkerKind.Frame,
             1,
             index++,
-            isIdle ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None,
+            isIdle ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.None,
             animation,
             PreferredFrameTicks: aim,
             TargetFrameTicks: aim,
@@ -67,7 +67,7 @@ namespace MB.FramePacing.Charts.UnitTest
       for (int i = 0; i < 60; ++i)
         Frame(isIdle: false);
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FrameMarker.MarkerFlags.None, 0), 1);
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.None, 0), 1);
       var result = TimelineAnalyzer.Analyze(rows);
       return new ChartRun(result.Runs.Single(), result.CapturePeriodTicks, result.ErrorThresholdTicks, Camera: false);
     }

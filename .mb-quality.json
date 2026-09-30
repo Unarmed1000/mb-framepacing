@@ -1,4 +1,4 @@
 {
   "cacheDir": "build/.mb-quality-cache",
-  "excludeDirs": ["node_modules", "sdk/marker/cpp", "sdk/data/cpp"]
+  "excludeDirs": ["node_modules", "sdk/cpp"]
 }

@@ -12,7 +12,7 @@ using System;
 using System.CommandLine;
 using System.Globalization;
 using MB.FramePacing.Capture.Ffmpeg;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -83,11 +83,11 @@ namespace MB.FramePacing.App.Commands
         AnsiConsole.MarkupLine("[yellow]The output height is not an integer multiple of the stored height: it works, but module edges blur.[/]");
 
       AnsiConsole.MarkupLine("[bold]Settings[/]");
-      AnsiConsole.MarkupLineInterpolated($"  C++    MB::FrameMarker::Options options{{{advice.RecommendedModulePx}}};");
+      AnsiConsole.MarkupLineInterpolated($"  C++    MB::FramePacing::Marker::Options options{{{advice.RecommendedModulePx}}};");
       AnsiConsole.MarkupLineInterpolated(
         $"         or RecommendModuleSizePx({advice.SourceHeight}, {advice.StoredHeight}{(advice.Mjpeg ? ", true" : string.Empty)})"
       );
-      AnsiConsole.MarkupLineInterpolated($"  C#     new Options({advice.RecommendedModulePx}), or Marker.RecommendModuleSizePx(...)");
+      AnsiConsole.MarkupLineInterpolated($"  C#     new Options({advice.RecommendedModulePx}), or FrameMarker.RecommendModuleSizePx(...)");
       AnsiConsole.MarkupLineInterpolated(
         $"  Unity  FrameMarkerOverlay: Stored Height {advice.StoredHeight}{(advice.Mjpeg ? ", MJPEG on" : string.Empty)} (or Module Size Px {advice.RecommendedModulePx})"
       );

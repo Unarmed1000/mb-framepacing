@@ -8,9 +8,9 @@ the frame to be shown**, its **target frame time** and the **preferred frame tim
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
-The C++20 library in [`sdk/marker/cpp/`](../marker/cpp) generates the marker geometry, and so do the C# library `MB.FrameMarker`
-([`sdk/marker/csharp/`](../marker/csharp)) and the Python library `mb_framemarker` ([`sdk/marker/python/`](../marker/python)). The C# library
-`MB.FramePacing.Marker` decodes it.
+The marker module of the C++20 library in [`sdk/cpp/marker/`](../cpp/marker) generates the marker geometry, and so do the C# module
+`MB.FramePacing.Marker` ([`sdk/csharp/marker/`](../csharp/marker)) and the Python module `mb_framepacing.marker` ([`sdk/python/`](../python)).
+The tools' C# library `MB.FramePacing.MarkerDecoding` decodes it.
 Both implement this document; if they disagree, this document is the reference. [Integrating the marker](integrating.md) builds it
 into an application, and [Filling the marker fields](marker-fields.md) says where each field's value comes from, when it changes and
 what the analysis does with it, with examples for typical frame pacers.
@@ -47,7 +47,7 @@ in all:
 
 | Offset | Size | Field       | Notes                                                                                                                                                     |
 | ------ | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FrameMarker::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
+| 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
 | 61     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).   |
 
 The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
@@ -165,7 +165,7 @@ Marker size in source pixels = `(modules + 2 × QuietZoneModules) × ModuleSizeP
 ## Geometry
 
 - Pixel coordinates with the **origin at the top-left**, **+x right**, **+y down**.
-- Every vertex lies on an integer **pixel edge**. A quad covers exactly the pixels `[Left, Right) × [Top, Bottom)`.
+- Every vertex lies on an integer **pixel edge**. A quad (`QuadRect`: `X`, `Y`, `Width`, `Height`) covers exactly the pixels `[Left, Right) × [Top, Bottom)`.
 - A marker is **encoded once** (`GenerateModules`: the payload's QR symbol as a module matrix, 1 bit per module, packed row-major,
   most significant bit first, 211 bytes for 41×41, 79 for the sync marker's 25×25) and **drawn from the matrix**, in any of these forms:
   - `ModulesToQuads`: the light background quad first (symbol plus quiet zone), then one dark quad per horizontal run of dark modules.
@@ -236,8 +236,8 @@ Let `s = storedHeight / sourceHeight`. For example, a 2160p source stored at 540
 | **Recommended.** Leaves margin for scaler blur and limited-range (16–235) video.                                         | `ceil(3 / s)`            | 3                    |
 | **MJPEG capture.** Many USB capture cards only reach high frame rates with MJPEG; the 8×8 DCT blocks smear module edges. | `ceil(4 / s)`            | 4                    |
 
-`MB::FrameMarker::MinimumModuleSizePx(sourceHeight, storedHeight)` and
-`MB::FrameMarker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `Marker.*`; Python: `minimum_module_size_px`, `recommend_module_size_px`).
+`MB::FramePacing::Marker::MinimumModuleSizePx(sourceHeight, storedHeight)` and
+`MB::FramePacing::Marker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `FrameMarker.*`; Python: `minimum_module_size_px`, `recommend_module_size_px`).
 `mb-framepacing marker-size --source 3840x2160 --stored 960x540 [--mjpeg]` prints the result for a setup, with the marker sizes, the
 origin and the settings for each library.
 
@@ -304,14 +304,14 @@ multiple of the downscale ratio.
 the main marker. Optional for a capture card, where it checks tearing: when the two markers show different frames, the analyzer flags the
 capture as _torn_ and uses the main marker for timing. Required for camera capture.
 
-`MB::FrameMarker::RecommendedOrigin(kind, sourceWidth, sourceHeight, options, alignPx)` returns these positions: bottom-left for
+`MB::FramePacing::Marker::RecommendedOrigin(kind, sourceWidth, sourceHeight, options, alignPx)` returns these positions: bottom-left for
 `MarkerKind::Sync`, top-left for every other kind.
 
 ## Example (C++)
 
 ```cpp
-#include <mb/framemarker/FrameMarker.hpp>
-namespace FM = MB::FrameMarker;
+#include <mb/framepacing/Marker.hpp>
+namespace FM = MB::FramePacing::Marker;
 
 // Once: 1080p output captured and stored at 540p (2:1)
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};   // 6 px
@@ -329,7 +329,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::None, animationTicks, preferredFrameTicks, targetFrameTicks,
                           intendedDisplayTicks, cpuStartTicks, cpuBusyTicks);
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
-// FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
+// MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
 // FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.
 FM::GenerateModules(payload, matrix, {startUtcTicks, sequenceId});                       // encode once
 const std::size_t vertexCount = FM::ModulesToTriangles(matrix, options, origin, vertices); // draw it

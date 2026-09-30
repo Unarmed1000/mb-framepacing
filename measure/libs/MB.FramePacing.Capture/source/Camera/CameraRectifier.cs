@@ -11,7 +11,7 @@
 //****************************************************************************************************************************************************
 
 using System;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Capture.Camera
 {

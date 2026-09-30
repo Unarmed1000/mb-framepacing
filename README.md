@@ -17,15 +17,15 @@ error**.
 > to compare, so this needs the application's source code and a small change to its renderer. It cannot measure an
 > unmodified game or app that you cannot rebuild.
 
-The marker libraries put the marker into your application. All of them draw exactly the same pixels; the C++ and C# libraries
+The SDK's marker modules put the marker into your application. All of them draw exactly the same pixels; the C++ and C# modules
 allocate nothing per frame:
 
-| Your application                 | Marker library                                                                                 | Guide                                            |
-| -------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| C++ (any engine or graphics API) | [`sdk/marker/cpp`](sdk/marker/cpp): C++20, CMake, no dependencies                              | [Integrating the marker](sdk/doc/integrating.md) |
-| C# / .NET                        | [`sdk/marker/csharp`](sdk/marker/csharp): `MB.FrameMarker`, .NET Standard 2.1, no dependencies | [Integrating the marker](sdk/doc/integrating.md) |
-| Unity 2021.3+                    | Unity package `com.manabattery.framemarker`: the C# library plus a drop-in overlay component   | [Unity](sdk/doc/unity.md)                        |
-| Python 3.12+                     | [`sdk/marker/python`](sdk/marker/python): `mb_framemarker`, standard library only              | [Python library](sdk/marker/python/README.md)    |
+| Your application                 | Marker module                                                                                                   | Guide                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| C++ (any engine or graphics API) | [`sdk/cpp`](sdk/cpp/README.md): `mb_framepacing::marker`, C++20, CMake, no dependencies                         | [Integrating the marker](sdk/doc/integrating.md) |
+| C# / .NET                        | [`sdk/csharp/marker`](sdk/csharp/marker/README.md): `MB.FramePacing.Marker`, .NET Standard 2.1, no dependencies | [Integrating the marker](sdk/doc/integrating.md) |
+| Unity 2021.3+                    | Unity package `com.manabattery.framepacing`: the C# module plus a drop-in overlay component                     | [Unity](sdk/doc/unity.md)                        |
+| Python 3.12+                     | [`sdk/python`](sdk/python/README.md): `mb_framepacing.marker`, standard library only                            | [Python library](sdk/python/README.md)           |
 
 **Get started:** install on [Windows](measure/doc/install/windows.md) · [Ubuntu](measure/doc/install/ubuntu.md) ·
 [macOS (Homebrew)](measure/doc/install/macos.md), add the marker with [Integrating the marker](sdk/doc/integrating.md) (C++ or C#) or the
@@ -82,7 +82,7 @@ diagrams and sources.
 
 There are two halves, and both are needed:
 
-- **Inside your application:** a marker library: C++20 ([`sdk/marker/cpp/`](sdk/marker/cpp)), C# ([`sdk/marker/csharp/`](sdk/marker/csharp)) or
+- **Inside your application:** the SDK's marker module: C++20 ([`sdk/cpp/`](sdk/cpp)), C# ([`sdk/csharp/marker/`](sdk/csharp/marker)) or
   the [Unity package](sdk/doc/unity.md). Every frame, it turns "frame index + animation time + run id" into pixel aligned black and white
   triangles (or rectangles) that your renderer draws on top of the finished image. No dependencies, no allocations per frame, any
   graphics API.
@@ -114,12 +114,12 @@ Link the library and draw the marker as the very last thing in every frame, afte
 It writes pixel aligned triangles straight into your vertex buffer, without allocating:
 
 ```cpp
-#include <mb/framemarker/FrameMarker.hpp>
-namespace FM = MB::FrameMarker;
+#include <mb/framepacing/Marker.hpp>
+namespace FM = MB::FramePacing::Marker;
 
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 FM::ModuleMatrix matrix;
-FM::GenerateModules({frameIndex, animationTicks, runId, FM::MarkerKind::Frame}, matrix);   // encode once
+FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, animationTicks}, matrix);   // encode once
 const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);        // draw it
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
@@ -128,13 +128,13 @@ DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, col
 
 - **C++:** see **[Integrating the marker](sdk/doc/integrating.md)** for adding the library with CMake (a release archive, git,
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
-- **C#:** the general library [`sdk/marker/csharp`](sdk/marker/csharp/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `Marker.ModulesToTriangles`).
+- **C#:** the marker module [`sdk/csharp/marker`](sdk/csharp/marker/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `FrameMarker.ModulesToTriangles`).
 - **Unity:** the **[Unity package](sdk/doc/unity.md)** adds an overlay component that does all of this for you.
 - **Every field:** **[Filling the marker fields](sdk/doc/marker-fields.md)** says where each value comes from, when it changes and what
   the analysis does with it, with examples for typical frame pacers.
-- **Python:** [`sdk/marker/python`](sdk/marker/python/README.md) (`mb_framemarker`), which also draws into pixel buffers.
+- **Python:** [`sdk/python`](sdk/python/README.md) (`mb_framepacing.marker`), which also draws into pixel buffers.
 
-[`sdk/marker/README.md`](sdk/marker/README.md) compares the four libraries; each has its own README with a quick start and its API.
+[`sdk/README.md`](sdk/README.md) compares the libraries; each has its own README with a quick start and its API.
 
 ### 2. Every test: record, run, analyse
 
@@ -307,7 +307,7 @@ GUI (`render --png` makes PNGs of them). The
 histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`; the error per frame and
 percent error in `runs[].statistics`), and late frames carry `Late`
 in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools: the files are specified in
-[sdk/doc/analysis-output-format.md](sdk/doc/analysis-output-format.md), and the [data libraries](sdk/data/README.md) read them.
+[sdk/doc/analysis-output-format.md](sdk/doc/analysis-output-format.md), and the SDK's [data modules](sdk/README.md#the-data-module) read them.
 
 **The report** is the run as one SVG card, in the style of
 [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained)'s charts: the headline numbers, the animation
@@ -438,13 +438,16 @@ AppleClang 15+), Python 3, and Node.js for formatting the docs.
 mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 
-# C++ marker library (presets: windows, linux, linux-clang, macos); the tests fetch GoogleTest
-cd sdk/marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
-python sdk/marker/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
+# C++ library, every module (presets: windows, linux, linux-clang, macos); the tests fetch GoogleTest
+cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
+python sdk/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
+
+# Python library (marker and data, against the golden data)
+python -m unittest discover -s sdk/python -t sdk/python
 
 # Unity package: assemble and validate; check it in a real Unity editor (batch mode, needs a Unity license)
-python sdk/marker/unity/build_upm.py --output dist/upm --check
-python sdk/marker/unity/check_in_unity.py
+python sdk/unity/build_upm.py --output dist/upm --check
+python sdk/unity/check_in_unity.py
 
 # Self-contained single-file executables for this machine (or --rid linux-x64, osx-arm64, ...)
 python measure/build_standalone.py
@@ -458,19 +461,19 @@ npm install && npm run format
 dotnet run --project measure/tools/DocImages
 ```
 
-The marker libraries are versioned in [`sdk/marker/VERSION`](sdk/marker/VERSION) and the tools in [`measure/VERSION`](measure/VERSION);
+The SDK is versioned in [`sdk/VERSION`](sdk/VERSION) (every module and language) and the tools in [`measure/VERSION`](measure/VERSION);
 [Releasing](doc/releasing.md) describes both release streams. The pieces fit together like this:
 
 ```mermaid
 flowchart TB
-    subgraph marker["sdk/marker/: goes into your application"]
-        L["sdk/marker/cpp: mb_framemarker<br/>C++20 library"]
+    subgraph marker["sdk/: goes into your application"]
+        L["sdk/cpp: mb_framepacing::marker<br/>C++20 library"]
         R["marker-render<br/>golden test images"]
-        CS["sdk/marker/csharp: MB.FrameMarker<br/>C# library (.NET Standard 2.1)"]
-        U["sdk/marker/unity<br/>Unity package + helpers"]
+        CS["sdk/csharp/marker: MB.FramePacing.Marker<br/>C# module (.NET Standard 2.1)"]
+        U["sdk/unity<br/>Unity package + helpers"]
     end
     subgraph dotnet["measure/ (.NET 10): records and analyses"]
-        M["MB.FramePacing.Marker<br/>QR decoding"]
+        M["MB.FramePacing.MarkerDecoding<br/>QR decoding"]
         CAP["MB.FramePacing.Capture<br/>recorder, ffmpeg, video/image/stream sources"]
         AN["MB.FramePacing.Analysis<br/>timeline, animation error, reports"]
         CLI["mb-framepacing<br/>command line"]
@@ -487,18 +490,16 @@ flowchart TB
 | Path                        | Contents                                                                                                   |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start |
-| `sdk/marker/`               | **Goes into your application**: the marker libraries and their version                                     |
-| `sdk/marker/cpp/`           | The C++20 marker library, `marker-render` (golden images), GoogleTest tests, CMake consumer check          |
-| `sdk/marker/csharp/`        | The general C# marker library `MB.FrameMarker` (.NET Standard 2.1, C# 9) and its NUnit tests               |
-| `sdk/marker/unity/`         | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)               |
-| `sdk/marker/python/`        | The Python marker library `mb_framemarker` (standard library only) and its unittest tests                  |
-| `sdk/marker/shaders/`       | Reference shaders that draw the marker as one quad                                                         |
-| `sdk/data/`                 | **Reads the results**: the data libraries (C#, C++, Python) for the capture data and the analysis output   |
-| `sdk/conan/`                | Conan 2 recipes of the C++ libraries (a local-recipes-index remote)                                        |
+| `sdk/VERSION`               | The SDK's version: every module, every language                                                            |
+| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`), its Conan recipe  |
+| `sdk/csharp/`               | The C# modules `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9) and `MB.FramePacing.Data` (.NET 10)       |
+| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests    |
+| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)               |
+| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                         |
 | `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats                 |
-| `sdk/test-data/`            | Golden marker images (checked by every marker library) and the data libraries' golden data                 |
+| `sdk/test-data/`            | Golden marker images (checked by every marker module) and the data modules' golden data                    |
 | `measure/`                  | **Measures it**: the recording and analysis tools and their version                                        |
-| `measure/libs/`             | Marker, Capture, Analysis and Charts libraries with their NUnit tests                                      |
+| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                              |
 | `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                        |
 | `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                  |
 | `measure/doc/`              | Platform, usage and camera guides, images                                                                  |

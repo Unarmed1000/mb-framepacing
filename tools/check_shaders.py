@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Check the marker's reference shaders (sdk/marker/shaders) with glslang (required; CI installs it):
+"""Check the marker's reference shaders (sdk/shaders) with glslang (required; CI installs it):
   - gl/      as OpenGL 3.3 core and as OpenGL ES 3.0 (the header their comment names);
   - gles2/   as GLSL ES 1.00 (OpenGL ES 2.0, WebGL 1);
   - vulkan/  to SPIR-V for Vulkan 1.0;
@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-SHADERS = REPOSITORY_ROOT / "sdk" / "marker" / "shaders"
+SHADERS = REPOSITORY_ROOT / "sdk" / "shaders"
 HLSL = SHADERS / "hlsl" / "FrameMarkerShaders.hlsl"
 STAGES = ("frame_marker.vert", "frame_marker_packed.frag", "frame_marker_modules.frag")
 # Entry point, glslang stage, DXC profile

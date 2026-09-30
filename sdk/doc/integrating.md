@@ -2,12 +2,12 @@
 
 This guide puts the marker into an application. There are four ways in:
 
-| Your application                 | Use                                                                                                                         |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| C++ (any engine or graphics API) | The C++20 library [`sdk/marker/cpp`](../marker/cpp/README.md), this guide                                                   |
-| Unity                            | The Unity package, see **[Unity](unity.md)**                                                                                |
-| Other C# / .NET                  | The general C# library [`sdk/marker/csharp`](../marker/csharp/README.md): the same API as C++ (`MarkerGenerator`, `Marker`) |
-| Python                           | The Python library [`sdk/marker/python`](../marker/python/README.md) (`mb_framemarker`)                                     |
+| Your application                 | Use                                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| C++ (any engine or graphics API) | The marker module of the C++20 library [`sdk/cpp`](../cpp/README.md) (`mb_framepacing::marker`), this guide                    |
+| Unity                            | The Unity package, see **[Unity](unity.md)**                                                                                   |
+| Other C# / .NET                  | The C# marker module [`sdk/csharp/marker`](../csharp/marker/README.md): the same API as C++ (`MarkerGenerator`, `FrameMarker`) |
+| Python                           | The Python package [`sdk/python`](../python/README.md) (`mb_framepacing.marker`)                                               |
 
 All four produce exactly the same pixels. The libraries are renderer independent: they give you pixel aligned geometry to draw with
 whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md);
@@ -15,79 +15,86 @@ whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precis
 
 ## 1. Add the C++ library
 
-CMake 4.0+ and a C++20 compiler; the library itself has no dependencies. Pick one of four ways:
+CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`); the marker
+module needs only the core and has no dependencies. Pick one of five ways:
 
 **a) The release archive (recommended):** a small download, no git, and pinned by its hash. The release page lists the hash for
 each version (`SHA256SUMS`):
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(mb_framemarker
-  URL https://github.com/Unarmed1000/mb-framepacing/releases/download/marker-v0.1.0/mb-framemarker-cpp-0.1.0.tar.gz
+FetchContent_Declare(mb_framepacing
+  URL https://github.com/Unarmed1000/mb-framepacing/releases/download/sdk-v0.1.0/mb-framepacing-cpp-0.1.0.tar.gz
   URL_HASH SHA256=<from SHA256SUMS>
-  FIND_PACKAGE_ARGS 0.1 CONFIG)      # an installed copy of a compatible version wins
-FetchContent_MakeAvailable(mb_framemarker)
-target_link_libraries(my_game PRIVATE mb::framemarker)
+  FIND_PACKAGE_ARGS 0.1 CONFIG COMPONENTS marker)      # an installed copy of a compatible version wins
+set(MB_FRAMEPACING_BUILD_DATA OFF)   # optional: leave the data module (and nlohmann/json) out
+FetchContent_MakeAvailable(mb_framepacing)
+target_link_libraries(my_game PRIVATE mb_framepacing::marker)
 ```
 
 **b) Git:** the same, fetched from the repository (it clones more than the library):
 
 ```cmake
-FetchContent_Declare(mb_framemarker
+FetchContent_Declare(mb_framepacing
   GIT_REPOSITORY https://github.com/Unarmed1000/mb-framepacing.git
-  GIT_TAG marker-v0.1.0
+  GIT_TAG sdk-v0.1.0
   GIT_SHALLOW TRUE
-  SOURCE_SUBDIR sdk/marker/cpp)
+  SOURCE_SUBDIR sdk/cpp)
 ```
 
-**c) A submodule or a copy in your tree:** `add_subdirectory(third_party/mb-framepacing/sdk/marker/cpp)`, or the unpacked release
+**c) A submodule or a copy in your tree:** `add_subdirectory(third_party/mb-framepacing/sdk/cpp)`, or the unpacked release
 archive.
 
 **d) An installed copy:** build and install it once, then find it:
 
 ```sh
-cmake -S sdk/marker/cpp -B build -DMB_FRAMEMARKER_BUILD_TESTS=OFF -DMB_FRAMEMARKER_BUILD_TOOLS=OFF
+cmake -S sdk/cpp -B build -DMB_FRAMEPACING_BUILD_TESTS=OFF -DMB_FRAMEPACING_BUILD_TOOLS=OFF
 cmake --build build --config Release
 cmake --install build --config Release --prefix <prefix>
 ```
 
 ```cmake
-find_package(mb_framemarker 0.1 CONFIG REQUIRED)   # with CMAKE_PREFIX_PATH=<prefix>
-target_link_libraries(my_game PRIVATE mb::framemarker)
+find_package(mb_framepacing 0.1 CONFIG REQUIRED COMPONENTS marker)   # with CMAKE_PREFIX_PATH=<prefix>
+target_link_libraries(my_game PRIVATE mb_framepacing::marker)
 ```
 
-**e) Conan 2:** the recipes are in the repository ([`sdk/conan`](../conan), laid out as conan-center-index is). Add a checkout as a
-remote, then require the package; Conan builds it from the release archive:
+**e) Conan 2:** the recipe is in the repository ([`sdk/cpp/conan`](../cpp/conan), laid out as conan-center-index is). Add a checkout
+as a remote, then require the package; Conan builds it from the release archive (`-o "mb-framepacing/*:with_data=False"` leaves the
+data module out):
 
 ```sh
-conan remote add mb-framepacing <checkout>/sdk/conan --type local-recipes-index
-conan install --requires mb-framemarker/0.1.0 --build=missing -s compiler.cppstd=20
+conan remote add mb-framepacing <checkout>/sdk/cpp/conan --type local-recipes-index
+conan install --requires mb-framepacing/0.1.0 --build=missing -s compiler.cppstd=20
 ```
 
 ```cmake
-find_package(mb_framemarker CONFIG REQUIRED)   # from Conan's CMakeDeps
-target_link_libraries(my_game PRIVATE mb::framemarker)
+find_package(mb_framepacing CONFIG REQUIRED COMPONENTS marker)   # from Conan's CMakeDeps
+target_link_libraries(my_game PRIVATE mb_framepacing::marker)
 ```
 
 The remote holds recipes only, no prebuilt binaries, and the library needs C++20: the profile's `compiler.cppstd` must be 20 or newer.
 
 What your project gets:
 
-- One static library target, **`mb::framemarker`**, in every way above.
+- A static library target per module in every way above: **`mb_framepacing::marker`** for the marker (it links
+  `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. The headers are `<mb/framepacing/Marker.hpp>`,
+  `<mb/framepacing/Data.hpp>` and `<mb/framepacing/Core.hpp>`.
 - When the library is not the top-level project, its tests, tools and warnings-as-errors are off, so GoogleTest is never downloaded.
   The options, if you want to change them:
 
-  | Option                              | Default                                  |
-  | ----------------------------------- | ---------------------------------------- |
-  | `MB_FRAMEMARKER_BUILD_TESTS`        | on only when top-level                   |
-  | `MB_FRAMEMARKER_BUILD_TOOLS`        | on only when top-level (`marker-render`) |
-  | `MB_FRAMEMARKER_WARNINGS_AS_ERRORS` | on only when top-level                   |
+  | Option                              | Default                                                |
+  | ----------------------------------- | ------------------------------------------------------ |
+  | `MB_FRAMEPACING_BUILD_MARKER`       | on                                                     |
+  | `MB_FRAMEPACING_BUILD_DATA`         | on (off: no data module and no nlohmann/json download) |
+  | `MB_FRAMEPACING_BUILD_TESTS`        | on only when top-level                                 |
+  | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)               |
+  | `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                 |
 
 - Versions follow semantic versioning. While the version is 0.x, a new minor version may change the API, so `find_package` only
   accepts the same minor version; from 1.0 it accepts any newer version with the same major version.
 
-CI builds and runs a consumer project (`sdk/marker/cpp/tests/consumer`) with FetchContent, `add_subdirectory` and `find_package`, and
-every release archive is consumed through its URL and hash before it is published. The Conan recipes are built and tested on
+CI builds and runs a consumer project (`sdk/cpp/tests/consumer`) with FetchContent, `add_subdirectory` and `find_package` with
+components, and every release archive is consumed through its URL and hash before it is published. The Conan recipe is built and tested on
 Windows, Ubuntu and macOS from every push, and from every release archive once it is published. The git way uses the same source tree.
 
 ## 2. Choose the size and place once
@@ -96,8 +103,8 @@ The marker must survive the capture's downscale: aim for at least 3 stored pixel
 `mb-framepacing marker-size --source <output> --stored <capture>` prints it for a setup:
 
 ```cpp
-#include <mb/framemarker/FrameMarker.hpp>
-namespace FM = MB::FrameMarker;
+#include <mb/framepacing/Marker.hpp>
+namespace FM = MB::FramePacing::Marker;
 
 // Output 1920x1080, capture stored at 960x540 (2:1)
 const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};       // 6 px modules
@@ -115,7 +122,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
-  const int64_t ticks = std::llround(animationSeconds * FM::TicksPerSecond); // the time your animation used
+  const int64_t ticks = std::llround(animationSeconds * MB::FramePacing::TicksPerSecond); // the time your animation used
   FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, ticks}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
@@ -143,7 +150,7 @@ frame for the 41×41 main marker (about 440 dark runs):
 
 ### A dedicated shader
 
-[`sdk/marker/shaders`](../marker/shaders/README.md) has ready-made shaders for Direct3D (HLSL), OpenGL 3.3 and OpenGL ES 3.0, OpenGL ES 2.0 and
+[`sdk/shaders`](../shaders/README.md) has ready-made shaders for Direct3D (HLSL), OpenGL 3.3 and OpenGL ES 3.0, OpenGL ES 2.0 and
 Vulkan (GLSL), each reading the packed bits or a texel per module; its README says how to draw them with each API. In short: the vertex
 shader makes one quad from the vertex index (draw 4 vertices as a triangle strip, no vertex buffer; OpenGL ES 2.0 needs a buffer of the
 4 corners) and hands on the marker-local pixel coordinate, (0, 0) top-left, +y down. Every fragment then gets `(px + 0.5, py + 0.5)`,
@@ -215,7 +222,7 @@ enum class Phase { Start, Measure, End, Done };
 
 void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
 {
-  static const int64_t startUtc = FM::ToDateTimeTicks(std::chrono::system_clock::now());
+  static const int64_t startUtc = MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now());
   static const FM::SequenceId sequenceId = NewUuidBytes();   // any 16 bytes unique to this run, or FM::SequenceId::TryFromText("camera pan", id)
   static std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
   static FM::ModuleMatrix matrix;
@@ -227,7 +234,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, std::llround(animationSeconds * FM::TicksPerSecond));
+  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, std::llround(animationSeconds * MB::FramePacing::TicksPerSecond));
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }
@@ -247,7 +254,7 @@ the screen with a high speed camera, draw the sync marker as well and see the ve
 
 ## Checking your integration
 
-- `sdk/marker/cpp/tools/marker-render` writes marker images (PGM) for any payload, so you can compare your renderer's output pixel by pixel.
+- `sdk/cpp/marker/tools/marker-render` writes marker images (PGM) for any payload, so you can compare your renderer's output pixel by pixel.
 - The GUI's live preview shows the decoded marker while capturing; "No marker seen yet" means the marker does not reach the
   capture unmodified (drawn too early, blended, scaled, too small).
 - A capture whose analysis warns about the module size needs a bigger `ModuleSizePx` or a smaller downscale.

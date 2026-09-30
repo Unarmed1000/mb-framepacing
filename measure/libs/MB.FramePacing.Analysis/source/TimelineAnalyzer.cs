@@ -12,7 +12,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using MB.FramePacing.Capture.Camera;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Analysis
 {

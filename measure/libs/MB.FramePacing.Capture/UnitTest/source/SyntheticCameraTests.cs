@@ -12,7 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using MB.FramePacing.Capture.Synthetic;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Capture.UnitTest
@@ -67,7 +67,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var older = camera.Scenario.PresentedFrames[shown - 1].Payload;
       Assert.That(
         results[1].Payload,
-        Is.EqualTo(new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FrameMarker.MarkerFlags.None, 0))
+        Is.EqualTo(new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FramePacing.Marker.MarkerFlags.None, 0))
       );
     }
 

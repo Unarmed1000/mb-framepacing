@@ -10,7 +10,7 @@
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Capture.Camera;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Capture.UnitTest

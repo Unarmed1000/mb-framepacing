@@ -16,7 +16,7 @@ using System.Threading;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Synthetic;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest
@@ -200,14 +200,20 @@ namespace MB.FramePacing.Analysis.UnitTest
           Array.Fill(frame.Pixels, (byte)96);
           MarkerRenderer.Render(
             frame,
-            new MarkerPayload(kind, 1, top, MB.FrameMarker.MarkerFlags.None, (long)top * 166_667),
+            new MarkerPayload(kind, 1, top, MB.FramePacing.Marker.MarkerFlags.None, (long)top * 166_667),
             12,
             12,
             3,
             metadata: start
           );
           if (kind == MarkerKind.Frame)
-            MarkerRenderer.Render(frame, new MarkerPayload(MarkerKind.Sync, bottomRun, bottom, MB.FrameMarker.MarkerFlags.None, 0), 12, 200, 3);
+            MarkerRenderer.Render(
+              frame,
+              new MarkerPayload(MarkerKind.Sync, bottomRun, bottom, MB.FramePacing.Marker.MarkerFlags.None, 0),
+              12,
+              200,
+              3
+            );
           new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
@@ -243,7 +249,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           if (i < Captures - lostCaptures)
             MarkerRenderer.Render(
               frame,
-              new MarkerPayload(MarkerKind.Frame, 1, (ulong)(i / 4), MB.FrameMarker.MarkerFlags.None, i / 4 * 166_667L),
+              new MarkerPayload(MarkerKind.Frame, 1, (ulong)(i / 4), MB.FramePacing.Marker.MarkerFlags.None, i / 4 * 166_667L),
               8,
               8,
               3

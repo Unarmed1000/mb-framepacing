@@ -96,7 +96,7 @@ and reading the results, in the GUI and on the command line.
 ```sh
 xcode-select --install     # AppleClang 15+
 brew install cmake         # 4.0 or newer
-cd sdk/marker/cpp
+cd sdk/cpp
 cmake --preset macos
 cmake --build --preset macos
 ctest --preset macos

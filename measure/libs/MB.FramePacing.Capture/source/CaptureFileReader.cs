@@ -9,7 +9,7 @@
 
 using System;
 using System.IO;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using Microsoft.Win32.SafeHandles;
 
 namespace MB.FramePacing.Capture

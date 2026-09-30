@@ -279,7 +279,7 @@ namespace MB.FramePacing.Charts
     /// <summary>The frame is presented on demand: its target (or, without one, its preferred frame time) says so, as the analysis reads it.</summary>
     private static bool OnDemand(PresentedFrame frame)
     {
-      const uint OnDemandTicks = MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
+      const uint OnDemandTicks = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTicks;
       return frame.MarkerTargetFrameTicks == OnDemandTicks || (frame.MarkerTargetFrameTicks == 0 && frame.MarkerPreferredFrameTicks == OnDemandTicks);
     }
 

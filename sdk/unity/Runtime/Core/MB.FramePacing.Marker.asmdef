@@ -1,0 +1,14 @@
+{
+  "name": "MB.FramePacing.Marker",
+  "rootNamespace": "MB.FramePacing.Marker",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

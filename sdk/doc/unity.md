@@ -1,9 +1,10 @@
 # Unity
 
-The Unity package **MB Frame Marker** (`com.manabattery.framemarker`) draws the marker into every frame of a Unity game. It contains:
+The Unity package **MB Frame Pacing** (`com.manabattery.framepacing`) draws the marker into every frame of a Unity game. It contains:
 
-- **the general C# library** `MB.FrameMarker`: the same code as [`sdk/marker/csharp`](../marker/csharp), with no Unity dependency;
-- **Unity helpers** `MB.FrameMarker.Unity`: an overlay component that does everything, and building blocks for your own render
+- **the SDK's general C# marker module** `MB.FramePacing.Marker`: the same code as [`sdk/csharp/marker`](../csharp/marker), with no
+  Unity dependency;
+- **Unity helpers** `MB.FramePacing.Marker.Unity`: an overlay component that does everything, and building blocks for your own render
   pipeline code.
 
 Unity 2021.3 or newer (C# 9). The package contents are checked in a real Unity editor, see [What is verified](#what-is-verified).
@@ -16,11 +17,11 @@ Unity 2021.3 or newer (C# 9). The package contents are checked in a real Unity e
 https://github.com/Unarmed1000/mb-framepacing.git#upm/v0.1.0
 ```
 
-`upm/v<version>` tags are created by the marker release workflow. To use an unreleased version, assemble the package yourself and
+`upm/v<version>` tags are created by the SDK release workflow. To use an unreleased version, assemble the package yourself and
 install it with **Add package from disk** (select its `package.json`):
 
 ```sh
-python sdk/marker/unity/build_upm.py --output <folder>
+python sdk/unity/build_upm.py --output <folder>
 ```
 
 ## Quick start
@@ -32,7 +33,7 @@ python sdk/marker/unity/build_upm.py --output <folder>
 4. Bracket the part to measure:
 
    ```csharp
-   using MB.FrameMarker.Unity;
+   using MB.FramePacing.Marker.Unity;
 
    var overlay = FindAnyObjectByType<FrameMarkerOverlay>();
    StartCoroutine(overlay.RunFor(10.0)); // start marker, 10 s of frame markers, end marker
@@ -89,7 +90,7 @@ The **target frame time** without a provider is what Unity's settings aim for: o
 `QualitySettings.vSyncCount` while vsync is on (`Application.targetFrameRate` is then ignored), else `Application.targetFrameRate`,
 else on the web the refresh rate, else unknown (0). XR platforms ignore both settings: give the XR display's rate as a provider. The
 **preferred frame time** is the rate the game wants to run at. Without a provider it is the same default, which Unity does not lower
-on its own; a pacer that runs the game slower than it wants gives its preferred rate here. `Marker.OnDemandFrameTicks` says the game
+on its own; a pacer that runs the game slower than it wants gives its preferred rate here. `FrameMarker.OnDemandFrameTicks` says the game
 presents only when something changes. What each field means, and what to write for typical frame pacers, is in
 [Filling the marker fields](marker-fields.md).
 
@@ -134,18 +135,18 @@ give the matrix to `FrameMarkerMesh`. It keeps a `Mesh` with the current marker 
 again only when the size, options, origin or output height change, and per frame only the indices of the dark modules:
 
 ```csharp
-using MB.FrameMarker;
-using MB.FrameMarker.Unity;
+using MB.FramePacing.Marker;
+using MB.FramePacing.Marker.Unity;
 
 var generator = new MarkerGenerator();                   // once
-var modules = new byte[Marker.MaxPackedModuleByteCount]; // once: the encoded marker lives here
+var modules = new byte[FrameMarker.MaxPackedModuleByteCount]; // once: the encoded marker lives here
 var markerMesh = new FrameMarkerMesh();                  // once
 var material = FrameMarkerGL.CreateMaterial();            // once, or your own unlit vertex color material
 
 // every frame, as the last thing drawn into the output
-var options = new Options(Marker.RecommendModuleSizePx(Screen.height, 540));
-var origin = Marker.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height, options);
-var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.None, Marker.SecondsToTicks(Time.timeAsDouble));
+var options = new Options(FrameMarker.RecommendModuleSizePx(Screen.height, 540));
+var origin = FrameMarker.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height, options);
+var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.None, FrameMarker.SecondsToTicks(Time.timeAsDouble));
 if (generator.TryGenerateModules(payload, modules, out var matrix))
   markerMesh.Update(matrix, options, origin, Screen.height);
 commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Screen.width, Screen.height));
@@ -171,12 +172,12 @@ bytes you own (the `ModuleMatrix`), and `Marker` draws it straight into your arr
 
 ```csharp
 var generator = new MarkerGenerator();
-var modules = new byte[Marker.MaxPackedModuleByteCount];
-var vertices = new Vertex[Marker.MaxTriangleVertexCount];
+var modules = new byte[FrameMarker.MaxPackedModuleByteCount];
+var vertices = new Vertex[FrameMarker.MaxTriangleVertexCount];
 
 if (generator.TryGenerateModules(payload, metadata, modules, out var matrix))  // the metadata only goes into start markers
 {
-  int count = Marker.ModulesToTriangles(matrix, options, origin, vertices);      // 6 vertices per quad, pixel coordinates, top-left origin
+  int count = FrameMarker.ModulesToTriangles(matrix, options, origin, vertices);      // 6 vertices per quad, pixel coordinates, top-left origin
 }
 ```
 
@@ -185,11 +186,11 @@ matrix can feed several.
 
 ## What is verified
 
-- **Every push (CI):** the package is assembled and validated with `python sdk/marker/unity/build_upm.py --output <folder> --check`:
-  every asset has a `.meta` file with a unique, stable GUID, the version matches `sdk/marker/VERSION` and the core sources equal
-  `sdk/marker/csharp/source`. The core library itself is tested on .NET, where it matches the C++ library module for module and pixel for
-  pixel.
-- **Before a release (local, needs a Unity license):** `python sdk/marker/unity/check_in_unity.py` runs a real Unity editor in batch mode
+- **Every push (CI):** the package is assembled and validated with `python sdk/unity/build_upm.py --output <folder> --check`:
+  every asset has a `.meta` file with a unique, stable GUID, the version matches `sdk/VERSION` and the core sources equal
+  `sdk/csharp/marker/source`. The core module itself is tested on .NET, where it matches the C++ marker module module for module and
+  pixel for pixel.
+- **Before a release (local, needs a Unity license):** `python sdk/unity/check_in_unity.py` runs a real Unity editor in batch mode
   (no window) on a throw-away project. It checks that:
   - the package compiles, without warnings;
   - the core library reproduces all 512 C++ module matrices on Unity's scripting runtime;

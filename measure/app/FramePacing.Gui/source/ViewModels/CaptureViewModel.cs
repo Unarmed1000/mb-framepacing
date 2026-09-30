@@ -25,7 +25,7 @@ using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Capture.Ffmpeg;
 using MB.FramePacing.Capture.Synthetic;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels

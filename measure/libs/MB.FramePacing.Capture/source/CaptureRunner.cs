@@ -14,7 +14,7 @@ using System;
 using System.IO;
 using System.Threading;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NLog;
 
 namespace MB.FramePacing.Capture

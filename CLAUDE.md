@@ -4,45 +4,47 @@ Frame pacing / animation error measurement.
 
 The repository has two parts, and the license follows them (see Conventions):
 
-- **`sdk/`** (BSD 3-Clause) holds everything applications embed or use to read the results: the marker libraries, the data
-  libraries, their docs and their golden data.
-- **`sdk/marker/`** holds what goes **into** the application: the marker libraries, which draw a QR marker into every frame.
-  They are the C++20 library (`sdk/marker/cpp/`), the general C# library (`sdk/marker/csharp/`), the Unity package (`sdk/marker/unity/`) and
-  the Python library (`sdk/marker/python/`).
+- **`sdk/`** (BSD 3-Clause) holds everything applications embed or use to read the results: one SDK with one version, laid out by
+  language (`sdk/cpp/`, `sdk/csharp/`, `sdk/python/`, `sdk/unity/`, `sdk/shaders/`), its docs and its golden data. Its modules:
+  - **marker**: what goes **into** the application, a QR marker drawn into every frame (C++ `MB::FramePacing::Marker`, C#
+    `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
+  - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
+    `mb_framepacing.data`);
+  - **core** (C++ only, `MB::FramePacing`): what the C++ modules share (the library version, tick units and conversions, the steady clock).
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
 
 See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker specification. **The document is the reference**: C++
-(`sdk/marker/cpp/src/Payload.cpp`) and C# (`sdk/marker/csharp/source/Marker.cs`) must match it byte for byte. The tools'
-`MarkerPayload` delegates to the C# library; ZXing is only used for decoding.
+(`sdk/cpp/marker/src/Payload.cpp`) and C# (`sdk/csharp/marker/source/FrameMarker.cs`) must match it byte for byte. The tools'
+`MarkerPayload` (`measure/libs/MB.FramePacing.MarkerDecoding`) delegates to the C# module; ZXing is only used for decoding.
 
 ## Layout
 
-| Path                                              | Contents                                                                                                        |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)     |
-| `sdk/marker/VERSION`                              | Version of the marker libraries (released with `marker-v*` tags)                                                |
-| `sdk/marker/cpp/`                                 | C++20 library, `marker-render` tool, GoogleTest tests, CMake presets                                            |
-| `sdk/marker/csharp/`                              | General C# library `MB.FrameMarker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |
-| `sdk/marker/unity/`                               | Unity package sources (helpers, samples), `build_upm.py`, `check_in_unity.py`                                   |
-| `sdk/marker/python/`                              | Python library `mb_framemarker` (standard library only, Python 3.12) + unittest tests                           |
-| `sdk/marker/shaders/`                             | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan  |
-| `sdk/data/VERSION`                                | Version of the data libraries (released with `data-v*` tags)                                                    |
-| `sdk/data/python/`                                | Python data library `mb_framepacing_data` (reads; standard library, Python 3.12) + unittest tests               |
-| `sdk/data/cpp/`                                   | C++20 data library `mb_framepacingdata` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests |
-| `sdk/data/csharp/`                                | C# data library `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output         |
-| `sdk/conan/`                                      | Conan 2 recipes of both C++ libraries (conan-center-index layout, a local-recipes-index remote)                 |
-| `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, capture data and analysis output formats              |
-| `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                     |
-| `sdk/test-data/data/`                             | The data libraries' golden data: a test clip imported and analysed, and `digest.json`                           |
-| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                            |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, Marker/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks              |
-| `measure/doc/`                                    | Usage, camera, install guides, and the README images (`measure/doc/images`)                                     |
-| `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                 |
-| `doc/`                                            | Project docs: releasing, roadmap                                                                                |
-| `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                            |
-| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                              |
-| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                            |
-| `licenses/`                                       | Third-party licenses                                                                                            |
+| Path                                              | Contents                                                                                                          |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)       |
+| `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                   |
+| `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`          |
+| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, tick units and conversions, steady clock + tests             |
+| `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker`, vendored qrcodegen, `marker-render` tool, GoogleTest tests                |
+| `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
+| `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote) |
+| `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                 |
+| `sdk/csharp/data/`                                | C# data module `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output            |
+| `sdk/python/`                                     | Python package `mb_framepacing` (`marker`, `data`; standard library only, Python 3.12) + unittest tests           |
+| `sdk/unity/`                                      | Unity package `com.manabattery.framepacing` sources (helpers, samples), `build_upm.py`, `check_in_unity.py`       |
+| `sdk/shaders/`                                    | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan    |
+| `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, capture data and analysis output formats                |
+| `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                       |
+| `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
+| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
+| `measure/doc/`                                    | Usage, camera, install guides, and the README images (`measure/doc/images`)                                       |
+| `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                   |
+| `doc/`                                            | Project docs: releasing, roadmap                                                                                  |
+| `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                              |
+| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                                |
+| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                              |
+| `licenses/`                                       | Third-party licenses                                                                                              |
 
 ## Build and test
 
@@ -51,12 +53,11 @@ mb-quality -r --all .                            # the standard check: dotnet fo
 mb-quality -r --repair .                         # apply formatting, then build and test
 dotnet build mb-framepacing.slnx                 # warnings are errors (Directory.Build.props)
 dotnet test  mb-framepacing.slnx
-cd sdk/marker/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # linux / linux-clang / macos too
-cd sdk/data/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows     # the C++ data library, the same way
+cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # every module; linux / linux-clang / macos too
 dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fps 500  # end to end without hardware
 uv sync                                          # the Python dev tools in .venv, on the Python of .python-version (3.12)
-uv run python -m unittest discover -s sdk/data/python -t sdk/data/python    # the Python data library against sdk/test-data/data
-uv run tools/check_conan.py                      # both Conan recipes built from this checkout, in a temporary Conan home
+uv run python -m unittest discover -s sdk/python -t sdk/python    # the Python package against sdk/test-data
+uv run tools/check_conan.py                      # the Conan recipe built from this checkout, in a temporary Conan home
 ```
 
 - **mb-quality**
@@ -71,20 +72,26 @@ uv run tools/check_conan.py                      # both Conan recipes built from
 - **Every .NET project is pinned to AnyCPU**, because some machines set a `Platform=x64` environment variable. Keep that pin:
   without it, single-project builds go to `bin/x64` and cause MSB3270 warnings.
 - **C++ formatting and linting**
-  - C++ follows `sdk/marker/cpp/.clang-format` and `sdk/marker/cpp/.clang-tidy` (namespaces are CamelCase: `MB::FrameMarker`); `sdk/data/cpp`
-    has copies of both. The `.clang-tidy` checks and options are gtec-demo-framework's (plus `hicpp-exception-baseclass`); keep
-    both copies equal. Suppress a finding only with `NOLINTNEXTLINE(<check>)` and a comment line saying why (the MSVC standard
-    library makes `bugprone-exception-escape` report allocation failures that are caught).
-  - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of both C++ libraries
-    (`--library marker|data` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a configured build of
-    each: `<library>/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
+  - C++ follows `sdk/cpp/.clang-format` and `sdk/cpp/.clang-tidy` (namespaces are CamelCase: `MB::FramePacing::Marker`). The
+    `.clang-tidy` checks and options are gtec-demo-framework's (plus `hicpp-exception-baseclass`). Suppress a finding only with
+    `NOLINTNEXTLINE(<check>)` and a comment line saying why (the MSVC standard library makes `bugprone-exception-escape` report
+    allocation failures that are caught).
+  - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of every module
+    (`--module core|marker|data` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a
+    configured build: `sdk/cpp/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
     include paths); `--preset` takes another one. To apply formatting: `clang-format -i` on the files the script lists.
+  - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,src,tests}`),
+    each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<Module>.hpp>`
+    (the umbrella: includes the module's types and declares its functions) and `<mb/framepacing/<module>/<Type>.hpp>`, namespaces
+    `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
+COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` leave modules out (no data module: nlohmann/json is never fetched).
+    Each module's tests are their own executable (the marker's allocation test replaces the global `operator new`).
   - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
     pass: shift and combine small unsigned types after casting them to `uint32_t`.
   - The `linux-sanitize` preset (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, compile database) is what CI runs the tests
     and clang-tidy with.
   - `cmake/Version.hpp.in` is guarded with `// clang-format off`, because formatting breaks its `@VAR@` placeholders.
-- **Python scripts** (`measure/build_standalone.py`, `tools/`, later `sdk/marker/unity/build_upm.py`): standard library only. They must pass
+- **Python scripts** (`measure/build_standalone.py`, `tools/`, `sdk/unity/build_upm.py`): standard library only. They must pass
   `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode). CI runs
   all three.
 - **uv manages the Python dev tools:** the root `pyproject.toml` (not a package) pins them in its `dev` group, `uv.lock` pins
@@ -92,24 +99,25 @@ uv run tools/check_conan.py                      # both Conan recipes built from
 script>` runs inside it, and CI runs `uv sync --locked`. `tools/check_cpp.py` and `tools/check_conan.py` use the tools next to the
   Python that runs them, so `uv run tools/check_cpp.py` gets the pinned versions. Raise a tool: change its pin in `pyproject.toml`,
   then `uv lock` (Dependabot's `uv` ecosystem does this weekly). A one-off extra: `uv run --with <package> ...`.
-- **Unity package** (`com.manabattery.framemarker`):
-  - It isn't stored as one folder: `sdk/marker/unity/build_upm.py` assembles it from `sdk/marker/csharp/source` (core) plus
-    `sdk/marker/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
+- **Unity package** (`com.manabattery.framepacing`):
+  - It isn't stored as one folder: `sdk/unity/build_upm.py` assembles it from `sdk/csharp/marker/source` (core) plus
+    `sdk/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
   - CI runs it with `--check`.
-  - `sdk/marker/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode (every drawing method pixel exact; `--graphics
+  - `sdk/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode (every drawing method pixel exact; `--graphics
 glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Unity Hub installed, or `--unity`. Run it after changing
     the core or the helpers.
   - The core must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
     APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
-- **Standalone release archive:** `sdk/marker/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE` and `licenses/` next to itself in a release
-  archive, and falls back to `sdk/marker/VERSION`, `sdk/marker/LICENSE` and the repository root's `licenses/` otherwise.
+- **Standalone release archive:** `sdk/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE`, `licenses/` and `shaders/` next to itself in a
+  release archive, and falls back to `sdk/VERSION`, `sdk/LICENSE`, `sdk/shaders` and the repository root's `licenses/` otherwise. The
+  archive (`sdk/cpp/package_release.py`) holds every module, the docs and `test-data/data`, not `conan/`.
 - **Docs**
   - Formatting: `npm install && npm run format` (Prettier: Markdown/JSON/YAML; config `.prettierrc.json`, ignores in
     `.prettierignore`).
   - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. The SVG report examples (`report-example-*.svg`) come from test clips
     imported through ffmpeg (skipped without it): example pictures use the test clips, not the synthetic game. It renders the real GUI **offscreen**
     (Avalonia.Headless) in no-save mode and neutralises machine specific text. Never take desktop screenshots.
-- **Data libraries (`data/`, BSD 3-Clause):** `MB.FramePacing.Data` reads and writes `captures.mbcd` (`sdk/doc/capture-data-format.md`) and
+- **Data modules (BSD 3-Clause):** `MB.FramePacing.Data` reads and writes `captures.mbcd` (`sdk/doc/capture-data-format.md`) and
   the analysis output (`sdk/doc/analysis-output-format.md`: `summary.json` with `formatVersion`, which covers the CSVs, and the CSVs). The
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
@@ -294,26 +302,27 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - Its other jobs: `lint` (Prettier, one type per file, ruff, basedpyright, actionlint, the Unity package assembly),
     `dotnet-lint` (dotnet format as mb-quality applies it, CSharpier, vulnerable packages), `cpp-analysis` (sanitizer tests,
     clang-format, clang-tidy) and `semver` (`tools/check_semver.py`).
-  - `.github/workflows/release-marker.yml` releases the marker libraries on a `marker-v*` tag, `release-data.yml` the data libraries
-    on a `data-v*` tag (`sdk/data/cpp/package_release.py --verify` installs the marker library and builds the archive against it; see
+  - `.github/workflows/release-sdk.yml` releases the SDK (C++ archive, Unity package, Conan check) on an `sdk-v*` tag (see
     `doc/releasing.md`). A `tools-v*` tag (which must match `measure/VERSION`) also builds the self-contained tools.
   - `.github/dependabot.yml` opens weekly grouped updates for GitHub Actions, NuGet (packages and dotnet tools), npm and pip.
     GoogleTest and nlohmann/json (FetchContent URLs) and qrcodegen (vendored) are updated by hand.
-- **Conan recipes (`sdk/conan`):**
-  - `recipes/<name>/all/` holds `conanfile.py`, `conandata.yml` (each version's release archive URL and SHA-256) and `test_package/`;
-    `recipes/<name>/config.yml` lists the versions. They build the release archives (`package_release.py`), never the checkout.
-  - A version is added after its release: `python tools/add_conan_version.py marker|data <version>` (reads the release's
-    `SHA256SUMS`), then commit. The release workflows test the new archive through the recipe (`check_conan.py --released`).
-  - `tools/check_conan.py` (CI `conan` job, Windows/Ubuntu/macOS) builds both recipes from this checkout's archives, using a copy of
-    `sdk/conan` as a local-recipes-index remote, then `conan test` of each test package with `compiler.cppstd=20`.
+- **Conan recipe (`sdk/cpp/conan`):**
+  - `recipes/mb-framepacing/all/` holds `conanfile.py` (a component per module; options `with_marker`, `with_data`), `conandata.yml`
+    (each version's release archive URL and SHA-256) and `test_package/`; `recipes/mb-framepacing/config.yml` lists the versions. It
+    builds the release archive (`package_release.py`), never the checkout.
+  - A version is added after its release: `python tools/add_conan_version.py <version>` (reads the release's `SHA256SUMS`), then
+    commit. The release workflow tests the new archive through the recipe (`check_conan.py --released`).
+  - `tools/check_conan.py` (CI `conan` job, Windows/Ubuntu/macOS) builds the recipe from this checkout's archive, using a copy of
+    `sdk/cpp/conan` as a local-recipes-index remote: `conan test` of the test package with `compiler.cppstd=20`, and a build without
+    the data module.
   - **Every Conan run uses a temporary `CONAN_HOME`**: never touch the user's cache (their global Conan may be another version;
     running a newer one migrates the cache). Conan is pinned in `pyproject.toml`'s dev group.
-  - basedpyright excludes `sdk/conan` (Conan's API is untyped); ruff still checks the recipes. The test packages' C++ is formatted by
-    `check_cpp.py` (`sdk/conan/.clang-format`, a copy).
-- **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks the three VERSION files and compares the
-  public API of `MB.FrameMarker` with the last `marker-v*` release and of `MB.FramePacing.Data` with the last `data-v*` release using
-  ApiCompat. `sdk/marker/VERSION` and `sdk/data/VERSION` are the next releases' versions: raise them in the change that alters the API (0.x:
-  minor for any API change; from 1.0: major for breaking changes).
+  - basedpyright excludes `sdk/cpp/conan` (Conan's API is untyped); ruff still checks the recipe. The test package's C++ is formatted
+    by `check_cpp.py` (with `sdk/cpp/.clang-format`).
+- **Semantic versions:** `python tools/check_semver.py` (after `dotnet tool restore`) checks the two VERSION files and compares the
+  public API of every C# module (`MB.FramePacing.Marker`, `MB.FramePacing.Data`) with the last `sdk-v*` release using ApiCompat.
+  `sdk/VERSION` is the next release's version: raise it in the change that alters the API (0.x: minor for any API change; from 1.0:
+  major for breaking changes).
   - A version may be a pre-release: `-alpha.N`, `-beta.N` or `-rc.N` only (doc/releasing.md "Pre-releases"). CMake splits it off
     (`project()` takes the numbers; `Version.hpp` has `VersionString` and `VersionPrerelease`), .NET makes it the `VersionSuffix`, and
     Python spells it as PEP 440 does (`0.2.0b1`, by hand in `pyproject.toml` and `__version__`; `test_version.py` checks both). The
@@ -321,8 +330,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - CMake reads VERSION on every configure (a normal variable; an edit reconfigures); `-D<NAME>_VERSION_OVERRIDE` builds one tree as
     another version.
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
-  `sdk/marker/cpp/build/<preset>/Release/marker-render --golden sdk/test-data/markers` (Windows: `...\Release\marker-render.exe`), then run
-  the C# tests and the Python tests (`python -m unittest discover -s sdk/marker/python -t sdk/marker/python`).
+  `sdk/cpp/build/<preset>/marker/marker-render --golden sdk/test-data/markers` (Windows: `sdk\cpp\build\windows\marker\Release\marker-render.exe`),
+  then run the C# tests and the Python tests (`python -m unittest discover -s sdk/python -t sdk/python`).
 - **Verify the GUI without touching the desktop:** `dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>` renders
   every page offscreen (Avalonia.Headless) and runs the synthetic demo capture and analysis; compare the images with `measure/doc/images`
   (live numbers on the capture page vary). `mb-framepacing-gui --demo` is **not** headless: it opens a real window and waits for it to
@@ -338,13 +347,15 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   seen on screen; **display time step** is how long it stayed (the time to the next frame). Animation error = animation time step -
   display time step.
 - **Versions:** there are two version files.
-  - `sdk/marker/VERSION`: the marker libraries. CMake reads it into `Version.hpp` (and `sdk/data/VERSION` into the data library's), which only
-    `src/LibraryVersion.cpp` and the tests include: the umbrella headers declare `GetLibraryVersion()`, so a version bump rebuilds one file.
+  - `sdk/VERSION`: the SDK, every module and language (C#: `sdk/Directory.Build.props`; Python: by hand in `pyproject.toml` and
+    `mb_framepacing.__version__`). CMake reads it into `mb/framepacing/core/Version.hpp`, which only `core/src/LibraryVersion.cpp` and the
+    tests include: `Core.hpp` declares `GetLibraryVersion()`, so a version bump rebuilds one file.
   - `measure/VERSION`: the tools. `measure/Directory.Build.props` reads it.
 - **One type per file:** C++ and C# use one class/struct/enum per file (nested private helpers may stay nested). The C++ public API
-  has one header per type; `FrameMarker.hpp` includes them all and declares the functions. CI runs `tools/check_one_type_per_file.py`.
+  has one header per type; each module's umbrella header (`Core.hpp`, `Marker.hpp`, `Data.hpp`) includes them all and declares the
+  functions. CI runs `tools/check_one_type_per_file.py`.
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
-- **Reference shaders (`sdk/marker/shaders/`, BSD):** one quad whose fragment shader finds each pixel's module, from the packed bits
+- **Reference shaders (`sdk/shaders/`, BSD):** one quad whose fragment shader finds each pixel's module, from the packed bits
   (`Bits()` as constants; the fastest way to draw the marker) or a texel per module. One folder per API: `hlsl/` (`FrameMarker.hlsl` is
   the lookup, also included by the Unity shaders; `build_upm.py` copies it into the package), `gl/`, `gles2/` (GLSL ES 1.00: no
   integers, so float arithmetic, and `#error` without `highp`: not 100 % exact with `mediump`), `vulkan/`. `python
@@ -353,7 +364,9 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   a shader, and `check_in_unity.py` (also `--graphics glcore|gles|vulkan`) after touching the Unity ones.
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
-  `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
+  `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). A drawn rectangle is a
+  `QuadRect` (`X`, `Y`, `Width`, `Height`, `Dark`; `Left()`/`Right()`/`Top()`/`Bottom()`, `constexpr noexcept` in C++). The C# static
+  class is `FrameMarker` (not `Marker`: a class named like its namespace `MB.FramePacing.Marker` breaks lookups in `MB.FramePacing.*` code). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
   value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**
   - hand-maintained SDK csproj files;
@@ -362,9 +375,9 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
 - **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored, GoogleTest
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):
-  - BSD 3-Clause: everything under `sdk/`: the marker libraries (`sdk/marker/LICENSE` holds the text alone and is what the C++
-    archive, the CMake install and the Unity package ship), the data libraries (`sdk/data/LICENSE`), their docs (`sdk/doc/`) and
-    their golden data (`sdk/test-data/`).
+  - BSD 3-Clause: everything under `sdk/`: the SDK's libraries in every language (`sdk/LICENSE` holds the text alone and is what the
+    C++ archive, the CMake install, the Python package and the Unity package ship), their docs (`sdk/doc/`) and their golden data
+    (`sdk/test-data/`).
   - PolyForm Perimeter 1.0.1: everything else (the tools, their libraries, scripts, other docs, build and CI files). The tools ship
     the root `LICENSE`, which holds both texts, since they include the BSD marker library.
   - Every source file names its license on an `SPDX-License-Identifier` line near its top: `BSD-3-Clause` under `sdk/`,
@@ -372,8 +385,8 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
     comment in XAML/MSBuild/solution files). Every code file (not MSBuild, solutions or workflows) has
     `SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS` on the line right before it, in the same comment style: the SPDX
     short form (as the Linux kernel and REUSE use it), never the license text in the file. `python tools/check_license_headers.py`
-    checks both (CI `lint`), `--fix` adds missing ones (the copyright with the current year). Third-party code (`third_party/`) keeps its own notices; each language's marker library keeps it in a `third_party/`
-    folder of its own (`sdk/marker/cpp/third_party/`, `sdk/marker/python/mb_framemarker/third_party/`), with its license text next to it.
+    checks both (CI `lint`), `--fix` adds missing ones (the copyright with the current year). Third-party code (`third_party/`) keeps its own notices; each language's marker module keeps it in a `third_party/`
+    folder of its own (`sdk/cpp/marker/third_party/`, `sdk/python/mb_framepacing/marker/third_party/`), with its license text next to it.
   - A new file belongs to the license of its path. Moving code across that line (for example from `measure/` into `sdk/`)
     changes its license: only Mana Battery can decide that.
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a

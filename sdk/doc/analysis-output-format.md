@@ -1,7 +1,7 @@
 # Analysis output format
 
 The analysis writes its results into the capture's `analysis/` folder: `summary.json`, `captures.csv`, and `run-<id>-frames.csv` for
-every run. This document specifies those files, so other tools can read them. The data libraries in [`sdk/data/`](../data/README.md) read
+every run. This document specifies those files, so other tools can read them. The SDK's data modules ([the SDK](../README.md#the-data-module)) read
 them in C#, Python and C++; the C# library also writes them, and the tools write through it.
 
 ```text

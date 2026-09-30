@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Check the semantic versions of the three release streams (see doc/releasing.md).
+"""Check the semantic versions of the two release streams (see doc/releasing.md).
 
-1. sdk/marker/VERSION, measure/VERSION and sdk/data/VERSION are MAJOR.MINOR.PATCH, optionally with a pre-release (-alpha.N, -beta.N
-   or -rc.N), and never lower than the newest release tag of their stream (marker-v*, tools-v*, data-v*), pre-releases included, in
-   semantic version order: 0.2.0-alpha.1 < 0.2.0-alpha.2 < 0.2.0-beta.1 < 0.2.0-rc.1 < 0.2.0.
-2. The public API of the C# marker library MB.FrameMarker is compared with the newest stable marker-v* release, and that of the C# data
-   library MB.FramePacing.Data with the newest stable data-v* release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool
-   restore). Pre-releases are not a baseline: the pre-releases of a version may change its API among themselves. The C++ marker API mirrors the C# one, so this also guards the C++ marker library.
+1. sdk/VERSION and measure/VERSION are MAJOR.MINOR.PATCH, optionally with a pre-release (-alpha.N, -beta.N or -rc.N), and never lower
+   than the newest release tag of their stream (sdk-v*, tools-v*), pre-releases included, in semantic version order:
+   0.2.0-alpha.1 < 0.2.0-alpha.2 < 0.2.0-beta.1 < 0.2.0-rc.1 < 0.2.0.
+2. The public API of every C# module of the SDK (MB.FramePacing.Marker, MB.FramePacing.Data) is compared with the newest stable sdk-v*
+   release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool restore). Pre-releases are not a baseline: the pre-releases
+   of a version may change its API among themselves. The C++ marker API mirrors the C# one, so this also guards the C++ marker module.
    - A breaking change needs a new major version (a new minor version while the major version is 0).
    - Any other API change (an addition) needs at least a new minor version.
-   Without a release tag of the stream there is nothing to compare with, and its API check is skipped. A tag on the checked out commit itself
-   (the release run of that tag) is not a baseline; the release before it is.
+   Without a release tag of the stream there is nothing to compare with, and its API check is skipped; a module the baseline release does
+   not have yet (a new one) has nothing to compare with either. A tag on the checked out commit itself (the release run of that tag) is not
+   a baseline; the release before it is.
 
-sdk/marker/VERSION and sdk/data/VERSION are the versions of the next releases, so raise them in the same change that alters the API.
+sdk/VERSION is the version of the next SDK release, so raise it in the same change that alters the API.
 
 Run from anywhere inside the repository (needs the release tags: git fetch --tags):
   python tools/check_semver.py
@@ -48,9 +49,10 @@ class ApiStream:
         return self.library + ".dll"
 
 
+# The SDK's C# modules: one version and one release for all of them
 API_STREAMS = (
-    ApiStream("MB.FrameMarker", Path("sdk/marker/csharp/MB.FrameMarker.csproj"), "sdk/marker/VERSION", "marker-v"),
-    ApiStream("MB.FramePacing.Data", Path("sdk/data/csharp/MB.FramePacing.Data.csproj"), "sdk/data/VERSION", "data-v"),
+    ApiStream("MB.FramePacing.Marker", Path("sdk/csharp/marker/MB.FramePacing.Marker.csproj"), "sdk/VERSION", "sdk-v"),
+    ApiStream("MB.FramePacing.Data", Path("sdk/csharp/data/MB.FramePacing.Data.csproj"), "sdk/VERSION", "sdk-v"),
 )
 
 # (major, minor, patch, 1 for a release or 0 for a pre-release, the pre-release label's rank, its number): sorts as semver does
@@ -155,6 +157,9 @@ def check_api(root: Path, stream: ApiStream, version: Version) -> bool:
         worktree = Path(temp) / "baseline"
         _ = git(root, "worktree", "add", "--detach", str(worktree), tag)
         try:
+            if not (worktree / stream.project).is_file():
+                notice(f"{tag} has no {stream.library} ({stream.project}), so there is no API to compare with")
+                return True
             baseline = build_library(stream, worktree, Path(temp) / "baseline-bin")
         finally:
             _ = git(root, "worktree", "remove", "--force", str(worktree))
@@ -194,12 +199,11 @@ def check_api(root: Path, stream: ApiStream, version: Version) -> bool:
 
 def main() -> int:
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
-    marker = check_stream(root, "sdk/marker/VERSION", "marker-v")
+    sdk = check_stream(root, "sdk/VERSION", "sdk-v")
     tools = check_stream(root, "measure/VERSION", "tools-v")
-    data = check_stream(root, "sdk/data/VERSION", "data-v")
-    if marker is None or tools is None or data is None:
+    if sdk is None or tools is None:
         return 1
-    results = [check_api(root, stream, version) for stream, version in zip(API_STREAMS, (marker, data), strict=True)]
+    results = [check_api(root, stream, sdk) for stream in API_STREAMS]
     return 0 if all(results) else 1
 
 

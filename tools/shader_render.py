@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
 """check_shaders.py --render: draw the marker's reference shaders with OpenGL (moderngl, a 4.1 context, which also takes GLSL ES 1.00) and
-compare every pixel with mb_framemarker's modules_to_bitmap, for every marker kind at several module sizes, quiet zones and origins. The
+compare every pixel with mb_framepacing.marker's modules_to_bitmap, for every marker kind at several module sizes, quiet zones and origins. The
 only script that needs a package beyond the standard library, and only for this optional check."""
 
 import random
@@ -11,8 +11,8 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "marker" / "python"))
-from mb_framemarker import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "python"))
+from mb_framepacing.marker import (  # noqa: E402
     MarkerFlags,
     MarkerKind,
     ModuleMatrix,

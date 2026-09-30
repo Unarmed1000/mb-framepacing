@@ -11,7 +11,7 @@
 //****************************************************************************************************************************************************
 
 using MB.FramePacing.Analysis;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Charts
 {

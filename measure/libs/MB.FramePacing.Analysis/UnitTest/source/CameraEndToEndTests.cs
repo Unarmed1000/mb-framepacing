@@ -16,7 +16,7 @@ using System.Threading;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Camera;
 using MB.FramePacing.Capture.Synthetic;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest

@@ -11,7 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest
@@ -42,7 +42,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         rows.Add(new CaptureRow(rows.Count, rows.Count * refresh, CaptureStatus.Decoded, payload, start));
 
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FrameMarker.MarkerFlags.None, 0), StartMetadata.FromTag(0, "pacing"));
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, 0), StartMetadata.FromTag(0, "pacing"));
       ulong index = 100;
       long animationMs = 0;
       foreach (var (refreshes, step, intendedMs, target) in frames)
@@ -54,7 +54,7 @@ namespace MB.FramePacing.Analysis.UnitTest
               MarkerKind.Frame,
               1,
               index,
-              MB.FrameMarker.MarkerFlags.None,
+              MB.FramePacing.Marker.MarkerFlags.None,
               animationMs * Ms,
               PreferredFrameTicks: preferredTicks,
               TargetFrameTicks: target,
@@ -64,7 +64,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         ++index;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FrameMarker.MarkerFlags.None, 0));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FramePacing.Marker.MarkerFlags.None, 0));
       return rows;
     }
 

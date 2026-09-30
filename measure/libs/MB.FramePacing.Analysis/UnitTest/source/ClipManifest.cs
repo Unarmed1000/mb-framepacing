@@ -19,7 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Analysis.UnitTest
 {
@@ -129,8 +129,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         kind,
         RunId,
         ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
-        (RenderedStaticAfter[frame] ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None)
-          | (RenderedStaticBefore[frame] ? MB.FrameMarker.MarkerFlags.StaticBefore : MB.FrameMarker.MarkerFlags.None),
+        (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.None)
+          | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.None),
         RenderedAnimationTicks[frame] + (loop * DurationTicks),
         PreferredFrameTicks: FrameTicks(RenderedPreferredInterval[frame]),
         TargetFrameTicks: FrameTicks(RenderedSwapInterval[frame]),

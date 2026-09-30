@@ -11,7 +11,7 @@
 using System;
 using System.Collections.Generic;
 using MB.FramePacing.Capture.Camera;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Capture.Ffmpeg
 {

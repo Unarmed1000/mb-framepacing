@@ -12,7 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Data;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest
@@ -68,7 +68,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         time += Period;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FrameMarker.MarkerFlags.None, 0), StartMetadata.Empty);
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, 0), StartMetadata.Empty);
       for (ulong frame = 1; frame <= 6; ++frame)
       {
         if ((int)frame == gapBefore)
@@ -78,7 +78,7 @@ namespace MB.FramePacing.Analysis.UnitTest
             MarkerKind.Frame,
             1,
             frame,
-            MB.FrameMarker.MarkerFlags.None,
+            MB.FramePacing.Marker.MarkerFlags.None,
             (long)frame * Period,
             PreferredFrameTicks: (uint)Period,
             TargetFrameTicks: (uint)Period
@@ -86,7 +86,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         );
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FrameMarker.MarkerFlags.None, 7 * Period));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FramePacing.Marker.MarkerFlags.None, 7 * Period));
       return records;
     }
 

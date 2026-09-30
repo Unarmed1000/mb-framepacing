@@ -105,17 +105,17 @@ In priority order:
 
 ## Where things are
 
-| What                                          | Where                                                                                                        |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Calibration, verification, rig file, library  | `measure/libs/MB.FramePacing.Capture/source/Camera/`                                                         |
-| ffmpeg rectification filter, `--recorded-fps` | `Capture/source/Ffmpeg/FfmpegCommandBuilder.cs` (`BuildCameraFilter`), `FfmpegCaptureSource.cs`              |
-| Homography, refinement, grid sampler          | `measure/libs/MB.FramePacing.Marker/source/` (`Homography*.cs`, `ModuleGridSampler.cs`, `MarkerGeometry.cs`) |
-| Camera analysis                               | `Analysis/source/CaptureDecoder.cs` (`CameraLayout`), `TimelineAnalyzer.cs` (`AnalyzeCamera`)                |
-| Synthetic camera (ground truth)               | `Capture/source/Synthetic/SyntheticCamera*.cs`                                                               |
-| CLI                                           | `measure/app/FramePacing/source/Commands/CameraRigCommand.cs`, `SelfTestCommand.cs` (`--camera`)             |
-| GUI                                           | `measure/app/FramePacing.Gui/source/ViewModels/Camera*.cs`, `Views/CameraWizardWindow.axaml`                 |
-| Tests                                         | `*Camera*Tests.cs`, `HomographyTests.cs`, `ModuleGridSamplerTests.cs`; `FfmpegCameraTests` needs ffmpeg      |
-| Benchmarks                                    | `measure/tools/Benchmarks` (`dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj`)    |
+| What                                          | Where                                                                                                                |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Calibration, verification, rig file, library  | `measure/libs/MB.FramePacing.Capture/source/Camera/`                                                                 |
+| ffmpeg rectification filter, `--recorded-fps` | `Capture/source/Ffmpeg/FfmpegCommandBuilder.cs` (`BuildCameraFilter`), `FfmpegCaptureSource.cs`                      |
+| Homography, refinement, grid sampler          | `measure/libs/MB.FramePacing.MarkerDecoding/source/` (`Homography*.cs`, `ModuleGridSampler.cs`, `MarkerGeometry.cs`) |
+| Camera analysis                               | `Analysis/source/CaptureDecoder.cs` (`CameraLayout`), `TimelineAnalyzer.cs` (`AnalyzeCamera`)                        |
+| Synthetic camera (ground truth)               | `Capture/source/Synthetic/SyntheticCamera*.cs`                                                                       |
+| CLI                                           | `measure/app/FramePacing/source/Commands/CameraRigCommand.cs`, `SelfTestCommand.cs` (`--camera`)                     |
+| GUI                                           | `measure/app/FramePacing.Gui/source/ViewModels/Camera*.cs`, `Views/CameraWizardWindow.axaml`                         |
+| Tests                                         | `*Camera*Tests.cs`, `HomographyTests.cs`, `ModuleGridSamplerTests.cs`; `FfmpegCameraTests` needs ffmpeg              |
+| Benchmarks                                    | `measure/tools/Benchmarks` (`dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj`)            |
 
 Quick checks after a change:
 

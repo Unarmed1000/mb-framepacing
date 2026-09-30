@@ -11,7 +11,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using MB.FramePacing.Marker;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Capture
 {
