@@ -138,15 +138,13 @@ namespace MB.FramePacing.Charts
       var tiles = ReportItem.TileIds.Any(options.IsShown) ? RunHeadline.Shown(section.Section, options).ToList() : new List<HeadlineTile>();
       if (options.HideEmpty && options.IsShown(ReportItem.LateShare) && (section.Section.Run.Pacing?.LateFrames ?? 0) == 0)
         options = options.Hide(new[] { ReportItem.LateShare });
-      // What the application wants, when its markers say so: a line of its own in the display box
-      string wants = options.IsShown(ReportItem.Display)
-        ? Wants(Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]))
-        : string.Empty;
-      double displayH = wants.Length > 0 ? DisplayBoxH + DisplayLineH : DisplayBoxH;
+      // The display box (RunHeadline, as the GUI's Display card); what the application wants gets a line of its own
+      var display = options.IsShown(ReportItem.Display) ? RunHeadline.Display(section) : null;
+      double displayH = display is { Wants.Length: > 0 } ? DisplayBoxH + DisplayLineH : DisplayBoxH;
       var layout = Layout.For(options, description.Count, tiles.Count, displayH);
       var parts = Header(title, options.IsShown(ReportItem.Description) ? description : Array.Empty<string>(), options.IsShown(ReportItem.Title));
-      if (options.IsShown(ReportItem.Display))
-        DisplayBox(parts, chart, section, refreshMs, width, wants, displayH);
+      if (display != null)
+        DisplayBox(parts, display, width, displayH);
 
       Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRowFor(tiles.Count));
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
@@ -271,96 +269,32 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// The display in the top right corner: its refresh rate, whether it is the fixed refresh a capture card captures at (vsync) or calculated
-    /// from a camera's frames, the time per refresh, and what the frames targeted in whole refreshes.
+    /// The display in the top right corner (<see cref="RunHeadline.Display"/>): its refresh rate, whether it is the fixed refresh a capture card
+    /// captures at (vsync) or calculated from a camera's frames, the time per refresh, what the frames targeted in whole refreshes, and what
+    /// the application wants.
     /// </summary>
-    private static void DisplayBox(
-      List<CardShape> parts,
-      ChartRun chart,
-      RunSection section,
-      double refreshMs,
-      double width,
-      string wants,
-      double boxH
-    )
+    private static void DisplayBox(List<CardShape> parts, DisplaySummary display, double width, double boxH)
     {
-      var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]);
       const double BoxW = 300;
       double X = width - 20 - BoxW;
       const double Y = 14;
-      var pacing = chart.Run.Pacing;
       parts.Add(new RectShape("tile", N(X, 1), N(Y, 0), N(BoxW, 0), N(boxH, 0), "10"));
       parts.Add(new TextShape(X + 14, Y + 19, "DISPLAY", "label", "start"));
-      string rate = Hz(pacing);
-      bool mismatch = pacing?.MatchesExpectedRefresh == false;
-
-      string kind =
-        pacing == null ? "unknown"
-        : pacing.RefreshCalculated ? "calculated from the camera"
-        : "fixed refresh (vsync)";
-      if (pacing?.ExpectedRefreshHz is { } expected && mismatch)
-        kind += $", expected {expected.ToString("0.##", CultureInfo.InvariantCulture)} Hz";
       parts.Add(
         new TextRunsShape(
           X + 14,
           Y + 42,
-          new[] { new TextRun(rate, mismatch ? "tile-value warn" : "tile-value"), new TextRun("  " + kind, "vsync-n") }
+          new[] { new TextRun(display.Rate, display.Mismatch ? "tile-value warn" : "tile-value"), new TextRun("  " + display.Kind, "vsync-n") }
         )
       );
-
-      // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate, like Swappy,
-      // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
-      static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
-      var refreshes = frames
-        .Where(f => f.DisplayDeltaTicks.HasValue && (Known(f.MarkerTargetFrameTicks) || f.TargetTicks.HasValue))
-        .Select(f =>
-          (int)
-            Math.Round(
-              (Known(f.MarkerTargetFrameTicks) ? f.MarkerTargetFrameTicks : f.TargetTicks!.Value) / (double)TimeSpan.TicksPerMillisecond / refreshMs
-            )
-        )
-        .Distinct()
-        .Order()
-        .ToArray();
-      string target =
-        refreshes.Length == 0 ? string.Empty
-        : refreshes.Length == 1
-          ? $", target {Refreshes(refreshes[0])} ({(1000 / (refreshes[0] * refreshMs)).ToString("0.#", CultureInfo.InvariantCulture)} fps)"
-        : $", target {refreshes[0]}\u2013{Refreshes(refreshes[^1])}";
-      parts.Add(new TextShape(X + 14, Y + 60, $"{Ms1(refreshMs)} ms per refresh{target}", "vsync-n", "start"));
-      if (wants.Length > 0)
-        parts.Add(new TextShape(X + 14, Y + 60 + DisplayLineH, wants, "vsync-n", "start"));
+      parts.Add(new TextShape(X + 14, Y + 60, display.Refresh, "vsync-n", "start"));
+      if (display.Wants.Length > 0)
+        parts.Add(new TextShape(X + 14, Y + 60 + DisplayLineH, display.Wants, "vsync-n", "start"));
     }
 
     // The display box's height, and one more line for what the application wants
     private const double DisplayBoxH = 68;
     private const double DisplayLineH = 16;
-
-    /// <summary>What the application wants, when its markers say so ("preferred 60 fps", "preferred 1–60 fps, on demand"), else empty.</summary>
-    private static string Wants(IEnumerable<PresentedFrame> frames)
-    {
-      static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
-      var preferredFps = frames
-        .Where(f => Known(f.MarkerPreferredFrameTicks))
-        .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTicks, 1))
-        .Distinct()
-        .Order()
-        .ToArray();
-      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTicks == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks);
-      var wants = new List<string>();
-      if (preferredFps.Length > 0)
-      {
-        string Fps(double fps) => fps.ToString("0.#", CultureInfo.InvariantCulture);
-        wants.Add(
-          preferredFps.Length == 1 ? $"preferred {Fps(preferredFps[0])} fps" : $"preferred {Fps(preferredFps[0])}\u2013{Fps(preferredFps[^1])} fps"
-        );
-      }
-      if (onDemand)
-        wants.Add("on demand");
-      return string.Join(", ", wants);
-    }
-
-    private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
 
     private static void Tiles(List<CardShape> parts, IReadOnlyList<HeadlineTile> tiles, double tilesY, double width, int perRow)
     {
@@ -1602,6 +1536,6 @@ namespace MB.FramePacing.Charts
 
     private static string Percent(double share) => share.ToString("P1", CultureInfo.InvariantCulture);
 
-    private static string Hz(RunPacing? pacing) => pacing != null ? $"{pacing.RefreshHz.ToString("0.##", CultureInfo.InvariantCulture)} Hz" : "?? Hz";
+    private static string Hz(RunPacing? pacing) => RunHeadline.Hz(pacing);
   }
 }

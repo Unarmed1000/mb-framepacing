@@ -236,6 +236,11 @@ The headline numbers on the Analyze page (the report card shows the same):
 | Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                                                                                                                                         |
 | Late frames        | Frames shown later than planned (see below), and their share of the run                                                                                                                                                             |
 
+Beside them, the **Display** card (the report's display box, top right) shows the refresh rate and whether it is a capture card's fixed
+refresh (vsync) or calculated from a camera, the time per refresh with what the frames targeted in whole refreshes, and what the
+application prefers when its markers say so. The rate turns amber when it differs from the display rate you expected; the card's
+tooltip says by how much.
+
 The frame rate numbers (average fps, the lows) and the display time step statistics and histogram describe the frames that animate: a
 static frame's time on screen (the marker's `StaticAfter` or `StaticBefore` flag) is left out, and the tile, the report's description and the statistics
 table say how many ("excluding 48 static frames"; `statistics.excludedStaticFrames` in `summary.json`, `StaticBefore` in the frames

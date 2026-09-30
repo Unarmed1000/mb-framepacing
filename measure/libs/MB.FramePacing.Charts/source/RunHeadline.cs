@@ -164,6 +164,75 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
+    /// The display <paramref name="section"/> was shown on: its refresh rate, whether it is the fixed refresh a capture card captures at
+    /// (vsync) or calculated from a camera's frames, the time per refresh, what the section's frames targeted in whole refreshes, and what the
+    /// application wants when its markers say so. The report's display box and the GUI's Display card show it.
+    /// </summary>
+    public static DisplaySummary Display(RunSection section)
+    {
+      var chart = section.Run;
+      var pacing = chart.Run.Pacing;
+      double refreshMs = pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
+      var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
+      bool mismatch = pacing?.MatchesExpectedRefresh == false;
+      string kind =
+        pacing == null ? "unknown"
+        : pacing.RefreshCalculated ? "calculated from the camera"
+        : "fixed refresh (vsync)";
+      if (pacing?.ExpectedRefreshHz is { } expected && mismatch)
+        kind += $", expected {expected.ToString("0.##", CultureInfo.InvariantCulture)} Hz";
+
+      // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate, like Swappy,
+      // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
+      var refreshes = frames
+        .Where(f => f.DisplayDeltaTicks.HasValue && (Known(f.MarkerTargetFrameTicks) || f.TargetTicks.HasValue))
+        .Select(f =>
+          (int)
+            Math.Round(
+              (Known(f.MarkerTargetFrameTicks) ? f.MarkerTargetFrameTicks : f.TargetTicks!.Value) / (double)TimeSpan.TicksPerMillisecond / refreshMs
+            )
+        )
+        .Distinct()
+        .Order()
+        .ToArray();
+      string target =
+        refreshes.Length == 0 ? string.Empty
+        : refreshes.Length == 1 ? $", target {Refreshes(refreshes[0])} ({Invariant(1000 / (refreshes[0] * refreshMs), "0.#")} fps)"
+        : $", target {refreshes[0]}–{Refreshes(refreshes[^1])}";
+      return new DisplaySummary(Hz(pacing), kind, mismatch, $"{ReportCard.Ms1(refreshMs)} ms per refresh{target}", Wants(frames));
+    }
+
+    /// <summary>The refresh rate ("60 Hz"), "?? Hz" without pacing.</summary>
+    public static string Hz(RunPacing? pacing) => pacing != null ? $"{Invariant(pacing.RefreshHz, "0.##")} Hz" : "?? Hz";
+
+    /// <summary>What the application wants, when its markers say so ("preferred 60 fps", "preferred 1–60 fps, on demand"), else empty.</summary>
+    private static string Wants(IReadOnlyList<PresentedFrame> frames)
+    {
+      var preferredFps = frames
+        .Where(f => Known(f.MarkerPreferredFrameTicks))
+        .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTicks, 1))
+        .Distinct()
+        .Order()
+        .ToArray();
+      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTicks == MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks);
+      var wants = new List<string>();
+      if (preferredFps.Length > 0)
+      {
+        string Fps(double fps) => Invariant(fps, "0.#");
+        wants.Add(
+          preferredFps.Length == 1 ? $"preferred {Fps(preferredFps[0])} fps" : $"preferred {Fps(preferredFps[0])}–{Fps(preferredFps[^1])} fps"
+        );
+      }
+      if (onDemand)
+        wants.Add("on demand");
+      return string.Join(", ", wants);
+    }
+
+    private static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.Marker.MarkerPayload.OnDemandFrameTicks;
+
+    private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
+
+    /// <summary>
     /// The frame rate numbers describe the frames that animate: "excluding 48 static frames" when a section has any, else null. Every frame
     /// rate number and the display time step histogram leave those display time steps out.
     /// </summary>

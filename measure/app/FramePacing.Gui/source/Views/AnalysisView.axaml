@@ -67,36 +67,59 @@
         <ComboBox ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="260" />
         <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding SelectedRun.StartText, FallbackValue=''}" />
       </Grid>
-      <!-- The headline tiles: RunHeadline builds them, the same the report card shows, in the card's tile style and its rows
-           (ReportOptions.TilesPerRowFor) -->
-      <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}" Margin="0,0,-8,-8">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate>
-            <UniformGrid Columns="{Binding SelectedRun.TileColumns, FallbackValue=4}" />
-          </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="charts:HeadlineTile">
-            <Border Classes="tile" Margin="0,0,8,8" ToolTip.Tip="{Binding Explanation}">
-              <StackPanel Spacing="4">
-                <TextBlock Classes="tileLabel" Text="{Binding Caption, Converter={x:Static views:UpperCaseConverter.Instance}}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Classes="tileValue" Classes.warning="{Binding Warning}" Text="{Binding Value}" />
-                  <TextBlock Classes="tileDetail" VerticalAlignment="Bottom" Text="{Binding Detail}" />
+      <!-- The tiles and, beside them, the Display card: the report's display box (RunHeadline.Display), top right as on the card -->
+      <Grid ColumnDefinitions="*,Auto">
+        <!-- The headline tiles: RunHeadline builds them, the same the report card shows, in the card's tile style and its rows
+             (ReportOptions.TilesPerRowFor) -->
+        <ItemsControl ItemsSource="{Binding SelectedRun.Tiles, FallbackValue={x:Null}}" Margin="0,0,-8,-8" VerticalAlignment="Top">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="{Binding SelectedRun.TileColumns, FallbackValue=4}" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="charts:HeadlineTile">
+              <Border Classes="tile" Margin="0,0,8,8" ToolTip.Tip="{Binding Explanation}">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="tileLabel" Text="{Binding Caption, Converter={x:Static views:UpperCaseConverter.Instance}}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="tileValue" Classes.warning="{Binding Warning}" Text="{Binding Value}" />
+                    <TextBlock Classes="tileDetail" VerticalAlignment="Bottom" Text="{Binding Detail}" />
+                  </StackPanel>
                 </StackPanel>
-              </StackPanel>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border
+          Grid.Column="1"
+          Classes="tile"
+          Width="300"
+          Margin="8,0,0,0"
+          VerticalAlignment="Top"
+          ToolTip.Tip="{Binding SelectedRun.RefreshText, FallbackValue=''}"
+        >
+          <StackPanel Spacing="4">
+            <TextBlock Classes="tileLabel" Text="DISPLAY" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock
+                Classes="tileValue"
+                Classes.warning="{Binding SelectedRun.Display.Mismatch, FallbackValue=False}"
+                Text="{Binding SelectedRun.Display.Rate, FallbackValue=''}"
+              />
+              <TextBlock Classes="tileDetail" VerticalAlignment="Bottom" Text="{Binding SelectedRun.Display.Kind, FallbackValue=''}" />
+            </StackPanel>
+            <TextBlock Classes="tileDetail" Text="{Binding SelectedRun.Display.Refresh, FallbackValue=''}" />
+            <TextBlock
+              Classes="tileDetail"
+              Text="{Binding SelectedRun.Display.Wants, FallbackValue=''}"
+              IsVisible="{Binding SelectedRun.HasWants, FallbackValue=False}"
+            />
+          </StackPanel>
+        </Border>
+      </Grid>
       <TextBlock Text="{Binding SelectedRun.VerdictText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.TargetText, FallbackValue=''}" TextWrapping="Wrap" />
-      <TextBlock
-        Classes="caption"
-        Classes.warning="{Binding SelectedRun.RefreshMismatch, FallbackValue=False}"
-        Text="{Binding SelectedRun.RefreshText, FallbackValue=''}"
-        TextWrapping="Wrap"
-      />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.CountsText, FallbackValue=''}" TextWrapping="Wrap" />
       <ItemsControl ItemsSource="{Binding SelectedRun.Warnings, FallbackValue={x:Null}}">
         <ItemsControl.ItemTemplate>

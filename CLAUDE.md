@@ -178,8 +178,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells. A
         static frame's cells are violet (`strip-static-a`/`-b`) and the error row says "static" on the static step after it; a frame presented on demand is never
         "held longer" (no interval to be late for).
-    - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, so add or change
-      a number there, not in the GUI. A tile without a number shows "-" with `HasValue` false.
+    - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, and the GUI's
+      Display card the report's display box (`RunHeadline.Display`, `DisplaySummary`), so add or change a number there, not in the GUI.
+      A tile without a number shows "-" with `HasValue` false.
     - The animation error panel draws a refresh line (`error-refresh`, dashed amber, labelled "+1 refresh (16.7 ms)") at every whole
       refresh an error reaches within a tenth of a refresh, over the frames the scale covers, and only inside the scale
       (`ChartScale.ErrorRefreshTicks`, at most four per side).

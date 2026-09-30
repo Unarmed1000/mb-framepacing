@@ -30,6 +30,7 @@ namespace MB.FramePacing.Gui.ViewModels
       Title = RunHeadline.Title(run);
       Tiles = RunHeadline.Shown(chart, ReportOptions.Default);
       TileColumns = ReportOptions.Default.TilesPerRowFor(Tiles.Count);
+      Display = RunHeadline.Display(RunSection.Whole(chart));
       var c = run.Counts;
       StartText = run.StartTimeUtc is { } start ? $"Started {start.ToLocalTime():yyyy-MM-dd HH:mm:ss}" : "No start time";
       CountsText =
@@ -67,7 +68,6 @@ namespace MB.FramePacing.Gui.ViewModels
               : string.Empty
           )
           + ".";
-        RefreshMismatch = pacing.MatchesExpectedRefresh == false;
         VerdictText = "Cause: " + RunHeadline.Cause(pacing);
       }
       var statistics = new List<StatisticsRow>
@@ -110,11 +110,14 @@ namespace MB.FramePacing.Gui.ViewModels
     public bool IsCamera { get; }
     public string TargetText { get; } = string.Empty;
 
-    /// <summary>The refresh rate used, where it comes from, and how it compares with the expected display rate.</summary>
+    /// <summary>The refresh rate used, where it comes from, and how it compares with the expected display rate: the Display card's tooltip.</summary>
     public string RefreshText { get; } = string.Empty;
 
-    /// <summary>The refresh rate differs from the expected display rate.</summary>
-    public bool RefreshMismatch { get; }
+    /// <summary>The Display card: the report's display box (RunHeadline.Display) for the whole run.</summary>
+    public DisplaySummary Display { get; }
+
+    /// <summary>The Display card has a line for what the application wants.</summary>
+    public bool HasWants => Display.Wants.Length > 0;
     public string VerdictText { get; } = string.Empty;
     public string Title { get; }
 
