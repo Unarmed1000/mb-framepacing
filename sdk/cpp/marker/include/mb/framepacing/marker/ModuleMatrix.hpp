@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/marker/Constants.hpp>
+#include <mb/framepacing/marker/MarkerKind.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -18,6 +18,18 @@ namespace MB::FramePacing::Marker
   //! it lives on the stack or as a member, never on the heap.
   class ModuleMatrix
   {
+  public:
+    //! The packed bytes of a size x size matrix (Bits): 1 bit per module, row-major, most significant bit first, continuous across rows,
+    //! the last byte zero padded. 211 bytes for a main marker (41x41), 79 for the sync marker (25x25).
+    static constexpr std::size_t PackedModuleByteCount(const int32_t size) noexcept
+    {
+      return size <= 0 ? 0u : ((static_cast<std::size_t>(size) * static_cast<std::size_t>(size)) + 7u) / 8u;
+    }
+
+    //! The packed bytes of the largest matrix, the main marker's.
+    static constexpr std::size_t MaxPackedModuleByteCount = ((static_cast<std::size_t>(QrModuleCount) * QrModuleCount) + 7u) / 8u;
+
+  private:
     int32_t m_size{0};
     std::array<uint8_t, MaxPackedModuleByteCount> m_bits{};
 

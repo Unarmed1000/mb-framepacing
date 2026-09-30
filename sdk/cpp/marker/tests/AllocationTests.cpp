@@ -6,7 +6,6 @@
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
@@ -142,7 +141,7 @@ namespace
   std::array<FM::Vertex, FM::MaxIndexedVertexCount()> g_indexedVertices{};
   std::array<uint32_t, FM::MaxIndexCount()> g_indices{};
   std::array<FM::Vertex, FM::MaxGridVertexCount()> g_grid{};
-  std::array<uint8_t, FM::MaxEncodedPayloadByteCount> g_payloadBytes{};
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount> g_payloadBytes{};
   std::array<uint8_t, std::size_t{294} * 294u * 4u> g_pixels{};
   FM::ModuleMatrix g_matrix{};
   FM::ModuleMatrix g_startMatrix{};

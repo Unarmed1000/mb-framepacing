@@ -31,11 +31,11 @@ namespace MB::FramePacing::Data
     //! SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep.
     std::vector<std::string> Flags;
     std::optional<int64_t> IntendedDisplayTicks;
-    //! Marker::OnDemandFrameTicks on demand.
+    //! Marker::Payload::OnDemandFrameTicks on demand.
     std::optional<int64_t> MarkerTargetTicks;
     //! In whole refreshes; empty on demand.
     std::optional<int64_t> TargetTicks;
-    //! The frame time the application wants to run at; Marker::OnDemandFrameTicks on demand.
+    //! The frame time the application wants to run at; Marker::Payload::OnDemandFrameTicks on demand.
     std::optional<int64_t> MarkerPreferredTicks;
     //! The preferred frame time the late share is measured against, in whole refreshes; empty on demand.
     std::optional<int64_t> PreferredTicks;

@@ -73,6 +73,8 @@ def tidy_command(root: Path, build: Path, sources: list[str]) -> list[str]:
         *(f"-I{cpp / module / 'include'}" for module in MODULES),
         f"-I{cpp / 'marker' / 'third_party' / 'qrcodegen'}",
         f"-I{cpp / 'pacer' / 'tests' / 'simulation'}",
+        # the marker tests check its private wire format
+        f"-I{cpp / 'marker' / 'source'}",
         f"-I{build / 'include'}",
         f"-isystem{build / '_deps/googletest-src/googletest/include'}",
         f"-isystem{build / '_deps/nlohmann_json-src/include'}",

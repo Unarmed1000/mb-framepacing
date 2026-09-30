@@ -112,17 +112,17 @@ faster still.
 
 In `MB::FramePacing::Marker`: the functions in `<mb/framepacing/marker/FrameMarker.hpp>`, each type in its own header (`<mb/framepacing/marker/…>`):
 
-| Function or type                                                                                                | What it does                                                                         |
-| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                          | What a marker carries                                                                |
-| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                        | Size and place: always valid (a value outside its range asserts, else is clamped)    |
-| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                    | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
-| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                 | A static grid uploaded once, and per frame only the indices                          |
-| `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                               | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
-| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark) | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
-| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount`  | Buffer sizes that fit every marker kind                                              |
-| `QrModuleCountFor`                                                                                              | Modules per side of a kind's symbol                                                  |
-| `EncodePayload`, `TryDecodePayload`                                                                             | The wire format                                                                      |
+| Function or type                                                                                                             | What it does                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                       | What a marker carries                                                                |
+| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                                     | Size and place: always valid (a value outside its range asserts, else is clamped)    |
+| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                                 | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
+| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                              | A static grid uploaded once, and per frame only the indices                          |
+| `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                                            | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark)              | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
+| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix::MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
+| `QrModuleCountFor`                                                                                                           | Modules per side of a kind's symbol                                                  |
+| `EncodePayload`, `TryDecodePayload`                                                                                          | The wire format                                                                      |
 
 Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the matrix is empty or a buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
 

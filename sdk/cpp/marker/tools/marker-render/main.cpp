@@ -11,7 +11,6 @@
 //                 [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>
 #include <mb/framepacing/core/Point.hpp>
-#include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
@@ -49,7 +48,7 @@ namespace
     FM::Options Options;
     int32_t CanvasWidth{0};
     int32_t CanvasHeight{0};
-    FP::Point Origin{FM::RecommendedInsetPx, FM::RecommendedInsetPx};
+    FP::Point Origin{FM::Options::RecommendedInsetPx, FM::Options::RecommendedInsetPx};
     uint8_t Background{128};
   };
 
@@ -64,8 +63,8 @@ namespace
   {
     const int32_t markerSize = request.Options.MarkerSizePx();
     Image image;
-    image.Width = request.CanvasWidth > 0 ? request.CanvasWidth : request.Origin.X + markerSize + FM::RecommendedInsetPx;
-    image.Height = request.CanvasHeight > 0 ? request.CanvasHeight : request.Origin.Y + markerSize + FM::RecommendedInsetPx;
+    image.Width = request.CanvasWidth > 0 ? request.CanvasWidth : request.Origin.X + markerSize + FM::Options::RecommendedInsetPx;
+    image.Height = request.CanvasHeight > 0 ? request.CanvasHeight : request.Origin.Y + markerSize + FM::Options::RecommendedInsetPx;
     image.Pixels.assign(static_cast<std::size_t>(image.Width) * static_cast<std::size_t>(image.Height), request.Background);
 
     // The library draws it: pixel (x,y) is covered when Left <= x < Right, exactly as a GPU rasterizes pixel-edge geometry
@@ -287,8 +286,8 @@ namespace
       {{FM::MarkerKind::Frame, 2u, 42u, FM::MarkerFlags::None, -1}, {}},
       {{FM::MarkerKind::Frame, 3u, 7u, FM::MarkerFlags::None, std::numeric_limits<int64_t>::min()}, {}},
       {{FM::MarkerKind::Frame, std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint64_t>::max(), static_cast<FM::MarkerFlags>(0xFFu),
-        std::numeric_limits<int64_t>::max(), FM::OnDemandFrameTicks, std::numeric_limits<uint32_t>::max(), std::numeric_limits<int64_t>::min(),
-        std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max()},
+        std::numeric_limits<int64_t>::max(), FM::Payload::OnDemandFrameTicks, std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max()},
        {}},
       {{FM::MarkerKind::Frame, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::StaticAfter, 0x1112131415161718, 0x71727374u, 0x41424344u,
         0x3132333435363738, 0x5152535455565758, 0x61626364u},
@@ -365,8 +364,8 @@ int main(int argc, char* argv[])
     RenderRequest request;
     std::string outputPath;
     std::string goldenDirectory;
-    int32_t moduleSize = FM::DefaultModuleSizePx;
-    int32_t quietZone = FM::RecommendedQuietZoneModules;
+    int32_t moduleSize = FM::Options::DefaultModuleSizePx;
+    int32_t quietZone = FM::Options::RecommendedQuietZoneModules;
 
     const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
     for (std::size_t i = 1; i < arguments.size(); ++i)
@@ -506,7 +505,8 @@ int main(int argc, char* argv[])
       PrintUsage();
       return 1;
     }
-    if (moduleSize < FM::MinModuleSizePx || moduleSize > FM::MaxModuleSizePx || quietZone < 0 || quietZone > FM::MaxQuietZoneModules)
+    if (moduleSize < FM::Options::MinModuleSizePx || moduleSize > FM::Options::MaxModuleSizePx || quietZone < 0 ||
+        quietZone > FM::Options::MaxQuietZoneModules)
     {
       throw std::invalid_argument("Invalid module size or quiet zone");
     }

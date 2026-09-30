@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/marker/Constants.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +14,7 @@ namespace MB::FramePacing::Marker
   //! UUID's bytes, or a short text tag padded with zeros). The wire format carries Bytes in order, byte 0 first.
   struct SequenceId
   {
-    static constexpr std::size_t ByteCount = SequenceIdByteCount;
+    static constexpr std::size_t ByteCount = 16;
 
     std::array<uint8_t, ByteCount> Bytes{};
 

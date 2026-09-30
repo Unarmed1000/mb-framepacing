@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/marker/Constants.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Marker
@@ -20,6 +19,14 @@ namespace MB::FramePacing::Marker
   };
 
   inline constexpr uint8_t MaxMarkerKindValue = static_cast<uint8_t>(MarkerKind::Sync);
+
+  //! Every main marker (frame, start and end) is QR version 6 (41x41 modules), ECC level M, byte mode, so it never changes size.
+  inline constexpr int32_t QrVersion = 6;
+  inline constexpr int32_t QrModuleCount = (4 * QrVersion) + 17;
+
+  //! The sync marker (MarkerKind::Sync) is QR version 2 (25x25 modules), ECC level M.
+  inline constexpr int32_t SyncQrVersion = 2;
+  inline constexpr int32_t SyncQrModuleCount = (4 * SyncQrVersion) + 17;
 
   //! Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.
   constexpr int32_t QrModuleCountFor(const MarkerKind kind) noexcept

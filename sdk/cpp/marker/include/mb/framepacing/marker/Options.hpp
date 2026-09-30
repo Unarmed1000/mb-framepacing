@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <mb/framepacing/core/Point.hpp>
-#include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <algorithm>
 #include <cassert>
@@ -21,6 +20,16 @@ namespace MB::FramePacing::Marker
     int32_t m_quietZoneModules{RecommendedQuietZoneModules};
 
   public:
+    //! The module size of default Options.
+    static constexpr int32_t DefaultModuleSizePx = 6;
+    static constexpr int32_t MinModuleSizePx = 1;
+    static constexpr int32_t MaxModuleSizePx = 1024;
+    static constexpr int32_t MaxQuietZoneModules = 16;
+    //! The QR specification asks for a quiet zone of 4 modules.
+    static constexpr int32_t RecommendedQuietZoneModules = 4;
+    //! Recommended distance in source pixels between the marker and the edge of the frame.
+    static constexpr int32_t RecommendedInsetPx = 32;
+
     //! DefaultModuleSizePx pixel modules and the recommended quiet zone.
     constexpr Options() noexcept = default;
 

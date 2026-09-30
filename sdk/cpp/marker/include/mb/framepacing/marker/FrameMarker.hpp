@@ -11,7 +11,6 @@
 // Every quad edge lies on an integer pixel edge and a quad covers exactly the pixels [Left(),Right()) x [Top(),Bottom()).
 
 #include <mb/framepacing/core/Point.hpp>
-#include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/IndexedCount.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/MarkerQuad.hpp>
@@ -61,9 +60,9 @@ namespace MB::FramePacing::Marker
     return GridVertexCount(MarkerKind::Frame);
   }
 
-  //! Serialize a complete payload into dst (MaxEncodedPayloadByteCount bytes is always enough). Start markers append the metadata, other
-  //! kinds ignore it. A frame or end marker is PayloadByteCount bytes, a start marker StartPayloadByteCount, a sync marker
-  //! SyncPayloadByteCount. Returns the number of bytes written, or 0 if dst is too small.
+  //! Serialize a complete payload into dst (Payload::MaxEncodedByteCount bytes is always enough). Start markers append the metadata, other
+  //! kinds ignore it. A frame or end marker is 53 bytes, a start marker 77, a sync marker 16
+  //! (doc/marker-format.md). Returns the number of bytes written, or 0 if dst is too small.
   std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, std::span<uint8_t> dst) noexcept;
 
   //! Parse the wire format. Returns false on a wrong length, magic, format version or an unknown kind.

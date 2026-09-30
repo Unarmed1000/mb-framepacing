@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
-#include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/IndexedCount.hpp>
 #include <mb/framepacing/marker/MarkerFlags.hpp>
@@ -24,6 +23,7 @@
 #include <string_view>
 #include <type_traits>
 #include <vector>
+#include "mb/framepacing/marker/detail/WireFormat.hpp"
 
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
@@ -69,7 +69,7 @@ namespace
   //! The payload's bytes (the header for frame, end and sync markers), through the one EncodePayload.
   std::vector<uint8_t> PayloadBytes(const FM::Payload& payload)
   {
-    std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
+    std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
     const std::size_t count = FM::EncodePayload(payload, {}, buffer);
     return {buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(count)};
   }
@@ -199,11 +199,11 @@ TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
   const auto bytes = PayloadBytes(payload);
   // magic, version, kind | run id | frame index | flags | animation time | preferred, target frame time | intended display time |
   // CPU start time | CPU busy
-  const std::array<uint8_t, FM::PayloadByteCount> expected{
+  const std::array<uint8_t, FM::Detail::PayloadByteCount> expected{
     'M',   'F',   1u,    2u,    0x24u, 0x23u, 0x22u, 0x21u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u, 0x01u, 0x18u,
     0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x74u, 0x73u, 0x72u, 0x71u, 0x44u, 0x43u, 0x42u, 0x41u, 0x38u, 0x37u, 0x36u,
     0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u};
-  EXPECT_EQ(FM::PayloadByteCount, 53u);
+  EXPECT_EQ(FM::Detail::PayloadByteCount, 53u);
   EXPECT_TRUE(std::equal(bytes.begin(), bytes.end(), expected.begin(), expected.end()));
 }
 
@@ -215,13 +215,13 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
   {
     metadata.Id.Bytes[i] = static_cast<uint8_t>(0xA0u + i);
   }
-  std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
-  ASSERT_EQ(FM::EncodePayload(payload, metadata, buffer), FM::StartPayloadByteCount);
-  EXPECT_EQ(FM::StartPayloadByteCount, 77u);
-  EXPECT_EQ(FM::MaxEncodedPayloadByteCount, FM::StartPayloadByteCount);
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
+  ASSERT_EQ(FM::EncodePayload(payload, metadata, buffer), FM::Detail::StartPayloadByteCount);
+  EXPECT_EQ(FM::Detail::StartPayloadByteCount, 77u);
+  EXPECT_EQ(FM::Payload::MaxEncodedByteCount, FM::Detail::StartPayloadByteCount);
 
   const auto header = PayloadBytes(payload);
-  EXPECT_TRUE(std::equal(header.begin(), header.begin() + FM::PayloadByteCount, buffer.begin())) << "the header comes first";
+  EXPECT_TRUE(std::equal(header.begin(), header.begin() + FM::Detail::PayloadByteCount, buffer.begin())) << "the header comes first";
   const std::array<uint8_t, 8> utcTicks{0x68u, 0x67u, 0x66u, 0x65u, 0x64u, 0x63u, 0x62u, 0x61u};
   EXPECT_TRUE(std::equal(utcTicks.begin(), utcTicks.end(), buffer.begin() + 53));
   for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
@@ -257,7 +257,7 @@ TEST(Payload, RoundTrips)
     {FM::MarkerKind::SequenceEnd, 3u, 42u, FM::MarkerFlags::None, -1},
     {FM::MarkerKind::SequenceStart, 0u, 0u, FM::MarkerFlags::None, 0},
     {FM::MarkerKind::Frame, 2u, 9u, FM::MarkerFlags::None, 1, 166'667u, 333'333u, 3, 5, 6u},
-    {FM::MarkerKind::Frame, 2u, 10u, FM::MarkerFlags::StaticAfter, 1, FM::OnDemandFrameTicks, FM::OnDemandFrameTicks, 0, 0, 0u},
+    {FM::MarkerKind::Frame, 2u, 10u, FM::MarkerFlags::StaticAfter, 1, FM::Payload::OnDemandFrameTicks, FM::Payload::OnDemandFrameTicks, 0, 0, 0u},
     {FM::MarkerKind::SequenceStart, 2u, 11u, FM::MarkerFlags::StaticAfter, 1, 10'000'000u, 4u, 3, 5, 6u},
     {FM::MarkerKind::Frame, 2u, 13u, FM::MarkerFlags::StaticBefore, 1, 7u, 4u, 3, 5, 6u},
     {FM::MarkerKind::SequenceEnd, 2u, 14u, FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, 1, 7u, 4u, 3, 5, 6u},
@@ -267,7 +267,7 @@ TEST(Payload, RoundTrips)
   for (const FM::Payload& payload : payloads)
   {
     SCOPED_TRACE(testing::PrintToString(payload));
-    std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
+    std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
     const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
     ASSERT_GT(byteCount, 0u);
     FM::Payload decoded{};
@@ -300,14 +300,14 @@ TEST(Payload, MarkerFlagsCombine)
   static_assert(!FM::HasFlag(FM::MarkerFlags::StaticAfter, FM::MarkerFlags::StaticBefore));
   static_assert(FM::HasFlag(FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, FM::MarkerFlags::StaticBefore));
   EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticBefore), 0x02u);
-  static_assert(FM::OnDemandFrameTicks == std::numeric_limits<uint32_t>::max());
+  static_assert(FM::Payload::OnDemandFrameTicks == std::numeric_limits<uint32_t>::max());
   EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticAfter | Reserved), 0x81u);
 }
 
 TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 {
   auto header = PayloadBytes({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::None, 2});
-  header.resize(FM::PayloadByteCount);
+  header.resize(FM::Detail::PayloadByteCount);
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(header, decoded));
 }
@@ -316,7 +316,7 @@ TEST(Payload, TryDecodeRejectsBadInput)
 {
   auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::None, 2});
   FM::Payload decoded{};
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::PayloadByteCount - 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::Detail::PayloadByteCount - 1), decoded));
   bytes[0] = 'X';
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[0] = 'M';
@@ -331,7 +331,7 @@ TEST(Payload, TryDecodeRejectsBadInput)
 
 TEST(Payload, TryDecodeRejectsWrongLengths)
 {
-  std::array<uint8_t, FM::MaxEncodedPayloadByteCount + 1> buffer{};
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount + 1> buffer{};
   FM::Payload decoded{};
   for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::SequenceEnd})
   {
@@ -365,9 +365,9 @@ TEST(Payload, StartMetadataRoundTrips)
   for (const FM::StartMetadata& expected : cases)
   {
     SCOPED_TRACE(testing::PrintToString(expected.Id));
-    std::array<uint8_t, FM::MaxEncodedPayloadByteCount + 1> buffer{};
+    std::array<uint8_t, FM::Payload::MaxEncodedByteCount + 1> buffer{};
     const std::size_t byteCount = FM::EncodePayload(payload, expected, buffer);
-    ASSERT_EQ(byteCount, FM::StartPayloadByteCount);
+    ASSERT_EQ(byteCount, FM::Detail::StartPayloadByteCount);
 
     FM::Payload decoded{};
     FM::StartMetadata metadata{1, byteId};
@@ -378,20 +378,20 @@ TEST(Payload, StartMetadataRoundTrips)
     // A start payload must be exactly StartPayloadByteCount bytes
     EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded, &metadata));
     EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded, &metadata));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::PayloadByteCount), decoded, &metadata));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::Detail::PayloadByteCount), decoded, &metadata));
   }
 
   // Frame and end payloads ignore the metadata and stay PayloadByteCount bytes, and decoding them resets the metadata
-  std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
-  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2}, {5, textId}, buffer), FM::PayloadByteCount);
-  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::None, 2}, {5, textId}, buffer), FM::PayloadByteCount);
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
+  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2}, {5, textId}, buffer), FM::Detail::PayloadByteCount);
+  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::None, 2}, {5, textId}, buffer), FM::Detail::PayloadByteCount);
   FM::Payload decoded{};
   FM::StartMetadata metadata{5, textId};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::PayloadByteCount), decoded, &metadata));
+  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::Detail::PayloadByteCount), decoded, &metadata));
   EXPECT_EQ(metadata, FM::StartMetadata{});
 
   // The start payload does not fit a smaller destination
-  std::array<uint8_t, FM::StartPayloadByteCount - 1> small{};
+  std::array<uint8_t, FM::Detail::StartPayloadByteCount - 1> small{};
   EXPECT_EQ(FM::EncodePayload(payload, {5, textId}, small), 0u);
 }
 
@@ -451,29 +451,29 @@ TEST(Geometry, MarkerSize)
 
 TEST(Options, TheDefaultIsSixPixelModulesAndTheRecommendedQuietZone)
 {
-  static_assert(FM::Options{}.ModuleSizePx() == FM::DefaultModuleSizePx && FM::DefaultModuleSizePx == 6);
-  static_assert(FM::Options{}.QuietZoneModules() == FM::RecommendedQuietZoneModules);
+  static_assert(FM::Options{}.ModuleSizePx() == FM::Options::DefaultModuleSizePx && FM::Options::DefaultModuleSizePx == 6);
+  static_assert(FM::Options{}.QuietZoneModules() == FM::Options::RecommendedQuietZoneModules);
   static_assert(FM::Options{} == FM::Options(6, 4));
-  static_assert(FM::Options(3).QuietZoneModules() == FM::RecommendedQuietZoneModules);
+  static_assert(FM::Options(3).QuietZoneModules() == FM::Options::RecommendedQuietZoneModules);
   static_assert(FM::Options(3, 4).QuietZonePx() == 12);
   // The limits themselves are valid
-  static_assert(FM::Options(FM::MinModuleSizePx, 0).ModuleSizePx() == FM::MinModuleSizePx);
-  static_assert(FM::Options(FM::MaxModuleSizePx, FM::MaxQuietZoneModules).QuietZoneModules() == FM::MaxQuietZoneModules);
+  static_assert(FM::Options(FM::Options::MinModuleSizePx, 0).ModuleSizePx() == FM::Options::MinModuleSizePx);
+  static_assert(FM::Options(FM::Options::MaxModuleSizePx, FM::Options::MaxQuietZoneModules).QuietZoneModules() == FM::Options::MaxQuietZoneModules);
 }
 
 TEST(Options, AValueOutsideItsRangeIsAsserted)
 {
 #ifdef NDEBUG
   // Without asserts it is clamped into its range: Options are always valid
-  EXPECT_EQ(FM::Options(0, 4), FM::Options(FM::MinModuleSizePx, 4));
-  EXPECT_EQ(FM::Options(FM::MaxModuleSizePx + 1, 4), FM::Options(FM::MaxModuleSizePx, 4));
+  EXPECT_EQ(FM::Options(0, 4), FM::Options(FM::Options::MinModuleSizePx, 4));
+  EXPECT_EQ(FM::Options(FM::Options::MaxModuleSizePx + 1, 4), FM::Options(FM::Options::MaxModuleSizePx, 4));
   EXPECT_EQ(FM::Options(6, -1), FM::Options(6, 0));
-  EXPECT_EQ(FM::Options(6, FM::MaxQuietZoneModules + 1), FM::Options(6, FM::MaxQuietZoneModules));
+  EXPECT_EQ(FM::Options(6, FM::Options::MaxQuietZoneModules + 1), FM::Options(6, FM::Options::MaxQuietZoneModules));
 #elif GTEST_HAS_DEATH_TEST
   EXPECT_DEATH(static_cast<void>(FM::Options(0, 4)), "");
-  EXPECT_DEATH(static_cast<void>(FM::Options(FM::MaxModuleSizePx + 1, 4)), "");
+  EXPECT_DEATH(static_cast<void>(FM::Options(FM::Options::MaxModuleSizePx + 1, 4)), "");
   EXPECT_DEATH(static_cast<void>(FM::Options(6, -1)), "");
-  EXPECT_DEATH(static_cast<void>(FM::Options(6, FM::MaxQuietZoneModules + 1)), "");
+  EXPECT_DEATH(static_cast<void>(FM::Options(6, FM::Options::MaxQuietZoneModules + 1)), "");
 #else
   GTEST_SKIP() << "asserts are on and death tests are not available";
 #endif
@@ -501,12 +501,12 @@ TEST(Symbol, SyncMarkersAreVersion2)
 
 TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 {
-  std::array<uint8_t, FM::MaxEncodedPayloadByteCount> buffer{};
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
   const FM::Payload payload{FM::MarkerKind::Sync, 4u, 0x0102030405060708u, FM::MarkerFlags::None, 123, 0, 6u, 5, 7, 8u};
   const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
-  ASSERT_EQ(byteCount, FM::SyncPayloadByteCount);
-  const std::array<uint8_t, FM::SyncPayloadByteCount> expected{'M',   'F',   1u,    3u,    0x04u, 0x00u, 0x00u, 0x00u,
-                                                               0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
+  ASSERT_EQ(byteCount, FM::Detail::SyncPayloadByteCount);
+  const std::array<uint8_t, FM::Detail::SyncPayloadByteCount> expected{'M',   'F',   1u,    3u,    0x04u, 0x00u, 0x00u, 0x00u,
+                                                                       0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
   EXPECT_TRUE(std::equal(expected.begin(), expected.end(), buffer.begin()));
 
   FM::Payload decoded{};
@@ -533,8 +533,8 @@ TEST(Symbol, EveryMarkerIsVersion6)
   EXPECT_EQ(matrix.Size(), FM::QrModuleCount);
 
   // Version 6-M holds 106 bytes: the start marker leaves room for future fields
-  EXPECT_EQ(FM::MaxEncodedPayloadByteCount, 77u);
-  EXPECT_LT(FM::MaxEncodedPayloadByteCount, FM::QrCapacityBytes);
+  EXPECT_EQ(FM::Payload::MaxEncodedByteCount, 77u);
+  EXPECT_LT(FM::Payload::MaxEncodedByteCount, FM::Detail::QrCapacityBytes);
 }
 
 TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
@@ -916,8 +916,8 @@ TEST(Sizing, ModuleSizeRecommendationsMatchTheDocumentation)
   // Invalid heights fall back to 1:1
   EXPECT_EQ(FM::Options::Recommended(0, 1080).ModuleSizePx(), 3);
   // A downscale beyond the largest module size gives the largest, and the recommended quiet zone
-  EXPECT_EQ(FM::Options::Recommended(1'000'000, 10).ModuleSizePx(), FM::MaxModuleSizePx);
-  EXPECT_EQ(FM::Options::Minimum(1080, 540), FM::Options(4, FM::RecommendedQuietZoneModules));
+  EXPECT_EQ(FM::Options::Recommended(1'000'000, 10).ModuleSizePx(), FM::Options::MaxModuleSizePx);
+  EXPECT_EQ(FM::Options::Minimum(1080, 540), FM::Options(4, FM::Options::RecommendedQuietZoneModules));
   static_assert(FM::Options::Recommended(1080, 540) == FM::Options(6, 4));
 }
 
@@ -945,7 +945,7 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
     const FM::ModuleMatrix matrix = Encode({kind, 9u, 12345u, FM::MarkerFlags::None, 678});
     const int32_t size = matrix.Size();
     const auto bits = matrix.Bits();
-    ASSERT_EQ(bits.size(), FM::PackedModuleByteCount(size));
+    ASSERT_EQ(bits.size(), FM::ModuleMatrix::PackedModuleByteCount(size));
     for (int32_t y = 0; y < size; ++y)
     {
       for (int32_t x = 0; x < size; ++x)
@@ -956,16 +956,16 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
       }
     }
   }
-  EXPECT_EQ(FM::PackedModuleByteCount(FM::QrModuleCount), 211u);
-  EXPECT_EQ(FM::PackedModuleByteCount(FM::SyncQrModuleCount), 79u);
+  EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(FM::QrModuleCount), 211u);
+  EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(FM::SyncQrModuleCount), 79u);
 }
 
 TEST(ModuleMatrix, TryFromBitsTakesQrSizesAndIgnoresThePadding)
 {
   const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, 2});
-  std::array<uint8_t, FM::MaxPackedModuleByteCount> bits{};
+  std::array<uint8_t, FM::ModuleMatrix::MaxPackedModuleByteCount> bits{};
   std::copy(matrix.Bits().begin(), matrix.Bits().end(), bits.begin());
-  bits[FM::PackedModuleByteCount(25) - 1u] |= 0x7Fu;    // 625 modules: the last byte uses 1 bit
+  bits[FM::ModuleMatrix::PackedModuleByteCount(25) - 1u] |= 0x7Fu;    // 625 modules: the last byte uses 1 bit
 
   FM::ModuleMatrix copy;
   ASSERT_TRUE(FM::ModuleMatrix::TryFromBits(25, bits, copy));

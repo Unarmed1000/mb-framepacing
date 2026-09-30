@@ -5,6 +5,7 @@
 
 #include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
+#include <cstddef>
 #include <cstdint>
 
 namespace MB::FramePacing::Marker
@@ -13,6 +14,11 @@ namespace MB::FramePacing::Marker
   //! flags and animation time are required; the timing fields are optional (0 = unknown). Trivially copyable and standard layout.
   struct Payload
   {
+    //! The most bytes a payload encodes to (a start marker's): EncodePayload's buffer size.
+    static constexpr std::size_t MaxEncodedByteCount = 77;
+    //! The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.
+    static constexpr uint32_t OnDemandFrameTicks = 0xFFFF'FFFFu;
+
     //! An empty payload (a frame marker, everything 0), for decoding into.
     constexpr Payload() noexcept = default;
 

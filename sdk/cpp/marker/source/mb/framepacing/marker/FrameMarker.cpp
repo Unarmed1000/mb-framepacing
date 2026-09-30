@@ -5,7 +5,6 @@
 // every way of drawing it.
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
-#include <mb/framepacing/marker/Constants.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/IndexedCount.hpp>
 #include <mb/framepacing/marker/MarkerFlags.hpp>
@@ -21,44 +20,15 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include "detail/WireFormat.hpp"
 #include "qrcodegen.h"
 
 namespace MB::FramePacing::Marker
 {
+  using namespace Detail;
+
   namespace
   {
-    constexpr std::size_t OffsetMagic0 = 0;
-    constexpr std::size_t OffsetMagic1 = 1;
-    constexpr std::size_t OffsetVersion = 2;
-    constexpr std::size_t OffsetKind = 3;
-    // Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work
-    constexpr std::size_t OffsetRunId = 4;
-    constexpr std::size_t OffsetFrameIndex = 8;
-    constexpr std::size_t OffsetFlags = 16;
-    constexpr std::size_t OffsetAnimationTicks = 17;
-    constexpr std::size_t OffsetPreferredFrameTicks = 25;
-    constexpr std::size_t OffsetTargetFrameTicks = 29;
-    constexpr std::size_t OffsetIntendedDisplayTicks = 33;
-    constexpr std::size_t OffsetCpuStartTicks = 41;
-    constexpr std::size_t OffsetCpuBusyTicks = 49;
-    constexpr std::size_t OffsetStartUtcTicks = PayloadByteCount;
-    constexpr std::size_t OffsetSequenceId = OffsetStartUtcTicks + 8;
-
-    static_assert(OffsetKind + 1 == OffsetRunId);
-    static_assert(OffsetRunId + 4 == OffsetFrameIndex);
-    static_assert(OffsetFrameIndex + 8 == SyncPayloadByteCount);
-    static_assert(SyncPayloadByteCount == OffsetFlags);
-    static_assert(OffsetFlags + 1 == OffsetAnimationTicks);
-    static_assert(OffsetAnimationTicks + 8 == OffsetPreferredFrameTicks);
-    static_assert(OffsetPreferredFrameTicks + 4 == OffsetTargetFrameTicks);
-    static_assert(OffsetTargetFrameTicks + 4 == OffsetIntendedDisplayTicks);
-    static_assert(OffsetIntendedDisplayTicks + 8 == OffsetCpuStartTicks);
-    static_assert(OffsetCpuStartTicks + 8 == OffsetCpuBusyTicks);
-    static_assert(OffsetCpuBusyTicks + 4 == PayloadByteCount);
-    static_assert(PayloadByteCount == 53u);
-    static_assert(OffsetSequenceId + SequenceId::ByteCount == StartPayloadByteCount);
-    static_assert(StartPayloadByteCount == 77u);
-    static_assert(MaxEncodedPayloadByteCount <= QrCapacityBytes);
 
     template <std::size_t TByteCount>
     void WriteLE(const std::span<uint8_t> dst, const std::size_t offset, const uint64_t value) noexcept
@@ -103,7 +73,7 @@ namespace MB::FramePacing::Marker
 
     constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(QrVersion);
 
-    static_assert(MaxEncodedPayloadByteCount <= QrBufferLength);
+    static_assert(Payload::MaxEncodedByteCount <= QrBufferLength);
     static_assert(QrModuleCount == 41);
     static_assert(MaxQuadCount() == 862u);
     static_assert(MaxTriangleVertexCount() == std::size_t{862} * 6u);
@@ -398,7 +368,7 @@ namespace MB::FramePacing::Marker
 
     // Pack the symbol: row-major, most significant bit first, continuous across rows
     const int32_t size = qrcodegen_getSize(qrCode.data());
-    std::array<uint8_t, MaxPackedModuleByteCount> bits{};
+    std::array<uint8_t, ModuleMatrix::MaxPackedModuleByteCount> bits{};
     std::size_t index = 0;
     for (int32_t y = 0; y < size; ++y)
     {
