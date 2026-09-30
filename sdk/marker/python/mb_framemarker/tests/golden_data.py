@@ -64,16 +64,16 @@ def _start(row: dict[str, str]) -> StartMetadata:
 
 def _payload(row: dict[str, str]) -> Payload:
     return Payload(
-        int(row["frameIndex"]),
-        int(row["animationTicks"]),
-        int(row["runId"]),
         MarkerKind(int(row["kind"])),
-        int(row["intendedDisplayTicks"]),
-        int(row["targetFrameTicks"]),
-        int(row["cpuStartTicks"]),
-        int(row["cpuBusyTicks"]),
-        int(row["preferredFrameTicks"]),
+        int(row["runId"]),
+        int(row["frameIndex"]),
         MarkerFlags(int(row["flags"])),
+        int(row["animationTicks"]),
+        preferred_frame_ticks=int(row["preferredFrameTicks"]),
+        target_frame_ticks=int(row["targetFrameTicks"]),
+        intended_display_ticks=int(row["intendedDisplayTicks"]),
+        cpu_start_ticks=int(row["cpuStartTicks"]),
+        cpu_busy_ticks=int(row["cpuBusyTicks"]),
     )
 
 

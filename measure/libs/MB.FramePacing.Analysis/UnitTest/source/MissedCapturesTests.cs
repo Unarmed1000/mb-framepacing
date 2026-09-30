@@ -68,15 +68,25 @@ namespace MB.FramePacing.Analysis.UnitTest
         time += Period;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(0, 0, 1, MarkerKind.SequenceStart), StartMetadata.Empty);
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FrameMarker.MarkerFlags.None, 0), StartMetadata.Empty);
       for (ulong frame = 1; frame <= 6; ++frame)
       {
         if ((int)frame == gapBefore)
           time += Period;
-        Add(new MarkerPayload(frame, (long)frame * Period, 1, TargetFrameTicks: (uint)Period, PreferredFrameTicks: (uint)Period));
+        Add(
+          new MarkerPayload(
+            MarkerKind.Frame,
+            1,
+            frame,
+            MB.FrameMarker.MarkerFlags.None,
+            (long)frame * Period,
+            PreferredFrameTicks: (uint)Period,
+            TargetFrameTicks: (uint)Period
+          )
+        );
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(7, 7 * Period, 1, MarkerKind.SequenceEnd));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FrameMarker.MarkerFlags.None, 7 * Period));
       return records;
     }
 

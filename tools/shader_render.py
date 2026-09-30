@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "marker" / "python"))
 from mb_framemarker import (  # noqa: E402
+    MarkerFlags,
     MarkerKind,
     ModuleMatrix,
     Options,
@@ -42,12 +43,13 @@ def cases() -> Iterator[tuple[int, MarkerKind, ModuleMatrix, Options, Point]]:
     for case in range(CASES):
         kind = kinds[case % len(kinds)]
         payload = Payload(
+            kind,
+            rng.randrange(1, 1000),
             rng.randrange(1 << 40),
+            MarkerFlags.NONE,
             rng.randrange(1 << 50),
-            run_id=rng.randrange(1, 1000),
-            kind=kind,
-            intended_display_ticks=rng.randrange(1 << 50),
             target_frame_ticks=166_667,
+            intended_display_ticks=rng.randrange(1 << 50),
             cpu_start_ticks=rng.randrange(1 << 50),
             cpu_busy_ticks=rng.randrange(1 << 20),
         )

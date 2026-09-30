@@ -34,16 +34,16 @@ namespace MB.FramePacing.Marker.UnitTest
 
         var kind = (MarkerKind)byte.Parse(Field("kind"), CultureInfo.InvariantCulture);
         var payload = new MarkerPayload(
-          ulong.Parse(Field("frameIndex"), CultureInfo.InvariantCulture),
-          long.Parse(Field("animationTicks"), CultureInfo.InvariantCulture),
-          uint.Parse(Field("runId"), CultureInfo.InvariantCulture),
           kind,
-          long.Parse(Field("intendedDisplayTicks"), CultureInfo.InvariantCulture),
-          uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture),
-          long.Parse(Field("cpuStartTicks"), CultureInfo.InvariantCulture),
-          uint.Parse(Field("cpuBusyTicks"), CultureInfo.InvariantCulture),
-          uint.Parse(Field("preferredFrameTicks"), CultureInfo.InvariantCulture),
-          (MB.FrameMarker.MarkerFlags)byte.Parse(Field("flags"), CultureInfo.InvariantCulture)
+          uint.Parse(Field("runId"), CultureInfo.InvariantCulture),
+          ulong.Parse(Field("frameIndex"), CultureInfo.InvariantCulture),
+          (MB.FrameMarker.MarkerFlags)byte.Parse(Field("flags"), CultureInfo.InvariantCulture),
+          long.Parse(Field("animationTicks"), CultureInfo.InvariantCulture),
+          PreferredFrameTicks: uint.Parse(Field("preferredFrameTicks"), CultureInfo.InvariantCulture),
+          TargetFrameTicks: uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture),
+          IntendedDisplayTicks: long.Parse(Field("intendedDisplayTicks"), CultureInfo.InvariantCulture),
+          CpuStartTicks: long.Parse(Field("cpuStartTicks"), CultureInfo.InvariantCulture),
+          CpuBusyTicks: uint.Parse(Field("cpuBusyTicks"), CultureInfo.InvariantCulture)
         );
         StartMetadata? start = null;
         if (kind == MarkerKind.SequenceStart)

@@ -189,14 +189,16 @@ namespace
     {
       throw std::runtime_error("Failed to create modules.csv in '" + directory.string() + "'");
     }
-    digest << "kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,preferredFrameTicks,"
-              "flags,startUtcTicks,sequenceIdHex,size,modulesHex\n";
+    // The payload's columns in the order of the wire format
+    digest << "kind,runId,frameIndex,flags,animationTicks,preferredFrameTicks,targetFrameTicks,intendedDisplayTicks,cpuStartTicks,cpuBusyTicks,"
+              "startUtcTicks,sequenceIdHex,size,modulesHex\n";
 
     // "mb-frame" + 5: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
     uint64_t state = 0x6D622D6672616D6Au;
     for (int32_t row = 0; row < RowCount; ++row)
     {
       FM::Payload payload;
+      // Drawn in this order, not the wire format's: the digest's values depend on it
       payload.Kind = static_cast<FM::MarkerKind>(row % 4);
       payload.FrameIndex = NextRandom(state);
       payload.AnimationTicks = static_cast<int64_t>(NextRandom(state));
@@ -244,10 +246,10 @@ namespace
       }
       // The matrix is stored packed exactly as the digest writes it
       const std::vector<uint8_t> bits(matrix.Bits().begin(), matrix.Bits().end());
-      digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ',' << payload.AnimationTicks << ','
-             << payload.IntendedDisplayTicks << ',' << payload.TargetFrameTicks << ',' << payload.CpuStartTicks << ',' << payload.CpuBusyTicks << ','
-             << payload.PreferredFrameTicks << ',' << static_cast<uint32_t>(payload.Flags) << ',' << start.UtcTicks << ','
-             << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
+      digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ','
+             << static_cast<uint32_t>(payload.Flags) << ',' << payload.AnimationTicks << ',' << payload.PreferredFrameTicks << ','
+             << payload.TargetFrameTicks << ',' << payload.IntendedDisplayTicks << ',' << payload.CpuStartTicks << ',' << payload.CpuBusyTicks << ','
+             << start.UtcTicks << ',' << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
     }
   }
 
@@ -266,24 +268,73 @@ namespace
     constexpr FM::SequenceId GoldenBytesId{
       {0x6Fu, 0x9Du, 0x2Cu, 0x41u, 0x8Bu, 0x3Eu, 0x4Au, 0x7Fu, 0x95u, 0xD0u, 0x1Cu, 0x00u, 0xE2u, 0xFFu, 0x80u, 0x7Au}};
     constexpr std::array<GoldenCase, 11> Cases{{
-      {{0u, 0, 0u, FM::MarkerKind::Frame}, {}},
-      {{1u, 166'667, 1u, FM::MarkerKind::Frame}, {}},
-      {{123'456'789u, 36'000'000'000, 1u, FM::MarkerKind::Frame, 987'654'321'000, 333'333u, 987'653'987'666, 123'456u, 166'667u}, {}},
-      {{42u, -1, 2u, FM::MarkerKind::Frame}, {}},
-      {{7u, std::numeric_limits<int64_t>::min(), 3u, FM::MarkerKind::Frame}, {}},
-      {{std::numeric_limits<uint64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max(), FM::MarkerKind::Frame,
-        std::numeric_limits<int64_t>::min(), std::numeric_limits<uint32_t>::max(), std::numeric_limits<int64_t>::max(),
-        std::numeric_limits<uint32_t>::max(), FM::OnDemandFrameTicks, static_cast<FM::MarkerFlags>(0xFFu)},
+      {{.Kind = FM::MarkerKind::Frame, .RunId = 0u, .FrameIndex = 0u, .AnimationTicks = 0}, {}},
+      {{.Kind = FM::MarkerKind::Frame, .RunId = 1u, .FrameIndex = 1u, .AnimationTicks = 166'667}, {}},
+      {{.Kind = FM::MarkerKind::Frame,
+        .RunId = 1u,
+        .FrameIndex = 123'456'789u,
+        .AnimationTicks = 36'000'000'000,
+        .PreferredFrameTicks = 166'667u,
+        .TargetFrameTicks = 333'333u,
+        .IntendedDisplayTicks = 987'654'321'000,
+        .CpuStartTicks = 987'653'987'666,
+        .CpuBusyTicks = 123'456u},
        {}},
-      {{0x0102030405060708u, 0x1112131415161718, 0x21222324u, FM::MarkerKind::Frame, 0x3132333435363738, 0x41424344u, 0x5152535455565758, 0x61626364u,
-        0x71727374u, FM::MarkerFlags::StaticAfter},
+      {{.Kind = FM::MarkerKind::Frame, .RunId = 2u, .FrameIndex = 42u, .AnimationTicks = -1}, {}},
+      {{.Kind = FM::MarkerKind::Frame, .RunId = 3u, .FrameIndex = 7u, .AnimationTicks = std::numeric_limits<int64_t>::min()}, {}},
+      {{.Kind = FM::MarkerKind::Frame,
+        .RunId = std::numeric_limits<uint32_t>::max(),
+        .FrameIndex = std::numeric_limits<uint64_t>::max(),
+        .Flags = static_cast<FM::MarkerFlags>(0xFFu),
+        .AnimationTicks = std::numeric_limits<int64_t>::max(),
+        .PreferredFrameTicks = FM::OnDemandFrameTicks,
+        .TargetFrameTicks = std::numeric_limits<uint32_t>::max(),
+        .IntendedDisplayTicks = std::numeric_limits<int64_t>::min(),
+        .CpuStartTicks = std::numeric_limits<int64_t>::max(),
+        .CpuBusyTicks = std::numeric_limits<uint32_t>::max()},
+       {}},
+      {{.Kind = FM::MarkerKind::Frame,
+        .RunId = 0x21222324u,
+        .FrameIndex = 0x0102030405060708u,
+        .Flags = FM::MarkerFlags::StaticAfter,
+        .AnimationTicks = 0x1112131415161718,
+        .PreferredFrameTicks = 0x71727374u,
+        .TargetFrameTicks = 0x41424344u,
+        .IntendedDisplayTicks = 0x3132333435363738,
+        .CpuStartTicks = 0x5152535455565758,
+        .CpuBusyTicks = 0x61626364u},
        {}},
       // Start and end markers carry the frame's values too
-      {{600u, 100'000'000, 5u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 80'000u, 10'000'000u, FM::MarkerFlags::StaticAfter},
+      {{.Kind = FM::MarkerKind::SequenceStart,
+        .RunId = 5u,
+        .FrameIndex = 600u,
+        .Flags = FM::MarkerFlags::StaticAfter,
+        .AnimationTicks = 100'000'000,
+        .PreferredFrameTicks = 10'000'000u,
+        .TargetFrameTicks = 0u,
+        .IntendedDisplayTicks = 0,
+        .CpuStartTicks = 0,
+        .CpuBusyTicks = 80'000u},
        {0, TextSequenceId("golden-run")}},
-      {{601u, 100'166'667, 6u, FM::MarkerKind::SequenceStart, 0, 0u, 0, 120'000u}, {GoldenStartUtcTicks, GoldenBytesId}},
-      {{900u, 150'000'000, 5u, FM::MarkerKind::SequenceEnd, 0, 0u, 0, 80'000u}, {}},
-      {{0x0102030405060708u, 0, 0x21222324u, FM::MarkerKind::Sync}, {}},
+      {{.Kind = FM::MarkerKind::SequenceStart,
+        .RunId = 6u,
+        .FrameIndex = 601u,
+        .AnimationTicks = 100'166'667,
+        .TargetFrameTicks = 0u,
+        .IntendedDisplayTicks = 0,
+        .CpuStartTicks = 0,
+        .CpuBusyTicks = 120'000u},
+       {GoldenStartUtcTicks, GoldenBytesId}},
+      {{.Kind = FM::MarkerKind::SequenceEnd,
+        .RunId = 5u,
+        .FrameIndex = 900u,
+        .AnimationTicks = 150'000'000,
+        .TargetFrameTicks = 0u,
+        .IntendedDisplayTicks = 0,
+        .CpuStartTicks = 0,
+        .CpuBusyTicks = 80'000u},
+       {}},
+      {{.Kind = FM::MarkerKind::Sync, .RunId = 0x21222324u, .FrameIndex = 0x0102030405060708u, .AnimationTicks = 0}, {}},
     }};
     constexpr std::array<int32_t, 4> ModuleSizes{2, 3, 4, 6};
 
@@ -292,8 +343,9 @@ namespace
     {
       throw std::runtime_error("Failed to create manifest in '" + directory.string() + "'");
     }
-    manifest << "file,kind,runId,frameIndex,animationTicks,intendedDisplayTicks,targetFrameTicks,cpuStartTicks,cpuBusyTicks,"
-                "preferredFrameTicks,flags,startUtcTicks,sequenceIdHex,moduleSizePx,quietZoneModules,originX,originY,width,height\n";
+    // The payload's columns in the order of the wire format
+    manifest << "file,kind,runId,frameIndex,flags,animationTicks,preferredFrameTicks,targetFrameTicks,intendedDisplayTicks,cpuStartTicks,"
+                "cpuBusyTicks,startUtcTicks,sequenceIdHex,moduleSizePx,quietZoneModules,originX,originY,width,height\n";
 
     for (std::size_t payloadIndex = 0; payloadIndex < Cases.size(); ++payloadIndex)
     {
@@ -317,9 +369,9 @@ namespace
         fileName += ".pgm";
         WritePgm(directory / fileName, image);
         manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind) << ',' << request.Payload.RunId << ','
-                 << request.Payload.FrameIndex << ',' << request.Payload.AnimationTicks << ',' << request.Payload.IntendedDisplayTicks << ','
-                 << request.Payload.TargetFrameTicks << ',' << request.Payload.CpuStartTicks << ',' << request.Payload.CpuBusyTicks << ','
-                 << request.Payload.PreferredFrameTicks << ',' << static_cast<uint32_t>(request.Payload.Flags) << ',' << request.Start.UtcTicks << ','
+                 << request.Payload.FrameIndex << ',' << static_cast<uint32_t>(request.Payload.Flags) << ',' << request.Payload.AnimationTicks << ','
+                 << request.Payload.PreferredFrameTicks << ',' << request.Payload.TargetFrameTicks << ',' << request.Payload.IntendedDisplayTicks
+                 << ',' << request.Payload.CpuStartTicks << ',' << request.Payload.CpuBusyTicks << ',' << request.Start.UtcTicks << ','
                  << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx << ','
                  << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
                  << image.Height << '\n';

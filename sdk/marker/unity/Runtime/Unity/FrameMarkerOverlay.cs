@@ -253,17 +253,17 @@ namespace MB.FrameMarker.Unity
       WarnOnce(moduleSize, height, storedHeight);
 
       var payload = new Payload(
-        (ulong)Time.frameCount,
-        Marker.SecondsToTicks(AnimationTime()),
-        Phase == MarkerPhase.Idle ? 0u : RunId,
         Kind(),
-        IntendedDisplayTicksProvider != null ? IntendedDisplayTicksProvider() : 0,
-        TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks(),
-        CpuStartTicks(),
-        CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks(),
-        PreferredFrameTicksProvider != null ? PreferredFrameTicksProvider() : DefaultTargetFrameTicks(),
+        Phase == MarkerPhase.Idle ? 0u : RunId,
+        (ulong)Time.frameCount,
         (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.None)
-          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.None)
+          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.None),
+        Marker.SecondsToTicks(AnimationTime()),
+        preferredFrameTicks: PreferredFrameTicksProvider != null ? PreferredFrameTicksProvider() : DefaultTargetFrameTicks(),
+        targetFrameTicks: TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks(),
+        intendedDisplayTicks: IntendedDisplayTicksProvider != null ? IntendedDisplayTicksProvider() : 0,
+        cpuStartTicks: CpuStartTicks(),
+        cpuBusyTicks: CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks()
       );
 
       DrawMarker(payload, options, Marker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height, sync: false);

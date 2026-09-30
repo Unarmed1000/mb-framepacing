@@ -26,7 +26,7 @@ namespace MB.FramePacing.Benchmarks
     {
       // Capture card: a 1080p frame downscaled 2x (960x540), marker with 3 stored pixels per module at the recommended origin
       CardFrame = new GrayImage(960, 540, 96);
-      MarkerRenderer.Render(CardFrame, new MarkerPayload(12345, 67890, 1), 32, 32, CardModulePx);
+      MarkerRenderer.Render(CardFrame, new MarkerPayload(MarkerKind.Frame, 1, 12345, MB.FrameMarker.MarkerFlags.None, 67890), 32, 32, CardModulePx);
       int size = MarkerRenderer.MarkerSizePx(CardModulePx);
       CardLock = new MarkerLock(new PixelRect(32, 32, size, size), CardModulePx);
 

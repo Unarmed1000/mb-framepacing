@@ -178,23 +178,23 @@ def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | No
     if magic != PAYLOAD_MAGIC or version != PAYLOAD_FORMAT_VERSION or kind > max(MarkerKind):
         return None
     if kind == MarkerKind.SYNC:
-        return (Payload(frame_index, 0, run_id, MarkerKind.SYNC), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
+        return (Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NONE, 0), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
     if len(data) < PAYLOAD_BYTE_COUNT:
         return None
     fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))
     _, _, _, _, _, flags, animation_ticks, preferred, target_frame_ticks, intended_display_ticks, cpu_start_ticks, cpu_busy_ticks = fields
     payload = Payload(
-        frame_index,
-        animation_ticks,
-        run_id,
         MarkerKind(kind),
-        intended_display_ticks,
-        target_frame_ticks,
-        cpu_start_ticks,
-        cpu_busy_ticks,
-        preferred,
+        run_id,
+        frame_index,
         # Every value is accepted: bits without a name are reserved and kept
         MarkerFlags(flags),
+        animation_ticks,
+        preferred_frame_ticks=preferred,
+        target_frame_ticks=target_frame_ticks,
+        intended_display_ticks=intended_display_ticks,
+        cpu_start_ticks=cpu_start_ticks,
+        cpu_busy_ticks=cpu_busy_ticks,
     )
     if payload.kind != MarkerKind.SEQUENCE_START:
         return (payload, None) if len(data) == PAYLOAD_BYTE_COUNT else None

@@ -56,16 +56,16 @@ namespace MB.FrameMarker.UnitTest
       for (int frame = 0; frame < frames; ++frame)
       {
         var payload = new Payload(
-          (ulong)frame,
-          Marker.SecondsToTicks(frame / 60.0),
-          7,
           MarkerKind.Frame,
-          1000 + frame,
-          166_667,
-          900 + frame,
-          80_000,
-          166_667,
-          MarkerFlags.StaticAfter
+          7,
+          (ulong)frame,
+          MarkerFlags.StaticAfter,
+          Marker.SecondsToTicks(frame / 60.0),
+          preferredFrameTicks: 166_667,
+          targetFrameTicks: 166_667,
+          intendedDisplayTicks: 1000 + frame,
+          cpuStartTicks: 900 + frame,
+          cpuBusyTicks: 80_000
         );
         if (m_generator.TryGenerateModules(payload, m_bits, out var matrix))
         {

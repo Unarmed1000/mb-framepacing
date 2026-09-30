@@ -65,7 +65,10 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(results[0].Payload, Is.EqualTo(camera.Scenario.PresentedFrames[shown].Payload));
       // The bottom zone is the sync marker: it only carries the run id and the frame index
       var older = camera.Scenario.PresentedFrames[shown - 1].Payload;
-      Assert.That(results[1].Payload, Is.EqualTo(new MarkerPayload(older.FrameIndex, 0, older.RunId, MarkerKind.Sync)));
+      Assert.That(
+        results[1].Payload,
+        Is.EqualTo(new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FrameMarker.MarkerFlags.None, 0))
+      );
     }
 
     /// <summary>Zone 0 shows the main marker, zone 1 the sync marker.</summary>

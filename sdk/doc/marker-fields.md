@@ -277,7 +277,7 @@ The frame timeline card draws the overlapping CPU boxes in further lanes.
 - A deliberate lower rate written as the target frame time without the preferred frame time: every frame is amber.
 - The sync marker without the run id: every capture reads as torn, and nothing is measured.
 - The frame index counts something other than rendered frames, or restarts without a new run id.
-- The payload built by position in the wrong order: the constructors take frame index, animation time, run id, kind, intended display
-  time, target frame time, CPU start time, CPU busy, preferred frame time and flags, which is not the order on the wire. Name the
-  fields (C# named arguments, Python keywords, C++ designated initializers).
+- The payload built by position in the wrong order: every library takes the fields in the order of the wire format (kind, run id,
+  frame index, flags and animation time, then the optional preferred frame time, target frame time, intended display time, CPU start
+  time and CPU busy). Name the optional ones (C# named arguments, Python keywords, C++ designated initializers).
 - CPU busy not clamped to `u32`.

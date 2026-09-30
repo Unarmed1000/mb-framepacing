@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The data every marker carries: the application's frame index, its animation time, the test run, the marker kind, the frame pacer's
-//* intended display time, target frame time and preferred frame time, the CPU start time and CPU busy, and the flags.
+//* The data every marker carries, in the order of the wire format: the marker kind, the test run, the application's frame index, the flags,
+//* its animation time, the preferred frame time, the frame pacer's target frame time and intended display time, the CPU start time and CPU
+//* busy.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -14,53 +15,68 @@ namespace MB.FrameMarker
 {
   public readonly struct Payload : IEquatable<Payload>
   {
+    /// <summary>The payload's fields in the order of the wire format (doc/marker-format.md); the timing fields are optional (0 = unknown).</summary>
     public Payload(
+      MarkerKind kind,
+      uint runId,
       ulong frameIndex,
+      MarkerFlags flags,
       long animationTicks,
-      uint runId = 0,
-      MarkerKind kind = MarkerKind.Frame,
-      long intendedDisplayTicks = 0,
-      uint targetFrameTicks = 0,
-      long cpuStartTicks = 0,
-      uint cpuBusyTicks = 0,
       uint preferredFrameTicks = 0,
-      MarkerFlags flags = MarkerFlags.None
+      uint targetFrameTicks = 0,
+      long intendedDisplayTicks = 0,
+      long cpuStartTicks = 0,
+      uint cpuBusyTicks = 0
     )
     {
-      FrameIndex = frameIndex;
-      AnimationTicks = animationTicks;
-      RunId = runId;
       Kind = kind;
-      IntendedDisplayTicks = intendedDisplayTicks;
+      RunId = runId;
+      FrameIndex = frameIndex;
+      Flags = flags;
+      AnimationTicks = animationTicks;
+      PreferredFrameTicks = preferredFrameTicks;
       TargetFrameTicks = targetFrameTicks;
+      IntendedDisplayTicks = intendedDisplayTicks;
       CpuStartTicks = cpuStartTicks;
       CpuBusyTicks = cpuBusyTicks;
-      PreferredFrameTicks = preferredFrameTicks;
-      Flags = flags;
     }
 
-    /// <summary>The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</summary>
-    public ulong FrameIndex { get; }
-
-    /// <summary>Animation time in TimeSpan ticks (100 ns): the time the frame's animation was evaluated for.</summary>
-    public long AnimationTicks { get; }
+    public MarkerKind Kind { get; }
 
     /// <summary>Identifies one test run. The start marker, every frame marker and the end marker of a run carry the same id.</summary>
     public uint RunId { get; }
 
-    public MarkerKind Kind { get; }
+    /// <summary>The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</summary>
+    public ulong FrameIndex { get; }
 
     /// <summary>
-    /// When the frame pacer intends this frame to become visible, in ticks (100 ns) on its steady clock (any epoch, the same clock for the
-    /// whole run). 0 = unknown.
+    /// <see cref="MarkerFlags.StaticAfter"/> when nothing animates while this frame is on screen, <see cref="MarkerFlags.StaticBefore"/> when
+    /// nothing animated while the frame before it was; the other bits are reserved (0).
     /// </summary>
-    public long IntendedDisplayTicks { get; }
+    public MarkerFlags Flags { get; }
+
+    /// <summary>Animation time in TimeSpan ticks (100 ns): the time the frame's animation was evaluated for.</summary>
+    public long AnimationTicks { get; }
+
+    /// <summary>
+    /// The interval the application wants to run at, in ticks (100 ns): what it would aim for if nothing held it back. It differs from
+    /// <see cref="TargetFrameTicks"/> only while the pacer runs slower than it wants (Swappy lowered to 30 fps: preferred 166 667, target
+    /// 333 333). A 30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, <see cref="Marker.OnDemandFrameTicks"/> =
+    /// frames only when something changes.
+    /// </summary>
+    public uint PreferredFrameTicks { get; }
 
     /// <summary>
     /// The interval the frame pacer aims for between the previous frame and this one, in ticks (100 ns): 166 667 for 60 fps. 0 = unknown,
     /// <see cref="Marker.OnDemandFrameTicks"/> = frames only when something changes.
     /// </summary>
     public uint TargetFrameTicks { get; }
+
+    /// <summary>
+    /// When the frame pacer intends this frame to become visible, in ticks (100 ns) on its steady clock (any epoch, the same clock for the
+    /// whole run). 0 = unknown.
+    /// </summary>
+    public long IntendedDisplayTicks { get; }
 
     /// <summary>
     /// CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in ticks (100 ns) on the same steady clock
@@ -75,46 +91,32 @@ namespace MB.FrameMarker
     /// </summary>
     public uint CpuBusyTicks { get; }
 
-    /// <summary>
-    /// The interval the application wants to run at, in ticks (100 ns): what it would aim for if nothing held it back. It differs from
-    /// <see cref="TargetFrameTicks"/> only while the pacer runs slower than it wants (Swappy lowered to 30 fps: preferred 166 667, target
-    /// 333 333). A 30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, <see cref="Marker.OnDemandFrameTicks"/> =
-    /// frames only when something changes.
-    /// </summary>
-    public uint PreferredFrameTicks { get; }
-
-    /// <summary>
-    /// <see cref="MarkerFlags.StaticAfter"/> when nothing animates while this frame is on screen, <see cref="MarkerFlags.StaticBefore"/> when
-    /// nothing animated while the frame before it was; the other bits are reserved (0).
-    /// </summary>
-    public MarkerFlags Flags { get; }
-
     /// <summary>The same payload with another kind.</summary>
     public Payload WithKind(MarkerKind kind) =>
       new Payload(
-        FrameIndex,
-        AnimationTicks,
-        RunId,
         kind,
-        IntendedDisplayTicks,
-        TargetFrameTicks,
-        CpuStartTicks,
-        CpuBusyTicks,
+        RunId,
+        FrameIndex,
+        Flags,
+        AnimationTicks,
         PreferredFrameTicks,
-        Flags
+        TargetFrameTicks,
+        IntendedDisplayTicks,
+        CpuStartTicks,
+        CpuBusyTicks
       );
 
     public bool Equals(Payload other) =>
-      FrameIndex == other.FrameIndex
-      && AnimationTicks == other.AnimationTicks
+      Kind == other.Kind
       && RunId == other.RunId
-      && Kind == other.Kind
-      && IntendedDisplayTicks == other.IntendedDisplayTicks
-      && TargetFrameTicks == other.TargetFrameTicks
-      && CpuStartTicks == other.CpuStartTicks
-      && CpuBusyTicks == other.CpuBusyTicks
+      && FrameIndex == other.FrameIndex
+      && Flags == other.Flags
+      && AnimationTicks == other.AnimationTicks
       && PreferredFrameTicks == other.PreferredFrameTicks
-      && Flags == other.Flags;
+      && TargetFrameTicks == other.TargetFrameTicks
+      && IntendedDisplayTicks == other.IntendedDisplayTicks
+      && CpuStartTicks == other.CpuStartTicks
+      && CpuBusyTicks == other.CpuBusyTicks;
 
     public override bool Equals(object obj) => obj is Payload other && Equals(other);
 
@@ -122,12 +124,11 @@ namespace MB.FrameMarker
     {
       unchecked
       {
-        int hash = (((((FrameIndex.GetHashCode() * 397) ^ AnimationTicks.GetHashCode()) * 397) ^ (int)RunId) * 397) ^ (int)Kind;
-        hash = (((hash * 397) ^ IntendedDisplayTicks.GetHashCode()) * 397) ^ (int)TargetFrameTicks;
-        hash = (hash * 397) ^ CpuStartTicks.GetHashCode();
-        hash = (hash * 397) ^ (int)CpuBusyTicks;
-        hash = (hash * 397) ^ (int)PreferredFrameTicks;
-        return (hash * 397) ^ (int)Flags;
+        int hash = (((((int)Kind * 397) ^ (int)RunId) * 397) ^ FrameIndex.GetHashCode()) * 397;
+        hash = (((hash ^ (int)Flags) * 397) ^ AnimationTicks.GetHashCode()) * 397;
+        hash = (((hash ^ (int)PreferredFrameTicks) * 397) ^ (int)TargetFrameTicks) * 397;
+        hash = (((hash ^ IntendedDisplayTicks.GetHashCode()) * 397) ^ CpuStartTicks.GetHashCode()) * 397;
+        return hash ^ (int)CpuBusyTicks;
       }
     }
 
@@ -136,6 +137,6 @@ namespace MB.FrameMarker
     public static bool operator !=(Payload left, Payload right) => !left.Equals(right);
 
     public override string ToString() =>
-      $"{{frame {FrameIndex}, ticks {AnimationTicks}, run {RunId}, {Kind}, intended {IntendedDisplayTicks}, target {TargetFrameTicks}, cpu start {CpuStartTicks}, cpu busy {CpuBusyTicks}, preferred {PreferredFrameTicks}, flags {Flags}}}";
+      $"{{{Kind}, run {RunId}, frame {FrameIndex}, flags {Flags}, ticks {AnimationTicks}, preferred {PreferredFrameTicks}, target {TargetFrameTicks}, intended {IntendedDisplayTicks}, cpu start {CpuStartTicks}, cpu busy {CpuBusyTicks}}}";
   }
 }

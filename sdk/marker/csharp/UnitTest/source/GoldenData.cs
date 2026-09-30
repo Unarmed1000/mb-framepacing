@@ -89,16 +89,16 @@ namespace MB.FrameMarker.UnitTest
 
     private static Payload Payload(Row row) =>
       new Payload(
-        ulong.Parse(row.Text("frameIndex"), CultureInfo.InvariantCulture),
-        row.Long("animationTicks"),
-        uint.Parse(row.Text("runId"), CultureInfo.InvariantCulture),
         (MarkerKind)byte.Parse(row.Text("kind"), CultureInfo.InvariantCulture),
-        row.Long("intendedDisplayTicks"),
-        uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture),
-        row.Long("cpuStartTicks"),
-        uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture),
-        uint.Parse(row.Text("preferredFrameTicks"), CultureInfo.InvariantCulture),
-        (MarkerFlags)byte.Parse(row.Text("flags"), CultureInfo.InvariantCulture)
+        uint.Parse(row.Text("runId"), CultureInfo.InvariantCulture),
+        ulong.Parse(row.Text("frameIndex"), CultureInfo.InvariantCulture),
+        (MarkerFlags)byte.Parse(row.Text("flags"), CultureInfo.InvariantCulture),
+        row.Long("animationTicks"),
+        preferredFrameTicks: uint.Parse(row.Text("preferredFrameTicks"), CultureInfo.InvariantCulture),
+        targetFrameTicks: uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture),
+        intendedDisplayTicks: row.Long("intendedDisplayTicks"),
+        cpuStartTicks: row.Long("cpuStartTicks"),
+        cpuBusyTicks: uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture)
       );
 
     private static StartMetadata Start(Row row) =>

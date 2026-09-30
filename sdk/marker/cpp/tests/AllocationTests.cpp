@@ -154,10 +154,18 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
     for (uint64_t frame = 0; frame < 200u; ++frame)
     {
       const auto ticks = static_cast<int64_t>(frame) * (FM::TicksPerSecond / 60);
-      const FM::Payload framePayload{frame,          ticks,   7u,       FM::MarkerKind::Frame,       ticks + 50'000, 166'667u,
-                                     ticks - 10'000, 80'000u, 166'667u, FM::MarkerFlags::StaticAfter};
-      const FM::Payload endPayload{frame, ticks, 7u, FM::MarkerKind::SequenceEnd};
-      const FM::Payload startPayload{frame, ticks, 7u, FM::MarkerKind::SequenceStart};
+      const FM::Payload framePayload{.Kind = FM::MarkerKind::Frame,
+                                     .RunId = 7u,
+                                     .FrameIndex = frame,
+                                     .Flags = FM::MarkerFlags::StaticAfter,
+                                     .AnimationTicks = ticks,
+                                     .PreferredFrameTicks = 166'667u,
+                                     .TargetFrameTicks = 166'667u,
+                                     .IntendedDisplayTicks = ticks + 50'000,
+                                     .CpuStartTicks = ticks - 10'000,
+                                     .CpuBusyTicks = 80'000u};
+      const FM::Payload endPayload{.Kind = FM::MarkerKind::SequenceEnd, .RunId = 7u, .FrameIndex = frame, .AnimationTicks = ticks};
+      const FM::Payload startPayload{.Kind = FM::MarkerKind::SequenceStart, .RunId = 7u, .FrameIndex = frame, .AnimationTicks = ticks};
       written += FM::SequenceId::TryFromText("allocation-test", metadata.Id) ? 1u : 0u;
 
       written += FM::GenerateModules(framePayload, g_matrix) ? 1u : 0u;

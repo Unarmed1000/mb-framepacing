@@ -42,18 +42,29 @@ namespace MB.FramePacing.Analysis.UnitTest
         rows.Add(new CaptureRow(rows.Count, rows.Count * refresh, CaptureStatus.Decoded, payload, start));
 
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(0, 0, 1, MarkerKind.SequenceStart), StartMetadata.FromTag(0, "pacing"));
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FrameMarker.MarkerFlags.None, 0), StartMetadata.FromTag(0, "pacing"));
       ulong index = 100;
       long animationMs = 0;
       foreach (var (refreshes, step, intendedMs, target) in frames)
       {
         animationMs += step;
         for (int c = 0; c < refreshes; ++c)
-          Add(new MarkerPayload(index, animationMs * Ms, 1, MarkerKind.Frame, intendedMs * Ms, target, PreferredFrameTicks: preferredTicks));
+          Add(
+            new MarkerPayload(
+              MarkerKind.Frame,
+              1,
+              index,
+              MB.FrameMarker.MarkerFlags.None,
+              animationMs * Ms,
+              PreferredFrameTicks: preferredTicks,
+              TargetFrameTicks: target,
+              IntendedDisplayTicks: intendedMs * Ms
+            )
+          );
         ++index;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(999_999, 0, 1, MarkerKind.SequenceEnd));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FrameMarker.MarkerFlags.None, 0));
       return rows;
     }
 

@@ -12,35 +12,36 @@ using FM = MB.FrameMarker;
 
 namespace MB.FramePacing.Marker
 {
-  /// <summary>The header carried by every marker.</summary>
-  /// <param name="FrameIndex">The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</param>
-  /// <param name="AnimationTicks">The animation time the frame was rendered for, in <see cref="TimeSpan"/> ticks (100ns).</param>
+  /// <summary>The header carried by every marker, its fields in the order of the wire format; the timing fields are optional (0 = unknown).</summary>
+  /// <param name="Kind">Frame, start, end or sync marker.</param>
   /// <param name="RunId">Identifies one test run: the start marker, every frame marker and the end marker of a run share it.</param>
-  /// <param name="IntendedDisplayTicks">
-  /// When the application's frame pacer intends the frame to become visible, in ticks (100ns) on its steady clock; 0 = unknown.
-  /// </param>
-  /// <param name="TargetFrameTicks">The interval the frame pacer aims for before this frame, in ticks (100ns); 0 = unknown.</param>
-  /// <param name="CpuStartTicks">CPU start time: when the CPU started working on the frame, in ticks (100ns) on the frame pacer's steady clock; 0 = unknown.</param>
-  /// <param name="CpuBusyTicks">CPU busy: how long the CPU worked on the frame before presenting it, in ticks (100ns); 0 = unknown.</param>
-  /// <param name="PreferredFrameTicks">
-  /// The interval the application wants to run at, in ticks (100ns); 0 = unknown, <see cref="OnDemandFrameTicks"/> = frames only when
-  /// something changes.
-  /// </param>
+  /// <param name="FrameIndex">The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</param>
   /// <param name="Flags">
   /// The marker's flags: <see cref="FM.MarkerFlags.StaticAfter"/> when nothing animates while the frame is on screen,
   /// <see cref="FM.MarkerFlags.StaticBefore"/> when nothing animated while the frame before it was.
   /// </param>
+  /// <param name="AnimationTicks">The animation time the frame was rendered for, in <see cref="TimeSpan"/> ticks (100ns).</param>
+  /// <param name="PreferredFrameTicks">
+  /// The interval the application wants to run at, in ticks (100ns); 0 = unknown, <see cref="OnDemandFrameTicks"/> = frames only when
+  /// something changes.
+  /// </param>
+  /// <param name="TargetFrameTicks">The interval the frame pacer aims for before this frame, in ticks (100ns); 0 = unknown.</param>
+  /// <param name="IntendedDisplayTicks">
+  /// When the application's frame pacer intends the frame to become visible, in ticks (100ns) on its steady clock; 0 = unknown.
+  /// </param>
+  /// <param name="CpuStartTicks">CPU start time: when the CPU started working on the frame, in ticks (100ns) on the frame pacer's steady clock; 0 = unknown.</param>
+  /// <param name="CpuBusyTicks">CPU busy: how long the CPU worked on the frame before presenting it, in ticks (100ns); 0 = unknown.</param>
   public readonly record struct MarkerPayload(
+    MarkerKind Kind,
+    uint RunId,
     ulong FrameIndex,
+    FM.MarkerFlags Flags,
     long AnimationTicks,
-    uint RunId = 0,
-    MarkerKind Kind = MarkerKind.Frame,
-    long IntendedDisplayTicks = 0,
-    uint TargetFrameTicks = 0,
-    long CpuStartTicks = 0,
-    uint CpuBusyTicks = 0,
     uint PreferredFrameTicks = 0,
-    FM.MarkerFlags Flags = FM.MarkerFlags.None
+    uint TargetFrameTicks = 0,
+    long IntendedDisplayTicks = 0,
+    long CpuStartTicks = 0,
+    uint CpuBusyTicks = 0
   )
   {
     /// <summary>Size of the header, which is the complete payload of frame and end markers.</summary>
@@ -85,16 +86,16 @@ namespace MB.FramePacing.Marker
       if (!FM.Marker.TryDecodePayload(src, out var decoded, out var start))
         return false;
       payload = new MarkerPayload(
-        decoded.FrameIndex,
-        decoded.AnimationTicks,
-        decoded.RunId,
         (MarkerKind)decoded.Kind,
-        decoded.IntendedDisplayTicks,
-        decoded.TargetFrameTicks,
-        decoded.CpuStartTicks,
-        decoded.CpuBusyTicks,
+        decoded.RunId,
+        decoded.FrameIndex,
+        decoded.Flags,
+        decoded.AnimationTicks,
         decoded.PreferredFrameTicks,
-        decoded.Flags
+        decoded.TargetFrameTicks,
+        decoded.IntendedDisplayTicks,
+        decoded.CpuStartTicks,
+        decoded.CpuBusyTicks
       );
       if (decoded.Kind == FM.MarkerKind.SequenceStart)
         metadata = new StartMetadata(start.UtcTicks, start.SequenceId);
@@ -106,16 +107,16 @@ namespace MB.FramePacing.Marker
     /// <summary>The same payload as the marker library's type.</summary>
     public FM.Payload ToFrameMarker() =>
       new FM.Payload(
-        FrameIndex,
-        AnimationTicks,
-        RunId,
         (FM.MarkerKind)Kind,
-        IntendedDisplayTicks,
-        TargetFrameTicks,
-        CpuStartTicks,
-        CpuBusyTicks,
+        RunId,
+        FrameIndex,
+        Flags,
+        AnimationTicks,
         PreferredFrameTicks,
-        Flags
+        TargetFrameTicks,
+        IntendedDisplayTicks,
+        CpuStartTicks,
+        CpuBusyTicks
       );
   }
 }

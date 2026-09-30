@@ -325,16 +325,16 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 // application wants to run at. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
 // marker is drawn last, just before Present). 0 = unknown. MarkerFlags::StaticAfter when nothing animates while this frame is
 // on screen, MarkerFlags::StaticBefore when the application only now knows nothing animated while the previous frame was
-const FM::Payload payload{.FrameIndex = frameIndex,
-                          .AnimationTicks = animationTicks,
+const FM::Payload payload{.Kind = kind,
                           .RunId = runId,
-                          .Kind = kind,
-                          .IntendedDisplayTicks = intendedDisplayTicks,
-                          .TargetFrameTicks = targetFrameTicks,
-                          .CpuStartTicks = cpuStartTicks,
-                          .CpuBusyTicks = cpuBusyTicks,
+                          .FrameIndex = frameIndex,
+                          .Flags = FM::MarkerFlags::None,
+                          .AnimationTicks = animationTicks,
                           .PreferredFrameTicks = preferredFrameTicks,
-                          .Flags = FM::MarkerFlags::None};
+                          .TargetFrameTicks = targetFrameTicks,
+                          .IntendedDisplayTicks = intendedDisplayTicks,
+                          .CpuStartTicks = cpuStartTicks,
+                          .CpuBusyTicks = cpuBusyTicks};
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
 // FM::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
 // FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.

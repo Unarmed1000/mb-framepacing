@@ -116,7 +116,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
   const int64_t ticks = std::llround(animationSeconds * FM::TicksPerSecond); // the time your animation used
-  FM::GenerateModules({.FrameIndex = frameIndex, .AnimationTicks = ticks, .RunId = runId}, matrix);
+  FM::GenerateModules({.RunId = runId, .FrameIndex = frameIndex, .AnimationTicks = ticks}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 }
@@ -163,33 +163,32 @@ every shader and compares every pixel with `ModulesToBitmap`. Unity's package dr
 Triangles are `(TL, TR, BL) (BL, TR, BR)`, clockwise on screen. Size your buffers with the `Max…Count()` functions; they fit every
 marker kind.
 
-**Frame pacing (recommended).** If your game paces its frames, put what the pacer aims for into the payload: the time it intends the
-frame to become visible (steady clock ticks, any epoch), its target frame time, and the **preferred frame time**, the rate the game
-wants to run at. The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
-does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
-lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
-presents only when something changes writes `FM::OnDemandFrameTicks` for both frame times.
-
 **Static frames (optional).** Set `FM::MarkerFlags::StaticAfter` on a frame when nothing animates while it is on screen (no pending
 work after it: an idle screen, a paused menu). An application that only knows it once it renders the next frame sets
 `FM::MarkerFlags::StaticBefore` on that next frame instead. The analysis then does not judge the animation error of the step out of
 the static frame, so an animation clock that pauses while idle does not look like a huge error ([the flags](marker-fields.md#flags-static-after-and-static-before)).
 
+**Frame pacing (recommended).** If your game paces its frames, put what the pacer aims for into the payload: the **preferred frame time**, the rate
+the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock ticks, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
+does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
+lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
+presents only when something changes writes `FM::OnDemandFrameTicks` for both frame times.
+
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the
-application side, including frames that took several refreshes or overlap the next one. Name the fields: the payload's order is not
-the order on the wire, and designated initializers keep them apart:
+application side, including frames that took several refreshes or overlap the next one. The payload's fields are in the order of the
+wire format; designated initializers name them:
 
 ```cpp
-const FM::Payload payload{.FrameIndex = frameIndex,
+const FM::Payload payload{.RunId = runId,
+                          .FrameIndex = frameIndex,
+                          .Flags = nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None,
                           .AnimationTicks = ticks,
-                          .RunId = runId,
-                          .IntendedDisplayTicks = intendedDisplayTicks,
-                          .TargetFrameTicks = targetFrameTicks,
-                          .CpuStartTicks = cpuStartTicks,
-                          .CpuBusyTicks = cpuBusyTicks,
                           .PreferredFrameTicks = preferredFrameTicks,
-                          .Flags = nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None};
+                          .TargetFrameTicks = targetFrameTicks,
+                          .IntendedDisplayTicks = intendedDisplayTicks,
+                          .CpuStartTicks = cpuStartTicks,
+                          .CpuBusyTicks = cpuBusyTicks};
 ```
 
 What to write in each field, for typical frame pacers, is in [Filling the marker fields](marker-fields.md).
@@ -200,7 +199,7 @@ and frame index. The analysis flags tearing when the two disagree, and a camera 
 ```cpp
 const FM::Point syncOrigin = FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 2);
 FM::ModuleMatrix sync;
-FM::GenerateModules({.FrameIndex = frameIndex, .RunId = runId, .Kind = FM::MarkerKind::Sync}, sync);
+FM::GenerateModules({.Kind = FM::MarkerKind::Sync, .RunId = runId, .FrameIndex = frameIndex}, sync);
 const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);
 ```
 
@@ -234,10 +233,10 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload{.FrameIndex = frameIndex,
-                            .AnimationTicks = std::llround(animationSeconds * FM::TicksPerSecond),
+  const FM::Payload payload{.Kind = kind,
                             .RunId = 7,
-                            .Kind = kind};
+                            .FrameIndex = frameIndex,
+                            .AnimationTicks = std::llround(animationSeconds * FM::TicksPerSecond)};
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }

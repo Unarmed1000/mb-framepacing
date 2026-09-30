@@ -45,7 +45,7 @@ FM::ModuleMatrix matrix;
 std::array<uint32_t, FM::MaxIndexCount()> indices;
 
 // Every frame, last (after post effects and UI), without blending:
-const FM::Payload payload{frameIndex, animationTicks, /*runId*/ 1};
+const FM::Payload payload{.RunId = 1, .FrameIndex = frameIndex, .AnimationTicks = animationTicks};
 FM::GenerateModules(payload, matrix);                                      // encode once
 const std::size_t count = FM::ModulesToGridIndices(matrix, indices);       // only the indices change
 DrawIndexed(indices.data(), count);      // triangles over the static vertices
@@ -54,13 +54,13 @@ DrawIndexed(indices.data(), count);      // triangles over the static vertices
 This is the most efficient way without a dedicated shader; the shaders (1 and 2 in [the options](#ways-to-draw-it-most-efficient-first)) are faster still.
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
-- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`FM::TicksPerSecond`).
-- **Frame pacing (optional):** `IntendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady
-  clock, any epoch), `TargetFrameTicks` (the interval it aims for: `166'667` for 60 fps) and `PreferredFrameTicks` (the interval the
-  application wants to run at; it differs from the target only while the pacer runs slower than wanted). `0` = unknown,
-  `OnDemandFrameTicks` = frames only when something changes.
 - **Flags (optional):** `MarkerFlags::StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags::StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame).
+- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`FM::TicksPerSecond`).
+- **Frame pacing (optional):** `PreferredFrameTicks` (the interval the application wants to run at; it differs from the target only
+  while the pacer runs slower than wanted), `TargetFrameTicks` (the interval the pacer aims for: `166'667` for 60 fps) and
+  `IntendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady clock, any epoch). `0` = unknown,
+  `OnDemandFrameTicks` = frames only when something changes.
 - **CPU start time and CPU busy (optional):** `CpuStartTicks` (when the CPU started working on the frame, on the same clock,
   PresentMon's `CPUStartTime`) and `CpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata

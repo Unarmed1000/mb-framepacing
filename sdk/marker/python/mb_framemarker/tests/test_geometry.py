@@ -14,6 +14,7 @@ from .. import (
     QR_VERSION,
     SYNC_QR_MODULE_COUNT,
     SYNC_QR_VERSION,
+    MarkerFlags,
     MarkerKind,
     ModuleMatrix,
     Options,
@@ -104,36 +105,40 @@ class GeometryTests(unittest.TestCase):
     def test_every_main_marker_kind_is_version_6(self) -> None:
         for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
             with self.subTest(kind):
-                self.assertEqual(generate_modules(Payload(1, 2, 3, kind, 4, 5)).size, 41)
-        start = Payload(1, 2, 3, MarkerKind.SEQUENCE_START)
+                self.assertEqual(generate_modules(Payload(kind, 3, 1, MarkerFlags.NONE, 2, target_frame_ticks=5, intended_display_ticks=4)).size, 41)
+        start = Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NONE, 2)
         self.assertEqual(generate_modules(start, StartMetadata(-1, SequenceId(bytes([0xFF]) * 16))).size, QR_MODULE_COUNT)
         with self.assertRaises(ValueError):
             _ = generate_modules(start, StartMetadata(1 << 63, SequenceId()))
 
     def test_sync_markers_are_version_2(self) -> None:
-        self.assertEqual(generate_modules(Payload(1, 2, 3, MarkerKind.SYNC, 4, 5)).size, SYNC_QR_MODULE_COUNT)
-        self.assertEqual(generate_modules(Payload(0xFFFF_FFFF_FFFF_FFFF, 0, 0, MarkerKind.SYNC)).size, 25)
+        self.assertEqual(
+            generate_modules(Payload(MarkerKind.SYNC, 3, 1, MarkerFlags.NONE, 2, target_frame_ticks=5, intended_display_ticks=4)).size, SYNC_QR_MODULE_COUNT
+        )
+        self.assertEqual(generate_modules(Payload(MarkerKind.SYNC, 0, 0xFFFF_FFFF_FFFF_FFFF, MarkerFlags.NONE, 0)).size, 25)
         # The background quad follows the symbol size, in every output
-        payload, options, origin = Payload(7, 0, 0, MarkerKind.SYNC), Options(3, 4), Point(10, 20)
+        payload, options, origin = Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NONE, 0), Options(3, 4), Point(10, 20)
         quads = generate_quads(payload, options, origin)
         self.assertEqual(quads[0], Quad(10, 20, 10 + 99, 20 + 99, False))
         self.assertTrue(all(quad.right <= 10 + 99 - 12 and quad.bottom <= 20 + 99 - 12 for quad in quads[1:]))
         self.assertEqual(generate_triangles(payload, options, origin), to_triangles(quads))
         self.assertEqual(generate_indexed(payload, options, origin, 5), to_indexed(quads, 5))
         # Only the run id and the frame index are encoded: the same symbol whatever the other fields hold
-        self.assertEqual(generate_quads(Payload(7, 123, 0, MarkerKind.SYNC, 5, 6), options, origin), quads)
-        self.assertNotEqual(generate_quads(Payload(7, 0, 4, MarkerKind.SYNC), options, origin), quads)
+        self.assertEqual(
+            generate_quads(Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NONE, 123, target_frame_ticks=6, intended_display_ticks=5), options, origin), quads
+        )
+        self.assertNotEqual(generate_quads(Payload(MarkerKind.SYNC, 4, 7, MarkerFlags.NONE, 0), options, origin), quads)
 
     def test_every_main_marker_kind_has_the_same_size(self) -> None:
         options, origin = Options(), Point(32, 32)
         expected = Quad(32, 32, 32 + 294, 32 + 294, False)
-        start = Payload(1, 2, 3, MarkerKind.SEQUENCE_START)
-        self.assertEqual(generate_quads(Payload(1, 2, 3), options, origin)[0], expected)
-        self.assertEqual(generate_quads(Payload(1, 2, 3, MarkerKind.SEQUENCE_END), options, origin)[0], expected)
+        start = Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NONE, 2)
+        self.assertEqual(generate_quads(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), options, origin)[0], expected)
+        self.assertEqual(generate_quads(Payload(MarkerKind.SEQUENCE_END, 3, 1, MarkerFlags.NONE, 2), options, origin)[0], expected)
         self.assertEqual(generate_start_quads(start, StartMetadata(1, SequenceId.from_text("x" * 16)), options, origin)[0], expected)
 
     def test_quads_are_pixel_aligned_background_first(self) -> None:
-        quads = generate_quads(Payload(5, 6, 7), Options(3, 4), Point(10, 20))
+        quads = generate_quads(Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6), Options(3, 4), Point(10, 20))
         self.assertTrue(2 <= len(quads) <= MAX_QUAD_COUNT)
         self.assertEqual(quads[0], Quad(10, 20, 10 + 147, 20 + 147, False))
         for quad in quads[1:]:
@@ -143,7 +148,7 @@ class GeometryTests(unittest.TestCase):
             self.assertEqual((quad.top - 32) % 3, 0, "top edges on module boundaries")
 
     def test_triangles_and_indexed_follow_the_quads_in_the_documented_order(self) -> None:
-        payload, options, origin = Payload(42, 1_234_567, 3), Options(2, 4), Point(7, 9)
+        payload, options, origin = Payload(MarkerKind.FRAME, 3, 42, MarkerFlags.NONE, 1_234_567), Options(2, 4), Point(7, 9)
         quads = generate_quads(payload, options, origin)
         self.assertEqual(generate_triangles(payload, options, origin), to_triangles(quads))
         self.assertEqual(generate_indexed(payload, options, origin, 50), to_indexed(quads, 50))
@@ -152,7 +157,7 @@ class GeometryTests(unittest.TestCase):
         # The background quad comes first: its vertices in the documented order
         options = Options(2, 4)
         size = marker_size_px(options)
-        triangles = generate_triangles(Payload(1, 2, 3), options, Point(10, 20))
+        triangles = generate_triangles(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), options, Point(10, 20))
         light = [
             Vertex(10, 20, 255),
             Vertex(10 + size, 20, 255),
@@ -162,26 +167,28 @@ class GeometryTests(unittest.TestCase):
             Vertex(10 + size, 20 + size, 255),
         ]
         self.assertEqual(triangles[:6], light)
-        vertices, indices = generate_indexed(Payload(1, 2, 3), options, Point(10, 20), 100)
+        vertices, indices = generate_indexed(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), options, Point(10, 20), 100)
         self.assertEqual(vertices[:4], [Vertex(10, 20, 255), Vertex(10 + size, 20, 255), Vertex(10 + size, 20 + size, 255), Vertex(10, 20 + size, 255)])
         self.assertEqual(indices[:12], [100, 101, 103, 103, 101, 102, 104, 105, 107, 107, 105, 106])
 
     def test_invalid_options_raise(self) -> None:
-        payload = Payload(1, 2, 3)
+        payload = Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2)
         for options in (Options(0), Options(6, -1), Options(6, MAX_QUIET_ZONE_MODULES + 1), Options(1025)):
             with self.subTest(options), self.assertRaises(ValueError):
                 _ = generate_quads(payload, options, Point(0, 0))
 
     def test_markers_fit_the_quad_count(self) -> None:
         for frame in range(0, 500, 7):
-            payload = Payload(frame * 7919, frame * 166_667, 9, MarkerKind(frame % 4), frame * 166_700, 166_667)
+            payload = Payload(
+                MarkerKind(frame % 4), 9, frame * 7919, MarkerFlags.NONE, frame * 166_667, target_frame_ticks=166_667, intended_display_ticks=frame * 166_700
+            )
             self.assertLessEqual(len(generate_quads(payload, Options(), Point(0, 0))), MAX_QUAD_COUNT)
 
 
 class ModuleMatrixTests(unittest.TestCase):
     def test_bits_are_packed_row_major_most_significant_bit_first(self) -> None:
         for kind in (MarkerKind.FRAME, MarkerKind.SYNC):
-            matrix = generate_modules(Payload(12345, 678, 9, kind))
+            matrix = generate_modules(Payload(kind, 9, 12345, MarkerFlags.NONE, 678))
             self.assertEqual(len(matrix.bits), packed_module_byte_count(matrix.size))
             for y in range(matrix.size):
                 for x in range(matrix.size):
@@ -190,7 +197,7 @@ class ModuleMatrixTests(unittest.TestCase):
         self.assertEqual((packed_module_byte_count(41), packed_module_byte_count(25)), (211, 79))
 
     def test_takes_qr_sizes_and_ignores_the_padding(self) -> None:
-        matrix = generate_modules(Payload(1, 2, 3, MarkerKind.SYNC))
+        matrix = generate_modules(Payload(MarkerKind.SYNC, 3, 1, MarkerFlags.NONE, 2))
         padded = bytearray(matrix.bits)
         padded[-1] |= 0x7F  # 625 modules: the last byte uses 1 bit
         self.assertEqual(ModuleMatrix(25, bytes(padded) + b"extra"), matrix)
@@ -203,10 +210,24 @@ class BitmapTests(unittest.TestCase):
     def test_equals_the_rasterized_quads_in_every_pixel_format(self) -> None:
         width, height = 173, 131
         cases = [
-            (Payload(1, 2, 3), Options(3, 4), Point(5, 7)),
-            (Payload(99, -5, 1, MarkerKind.SEQUENCE_END), Options(1, 0), Point(0, 0)),
-            (Payload(7, 0, 0, MarkerKind.SYNC), Options(2, 4), Point(3, 1)),
-            (Payload(0xFFFF_FFFF_FFFF_FFFF, 1, 2, MarkerKind.FRAME, 3, 4, 5, 6), Options(2, 1), Point(-9, -4)),
+            (Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), Options(3, 4), Point(5, 7)),
+            (Payload(MarkerKind.SEQUENCE_END, 1, 99, MarkerFlags.NONE, -5), Options(1, 0), Point(0, 0)),
+            (Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NONE, 0), Options(2, 4), Point(3, 1)),
+            (
+                Payload(
+                    MarkerKind.FRAME,
+                    2,
+                    0xFFFF_FFFF_FFFF_FFFF,
+                    MarkerFlags.NONE,
+                    1,
+                    target_frame_ticks=4,
+                    intended_display_ticks=3,
+                    cpu_start_ticks=5,
+                    cpu_busy_ticks=6,
+                ),
+                Options(2, 1),
+                Point(-9, -4),
+            ),
         ]
         for payload, options, origin in cases:
             matrix = generate_modules(payload)
@@ -226,7 +247,7 @@ class BitmapTests(unittest.TestCase):
                         self.assertEqual(bytes(row[width * size :]), bytes([128] * 5), "the row padding is never written")
 
     def test_a_module_resolution_image_scaled_up_equals_the_full_size_one(self) -> None:
-        matrix = generate_modules(Payload(31, 41, 59))
+        matrix = generate_modules(Payload(MarkerKind.FRAME, 59, 31, MarkerFlags.NONE, 41))
         small, large, module = Options(1, 4), Options(3, 4), 3
         small_size, large_size = marker_size_px(small), marker_size_px(large)
         modules = bytearray(small_size * small_size)
@@ -238,7 +259,7 @@ class BitmapTests(unittest.TestCase):
                 self.assertEqual(pixels[(y * large_size) + x], modules[((y // module) * small_size) + (x // module)])
 
     def test_rejects_invalid_arguments_without_writing(self) -> None:
-        matrix = generate_modules(Payload(1, 2, 3))
+        matrix = generate_modules(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2))
         pixels = bytearray([128]) * (64 * 64 * 4)
         with self.assertRaises(ValueError):
             modules_to_bitmap(matrix, Options(0), Point(0, 0), pixels, 64, 64)
@@ -257,7 +278,11 @@ class GridTests(unittest.TestCase):
 
     def test_resolved_indices_equal_the_indexed_triangles(self) -> None:
         base = 100
-        for payload in (Payload(1, 2, 3), Payload(7, 0, 0, MarkerKind.SYNC), Payload(5, 6, 7, MarkerKind.SEQUENCE_START)):
+        for payload in (
+            Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2),
+            Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NONE, 0),
+            Payload(MarkerKind.SEQUENCE_START, 7, 5, MarkerFlags.NONE, 6),
+        ):
             for options in (Options(1, 0), Options(3, 4)):
                 with self.subTest(payload=payload, options=options):
                     matrix = generate_modules(payload)

@@ -117,7 +117,8 @@ namespace MB::FrameMarker
       {
         return false;
       }
-      rPayload = Payload{ReadLE<8>(bytes, OffsetFrameIndex), 0, static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId)), kind};
+      rPayload =
+        Payload{.Kind = kind, .RunId = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId)), .FrameIndex = ReadLE<8>(bytes, OffsetFrameIndex)};
       if (pMetadata != nullptr)
       {
         *pMetadata = StartMetadata{};

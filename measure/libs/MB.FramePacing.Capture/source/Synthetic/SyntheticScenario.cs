@@ -140,17 +140,18 @@ namespace MB.FramePacing.Capture.Synthetic
         // per refresh, and that is also the rate it prefers
         var payload = o.PacingInformation
           ? new MarkerPayload(
-            frameIndex,
-            animationTicks,
-            idle ? 0u : o.RunId,
             kind,
-            intendedTicks,
-            (uint)refresh,
-            cpuStartTicks,
-            (uint)cpuBusyTicks,
-            (uint)refresh
+            idle ? 0u : o.RunId,
+            frameIndex,
+            MB.FrameMarker.MarkerFlags.None,
+            animationTicks,
+            PreferredFrameTicks: (uint)refresh,
+            TargetFrameTicks: (uint)refresh,
+            IntendedDisplayTicks: intendedTicks,
+            CpuStartTicks: cpuStartTicks,
+            CpuBusyTicks: (uint)cpuBusyTicks
           )
-          : new MarkerPayload(frameIndex, animationTicks, idle ? 0u : o.RunId, kind);
+          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FrameMarker.MarkerFlags.None, animationTicks);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
       }
     }

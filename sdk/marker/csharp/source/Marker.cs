@@ -197,10 +197,11 @@ namespace MB.FrameMarker
         if (source.Length != SyncPayloadByteCount)
           return false;
         payload = new Payload(
-          BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
-          0,
+          kind,
           BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
-          kind
+          BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
+          MarkerFlags.None,
+          0
         );
         return true;
       }
@@ -221,17 +222,17 @@ namespace MB.FrameMarker
       }
 
       payload = new Payload(
-        BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetAnimationTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
         kind,
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetIntendedDisplayTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetTargetFrameTicks)),
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetCpuStartTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetCpuBusyTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetPreferredFrameTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
+        BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
         // Every value is accepted: bits without a name are reserved and kept
-        (MarkerFlags)source[OffsetFlags]
+        (MarkerFlags)source[OffsetFlags],
+        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetAnimationTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetPreferredFrameTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetTargetFrameTicks)),
+        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetIntendedDisplayTicks)),
+        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetCpuStartTicks)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetCpuBusyTicks))
       );
       return true;
     }

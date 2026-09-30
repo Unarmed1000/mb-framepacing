@@ -121,16 +121,16 @@ namespace MB.FramePacing.Analysis.UnitTest
         : refresh >= RefreshCount ? MarkerKind.SequenceEnd
         : MarkerKind.Frame;
       return new MarkerPayload(
-        ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
-        RenderedAnimationTicks[frame] + (loop * DurationTicks),
-        RunId,
         kind,
-        RefreshTicks(intendedRefresh),
-        FrameTicks(RenderedSwapInterval[frame]),
-        RenderedCpuStartTicks[frame] + (loop * DurationTicks),
-        (uint)RenderedCpuBusyTicks[frame],
-        FrameTicks(RenderedPreferredInterval[frame]),
-        RenderedStatic[frame] ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None
+        RunId,
+        ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
+        RenderedStatic[frame] ? MB.FrameMarker.MarkerFlags.StaticAfter : MB.FrameMarker.MarkerFlags.None,
+        RenderedAnimationTicks[frame] + (loop * DurationTicks),
+        PreferredFrameTicks: FrameTicks(RenderedPreferredInterval[frame]),
+        TargetFrameTicks: FrameTicks(RenderedSwapInterval[frame]),
+        IntendedDisplayTicks: RefreshTicks(intendedRefresh),
+        CpuStartTicks: RenderedCpuStartTicks[frame] + (loop * DurationTicks),
+        CpuBusyTicks: (uint)RenderedCpuBusyTicks[frame]
       );
     }
 

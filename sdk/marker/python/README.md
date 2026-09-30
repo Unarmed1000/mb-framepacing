@@ -11,26 +11,25 @@ in [Filling the marker fields](../../doc/marker-fields.md). Standard library onl
 ## Quick start
 
 ```python
-from mb_framemarker import MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, recommended_origin, seconds_to_ticks
+from mb_framemarker import MarkerFlags, MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, recommended_origin, seconds_to_ticks
 
 options = Options(module_size_px=3)
 origin = recommended_origin(MarkerKind.FRAME, width, height, options)
 
 # Every frame, last (after post effects and UI), without blending:
-matrix = generate_modules(Payload(frame_index, seconds_to_ticks(animation_seconds), run_id=1))  # encode once
+matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))  # encode once
 modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelFormat.RGB24)  # draw it
 ```
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
-- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`seconds_to_ticks`).
-- **Frame pacing (optional):** when the application paces its frames, `Payload(..., intended_display_ticks=..., target_frame_ticks=...)`
-  carries when the pacer intends the frame to be shown (100 ns ticks on its steady clock, any epoch) and the interval it aims for
-  (`166_667` for 60 fps); `preferred_frame_ticks=...` the interval the application wants to run at (it differs from the target only
-  while the pacer runs slower than wanted). All default to `0` (unknown); `ON_DEMAND_FRAME_TICKS` = frames only when something
-  changes.
-- **Flags (optional):** `flags=MarkerFlags.STATIC_AFTER` on a frame when nothing animates while it is on screen, or
+- **Flags:** `MarkerFlags.NONE`, or `MarkerFlags.STATIC_AFTER` on a frame when nothing animates while it is on screen, or
   `MarkerFlags.STATIC_BEFORE` on the next frame when that is only known then (the analysis does not judge the step out of the static
   frame).
+- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`seconds_to_ticks`).
+- **Frame pacing (optional):** when the application paces its frames, `Payload(..., preferred_frame_ticks=..., target_frame_ticks=...,
+intended_display_ticks=...)` carries the interval the application wants to run at (it differs from the target only while the pacer
+  runs slower than wanted), the interval the pacer aims for (`166_667` for 60 fps) and when it intends the frame to be shown (100 ns
+  ticks on its steady clock, any epoch). All default to `0` (unknown); `ON_DEMAND_FRAME_TICKS` = frames only when something changes.
 - **CPU start time and CPU busy (optional):** `Payload(..., cpu_start_ticks=..., cpu_busy_ticks=...)` carries when the CPU started
   working on the frame (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on
   it before presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's
@@ -48,7 +47,7 @@ modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelForm
 
 ```python
 sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)  # bottom-left
-sync = generate_modules(Payload(frame_index, 0, run_id=1, kind=MarkerKind.SYNC))  # the main marker's run id and frame index
+sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NONE, 0))  # the main marker's run id and frame index
 modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelFormat.RGB24)
 ```
 

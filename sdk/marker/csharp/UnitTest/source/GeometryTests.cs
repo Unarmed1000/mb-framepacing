@@ -73,11 +73,18 @@ namespace MB.FrameMarker.UnitTest
     {
       var generator = new MarkerGenerator();
       Span<byte> bits = stackalloc byte[Marker.MaxPackedModuleByteCount];
-      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.Sync, 4, 5), bits, out var matrix), Is.True);
+      Assert.That(
+        generator.TryGenerateModules(
+          new Payload(MarkerKind.Sync, 3, 1, MarkerFlags.None, 2, targetFrameTicks: 5, intendedDisplayTicks: 4),
+          bits,
+          out var matrix
+        ),
+        Is.True
+      );
       Assert.That(matrix.Size, Is.EqualTo(Marker.SyncQrModuleCount));
       Assert.That(matrix.Bits.Length, Is.EqualTo(79));
       var quads = new Quad[Marker.MaxQuadCount];
-      int count = TestMarkers.GenerateQuads(new Payload(7, 0, 0, MarkerKind.Sync), new Options(3, 4), new Point(10, 20), quads);
+      int count = TestMarkers.GenerateQuads(new Payload(MarkerKind.Sync, 0, 7, MarkerFlags.None, 0), new Options(3, 4), new Point(10, 20), quads);
       Assert.That(count, Is.GreaterThan(1));
       Assert.That(quads[0], Is.EqualTo(new Quad(10, 20, 10 + 99, 20 + 99, false)));
     }
@@ -87,14 +94,24 @@ namespace MB.FrameMarker.UnitTest
     {
       var generator = new MarkerGenerator();
       var bits = new byte[Marker.MaxPackedModuleByteCount];
-      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3), bits, out var frame) && frame.Size == 41, Is.True);
-      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceEnd), bits, out var end) && end.Size == 41, Is.True);
       Assert.That(
-        generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), default, bits, out var start) && start.Size == 41,
+        generator.TryGenerateModules(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2), bits, out var frame) && frame.Size == 41,
+        Is.True
+      );
+      Assert.That(
+        generator.TryGenerateModules(new Payload(MarkerKind.SequenceEnd, 3, 1, MarkerFlags.None, 2), bits, out var end) && end.Size == 41,
+        Is.True
+      );
+      Assert.That(
+        generator.TryGenerateModules(new Payload(MarkerKind.SequenceStart, 3, 1, MarkerFlags.None, 2), default, bits, out var start)
+          && start.Size == 41,
         Is.True
       );
       var full = new StartMetadata(123, new SequenceId(ulong.MaxValue, ulong.MaxValue));
-      Assert.That(generator.TryGenerateModules(new Payload(1, 2, 3, MarkerKind.SequenceStart), full, bits, out var matrix), Is.True);
+      Assert.That(
+        generator.TryGenerateModules(new Payload(MarkerKind.SequenceStart, 3, 1, MarkerFlags.None, 2), full, bits, out var matrix),
+        Is.True
+      );
       Assert.That(matrix.Size, Is.EqualTo(Marker.QrModuleCount));
       Assert.That(matrix.Bits.Length, Is.EqualTo(Marker.MaxPackedModuleByteCount));
     }
@@ -103,7 +120,7 @@ namespace MB.FrameMarker.UnitTest
     public void Quads_ArePixelAligned_BackgroundFirst()
     {
       var quads = new Quad[Marker.MaxQuadCount];
-      int count = TestMarkers.GenerateQuads(new Payload(5, 6, 7), new Options(3, 4), new Point(10, 20), quads);
+      int count = TestMarkers.GenerateQuads(new Payload(MarkerKind.Frame, 7, 5, MarkerFlags.None, 6), new Options(3, 4), new Point(10, 20), quads);
       Assert.That(count, Is.InRange(2, Marker.MaxQuadCount));
       Assert.That(quads[0], Is.EqualTo(new Quad(10, 20, 10 + 147, 20 + 147, false)));
       foreach (var quad in quads.Skip(1).Take(count - 1))
@@ -118,7 +135,7 @@ namespace MB.FrameMarker.UnitTest
     [Test]
     public void Triangles_AndIndexed_FollowTheQuadsInTheDocumentedOrder()
     {
-      var payload = new Payload(42, 1_234_567, 3);
+      var payload = new Payload(MarkerKind.Frame, 3, 42, MarkerFlags.None, 1_234_567);
       var options = new Options(2, 4);
       var origin = new Point(7, 9);
       var quads = new Quad[Marker.MaxQuadCount];
@@ -141,7 +158,7 @@ namespace MB.FrameMarker.UnitTest
     public void VertexOrder_MatchesTheCppLibrary()
     {
       // The background quad comes first: its vertices in the documented order
-      var matrix = TestMarkers.Encode(new Payload(1, 2, 3));
+      var matrix = TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2));
       var options = new Options(2, 4);
       int size = Marker.MarkerSizePx(options);
       var triangles = new Vertex[Marker.MaxTriangleVertexCount];
@@ -164,7 +181,16 @@ namespace MB.FrameMarker.UnitTest
       var vertices = new Vertex[Marker.MaxIndexedVertexCount];
       var indices = new int[Marker.MaxIndexCount];
       Assert.That(
-        Marker.ModulesToIndexed(TestMarkers.Encode(new Payload(1, 2, 3)), options, new Point(10, 20), vertices, indices, 100).IndexCount,
+        Marker
+          .ModulesToIndexed(
+            TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
+            options,
+            new Point(10, 20),
+            vertices,
+            indices,
+            100
+          )
+          .IndexCount,
         Is.GreaterThan(6)
       );
       Assert.That(
@@ -179,7 +205,7 @@ namespace MB.FrameMarker.UnitTest
     [Test]
     public void InvalidOptions_OrSmallBuffers_GenerateNothing()
     {
-      var payload = new Payload(1, 2, 3);
+      var payload = new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2);
       Assert.That(TestMarkers.GenerateQuads(payload, new Options(0), default, new Quad[Marker.MaxQuadCount]), Is.Zero);
       Assert.That(TestMarkers.GenerateTriangles(payload, new Options(6, -1), default, new Vertex[Marker.MaxTriangleVertexCount]), Is.Zero);
       Assert.That(
@@ -198,7 +224,12 @@ namespace MB.FrameMarker.UnitTest
       var vertices = new Vertex[Marker.MaxTriangleVertexCount];
       for (ulong frame = 0; frame < 500; ++frame)
         Assert.That(
-          TestMarkers.GenerateTriangles(new Payload(frame * 7919, (long)frame * 166_667, 9), Options.Default, default, vertices),
+          TestMarkers.GenerateTriangles(
+            new Payload(MarkerKind.Frame, 9, frame * 7919, MarkerFlags.None, (long)frame * 166_667),
+            Options.Default,
+            default,
+            vertices
+          ),
           Is.Positive
         );
     }
@@ -210,7 +241,7 @@ namespace MB.FrameMarker.UnitTest
       var bits = new byte[Marker.MaxPackedModuleByteCount];
       foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.Sync })
       {
-        Assert.That(generator.TryGenerateModules(new Payload(12345, 678, 9, kind), bits, out var matrix), Is.True);
+        Assert.That(generator.TryGenerateModules(new Payload(kind, 9, 12345, MarkerFlags.None, 678), bits, out var matrix), Is.True);
         Assert.That(matrix.Bits.Length, Is.EqualTo(Marker.PackedModuleByteCount(matrix.Size)));
         for (int y = 0; y < matrix.Size; ++y)
         {
@@ -229,7 +260,7 @@ namespace MB.FrameMarker.UnitTest
     public void ModuleMatrix_TryFromBits_TakesQrSizesAndIgnoresThePadding()
     {
       var bits = new byte[Marker.MaxPackedModuleByteCount];
-      Assert.That(new MarkerGenerator().TryGenerateModules(new Payload(1, 2, 3, MarkerKind.Sync), bits, out var matrix), Is.True);
+      Assert.That(new MarkerGenerator().TryGenerateModules(new Payload(MarkerKind.Sync, 3, 1, MarkerFlags.None, 2), bits, out var matrix), Is.True);
       var copy = (byte[])bits.Clone();
       copy[78] |= 0x7F; // 625 modules: the last byte uses 1 bit
       Assert.That(ModuleMatrix.TryFromBits(25, copy, out var fromBits), Is.True);
@@ -237,7 +268,11 @@ namespace MB.FrameMarker.UnitTest
       Assert.That(ModuleMatrix.TryFromBits(24, copy, out _), Is.False);
       Assert.That(ModuleMatrix.TryFromBits(45, copy, out _), Is.False);
       Assert.That(ModuleMatrix.TryFromBits(25, copy.AsSpan(0, 78), out _), Is.False);
-      Assert.That(new MarkerGenerator().TryGenerateModules(new Payload(1, 2, 3, MarkerKind.Sync), new byte[78], out _), Is.False, "too small");
+      Assert.That(
+        new MarkerGenerator().TryGenerateModules(new Payload(MarkerKind.Sync, 3, 1, MarkerFlags.None, 2), new byte[78], out _),
+        Is.False,
+        "too small"
+      );
     }
 
     [Test]
@@ -256,11 +291,25 @@ namespace MB.FrameMarker.UnitTest
       const int Height = 131;
       var cases = new[]
       {
-        (new Payload(1, 2, 3), new Options(3, 4), new Point(5, 7)),
-        (new Payload(99, -5, 1, MarkerKind.SequenceEnd), new Options(1, 0), new Point(0, 0)),
-        (new Payload(7, 0, 0, MarkerKind.Sync), new Options(2, 4), new Point(3, 1)),
-        (new Payload(ulong.MaxValue, 1, 2, MarkerKind.Frame, 3, 4, 5, 6), new Options(2, 1), new Point(-9, -4)),
-        (new Payload(5, 6, 7), new Options(4, 2), new Point(100, 60)),
+        (new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2), new Options(3, 4), new Point(5, 7)),
+        (new Payload(MarkerKind.SequenceEnd, 1, 99, MarkerFlags.None, -5), new Options(1, 0), new Point(0, 0)),
+        (new Payload(MarkerKind.Sync, 0, 7, MarkerFlags.None, 0), new Options(2, 4), new Point(3, 1)),
+        (
+          new Payload(
+            MarkerKind.Frame,
+            2,
+            ulong.MaxValue,
+            MarkerFlags.None,
+            1,
+            targetFrameTicks: 4,
+            intendedDisplayTicks: 3,
+            cpuStartTicks: 5,
+            cpuBusyTicks: 6
+          ),
+          new Options(2, 1),
+          new Point(-9, -4)
+        ),
+        (new Payload(MarkerKind.Frame, 7, 5, MarkerFlags.None, 6), new Options(4, 2), new Point(100, 60)),
       };
       int bytesPerPixel = Marker.BytesPerPixel(format);
       int stride = (Width * bytesPerPixel) + 5; // padded rows
@@ -301,10 +350,26 @@ namespace MB.FrameMarker.UnitTest
       var modules = new byte[smallSize * smallSize];
       var pixels = new byte[largeSize * largeSize];
       Assert.That(
-        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(31, 41, 59)), small, default, modules, smallSize, smallSize, PixelFormat.Gray8)
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 59, 31, MarkerFlags.None, 41)),
+          small,
+          default,
+          modules,
+          smallSize,
+          smallSize,
+          PixelFormat.Gray8
+        )
       );
       Assert.That(
-        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(31, 41, 59)), large, default, pixels, largeSize, largeSize, PixelFormat.Gray8)
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 59, 31, MarkerFlags.None, 41)),
+          large,
+          default,
+          pixels,
+          largeSize,
+          largeSize,
+          PixelFormat.Gray8
+        )
       );
       for (int y = 0; y < largeSize; ++y)
       {
@@ -320,16 +385,33 @@ namespace MB.FrameMarker.UnitTest
       Array.Fill(pixels, (byte)128);
       var options = new Options(1, 4);
       Assert.That(
-        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), new Options(0), default, pixels, 64, 64, PixelFormat.Gray8),
-        Is.False
-      );
-      Assert.That(
-        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), options, default, pixels, 64, 64, PixelFormat.Rgb24, (64 * 3) - 1),
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
+          new Options(0),
+          default,
+          pixels,
+          64,
+          64,
+          PixelFormat.Gray8
+        ),
         Is.False
       );
       Assert.That(
         Marker.ModulesToBitmap(
-          TestMarkers.Encode(new Payload(1, 2, 3)),
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
+          options,
+          default,
+          pixels,
+          64,
+          64,
+          PixelFormat.Rgb24,
+          (64 * 3) - 1
+        ),
+        Is.False
+      );
+      Assert.That(
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
           options,
           default,
           pixels.AsSpan(0, pixels.Length - 1),
@@ -339,10 +421,29 @@ namespace MB.FrameMarker.UnitTest
         ),
         Is.False
       );
-      Assert.That(Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), options, default, pixels, -1, 64, PixelFormat.Gray8), Is.False);
+      Assert.That(
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
+          options,
+          default,
+          pixels,
+          -1,
+          64,
+          PixelFormat.Gray8
+        ),
+        Is.False
+      );
       Assert.That(pixels.All(p => p == 128), Is.True);
       Assert.That(
-        Marker.ModulesToBitmap(TestMarkers.Encode(new Payload(1, 2, 3)), options, new Point(500, 500), pixels, 64, 64, PixelFormat.Gray8),
+        Marker.ModulesToBitmap(
+          TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
+          options,
+          new Point(500, 500),
+          pixels,
+          64,
+          64,
+          PixelFormat.Gray8
+        ),
         Is.True
       );
       Assert.That(pixels.All(p => p == 128), Is.True, "outside the buffer: nothing to draw");
@@ -366,11 +467,21 @@ namespace MB.FrameMarker.UnitTest
       const int BaseVertex = 100;
       var payloads = new[]
       {
-        new Payload(1, 2, 3),
-        new Payload(99, -5, 1, MarkerKind.SequenceEnd),
-        new Payload(7, 0, 0, MarkerKind.Sync),
-        new Payload(ulong.MaxValue, 1, 2, MarkerKind.Frame, 3, 4, 5, 6),
-        new Payload(5, 6, 7, MarkerKind.SequenceStart),
+        new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2),
+        new Payload(MarkerKind.SequenceEnd, 1, 99, MarkerFlags.None, -5),
+        new Payload(MarkerKind.Sync, 0, 7, MarkerFlags.None, 0),
+        new Payload(
+          MarkerKind.Frame,
+          2,
+          ulong.MaxValue,
+          MarkerFlags.None,
+          1,
+          targetFrameTicks: 4,
+          intendedDisplayTicks: 3,
+          cpuStartTicks: 5,
+          cpuBusyTicks: 6
+        ),
+        new Payload(MarkerKind.SequenceStart, 7, 5, MarkerFlags.None, 6),
       };
       foreach (var payload in payloads)
       {
@@ -401,7 +512,7 @@ namespace MB.FrameMarker.UnitTest
       Assert.That(Marker.GridVertices(MarkerKind.Frame, new Options(0), default, new Vertex[Marker.MaxGridVertexCount]), Is.Zero);
       Assert.That(Marker.GridVertices(MarkerKind.Frame, Options.Default, default, new Vertex[1767]), Is.Zero);
       Assert.That(Marker.GridVertices(MarkerKind.Sync, Options.Default, default, new Vertex[680]), Is.EqualTo(680));
-      Assert.That(Marker.ModulesToGridIndices(TestMarkers.Encode(new Payload(1, 2, 3)), new int[12]), Is.Zero);
+      Assert.That(Marker.ModulesToGridIndices(TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)), new int[12]), Is.Zero);
       Assert.That(Marker.ModulesToGridIndices(default, new int[12]), Is.Zero);
     }
   }

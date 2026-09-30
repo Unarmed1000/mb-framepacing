@@ -41,18 +41,26 @@ class MarkerFlags(IntFlag):
 
 @dataclass(frozen=True, slots=True)
 class Payload:
-    """What a marker carries: the frame index (u64), the animation time in TimeSpan ticks (100 ns, i64), the run id (u32), the kind
-    and, when the application paces its frames, the intended display time (i64 ticks on the frame pacer's steady clock, any epoch, the
-    same clock for the whole run) and the target frame time (u32 ticks, 166_667 for 60 fps), then the CPU start time (i64 ticks on the
-    same steady clock) and CPU busy (u32 ticks), the preferred frame time (u32 ticks) and the flags; 0 = unknown for the numbers. A sync
-    marker only carries the frame index."""
+    """What a marker carries, its fields in the order of the wire format: the kind, the run id (u32), the frame index (u64), the flags
+    and the animation time in TimeSpan ticks (100 ns, i64), then, when the application paces its frames, the preferred frame time and
+    the target frame time (u32 ticks, 166_667 for 60 fps) and the intended display time (i64 ticks on the frame pacer's steady clock, any
+    epoch, the same clock for the whole run), then the CPU start time (i64 ticks on the same steady clock) and CPU busy (u32 ticks); 0 =
+    unknown for the timing fields. A sync marker only carries the kind, run id and frame index."""
 
+    kind: MarkerKind
+    run_id: int
     frame_index: int
+    flags: MarkerFlags
+    """MarkerFlags.STATIC_AFTER when nothing animates while this frame is on screen, MarkerFlags.STATIC_BEFORE when nothing animated while
+    the frame before it was; the other bits are reserved (0)."""
     animation_ticks: int
-    run_id: int = 0
-    kind: MarkerKind = MarkerKind.FRAME
-    intended_display_ticks: int = 0
+    preferred_frame_ticks: int = 0
+    """The interval the application wants to run at, in ticks (100 ns, u32): what it would aim for if nothing held it back. It differs
+    from target_frame_ticks only while the pacer runs slower than it wants (Swappy lowered to 30 fps: preferred 166_667, target 333_333). A
+    30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, ON_DEMAND_FRAME_TICKS = frames only when something
+    changes (also allowed in target_frame_ticks)."""
     target_frame_ticks: int = 0
+    intended_display_ticks: int = 0
     cpu_start_ticks: int = 0
     """CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in ticks (100 ns) on the same steady clock
     as the intended display time. Anywhere inside a refresh; frames can overlap. 0 = unknown."""
@@ -60,14 +68,6 @@ class Payload:
     """CPU busy: how long the CPU worked on this frame before presenting it (PresentMon's MsCPUBusy), from the CPU start time until
     Present is called, in ticks (100 ns, u32). The marker is drawn last, so the application measures it as it draws the marker. It does
     not include the GPU's work. May span several refreshes. 0 = unknown."""
-    preferred_frame_ticks: int = 0
-    """The interval the application wants to run at, in ticks (100 ns, u32): what it would aim for if nothing held it back. It differs
-    from target_frame_ticks only while the pacer runs slower than it wants (Swappy lowered to 30 fps: preferred 166_667, target 333_333). A
-    30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, ON_DEMAND_FRAME_TICKS = frames only when something
-    changes (also allowed in target_frame_ticks)."""
-    flags: MarkerFlags = MarkerFlags.NONE
-    """MarkerFlags.STATIC_AFTER when nothing animates while this frame is on screen, MarkerFlags.STATIC_BEFORE when nothing animated while
-    the frame before it was; the other bits are reserved (0)."""
 
     def with_kind(self, kind: MarkerKind) -> Self:
         return replace(self, kind=kind)

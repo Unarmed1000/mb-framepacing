@@ -243,6 +243,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
     `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
     into the static frame is judged. Independent flags, not an enum; bits 2 to 7 are reserved (write 0, decoders keep them).
+  - **Field order:** every payload type (C++ and C# `Payload`, Python `Payload`, the tools' `MarkerPayload`) lists its fields in the
+    order of the wire format: kind, run id, frame index, flags, animation time (required in C# and Python), then the optional
+    preferred frame time, target frame time, intended display time, CPU start time and CPU busy. The golden CSVs' columns
+    (`sdk/test-data/markers`) and the docs' field lists follow it; keep new fields in their wire position.
   - **Frame rates describe the frames that animate:** a static frame's time on screen (the next frame's display time step, flag
     `StaticBefore`) is left out of average fps, the lows and the display time step statistics and histogram
     (`RunStatistics.CountsTowardFrameRate`, `RunChartData.FrameRateSteps`), and counted (`excludedStaticFrames`); the tile, the report's

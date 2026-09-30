@@ -17,9 +17,12 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void EveryMarkerKind_IsVersion6()
     {
-      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3)).Size, Is.EqualTo(41));
-      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(1, 2, 3, MarkerKind.SequenceEnd)).Size, Is.EqualTo(41));
-      var start = new MarkerPayload(1, 2, 3, MarkerKind.SequenceStart);
+      Assert.That(MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FrameMarker.MarkerFlags.None, 2)).Size, Is.EqualTo(41));
+      Assert.That(
+        MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.SequenceEnd, 3, 1, MB.FrameMarker.MarkerFlags.None, 2)).Size,
+        Is.EqualTo(41)
+      );
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FrameMarker.MarkerFlags.None, 2);
       Assert.That(MarkerRenderer.GenerateModules(start).Size, Is.EqualTo(41));
       var full = MarkerRenderer.GenerateModules(
         start,
@@ -31,7 +34,15 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void PacingFields_SurviveRenderingAndDecoding()
     {
-      var payload = new MarkerPayload(10, 20, 30, MarkerKind.Frame, 1_234_567_890_123, 166_667);
+      var payload = new MarkerPayload(
+        MarkerKind.Frame,
+        30,
+        10,
+        MB.FrameMarker.MarkerFlags.None,
+        20,
+        TargetFrameTicks: 166_667,
+        IntendedDisplayTicks: 1_234_567_890_123
+      );
       var image = new GrayImage(400, 400, 96);
       MarkerRenderer.Render(image, payload, 20, 20, 3, MarkerRenderer.RecommendedQuietZoneModules);
       var result = new MarkerDecoder().Decode(image);
@@ -57,9 +68,9 @@ namespace MB.FramePacing.Marker.UnitTest
     {
       // 294 px markers at the top, middle and bottom of the frame
       var image = new GrayImage(640, 1100, 128);
-      MarkerRenderer.Render(image, new MarkerPayload(10, 100, 1), 32, 32, 6);
-      MarkerRenderer.Render(image, new MarkerPayload(10, 100, 1), 32, 400, 6);
-      MarkerRenderer.Render(image, new MarkerPayload(11, 200, 1), 32, 768, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FrameMarker.MarkerFlags.None, 100), 32, 32, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FrameMarker.MarkerFlags.None, 100), 32, 400, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 11, MB.FrameMarker.MarkerFlags.None, 200), 32, 768, 6);
 
       var results = new MarkerDecoder(tryHarder: true).DecodeAll(image);
 

@@ -41,13 +41,13 @@ namespace MB.FramePacing.Analysis.UnitTest
       )
       {
         var payload = new MarkerPayload(
-          frameIndex,
-          animationMs * Ms,
-          runId,
           kind,
-          TargetFrameTicks: targetFrameTicks,
+          runId,
+          frameIndex,
+          flags,
+          animationMs * Ms,
           PreferredFrameTicks: preferredFrameTicks,
-          Flags: flags
+          TargetFrameTicks: targetFrameTicks
         );
         for (int i = 0; i < captures; ++i)
           Rows.Add(new CaptureRow(Next, Next * Period, CaptureStatus.Decoded, payload, start));

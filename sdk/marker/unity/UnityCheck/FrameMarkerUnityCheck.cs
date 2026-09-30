@@ -70,19 +70,20 @@ public static class FrameMarkerUnityCheck
     {
       var f = lines[i].Split(',');
       var payload = new Payload(
-        ulong.Parse(f[2], CultureInfo.InvariantCulture),
-        long.Parse(f[3], CultureInfo.InvariantCulture),
-        uint.Parse(f[1], CultureInfo.InvariantCulture),
         (MarkerKind)byte.Parse(f[0], CultureInfo.InvariantCulture),
+        uint.Parse(f[1], CultureInfo.InvariantCulture),
+        ulong.Parse(f[2], CultureInfo.InvariantCulture),
+        (MarkerFlags)byte.Parse(f[3], CultureInfo.InvariantCulture),
         long.Parse(f[4], CultureInfo.InvariantCulture),
-        uint.Parse(f[5], CultureInfo.InvariantCulture),
-        long.Parse(f[6], CultureInfo.InvariantCulture),
-        uint.Parse(f[7], CultureInfo.InvariantCulture),
-        uint.Parse(f[8], CultureInfo.InvariantCulture),
-        (MarkerFlags)byte.Parse(f[9], CultureInfo.InvariantCulture)
+        preferredFrameTicks: uint.Parse(f[5], CultureInfo.InvariantCulture),
+        targetFrameTicks: uint.Parse(f[6], CultureInfo.InvariantCulture),
+        intendedDisplayTicks: long.Parse(f[7], CultureInfo.InvariantCulture),
+        cpuStartTicks: long.Parse(f[8], CultureInfo.InvariantCulture),
+        cpuBusyTicks: uint.Parse(f[9], CultureInfo.InvariantCulture)
       );
-      // Columns: kind, runId, frameIndex, animationTicks, intendedDisplayTicks, targetFrameTicks, cpuStartTicks, cpuBusyTicks,
-      // preferredFrameTicks, flags, startUtcTicks, sequenceIdHex (empty for other kinds), size, modulesHex
+      // Columns (the payload's in the order of the wire format): kind, runId, frameIndex, flags, animationTicks, preferredFrameTicks,
+      // targetFrameTicks, intendedDisplayTicks, cpuStartTicks, cpuBusyTicks, startUtcTicks, sequenceIdHex (empty for other kinds), size,
+      // modulesHex
       var sequenceId = f[11].Length > 0 ? SequenceId.FromBytes(FromHex(f[11])) : default;
       var start = new StartMetadata(long.Parse(f[10], CultureInfo.InvariantCulture), sequenceId);
       if (
@@ -103,15 +104,20 @@ public static class FrameMarkerUnityCheck
   {
     var cases = new[]
     {
-      (Payload: new Payload(4242, 9_876_543, 7), Start: default(StartMetadata), Options: new Options(3, 4), Origin: new Point(17, 23)),
       (
-        new Payload(77, 1_234, 7, MarkerKind.SequenceStart),
+        Payload: new Payload(MarkerKind.Frame, 7, 4242, MarkerFlags.None, 9_876_543),
+        Start: default(StartMetadata),
+        Options: new Options(3, 4),
+        Origin: new Point(17, 23)
+      ),
+      (
+        new Payload(MarkerKind.SequenceStart, 7, 77, MarkerFlags.None, 1_234),
         new StartMetadata(638_000_000_000_000_000, new SequenceId(1, 2)),
         new Options(1, 0),
         new Point(33, 7)
       ),
-      (new Payload(99, 5, 7, MarkerKind.SequenceEnd), default(StartMetadata), new Options(2, 2), new Point(151, 41)),
-      (new Payload(4242, 0, 0, MarkerKind.Sync), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
+      (new Payload(MarkerKind.SequenceEnd, 7, 99, MarkerFlags.None, 5), default(StartMetadata), new Options(2, 2), new Point(151, 41)),
+      (new Payload(MarkerKind.Sync, 0, 4242, MarkerFlags.None, 0), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
     };
     int failures = 0;
     var generator = new MarkerGenerator();
@@ -276,7 +282,10 @@ public static class FrameMarkerUnityCheck
     {
       foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.Sync })
       {
-        if (!new MarkerGenerator().TryGenerateModules(new Payload(99, 1234, 5, kind), bits, out var matrix) || !texture.Update(matrix, 4))
+        if (
+          !new MarkerGenerator().TryGenerateModules(new Payload(kind, 5, 99, MarkerFlags.None, 1234), bits, out var matrix)
+          || !texture.Update(matrix, 4)
+        )
           throw new InvalidOperationException("FrameMarkerTexture.Update failed");
         int size = matrix.Size + 8;
         var pixels = texture.Texture.GetPixels32();
