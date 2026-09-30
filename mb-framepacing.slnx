@@ -4,6 +4,7 @@
     <Platform Name="Any CPU" />
   </Configurations>
   <Folder Name="/sdk/">
+    <Project Path="sdk/csharp/core/MB.FramePacing.csproj" />
     <Project Path="sdk/csharp/data/MB.FramePacing.Data.csproj" />
     <Project Path="sdk/csharp/marker/MB.FramePacing.Marker.csproj" />
   </Folder>
@@ -22,6 +23,7 @@
     <Project Path="measure/tools/DocImages/DocImages.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="sdk/csharp/core/UnitTest/MB.FramePacing.UnitTest.csproj" />
     <Project Path="sdk/csharp/data/UnitTest/MB.FramePacing.Data.UnitTest.csproj" />
     <Project Path="sdk/csharp/marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Analysis/UnitTest/MB.FramePacing.Analysis.UnitTest.csproj" />

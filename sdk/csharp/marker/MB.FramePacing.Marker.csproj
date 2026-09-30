@@ -15,4 +15,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="MB.FramePacing.Marker.UnitTest" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\core\MB.FramePacing.csproj" />
+  </ItemGroup>
 </Project>

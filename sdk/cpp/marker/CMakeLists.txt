@@ -26,7 +26,7 @@ target_sources(mb_framepacing_marker
       include/mb/framepacing/marker/Payload.hpp
       include/mb/framepacing/marker/PixelFormat.hpp
       include/mb/framepacing/marker/Point.hpp
-      include/mb/framepacing/marker/QuadRect.hpp
+      include/mb/framepacing/marker/MarkerQuad.hpp
       include/mb/framepacing/marker/SequenceId.hpp
       include/mb/framepacing/marker/StartMetadata.hpp
       include/mb/framepacing/marker/Vertex.hpp)

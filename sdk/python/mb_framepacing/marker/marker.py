@@ -13,15 +13,16 @@ import struct
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+from ..rectangle import Rectangle
 from .structures import (
     SEQUENCE_ID_BYTE_COUNT,
     MarkerFlags,
     MarkerKind,
+    MarkerQuad,
     ModuleMatrix,
     Options,
     Payload,
     Point,
-    QuadRect,
     SequenceId,
     StartMetadata,
     Vertex,
@@ -222,7 +223,7 @@ def generate_modules(payload: Payload, metadata: StartMetadata | None = None) ->
     return ModuleMatrix(symbol.size, bytes(bits))
 
 
-def modules_to_quads(matrix: ModuleMatrix, options: Options, origin: Point) -> list[QuadRect]:
+def modules_to_quads(matrix: ModuleMatrix, options: Options, origin: Point) -> list[MarkerQuad]:
     """The marker as quads, for renderers that fill rectangles: the light background (symbol + quiet zone) first, then one dark quad per
     horizontal run of dark modules. Raises ValueError if the options are invalid."""
     if not is_valid(options):
@@ -288,31 +289,31 @@ def modules_to_grid_indices(matrix: ModuleMatrix, base_vertex: int = 0) -> list[
     indices = [base_vertex + i for i in (0, 1, 3, 3, 1, 2)]
     # With 1 px modules at the origin, a run's quad is its columns and row
     for run in _walk(matrix, Options(1, 0), Point(0, 0))[1:]:
-        top_left = base_vertex + 4 + (run.top * corners) + run.left
-        top_right = base_vertex + 4 + (run.top * corners) + run.right
+        top_left = base_vertex + 4 + (run.rect.top * corners) + run.rect.left
+        top_right = base_vertex + 4 + (run.rect.top * corners) + run.rect.right
         indices += (top_left, top_right, top_left + corners, top_left + corners, top_right, top_right + corners)
     return indices
 
 
-def _corners(quad: QuadRect) -> tuple[Vertex, Vertex, Vertex, Vertex]:
+def _corners(quad: MarkerQuad) -> tuple[Vertex, Vertex, Vertex, Vertex]:
     """TL, TR, BR, BL."""
     luma = 0 if quad.dark else 255
     return (
-        Vertex(quad.left, quad.top, luma),
-        Vertex(quad.right, quad.top, luma),
-        Vertex(quad.right, quad.bottom, luma),
-        Vertex(quad.left, quad.bottom, luma),
+        Vertex(quad.rect.left, quad.rect.top, luma),
+        Vertex(quad.rect.right, quad.rect.top, luma),
+        Vertex(quad.rect.right, quad.rect.bottom, luma),
+        Vertex(quad.rect.left, quad.rect.bottom, luma),
     )
 
 
-def _walk(matrix: ModuleMatrix, options: Options, origin: Point) -> list[QuadRect]:
+def _walk(matrix: ModuleMatrix, options: Options, origin: Point) -> list[MarkerQuad]:
     """The marker in draw order: the background quad, then every horizontal run of dark modules, row by row."""
     module_size = options.module_size_px
     marker_size = (matrix.size + (2 * options.quiet_zone_modules)) * module_size
     symbol_left = origin.x + (options.quiet_zone_modules * module_size)
     symbol_top = origin.y + (options.quiet_zone_modules * module_size)
 
-    quads = [QuadRect(origin.x, origin.y, marker_size, marker_size, False)]
+    quads = [MarkerQuad(Rectangle(origin.x, origin.y, marker_size, marker_size), False)]
     for y in range(matrix.size):
         top = symbol_top + (y * module_size)
         x = 0
@@ -323,7 +324,7 @@ def _walk(matrix: ModuleMatrix, options: Options, origin: Point) -> list[QuadRec
             run_start = x
             while x < matrix.size and matrix.is_dark(x, y):
                 x += 1
-            quads.append(QuadRect(symbol_left + (run_start * module_size), top, (x - run_start) * module_size, module_size, True))
+            quads.append(MarkerQuad(Rectangle(symbol_left + (run_start * module_size), top, (x - run_start) * module_size, module_size), True))
     return quads
 
 

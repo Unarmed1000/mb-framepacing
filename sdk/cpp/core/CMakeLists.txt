@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# The core module: the types every module shares (the library version, the tick units, the steady clock).
+# The core module: the types every module shares (the library version, the tick units, Rectangle).
 
 add_library(mb_framepacing_core STATIC)
 add_library(mb_framepacing::core ALIAS mb_framepacing_core)
@@ -15,7 +15,7 @@ target_sources(mb_framepacing_core
     FILES
       include/mb/framepacing/Core.hpp
       include/mb/framepacing/core/LibraryVersion.hpp
-      include/mb/framepacing/core/SteadyClock.hpp
+      include/mb/framepacing/core/Rectangle.hpp
       include/mb/framepacing/core/Ticks.hpp
       ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Version.hpp)
 target_compile_features(mb_framepacing_core PUBLIC cxx_std_20)

@@ -1,5 +1,5 @@
-#ifndef MB_FRAMEPACING_CORE_STEADYCLOCK_HPP
-#define MB_FRAMEPACING_CORE_STEADYCLOCK_HPP
+#ifndef MB_FRAMEPACING_CORE_TESTS_STEADYCLOCK_HPP
+#define MB_FRAMEPACING_CORE_TESTS_STEADYCLOCK_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -9,8 +9,8 @@
 
 namespace MB::FramePacing
 {
-  //! The steady clock in ticks: std::chrono::steady_clock (QueryPerformanceCounter on Windows, CLOCK_MONOTONIC on Linux and Android). Its
-  //! epoch is arbitrary but the same for the whole process, which is what the marker's intended display time and CPU start time need.
+  //! A test helper: std::chrono::steady_clock in ticks, to check TickDuration against a real clock. The SDK itself never reads a clock;
+  //! applications pass their own clock's times.
   struct SteadyClock
   {
     static int64_t NowTicks() noexcept

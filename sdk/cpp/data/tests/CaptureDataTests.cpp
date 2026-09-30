@@ -80,9 +80,9 @@ TEST(CaptureData, TheHeaderFieldsAreWhereTheFormatSays)
   EXPECT_EQ(header.FrameRateDenominator, 1001u);
   EXPECT_EQ(header.SourceWidth, 1920);
   EXPECT_EQ(header.SourceHeight, 1080);
-  EXPECT_EQ(header.Region, (FD::DataRect{8, 16, 960, 540}));
+  EXPECT_EQ(header.Region, (MB::FramePacing::Rectangle(8, 16, 960, 540)));
   ASSERT_EQ(header.Markers.size(), 2u);
-  EXPECT_EQ(header.Markers[1].Bounds.Y, 33);
+  EXPECT_EQ(header.Markers[1].Bounds.Y(), 33);
   EXPECT_EQ(header.Markers[1].ModuleSizePx, 3.0);
   EXPECT_TRUE(header.FramesStored);
   EXPECT_TRUE(header.Camera);

@@ -32,8 +32,8 @@ def modules_to_bitmap(
     if stride < row_bytes or len(buffer) < needed:
         raise ValueError(f"a buffer of {len(buffer)} bytes is too small for {width} x {height} {pixel_format.name} pixels, stride {stride}")
     for quad in modules_to_quads(matrix, options, origin):
-        left, right = max(quad.left, 0), min(quad.right, width)
-        top, bottom = max(quad.top, 0), min(quad.bottom, height)
+        left, right = max(quad.rect.left, 0), min(quad.rect.right, width)
+        top, bottom = max(quad.rect.top, 0), min(quad.rect.bottom, height)
         if left >= right or top >= bottom:
             continue
         luma = 0 if quad.dark else 255

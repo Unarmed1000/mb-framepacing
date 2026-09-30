@@ -74,7 +74,7 @@ namespace MB::FramePacing::Marker
       const int32_t symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
       const int32_t symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
 
-      if (!emit(QuadRect{origin.X, origin.Y, markerSize, markerSize, false}))
+      if (!emit(MarkerQuad{Rectangle(origin.X, origin.Y, markerSize, markerSize), false}))
       {
         return false;
       }
@@ -82,18 +82,18 @@ namespace MB::FramePacing::Marker
                       [&](const int32_t row, const int32_t first, const int32_t end) noexcept
                       {
                         const int32_t top = symbolTop + (row * moduleSize);
-                        return emit(QuadRect{symbolLeft + (first * moduleSize), top, (end - first) * moduleSize, moduleSize, true});
+                        return emit(MarkerQuad{Rectangle(symbolLeft + (first * moduleSize), top, (end - first) * moduleSize, moduleSize), true});
                       });
     }
 
     //! 6 vertices: (TL, TR, BL) (BL, TR, BR), clockwise on screen (+y down).
-    void WriteTriangles(const QuadRect& quad, const std::span<Vertex, 6> dst) noexcept
+    void WriteTriangles(const MarkerQuad& quad, const std::span<Vertex, 6> dst) noexcept
     {
       const uint8_t luma = quad.Dark ? 0u : 255u;
-      const Vertex topLeft{quad.Left(), quad.Top(), luma};
-      const Vertex topRight{quad.Right(), quad.Top(), luma};
-      const Vertex bottomRight{quad.Right(), quad.Bottom(), luma};
-      const Vertex bottomLeft{quad.Left(), quad.Bottom(), luma};
+      const Vertex topLeft{quad.Rect.Left(), quad.Rect.Top(), luma};
+      const Vertex topRight{quad.Rect.Right(), quad.Rect.Top(), luma};
+      const Vertex bottomRight{quad.Rect.Right(), quad.Rect.Bottom(), luma};
+      const Vertex bottomLeft{quad.Rect.Left(), quad.Rect.Bottom(), luma};
       dst[0] = topLeft;
       dst[1] = topRight;
       dst[2] = bottomLeft;
@@ -103,14 +103,14 @@ namespace MB::FramePacing::Marker
     }
 
     //! 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2), clockwise on screen. first is the index of the first vertex.
-    void WriteIndexed(const QuadRect& quad, const std::span<Vertex, 4> dstVertices, const std::span<uint32_t, 6> dstIndices,
+    void WriteIndexed(const MarkerQuad& quad, const std::span<Vertex, 4> dstVertices, const std::span<uint32_t, 6> dstIndices,
                       const uint32_t first) noexcept
     {
       const uint8_t luma = quad.Dark ? 0u : 255u;
-      dstVertices[0] = Vertex{quad.Left(), quad.Top(), luma};
-      dstVertices[1] = Vertex{quad.Right(), quad.Top(), luma};
-      dstVertices[2] = Vertex{quad.Right(), quad.Bottom(), luma};
-      dstVertices[3] = Vertex{quad.Left(), quad.Bottom(), luma};
+      dstVertices[0] = Vertex{quad.Rect.Left(), quad.Rect.Top(), luma};
+      dstVertices[1] = Vertex{quad.Rect.Right(), quad.Rect.Top(), luma};
+      dstVertices[2] = Vertex{quad.Rect.Right(), quad.Rect.Bottom(), luma};
+      dstVertices[3] = Vertex{quad.Rect.Left(), quad.Rect.Bottom(), luma};
       dstIndices[0] = first + 0u;
       dstIndices[1] = first + 1u;
       dstIndices[2] = first + 3u;
@@ -119,11 +119,11 @@ namespace MB::FramePacing::Marker
       dstIndices[5] = first + 2u;
     }
 
-    std::size_t BuildQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<QuadRect> dst) noexcept
+    std::size_t BuildQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<MarkerQuad> dst) noexcept
     {
       std::size_t count = 0;
       const bool complete = WalkQuads(matrix, options, origin,
-                                      [&](const QuadRect& quad) noexcept
+                                      [&](const MarkerQuad& quad) noexcept
                                       {
                                         if (count >= dst.size())
                                         {
@@ -139,7 +139,7 @@ namespace MB::FramePacing::Marker
     {
       std::size_t count = 0;
       const bool complete = WalkQuads(matrix, options, origin,
-                                      [&](const QuadRect& quad) noexcept
+                                      [&](const MarkerQuad& quad) noexcept
                                       {
                                         if (dst.size() - count < 6u)
                                         {
@@ -158,7 +158,7 @@ namespace MB::FramePacing::Marker
       IndexedCount count;
       const bool complete =
         WalkQuads(matrix, options, origin,
-                  [&](const QuadRect& quad) noexcept
+                  [&](const MarkerQuad& quad) noexcept
                   {
                     if (dstVertices.size() - count.VertexCount < 4u || dstIndices.size() - count.IndexCount < 6u)
                     {
@@ -174,13 +174,13 @@ namespace MB::FramePacing::Marker
     }
 
     //! Fill a quad, clipped to the buffer, with its luma in every colour channel (alpha 255).
-    void FillQuad(const QuadRect& quad, const std::span<uint8_t> dst, const int32_t width, const int32_t height, const std::size_t bytesPerPixel,
+    void FillQuad(const MarkerQuad& quad, const std::span<uint8_t> dst, const int32_t width, const int32_t height, const std::size_t bytesPerPixel,
                   const std::size_t stride) noexcept
     {
-      const int32_t left = std::max(quad.Left(), 0);
-      const int32_t right = std::min(quad.Right(), width);
-      const int32_t top = std::max(quad.Top(), 0);
-      const int32_t bottom = std::min(quad.Bottom(), height);
+      const int32_t left = std::max(quad.Rect.Left(), 0);
+      const int32_t right = std::min(quad.Rect.Right(), width);
+      const int32_t top = std::max(quad.Rect.Top(), 0);
+      const int32_t bottom = std::min(quad.Rect.Bottom(), height);
       if (left >= right || top >= bottom)
       {
         return;
@@ -243,7 +243,7 @@ namespace MB::FramePacing::Marker
     return ModuleMatrix::TryFromBits(size, bits, rMatrix);
   }
 
-  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<QuadRect> dst) noexcept
+  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<MarkerQuad> dst) noexcept
   {
     return IsValid(options) && matrix.Size() > 0 ? BuildQuads(matrix, options, origin, dst) : 0u;
   }
@@ -338,7 +338,7 @@ namespace MB::FramePacing::Marker
       return false;
     }
     return WalkQuads(matrix, options, origin,
-                     [&](const QuadRect& quad) noexcept
+                     [&](const MarkerQuad& quad) noexcept
                      {
                        FillQuad(quad, dst, width, height, bytesPerPixel, rowStride);
                        return true;

@@ -39,9 +39,9 @@ namespace
     return std::nullopt;
   }
 
-  Json Rect(const FD::DataRect& rect)
+  Json Rect(const MB::FramePacing::Rectangle& rect)
   {
-    return Json::array({rect.X, rect.Y, rect.Width, rect.Height});
+    return Json::array({rect.X(), rect.Y(), rect.Width(), rect.Height()});
   }
 
   Json Counts(const std::vector<std::string>& names)

@@ -9,5 +9,5 @@
 
 namespace MB.FramePacing.Data
 {
-  public readonly record struct MarkerLocation(DataRect Bounds, double ModuleSizePx);
+  public readonly record struct MarkerLocation(Rectangle Bounds, double ModuleSizePx);
 }

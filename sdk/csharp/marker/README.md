@@ -4,14 +4,15 @@ Draws the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) frame 
 QR code that carries the frame index and the animation time. A capture of the display output, analysed with the mb-framepacing
 tools, then shows the **animation error**: how far what the application animated is from what was actually shown on screen.
 
-`MB.FramePacing.Marker`, the SDK's C# marker module: .NET Standard 2.1, C# 9, no dependencies. It is the same API as the C++ marker
+`MB.FramePacing.Marker`, the SDK's C# marker module: .NET Standard 2.1, C# 9, no dependencies besides the SDK's core
+([`MB.FramePacing`](../core/README.md)). It is the same API as the C++ marker
 module and draws exactly the same pixels (the tests check it against the golden images in [`test-data/markers`](../../test-data/markers)). The format is specified in
 [marker-format.md](../../doc/marker-format.md); what to write in each field is in [Filling the marker fields](../../doc/marker-fields.md).
 
 ## Add it
 
 It is not published as a NuGet package. Use the source at an `sdk-v*` tag, as a project reference to
-`MB.FramePacing.Marker.csproj` or as a copy of `source/`. **Unity:** use the [Unity package](../../unity/README.md) instead; it contains
+`MB.FramePacing.Marker.csproj` (it references `../core`) or as a copy of `source/` and `../core/source/`. **Unity:** use the [Unity package](../../unity/README.md) instead; it contains
 this module plus an overlay component.
 
 ## Quick start
@@ -66,7 +67,7 @@ This is the most efficient way without a dedicated shader; the shaders (1 and 2 
 | 3   | **Static grid**: `GridVertices` once, then `ModulesToGridIndices`                   | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                     |
 | 4   | **Module texture scaled up**: `ModulesToBitmap` at 1 px per module                  | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact    |
 | 5   | **Triangles**: `ModulesToIndexed` or `ModulesToTriangles`                           | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                        |
-| 6   | **Rectangles**: `ModulesToQuads`                                                    | About 440 filled rectangles (`QuadRect`)                     | A 2D fill-rectangle API                                                       |
+| 6   | **Rectangles**: `ModulesToQuads`                                                    | About 440 filled rectangles (`MarkerQuad`)                   | A 2D fill-rectangle API                                                       |
 | 7   | **Full-size bitmap**: `ModulesToBitmap`                                             | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images                  |
 
 Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shaders for 1 and 2
@@ -77,18 +78,18 @@ Every option draws exactly the same pixels, from one encode per frame (the 211 b
 
 Buffers are spans: `ReadOnlySpan<T>` in, `Span<T>` out; an array or a `stackalloc` passes straight in. Nothing allocates per frame.
 
-| Type or member                                                                                                                                     | What it does                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                                             | What a marker carries                                                                |
-| `Options`, `Point`                                                                                                                                 | Size and place                                                                       |
-| `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                                    | Encode the marker into your bytes: its QR symbol, 1 bit per module                   |
-| `FrameMarker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                                        | A static grid uploaded once, and per frame only the indices                          |
-| `FrameMarker.ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                                                      | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
-| `FrameMarker.ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`QuadRect`: `X`, `Y`, `Width`, `Height`, `Left`, `Right`, `Top`, `Bottom`) | Draw it as indexed triangles, a triangle list or rectangles                          |
-| `FrameMarker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount`                         | Buffer sizes that fit every marker kind                                              |
-| `FrameMarker.MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                                                | Sizing and placement                                                                 |
-| `FrameMarker.MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                                         | Module size for a capture's scaling                                                  |
-| `FrameMarker.EncodePayload`, `TryDecodePayload`, `SecondsToTicks`, `ToDateTimeTicks`                                                               | The wire format and its time units                                                   |
+| Type or member                                                                                                             | What it does                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                     | What a marker carries                                                                |
+| `Options`, `Point`                                                                                                         | Size and place                                                                       |
+| `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                            | Encode the marker into your bytes: its QR symbol, 1 bit per module                   |
+| `FrameMarker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                | A static grid uploaded once, and per frame only the indices                          |
+| `FrameMarker.ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `FrameMarker.ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: `Rect`, a `Rectangle`, and `Dark`)   | Draw it as indexed triangles, a triangle list or rectangles                          |
+| `FrameMarker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
+| `FrameMarker.MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                        | Sizing and placement                                                                 |
+| `FrameMarker.MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                 | Module size for a capture's scaling                                                  |
+| `FrameMarker.EncodePayload`, `TryDecodePayload`, `SecondsToTicks`, `ToDateTimeTicks`                                       | The wire format and its time units                                                   |
 
 `ModuleMatrix` is a `ref struct` view over the bytes you give `TryGenerateModules`: keep the bytes, not the view, in a field. One encode
 can feed several outputs. The drawing methods return 0 (an empty `IndexedCount`, false) when the options are invalid, the matrix is empty

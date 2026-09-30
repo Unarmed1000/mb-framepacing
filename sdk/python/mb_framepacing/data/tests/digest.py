@@ -15,8 +15,8 @@ from .. import (
     SUMMARY_FILE_NAME,
     AnalysisSummary,
     CaptureDataReader,
-    DataRect,
     FrameRow,
+    Rectangle,
     read_captures,
     read_frames,
     read_summary,
@@ -63,7 +63,7 @@ def compute(clip: Path) -> dict[str, JsonValue]:
     }
 
 
-def _rect(rect: DataRect) -> list[JsonValue]:
+def _rect(rect: Rectangle) -> list[JsonValue]:
     return [rect.x, rect.y, rect.width, rect.height]
 
 

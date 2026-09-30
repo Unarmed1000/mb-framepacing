@@ -39,7 +39,7 @@ namespace MB.FramePacing.Marker.Unity
     /// Draw <paramref name="quads"/> (pixel coordinates of an <paramref name="outputWidth"/> x <paramref name="outputHeight"/> output,
     /// top-left origin) into the current render target with <paramref name="material"/>. Does not allocate.
     /// </summary>
-    public static void DrawQuads(Material material, ReadOnlySpan<QuadRect> quads, int outputWidth, int outputHeight)
+    public static void DrawQuads(Material material, ReadOnlySpan<MarkerQuad> quads, int outputWidth, int outputHeight)
     {
       GL.PushMatrix();
       _ = material.SetPass(0);
@@ -49,10 +49,10 @@ namespace MB.FramePacing.Marker.Unity
       {
         var quad = quads[i];
         GL.Color(quad.Dark ? Color.black : Color.white);
-        GL.Vertex3(quad.Left, outputHeight - quad.Top, 0f);
-        GL.Vertex3(quad.Right, outputHeight - quad.Top, 0f);
-        GL.Vertex3(quad.Right, outputHeight - quad.Bottom, 0f);
-        GL.Vertex3(quad.Left, outputHeight - quad.Bottom, 0f);
+        GL.Vertex3(quad.Rect.Left, outputHeight - quad.Rect.Top, 0f);
+        GL.Vertex3(quad.Rect.Right, outputHeight - quad.Rect.Top, 0f);
+        GL.Vertex3(quad.Rect.Right, outputHeight - quad.Rect.Bottom, 0f);
+        GL.Vertex3(quad.Rect.Left, outputHeight - quad.Rect.Bottom, 0f);
       }
       GL.End();
       GL.PopMatrix();

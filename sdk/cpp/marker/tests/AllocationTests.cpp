@@ -122,7 +122,7 @@ namespace FM = MB::FramePacing::Marker;
 namespace
 {
   // Static: several of these are tens of kilobytes. Sized with the library's own Max... helpers, exactly like an engine would.
-  std::array<FM::QuadRect, FM::MaxQuadCount()> g_quads{};
+  std::array<FM::MarkerQuad, FM::MaxQuadCount()> g_quads{};
   std::array<FM::Vertex, FM::MaxTriangleVertexCount()> g_triangleVertices{};
   std::array<FM::Vertex, FM::MaxIndexedVertexCount()> g_indexedVertices{};
   std::array<uint32_t, FM::MaxIndexCount()> g_indices{};

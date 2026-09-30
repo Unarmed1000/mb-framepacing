@@ -165,7 +165,8 @@ Marker size in source pixels = `(modules + 2 × QuietZoneModules) × ModuleSizeP
 ## Geometry
 
 - Pixel coordinates with the **origin at the top-left**, **+x right**, **+y down**.
-- Every vertex lies on an integer **pixel edge**. A quad (`QuadRect`: `X`, `Y`, `Width`, `Height`) covers exactly the pixels `[Left, Right) × [Top, Bottom)`.
+- Every vertex lies on an integer **pixel edge**. A quad (`MarkerQuad`: its `Rect`, a `Rectangle` of `X`, `Y`, `Width`, `Height`, and `Dark`) covers exactly the pixels
+  `[Left, Right) × [Top, Bottom)`.
 - A marker is **encoded once** (`GenerateModules`: the payload's QR symbol as a module matrix, 1 bit per module, packed row-major,
   most significant bit first, 211 bytes for 41×41, 79 for the sync marker's 25×25) and **drawn from the matrix**, in any of these forms:
   - `ModulesToQuads`: the light background quad first (symbol plus quiet zone), then one dark quad per horizontal run of dark modules.

@@ -18,7 +18,7 @@ namespace MB.FramePacing.Marker.UnitTest
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
     private readonly byte[] m_bits = new byte[FrameMarker.MaxPackedModuleByteCount];
     private readonly byte[] m_pixels = new byte[294 * 294 * 4];
-    private readonly QuadRect[] m_quads = new QuadRect[FrameMarker.MaxQuadCount];
+    private readonly MarkerQuad[] m_quads = new MarkerQuad[FrameMarker.MaxQuadCount];
     private readonly Vertex[] m_triangles = new Vertex[FrameMarker.MaxTriangleVertexCount];
     private readonly Vertex[] m_indexedVertices = new Vertex[FrameMarker.MaxIndexedVertexCount];
     private readonly int[] m_indices = new int[FrameMarker.MaxIndexCount];
@@ -50,7 +50,7 @@ namespace MB.FramePacing.Marker.UnitTest
       var options = Options.Default;
       var origin = FrameMarker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 2);
       // The span path with stack buffers, as a caller without arrays uses it
-      Span<QuadRect> stackQuads = stackalloc QuadRect[FrameMarker.MaxQuadCount];
+      Span<MarkerQuad> stackQuads = stackalloc MarkerQuad[FrameMarker.MaxQuadCount];
       Span<byte> stackBytes = stackalloc byte[FrameMarker.MaxEncodedPayloadByteCount];
       Span<byte> stackBits = stackalloc byte[FrameMarker.MaxPackedModuleByteCount];
       for (int frame = 0; frame < frames; ++frame)

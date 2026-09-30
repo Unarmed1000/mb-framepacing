@@ -27,24 +27,24 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     /// <summary>The documented vertex order of a quad, (TL, TR, BL) (BL, TR, BR), written independently of the library.</summary>
-    public static List<Vertex> ToTriangles(IEnumerable<QuadRect> quads)
+    public static List<Vertex> ToTriangles(IEnumerable<MarkerQuad> quads)
     {
       var vertices = new List<Vertex>();
       foreach (var quad in quads)
       {
         byte luma = quad.Dark ? (byte)0 : (byte)255;
-        vertices.Add(new Vertex(quad.Left, quad.Top, luma));
-        vertices.Add(new Vertex(quad.Right, quad.Top, luma));
-        vertices.Add(new Vertex(quad.Left, quad.Bottom, luma));
-        vertices.Add(new Vertex(quad.Left, quad.Bottom, luma));
-        vertices.Add(new Vertex(quad.Right, quad.Top, luma));
-        vertices.Add(new Vertex(quad.Right, quad.Bottom, luma));
+        vertices.Add(new Vertex(quad.Rect.Left, quad.Rect.Top, luma));
+        vertices.Add(new Vertex(quad.Rect.Right, quad.Rect.Top, luma));
+        vertices.Add(new Vertex(quad.Rect.Left, quad.Rect.Bottom, luma));
+        vertices.Add(new Vertex(quad.Rect.Left, quad.Rect.Bottom, luma));
+        vertices.Add(new Vertex(quad.Rect.Right, quad.Rect.Top, luma));
+        vertices.Add(new Vertex(quad.Rect.Right, quad.Rect.Bottom, luma));
       }
       return vertices;
     }
 
     /// <summary>The documented indexed order: 4 vertices (TL, TR, BR, BL) and indices (0,1,3)(3,1,2) per quad, plus the base vertex.</summary>
-    public static (List<Vertex> Vertices, List<int> Indices) ToIndexed(IEnumerable<QuadRect> quads, int baseVertex)
+    public static (List<Vertex> Vertices, List<int> Indices) ToIndexed(IEnumerable<MarkerQuad> quads, int baseVertex)
     {
       var vertices = new List<Vertex>();
       var indices = new List<int>();
@@ -52,16 +52,16 @@ namespace MB.FramePacing.Marker.UnitTest
       {
         byte luma = quad.Dark ? (byte)0 : (byte)255;
         int first = baseVertex + vertices.Count;
-        vertices.Add(new Vertex(quad.Left, quad.Top, luma));
-        vertices.Add(new Vertex(quad.Right, quad.Top, luma));
-        vertices.Add(new Vertex(quad.Right, quad.Bottom, luma));
-        vertices.Add(new Vertex(quad.Left, quad.Bottom, luma));
+        vertices.Add(new Vertex(quad.Rect.Left, quad.Rect.Top, luma));
+        vertices.Add(new Vertex(quad.Rect.Right, quad.Rect.Top, luma));
+        vertices.Add(new Vertex(quad.Rect.Right, quad.Rect.Bottom, luma));
+        vertices.Add(new Vertex(quad.Rect.Left, quad.Rect.Bottom, luma));
         indices.AddRange(new[] { first, first + 1, first + 3, first + 3, first + 1, first + 2 });
       }
       return (vertices, indices);
     }
 
-    public static int GenerateQuads(in Payload payload, in Options options, Point origin, Span<QuadRect> destination) =>
+    public static int GenerateQuads(in Payload payload, in Options options, Point origin, Span<MarkerQuad> destination) =>
       FrameMarker.ModulesToQuads(Encode(payload), options, origin, destination);
 
     public static int GenerateStartQuads(
@@ -69,7 +69,7 @@ namespace MB.FramePacing.Marker.UnitTest
       in StartMetadata metadata,
       in Options options,
       Point origin,
-      Span<QuadRect> destination
+      Span<MarkerQuad> destination
     ) => FrameMarker.ModulesToQuads(Encode(payload.WithKind(MarkerKind.SequenceStart), metadata), options, origin, destination);
 
     public static int GenerateTriangles(in Payload payload, in Options options, Point origin, Span<Vertex> destination) =>

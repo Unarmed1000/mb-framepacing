@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/data/DataRect.hpp>
+#include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/data/MarkerLocation.hpp>
 #include <cstdint>
 #include <span>
@@ -24,7 +24,7 @@ namespace MB::FramePacing::Data
     int32_t SourceWidth{0};
     int32_t SourceHeight{0};
     //! The stored region of the source, in source pixels; empty = the whole frame.
-    DataRect Region{};
+    Rectangle Region;
     std::vector<MarkerLocation> Markers;
     bool FramesStored{false};
     bool Camera{false};

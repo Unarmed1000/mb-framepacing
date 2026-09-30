@@ -23,6 +23,7 @@ it against the golden images the C++ library writes (test-data/markers). The for
 Standard library only, Python 3.12 or later.
 """
 
+from ..rectangle import Rectangle
 from .bitmap import modules_to_bitmap
 from .marker import (
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
@@ -69,12 +70,12 @@ from .structures import (
     SEQUENCE_ID_BYTE_COUNT,
     MarkerFlags,
     MarkerKind,
+    MarkerQuad,
     ModuleMatrix,
     Options,
     Payload,
     PixelFormat,
     Point,
-    QuadRect,
     SequenceId,
     StartMetadata,
     Vertex,
@@ -112,7 +113,8 @@ __all__ = [
     "Payload",
     "PixelFormat",
     "Point",
-    "QuadRect",
+    "MarkerQuad",
+    "Rectangle",
     "SequenceId",
     "StartMetadata",
     "Vertex",

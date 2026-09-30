@@ -16,14 +16,14 @@ namespace MB.FramePacing.Marker.UnitTest
   public static class SoftwareRaster
   {
     /// <summary>Fill pixel (x, y) when Left &lt;= x &lt; Right and Top &lt;= y &lt; Bottom.</summary>
-    public static byte[] Quads(IReadOnlyList<QuadRect> quads, int width, int height)
+    public static byte[] Quads(IReadOnlyList<MarkerQuad> quads, int width, int height)
     {
       var pixels = NewCanvas(width, height);
       foreach (var quad in quads)
       {
-        for (int y = Math.Max(quad.Top, 0); y < Math.Min(quad.Bottom, height); ++y)
+        for (int y = Math.Max(quad.Rect.Top, 0); y < Math.Min(quad.Rect.Bottom, height); ++y)
         {
-          for (int x = Math.Max(quad.Left, 0); x < Math.Min(quad.Right, width); ++x)
+          for (int x = Math.Max(quad.Rect.Left, 0); x < Math.Min(quad.Rect.Right, width); ++x)
             pixels[(y * width) + x] = quad.Dark ? (byte)0 : (byte)255;
         }
       }

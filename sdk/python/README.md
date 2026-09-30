@@ -81,7 +81,7 @@ encoded and decode as `0`.
 | 3   | **Static grid**: `grid_vertices` once, then `modules_to_grid_indices`               | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                     |
 | 4   | **Module texture scaled up**: `modules_to_bitmap` at 1 px per module                | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact    |
 | 5   | **Triangles**: `modules_to_indexed` or `modules_to_triangles`                       | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                        |
-| 6   | **Rectangles**: `modules_to_quads`                                                  | About 440 filled rectangles (`QuadRect`)                     | A 2D fill-rectangle API                                                       |
+| 6   | **Rectangles**: `modules_to_quads`                                                  | About 440 filled rectangles (`MarkerQuad`)                   | A 2D fill-rectangle API                                                       |
 | 7   | **Full-size bitmap**: `modules_to_bitmap`                                           | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images                  |
 
 Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shaders for 1 and 2 (HLSL for
@@ -94,18 +94,18 @@ frame.
 
 The same API as the C# marker module (`MB.FramePacing.Marker`), in Python's naming:
 
-| Python                                                                                         | What it does                                                                            |
-| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                         | What a marker carries                                                                   |
-| `Options`, `Point`                                                                             | Size and place                                                                          |
-| `generate_modules`, `ModuleMatrix` (`size`, `is_dark`, `bits`)                                 | Encode the marker: its QR symbol, 1 bit per module (211 bytes)                          |
-| `grid_vertices`, `grid_vertex_count`, `modules_to_grid_indices`                                | A static grid uploaded once, and per frame only the indices                             |
-| `modules_to_bitmap`, `PixelFormat`                                                             | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                             |
-| `modules_to_indexed`, `modules_to_triangles`                                                   | Draw it as indexed triangles or a triangle list, for a GPU                              |
-| `modules_to_quads`, `QuadRect` (`x`, `y`, `width`, `height`, `left`, `right`, `top`, `bottom`) | Draw it as rectangles: the light background, then one dark rectangle per run of modules |
-| `marker_size_px`, `qr_module_count_for`, `recommended_origin`                                  | Sizing and placement                                                                    |
-| `minimum_module_size_px`, `recommend_module_size_px`                                           | Module size for a capture's scaling                                                     |
-| `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks`               | The wire format and its time units                                                      |
+| Python                                                                                                                          | What it does                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                          | What a marker carries                                                                   |
+| `Options`, `Point`                                                                                                              | Size and place                                                                          |
+| `generate_modules`, `ModuleMatrix` (`size`, `is_dark`, `bits`)                                                                  | Encode the marker: its QR symbol, 1 bit per module (211 bytes)                          |
+| `grid_vertices`, `grid_vertex_count`, `modules_to_grid_indices`                                                                 | A static grid uploaded once, and per frame only the indices                             |
+| `modules_to_bitmap`, `PixelFormat`                                                                                              | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                             |
+| `modules_to_indexed`, `modules_to_triangles`                                                                                    | Draw it as indexed triangles or a triangle list, for a GPU                              |
+| `modules_to_quads`, `MarkerQuad` (`rect`, a `Rectangle`: `x`, `y`, `width`, `height`, `left`, `right`, `top`, `bottom`; `dark`) | Draw it as rectangles: the light background, then one dark rectangle per run of modules |
+| `marker_size_px`, `qr_module_count_for`, `recommended_origin`                                                                   | Sizing and placement                                                                    |
+| `minimum_module_size_px`, `recommend_module_size_px`                                                                            | Module size for a capture's scaling                                                     |
+| `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks`                                                | The wire format and its time units                                                      |
 
 A Python caller usually has a pixel buffer: `modules_to_bitmap` draws into it (a `bytearray`, PIL's `Image.tobytes`, a numpy array's
 memory). `PixelFormat` gives the byte layout: `RGB24` is `[R, G, B]`, `RGBA32` `[R, G, B, A]` with A 255; the marker is black and
@@ -138,7 +138,7 @@ with CaptureDataReader(capture_folder / "captures.mbcd") as reader:
 | Python                                                                        | What it is                                                                |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                 | `captures.mbcd`: the header, the records (`records()`, `read_all()`, ...) |
-| `CaptureDataStatus`, `DataRect`, `MarkerLocation`, `UNKNOWN_TICKS`            | A record's status, where the markers are, a missing device time           |
+| `CaptureDataStatus`, `Rectangle`, `MarkerLocation`, `UNKNOWN_TICKS`           | A record's status, where the markers are, a missing device time           |
 | `read_summary`, `parse_summary`, `AnalysisSummary` and the `Summary…` classes | `summary.json`                                                            |
 | `read_frames`, `FrameRow`                                                     | A run's frames CSV                                                        |
 | `read_captures`, `CaptureCsvRow`                                              | `captures.csv`                                                            |

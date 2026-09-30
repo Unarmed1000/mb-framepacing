@@ -23,8 +23,8 @@ namespace MB.FramePacing.Data.UnitTest
       1001,
       1920,
       1080,
-      new DataRect(8, 16, 960, 540),
-      new[] { new MarkerLocation(new DataRect(40, 32, 147, 147), 3), new MarkerLocation(new DataRect(40, 400, 99, 99), 3) },
+      new Rectangle(8, 16, 960, 540),
+      new[] { new MarkerLocation(new Rectangle(40, 32, 147, 147), 3), new MarkerLocation(new Rectangle(40, 400, 99, 99), 3) },
       FramesStored: true,
       Camera: false
     );

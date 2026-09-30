@@ -134,7 +134,7 @@ public static class FrameMarkerUnityCheck
         var (payload, start, options, origin) = cases[c];
         if (!generator.TryGenerateModules(payload, start, bits, out var matrix))
           throw new InvalidOperationException("TryGenerateModules failed");
-        var quads = new QuadRect[FrameMarker.MaxQuadCount];
+        var quads = new MarkerQuad[FrameMarker.MaxQuadCount];
         int quadCount = FrameMarker.ModulesToQuads(matrix, options, origin, quads);
         var target = BeginRender();
         {
@@ -242,16 +242,16 @@ public static class FrameMarkerUnityCheck
   }
 
   /// <summary>The pixels must equal the quads painted in order, pixel (x, y) covered when Left &lt;= x &lt; Right and Top &lt;= y &lt; Bottom.</summary>
-  private static int Compare(string name, QuadRect[] quads, int quadCount, Color32[] pixels)
+  private static int Compare(string name, MarkerQuad[] quads, int quadCount, Color32[] pixels)
   {
     var expected = new int[Width * Height];
     for (int i = 0; i < expected.Length; ++i)
       expected[i] = -1;
     for (int q = 0; q < quadCount; ++q)
     {
-      for (int y = Math.Max(quads[q].Top, 0); y < Math.Min(quads[q].Bottom, Height); ++y)
+      for (int y = Math.Max(quads[q].Rect.Top, 0); y < Math.Min(quads[q].Rect.Bottom, Height); ++y)
       {
-        for (int x = Math.Max(quads[q].Left, 0); x < Math.Min(quads[q].Right, Width); ++x)
+        for (int x = Math.Max(quads[q].Rect.Left, 0); x < Math.Min(quads[q].Rect.Right, Width); ++x)
           expected[(y * Width) + x] = quads[q].Dark ? 0 : 255;
       }
     }

@@ -302,8 +302,8 @@ namespace MB.FramePacing.Marker
         if (destination.Length - count < 6)
           return 0;
         // With 1 px modules at the origin, a run's quad is its columns and row
-        int topLeft = baseVertex + 4 + (run.Top * corners) + run.Left;
-        int topRight = baseVertex + 4 + (run.Top * corners) + run.Right;
+        int topLeft = baseVertex + 4 + (run.Rect.Top * corners) + run.Rect.Left;
+        int topRight = baseVertex + 4 + (run.Rect.Top * corners) + run.Rect.Right;
         destination[count++] = topLeft;
         destination[count++] = topRight;
         destination[count++] = topLeft + corners;
@@ -328,7 +328,7 @@ namespace MB.FramePacing.Marker
     /// in order. Every marker produces at most <see cref="MaxQuadCount"/> quads. Returns the number of quads written, or 0 if the options are
     /// invalid, the matrix is empty or <paramref name="destination"/> is too small.
     /// </summary>
-    public static int ModulesToQuads(ModuleMatrix matrix, in Options options, Point origin, Span<QuadRect> destination)
+    public static int ModulesToQuads(ModuleMatrix matrix, in Options options, Point origin, Span<MarkerQuad> destination)
     {
       if (!IsValid(options) || matrix.IsEmpty)
         return 0;
@@ -427,13 +427,13 @@ namespace MB.FramePacing.Marker
     }
 
     /// <summary>The quad's two triangles into <paramref name="destination"/> (6 vertices).</summary>
-    internal static void WriteTriangles(in QuadRect quad, Span<Vertex> destination)
+    internal static void WriteTriangles(in MarkerQuad quad, Span<Vertex> destination)
     {
       byte luma = quad.Dark ? (byte)0 : (byte)255;
-      var topLeft = new Vertex(quad.Left, quad.Top, luma);
-      var topRight = new Vertex(quad.Right, quad.Top, luma);
-      var bottomRight = new Vertex(quad.Right, quad.Bottom, luma);
-      var bottomLeft = new Vertex(quad.Left, quad.Bottom, luma);
+      var topLeft = new Vertex(quad.Rect.Left, quad.Rect.Top, luma);
+      var topRight = new Vertex(quad.Rect.Right, quad.Rect.Top, luma);
+      var bottomRight = new Vertex(quad.Rect.Right, quad.Rect.Bottom, luma);
+      var bottomLeft = new Vertex(quad.Rect.Left, quad.Rect.Bottom, luma);
       destination[0] = topLeft;
       destination[1] = topRight;
       destination[2] = bottomLeft;
@@ -443,13 +443,13 @@ namespace MB.FramePacing.Marker
     }
 
     /// <summary>The quad's 4 vertices and 6 indices (starting at <paramref name="firstIndex"/>).</summary>
-    internal static void WriteIndexed(in QuadRect quad, Span<Vertex> vertices, Span<int> indices, int firstIndex)
+    internal static void WriteIndexed(in MarkerQuad quad, Span<Vertex> vertices, Span<int> indices, int firstIndex)
     {
       byte luma = quad.Dark ? (byte)0 : (byte)255;
-      vertices[0] = new Vertex(quad.Left, quad.Top, luma);
-      vertices[1] = new Vertex(quad.Right, quad.Top, luma);
-      vertices[2] = new Vertex(quad.Right, quad.Bottom, luma);
-      vertices[3] = new Vertex(quad.Left, quad.Bottom, luma);
+      vertices[0] = new Vertex(quad.Rect.Left, quad.Rect.Top, luma);
+      vertices[1] = new Vertex(quad.Rect.Right, quad.Rect.Top, luma);
+      vertices[2] = new Vertex(quad.Rect.Right, quad.Rect.Bottom, luma);
+      vertices[3] = new Vertex(quad.Rect.Left, quad.Rect.Bottom, luma);
       indices[0] = firstIndex;
       indices[1] = firstIndex + 1;
       indices[2] = firstIndex + 3;
@@ -459,12 +459,12 @@ namespace MB.FramePacing.Marker
     }
 
     /// <summary>Fill a quad, clipped to the buffer, with its luma in every colour channel (alpha 255).</summary>
-    private static void FillQuad(in QuadRect quad, Span<byte> destination, int width, int height, int bytesPerPixel, int stride)
+    private static void FillQuad(in MarkerQuad quad, Span<byte> destination, int width, int height, int bytesPerPixel, int stride)
     {
-      int left = Math.Max(quad.Left, 0);
-      int right = Math.Min(quad.Right, width);
-      int top = Math.Max(quad.Top, 0);
-      int bottom = Math.Min(quad.Bottom, height);
+      int left = Math.Max(quad.Rect.Left, 0);
+      int right = Math.Min(quad.Rect.Right, width);
+      int top = Math.Max(quad.Rect.Top, 0);
+      int bottom = Math.Min(quad.Rect.Bottom, height);
       if (left >= right || top >= bottom)
         return;
       byte luma = quad.Dark ? (byte)0 : (byte)255;
@@ -515,7 +515,7 @@ namespace MB.FramePacing.Marker
       private readonly int m_moduleSize;
       private readonly int m_symbolLeft;
       private readonly int m_symbolTop;
-      private readonly QuadRect m_background;
+      private readonly MarkerQuad m_background;
       private bool m_backgroundDone;
       private int m_x;
       private int m_y;
@@ -528,13 +528,13 @@ namespace MB.FramePacing.Marker
         int markerSize = (matrix.Size + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
         m_symbolLeft = origin.X + (options.QuietZoneModules * m_moduleSize);
         m_symbolTop = origin.Y + (options.QuietZoneModules * m_moduleSize);
-        m_background = new QuadRect(origin.X, origin.Y, markerSize, markerSize, false);
+        m_background = new MarkerQuad(new Rectangle(origin.X, origin.Y, markerSize, markerSize), false);
         m_backgroundDone = false;
         m_x = 0;
         m_y = 0;
       }
 
-      public bool TryNext(out QuadRect quad)
+      public bool TryNext(out MarkerQuad quad)
       {
         if (!m_backgroundDone)
         {
@@ -550,7 +550,7 @@ namespace MB.FramePacing.Marker
           {
             m_x = FindModule(rowStart, runStart, false);
             int top = m_symbolTop + (m_y * m_moduleSize);
-            quad = new QuadRect(m_symbolLeft + (runStart * m_moduleSize), top, (m_x - runStart) * m_moduleSize, m_moduleSize, true);
+            quad = new MarkerQuad(new Rectangle(m_symbolLeft + (runStart * m_moduleSize), top, (m_x - runStart) * m_moduleSize, m_moduleSize), true);
             return true;
           }
           m_x = 0;

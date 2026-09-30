@@ -60,7 +60,7 @@ namespace MB::FramePacing::Data
       return std::bit_cast<double>(ReadU64(bytes, offset));
     }
 
-    DataRect ReadRect(const std::span<const uint8_t> bytes, const std::size_t offset) noexcept
+    Rectangle ReadRect(const std::span<const uint8_t> bytes, const std::size_t offset) noexcept
     {
       return {ReadI32(bytes, offset), ReadI32(bytes, offset + 4), ReadI32(bytes, offset + 8), ReadI32(bytes, offset + 12)};
     }

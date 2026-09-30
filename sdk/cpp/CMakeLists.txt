@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 4.0)
 
 # mb_framepacing: one library of modules, each its own static library target, like Boost's and Poco's
-#   core    mb_framepacing::core    shared types: the library version, tick units, the steady clock
+#   core    mb_framepacing::core    shared types: the library version, tick units, Rectangle
 #   marker  mb_framepacing::marker  the frame marker: encode it and draw it (links core)
 #   data    mb_framepacing::data    reads the tools' capture data and analysis output (links marker; nlohmann/json inside)
 # Every module has its folder (include/, src/, tests/); the headers install into one tree, <mb/framepacing/...>.

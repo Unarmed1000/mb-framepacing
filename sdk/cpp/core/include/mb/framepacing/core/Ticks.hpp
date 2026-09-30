@@ -6,8 +6,10 @@
 // The time unit of the SDK: 100 ns ticks, C# TimeSpan / DateTime ticks. Every time the markers carry and the data files store is in
 // ticks. Platforms report other units (nanoseconds, a performance counter with its frequency); these convert them.
 
+#include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <ratio>
 
 namespace MB::FramePacing
@@ -36,9 +38,17 @@ namespace MB::FramePacing
 
   //! A counter value of a clock that counts frequency times a second (QueryPerformanceCounter with QueryPerformanceFrequency, .NET's
   //! Stopwatch) as ticks, rounded down. Exact for any counter value: the whole seconds and the rest are converted apart, so nothing
-  //! overflows. frequency must be positive.
+  //! overflows. frequency must be positive and at most MaxCounterFrequency (asserted; without asserts, another frequency gives 0,
+  //! unknown).
+  inline constexpr int64_t MaxCounterFrequency = std::numeric_limits<int64_t>::max() / TicksPerSecond;
+
   constexpr int64_t CounterToTicks(const int64_t counter, const int64_t frequency) noexcept
   {
+    assert(frequency > 0 && frequency <= MaxCounterFrequency);
+    if (frequency <= 0 || frequency > MaxCounterFrequency)
+    {
+      return 0;
+    }
     int64_t seconds = counter / frequency;
     int64_t rest = counter % frequency;
     if (rest < 0)
@@ -46,7 +56,7 @@ namespace MB::FramePacing
       --seconds;
       rest += frequency;
     }
-    // rest < frequency, and a frequency above 2^63 / 10^7 (about 922 GHz) is not a clock any platform has
+    // rest < frequency <= MaxCounterFrequency (about 922 GHz, beyond any platform's clock), so rest * TicksPerSecond fits
     return (seconds * TicksPerSecond) + ((rest * TicksPerSecond) / frequency);
   }
 

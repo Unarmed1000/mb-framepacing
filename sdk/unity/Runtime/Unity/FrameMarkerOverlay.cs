@@ -79,7 +79,7 @@ namespace MB.FramePacing.Marker.Unity
 
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
     private readonly byte[] m_modules = new byte[FrameMarker.MaxPackedModuleByteCount];
-    private readonly QuadRect[] m_quads = new QuadRect[FrameMarker.MaxQuadCount];
+    private readonly MarkerQuad[] m_quads = new MarkerQuad[FrameMarker.MaxQuadCount];
     private FrameMarkerTexture m_mainTexture;
     private FrameMarkerTexture m_syncTexture;
     private FrameMarkerQuad m_mainQuad;

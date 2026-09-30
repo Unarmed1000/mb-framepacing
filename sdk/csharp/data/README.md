@@ -2,7 +2,7 @@
 
 `MB.FramePacing.Data`, the SDK's C# data module, reads and writes the data of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) tools: the
 capture data (`captures.mbcd`) and the analysis output (`summary.json`, `captures.csv`, `run-<id>-frames.csv`). .NET 10, no dependencies
-besides the marker module (`MB.FramePacing.Marker`), which decodes the markers' payloads. The tools write every file through it.
+besides the marker module (`MB.FramePacing.Marker`), which decodes the markers' payloads, and the core (`MB.FramePacing`). The tools write every file through it.
 
 It is not published as a NuGet package: use the source at an `sdk-v*` tag, as a project reference to `MB.FramePacing.Data.csproj`
 (it references `../marker`).
@@ -41,7 +41,7 @@ foreach (var record in reader.ReadAll())
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CaptureDataHeader`, `CaptureDataRecord`, `CaptureDataStatus`   | The header and records of `captures.mbcd` (a record's `SourceDrops`: frames the source reported dropping before it); `TryDecodeMain` decodes a record's marker |
 | `CaptureDataReader`, `CaptureDataWriter`                        | Read and write `captures.mbcd`                                                                                                                                 |
-| `DataRect`, `MarkerLocation`                                    | Where the markers are                                                                                                                                          |
+| `MarkerLocation` (its bounds a core `Rectangle`)                | Where the markers are                                                                                                                                          |
 | `AnalysisSummary` and the `Summary…` records, `ValueStatistics` | `summary.json`: `Read`, `Parse`, `Write`, `ToJson`                                                                                                             |
 | `FramesCsv`, `FrameRow`                                         | A run's frames CSV                                                                                                                                             |
 | `CapturesCsv`, `CaptureCsvRow`                                  | `captures.csv`                                                                                                                                                 |

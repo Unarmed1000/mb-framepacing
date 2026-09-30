@@ -19,12 +19,12 @@
 #include <mb/framepacing/marker/IndexedCount.hpp>
 #include <mb/framepacing/marker/MarkerFlags.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
+#include <mb/framepacing/marker/MarkerQuad.hpp>
 #include <mb/framepacing/marker/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/Options.hpp>
 #include <mb/framepacing/marker/Payload.hpp>
 #include <mb/framepacing/marker/PixelFormat.hpp>
 #include <mb/framepacing/marker/Point.hpp>
-#include <mb/framepacing/marker/QuadRect.hpp>
 #include <mb/framepacing/marker/SequenceId.hpp>
 #include <mb/framepacing/marker/StartMetadata.hpp>
 #include <mb/framepacing/marker/Vertex.hpp>
@@ -160,7 +160,7 @@ namespace MB::FramePacing::Marker
   //! The marker as quads: the light background (symbol + quiet zone) first, then one dark quad per horizontal run of dark modules. Draw
   //! them in order. Every marker produces at most MaxQuadCount() quads. Does not allocate.
   //! Returns the number of quads written, or 0 if the options are invalid, the matrix is empty or dst is too small.
-  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<QuadRect> dst) noexcept;
+  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<MarkerQuad> dst) noexcept;
 
   //! The marker as a triangle list, written straight into dst: 6 vertices per quad (see ModulesToQuads for the quad order), (TL, TR, BL)
   //! (BL, TR, BR), clockwise on screen. Every vertex lies on a pixel corner. Every marker needs at most MaxTriangleVertexCount() vertices.

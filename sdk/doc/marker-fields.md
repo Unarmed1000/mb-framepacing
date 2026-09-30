@@ -27,8 +27,9 @@ exactly `0` (a counter that starts at the process start, say) must be offset, or
 Steady clock ticks in each language:
 
 ```cpp
-// C++: the core module's steady clock in ticks (std::chrono::steady_clock; MB::FramePacing::TickDuration is the 100 ns duration)
-const int64_t nowTicks = MB::FramePacing::SteadyClock::NowTicks();
+// C++: your steady clock in ticks (MB::FramePacing::TickDuration is the 100 ns std::chrono duration)
+const int64_t nowTicks =
+  std::chrono::duration_cast<MB::FramePacing::TickDuration>(std::chrono::steady_clock::now().time_since_epoch()).count();
 ```
 
 ```csharp

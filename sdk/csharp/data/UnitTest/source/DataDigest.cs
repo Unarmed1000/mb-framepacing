@@ -192,7 +192,7 @@ namespace MB.FramePacing.Data.UnitTest
       };
     }
 
-    private static JsonArray Rect(DataRect rect) => new JsonArray(rect.X, rect.Y, rect.Width, rect.Height);
+    private static JsonArray Rect(Rectangle rect) => new JsonArray(rect.X, rect.Y, rect.Width, rect.Height);
 
     /// <summary>How often each name occurs, by name in ordinal order.</summary>
     private static JsonObject Counts(IEnumerable<string> names)

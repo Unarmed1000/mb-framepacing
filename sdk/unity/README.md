@@ -6,8 +6,8 @@ shows the **animation error**: how far what the game animated is from what was a
 
 ## Contents
 
-- **`MB.FramePacing.Marker`** (`Runtime/Core`): the SDK's general C# marker module (no Unity dependency). It is the same code as the
-  .NET module.
+- **`MB.FramePacing`** (`Runtime/Core`) and **`MB.FramePacing.Marker`** (`Runtime/Marker`): the SDK's C# core and marker modules (no
+  Unity dependency). They are the same code as the .NET modules.
 - **`MB.FramePacing.Marker.Unity`** (`Runtime/Unity`):
   - `FrameMarkerOverlay`: add it to a GameObject and the marker is drawn at the end of every frame, on top of everything.
   - `BeginRun` / `EndRun` / `RunFor`: bracket the part to measure with start and end markers.

@@ -19,7 +19,6 @@
 #include <mb/framepacing/data/CaptureDataStatus.hpp>
 #include <mb/framepacing/data/Constants.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
-#include <mb/framepacing/data/DataRect.hpp>
 #include <mb/framepacing/data/FrameRow.hpp>
 #include <mb/framepacing/data/MarkerLocation.hpp>
 #include <mb/framepacing/data/OlderFrame.hpp>

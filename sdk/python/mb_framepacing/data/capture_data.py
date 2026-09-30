@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import BinaryIO, cast
 
 from ..marker import Payload, StartMetadata, try_decode_payload
+from ..rectangle import Rectangle
 from .errors import DataFormatError
 
 FILE_NAME = "captures.mbcd"
@@ -44,20 +45,10 @@ class CaptureDataStatus(IntEnum):
 
 
 @dataclass(frozen=True)
-class DataRect:
-    """An integer pixel rectangle: [x, x + width) x [y, y + height)."""
-
-    x: int
-    y: int
-    width: int
-    height: int
-
-
-@dataclass(frozen=True)
 class MarkerLocation:
     """Where a marker is: its bounds (including the quiet zone) and module size, in stored pixels."""
 
-    bounds: DataRect
+    bounds: Rectangle
     module_size_px: float
 
 
@@ -73,7 +64,7 @@ class CaptureDataHeader:
     frame_rate_denominator: int
     source_width: int
     source_height: int
-    region: DataRect
+    region: Rectangle
     markers: tuple[MarkerLocation, ...]
     frames_stored: bool
     camera: bool
@@ -101,7 +92,7 @@ class CaptureDataHeader:
         markers: list[MarkerLocation] = []
         for i in range(marker_count):
             x, y, w, h, module = cast(tuple[int, int, int, int, float], _MARKER.unpack_from(data, _MARKERS_OFFSET + (i * _MARKER.size)))
-            markers.append(MarkerLocation(DataRect(x, y, w, h), module))
+            markers.append(MarkerLocation(Rectangle(x, y, w, h), module))
         return CaptureDataHeader(
             width=fields[5],
             height=fields[6],
@@ -109,7 +100,7 @@ class CaptureDataHeader:
             frame_rate_denominator=fields[8],
             source_width=fields[9],
             source_height=fields[10],
-            region=DataRect(fields[11], fields[12], fields[13], fields[14]),
+            region=Rectangle(fields[11], fields[12], fields[13], fields[14]),
             markers=tuple(markers),
             frames_stored=(flags & _FRAMES_STORED) != 0,
             camera=(flags & _CAMERA) != 0,

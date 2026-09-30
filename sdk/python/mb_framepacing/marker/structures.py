@@ -12,6 +12,8 @@ from enum import IntEnum, IntFlag
 from typing import Self
 from uuid import UUID
 
+from ..rectangle import Rectangle
+
 SEQUENCE_ID_BYTE_COUNT = 16
 """A sequence id is 16 opaque bytes."""
 
@@ -136,33 +138,11 @@ class Point:
 
 
 @dataclass(frozen=True, slots=True)
-class QuadRect:
-    """A filled rectangle covering pixels x <= px < x + width and y <= py < y + height (left <= px < right, top <= py < bottom), dark (luma 0)
-    or light (luma 255)."""
+class MarkerQuad:
+    """A rectangle of the marker to fill (modules_to_quads): its pixels, dark (luma 0) or light (luma 255)."""
 
-    x: int
-    y: int
-    width: int
-    height: int
+    rect: Rectangle
     dark: bool
-
-    @property
-    def left(self) -> int:
-        return self.x
-
-    @property
-    def top(self) -> int:
-        return self.y
-
-    @property
-    def right(self) -> int:
-        """The first pixel column right of the rectangle."""
-        return self.x + self.width
-
-    @property
-    def bottom(self) -> int:
-        """The first pixel row below the rectangle."""
-        return self.y + self.height
 
 
 @dataclass(frozen=True, slots=True)

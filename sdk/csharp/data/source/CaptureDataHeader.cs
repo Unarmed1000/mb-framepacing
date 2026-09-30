@@ -32,7 +32,7 @@ namespace MB.FramePacing.Data
     uint FrameRateDenominator,
     int SourceWidth,
     int SourceHeight,
-    DataRect Region,
+    Rectangle Region,
     IReadOnlyList<MarkerLocation> Markers,
     bool FramesStored,
     bool Camera
@@ -121,7 +121,7 @@ namespace MB.FramePacing.Data
       );
     }
 
-    private static void WriteRect(Span<byte> destination, DataRect rect)
+    private static void WriteRect(Span<byte> destination, Rectangle rect)
     {
       BinaryPrimitives.WriteInt32LittleEndian(destination, rect.X);
       BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(4), rect.Y);
@@ -129,8 +129,8 @@ namespace MB.FramePacing.Data
       BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(12), rect.Height);
     }
 
-    private static DataRect ReadRect(ReadOnlySpan<byte> source) =>
-      new DataRect(
+    private static Rectangle ReadRect(ReadOnlySpan<byte> source) =>
+      new Rectangle(
         BinaryPrimitives.ReadInt32LittleEndian(source),
         BinaryPrimitives.ReadInt32LittleEndian(source.Slice(4)),
         BinaryPrimitives.ReadInt32LittleEndian(source.Slice(8)),

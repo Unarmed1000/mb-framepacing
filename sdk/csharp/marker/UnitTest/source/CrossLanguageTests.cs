@@ -57,7 +57,7 @@ namespace MB.FramePacing.Marker.UnitTest
     [TestCaseSource(nameof(Golden))]
     public void GoldenImage_FromQuads(GoldenMarker golden)
     {
-      var quads = new QuadRect[FrameMarker.MaxQuadCount];
+      var quads = new MarkerQuad[FrameMarker.MaxQuadCount];
       int count =
         golden.Payload.Kind == MarkerKind.SequenceStart
           ? TestMarkers.GenerateStartQuads(golden.Payload, golden.Start, golden.Options, golden.Origin, quads)

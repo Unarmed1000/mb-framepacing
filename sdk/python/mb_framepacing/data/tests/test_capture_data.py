@@ -14,7 +14,7 @@ from .. import (
     CaptureDataReader,
     CaptureDataStatus,
     DataFormatError,
-    DataRect,
+    Rectangle,
 )
 from ..capture_data import HEADER_SIZE, MAGIC, RECORD_SIZE
 
@@ -42,7 +42,7 @@ class CaptureDataTests(unittest.TestCase):
     def test_the_header_fields_are_where_the_format_says(self) -> None:
         header = CaptureDataHeader.parse(bytes(header_bytes(markers=2)))
         self.assertEqual((header.width, header.height, header.frame_rate_numerator, header.frame_rate_denominator), (960, 540, 60000, 1001))
-        self.assertEqual((header.source_width, header.source_height, header.region), (1920, 1080, DataRect(8, 16, 960, 540)))
+        self.assertEqual((header.source_width, header.source_height, header.region), (1920, 1080, Rectangle(8, 16, 960, 540)))
         self.assertEqual([m.bounds.y for m in header.markers], [32, 33])
         self.assertTrue(header.frames_stored and header.camera)
 

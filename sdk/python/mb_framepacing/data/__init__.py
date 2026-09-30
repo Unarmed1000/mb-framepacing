@@ -19,6 +19,7 @@ Standard library only, Python 3.12 or later. A marker's payload in the capture d
 mb_framepacing.marker.
 """
 
+from ..rectangle import Rectangle
 from .analysis_files import (
     CAPTURES_FILE_NAME,
     DIRECTORY_NAME,
@@ -42,7 +43,6 @@ from .capture_data import (
     CaptureDataReader,
     CaptureDataRecord,
     CaptureDataStatus,
-    DataRect,
     MarkerLocation,
 )
 from .csv_files import ON_DEMAND_FRAME_TICKS, CaptureCsvRow, FrameRow, read_captures, read_frames
@@ -83,7 +83,7 @@ __all__ = [
     "CaptureDataRecord",
     "CaptureDataStatus",
     "DataFormatError",
-    "DataRect",
+    "Rectangle",
     "FrameRow",
     "MarkerLocation",
     "SummaryCamera",

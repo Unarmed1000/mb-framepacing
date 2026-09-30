@@ -3,11 +3,11 @@
 The C++20 library of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) SDK: one CMake project of modules, each its
 own static library target, like Boost's and Poco's.
 
-| Module   | Target                   | Header                        | What it does                                                                                  |
-| -------- | ------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------- |
-| `core`   | `mb_framepacing::core`   | `<mb/framepacing/Core.hpp>`   | What every module shares: the library version, the tick units and conversions, a steady clock |
-| `marker` | `mb_framepacing::marker` | `<mb/framepacing/Marker.hpp>` | Draws the frame marker into every frame of an application; no dependencies, no allocations    |
-| `data`   | `mb_framepacing::data`   | `<mb/framepacing/Data.hpp>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json   |
+| Module   | Target                   | Header                        | What it does                                                                                |
+| -------- | ------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `core`   | `mb_framepacing::core`   | `<mb/framepacing/Core.hpp>`   | What every module shares: the library version, the tick units and conversions, `Rectangle`  |
+| `marker` | `mb_framepacing::marker` | `<mb/framepacing/Marker.hpp>` | Draws the frame marker into every frame of an application; no dependencies, no allocations  |
+| `data`   | `mb_framepacing::data`   | `<mb/framepacing/Data.hpp>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json |
 
 The **marker** draws a small QR code into every frame that carries the frame index and the animation time. A capture of the display
 output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the application animated is from
@@ -86,8 +86,8 @@ faster still.
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`MB::FramePacing::TicksPerSecond`).
 - **Frame pacing (optional):** `PreferredFrameTicks` (the interval the application wants to run at; it differs from the target only
   while the pacer runs slower than wanted), `TargetFrameTicks` (the interval the pacer aims for: `166'667` for 60 fps) and
-  `IntendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady clock, any epoch:
-  `MB::FramePacing::SteadyClock::NowTicks()`). `0` = unknown, `OnDemandFrameTicks` = frames only when something changes.
+  `IntendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady clock, any epoch; the SDK never
+  reads a clock: `TickDuration` converts yours). `0` = unknown, `OnDemandFrameTicks` = frames only when something changes.
 - **CPU start time and CPU busy (optional):** `CpuStartTicks` (when the CPU started working on the frame, on the same clock,
   PresentMon's `CPUStartTime`) and `CpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
@@ -101,18 +101,18 @@ faster still.
 
 Everything is declared by `<mb/framepacing/Marker.hpp>` in `MB::FramePacing::Marker`, one header per type (`<mb/framepacing/marker/…>`):
 
-| Function or type                                                                                                                               | What it does                                                                         |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                                         | What a marker carries                                                                |
-| `Options`, `Point`                                                                                                                             | Size and place                                                                       |
-| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                                                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
-| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                                                | A static grid uploaded once, and per frame only the indices                          |
-| `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
-| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`QuadRect`: `X`, `Y`, `Width`, `Height`, `Left()`, `Right()`, `Top()`, `Bottom()`) | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
-| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount`                                 | Buffer sizes that fit every marker kind                                              |
-| `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                                                        | Sizing and placement                                                                 |
-| `MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                                                 | Module size for a capture's scaling                                                  |
-| `EncodePayload`, `TryDecodePayload`                                                                                                            | The wire format                                                                      |
+| Function or type                                                                                                | What it does                                                                         |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                          | What a marker carries                                                                |
+| `Options`, `Point`                                                                                              | Size and place                                                                       |
+| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                    | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
+| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                 | A static grid uploaded once, and per frame only the indices                          |
+| `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                               | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
+| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark) | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
+| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount`  | Buffer sizes that fit every marker kind                                              |
+| `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                         | Sizing and placement                                                                 |
+| `MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                  | Module size for a capture's scaling                                                  |
+| `EncodePayload`, `TryDecodePayload`                                                                             | The wire format                                                                      |
 
 Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the options are invalid, the matrix is empty or a
 buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
@@ -155,7 +155,7 @@ version, whose message says to update), `std::runtime_error` for a file it canno
 | Function or type                                                            | What it does                                                       |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`               | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...) |
-| `CaptureDataStatus`, `DataRect`, `MarkerLocation`, `UnknownTicks`           | A record's status, where the markers are, a missing device time    |
+| `CaptureDataStatus`, `MarkerLocation`, `UnknownTicks`                       | A record's status, where the markers are, a missing device time    |
 | `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs | `summary.json` (capture.json inside it as JSON text)               |
 | `ReadFrames`, `FrameRow`                                                    | A run's frames CSV, by column name                                 |
 | `ReadCaptures`, `CaptureCsvRow`                                             | `captures.csv`, by column name                                     |
@@ -170,7 +170,7 @@ version, whose message says to update), `std::runtime_error` for a file it canno
 | `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp` (include it yourself) | The linked library's version; at compile time, for `#if` and `static_assert` |
 | `TicksPerSecond`, `TicksPerMillisecond`, `TickDuration`                         | The SDK's time unit: 100 ns ticks (C# `TimeSpan` ticks)                      |
 | `NanosecondsToTicks`, `TicksToNanoseconds`, `CounterToTicks`, `ToDateTimeTicks` | Platform times (ns, a performance counter, the wall clock) as ticks          |
-| `SteadyClock::NowTicks`                                                         | `std::chrono::steady_clock` in ticks                                         |
+| `Rectangle`                                                                     | An integer pixel rectangle, always valid (a negative size is 0)              |
 
 ## Build and test
 

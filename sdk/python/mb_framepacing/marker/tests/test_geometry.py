@@ -16,12 +16,13 @@ from .. import (
     SYNC_QR_VERSION,
     MarkerFlags,
     MarkerKind,
+    MarkerQuad,
     ModuleMatrix,
     Options,
     Payload,
     PixelFormat,
     Point,
-    QuadRect,
+    Rectangle,
     SequenceId,
     StartMetadata,
     Vertex,
@@ -119,8 +120,8 @@ class GeometryTests(unittest.TestCase):
         # The background quad follows the symbol size, in every output
         payload, options, origin = Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NONE, 0), Options(3, 4), Point(10, 20)
         quads = generate_quads(payload, options, origin)
-        self.assertEqual(quads[0], QuadRect(10, 20, 99, 99, False))
-        self.assertTrue(all(quad.right <= 10 + 99 - 12 and quad.bottom <= 20 + 99 - 12 for quad in quads[1:]))
+        self.assertEqual(quads[0], MarkerQuad(Rectangle(10, 20, 99, 99), False))
+        self.assertTrue(all(quad.rect.right <= 10 + 99 - 12 and quad.rect.bottom <= 20 + 99 - 12 for quad in quads[1:]))
         self.assertEqual(generate_triangles(payload, options, origin), to_triangles(quads))
         self.assertEqual(generate_indexed(payload, options, origin, 5), to_indexed(quads, 5))
         # Only the run id and the frame index are encoded: the same symbol whatever the other fields hold
@@ -131,7 +132,7 @@ class GeometryTests(unittest.TestCase):
 
     def test_every_main_marker_kind_has_the_same_size(self) -> None:
         options, origin = Options(), Point(32, 32)
-        expected = QuadRect(32, 32, 294, 294, False)
+        expected = MarkerQuad(Rectangle(32, 32, 294, 294), False)
         start = Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NONE, 2)
         self.assertEqual(generate_quads(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), options, origin)[0], expected)
         self.assertEqual(generate_quads(Payload(MarkerKind.SEQUENCE_END, 3, 1, MarkerFlags.NONE, 2), options, origin)[0], expected)
@@ -140,12 +141,12 @@ class GeometryTests(unittest.TestCase):
     def test_quads_are_pixel_aligned_background_first(self) -> None:
         quads = generate_quads(Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6), Options(3, 4), Point(10, 20))
         self.assertTrue(2 <= len(quads) <= MAX_QUAD_COUNT)
-        self.assertEqual(quads[0], QuadRect(10, 20, 147, 147, False))
+        self.assertEqual(quads[0], MarkerQuad(Rectangle(10, 20, 147, 147), False))
         for quad in quads[1:]:
             self.assertTrue(quad.dark)
-            self.assertEqual(quad.height, 3)
-            self.assertEqual((quad.left - 22) % 3, 0, "left edges on module boundaries")
-            self.assertEqual((quad.top - 32) % 3, 0, "top edges on module boundaries")
+            self.assertEqual(quad.rect.height, 3)
+            self.assertEqual((quad.rect.left - 22) % 3, 0, "left edges on module boundaries")
+            self.assertEqual((quad.rect.top - 32) % 3, 0, "top edges on module boundaries")
 
     def test_triangles_and_indexed_follow_the_quads_in_the_documented_order(self) -> None:
         payload, options, origin = Payload(MarkerKind.FRAME, 3, 42, MarkerFlags.NONE, 1_234_567), Options(2, 4), Point(7, 9)

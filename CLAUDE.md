@@ -10,7 +10,9 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
-  - **core** (C++ only, `MB::FramePacing`): what the C++ modules share (the library version, tick units and conversions, the steady clock).
+  - **core**: the types every module shares, `Rectangle` (always valid: a negative size is 0) in every language (C++ `MB::FramePacing`
+    with the library version and the tick units and conversions, C# assembly `MB.FramePacing`, Python `mb_framepacing`). The SDK never
+    reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test helper).
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
 
 See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker specification. **The document is the reference**: C++
@@ -24,10 +26,11 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)       |
 | `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                   |
 | `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`          |
-| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, tick units and conversions, steady clock + tests             |
+| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, tick units and conversions, `Rectangle` + tests              |
 | `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker`, vendored qrcodegen, `marker-render` tool, GoogleTest tests                |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
 | `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote) |
+| `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Rectangle`; .NET Standard 2.1, C# 9, no dependencies) + NUnit tests             |
 | `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                 |
 | `sdk/csharp/data/`                                | C# data module `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output            |
 | `sdk/python/`                                     | Python package `mb_framepacing` (`marker`, `data`; standard library only, Python 3.12) + unittest tests           |
@@ -100,13 +103,14 @@ script>` runs inside it, and CI runs `uv sync --locked`. `tools/check_cpp.py` an
   Python that runs them, so `uv run tools/check_cpp.py` gets the pinned versions. Raise a tool: change its pin in `pyproject.toml`,
   then `uv lock` (Dependabot's `uv` ecosystem does this weekly). A one-off extra: `uv run --with <package> ...`.
 - **Unity package** (`com.manabattery.framepacing`):
-  - It isn't stored as one folder: `sdk/unity/build_upm.py` assembles it from `sdk/csharp/marker/source` (core) plus
-    `sdk/unity/Runtime/Unity` (helpers, all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
+  - It isn't stored as one folder: `sdk/unity/build_upm.py` assembles it from `sdk/csharp/core/source` (`Runtime/Core`, asmdef
+    `MB.FramePacing`), `sdk/csharp/marker/source` (`Runtime/Marker`, `MB.FramePacing.Marker`) plus `sdk/unity/Runtime/Unity` (helpers,
+    all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
   - CI runs it with `--check`.
   - `sdk/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode (every drawing method pixel exact; `--graphics
 glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Unity Hub installed, or `--unity`. Run it after changing
-    the core or the helpers.
-  - The core must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
+    the core, the marker module or the helpers.
+  - The core and the marker module must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
     APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
 - **Standalone release archive:** `sdk/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE`, `licenses/` and `shaders/` next to itself in a
   release archive, and falls back to `sdk/VERSION`, `sdk/LICENSE`, `sdk/shaders` and the repository root's `licenses/` otherwise. The
@@ -365,7 +369,7 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
   `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). A drawn rectangle is a
-  `QuadRect` (`X`, `Y`, `Width`, `Height`, `Dark`; `Left()`/`Right()`/`Top()`/`Bottom()`, `constexpr noexcept` in C++). The C# static
+  `MarkerQuad` (a core `Rectangle` `Rect` and `Dark`). The C# static
   class is `FrameMarker` (not `Marker`: a class named like its namespace `MB.FramePacing.Marker` breaks lookups in `MB.FramePacing.*` code). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
   value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**

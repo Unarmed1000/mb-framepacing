@@ -26,7 +26,7 @@ namespace MB.FramePacing.Capture
         frames.NominalFrameRate.Denominator,
         frames.SourceWidth,
         frames.SourceHeight,
-        new DataRect(frames.Roi.X, frames.Roi.Y, frames.Roi.Width, frames.Roi.Height),
+        new Rectangle(frames.Roi.X, frames.Roi.Y, frames.Roi.Width, frames.Roi.Height),
         locks.ToLocations(),
         framesStored,
         camera
@@ -48,6 +48,6 @@ namespace MB.FramePacing.Capture
       header.Markers.Select(m => new MarkerLock(new PixelRect(m.Bounds.X, m.Bounds.Y, m.Bounds.Width, m.Bounds.Height), m.ModuleSizePx)).ToList();
 
     public static IReadOnlyList<MarkerLocation> ToLocations(this IReadOnlyList<MarkerLock> locks) =>
-      locks.Select(l => new MarkerLocation(new DataRect(l.Bounds.X, l.Bounds.Y, l.Bounds.Width, l.Bounds.Height), l.ModuleSizePx)).ToList();
+      locks.Select(l => new MarkerLocation(new Rectangle(l.Bounds.X, l.Bounds.Y, l.Bounds.Width, l.Bounds.Height), l.ModuleSizePx)).ToList();
   }
 }

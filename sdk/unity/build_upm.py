@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Assemble the Unity package com.manabattery.framepacing from the repository.
 
-The package is not kept as one folder on master (its core would duplicate sdk/csharp/marker). This script builds it:
+The package is not kept as one folder on master (its assemblies would duplicate sdk/csharp). This script builds it:
 
   package.json            package.template.json with the version from sdk/VERSION
   README.md               sdk/unity/README.md
   LICENSE.md              sdk/LICENSE (BSD 3-Clause)
-  Third Party Notices.md  qrcodegen (MIT), ported in the core
-  Runtime/Core/           sdk/csharp/marker/source/*.cs + MB.FramePacing.Marker.asmdef (engine free)
+  Third Party Notices.md  qrcodegen (MIT), ported in the marker module
+  Runtime/Core/           sdk/csharp/core/source/*.cs + MB.FramePacing.asmdef (the SDK's core types, engine free)
+  Runtime/Marker/         sdk/csharp/marker/source/*.cs + MB.FramePacing.Marker.asmdef (engine free)
   Runtime/Unity/          the Unity helpers + MB.FramePacing.Marker.Unity.asmdef, and FrameMarker.hlsl from sdk/shaders/hlsl
   Samples~/               samples (imported on demand from the Package Manager)
 
@@ -33,7 +34,11 @@ from typing import cast
 PACKAGE_NAME = "com.manabattery.framepacing"
 SCRIPT_DIR = Path(__file__).resolve().parent
 SDK_DIR = SCRIPT_DIR.parent
-MARKER_SOURCES = SDK_DIR / "csharp" / "marker" / "source"
+# The .NET modules the package ships, each as its own assembly: the package folder, the sources, the asmdef in sdk/unity/Runtime/<folder>
+MODULES = {
+    "Core": (SDK_DIR / "csharp" / "core" / "source", "MB.FramePacing.asmdef"),
+    "Marker": (SDK_DIR / "csharp" / "marker" / "source", "MB.FramePacing.Marker.asmdef"),
+}
 REPOSITORY_ROOT = SDK_DIR.parent
 
 META_IMPORTERS = {
@@ -126,7 +131,7 @@ def assemble(output: Path, version: str) -> None:
         [
             "# Third Party Notices",
             "",
-            "The QR encoder (Runtime/Core/QrEncoder.cs) is a port of the QR Code generator library by Project Nayuki",
+            "The QR encoder (Runtime/Marker/QrEncoder.cs) is a port of the QR Code generator library by Project Nayuki",
             "(https://www.nayuki.io/page/qr-code-generator-library), MIT License:",
             "",
             "```",
@@ -137,8 +142,9 @@ def assemble(output: Path, version: str) -> None:
     )
     _ = (output / "Third Party Notices.md").write_text(notices, encoding="utf-8")
 
-    copy_sources(MARKER_SOURCES, output / "Runtime" / "Core", "*.cs")
-    _ = shutil.copy2(SCRIPT_DIR / "Runtime" / "Core" / "MB.FramePacing.Marker.asmdef", output / "Runtime" / "Core" / "MB.FramePacing.Marker.asmdef")
+    for folder, (sources, asmdef) in MODULES.items():
+        copy_sources(sources, output / "Runtime" / folder, "*.cs")
+        _ = shutil.copy2(SCRIPT_DIR / "Runtime" / folder / asmdef, output / "Runtime" / folder / asmdef)
     copy_sources(SCRIPT_DIR / "Runtime" / "Unity", output / "Runtime" / "Unity", "*")
     # The shaders include the reference shaders' module lookup, the same code other engines use
     _ = shutil.copy2(SDK_DIR / "shaders" / "hlsl" / "FrameMarker.hlsl", output / "Runtime" / "Unity" / "FrameMarker.hlsl")
@@ -179,10 +185,11 @@ def check(output: Path, version: str) -> list[str]:
     if name != PACKAGE_NAME or manifest_version != version:
         problems.append(f"package.json: name/version {name}/{manifest_version}, expected {PACKAGE_NAME}/{version}")
 
-    for source in sorted(MARKER_SOURCES.glob("*.cs")):
-        copy = output / "Runtime" / "Core" / source.name
-        if not copy.exists() or copy.read_bytes() != source.read_bytes():
-            problems.append(f"Runtime/Core/{source.name}: differs from sdk/csharp/marker/source")
+    for folder, (sources, _asmdef) in MODULES.items():
+        for source in sorted(sources.glob("*.cs")):
+            copy = output / "Runtime" / folder / source.name
+            if not copy.exists() or copy.read_bytes() != source.read_bytes():
+                problems.append(f"Runtime/{folder}/{source.name}: differs from {source.parent.relative_to(REPOSITORY_ROOT).as_posix()}")
     return problems
 
 

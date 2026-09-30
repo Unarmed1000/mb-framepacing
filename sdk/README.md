@@ -24,22 +24,22 @@ Everything here is under the BSD 3-Clause License. The measuring tools themselve
 
 ## Pick a library
 
-| Your application                 | Library                                                                              | How to get it                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| C++ (any engine or graphics API) | [C++20](cpp/README.md): `mb_framepacing::core`, `::marker`, `::data`                 | Release archive via CMake `FetchContent`, git, `add_subdirectory`, an install or Conan |
-| Unity 2021.3+                    | [Unity package](unity/README.md) (`com.manabattery.framepacing`)                     | Package Manager, git URL (`#upm/v<version>`)                                           |
-| Other C# / .NET                  | [`MB.FramePacing.Marker`](csharp/marker/README.md) (.NET Standard 2.1)               | The source at an `sdk-v*` tag, as a project reference or a copy                        |
-|                                  | [`MB.FramePacing.Data`](csharp/data/README.md) (.NET 10, reads and writes)           |                                                                                        |
-| Python 3.12+                     | [`mb_framepacing`](python/README.md): `mb_framepacing.marker`, `mb_framepacing.data` | One package, standard library only                                                     |
+| Your application                 | Library                                                                                                                         | How to get it                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| C++ (any engine or graphics API) | [C++20](cpp/README.md): `mb_framepacing::core`, `::marker`, `::data`                                                            | Release archive via CMake `FetchContent`, git, `add_subdirectory`, an install or Conan |
+| Unity 2021.3+                    | [Unity package](unity/README.md) (`com.manabattery.framepacing`)                                                                | Package Manager, git URL (`#upm/v<version>`)                                           |
+| Other C# / .NET                  | [`MB.FramePacing.Marker`](csharp/marker/README.md) (.NET Standard 2.1, with the core [`MB.FramePacing`](csharp/core/README.md)) | The source at an `sdk-v*` tag, as a project reference or a copy                        |
+|                                  | [`MB.FramePacing.Data`](csharp/data/README.md) (.NET 10, reads and writes)                                                      |                                                                                        |
+| Python 3.12+                     | [`mb_framepacing`](python/README.md): `mb_framepacing.marker`, `mb_framepacing.data`                                            | One package, standard library only                                                     |
 
-The Unity package contains the C# marker module plus Unity helpers (an overlay component that does everything for you).
+The Unity package contains the C# core and marker modules plus Unity helpers (an overlay component that does everything for you).
 
 ## What is here
 
 | Path                            | Contents                                                                                                                     |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | [`cpp/`](cpp/README.md)         | The C++20 library: one CMake project, a folder per module (`core/`, `marker/`, `data/`), and its Conan recipe (`cpp/conan/`) |
-| [`csharp/`](csharp)             | The C# modules: [`marker/`](csharp/marker/README.md) and [`data/`](csharp/data/README.md)                                    |
+| [`csharp/`](csharp)             | The C# modules: [`core/`](csharp/core/README.md), [`marker/`](csharp/marker/README.md) and [`data/`](csharp/data/README.md)  |
 | [`python/`](python/README.md)   | The Python package `mb_framepacing`, with the `marker` and `data` subpackages                                                |
 | [`unity/`](unity/README.md)     | The Unity package's sources: helpers, samples, and the scripts that assemble and check it                                    |
 | [`shaders/`](shaders/README.md) | The reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 and Vulkan         |
@@ -65,7 +65,7 @@ The Unity package contains the C# marker module plus Unity helpers (an overlay c
 | 3   | **Static grid**: `GridVertices` once, then `ModulesToGridIndices`                   | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                     |
 | 4   | **Module texture scaled up**: `ModulesToBitmap` at 1 px per module                  | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact    |
 | 5   | **Triangles**: `ModulesToIndexed` or `ModulesToTriangles`                           | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                        |
-| 6   | **Rectangles**: `ModulesToQuads`                                                    | About 440 filled rectangles (`QuadRect`)                     | A 2D fill-rectangle API                                                       |
+| 6   | **Rectangles**: `ModulesToQuads`                                                    | About 440 filled rectangles (`MarkerQuad`)                   | A 2D fill-rectangle API                                                       |
 | 7   | **Full-size bitmap**: `ModulesToBitmap`                                             | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images                  |
 
 Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shaders for 1 and 2 and how

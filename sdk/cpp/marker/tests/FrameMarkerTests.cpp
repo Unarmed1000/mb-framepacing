@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <vector>
 
+namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 namespace MB::FramePacing::Marker
@@ -32,9 +33,10 @@ namespace MB::FramePacing::Marker
     }
   }
 
-  void PrintTo(const QuadRect& value, std::ostream* os)
+  void PrintTo(const MarkerQuad& value, std::ostream* os)
   {
-    *os << "{" << value.X << "," << value.Y << " " << value.Width << "x" << value.Height << (value.Dark ? " dark}" : " light}");
+    *os << "{" << value.Rect.X() << "," << value.Rect.Y() << " " << value.Rect.Width() << "x" << value.Rect.Height()
+        << (value.Dark ? " dark}" : " light}");
   }
 
   void PrintTo(const Vertex& value, std::ostream* os)
@@ -59,33 +61,34 @@ namespace
   }
 
   //! The documented vertex order of a quad: (TL, TR, BL) (BL, TR, BR), written independently of the library.
-  std::vector<FM::Vertex> ToTriangles(const std::vector<FM::QuadRect>& quads)
+  std::vector<FM::Vertex> ToTriangles(const std::vector<FM::MarkerQuad>& quads)
   {
     std::vector<FM::Vertex> vertices;
-    for (const FM::QuadRect& quad : quads)
+    for (const FM::MarkerQuad& quad : quads)
     {
       const uint8_t luma = quad.Dark ? 0u : 255u;
-      vertices.insert(vertices.end(), {{quad.Left(), quad.Top(), luma},
-                                       {quad.Right(), quad.Top(), luma},
-                                       {quad.Left(), quad.Bottom(), luma},
-                                       {quad.Left(), quad.Bottom(), luma},
-                                       {quad.Right(), quad.Top(), luma},
-                                       {quad.Right(), quad.Bottom(), luma}});
+      vertices.insert(vertices.end(), {{quad.Rect.Left(), quad.Rect.Top(), luma},
+                                       {quad.Rect.Right(), quad.Rect.Top(), luma},
+                                       {quad.Rect.Left(), quad.Rect.Bottom(), luma},
+                                       {quad.Rect.Left(), quad.Rect.Bottom(), luma},
+                                       {quad.Rect.Right(), quad.Rect.Top(), luma},
+                                       {quad.Rect.Right(), quad.Rect.Bottom(), luma}});
     }
     return vertices;
   }
 
   //! The documented indexed order: 4 vertices (TL, TR, BR, BL) and indices (0,1,3)(3,1,2) per quad, plus baseVertex.
-  void ToIndexed(const std::vector<FM::QuadRect>& quads, const uint32_t baseVertex, std::vector<FM::Vertex>& rVertices,
+  void ToIndexed(const std::vector<FM::MarkerQuad>& quads, const uint32_t baseVertex, std::vector<FM::Vertex>& rVertices,
                  std::vector<uint32_t>& rIndices)
   {
-    for (const FM::QuadRect& quad : quads)
+    for (const FM::MarkerQuad& quad : quads)
     {
       const uint8_t luma = quad.Dark ? 0u : 255u;
       const auto first = baseVertex + static_cast<uint32_t>(rVertices.size());
-      rVertices.insert(
-        rVertices.end(),
-        {{quad.Left(), quad.Top(), luma}, {quad.Right(), quad.Top(), luma}, {quad.Right(), quad.Bottom(), luma}, {quad.Left(), quad.Bottom(), luma}});
+      rVertices.insert(rVertices.end(), {{quad.Rect.Left(), quad.Rect.Top(), luma},
+                                         {quad.Rect.Right(), quad.Rect.Top(), luma},
+                                         {quad.Rect.Right(), quad.Rect.Bottom(), luma},
+                                         {quad.Rect.Left(), quad.Rect.Bottom(), luma}});
       rIndices.insert(rIndices.end(), {first, first + 1u, first + 3u, first + 3u, first + 1u, first + 2u});
     }
   }
@@ -105,13 +108,13 @@ namespace
     return Encode(start, metadata);
   }
 
-  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FM::Point origin, const std::span<FM::QuadRect> dst)
+  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FM::Point origin, const std::span<FM::MarkerQuad> dst)
   {
     return FM::ModulesToQuads(Encode(payload), options, origin, dst);
   }
 
   std::size_t GenerateStartQuads(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options, const FM::Point origin,
-                                 const std::span<FM::QuadRect> dst)
+                                 const std::span<FM::MarkerQuad> dst)
   {
     return FM::ModulesToQuads(EncodeStart(payload, metadata), options, origin, dst);
   }
@@ -140,27 +143,27 @@ namespace
     return FM::ModulesToIndexed(EncodeStart(payload, metadata), options, origin, dstVertices, dstIndices, baseVertex);
   }
 
-  std::vector<FM::QuadRect> Generate(const FM::Payload& payload, const FM::Options& options, const FM::Point origin)
+  std::vector<FM::MarkerQuad> Generate(const FM::Payload& payload, const FM::Options& options, const FM::Point origin)
   {
-    std::vector<FM::QuadRect> quads(FM::MaxQuadCount());
+    std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
     const std::size_t count = GenerateQuads(payload, options, origin, quads);
     quads.resize(count);
     return quads;
   }
 
   //! Software rasterization with pixel-edge vertices, 128 = untouched. Returns false if a quad leaves the canvas.
-  bool Rasterize(const std::vector<FM::QuadRect>& quads, const int32_t width, const int32_t height, std::vector<uint8_t>& rPixels)
+  bool Rasterize(const std::vector<FM::MarkerQuad>& quads, const int32_t width, const int32_t height, std::vector<uint8_t>& rPixels)
   {
     rPixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 128u);
-    for (const FM::QuadRect& quad : quads)
+    for (const FM::MarkerQuad& quad : quads)
     {
-      if (quad.Left() < 0 || quad.Top() < 0 || quad.Right() > width || quad.Bottom() > height)
+      if (quad.Rect.Left() < 0 || quad.Rect.Top() < 0 || quad.Rect.Right() > width || quad.Rect.Bottom() > height)
       {
         return false;
       }
-      for (int32_t y = quad.Top(); y < quad.Bottom(); ++y)
+      for (int32_t y = quad.Rect.Top(); y < quad.Rect.Bottom(); ++y)
       {
-        for (int32_t x = quad.Left(); x < quad.Right(); ++x)
+        for (int32_t x = quad.Rect.Left(); x < quad.Rect.Right(); ++x)
         {
           rPixels[(static_cast<std::size_t>(y) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(x)] = quad.Dark ? 0u : 255u;
         }
@@ -434,7 +437,7 @@ TEST(Geometry, MarkerSize)
 
 TEST(Geometry, InvalidOptionsGenerateNothing)
 {
-  std::vector<FM::QuadRect> quads(FM::MaxQuadCount());
+  std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
   EXPECT_EQ(GenerateQuads({}, FM::Options{0, 4}, {}, quads), 0u);
   EXPECT_EQ(GenerateQuads({}, FM::Options{6, -1}, {}, quads), 0u);
   EXPECT_EQ(GenerateQuads({}, FM::Options{6, FM::MaxQuietZoneModules + 1}, {}, quads), 0u);
@@ -442,7 +445,7 @@ TEST(Geometry, InvalidOptionsGenerateNothing)
 
 TEST(Geometry, TooSmallDestinationGeneratesNothing)
 {
-  std::vector<FM::QuadRect> quads(10);
+  std::vector<FM::MarkerQuad> quads(10);
   EXPECT_EQ(GenerateQuads({}, FM::Options{}, {}, quads), 0u);
 }
 
@@ -454,10 +457,10 @@ TEST(Symbol, SyncMarkersAreVersion2)
   EXPECT_EQ(matrix.Size(), 25);
 
   const FM::Options options{3, 4};
-  std::vector<FM::QuadRect> quads(FM::MaxQuadCount());
+  std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
   const std::size_t count = GenerateQuads({FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::None, 0}, options, {10, 20}, quads);
   ASSERT_GT(count, 0u);
-  EXPECT_EQ(quads.front(), (FM::QuadRect{10, 20, 99, 99, false}));
+  EXPECT_EQ(quads.front(), (FM::MarkerQuad{FP::Rectangle(10, 20, 99, 99), false}));
 }
 
 TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
@@ -504,18 +507,18 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
   id.Bytes.fill(0xFFu);
   const FM::Options options{};
   const FM::Point origin{32, 32};
-  std::vector<FM::QuadRect> quads(FM::MaxQuadCount());
+  std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
   const std::size_t count = GenerateStartQuads({FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::None, 6}, {99, id}, options, origin, quads);
   ASSERT_GT(count, 0u);
   ASSERT_LE(count, FM::MaxQuadCount());
-  const FM::QuadRect& background = quads.front();
-  EXPECT_EQ(background.Left(), origin.X);
-  EXPECT_EQ(background.Top(), origin.Y);
-  EXPECT_EQ(background.Right() - background.Left(), FM::MarkerSizePx(options));
+  const FM::MarkerQuad& background = quads.front();
+  EXPECT_EQ(background.Rect.Left(), origin.X);
+  EXPECT_EQ(background.Rect.Top(), origin.Y);
+  EXPECT_EQ(background.Rect.Right() - background.Rect.Left(), FM::MarkerSizePx(options));
   for (std::size_t i = 1; i < count; ++i)
   {
-    EXPECT_LE(quads[i].Right(), background.Right()) << "quad " << i;
-    EXPECT_LE(quads[i].Bottom(), background.Bottom()) << "quad " << i;
+    EXPECT_LE(quads[i].Rect.Right(), background.Rect.Right()) << "quad " << i;
+    EXPECT_LE(quads[i].Rect.Bottom(), background.Rect.Bottom()) << "quad " << i;
   }
 }
 
@@ -534,23 +537,23 @@ TEST(Geometry, QuadsArePixelAlignedAndReproduceTheModuleMatrix)
 
       ASSERT_FALSE(quads.empty());
       ASSERT_LE(quads.size(), FM::MaxQuadCount());
-      EXPECT_EQ(quads.front(), (FM::QuadRect{origin.X, origin.Y, size, size, false}));
+      EXPECT_EQ(quads.front(), (FM::MarkerQuad{FP::Rectangle(origin.X, origin.Y, size, size), false}));
 
       for (std::size_t i = 1; i < quads.size(); ++i)
       {
-        const FM::QuadRect& quad = quads[i];
+        const FM::MarkerQuad& quad = quads[i];
         EXPECT_TRUE(quad.Dark) << "quad " << i;
-        EXPECT_LT(quad.Left(), quad.Right()) << "quad " << i;
-        EXPECT_EQ(quad.Bottom() - quad.Top(), moduleSize) << "quad " << i;
-        EXPECT_EQ((quad.Left() - origin.X) % moduleSize, 0) << "quad " << i;
-        EXPECT_EQ((quad.Right() - origin.X) % moduleSize, 0) << "quad " << i;
-        EXPECT_EQ((quad.Top() - origin.Y) % moduleSize, 0) << "quad " << i;
+        EXPECT_LT(quad.Rect.Left(), quad.Rect.Right()) << "quad " << i;
+        EXPECT_EQ(quad.Rect.Bottom() - quad.Rect.Top(), moduleSize) << "quad " << i;
+        EXPECT_EQ((quad.Rect.Left() - origin.X) % moduleSize, 0) << "quad " << i;
+        EXPECT_EQ((quad.Rect.Right() - origin.X) % moduleSize, 0) << "quad " << i;
+        EXPECT_EQ((quad.Rect.Top() - origin.Y) % moduleSize, 0) << "quad " << i;
         // Dark quads never overlap: runs within a row are separated, rows are disjoint.
         for (std::size_t j = i + 1; j < quads.size(); ++j)
         {
-          const FM::QuadRect& other = quads[j];
-          const bool overlap =
-            quad.Left() < other.Right() && other.Left() < quad.Right() && quad.Top() < other.Bottom() && other.Top() < quad.Bottom();
+          const FM::MarkerQuad& other = quads[j];
+          const bool overlap = quad.Rect.Left() < other.Rect.Right() && other.Rect.Left() < quad.Rect.Right() &&
+                               quad.Rect.Top() < other.Rect.Bottom() && other.Rect.Top() < quad.Rect.Bottom();
           EXPECT_FALSE(overlap) << "quads " << i << " and " << j;
         }
       }
@@ -686,9 +689,9 @@ namespace
     return cases;
   }
 
-  std::vector<FM::QuadRect> GenerateCase(const TriangleCase& testCase)
+  std::vector<FM::MarkerQuad> GenerateCase(const TriangleCase& testCase)
   {
-    std::vector<FM::QuadRect> quads(FM::MaxQuadCount());
+    std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
     const std::size_t count = testCase.Payload.Kind == FM::MarkerKind::SequenceStart
                                 ? GenerateStartQuads(testCase.Payload, {1, testCase.StartId}, testCase.Options, testCase.Origin, quads)
                                 : GenerateQuads(testCase.Payload, testCase.Options, testCase.Origin, quads);
@@ -772,7 +775,7 @@ TEST(Triangles, DirectOutputEqualsTheConvertedQuads)
   {
     SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
                                     << ", quiet " << testCase.Options.QuietZoneModules << ", id " << testing::PrintToString(testCase.StartId));
-    const std::vector<FM::QuadRect> quads = GenerateCase(testCase);
+    const std::vector<FM::MarkerQuad> quads = GenerateCase(testCase);
     ASSERT_FALSE(quads.empty());
 
     EXPECT_EQ(GenerateCaseTriangles(testCase), ToTriangles(quads));
@@ -940,7 +943,7 @@ TEST(ModuleMatrix, TryFromBitsTakesQrSizesAndIgnoresThePadding)
 TEST(ModuleMatrix, AnEmptyMatrixDrawsNothing)
 {
   const FM::ModuleMatrix empty;
-  std::array<FM::QuadRect, 4> quads{};
+  std::array<FM::MarkerQuad, 4> quads{};
   std::array<uint8_t, 16> pixels{};
   EXPECT_EQ(empty.Size(), 0);
   EXPECT_EQ(FM::ModulesToQuads(empty, {}, {}, quads), 0u);
@@ -973,16 +976,16 @@ TEST(Bitmap, EqualsTheRasterizedQuadsInEveryPixelFormat)
   {
     SCOPED_TRACE(testing::PrintToString(testCase.Payload));
     const FM::ModuleMatrix matrix = Encode(testCase.Payload);
-    std::vector<FM::QuadRect> quads(FM::MaxQuadCount());
+    std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
     quads.resize(FM::ModulesToQuads(matrix, testCase.Options, testCase.Origin, quads));
 
     // The expected pixels: every quad clipped to the canvas, over untouched pixels of 128
     std::vector<uint8_t> expected(static_cast<std::size_t>(Width) * static_cast<std::size_t>(Height), 128u);
-    for (const FM::QuadRect& quad : quads)
+    for (const FM::MarkerQuad& quad : quads)
     {
-      for (int32_t y = std::max(quad.Top(), 0); y < std::min(quad.Bottom(), Height); ++y)
+      for (int32_t y = std::max(quad.Rect.Top(), 0); y < std::min(quad.Rect.Bottom(), Height); ++y)
       {
-        for (int32_t x = std::max(quad.Left(), 0); x < std::min(quad.Right(), Width); ++x)
+        for (int32_t x = std::max(quad.Rect.Left(), 0); x < std::min(quad.Rect.Right(), Width); ++x)
         {
           expected[(static_cast<std::size_t>(y) * Width) + static_cast<std::size_t>(x)] = quad.Dark ? 0u : 255u;
         }

@@ -83,10 +83,10 @@ namespace MB.FramePacing.Marker.UnitTest
       );
       Assert.That(matrix.Size, Is.EqualTo(FrameMarker.SyncQrModuleCount));
       Assert.That(matrix.Bits.Length, Is.EqualTo(79));
-      var quads = new QuadRect[FrameMarker.MaxQuadCount];
+      var quads = new MarkerQuad[FrameMarker.MaxQuadCount];
       int count = TestMarkers.GenerateQuads(new Payload(MarkerKind.Sync, 0, 7, MarkerFlags.None, 0), new Options(3, 4), new Point(10, 20), quads);
       Assert.That(count, Is.GreaterThan(1));
-      Assert.That(quads[0], Is.EqualTo(new QuadRect(10, 20, 99, 99, false)));
+      Assert.That(quads[0], Is.EqualTo(new MarkerQuad(new Rectangle(10, 20, 99, 99), false)));
     }
 
     [Test]
@@ -119,16 +119,16 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void Quads_ArePixelAligned_BackgroundFirst()
     {
-      var quads = new QuadRect[FrameMarker.MaxQuadCount];
+      var quads = new MarkerQuad[FrameMarker.MaxQuadCount];
       int count = TestMarkers.GenerateQuads(new Payload(MarkerKind.Frame, 7, 5, MarkerFlags.None, 6), new Options(3, 4), new Point(10, 20), quads);
       Assert.That(count, Is.InRange(2, FrameMarker.MaxQuadCount));
-      Assert.That(quads[0], Is.EqualTo(new QuadRect(10, 20, 147, 147, false)));
+      Assert.That(quads[0], Is.EqualTo(new MarkerQuad(new Rectangle(10, 20, 147, 147), false)));
       foreach (var quad in quads.Skip(1).Take(count - 1))
       {
         Assert.That(quad.Dark, Is.True);
-        Assert.That(quad.Height, Is.EqualTo(3));
-        Assert.That((quad.Left - 22) % 3, Is.Zero, "left edges on module boundaries");
-        Assert.That((quad.Top - 32) % 3, Is.Zero, "top edges on module boundaries");
+        Assert.That(quad.Rect.Height, Is.EqualTo(3));
+        Assert.That((quad.Rect.Left - 22) % 3, Is.Zero, "left edges on module boundaries");
+        Assert.That((quad.Rect.Top - 32) % 3, Is.Zero, "top edges on module boundaries");
       }
     }
 
@@ -138,7 +138,7 @@ namespace MB.FramePacing.Marker.UnitTest
       var payload = new Payload(MarkerKind.Frame, 3, 42, MarkerFlags.None, 1_234_567);
       var options = new Options(2, 4);
       var origin = new Point(7, 9);
-      var quads = new QuadRect[FrameMarker.MaxQuadCount];
+      var quads = new MarkerQuad[FrameMarker.MaxQuadCount];
       int quadCount = TestMarkers.GenerateQuads(payload, options, origin, quads);
 
       var converted = TestMarkers.ToTriangles(quads.Take(quadCount));
@@ -206,13 +206,13 @@ namespace MB.FramePacing.Marker.UnitTest
     public void InvalidOptions_OrSmallBuffers_GenerateNothing()
     {
       var payload = new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2);
-      Assert.That(TestMarkers.GenerateQuads(payload, new Options(0), default, new QuadRect[FrameMarker.MaxQuadCount]), Is.Zero);
+      Assert.That(TestMarkers.GenerateQuads(payload, new Options(0), default, new MarkerQuad[FrameMarker.MaxQuadCount]), Is.Zero);
       Assert.That(TestMarkers.GenerateTriangles(payload, new Options(6, -1), default, new Vertex[FrameMarker.MaxTriangleVertexCount]), Is.Zero);
       Assert.That(
-        TestMarkers.GenerateQuads(payload, new Options(6, FrameMarker.MaxQuietZoneModules + 1), default, new QuadRect[FrameMarker.MaxQuadCount]),
+        TestMarkers.GenerateQuads(payload, new Options(6, FrameMarker.MaxQuietZoneModules + 1), default, new MarkerQuad[FrameMarker.MaxQuadCount]),
         Is.Zero
       );
-      Assert.That(TestMarkers.GenerateQuads(payload, Options.Default, default, new QuadRect[10]), Is.Zero);
+      Assert.That(TestMarkers.GenerateQuads(payload, Options.Default, default, new MarkerQuad[10]), Is.Zero);
       Assert.That(TestMarkers.GenerateTriangles(payload, Options.Default, default, new Vertex[12]), Is.Zero);
       var failed = TestMarkers.GenerateIndexed(payload, Options.Default, default, new Vertex[FrameMarker.MaxIndexedVertexCount], new int[12]);
       Assert.That((failed.VertexCount, failed.IndexCount), Is.EqualTo((0, 0)));
@@ -278,7 +278,7 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void EmptyMatrix_DrawsNothing()
     {
-      Assert.That(FrameMarker.ModulesToQuads(default, Options.Default, default, new QuadRect[4]), Is.Zero);
+      Assert.That(FrameMarker.ModulesToQuads(default, Options.Default, default, new MarkerQuad[4]), Is.Zero);
       Assert.That(FrameMarker.ModulesToBitmap(default, new Options(1, 0), default, new byte[16], 4, 4, PixelFormat.Gray8), Is.False);
     }
 
@@ -315,7 +315,7 @@ namespace MB.FramePacing.Marker.UnitTest
       int stride = (Width * bytesPerPixel) + 5; // padded rows
       foreach (var (payload, options, origin) in cases)
       {
-        var quads = new QuadRect[FrameMarker.MaxQuadCount];
+        var quads = new MarkerQuad[FrameMarker.MaxQuadCount];
         var matrix = TestMarkers.Encode(payload);
         int count = FrameMarker.ModulesToQuads(matrix, options, origin, quads);
         var expected = SoftwareRaster.Quads(quads.Take(count).ToList(), Width, Height);
