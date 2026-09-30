@@ -31,7 +31,7 @@ namespace MB.FramePacing.Marker.Unity
     public bool Update(ModuleMatrix matrix, int quietZoneModules = FrameMarker.RecommendedQuietZoneModules)
     {
       var options = new Options(1, quietZoneModules);
-      if (!FrameMarker.IsValid(options) || matrix.IsEmpty)
+      if (matrix.IsEmpty)
         return false;
       int size = matrix.Size + (2 * quietZoneModules);
       int rowBytes = size * 4;
@@ -48,7 +48,7 @@ namespace MB.FramePacing.Marker.Unity
         m_rows = new byte[rowBytes * size];
         m_pixels = new byte[rowBytes * size];
       }
-      if (!FrameMarker.ModulesToBitmap(matrix, options, default, m_rows, size, size, PixelFormat.Rgba32))
+      if (!FrameMarker.ModulesToBitmap(matrix, options, default, m_rows, size, size, PixelFormat.R8G8B8A8))
         return false;
       // The marker's rows run top down, a texture's bottom up
       for (int y = 0; y < size; ++y)

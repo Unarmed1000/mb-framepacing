@@ -10,9 +10,10 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
-  - **core**: the types every module shares, `Rectangle` (always valid: a negative size is 0) in every language (C++ `MB::FramePacing`
-    with the library version and the tick units and conversions, C# assembly `MB.FramePacing`, Python `mb_framepacing`). The SDK never
-    reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test helper).
+  - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
+    `MB::FramePacing` with the library version and the tick units and conversions, C# assembly `MB.FramePacing`, Python
+    `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
+    helper). The core's types hide same-named types that a `using` brings into `MB.FramePacing.*` code: the GUI writes `Avalonia.Point`.
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
 
 See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker specification. **The document is the reference**: C++
@@ -275,7 +276,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - The start marker (77 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
     most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
     captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 16 bytes: the header's start, run id and frame index; matched to its main marker by both) is QR version 2 (25×25), drawn
-    bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `RecommendedOrigin(kind, …)`
+    bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `Options.RecommendedOrigin(kind, …)`
     places both; there are no other slots.
 - **Camera capture (VERY EXPERIMENTAL, `measure/doc/camera.md`):**
   - The GUI hides it (the camera card, the synthetic camera source) unless **Settings → Experimental features** is on
@@ -369,7 +370,10 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
   `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). A drawn rectangle is a
-  `MarkerQuad` (a core `Rectangle` `Rect` and `Dark`). The C# static
+  `MarkerQuad` (a core `Rectangle` `Rect` and `Dark`). `Options` (module size and quiet zone) is always valid: C++ asserts a value outside its range and clamps it
+  without asserts, C# and Python clamp (C# stores it relative to the defaults, so `default(Options)` is `Options.Default`); the sizing
+  and placement are its members (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`). Pixel formats are named
+  by their channels: `R8`, `R8G8B8`, `R8G8B8A8`. The C# static
   class is `FrameMarker` (not `Marker`: a class named like its namespace `MB.FramePacing.Marker` breaks lookups in `MB.FramePacing.*` code). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
   value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**

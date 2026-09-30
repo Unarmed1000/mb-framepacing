@@ -14,10 +14,10 @@ only 211 bytes change.
 
 Every folder has two fragment shaders; pick one:
 
-| Variant                          | Per frame                                     | Where the modules come from                                                                                        |
-| -------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Packed** (`*packed*`, fastest) | 211 bytes: `ModuleMatrix::Bits()` as they are | 14 `uint4` of constants (`hlsl/`, `gl/`, `vulkan/`), or a 211 × 1 texture (`gles2/`: no integers, no large arrays) |
-| **Modules** (`*modules*`)        | 1,681 bytes: one byte per module              | A 41 × 41 single channel texture: `ModulesToBitmap(matrix, {1, 0}, {0, 0}, texels, 41, 41, PixelFormat::Gray8)`    |
+| Variant                          | Per frame                                     | Where the modules come from                                                                                         |
+| -------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Packed** (`*packed*`, fastest) | 211 bytes: `ModuleMatrix::Bits()` as they are | 14 `uint4` of constants (`hlsl/`, `gl/`, `vulkan/`), or a 211 × 1 texture (`gles2/`: no integers, no large arrays)  |
+| **Modules** (`*modules*`)        | 1,681 bytes: one byte per module              | A 41 × 41 single channel texture: `ModulesToBitmap(matrix, Options(1, 0), {0, 0}, texels, 41, 41, PixelFormat::R8)` |
 
 ## Drawing it
 

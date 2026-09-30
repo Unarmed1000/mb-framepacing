@@ -40,11 +40,11 @@ namespace MB.FramePacing.Marker.Unity
     /// Fill the mesh with the encoded marker (<see cref="MarkerGenerator.TryGenerateModules(in Payload, in StartMetadata, Span{byte}, out ModuleMatrix)"/>)
     /// for an output of <paramref name="outputHeight"/> pixels. The vertices are the static grid (<see cref="FrameMarker.GridVertices"/>), set
     /// again only when the symbol size, the options, the origin or the output height change; every other frame only the indices are
-    /// uploaded. Returns false (and leaves the mesh unchanged) if the options are invalid or the matrix is empty.
+    /// uploaded. Returns false (and leaves the mesh unchanged) if the matrix is empty.
     /// </summary>
     public bool Update(ModuleMatrix matrix, in Options options, Point origin, int outputHeight)
     {
-      if (Mesh == null || matrix.IsEmpty || !FrameMarker.IsValid(options))
+      if (Mesh == null || matrix.IsEmpty)
         return false;
       bool sameGrid =
         matrix.Size == m_gridSize

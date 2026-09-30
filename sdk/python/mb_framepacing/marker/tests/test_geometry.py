@@ -6,12 +6,16 @@
 import unittest
 
 from .. import (
+    DEFAULT_MODULE_SIZE_PX,
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
+    MAX_MODULE_SIZE_PX,
     MAX_QUAD_COUNT,
     MAX_QUIET_ZONE_MODULES,
+    MIN_MODULE_SIZE_PX,
     QR_CAPACITY_BYTES,
     QR_MODULE_COUNT,
     QR_VERSION,
+    RECOMMENDED_QUIET_ZONE_MODULES,
     SYNC_QR_MODULE_COUNT,
     SYNC_QR_VERSION,
     MarkerFlags,
@@ -29,16 +33,12 @@ from .. import (
     generate_modules,
     grid_vertex_count,
     grid_vertices,
-    marker_size_px,
-    minimum_module_size_px,
     modules_to_bitmap,
     modules_to_grid_indices,
     modules_to_indexed,
     modules_to_quads,
     packed_module_byte_count,
     qr_module_count_for,
-    recommend_module_size_px,
-    recommended_origin,
 )
 from . import software_raster
 from .markers import generate_indexed, generate_quads, generate_start_quads, generate_triangles, to_indexed, to_triangles
@@ -56,52 +56,52 @@ class GeometryTests(unittest.TestCase):
         self.assertLessEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, QR_CAPACITY_BYTES)
 
     def test_marker_size(self) -> None:
-        self.assertEqual(marker_size_px(Options()), 294)
-        self.assertEqual(marker_size_px(Options(3)), 147)
-        self.assertEqual(marker_size_px(Options(4)), 196)
-        self.assertEqual(marker_size_px(Options(12)), 588)
-        self.assertEqual(marker_size_px(Options(1, 0)), 41)
+        self.assertEqual(Options().marker_size_px(), 294)
+        self.assertEqual(Options(3).marker_size_px(), 147)
+        self.assertEqual(Options(4).marker_size_px(), 196)
+        self.assertEqual(Options(12).marker_size_px(), 588)
+        self.assertEqual(Options(1, 0).marker_size_px(), 41)
         for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
-            self.assertEqual(marker_size_px(Options(), kind), 294)
+            self.assertEqual(Options().marker_size_px(kind), 294)
             self.assertEqual(qr_module_count_for(kind), QR_MODULE_COUNT)
 
     def test_sync_marker_size(self) -> None:
         self.assertEqual(qr_module_count_for(MarkerKind.SYNC), SYNC_QR_MODULE_COUNT)
-        self.assertEqual(marker_size_px(Options(), MarkerKind.SYNC), 198)
-        self.assertEqual(marker_size_px(Options(3), MarkerKind.SYNC), 99)
-        self.assertEqual(marker_size_px(Options(1, 0), MarkerKind.SYNC), 25)
+        self.assertEqual(Options().marker_size_px(MarkerKind.SYNC), 198)
+        self.assertEqual(Options(3).marker_size_px(MarkerKind.SYNC), 99)
+        self.assertEqual(Options(1, 0).marker_size_px(MarkerKind.SYNC), 25)
 
     def test_module_size_recommendations_match_the_documentation(self) -> None:
-        self.assertEqual(minimum_module_size_px(1080, 1080), 2)
-        self.assertEqual(recommend_module_size_px(1080, 1080), 3)
-        self.assertEqual(recommend_module_size_px(1080, 1080, mjpeg=True), 4)
-        self.assertEqual(minimum_module_size_px(1440, 1080), 3)
-        self.assertEqual(recommend_module_size_px(1440, 1080), 4)
-        self.assertEqual(minimum_module_size_px(1080, 540), 4)
-        self.assertEqual(recommend_module_size_px(1080, 540), 6)
-        self.assertEqual(recommend_module_size_px(2160, 1080), 6)
-        self.assertEqual(recommend_module_size_px(1080, 540, mjpeg=True), 8)
-        self.assertEqual(minimum_module_size_px(1080, 360), 6)
-        self.assertEqual(recommend_module_size_px(1080, 360), 9)
-        self.assertEqual(minimum_module_size_px(2160, 540), 8)
-        self.assertEqual(recommend_module_size_px(2160, 540), 12)
-        self.assertEqual(recommend_module_size_px(540, 1080), 3)
-        self.assertEqual(recommend_module_size_px(0, 1080), 3)
+        self.assertEqual(Options.minimum(1080, 1080).module_size_px, 2)
+        self.assertEqual(Options.recommended(1080, 1080).module_size_px, 3)
+        self.assertEqual(Options.recommended(1080, 1080, mjpeg=True).module_size_px, 4)
+        self.assertEqual(Options.minimum(1440, 1080).module_size_px, 3)
+        self.assertEqual(Options.recommended(1440, 1080).module_size_px, 4)
+        self.assertEqual(Options.minimum(1080, 540).module_size_px, 4)
+        self.assertEqual(Options.recommended(1080, 540).module_size_px, 6)
+        self.assertEqual(Options.recommended(2160, 1080).module_size_px, 6)
+        self.assertEqual(Options.recommended(1080, 540, mjpeg=True).module_size_px, 8)
+        self.assertEqual(Options.minimum(1080, 360).module_size_px, 6)
+        self.assertEqual(Options.recommended(1080, 360).module_size_px, 9)
+        self.assertEqual(Options.minimum(2160, 540).module_size_px, 8)
+        self.assertEqual(Options.recommended(2160, 540).module_size_px, 12)
+        self.assertEqual(Options.recommended(540, 1080).module_size_px, 3)
+        self.assertEqual(Options.recommended(0, 1080).module_size_px, 3)
 
     def test_recommended_origins(self) -> None:
         options = Options()
         # The main marker top-left, the sync marker bottom-left
-        self.assertEqual(recommended_origin(MarkerKind.FRAME, 1920, 1080, options), Point(32, 32))
-        self.assertEqual(recommended_origin(MarkerKind.SEQUENCE_START, 1920, 1080, options), Point(32, 32))
-        self.assertEqual(recommended_origin(MarkerKind.SEQUENCE_END, 1920, 1080, options), Point(32, 32))
-        self.assertEqual(recommended_origin(MarkerKind.SYNC, 1920, 1080, options), Point(32, 1080 - 32 - 198))
+        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1920, 1080), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.SEQUENCE_START, 1920, 1080), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.SEQUENCE_END, 1920, 1080), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 1920, 1080), Point(32, 1080 - 32 - 198))
         # Aligned to a 3:1 downscale ratio
-        self.assertEqual(recommended_origin(MarkerKind.FRAME, 1920, 1080, options, 3), Point(33, 33))
-        self.assertEqual(recommended_origin(MarkerKind.SYNC, 1920, 1080, options, 3), Point(33, 849))
-        self.assertEqual(recommended_origin(MarkerKind.FRAME, 1920, 1080, options, 4), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1920, 1080, 3), Point(33, 33))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 1920, 1080, 3), Point(33, 849))
+        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1920, 1080, 4), Point(32, 32))
         # A frame lower than the marker: C# and C++ truncate toward zero, Python's // would floor
-        self.assertEqual(recommended_origin(MarkerKind.SYNC, 100, 100, options), Point(32, -130))
-        self.assertEqual(recommended_origin(MarkerKind.SYNC, 100, 100, options, 3), Point(33, -129))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 100, 100), Point(32, -130))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 100, 100, 3), Point(33, -129))
 
     def test_every_main_marker_kind_is_version_6(self) -> None:
         for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
@@ -157,7 +157,7 @@ class GeometryTests(unittest.TestCase):
     def test_vertex_order_matches_the_cpp_library(self) -> None:
         # The background quad comes first: its vertices in the documented order
         options = Options(2, 4)
-        size = marker_size_px(options)
+        size = options.marker_size_px()
         triangles = generate_triangles(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), options, Point(10, 20))
         light = [
             Vertex(10, 20, 255),
@@ -172,11 +172,17 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(vertices[:4], [Vertex(10, 20, 255), Vertex(10 + size, 20, 255), Vertex(10 + size, 20 + size, 255), Vertex(10, 20 + size, 255)])
         self.assertEqual(indices[:12], [100, 101, 103, 103, 101, 102, 104, 105, 107, 107, 105, 106])
 
-    def test_invalid_options_raise(self) -> None:
-        payload = Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2)
-        for options in (Options(0), Options(6, -1), Options(6, MAX_QUIET_ZONE_MODULES + 1), Options(1025)):
-            with self.subTest(options), self.assertRaises(ValueError):
-                _ = generate_quads(payload, options, Point(0, 0))
+    def test_options_are_always_valid(self) -> None:
+        self.assertEqual(Options(), Options(DEFAULT_MODULE_SIZE_PX, RECOMMENDED_QUIET_ZONE_MODULES))
+        self.assertEqual(DEFAULT_MODULE_SIZE_PX, 6)
+        self.assertEqual(Options(3, 4).quiet_zone_px, 12)
+        # A value outside its range is clamped, as in the C# library (and the C++ library without asserts)
+        self.assertEqual(Options(0, 4), Options(MIN_MODULE_SIZE_PX, 4))
+        self.assertEqual(Options(MAX_MODULE_SIZE_PX + 1, 4).module_size_px, MAX_MODULE_SIZE_PX)
+        self.assertEqual(Options(6, -1).quiet_zone_modules, 0)
+        self.assertEqual(Options(6, MAX_QUIET_ZONE_MODULES + 1).quiet_zone_modules, MAX_QUIET_ZONE_MODULES)
+        self.assertEqual(Options.recommended(1_000_000, 10).module_size_px, MAX_MODULE_SIZE_PX)
+        self.assertEqual(Options.minimum(1080, 540), Options(4, RECOMMENDED_QUIET_ZONE_MODULES))
 
     def test_markers_fit_the_quad_count(self) -> None:
         for frame in range(0, 500, 7):
@@ -250,7 +256,7 @@ class BitmapTests(unittest.TestCase):
     def test_a_module_resolution_image_scaled_up_equals_the_full_size_one(self) -> None:
         matrix = generate_modules(Payload(MarkerKind.FRAME, 59, 31, MarkerFlags.NONE, 41))
         small, large, module = Options(1, 4), Options(3, 4), 3
-        small_size, large_size = marker_size_px(small), marker_size_px(large)
+        small_size, large_size = small.marker_size_px(), large.marker_size_px()
         modules = bytearray(small_size * small_size)
         pixels = bytearray(large_size * large_size)
         modules_to_bitmap(matrix, small, Point(0, 0), modules, small_size, small_size)
@@ -263,11 +269,9 @@ class BitmapTests(unittest.TestCase):
         matrix = generate_modules(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2))
         pixels = bytearray([128]) * (64 * 64 * 4)
         with self.assertRaises(ValueError):
-            modules_to_bitmap(matrix, Options(0), Point(0, 0), pixels, 64, 64)
+            modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), pixels, 64, 64, PixelFormat.R8G8B8, (64 * 3) - 1)
         with self.assertRaises(ValueError):
-            modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), pixels, 64, 64, PixelFormat.RGB24, (64 * 3) - 1)
-        with self.assertRaises(ValueError):
-            modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), memoryview(pixels)[:-1], 64, 64, PixelFormat.RGBA32)
+            modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), memoryview(pixels)[:-1], 64, 64, PixelFormat.R8G8B8A8)
         self.assertTrue(all(value == 128 for value in pixels))
         modules_to_bitmap(matrix, Options(1, 4), Point(500, 500), pixels, 64, 64)
         self.assertTrue(all(value == 128 for value in pixels), "outside the buffer: nothing to draw")

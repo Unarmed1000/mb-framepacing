@@ -58,11 +58,12 @@ likewise, only for the tests.
 
 ```cpp
 #include <mb/framepacing/Marker.hpp>
+namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 // Once: output 1920x1080, capture stored at 960x540 (2:1)
-const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};
-const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, /*alignPx*/ 2);
+const auto options = FM::Options::Recommended(1080, 540);   // 6 px modules, the recommended quiet zone
+const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, /*alignPx*/ 2);
 std::array<FM::Vertex, FM::MaxGridVertexCount()> grid;
 const std::size_t gridCount = FM::GridVertices(FM::MarkerKind::Frame, options, origin, grid);
 UploadVertices(grid.data(), gridCount);   // your renderer: a static vertex buffer, (X, Y) in pixels, color (Luma, Luma, Luma)
@@ -95,27 +96,25 @@ faster still.
   frames. The sequence id is 16 opaque bytes unique to the run: a UUID's bytes, or a text tag of up to 16 printable ASCII characters
   (`SequenceId::TryFromText`).
 - **Sync marker (optional; required for camera capture):** a small second marker with only the run id and frame index, drawn
-  bottom-left (`RecommendedOrigin(MarkerKind::Sync, …)`) with a payload of kind `MarkerKind::Sync`.
+  bottom-left (`options.RecommendedOrigin(MarkerKind::Sync, …)`) with a payload of kind `MarkerKind::Sync`.
 - **Size:** every main marker (frame, start, end) is QR version 6, 41×41 modules, so it never changes size:
-  `MarkerSizePx(options)`. The sync marker is QR version 2, 25×25 modules.
+  `options.MarkerSizePx()`. The sync marker is QR version 2, 25×25 modules.
 
 Everything is declared by `<mb/framepacing/Marker.hpp>` in `MB::FramePacing::Marker`, one header per type (`<mb/framepacing/marker/…>`):
 
 | Function or type                                                                                                | What it does                                                                         |
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                          | What a marker carries                                                                |
-| `Options`, `Point`                                                                                              | Size and place                                                                       |
+| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                        | Size and place: always valid (a value outside its range asserts, else is clamped)    |
 | `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                    | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
 | `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                 | A static grid uploaded once, and per frame only the indices                          |
 | `ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                               | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
 | `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark) | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
 | `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount`  | Buffer sizes that fit every marker kind                                              |
-| `MarkerSizePx`, `QrModuleCountFor`, `RecommendedOrigin`                                                         | Sizing and placement                                                                 |
-| `MinimumModuleSizePx`, `RecommendModuleSizePx`                                                                  | Module size for a capture's scaling                                                  |
+| `QrModuleCountFor`                                                                                              | Modules per side of a kind's symbol                                                  |
 | `EncodePayload`, `TryDecodePayload`                                                                             | The wire format                                                                      |
 
-Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the options are invalid, the matrix is empty or a
-buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
+Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the matrix is empty or a buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
 
 ## The data
 
@@ -165,12 +164,12 @@ version, whose message says to update), `std::runtime_error` for a file it canno
 
 `<mb/framepacing/Core.hpp>` in `MB::FramePacing` (every module's header includes it):
 
-| Function or type                                                                | What it does                                                                 |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp` (include it yourself) | The linked library's version; at compile time, for `#if` and `static_assert` |
-| `TicksPerSecond`, `TicksPerMillisecond`, `TickDuration`                         | The SDK's time unit: 100 ns ticks (C# `TimeSpan` ticks)                      |
-| `NanosecondsToTicks`, `TicksToNanoseconds`, `CounterToTicks`, `ToDateTimeTicks` | Platform times (ns, a performance counter, the wall clock) as ticks          |
-| `Rectangle`                                                                     | An integer pixel rectangle, always valid (a negative size is 0)              |
+| Function or type                                                                | What it does                                                                      |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp` (include it yourself) | The linked library's version; at compile time, for `#if` and `static_assert`      |
+| `TicksPerSecond`, `TicksPerMillisecond`, `TickDuration`                         | The SDK's time unit: 100 ns ticks (C# `TimeSpan` ticks)                           |
+| `NanosecondsToTicks`, `TicksToNanoseconds`, `CounterToTicks`, `ToDateTimeTicks` | Platform times (ns, a performance counter, the wall clock) as ticks               |
+| `Point`, `Rectangle`                                                            | A pixel position; an integer pixel rectangle, always valid (a negative size is 0) |
 
 ## Build and test
 

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-// The core module: the library version, the tick conversions and Rectangle.
+// The core module: the library version, the tick conversions, Point and Rectangle.
 #include <mb/framepacing/Core.hpp>
 #include <mb/framepacing/core/Version.hpp>
 #include <gtest/gtest.h>
@@ -96,6 +96,13 @@ TEST(SteadyClock, NeverGoesBack)
     EXPECT_GE(now, previous);
     previous = now;
   }
+}
+
+TEST(Point, IsAPixelPositionThatComparesByValue)
+{
+  static_assert(FP::Point{} == FP::Point{0, 0});
+  static_assert(FP::Point{3, -4}.X == 3 && FP::Point{3, -4}.Y == -4);
+  static_assert(FP::Point{3, -4} != FP::Point{-4, 3});
 }
 
 TEST(Rectangle, ItsEdgesFollowFromItsPositionAndSize)

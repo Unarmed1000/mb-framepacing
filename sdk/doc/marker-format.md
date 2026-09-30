@@ -160,7 +160,7 @@ where the next frame index was captured too. Leave the fields `0` when the appli
   the application does not need to clear the area first.
 
 Marker size in source pixels = `(modules + 2 × QuietZoneModules) × ModuleSizePx`: `49 × ModuleSizePx` for the main marker and
-`33 × ModuleSizePx` for the sync marker with the default quiet zone (`MarkerSizePx(options, kind)`).
+`33 × ModuleSizePx` for the sync marker with the default quiet zone (`options.MarkerSizePx(kind)`).
 
 ## Geometry
 
@@ -237,8 +237,9 @@ Let `s = storedHeight / sourceHeight`. For example, a 2160p source stored at 540
 | **Recommended.** Leaves margin for scaler blur and limited-range (16–235) video.                                         | `ceil(3 / s)`            | 3                    |
 | **MJPEG capture.** Many USB capture cards only reach high frame rates with MJPEG; the 8×8 DCT blocks smear module edges. | `ceil(4 / s)`            | 4                    |
 
-`MB::FramePacing::Marker::MinimumModuleSizePx(sourceHeight, storedHeight)` and
-`MB::FramePacing::Marker::RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `FrameMarker.*`; Python: `minimum_module_size_px`, `recommend_module_size_px`).
+`MB::FramePacing::Marker::Options::Minimum(sourceHeight, storedHeight)` and
+`MB::FramePacing::Marker::Options::Recommended(sourceHeight, storedHeight, mjpeg)` implement these formulas (C# and Unity: `Options.Minimum`,
+`Options.Recommended`; Python: `Options.minimum`, `Options.recommended`).
 `mb-framepacing marker-size --source 3840x2160 --stored 960x540 [--mjpeg]` prints the result for a setup, with the marker sizes, the
 origin and the settings for each library.
 
@@ -254,7 +255,7 @@ origin and the settings for each library.
 
 - Prefer **integer downscale ratios** (2:1, 3:1, 4:1). With an integer ratio `k`, make `ModuleSizePx` and the marker origin
   multiples of `k`. Every module edge then lands on a stored-pixel edge and the downscaled marker stays perfectly sharp.
-  `RecommendModuleSizePx` already returns a multiple of `k`. Pass `k` as `alignPx` to `RecommendedOrigin`.
+  `Options::Recommended` already gives a module size that is a multiple of `k`. Pass `k` as `alignPx` to `RecommendedOrigin`.
 - **At the hard minimum (2 stored px per module) alignment is required, not optional.** The test suite shows that aligned
   2 px markers decode reliably, while the same markers shifted off the scaling grid do not decode at all.
 - A non-integer ratio (for example 1440p → 1080p) still works, but use at least the recommended size, not the minimum.
@@ -305,18 +306,19 @@ multiple of the downscale ratio.
 the main marker. Optional for a capture card, where it checks tearing: when the two markers show different frames, the analyzer flags the
 capture as _torn_ and uses the main marker for timing. Required for camera capture.
 
-`MB::FramePacing::Marker::RecommendedOrigin(kind, sourceWidth, sourceHeight, options, alignPx)` returns these positions: bottom-left for
+`options.RecommendedOrigin(kind, sourceWidth, sourceHeight, alignPx)` (`MB::FramePacing::Marker::Options`) returns these positions: bottom-left for
 `MarkerKind::Sync`, top-left for every other kind.
 
 ## Example (C++)
 
 ```cpp
 #include <mb/framepacing/Marker.hpp>
+namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 // Once: 1080p output captured and stored at 540p (2:1)
-const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};   // 6 px
-const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 2);
+const auto options = FM::Options::Recommended(1080, 540);   // 6 px
+const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 2);
 
 FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;

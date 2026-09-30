@@ -22,12 +22,12 @@ namespace MB.FramePacing.MarkerDecoding
       if (storedHeight <= 0)
         throw new ArgumentOutOfRangeException(nameof(storedHeight), "The stored height must be positive");
 
-      int module = FM.FrameMarker.RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg);
+      int module = FM.Options.Recommended(sourceHeight, storedHeight, mjpeg).ModuleSizePx;
       var options = new FM.Options(module);
       // Integer downscales keep module edges on stored pixel edges when the origin is a multiple of the ratio
       int align = sourceHeight % storedHeight == 0 ? sourceHeight / storedHeight : 1;
-      var origin = FM.FrameMarker.RecommendedOrigin(FM.MarkerKind.Frame, sourceWidth, sourceHeight, options, align);
-      var syncOrigin = FM.FrameMarker.RecommendedOrigin(FM.MarkerKind.Sync, sourceWidth, sourceHeight, options, align);
+      var origin = options.RecommendedOrigin(FM.MarkerKind.Frame, sourceWidth, sourceHeight, align);
+      var syncOrigin = options.RecommendedOrigin(FM.MarkerKind.Sync, sourceWidth, sourceHeight, align);
       return new MarkerSizingAdvice
       {
         SourceWidth = sourceWidth,
@@ -35,10 +35,10 @@ namespace MB.FramePacing.MarkerDecoding
         StoredHeight = storedHeight,
         Mjpeg = mjpeg,
         RecommendedModulePx = module,
-        MinimumModulePx = FM.FrameMarker.MinimumModuleSizePx(sourceHeight, storedHeight),
+        MinimumModulePx = FM.Options.Minimum(sourceHeight, storedHeight).ModuleSizePx,
         StoredPxPerModule = module * (double)storedHeight / sourceHeight,
-        MarkerPx = FM.FrameMarker.MarkerSizePx(options),
-        SyncMarkerPx = FM.FrameMarker.MarkerSizePx(options, FM.MarkerKind.Sync),
+        MarkerPx = options.MarkerSizePx(),
+        SyncMarkerPx = options.MarkerSizePx(FM.MarkerKind.Sync),
         SyncOriginX = syncOrigin.X,
         SyncOriginY = syncOrigin.Y,
         AlignPx = align,

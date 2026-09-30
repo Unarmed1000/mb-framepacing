@@ -117,6 +117,7 @@ void operator delete[](void* memory, std::size_t /*size*/) noexcept
 }
 // NOLINTEND(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
 
+namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 namespace
@@ -145,7 +146,7 @@ TEST(Allocations, CountingWorks)
 TEST(Allocations, GeneratingMarkersDoesNotAllocate)
 {
   const FM::Options options{};
-  const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 2);
+  const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 2);
   FM::StartMetadata metadata{MB::FramePacing::UnixEpochDateTimeTicks, {}};
 
   std::size_t written = 0;
@@ -166,8 +167,8 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       written += FM::ModulesToQuads(g_startMatrix, options, origin, g_quads);
       written += FM::ModulesToTriangles(g_matrix, options, origin, g_triangleVertices);
       written += FM::ModulesToIndexed(g_matrix, options, origin, g_indexedVertices, g_indices, 16u).IndexCount;
-      written += FM::ModulesToBitmap(g_matrix, options, {0, 0}, g_pixels, 294, 294, FM::PixelFormat::Rgba32) ? 1u : 0u;
-      written += FM::ModulesToBitmap(g_startMatrix, {1, 0}, {0, 0}, g_pixels, 41, 41, FM::PixelFormat::Gray8) ? 1u : 0u;
+      written += FM::ModulesToBitmap(g_matrix, options, {0, 0}, g_pixels, 294, 294, FM::PixelFormat::R8G8B8A8) ? 1u : 0u;
+      written += FM::ModulesToBitmap(g_startMatrix, FM::Options(1, 0), {0, 0}, g_pixels, 41, 41, FM::PixelFormat::R8) ? 1u : 0u;
       written += g_matrix.Bits().size();
       written += FM::GridVertices(FM::MarkerKind::Frame, options, origin, g_grid);
       written += FM::ModulesToGridIndices(g_matrix, g_indices, 32u);

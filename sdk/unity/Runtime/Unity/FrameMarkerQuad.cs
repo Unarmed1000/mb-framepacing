@@ -81,12 +81,11 @@ namespace MB.FramePacing.Marker.Unity
 
     /// <summary>
     /// Show the encoded marker at <paramref name="origin"/> (top-left, pixels) in an output of <paramref name="outputHeight"/> pixels. The
-    /// quad is rebuilt only when its size or place changes. Returns false if the shader is not available, the options are invalid or the
-    /// matrix is empty.
+    /// quad is rebuilt only when its size or place changes. Returns false if the shader is not available or the matrix is empty.
     /// </summary>
     public bool Update(ModuleMatrix matrix, in Options options, Point origin, int outputHeight)
     {
-      if (Material == null || matrix.IsEmpty || !FrameMarker.IsValid(options))
+      if (Material == null || matrix.IsEmpty)
         return false;
       if (PackedBits)
       {
@@ -101,7 +100,7 @@ namespace MB.FramePacing.Marker.Unity
           m_texels,
           FrameMarker.QrModuleCount,
           FrameMarker.QrModuleCount,
-          PixelFormat.Gray8
+          PixelFormat.R8
         )
       )
       {

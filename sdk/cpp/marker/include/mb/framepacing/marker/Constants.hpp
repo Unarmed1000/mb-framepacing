@@ -48,6 +48,8 @@ namespace MB::FramePacing::Marker
   //! Recommended distance in source pixels between the marker and the edge of the frame.
   inline constexpr int32_t RecommendedInsetPx = 32;
 
+  //! The module size of default Options.
+  inline constexpr int32_t DefaultModuleSizePx = 6;
   inline constexpr int32_t MinModuleSizePx = 1;
   inline constexpr int32_t MaxModuleSizePx = 1024;
   inline constexpr int32_t MaxQuietZoneModules = 16;

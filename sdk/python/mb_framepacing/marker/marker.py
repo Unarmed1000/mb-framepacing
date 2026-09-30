@@ -3,7 +3,7 @@
 
 """The marker format and geometry: constants, sizing and placement, the payload wire format, encoding the marker (generate_modules) and
 drawing it from the modules as quads, triangles or indexed triangles. The same API as the C# library (MB.FramePacing.Marker) and the C++ library
-(MB::FrameMarker), in Python's naming; the specification is doc/marker-format.md.
+(MB::FramePacing::Marker), in Python's naming; the specification is doc/marker-format.md.
 
 Every output walks the marker in the same order: the light background (symbol + quiet zone) first, then one dark quad per horizontal
 run of dark modules. Draw it in that order, last in the frame (after post effects and UI), without blending, in pure black and white.
@@ -13,16 +13,27 @@ import struct
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+from ..point import Point
 from ..rectangle import Rectangle
+from .constants import (
+    PAYLOAD_BYTE_COUNT,
+    PAYLOAD_FORMAT_VERSION,
+    PAYLOAD_MAGIC,
+    QR_VERSION,
+    START_PAYLOAD_BYTE_COUNT,
+    SYNC_PAYLOAD_BYTE_COUNT,
+    SYNC_QR_VERSION,
+    TICKS_PER_SECOND,
+    qr_module_count_for,
+)
+from .options import Options
 from .structures import (
     SEQUENCE_ID_BYTE_COUNT,
     MarkerFlags,
     MarkerKind,
     MarkerQuad,
     ModuleMatrix,
-    Options,
     Payload,
-    Point,
     SequenceId,
     StartMetadata,
     Vertex,
@@ -30,97 +41,11 @@ from .structures import (
 )
 from .third_party.qrcodegen import encode as _encode_qr
 
-QR_VERSION = 6
-"""Every main marker (frame, start and end) is QR version 6 (41x41 modules), error correction level M, byte mode, so the marker never
-changes size."""
-QR_MODULE_COUNT = (4 * QR_VERSION) + 17
-QR_CAPACITY_BYTES = 106
-"""Version 6-M holds 106 bytes: a frame or end marker uses PAYLOAD_BYTE_COUNT of them, a start marker START_PAYLOAD_BYTE_COUNT; the rest
-is room for future fields."""
-
-SYNC_QR_VERSION = 2
-"""The sync marker (MarkerKind.SYNC) is QR version 2 (25x25 modules), error correction level M: magic | format version | kind | run id
-u32 | frame index u64."""
-SYNC_QR_MODULE_COUNT = (4 * SYNC_QR_VERSION) + 17
-SYNC_PAYLOAD_BYTE_COUNT = 16
-
-PAYLOAD_BYTE_COUNT = 53
-"""Payload header, shared by every marker kind (little endian), grouped: magic "MF" | format version | kind | run id u32 | frame index
-u64 | flags u8 | animation ticks i64 | preferred frame ticks u32 | target frame ticks u32 | intended display ticks i64 | CPU start ticks
-i64 | CPU busy ticks u32. Start and end markers carry the values of the frame that shows them."""
-PAYLOAD_MAGIC = b"MF"
-PAYLOAD_FORMAT_VERSION = 1
-
-ON_DEMAND_FRAME_TICKS = 0xFFFF_FFFF
-"""The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for."""
-
-START_PAYLOAD_BYTE_COUNT = PAYLOAD_BYTE_COUNT + 8 + SEQUENCE_ID_BYTE_COUNT
-"""Start marker payload: header | start time UTC i64 | sequence id (16 bytes)."""
-MAX_ENCODED_PAYLOAD_BYTE_COUNT = START_PAYLOAD_BYTE_COUNT
-"""The longest payload of any kind: the start marker's."""
-
-TICKS_PER_SECOND = 10_000_000
-"""TimeSpan / DateTime resolution."""
-UNIX_EPOCH_DATE_TIME_TICKS = 621_355_968_000_000_000
-"""DateTime ticks (since 0001-01-01) at the Unix epoch."""
-
-RECOMMENDED_INSET_PX = 32
-"""Recommended distance in source pixels between the marker and the edge of the frame."""
-
-MIN_MODULE_SIZE_PX = 1
-MAX_MODULE_SIZE_PX = 1024
-MAX_QUIET_ZONE_MODULES = 16
-RECOMMENDED_QUIET_ZONE_MODULES = 4
-
-MAX_QUAD_COUNT = 1 + (QR_MODULE_COUNT * ((QR_MODULE_COUNT + 1) // 2))
-"""Upper bound on the number of quads for any marker: one background quad plus at most one quad per dark run."""
-
-MAX_PACKED_MODULE_BYTE_COUNT = packed_module_byte_count(QR_MODULE_COUNT)
-"""The packed module matrix of the largest symbol: 211 bytes for 41x41."""
-
-MAX_GRID_VERTEX_COUNT = 4 + ((QR_MODULE_COUNT + 1) ** 2)
-"""Vertices of the main marker's static grid (grid_vertices): 1768; the sync marker's is 680. Both fit 16-bit indices."""
-
 # Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work
 _HEADER = struct.Struct("<2sBBIQBqIIqqI")
 _SYNC = struct.Struct("<2sBBIQ")
 _START_FIELDS = struct.Struct(f"<q{SEQUENCE_ID_BYTE_COUNT}s")
 _DATE_TIME_EPOCH = datetime(1, 1, 1, tzinfo=UTC)
-
-
-def is_valid(options: Options) -> bool:
-    return MIN_MODULE_SIZE_PX <= options.module_size_px <= MAX_MODULE_SIZE_PX and 0 <= options.quiet_zone_modules <= MAX_QUIET_ZONE_MODULES
-
-
-def qr_module_count_for(kind: MarkerKind) -> int:
-    """Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker."""
-    return SYNC_QR_MODULE_COUNT if kind == MarkerKind.SYNC else QR_MODULE_COUNT
-
-
-def marker_size_px(options: Options, kind: MarkerKind = MarkerKind.FRAME) -> int:
-    """Width and height in source pixels of a marker (symbol + quiet zone). Frame, start and end markers have one size, the sync marker
-    is smaller."""
-    return (qr_module_count_for(kind) + (2 * options.quiet_zone_modules)) * options.module_size_px
-
-
-def minimum_module_size_px(source_height: int, stored_height: int) -> int:
-    """Hard minimum module size: 2 stored pixels per module after all scaling (source -> capture -> stored)."""
-    return _module_size_for_stored_px(2, source_height, stored_height)
-
-
-def recommend_module_size_px(source_height: int, stored_height: int, mjpeg: bool = False) -> int:
-    """Recommended module size: 3 stored pixels per module, or 4 when the capture card delivers MJPEG."""
-    return _module_size_for_stored_px(4 if mjpeg else 3, source_height, stored_height)
-
-
-def recommended_origin(kind: MarkerKind, source_width: int, source_height: int, options: Options, align_px: int = 1) -> Point:
-    """Recommended origin of a marker: the main marker (frame, start and end) top-left, the sync marker bottom-left. `align_px` should
-    be the integer downscale ratio (1 if none) so module edges land on stored pixel edges."""
-    del source_width  # the markers sit at the left edge; the width is part of the API as in the C# and C++ libraries
-    inset = _align_up(RECOMMENDED_INSET_PX, align_px)
-    if kind == MarkerKind.SYNC:
-        return Point(inset, _align_down(source_height - inset - marker_size_px(options, kind), align_px))
-    return Point(inset, inset)
 
 
 def to_date_time_ticks(time: datetime) -> int:
@@ -225,9 +150,7 @@ def generate_modules(payload: Payload, metadata: StartMetadata | None = None) ->
 
 def modules_to_quads(matrix: ModuleMatrix, options: Options, origin: Point) -> list[MarkerQuad]:
     """The marker as quads, for renderers that fill rectangles: the light background (symbol + quiet zone) first, then one dark quad per
-    horizontal run of dark modules. Raises ValueError if the options are invalid."""
-    if not is_valid(options):
-        raise ValueError(f"invalid options: {options}")
+    horizontal run of dark modules."""
     return _walk(matrix, options, origin)
 
 
@@ -261,14 +184,11 @@ def grid_vertex_count(kind: MarkerKind) -> int:
 def grid_vertices(kind: MarkerKind, options: Options, origin: Point) -> list[Vertex]:
     """The marker's static grid, for drawing it with per-frame indices only (modules_to_grid_indices): the vertices stay the same while the
     kind's symbol size, the options and the origin do. Vertices 0..3 are the light background (TL, TR, BR, BL, luma 255); then the corners
-    of the modules, dark (luma 0), row-major: corner (column, row) is vertex 4 + row x (N + 1) + column, N the kind's modules per side.
-    Raises ValueError if the options are invalid."""
-    if not is_valid(options):
-        raise ValueError(f"invalid options: {options}")
+    of the modules, dark (luma 0), row-major: corner (column, row) is vertex 4 + row x (N + 1) + column, N the kind's modules per side."""
     modules = qr_module_count_for(kind)
-    size = marker_size_px(options, kind)
-    left = origin.x + (options.quiet_zone_modules * options.module_size_px)
-    top = origin.y + (options.quiet_zone_modules * options.module_size_px)
+    size = options.marker_size_px(kind)
+    left = origin.x + options.quiet_zone_px
+    top = origin.y + options.quiet_zone_px
     vertices = [
         Vertex(origin.x, origin.y, 255),
         Vertex(origin.x + size, origin.y, 255),
@@ -310,8 +230,8 @@ def _walk(matrix: ModuleMatrix, options: Options, origin: Point) -> list[MarkerQ
     """The marker in draw order: the background quad, then every horizontal run of dark modules, row by row."""
     module_size = options.module_size_px
     marker_size = (matrix.size + (2 * options.quiet_zone_modules)) * module_size
-    symbol_left = origin.x + (options.quiet_zone_modules * module_size)
-    symbol_top = origin.y + (options.quiet_zone_modules * module_size)
+    symbol_left = origin.x + options.quiet_zone_px
+    symbol_top = origin.y + options.quiet_zone_px
 
     quads = [MarkerQuad(Rectangle(origin.x, origin.y, marker_size, marker_size), False)]
     for y in range(matrix.size):
@@ -326,28 +246,3 @@ def _walk(matrix: ModuleMatrix, options: Options, origin: Point) -> list[MarkerQ
                 x += 1
             quads.append(MarkerQuad(Rectangle(symbol_left + (run_start * module_size), top, (x - run_start) * module_size, module_size), True))
     return quads
-
-
-def _divide(numerator: int, denominator: int) -> int:
-    """Integer division truncating toward zero, as in C# and C++ (Python's // floors)."""
-    quotient = abs(numerator) // abs(denominator)
-    return quotient if (numerator >= 0) == (denominator > 0) else -quotient
-
-
-def _ceil_divide(numerator: int, denominator: int) -> int:
-    return _divide(numerator + denominator - 1, denominator)
-
-
-def _align_down(value: int, alignment: int) -> int:
-    return value if alignment <= 1 else _divide(value, alignment) * alignment
-
-
-def _align_up(value: int, alignment: int) -> int:
-    return value if alignment <= 1 else _ceil_divide(value, alignment) * alignment
-
-
-def _module_size_for_stored_px(stored_px_per_module: int, source_height: int, stored_height: int) -> int:
-    if source_height <= 0 or stored_height <= 0:
-        return stored_px_per_module
-    # module_size_px = ceil(stored_px_per_module / s) where s = stored_height / source_height
-    return max(stored_px_per_module, _ceil_divide(stored_px_per_module * source_height, stored_height))

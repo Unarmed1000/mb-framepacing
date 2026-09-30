@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* The marker format and geometry: constants, sizing and placement, the payload wire format and quad to vertex conversion. The same API as
-//* the C++ library (MB::FrameMarker); the specification is doc/marker-format.md. Nothing here allocates.
+//* the C++ library (MB::FramePacing::Marker); the specification is doc/marker-format.md. Nothing here allocates.
 //*
 //* Coordinates are pixels with the origin at the top-left corner, +x to the right and +y down. Every quad edge and every vertex lies on
 //* an integer pixel edge.
@@ -60,6 +60,9 @@ namespace MB.FramePacing.Marker
     /// <summary>Recommended distance in source pixels between the marker and the edge of the frame.</summary>
     public const int RecommendedInsetPx = 32;
 
+    /// <summary>The module size of <see cref="Options.Default"/>.</summary>
+    public const int DefaultModuleSizePx = 6;
+
     public const int MinModuleSizePx = 1;
     public const int MaxModuleSizePx = 1024;
     public const int MaxQuietZoneModules = 16;
@@ -94,40 +97,8 @@ namespace MB.FramePacing.Marker
     private const int OffsetStartUtcTicks = PayloadByteCount;
     private const int OffsetSequenceId = OffsetStartUtcTicks + 8;
 
-    public static bool IsValid(in Options options) =>
-      options.ModuleSizePx >= MinModuleSizePx
-      && options.ModuleSizePx <= MaxModuleSizePx
-      && options.QuietZoneModules >= 0
-      && options.QuietZoneModules <= MaxQuietZoneModules;
-
     /// <summary>Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.</summary>
     public static int QrModuleCountFor(MarkerKind kind) => kind == MarkerKind.Sync ? SyncQrModuleCount : QrModuleCount;
-
-    /// <summary>
-    /// Width and height in source pixels of a marker (symbol + quiet zone). Frame, start and end markers have one size, the sync marker is
-    /// smaller.
-    /// </summary>
-    public static int MarkerSizePx(in Options options, MarkerKind kind = MarkerKind.Frame) =>
-      (QrModuleCountFor(kind) + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
-
-    /// <summary>Hard minimum module size: 2 stored pixels per module after all scaling (source -> capture -> stored).</summary>
-    public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => ModuleSizeForStoredPx(2, sourceHeight, storedHeight);
-
-    /// <summary>Recommended module size: 3 stored pixels per module, or 4 when the capture card delivers MJPEG.</summary>
-    public static int RecommendModuleSizePx(int sourceHeight, int storedHeight, bool mjpeg = false) =>
-      ModuleSizeForStoredPx(mjpeg ? 4 : 3, sourceHeight, storedHeight);
-
-    /// <summary>
-    /// Recommended origin of a marker: the main marker (frame, start and end) top-left, the sync marker bottom-left.
-    /// <paramref name="alignPx"/> should be the integer downscale ratio (1 if none) so module edges land on stored pixel edges.
-    /// </summary>
-    public static Point RecommendedOrigin(MarkerKind kind, int sourceWidth, int sourceHeight, in Options options, int alignPx = 1)
-    {
-      int inset = AlignUp(RecommendedInsetPx, alignPx);
-      if (kind == MarkerKind.Sync)
-        return new Point(inset, AlignDown(sourceHeight - inset - MarkerSizePx(options, kind), alignPx));
-      return new Point(inset, inset);
-    }
 
     /// <summary>Convert a wall clock time to DateTime UTC ticks (the <see cref="StartMetadata.UtcTicks"/> format).</summary>
     public static long ToDateTimeTicks(DateTime time) => time.ToUniversalTime().Ticks;
@@ -251,23 +222,23 @@ namespace MB.FramePacing.Marker
     /// The marker's static grid, for drawing it with per-frame indices only (<see cref="ModulesToGridIndices"/>): the vertices stay the same
     /// while the kind's symbol size, the options and the origin do. Vertices 0..3 are the light background (TL, TR, BR, BL, luma 255); then
     /// the corners of the modules, dark (luma 0), row-major: corner (column, row) is vertex 4 + row x (N + 1) + column, N the kind's modules
-    /// per side. Returns the number of vertices written (<see cref="GridVertexCount"/>), or 0 if the options are invalid or
-    /// <paramref name="destination"/> is too small.
+    /// per side. Returns the number of vertices written (<see cref="GridVertexCount"/>), or 0 if <paramref name="destination"/> is too
+    /// small.
     /// </summary>
     public static int GridVertices(MarkerKind kind, in Options options, Point origin, Span<Vertex> destination)
     {
       int count = GridVertexCount(kind);
-      if (!IsValid(options) || destination.Length < count)
+      if (destination.Length < count)
         return 0;
       int modules = QrModuleCountFor(kind);
       int moduleSize = options.ModuleSizePx;
-      int markerSize = MarkerSizePx(options, kind);
+      int markerSize = options.MarkerSizePx(kind);
       destination[0] = new Vertex(origin.X, origin.Y, 255);
       destination[1] = new Vertex(origin.X + markerSize, origin.Y, 255);
       destination[2] = new Vertex(origin.X + markerSize, origin.Y + markerSize, 255);
       destination[3] = new Vertex(origin.X, origin.Y + markerSize, 255);
-      int symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
-      int symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
+      int symbolLeft = origin.X + options.QuietZonePx;
+      int symbolTop = origin.Y + options.QuietZonePx;
       int index = 4;
       for (int row = 0; row <= modules; ++row)
       {
@@ -318,19 +289,19 @@ namespace MB.FramePacing.Marker
     public static int BytesPerPixel(PixelFormat format) =>
       format switch
       {
-        PixelFormat.Rgb24 => 3,
-        PixelFormat.Rgba32 => 4,
+        PixelFormat.R8G8B8 => 3,
+        PixelFormat.R8G8B8A8 => 4,
         _ => 1,
       };
 
     /// <summary>
     /// The marker as quads: the light background (symbol + quiet zone) first, then one dark quad per horizontal run of dark modules. Draw them
-    /// in order. Every marker produces at most <see cref="MaxQuadCount"/> quads. Returns the number of quads written, or 0 if the options are
-    /// invalid, the matrix is empty or <paramref name="destination"/> is too small.
+    /// in order. Every marker produces at most <see cref="MaxQuadCount"/> quads. Returns the number of quads written, or 0 if the matrix is
+    /// empty or <paramref name="destination"/> is too small.
     /// </summary>
     public static int ModulesToQuads(ModuleMatrix matrix, in Options options, Point origin, Span<MarkerQuad> destination)
     {
-      if (!IsValid(options) || matrix.IsEmpty)
+      if (matrix.IsEmpty)
         return 0;
       var walker = new QuadWalker(matrix, options, origin);
       int count = 0;
@@ -346,11 +317,11 @@ namespace MB.FramePacing.Marker
     /// <summary>
     /// The marker as a triangle list: 6 vertices per quad (see <see cref="ModulesToQuads"/> for the order), (TL, TR, BL) (BL, TR, BR), clockwise
     /// on screen, every vertex on a pixel corner. Every marker needs at most <see cref="MaxTriangleVertexCount"/> vertices. Returns the number of
-    /// vertices written, or 0 if the options are invalid, the matrix is empty or <paramref name="destination"/> is too small.
+    /// vertices written, or 0 if the matrix is empty or <paramref name="destination"/> is too small.
     /// </summary>
     public static int ModulesToTriangles(ModuleMatrix matrix, in Options options, Point origin, Span<Vertex> destination)
     {
-      if (!IsValid(options) || matrix.IsEmpty)
+      if (matrix.IsEmpty)
         return 0;
       var walker = new QuadWalker(matrix, options, origin);
       int count = 0;
@@ -367,7 +338,7 @@ namespace MB.FramePacing.Marker
     /// <summary>
     /// The marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on screen.
     /// <paramref name="baseVertex"/> is added to every index. Every marker needs at most <see cref="MaxIndexedVertexCount"/> vertices and
-    /// <see cref="MaxIndexCount"/> indices. Returns an empty count if the options are invalid, the matrix is empty or a destination is too small.
+    /// <see cref="MaxIndexCount"/> indices. Returns an empty count if the matrix is empty or a destination is too small.
     /// </summary>
     public static IndexedCount ModulesToIndexed(
       ModuleMatrix matrix,
@@ -378,7 +349,7 @@ namespace MB.FramePacing.Marker
       int baseVertex = 0
     )
     {
-      if (!IsValid(options) || matrix.IsEmpty)
+      if (matrix.IsEmpty)
         return default;
       var walker = new QuadWalker(matrix, options, origin);
       int vertexCount = 0;
@@ -399,7 +370,7 @@ namespace MB.FramePacing.Marker
     /// (0 = width x <see cref="BytesPerPixel"/>): the light background (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in
     /// every colour channel and alpha 255. The marker is clipped to the buffer; other pixels are left as they are. With a module size of 1 and
     /// origin (0,0) this is a module-resolution image (a texture to scale up with point filtering). Returns false, writing nothing, if the
-    /// options are invalid, the matrix is empty, the stride is shorter than a row or <paramref name="destination"/> is too small.
+    /// matrix is empty, the stride is shorter than a row or <paramref name="destination"/> is too small.
     /// </summary>
     public static bool ModulesToBitmap(
       ModuleMatrix matrix,
@@ -412,7 +383,7 @@ namespace MB.FramePacing.Marker
       int stride = 0
     )
     {
-      if (!IsValid(options) || matrix.IsEmpty || width < 0 || height < 0)
+      if (matrix.IsEmpty || width < 0 || height < 0)
         return false;
       int bytesPerPixel = BytesPerPixel(format);
       long rowBytes = (long)width * bytesPerPixel;
@@ -488,21 +459,6 @@ namespace MB.FramePacing.Marker
       }
     }
 
-    private static int CeilDiv(long numerator, long denominator) => (int)((numerator + denominator - 1) / denominator);
-
-    private static int AlignDown(int value, int alignment) => alignment <= 1 ? value : (value / alignment) * alignment;
-
-    private static int AlignUp(int value, int alignment) => alignment <= 1 ? value : CeilDiv(value, alignment) * alignment;
-
-    private static int ModuleSizeForStoredPx(int storedPxPerModule, int sourceHeight, int storedHeight)
-    {
-      if (sourceHeight <= 0 || storedHeight <= 0)
-        return storedPxPerModule;
-      // ModuleSizePx = ceil(storedPxPerModule / s) where s = storedHeight / sourceHeight
-      int size = CeilDiv((long)storedPxPerModule * sourceHeight, storedHeight);
-      return size < storedPxPerModule ? storedPxPerModule : size;
-    }
-
     /// <summary>
     /// The marker's quads in draw order: the light background, then one dark quad per horizontal run of dark modules. A ref struct over the
     /// packed module matrix, so every output walks the same code without allocating (C# 9 cannot pass spans through an interface). It reads
@@ -525,9 +481,9 @@ namespace MB.FramePacing.Marker
         m_bits = matrix.Bits;
         m_size = matrix.Size;
         m_moduleSize = options.ModuleSizePx;
-        int markerSize = (matrix.Size + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
-        m_symbolLeft = origin.X + (options.QuietZoneModules * m_moduleSize);
-        m_symbolTop = origin.Y + (options.QuietZoneModules * m_moduleSize);
+        int markerSize = (matrix.Size + (2 * options.QuietZoneModules)) * m_moduleSize;
+        m_symbolLeft = origin.X + options.QuietZonePx;
+        m_symbolTop = origin.Y + options.QuietZonePx;
         m_background = new MarkerQuad(new Rectangle(origin.X, origin.Y, markerSize, markerSize), false);
         m_backgroundDone = false;
         m_x = 0;

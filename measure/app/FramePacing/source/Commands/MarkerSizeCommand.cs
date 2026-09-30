@@ -85,9 +85,9 @@ namespace MB.FramePacing.App.Commands
       AnsiConsole.MarkupLine("[bold]Settings[/]");
       AnsiConsole.MarkupLineInterpolated($"  C++    MB::FramePacing::Marker::Options options{{{advice.RecommendedModulePx}}};");
       AnsiConsole.MarkupLineInterpolated(
-        $"         or RecommendModuleSizePx({advice.SourceHeight}, {advice.StoredHeight}{(advice.Mjpeg ? ", true" : string.Empty)})"
+        $"         or Options::Recommended({advice.SourceHeight}, {advice.StoredHeight}{(advice.Mjpeg ? ", true" : string.Empty)})"
       );
-      AnsiConsole.MarkupLineInterpolated($"  C#     new Options({advice.RecommendedModulePx}), or FrameMarker.RecommendModuleSizePx(...)");
+      AnsiConsole.MarkupLineInterpolated($"  C#     new Options({advice.RecommendedModulePx}), or Options.Recommended(...)");
       AnsiConsole.MarkupLineInterpolated(
         $"  Unity  FrameMarkerOverlay: Stored Height {advice.StoredHeight}{(advice.Mjpeg ? ", MJPEG on" : string.Empty)} (or Module Size Px {advice.RecommendedModulePx})"
       );

@@ -268,8 +268,8 @@ namespace MB.FramePacing.DocImages
       Expect(Math.Abs(drawing.Width - Math.Max(AnalysisViewModel.MinCardWidth, Math.Floor(card.Bounds.Width))) < 1, "laid out for its width");
       var plot = drawing.Plots[0];
       double scale = card.Bounds.Width / drawing.Width;
-      Point At(double x, double y) =>
-        card.TranslatePoint(new Point(x * scale, y * scale), window) ?? throw new InvalidOperationException("The card is not in the window");
+      Avalonia.Point At(double x, double y) =>
+        card.TranslatePoint(new Avalonia.Point(x * scale, y * scale), window) ?? throw new InvalidOperationException("The card is not in the window");
       var middle = At((plot.Left + plot.Right) / 2, (plot.Top + plot.Bottom) / 2);
       double atPointer = plot.ValueX((plot.Left + plot.Right) / 2);
       string whole = analysis.SectionText;

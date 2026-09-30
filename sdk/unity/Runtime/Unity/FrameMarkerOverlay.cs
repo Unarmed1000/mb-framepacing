@@ -246,7 +246,7 @@ namespace MB.FramePacing.Marker.Unity
       int width = Screen.width;
       int height = Screen.height;
       int storedHeight = m_storedHeight > 0 ? m_storedHeight : height;
-      int moduleSize = m_moduleSizePx > 0 ? m_moduleSizePx : FrameMarker.RecommendModuleSizePx(height, storedHeight, m_mjpeg);
+      int moduleSize = m_moduleSizePx > 0 ? m_moduleSizePx : Options.Recommended(height, storedHeight, m_mjpeg).ModuleSizePx;
       var options = new Options(moduleSize);
       // Integer downscales keep module edges on stored pixel edges when the origin is a multiple of the ratio
       int align = height % storedHeight == 0 ? height / storedHeight : 1;
@@ -266,11 +266,11 @@ namespace MB.FramePacing.Marker.Unity
         cpuBusyTicks: CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks()
       );
 
-      DrawMarker(payload, options, FrameMarker.RecommendedOrigin(payload.Kind, width, height, options, align), width, height, sync: false);
+      DrawMarker(payload, options, options.RecommendedOrigin(payload.Kind, width, height, align), width, height, sync: false);
       if (m_syncMarker)
       {
         var sync = payload.WithKind(MarkerKind.Sync);
-        DrawMarker(sync, options, FrameMarker.RecommendedOrigin(MarkerKind.Sync, width, height, options, align), width, height, sync: true);
+        DrawMarker(sync, options, options.RecommendedOrigin(MarkerKind.Sync, width, height, align), width, height, sync: true);
       }
     }
 
@@ -423,7 +423,7 @@ namespace MB.FramePacing.Marker.Unity
       if (m_warned)
         return;
       m_warned = true;
-      if (moduleSize < FrameMarker.MinimumModuleSizePx(height, storedHeight))
+      if (moduleSize < Options.Minimum(height, storedHeight).ModuleSizePx)
         Debug.LogWarning(
           $"FrameMarkerOverlay: {moduleSize} px modules become fewer than 2 pixels in a {storedHeight} pixel high capture; the marker will not be readable.",
           this

@@ -9,7 +9,7 @@
 
 using System;
 
-namespace MB.FramePacing.Marker
+namespace MB.FramePacing
 {
   public readonly struct Point : IEquatable<Point>
   {

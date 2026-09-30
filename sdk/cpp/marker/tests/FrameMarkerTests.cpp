@@ -108,42 +108,42 @@ namespace
     return Encode(start, metadata);
   }
 
-  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FM::Point origin, const std::span<FM::MarkerQuad> dst)
+  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FP::Point origin, const std::span<FM::MarkerQuad> dst)
   {
     return FM::ModulesToQuads(Encode(payload), options, origin, dst);
   }
 
-  std::size_t GenerateStartQuads(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options, const FM::Point origin,
+  std::size_t GenerateStartQuads(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options, const FP::Point origin,
                                  const std::span<FM::MarkerQuad> dst)
   {
     return FM::ModulesToQuads(EncodeStart(payload, metadata), options, origin, dst);
   }
 
-  std::size_t GenerateTriangles(const FM::Payload& payload, const FM::Options& options, const FM::Point origin, const std::span<FM::Vertex> dst)
+  std::size_t GenerateTriangles(const FM::Payload& payload, const FM::Options& options, const FP::Point origin, const std::span<FM::Vertex> dst)
   {
     return FM::ModulesToTriangles(Encode(payload), options, origin, dst);
   }
 
   std::size_t GenerateStartTriangles(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options,
-                                     const FM::Point origin, const std::span<FM::Vertex> dst)
+                                     const FP::Point origin, const std::span<FM::Vertex> dst)
   {
     return FM::ModulesToTriangles(EncodeStart(payload, metadata), options, origin, dst);
   }
 
-  FM::IndexedCount GenerateIndexed(const FM::Payload& payload, const FM::Options& options, const FM::Point origin,
+  FM::IndexedCount GenerateIndexed(const FM::Payload& payload, const FM::Options& options, const FP::Point origin,
                                    const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices, const uint32_t baseVertex = 0)
   {
     return FM::ModulesToIndexed(Encode(payload), options, origin, dstVertices, dstIndices, baseVertex);
   }
 
   FM::IndexedCount GenerateStartIndexed(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options,
-                                        const FM::Point origin, const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices,
+                                        const FP::Point origin, const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices,
                                         const uint32_t baseVertex = 0)
   {
     return FM::ModulesToIndexed(EncodeStart(payload, metadata), options, origin, dstVertices, dstIndices, baseVertex);
   }
 
-  std::vector<FM::MarkerQuad> Generate(const FM::Payload& payload, const FM::Options& options, const FM::Point origin)
+  std::vector<FM::MarkerQuad> Generate(const FM::Payload& payload, const FM::Options& options, const FP::Point origin)
   {
     std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
     const std::size_t count = GenerateQuads(payload, options, origin, quads);
@@ -428,19 +428,41 @@ TEST(SequenceId, TryFromTextRejectsOtherText)
 
 TEST(Geometry, MarkerSize)
 {
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{}, FM::MarkerKind::Sync), 198);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{}), 294);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{3, 4}), 147);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{12, 4}), 588);
-  EXPECT_EQ(FM::MarkerSizePx(FM::Options{1, 0}), 41);
+  EXPECT_EQ(FM::Options{}.MarkerSizePx(FM::MarkerKind::Sync), 198);
+  EXPECT_EQ(FM::Options{}.MarkerSizePx(), 294);
+  EXPECT_EQ(FM::Options(3, 4).MarkerSizePx(), 147);
+  EXPECT_EQ(FM::Options(12, 4).MarkerSizePx(), 588);
+  EXPECT_EQ(FM::Options(1, 0).MarkerSizePx(), 41);
 }
 
-TEST(Geometry, InvalidOptionsGenerateNothing)
+TEST(Options, TheDefaultIsSixPixelModulesAndTheRecommendedQuietZone)
 {
-  std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
-  EXPECT_EQ(GenerateQuads({}, FM::Options{0, 4}, {}, quads), 0u);
-  EXPECT_EQ(GenerateQuads({}, FM::Options{6, -1}, {}, quads), 0u);
-  EXPECT_EQ(GenerateQuads({}, FM::Options{6, FM::MaxQuietZoneModules + 1}, {}, quads), 0u);
+  static_assert(FM::Options{}.ModuleSizePx() == FM::DefaultModuleSizePx && FM::DefaultModuleSizePx == 6);
+  static_assert(FM::Options{}.QuietZoneModules() == FM::RecommendedQuietZoneModules);
+  static_assert(FM::Options{} == FM::Options(6, 4));
+  static_assert(FM::Options(3).QuietZoneModules() == FM::RecommendedQuietZoneModules);
+  static_assert(FM::Options(3, 4).QuietZonePx() == 12);
+  // The limits themselves are valid
+  static_assert(FM::Options(FM::MinModuleSizePx, 0).ModuleSizePx() == FM::MinModuleSizePx);
+  static_assert(FM::Options(FM::MaxModuleSizePx, FM::MaxQuietZoneModules).QuietZoneModules() == FM::MaxQuietZoneModules);
+}
+
+TEST(Options, AValueOutsideItsRangeIsAsserted)
+{
+#ifdef NDEBUG
+  // Without asserts it is clamped into its range: Options are always valid
+  EXPECT_EQ(FM::Options(0, 4), FM::Options(FM::MinModuleSizePx, 4));
+  EXPECT_EQ(FM::Options(FM::MaxModuleSizePx + 1, 4), FM::Options(FM::MaxModuleSizePx, 4));
+  EXPECT_EQ(FM::Options(6, -1), FM::Options(6, 0));
+  EXPECT_EQ(FM::Options(6, FM::MaxQuietZoneModules + 1), FM::Options(6, FM::MaxQuietZoneModules));
+#elif GTEST_HAS_DEATH_TEST
+  EXPECT_DEATH(static_cast<void>(FM::Options(0, 4)), "");
+  EXPECT_DEATH(static_cast<void>(FM::Options(FM::MaxModuleSizePx + 1, 4)), "");
+  EXPECT_DEATH(static_cast<void>(FM::Options(6, -1)), "");
+  EXPECT_DEATH(static_cast<void>(FM::Options(6, FM::MaxQuietZoneModules + 1)), "");
+#else
+  GTEST_SKIP() << "asserts are on and death tests are not available";
+#endif
 }
 
 TEST(Geometry, TooSmallDestinationGeneratesNothing)
@@ -506,7 +528,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
   FM::SequenceId id;
   id.Bytes.fill(0xFFu);
   const FM::Options options{};
-  const FM::Point origin{32, 32};
+  const FP::Point origin{32, 32};
   std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
   const std::size_t count = GenerateStartQuads({FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::None, 6}, {99, id}, options, origin, quads);
   ASSERT_GT(count, 0u);
@@ -514,7 +536,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
   const FM::MarkerQuad& background = quads.front();
   EXPECT_EQ(background.Rect.Left(), origin.X);
   EXPECT_EQ(background.Rect.Top(), origin.Y);
-  EXPECT_EQ(background.Rect.Right() - background.Rect.Left(), FM::MarkerSizePx(options));
+  EXPECT_EQ(background.Rect.Right() - background.Rect.Left(), options.MarkerSizePx());
   for (std::size_t i = 1; i < count; ++i)
   {
     EXPECT_LE(quads[i].Rect.Right(), background.Rect.Right()) << "quad " << i;
@@ -531,9 +553,9 @@ TEST(Geometry, QuadsArePixelAlignedAndReproduceTheModuleMatrix)
     {
       SCOPED_TRACE("moduleSize " + std::to_string(moduleSize) + ", quiet " + std::to_string(quiet));
       const FM::Options options{moduleSize, quiet};
-      const FM::Point origin{5, 7};
+      const FP::Point origin{5, 7};
       const auto quads = Generate(payload, options, origin);
-      const int32_t size = FM::MarkerSizePx(options);
+      const int32_t size = options.MarkerSizePx();
 
       ASSERT_FALSE(quads.empty());
       ASSERT_LE(quads.size(), FM::MaxQuadCount());
@@ -634,7 +656,7 @@ TEST(Vertices, TheBackgroundQuadIsDrawnInTheDocumentedOrder)
 {
   const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2});
   const FM::Options options{2, 4};
-  const int32_t size = FM::MarkerSizePx(options);
+  const int32_t size = options.MarkerSizePx();
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
   ASSERT_GT(FM::ModulesToTriangles(matrix, options, {10, 20}, vertices), 6u);
   const std::array<FM::Vertex, 6> expected{
@@ -662,7 +684,7 @@ namespace
     FM::Payload Payload;
     FM::SequenceId StartId;
     FM::Options Options;
-    FM::Point Origin;
+    FP::Point Origin;
   };
 
   std::vector<TriangleCase> TriangleCases()
@@ -773,8 +795,8 @@ TEST(Triangles, DirectOutputEqualsTheConvertedQuads)
 {
   for (const TriangleCase& testCase : TriangleCases())
   {
-    SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
-                                    << ", quiet " << testCase.Options.QuietZoneModules << ", id " << testing::PrintToString(testCase.StartId));
+    SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx()
+                                    << ", quiet " << testCase.Options.QuietZoneModules() << ", id " << testing::PrintToString(testCase.StartId));
     const std::vector<FM::MarkerQuad> quads = GenerateCase(testCase);
     ASSERT_FALSE(quads.empty());
 
@@ -802,9 +824,9 @@ TEST(Triangles, RasterizedTrianglesReproduceTheQuads)
 {
   for (const TriangleCase& testCase : TriangleCases())
   {
-    SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx
-                                    << ", quiet " << testCase.Options.QuietZoneModules);
-    const int32_t size = testCase.Origin.Y + FM::MarkerSizePx(testCase.Options) + 8;
+    SCOPED_TRACE(testing::Message() << "kind " << static_cast<uint32_t>(testCase.Payload.Kind) << ", module " << testCase.Options.ModuleSizePx()
+                                    << ", quiet " << testCase.Options.QuietZoneModules());
+    const int32_t size = testCase.Origin.Y + testCase.Options.MarkerSizePx() + 8;
     std::vector<uint8_t> fromQuads;
     ASSERT_TRUE(Rasterize(GenerateCase(testCase), size, size, fromQuads));
 
@@ -839,14 +861,10 @@ TEST(Triangles, FrameMarkersFitTheBufferSizes)
   }
 }
 
-TEST(Triangles, InvalidOptionsOrSmallBuffersGenerateNothing)
+TEST(Triangles, SmallBuffersGenerateNothing)
 {
   const FM::Payload payload{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2};
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
-  std::vector<uint32_t> indices(FM::MaxIndexCount());
-  EXPECT_EQ(GenerateTriangles(payload, {0, 4}, {0, 0}, vertices), 0u);
-  EXPECT_EQ(GenerateIndexed(payload, {6, -1}, {0, 0}, vertices, indices).VertexCount, 0u);
-
   std::vector<FM::Vertex> tooFew(12);
   EXPECT_EQ(GenerateTriangles(payload, {}, {0, 0}, tooFew), 0u);
   std::vector<uint32_t> tooFewIndices(12);
@@ -862,40 +880,44 @@ TEST(Triangles, InvalidOptionsOrSmallBuffersGenerateNothing)
 TEST(Sizing, ModuleSizeRecommendationsMatchTheDocumentation)
 {
   // 1:1
-  EXPECT_EQ(FM::MinimumModuleSizePx(1080, 1080), 2);
-  EXPECT_EQ(FM::RecommendModuleSizePx(1080, 1080), 3);
-  EXPECT_EQ(FM::RecommendModuleSizePx(1080, 1080, true), 4);
+  EXPECT_EQ(FM::Options::Minimum(1080, 1080).ModuleSizePx(), 2);
+  EXPECT_EQ(FM::Options::Recommended(1080, 1080).ModuleSizePx(), 3);
+  EXPECT_EQ(FM::Options::Recommended(1080, 1080, true).ModuleSizePx(), 4);
   // 1440p -> 1080p
-  EXPECT_EQ(FM::MinimumModuleSizePx(1440, 1080), 3);
-  EXPECT_EQ(FM::RecommendModuleSizePx(1440, 1080), 4);
+  EXPECT_EQ(FM::Options::Minimum(1440, 1080).ModuleSizePx(), 3);
+  EXPECT_EQ(FM::Options::Recommended(1440, 1080).ModuleSizePx(), 4);
   // 1080p -> 540p and 2160p -> 1080p
-  EXPECT_EQ(FM::MinimumModuleSizePx(1080, 540), 4);
-  EXPECT_EQ(FM::RecommendModuleSizePx(1080, 540), 6);
-  EXPECT_EQ(FM::RecommendModuleSizePx(2160, 1080), 6);
-  EXPECT_EQ(FM::RecommendModuleSizePx(1080, 540, true), 8);
+  EXPECT_EQ(FM::Options::Minimum(1080, 540).ModuleSizePx(), 4);
+  EXPECT_EQ(FM::Options::Recommended(1080, 540).ModuleSizePx(), 6);
+  EXPECT_EQ(FM::Options::Recommended(2160, 1080).ModuleSizePx(), 6);
+  EXPECT_EQ(FM::Options::Recommended(1080, 540, true).ModuleSizePx(), 8);
   // 1080p -> 360p
-  EXPECT_EQ(FM::MinimumModuleSizePx(1080, 360), 6);
-  EXPECT_EQ(FM::RecommendModuleSizePx(1080, 360), 9);
+  EXPECT_EQ(FM::Options::Minimum(1080, 360).ModuleSizePx(), 6);
+  EXPECT_EQ(FM::Options::Recommended(1080, 360).ModuleSizePx(), 9);
   // 2160p -> 540p
-  EXPECT_EQ(FM::MinimumModuleSizePx(2160, 540), 8);
-  EXPECT_EQ(FM::RecommendModuleSizePx(2160, 540), 12);
+  EXPECT_EQ(FM::Options::Minimum(2160, 540).ModuleSizePx(), 8);
+  EXPECT_EQ(FM::Options::Recommended(2160, 540).ModuleSizePx(), 12);
   // Upscaling never goes below the stored pixel count
-  EXPECT_EQ(FM::RecommendModuleSizePx(540, 1080), 3);
+  EXPECT_EQ(FM::Options::Recommended(540, 1080).ModuleSizePx(), 3);
   // Invalid heights fall back to 1:1
-  EXPECT_EQ(FM::RecommendModuleSizePx(0, 1080), 3);
+  EXPECT_EQ(FM::Options::Recommended(0, 1080).ModuleSizePx(), 3);
+  // A downscale beyond the largest module size gives the largest, and the recommended quiet zone
+  EXPECT_EQ(FM::Options::Recommended(1'000'000, 10).ModuleSizePx(), FM::MaxModuleSizePx);
+  EXPECT_EQ(FM::Options::Minimum(1080, 540), FM::Options(4, FM::RecommendedQuietZoneModules));
+  static_assert(FM::Options::Recommended(1080, 540) == FM::Options(6, 4));
 }
 
 TEST(Sizing, RecommendedOrigins)
 {
   const FM::Options options{};
   // The main marker top-left, the sync marker bottom-left
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options), (FM::Point{32, 32}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::SequenceStart, 1920, 1080, options), (FM::Point{32, 32}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options), (FM::Point{32, 1080 - 32 - 198}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080), (FP::Point{32, 32}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::SequenceStart, 1920, 1080), (FP::Point{32, 32}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080), (FP::Point{32, 1080 - 32 - 198}));
   // Aligned to a 3:1 downscale ratio
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, 3), (FM::Point{33, 33}));
-  EXPECT_EQ(FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 3), (FM::Point{33, 849}));
-  static_assert(FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, FM::Options{}, 4) == FM::Point{32, 32});
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 3), (FP::Point{33, 33}));
+  EXPECT_EQ(options.RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, 3), (FP::Point{33, 849}));
+  static_assert(FM::Options{}.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, 4) == FP::Point{32, 32});
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -947,7 +969,7 @@ TEST(ModuleMatrix, AnEmptyMatrixDrawsNothing)
   std::array<uint8_t, 16> pixels{};
   EXPECT_EQ(empty.Size(), 0);
   EXPECT_EQ(FM::ModulesToQuads(empty, {}, {}, quads), 0u);
-  EXPECT_FALSE(FM::ModulesToBitmap(empty, {1, 0}, {}, pixels, 4, 4, FM::PixelFormat::Gray8));
+  EXPECT_FALSE(FM::ModulesToBitmap(empty, FM::Options(1, 0), {}, pixels, 4, 4, FM::PixelFormat::R8));
 }
 
 namespace
@@ -956,15 +978,15 @@ namespace
   {
     FM::Payload Payload;
     FM::Options Options;
-    FM::Point Origin;
+    FP::Point Origin;
   };
 
   const std::array<BitmapCase, 5> g_bitmapCases{{
-    {{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2}, {3, 4}, {5, 7}},
-    {{FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::None, -5}, {1, 0}, {0, 0}},
-    {{FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::None, 0}, {2, 4}, {3, 1}},
-    {{FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::None, 1, 0, 4u, 3, 5, 6u}, {2, 1}, {-9, -4}},
-    {{FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::None, 6}, {4, 2}, {100, 60}},
+    {{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2}, FM::Options(3, 4), {5, 7}},
+    {{FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::None, -5}, FM::Options(1, 0), {0, 0}},
+    {{FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::None, 0}, FM::Options(2, 4), {3, 1}},
+    {{FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::None, 1, 0, 4u, 3, 5, 6u}, FM::Options(2, 1), {-9, -4}},
+    {{FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::None, 6}, FM::Options(4, 2), {100, 60}},
   }};
 }
 
@@ -992,7 +1014,7 @@ TEST(Bitmap, EqualsTheRasterizedQuadsInEveryPixelFormat)
       }
     }
 
-    for (const FM::PixelFormat format : {FM::PixelFormat::Gray8, FM::PixelFormat::Rgb24, FM::PixelFormat::Rgba32})
+    for (const FM::PixelFormat format : {FM::PixelFormat::R8, FM::PixelFormat::R8G8B8, FM::PixelFormat::R8G8B8A8})
     {
       const auto bytesPerPixel = static_cast<std::size_t>(FM::BytesPerPixel(format));
       const std::size_t stride = (static_cast<std::size_t>(Width) * bytesPerPixel) + 5u;    // padded rows
@@ -1026,12 +1048,12 @@ TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
   constexpr int32_t ModuleSize = 3;
   const FM::Options small{1, 4};
   const FM::Options large{ModuleSize, 4};
-  const int32_t smallSize = FM::MarkerSizePx(small);
-  const int32_t largeSize = FM::MarkerSizePx(large);
+  const int32_t smallSize = small.MarkerSizePx();
+  const int32_t largeSize = large.MarkerSizePx();
   std::vector<uint8_t> modules(static_cast<std::size_t>(smallSize) * static_cast<std::size_t>(smallSize));
   std::vector<uint8_t> pixels(static_cast<std::size_t>(largeSize) * static_cast<std::size_t>(largeSize));
-  ASSERT_TRUE(FM::ModulesToBitmap(matrix, small, {0, 0}, modules, smallSize, smallSize, FM::PixelFormat::Gray8));
-  ASSERT_TRUE(FM::ModulesToBitmap(matrix, large, {0, 0}, pixels, largeSize, largeSize, FM::PixelFormat::Gray8));
+  ASSERT_TRUE(FM::ModulesToBitmap(matrix, small, {0, 0}, modules, smallSize, smallSize, FM::PixelFormat::R8));
+  ASSERT_TRUE(FM::ModulesToBitmap(matrix, large, {0, 0}, pixels, largeSize, largeSize, FM::PixelFormat::R8));
   for (int32_t y = 0; y < largeSize; ++y)
   {
     for (int32_t x = 0; x < largeSize; ++x)
@@ -1047,21 +1069,22 @@ TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
 {
   const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, 2});
   std::vector<uint8_t> pixels(std::size_t{64} * 64u * 4u, 128u);
-  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {0, 4}, {}, pixels, 64, 64, FM::PixelFormat::Gray8)) << "invalid options";
-  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, pixels, 64, 64, FM::PixelFormat::Rgb24, 64u * 3u - 1u)) << "short stride";
-  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, std::span<uint8_t>(pixels).first((64u * 64u * 4u) - 1u), 64, 64, FM::PixelFormat::Rgba32))
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, 64, 64, FM::PixelFormat::R8G8B8, 64u * 3u - 1u)) << "short stride";
+  EXPECT_FALSE(
+    FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, std::span<uint8_t>(pixels).first((64u * 64u * 4u) - 1u), 64, 64, FM::PixelFormat::R8G8B8A8))
     << "too small";
-  EXPECT_FALSE(FM::ModulesToBitmap(matrix, {1, 4}, {}, pixels, -1, 64, FM::PixelFormat::Gray8)) << "negative width";
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, -1, 64, FM::PixelFormat::R8)) << "negative width";
   EXPECT_TRUE(std::all_of(pixels.begin(), pixels.end(), [](const uint8_t value) { return value == 128u; }));
-  EXPECT_TRUE(FM::ModulesToBitmap(matrix, {1, 4}, {500, 500}, pixels, 64, 64, FM::PixelFormat::Gray8)) << "outside the buffer: nothing to draw";
+  EXPECT_TRUE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8))
+    << "outside the buffer: nothing to draw";
   EXPECT_TRUE(std::all_of(pixels.begin(), pixels.end(), [](const uint8_t value) { return value == 128u; }));
 }
 
 TEST(Bitmap, BytesPerPixel)
 {
-  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Gray8), 1);
-  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Rgb24), 3);
-  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::Rgba32), 4);
+  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::R8), 1);
+  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::R8G8B8), 3);
+  EXPECT_EQ(FM::BytesPerPixel(FM::PixelFormat::R8G8B8A8), 4);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -1089,10 +1112,10 @@ TEST(Grid, ResolvedIndicesEqualTheIndexedTrianglesTriangleByTriangle)
   }};
   for (const FM::Payload& payload : payloads)
   {
-    for (const FM::Options options : {FM::Options{1, 0}, FM::Options{3, 4}, FM::Options{6, 2}})
+    for (const FM::Options options : {FM::Options(1, 0), FM::Options(3, 4), FM::Options(6, 2)})
     {
-      SCOPED_TRACE(testing::Message() << testing::PrintToString(payload) << ", module " << options.ModuleSizePx);
-      const FM::Point origin{17, 23};
+      SCOPED_TRACE(testing::Message() << testing::PrintToString(payload) << ", module " << options.ModuleSizePx());
+      const FP::Point origin{17, 23};
       const FM::ModuleMatrix matrix = Encode(payload);
       std::vector<FM::Vertex> grid(FM::MaxGridVertexCount());
       ASSERT_EQ(FM::GridVertices(payload.Kind, options, origin, grid), FM::GridVertexCount(payload.Kind));
@@ -1113,10 +1136,9 @@ TEST(Grid, ResolvedIndicesEqualTheIndexedTrianglesTriangleByTriangle)
   }
 }
 
-TEST(Grid, InvalidOptionsOrSmallBuffersGiveNothing)
+TEST(Grid, SmallBuffersGiveNothing)
 {
   std::vector<FM::Vertex> grid(FM::MaxGridVertexCount());
-  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {0, 4}, {}, grid), 0u);
   EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {}, {}, std::span<FM::Vertex>(grid).first(1767)), 0u);
   EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Sync, {}, {}, std::span<FM::Vertex>(grid).first(680)), 680u);
   std::array<uint32_t, 12> indices{};

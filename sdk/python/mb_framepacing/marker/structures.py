@@ -124,20 +124,6 @@ class StartMetadata:
 
 
 @dataclass(frozen=True, slots=True)
-class Options:
-    """The marker's size: pixels per module and the quiet zone around the symbol, in modules."""
-
-    module_size_px: int = 6
-    quiet_zone_modules: int = 4
-
-
-@dataclass(frozen=True, slots=True)
-class Point:
-    x: int
-    y: int
-
-
-@dataclass(frozen=True, slots=True)
 class MarkerQuad:
     """A rectangle of the marker to fill (modules_to_quads): its pixels, dark (luma 0) or light (luma 255)."""
 
@@ -190,16 +176,16 @@ class PixelFormat(IntEnum):
     """The pixels modules_to_bitmap writes. Each pixel is a run of bytes in memory order; pixels follow each other left to right, rows are
     the stride apart, top row first. Every colour channel holds the same value: 0 for a dark module, 255 for a light one.
 
-        GRAY8   1 byte:  [L]
-        RGB24   3 bytes: [R, G, B]          (R = G = B = L)
-        RGBA32  4 bytes: [R, G, B, A]       (R = G = B = L, A = 255)
+        R8        1 byte:  [L]
+        R8G8B8    3 bytes: [R, G, B]          (R = G = B = L)
+        R8G8B8A8  4 bytes: [R, G, B, A]       (R = G = B = L, A = 255)
 
-    Because R, G and B are equal, a BGR24 or BGRA32 buffer (PIL's "BGR;24", OpenCV's default order) gets exactly the same bytes: use RGB24
-    or RGBA32 for them. A buffer with alpha first (ARGB) is not supported."""
+    Because R, G and B are equal, a B8G8R8 or B8G8R8A8 buffer (PIL's "BGR;24", OpenCV's default order) gets exactly the same bytes: use
+    R8G8B8 or R8G8B8A8 for them. A buffer with alpha first (ARGB) is not supported."""
 
-    GRAY8 = 0
-    RGB24 = 1
-    RGBA32 = 2
+    R8 = 0
+    R8G8B8 = 1
+    R8G8B8A8 = 2
 
     @property
     def bytes_per_pixel(self) -> int:

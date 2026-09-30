@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // MB Frame Marker, Vulkan (GLSL 4.50): looks each module up in a 41 x 41 VK_FORMAT_R8_UNORM image, one texel per module (1681 bytes per
-// frame), bound as a combined image sampler (nearest). Per frame, fill it with ModulesToBitmap(matrix, {1, 0}, {0, 0}, texels, 41, 41,
-// PixelFormat::Gray8), row 0 the symbol's top row; texelFetch reads the rows as uploaded. A sync marker uses its top-left 25 x 25.
+// frame), bound as a combined image sampler (nearest). Per frame, fill it with ModulesToBitmap(matrix, Options(1, 0), {0, 0}, texels, 41,
+// 41, PixelFormat::R8), row 0 the symbol's top row; texelFetch reads the rows as uploaded. A sync marker uses its top-left 25 x 25.
 
 layout(set = 0, binding = 0, std140) uniform FrameMarkerConstants
 {

@@ -65,7 +65,7 @@ What is implemented, how it was checked, known issues and the next steps are in
 - **Full brightness, no strobing.** PWM dimming and strobing/backlight modes (ULMB, "motion blur reduction") make the white level
   flicker between camera frames. Calibration reports this as a warning.
 - **Two marker zones.** The application draws the main marker (top-left) and the **sync marker** (bottom-left,
-  `Marker::RecommendedOrigin(MarkerKind::Sync, ...)`). In Unity, turn on **Sync Marker**. The sync marker times the frames, the main
+  `options.RecommendedOrigin(MarkerKind::Sync, ...)`). In Unity, turn on **Sync Marker**. The sync marker times the frames, the main
   marker identifies them; together they give the scanout delay and camera tear detection.
 - **Vsync on** while you calibrate, so the refresh rate and the scanout delay can be measured.
 

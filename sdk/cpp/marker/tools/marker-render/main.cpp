@@ -27,6 +27,7 @@
 #include <utility>
 #include <vector>
 
+namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 namespace
@@ -38,7 +39,7 @@ namespace
     FM::Options Options;
     int32_t CanvasWidth{0};
     int32_t CanvasHeight{0};
-    FM::Point Origin{FM::RecommendedInsetPx, FM::RecommendedInsetPx};
+    FP::Point Origin{FM::RecommendedInsetPx, FM::RecommendedInsetPx};
     uint8_t Background{128};
   };
 
@@ -51,7 +52,7 @@ namespace
 
   Image Render(const RenderRequest& request)
   {
-    const int32_t markerSize = FM::MarkerSizePx(request.Options);
+    const int32_t markerSize = request.Options.MarkerSizePx();
     Image image;
     image.Width = request.CanvasWidth > 0 ? request.CanvasWidth : request.Origin.X + markerSize + FM::RecommendedInsetPx;
     image.Height = request.CanvasHeight > 0 ? request.CanvasHeight : request.Origin.Y + markerSize + FM::RecommendedInsetPx;
@@ -60,9 +61,9 @@ namespace
     // The library draws it: pixel (x,y) is covered when Left <= x < Right, exactly as a GPU rasterizes pixel-edge geometry
     FM::ModuleMatrix matrix;
     if (!FM::GenerateModules(request.Payload, matrix, request.Start) ||
-        !FM::ModulesToBitmap(matrix, request.Options, request.Origin, image.Pixels, image.Width, image.Height, FM::PixelFormat::Gray8))
+        !FM::ModulesToBitmap(matrix, request.Options, request.Origin, image.Pixels, image.Width, image.Height, FM::PixelFormat::R8))
     {
-      throw std::runtime_error("Drawing the marker failed (invalid options?)");
+      throw std::runtime_error("Drawing the marker failed");
     }
     return image;
   }
@@ -307,10 +308,10 @@ namespace
         RenderRequest request;
         request.Payload = Cases[payloadIndex].Payload;
         request.Start = Cases[payloadIndex].Start;
-        request.Options.ModuleSizePx = moduleSize;
+        request.Options = FM::Options(moduleSize);
         // Origin and canvas are multiples of 12 (lcm of 2,3,4,6) so every integer downscale test keeps module edges pixel aligned.
         request.Origin = {36, 36};
-        const int32_t canvas = ((request.Origin.X + FM::MarkerSizePx(request.Options) + 36 + 11) / 12) * 12;
+        const int32_t canvas = ((request.Origin.X + request.Options.MarkerSizePx() + 36 + 11) / 12) * 12;
         request.CanvasWidth = canvas;
         request.CanvasHeight = canvas;
 
@@ -325,8 +326,8 @@ namespace
                  << request.Payload.FrameIndex << ',' << static_cast<uint32_t>(request.Payload.Flags) << ',' << request.Payload.AnimationTicks << ','
                  << request.Payload.PreferredFrameTicks << ',' << request.Payload.TargetFrameTicks << ',' << request.Payload.IntendedDisplayTicks
                  << ',' << request.Payload.CpuStartTicks << ',' << request.Payload.CpuBusyTicks << ',' << request.Start.UtcTicks << ','
-                 << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx << ','
-                 << request.Options.QuietZoneModules << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
+                 << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx() << ','
+                 << request.Options.QuietZoneModules() << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
                  << image.Height << '\n';
       }
     }
@@ -354,6 +355,8 @@ int main(int argc, char* argv[])
     RenderRequest request;
     std::string outputPath;
     std::string goldenDirectory;
+    int32_t moduleSize = FM::DefaultModuleSizePx;
+    int32_t quietZone = FM::RecommendedQuietZoneModules;
 
     const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
     for (std::size_t i = 1; i < arguments.size(); ++i)
@@ -451,11 +454,11 @@ int main(int argc, char* argv[])
       }
       else if (arg == "--module")
       {
-        request.Options.ModuleSizePx = ParseNumber<int32_t>(next(), arg);
+        moduleSize = ParseNumber<int32_t>(next(), arg);
       }
       else if (arg == "--quiet")
       {
-        request.Options.QuietZoneModules = ParseNumber<int32_t>(next(), arg);
+        quietZone = ParseNumber<int32_t>(next(), arg);
       }
       else if (arg == "--canvas")
       {
@@ -493,10 +496,11 @@ int main(int argc, char* argv[])
       PrintUsage();
       return 1;
     }
-    if (!FM::IsValid(request.Options))
+    if (moduleSize < FM::MinModuleSizePx || moduleSize > FM::MaxModuleSizePx || quietZone < 0 || quietZone > FM::MaxQuietZoneModules)
     {
       throw std::invalid_argument("Invalid module size or quiet zone");
     }
+    request.Options = FM::Options(moduleSize, quietZone);
     WritePgm(outputPath, Render(request));
     return 0;
   }

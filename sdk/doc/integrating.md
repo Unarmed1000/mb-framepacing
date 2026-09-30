@@ -104,11 +104,12 @@ The marker must survive the capture's downscale: aim for at least 3 stored pixel
 
 ```cpp
 #include <mb/framepacing/Marker.hpp>
+namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
 
 // Output 1920x1080, capture stored at 960x540 (2:1)
-const FM::Options options{FM::RecommendModuleSizePx(1080, 540), FM::RecommendedQuietZoneModules};       // 6 px modules
-const FM::Point origin = FM::RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, options, /*alignPx*/ 2); // (32, 32)
+const auto options = FM::Options::Recommended(1080, 540);                                  // 6 px modules
+const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1920, 1080, /*alignPx*/ 2); // (32, 32)
 ```
 
 ## 3. Draw it every frame
@@ -138,13 +139,13 @@ frame for the 41×41 main marker (about 440 dark runs):
 3. **`GridVertices` + `ModulesToGridIndices`:** a static grid of vertices (every module corner; 1768 for the main marker, 680 for the
    sync marker) that you upload once, and per frame only the indices of the dark runs: about 2,600 (10 KB as 32 bit, 5 KB as 16 bit;
    the grid fits 16 bit indices). The grid stays valid while the kind's symbol size, the options and the origin do.
-4. **`ModulesToBitmap` at module resolution:** with `ModuleSizePx` 1 and origin (0, 0), a 41×41 image to draw as a texture scaled up
+4. **`ModulesToBitmap` at module resolution:** with a module size of 1 and origin (0, 0), a 41×41 image to draw as a texture scaled up
    by a whole number with point filtering (1,681 pixels per frame).
 5. **`ModulesToIndexed`** (4 vertices and 6 indices per quad, for index buffers) or **`ModulesToTriangles`** (above): about 1,750
    vertices and 2,600 indices, or 2,600 vertices, rebuilt every frame.
 6. **`ModulesToQuads`:** rectangles covering `[Left, Right) x [Top, Bottom)`, for 2D fill-rect APIs (about 440).
-7. **`ModulesToBitmap` at full size:** the pixels themselves, into a `Gray8`, `Rgb24` or `Rgba32` buffer (any stride; BGR and BGRA
-   buffers take the same bytes, since the marker is black and white), for software rendering, video frames and images.
+7. **`ModulesToBitmap` at full size:** the pixels themselves, into an `R8`, `R8G8B8` or `R8G8B8A8` buffer (any stride; B8G8R8 and
+   B8G8R8A8 buffers take the same bytes, since the marker is black and white), for software rendering, video frames and images.
 
 `ModuleMatrix::Bits()` gives the packed bits themselves (1 bit per module, row-major, most significant bit first).
 
@@ -159,7 +160,7 @@ shader makes one quad from the vertex index (draw 4 vertices as a triangle strip
 - **Packed bits:** module `i = row × size + column` is bit `7 − (i mod 8)` of byte `i / 8` of `Bits()`; copy the 211 bytes (79 for the
   sync marker) as they are into 14 `uint4` of constants. OpenGL ES 2.0 has no integers: there they come in a 211×1 texture and the
   bit comes from float arithmetic.
-- **A texel per module:** `ModulesToBitmap(matrix, {1, 0}, {0, 0}, texels, 41, 41, PixelFormat::Gray8)` uploaded as a 41×41 single
+- **A texel per module:** `ModulesToBitmap(matrix, FM::Options(1, 0), {0, 0}, texels, 41, 41, PixelFormat::R8)` uploaded as a 41×41 single
   channel texture (no filtering, no mip maps), row 0 the symbol's top row; a sync marker uses its top-left 25×25.
 
 Draw it opaque, without blending, depth test or culling, last. On OpenGL ES 2.0 the shaders need `highp` floats in the fragment shader
@@ -198,7 +199,7 @@ What to write in each field, for typical frame pacers, is in [Filling the marker
 and frame index. The analysis flags tearing when the two disagree, and a camera filming the screen times the frames by it:
 
 ```cpp
-const FM::Point syncOrigin = FM::RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, options, 2);
+const FP::Point syncOrigin = options.RecommendedOrigin(FM::MarkerKind::Sync, 1920, 1080, 2);
 FM::ModuleMatrix sync;
 FM::GenerateModules({FM::MarkerKind::Sync, runId, frameIndex, FM::MarkerFlags::None, 0}, sync);
 const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);

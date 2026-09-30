@@ -48,7 +48,7 @@ namespace MB.FramePacing.Marker.UnitTest
     {
       long written = 0;
       var options = Options.Default;
-      var origin = FrameMarker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 2);
+      var origin = options.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, 2);
       // The span path with stack buffers, as a caller without arrays uses it
       Span<MarkerQuad> stackQuads = stackalloc MarkerQuad[FrameMarker.MaxQuadCount];
       Span<byte> stackBytes = stackalloc byte[FrameMarker.MaxEncodedPayloadByteCount];
@@ -74,13 +74,13 @@ namespace MB.FramePacing.Marker.UnitTest
           written += FrameMarker.ModulesToQuads(matrix, options, origin, m_quads);
           written += FrameMarker.GridVertices(MarkerKind.Frame, options, origin, m_grid);
           written += FrameMarker.ModulesToGridIndices(matrix, m_indices, 32);
-          written += FrameMarker.ModulesToBitmap(matrix, options, default, m_pixels, 294, 294, PixelFormat.Rgba32) ? 1 : 0;
+          written += FrameMarker.ModulesToBitmap(matrix, options, default, m_pixels, 294, 294, PixelFormat.R8G8B8A8) ? 1 : 0;
         }
         if (m_generator.TryGenerateModules(payload.WithKind(MarkerKind.SequenceStart), m_metadata, stackBits, out var start))
         {
           written += FrameMarker.ModulesToTriangles(start, options, origin, m_triangles);
           written += FrameMarker.ModulesToQuads(start, options, origin, stackQuads);
-          written += FrameMarker.ModulesToBitmap(start, new Options(1, 0), default, m_pixels, 41, 41, PixelFormat.Gray8) ? 1 : 0;
+          written += FrameMarker.ModulesToBitmap(start, new Options(1, 0), default, m_pixels, 41, 41, PixelFormat.R8) ? 1 : 0;
         }
         written += m_generator.TryGenerateModules(payload.WithKind(MarkerKind.Sync), stackBits, out var sync) ? sync.Bits.Length : 0;
         written += FrameMarker.EncodePayload(payload, m_metadata, m_payloadBytes);

@@ -23,7 +23,6 @@ from mb_framepacing.marker import (  # noqa: E402
     SequenceId,
     StartMetadata,
     generate_modules,
-    marker_size_px,
     modules_to_bitmap,
 )
 
@@ -58,7 +57,7 @@ def cases() -> Iterator[tuple[int, MarkerKind, ModuleMatrix, Options, Point]]:
         else:
             matrix = generate_modules(payload)
         options = Options(module_size_px=1 + (case % 6), quiet_zone_modules=(4, 2, 0)[case % 3])
-        size = marker_size_px(options, kind)
+        size = options.marker_size_px(kind)
         yield case, kind, matrix, options, Point(rng.randrange(0, WIDTH - size), rng.randrange(0, HEIGHT - size))
 
 
@@ -96,9 +95,9 @@ def render_all(shaders: Path, through_spirv: dict[str, dict[str, str]]) -> bool:
     failed = 0
     for case, kind, matrix, options, origin in cases():
         expected = bytearray([GREY]) * (WIDTH * HEIGHT)
-        modules_to_bitmap(matrix, options, origin, expected, WIDTH, HEIGHT, PixelFormat.GRAY8)
+        modules_to_bitmap(matrix, options, origin, expected, WIDTH, HEIGHT, PixelFormat.R8)
         texels = bytearray(41 * 41)
-        modules_to_bitmap(matrix, Options(module_size_px=1, quiet_zone_modules=0), Point(0, 0), texels, 41, 41, PixelFormat.GRAY8)
+        modules_to_bitmap(matrix, Options(module_size_px=1, quiet_zone_modules=0), Point(0, 0), texels, 41, 41, PixelFormat.R8)
         modules.write(bytes(texels))
         packed = bytes(matrix.bits) + bytes(224 - len(matrix.bits))
         bits.write(packed[:211])

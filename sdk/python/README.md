@@ -25,16 +25,15 @@ from mb_framepacing.marker import (
     PixelFormat,
     generate_modules,
     modules_to_bitmap,
-    recommended_origin,
     seconds_to_ticks,
 )
 
 options = Options(module_size_px=3)
-origin = recommended_origin(MarkerKind.FRAME, width, height, options)
+origin = options.recommended_origin(MarkerKind.FRAME, width, height)
 
 # Every frame, last (after post effects and UI), without blending:
 matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))  # encode once
-modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelFormat.RGB24)  # draw it
+modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)  # draw it
 ```
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
@@ -57,18 +56,18 @@ intended_display_ticks=...)` carries the interval the application wants to run a
   16 printable ASCII characters, `SequenceId.from_text("run-42")`. `str(sequence_id)` shows it as the text, or as the UUID's
   8-4-4-4-12 form.
 - **Size:** every main marker (frame, start and end) is QR version 6, 41×41 modules, so it never changes size:
-  `marker_size_px(options)` is `49 × module_size_px` with the default quiet zone (294 px for the default 6 px modules).
+  `options.marker_size_px()` is `49 × module_size_px` with the default quiet zone (294 px for the default 6 px modules).
 - **Sync marker (optional; required for camera capture):** a small second marker that carries only the run id and frame index, drawn
   every frame next to the main marker. It checks tearing on a capture card and times the frames for a camera. It is QR version 2,
-  25×25 modules: `marker_size_px(options, MarkerKind.SYNC)` is `33 × module_size_px` (198 px for 6 px modules).
+  25×25 modules: `options.marker_size_px(MarkerKind.SYNC)` is `33 × module_size_px` (198 px for 6 px modules).
 
 ```python
-sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)  # bottom-left
+sync_origin = options.recommended_origin(MarkerKind.SYNC, width, height)  # bottom-left
 sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NONE, 0))  # the main marker's run id and frame index
-modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelFormat.RGB24)
+modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFormat.R8G8B8)
 ```
 
-`recommended_origin(kind, ...)` places the main marker top-left and the sync marker bottom-left, both inset 32 px (rounded up to the
+`options.recommended_origin(kind, ...)` places the main marker top-left and the sync marker bottom-left, both inset 32 px (rounded up to the
 `align_px` downscale ratio). A sync payload is 16 bytes (magic, format version, kind, run id, frame index); its other fields are not
 encoded and decode as `0`.
 
@@ -97,19 +96,18 @@ The same API as the C# marker module (`MB.FramePacing.Marker`), in Python's nami
 | Python                                                                                                                          | What it does                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                          | What a marker carries                                                                   |
-| `Options`, `Point`                                                                                                              | Size and place                                                                          |
+| `Options` (`recommended`, `minimum`, `marker_size_px`, `quiet_zone_px`, `recommended_origin`), `Point`                          | Size and place: always valid (a value outside its range is clamped)                     |
 | `generate_modules`, `ModuleMatrix` (`size`, `is_dark`, `bits`)                                                                  | Encode the marker: its QR symbol, 1 bit per module (211 bytes)                          |
 | `grid_vertices`, `grid_vertex_count`, `modules_to_grid_indices`                                                                 | A static grid uploaded once, and per frame only the indices                             |
-| `modules_to_bitmap`, `PixelFormat`                                                                                              | Draw it into a pixel buffer (grey, RGB or RGBA, any stride)                             |
+| `modules_to_bitmap`, `PixelFormat`                                                                                              | Draw it into a pixel buffer (R8, R8G8B8 or R8G8B8A8, any stride)                        |
 | `modules_to_indexed`, `modules_to_triangles`                                                                                    | Draw it as indexed triangles or a triangle list, for a GPU                              |
 | `modules_to_quads`, `MarkerQuad` (`rect`, a `Rectangle`: `x`, `y`, `width`, `height`, `left`, `right`, `top`, `bottom`; `dark`) | Draw it as rectangles: the light background, then one dark rectangle per run of modules |
-| `marker_size_px`, `qr_module_count_for`, `recommended_origin`                                                                   | Sizing and placement                                                                    |
-| `minimum_module_size_px`, `recommend_module_size_px`                                                                            | Module size for a capture's scaling                                                     |
+| `qr_module_count_for`                                                                                                           | Modules per side of a kind's symbol                                                     |
 | `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks`                                                | The wire format and its time units                                                      |
 
 A Python caller usually has a pixel buffer: `modules_to_bitmap` draws into it (a `bytearray`, PIL's `Image.tobytes`, a numpy array's
-memory). `PixelFormat` gives the byte layout: `RGB24` is `[R, G, B]`, `RGBA32` `[R, G, B, A]` with A 255; the marker is black and
-white, so BGR and BGRA buffers take the same bytes.
+memory). `PixelFormat` gives the byte layout: `R8G8B8` is `[R, G, B]`, `R8G8B8A8` `[R, G, B, A]` with A 255; the marker is black
+and white, so B8G8R8 and B8G8R8A8 buffers take the same bytes.
 
 ## The data
 

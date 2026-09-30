@@ -112,10 +112,7 @@ namespace MB.FramePacing.Marker.UnitTest
       var pixels = new byte[golden.Width * golden.Height];
       Array.Fill(pixels, (byte)128);
       var matrix = TestMarkers.Encode(golden.Payload, golden.Start);
-      Assert.That(
-        FrameMarker.ModulesToBitmap(matrix, golden.Options, golden.Origin, pixels, golden.Width, golden.Height, PixelFormat.Gray8),
-        Is.True
-      );
+      Assert.That(FrameMarker.ModulesToBitmap(matrix, golden.Options, golden.Origin, pixels, golden.Width, golden.Height, PixelFormat.R8), Is.True);
       AssertMatchesGolden(golden, pixels);
     }
 

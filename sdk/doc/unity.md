@@ -144,8 +144,8 @@ var markerMesh = new FrameMarkerMesh();                  // once
 var material = FrameMarkerGL.CreateMaterial();            // once, or your own unlit vertex color material
 
 // every frame, as the last thing drawn into the output
-var options = new Options(FrameMarker.RecommendModuleSizePx(Screen.height, 540));
-var origin = FrameMarker.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height, options);
+var options = Options.Recommended(Screen.height, 540);
+var origin = options.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height);
 var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.None, FrameMarker.SecondsToTicks(Time.timeAsDouble));
 if (generator.TryGenerateModules(payload, modules, out var matrix))
   markerMesh.Update(matrix, options, origin, Screen.height);

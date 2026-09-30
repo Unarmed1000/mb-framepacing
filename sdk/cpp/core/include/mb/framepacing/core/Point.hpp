@@ -1,11 +1,11 @@
-#ifndef MB_FRAMEPACING_MARKER_POINT_HPP
-#define MB_FRAMEPACING_MARKER_POINT_HPP
+#ifndef MB_FRAMEPACING_CORE_POINT_HPP
+#define MB_FRAMEPACING_CORE_POINT_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <cstdint>
 
-namespace MB::FramePacing::Marker
+namespace MB::FramePacing
 {
   //! A pixel position: origin at the top-left corner, +x to the right, +y down.
   struct Point

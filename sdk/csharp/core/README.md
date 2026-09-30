@@ -9,7 +9,8 @@ copy of `source/`. **Unity:** the [Unity package](../../unity/README.md) contain
 
 | Type        | What it is                                                                                                                                |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Point`     | A pixel position: origin at the top-left corner, +x to the right, +y down                                                                 |
 | `Rectangle` | An integer pixel rectangle, `[Left, Right) × [Top, Bottom)`. Always valid: a negative width or height is 0 (`FromLeftTopRightBottom` too) |
 
 The C++ core (`MB::FramePacing` in [`sdk/cpp/core`](../../cpp/README.md#the-core)) and the Python package's root (`mb_framepacing`) have
-the same `Rectangle`.
+the same `Point` and `Rectangle`.

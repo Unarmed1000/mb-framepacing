@@ -8,24 +8,26 @@ target frame time, the CPU start time and CPU busy into every frame of an applic
 error on the real display output. It draws exactly the same pixels as the C++ and C# libraries: the tests check
 it against the golden images the C++ library writes (test-data/markers). The format is specified in doc/marker-format.md.
 
-    from mb_framepacing.marker import MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, recommended_origin, seconds_to_ticks
+    from mb_framepacing.marker import MarkerFlags, MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, seconds_to_ticks
 
     options = Options(module_size_px=3)
-    origin = recommended_origin(MarkerKind.FRAME, width, height, options)
+    origin = options.recommended_origin(MarkerKind.FRAME, width, height)
     matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))   # encode once
-    modules_to_bitmap(matrix, options, origin, rgb24_frame, width, height, PixelFormat.RGB24)       # draw it
+    modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)       # draw it
 
     # Optional (required for camera capture): the small sync marker, bottom-left, with the same frame index
-    sync_origin = recommended_origin(MarkerKind.SYNC, width, height, options)
+    sync_origin = options.recommended_origin(MarkerKind.SYNC, width, height)
     sync = generate_modules(Payload(MarkerKind.SYNC, 0, frame_index, MarkerFlags.NONE, 0))
-    modules_to_bitmap(sync, options, sync_origin, rgb24_frame, width, height, PixelFormat.RGB24)
+    modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFormat.R8G8B8)
 
 Standard library only, Python 3.12 or later.
 """
 
+from ..point import Point
 from ..rectangle import Rectangle
 from .bitmap import modules_to_bitmap
-from .marker import (
+from .constants import (
+    DEFAULT_MODULE_SIZE_PX,
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
     MAX_GRID_VERTEX_COUNT,
     MAX_MODULE_SIZE_PX,
@@ -48,34 +50,30 @@ from .marker import (
     SYNC_QR_VERSION,
     TICKS_PER_SECOND,
     UNIX_EPOCH_DATE_TIME_TICKS,
+    qr_module_count_for,
+)
+from .marker import (
     encode_payload,
     generate_modules,
     grid_vertex_count,
     grid_vertices,
-    is_valid,
-    marker_size_px,
-    minimum_module_size_px,
     modules_to_grid_indices,
     modules_to_indexed,
     modules_to_quads,
     modules_to_triangles,
-    qr_module_count_for,
-    recommend_module_size_px,
-    recommended_origin,
     seconds_to_ticks,
     to_date_time_ticks,
     try_decode_payload,
 )
+from .options import Options
 from .structures import (
     SEQUENCE_ID_BYTE_COUNT,
     MarkerFlags,
     MarkerKind,
     MarkerQuad,
     ModuleMatrix,
-    Options,
     Payload,
     PixelFormat,
-    Point,
     SequenceId,
     StartMetadata,
     Vertex,
@@ -83,6 +81,7 @@ from .structures import (
 )
 
 __all__ = [
+    "DEFAULT_MODULE_SIZE_PX",
     "MAX_ENCODED_PAYLOAD_BYTE_COUNT",
     "MAX_GRID_VERTEX_COUNT",
     "MAX_MODULE_SIZE_PX",
@@ -122,9 +121,6 @@ __all__ = [
     "generate_modules",
     "grid_vertex_count",
     "grid_vertices",
-    "is_valid",
-    "marker_size_px",
-    "minimum_module_size_px",
     "modules_to_bitmap",
     "modules_to_grid_indices",
     "modules_to_indexed",
@@ -132,8 +128,6 @@ __all__ = [
     "modules_to_triangles",
     "packed_module_byte_count",
     "qr_module_count_for",
-    "recommend_module_size_px",
-    "recommended_origin",
     "seconds_to_ticks",
     "to_date_time_ticks",
     "try_decode_payload",

@@ -69,10 +69,10 @@ namespace MB::FramePacing::Marker
     template <typename TEmit>
     bool WalkQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const TEmit& emit) noexcept
     {
-      const int32_t moduleSize = options.ModuleSizePx;
-      const int32_t markerSize = (matrix.Size() + (2 * options.QuietZoneModules)) * options.ModuleSizePx;
-      const int32_t symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
-      const int32_t symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
+      const int32_t moduleSize = options.ModuleSizePx();
+      const int32_t markerSize = (matrix.Size() + (2 * options.QuietZoneModules())) * moduleSize;
+      const int32_t symbolLeft = origin.X + options.QuietZonePx();
+      const int32_t symbolTop = origin.Y + options.QuietZonePx();
 
       if (!emit(MarkerQuad{Rectangle(origin.X, origin.Y, markerSize, markerSize), false}))
       {
@@ -245,36 +245,36 @@ namespace MB::FramePacing::Marker
 
   std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<MarkerQuad> dst) noexcept
   {
-    return IsValid(options) && matrix.Size() > 0 ? BuildQuads(matrix, options, origin, dst) : 0u;
+    return matrix.Size() > 0 ? BuildQuads(matrix, options, origin, dst) : 0u;
   }
 
   std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
   {
-    return IsValid(options) && matrix.Size() > 0 ? BuildTriangles(matrix, options, origin, dst) : 0u;
+    return matrix.Size() > 0 ? BuildTriangles(matrix, options, origin, dst) : 0u;
   }
 
   IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
                                 const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
   {
-    return IsValid(options) && matrix.Size() > 0 ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex) : IndexedCount{};
+    return matrix.Size() > 0 ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex) : IndexedCount{};
   }
 
   std::size_t GridVertices(const MarkerKind kind, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
   {
     const std::size_t count = GridVertexCount(kind);
-    if (!IsValid(options) || dst.size() < count)
+    if (dst.size() < count)
     {
       return 0;
     }
     const int32_t modules = QrModuleCountFor(kind);
-    const int32_t moduleSize = options.ModuleSizePx;
-    const int32_t markerSize = MarkerSizePx(options, kind);
+    const int32_t moduleSize = options.ModuleSizePx();
+    const int32_t markerSize = options.MarkerSizePx(kind);
     dst[0] = Vertex{origin.X, origin.Y, 255u};
     dst[1] = Vertex{origin.X + markerSize, origin.Y, 255u};
     dst[2] = Vertex{origin.X + markerSize, origin.Y + markerSize, 255u};
     dst[3] = Vertex{origin.X, origin.Y + markerSize, 255u};
-    const int32_t symbolLeft = origin.X + (options.QuietZoneModules * moduleSize);
-    const int32_t symbolTop = origin.Y + (options.QuietZoneModules * moduleSize);
+    const int32_t symbolLeft = origin.X + options.QuietZonePx();
+    const int32_t symbolTop = origin.Y + options.QuietZonePx();
     std::size_t index = 4;
     for (int32_t row = 0; row <= modules; ++row)
     {
@@ -325,7 +325,7 @@ namespace MB::FramePacing::Marker
   bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<uint8_t> dst, const int32_t width,
                        const int32_t height, const PixelFormat format, const std::size_t stride) noexcept
   {
-    if (!IsValid(options) || matrix.Size() == 0 || width < 0 || height < 0)
+    if (matrix.Size() == 0 || width < 0 || height < 0)
     {
       return false;
     }

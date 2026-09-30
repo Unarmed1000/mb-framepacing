@@ -19,6 +19,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using MB.FramePacing;
 using MB.FramePacing.Marker;
 using MB.FramePacing.Marker.Unity;
 using UnityEditor;

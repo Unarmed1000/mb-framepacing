@@ -37,11 +37,11 @@ namespace MB.FramePacing.MarkerDecoding
       (QrModuleCountFor(kind) + (2 * quietZoneModules)) * moduleSizePx;
 
     /// <summary>Hard minimum module size in source pixels: 2 stored pixels per module after all scaling.</summary>
-    public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => FM.FrameMarker.MinimumModuleSizePx(sourceHeight, storedHeight);
+    public static int MinimumModuleSizePx(int sourceHeight, int storedHeight) => FM.Options.Minimum(sourceHeight, storedHeight).ModuleSizePx;
 
     /// <summary>Recommended module size in source pixels: 3 stored pixels per module (4 for MJPEG capture).</summary>
     public static int RecommendModuleSizePx(int sourceHeight, int storedHeight, bool mjpeg = false) =>
-      FM.FrameMarker.RecommendModuleSizePx(sourceHeight, storedHeight, mjpeg);
+      FM.Options.Recommended(sourceHeight, storedHeight, mjpeg).ModuleSizePx;
 
     /// <summary>Build the QR module matrix for the payload. The metadata is only used by start markers.</summary>
     public static ModuleMatrix GenerateModules(MarkerPayload payload, StartMetadata? metadata = null)

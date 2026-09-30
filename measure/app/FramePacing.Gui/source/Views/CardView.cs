@@ -42,7 +42,7 @@ namespace MB.FramePacing.Gui.Views
     private static readonly IPen g_cursor = new Pen(new SolidColorBrush(Colors.White, 0.5), 1);
 
     private List<Action<DrawingContext>> m_operations = new List<Action<DrawingContext>>();
-    private (CardPlot Plot, Point Card, string? Text)? m_hover;
+    private (CardPlot Plot, Avalonia.Point Card, string? Text)? m_hover;
     private (CardPlot Plot, double StartX)? m_drag;
 
     static CardView()
@@ -215,10 +215,10 @@ namespace MB.FramePacing.Gui.Views
       e.Handled = true;
     }
 
-    private Point ToCard(Point control) => new Point(control.X / Scale, control.Y / Scale);
+    private Avalonia.Point ToCard(Avalonia.Point control) => new Avalonia.Point(control.X / Scale, control.Y / Scale);
 
     /// <summary>The plot at the point, its time range moved with the scrolling layers.</summary>
-    private CardPlot? PlotAt(CardDrawing drawing, Point card) =>
+    private CardPlot? PlotAt(CardDrawing drawing, Avalonia.Point card) =>
       drawing.Plots.FirstOrDefault(p => p.Contains(card.X, card.Y)) is { } plot ? Scrolled(plot) : null;
 
     private CardPlot Scrolled(CardPlot plot)
@@ -230,13 +230,13 @@ namespace MB.FramePacing.Gui.Views
       return plot with { XFrom = plot.XFrom - seconds, XTo = plot.XTo - seconds };
     }
 
-    private (CardPlot, Point, string?)? Hover(CardDrawing drawing, Point card) =>
+    private (CardPlot, Avalonia.Point, string?)? Hover(CardDrawing drawing, Avalonia.Point card) =>
       PlotAt(drawing, card) is { } plot ? (plot, card, HoverText?.Invoke(plot, plot.ValueX(card.X), plot.ValueY(card.Y))) : null;
 
     /// <summary>The cursor line through the plot, and the text in a box beside the pointer, kept on the card.</summary>
-    private static void DrawHover(DrawingContext context, CardDrawing drawing, CardPlot plot, Point card, string? text)
+    private static void DrawHover(DrawingContext context, CardDrawing drawing, CardPlot plot, Avalonia.Point card, string? text)
     {
-      context.DrawLine(g_cursor, new Point(card.X, plot.Top), new Point(card.X, plot.Bottom));
+      context.DrawLine(g_cursor, new Avalonia.Point(card.X, plot.Top), new Avalonia.Point(card.X, plot.Bottom));
       if (string.IsNullOrEmpty(text))
         return;
       var layout = new TextLayout(text, new Typeface(g_font), 12, Brushes.White);
@@ -246,7 +246,7 @@ namespace MB.FramePacing.Gui.Views
       double x = card.X + 14 + width <= drawing.Width - 4 ? card.X + 14 : card.X - 14 - width;
       double y = Math.Clamp(card.Y - (height / 2), 4, Math.Max(4, drawing.Height - height - 4));
       context.DrawRectangle(g_hoverBackground, g_hoverBorder, new Rect(x, y, width, height), 6, 6);
-      layout.Draw(context, new Point(x + Padding, y + Padding));
+      layout.Draw(context, new Avalonia.Point(x + Padding, y + Padding));
     }
 
     // ------------------------------------------------------------------------------------------------------------------------------------------
@@ -283,8 +283,8 @@ namespace MB.FramePacing.Gui.Views
         {
           if (Pen(CardStyle.Resolve(l.Class, text: false)) is { } pen)
           {
-            var from = new Point(l.X1.Value, l.Y1.Value);
-            var to = new Point(l.X2.Value, l.Y2.Value);
+            var from = new Avalonia.Point(l.X1.Value, l.Y1.Value);
+            var to = new Avalonia.Point(l.X2.Value, l.Y2.Value);
             operations.Add(context => context.DrawLine(pen, from, to));
           }
           break;
@@ -311,7 +311,7 @@ namespace MB.FramePacing.Gui.Views
           };
           foreach (var piece in layouts)
           {
-            var origin = new Point(at, t.Y - piece.TextLines[0].Baseline);
+            var origin = new Avalonia.Point(at, t.Y - piece.TextLines[0].Baseline);
             operations.Add(context => piece.Draw(context, origin));
             at += piece.WidthIncludingTrailingWhitespace;
           }
@@ -327,7 +327,7 @@ namespace MB.FramePacing.Gui.Views
             "end" => t.X - width,
             _ => t.X,
           };
-          var origin = new Point(x, t.Y - layout.TextLines[0].Baseline);
+          var origin = new Avalonia.Point(x, t.Y - layout.TextLines[0].Baseline);
           operations.Add(context => layout.Draw(context, origin));
           break;
         }

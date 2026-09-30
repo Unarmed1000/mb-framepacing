@@ -26,7 +26,7 @@ cbuffer FrameMarkerConstants : register(b0)
   uint4 Bits[14];          // FrameMarkerPackedPS: the packed module bits, 211 bytes (79 for the sync marker) copied as they are
 };
 
-Texture2D<float> Modules : register(t0);  // FrameMarkerModulesPS: ModulesToBitmap(matrix, {1, 0}, {0, 0}, ..., 41, 41, Gray8), R8
+Texture2D<float> Modules : register(t0);  // FrameMarkerModulesPS: ModulesToBitmap(matrix, Options(1, 0), {0, 0}, ..., 41, 41, R8), R8
 
 struct FrameMarkerVaryings
 {

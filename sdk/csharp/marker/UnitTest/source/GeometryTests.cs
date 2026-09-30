@@ -29,43 +29,46 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void MarkerSize()
     {
-      Assert.That(FrameMarker.MarkerSizePx(Options.Default), Is.EqualTo(294));
-      Assert.That(FrameMarker.MarkerSizePx(Options.Default, MarkerKind.Sync), Is.EqualTo(198));
-      Assert.That(FrameMarker.MarkerSizePx(new Options(3)), Is.EqualTo(147));
-      Assert.That(FrameMarker.MarkerSizePx(new Options(12)), Is.EqualTo(588));
-      Assert.That(FrameMarker.MarkerSizePx(new Options(1, 0)), Is.EqualTo(41));
+      Assert.That(Options.Default.MarkerSizePx(), Is.EqualTo(294));
+      Assert.That(Options.Default.MarkerSizePx(MarkerKind.Sync), Is.EqualTo(198));
+      Assert.That(new Options(3).MarkerSizePx(), Is.EqualTo(147));
+      Assert.That(new Options(12).MarkerSizePx(), Is.EqualTo(588));
+      Assert.That(new Options(1, 0).MarkerSizePx(), Is.EqualTo(41));
     }
 
     [Test]
     public void ModuleSizeRecommendations_MatchTheDocumentation()
     {
-      Assert.That(FrameMarker.MinimumModuleSizePx(1080, 1080), Is.EqualTo(2));
-      Assert.That(FrameMarker.RecommendModuleSizePx(1080, 1080), Is.EqualTo(3));
-      Assert.That(FrameMarker.RecommendModuleSizePx(1080, 1080, mjpeg: true), Is.EqualTo(4));
-      Assert.That(FrameMarker.MinimumModuleSizePx(1440, 1080), Is.EqualTo(3));
-      Assert.That(FrameMarker.RecommendModuleSizePx(1440, 1080), Is.EqualTo(4));
-      Assert.That(FrameMarker.MinimumModuleSizePx(1080, 540), Is.EqualTo(4));
-      Assert.That(FrameMarker.RecommendModuleSizePx(1080, 540), Is.EqualTo(6));
-      Assert.That(FrameMarker.RecommendModuleSizePx(2160, 1080), Is.EqualTo(6));
-      Assert.That(FrameMarker.RecommendModuleSizePx(1080, 540, mjpeg: true), Is.EqualTo(8));
-      Assert.That(FrameMarker.MinimumModuleSizePx(1080, 360), Is.EqualTo(6));
-      Assert.That(FrameMarker.RecommendModuleSizePx(1080, 360), Is.EqualTo(9));
-      Assert.That(FrameMarker.MinimumModuleSizePx(2160, 540), Is.EqualTo(8));
-      Assert.That(FrameMarker.RecommendModuleSizePx(2160, 540), Is.EqualTo(12));
-      Assert.That(FrameMarker.RecommendModuleSizePx(540, 1080), Is.EqualTo(3));
-      Assert.That(FrameMarker.RecommendModuleSizePx(0, 1080), Is.EqualTo(3));
+      Assert.That(Options.Minimum(1080, 1080).ModuleSizePx, Is.EqualTo(2));
+      Assert.That(Options.Recommended(1080, 1080).ModuleSizePx, Is.EqualTo(3));
+      Assert.That(Options.Recommended(1080, 1080, mjpeg: true).ModuleSizePx, Is.EqualTo(4));
+      Assert.That(Options.Minimum(1440, 1080).ModuleSizePx, Is.EqualTo(3));
+      Assert.That(Options.Recommended(1440, 1080).ModuleSizePx, Is.EqualTo(4));
+      Assert.That(Options.Minimum(1080, 540).ModuleSizePx, Is.EqualTo(4));
+      Assert.That(Options.Recommended(1080, 540).ModuleSizePx, Is.EqualTo(6));
+      Assert.That(Options.Recommended(2160, 1080).ModuleSizePx, Is.EqualTo(6));
+      Assert.That(Options.Recommended(1080, 540, mjpeg: true).ModuleSizePx, Is.EqualTo(8));
+      Assert.That(Options.Minimum(1080, 360).ModuleSizePx, Is.EqualTo(6));
+      Assert.That(Options.Recommended(1080, 360).ModuleSizePx, Is.EqualTo(9));
+      Assert.That(Options.Minimum(2160, 540).ModuleSizePx, Is.EqualTo(8));
+      Assert.That(Options.Recommended(2160, 540).ModuleSizePx, Is.EqualTo(12));
+      Assert.That(Options.Recommended(540, 1080).ModuleSizePx, Is.EqualTo(3));
+      Assert.That(Options.Recommended(0, 1080).ModuleSizePx, Is.EqualTo(3));
+      // A downscale beyond the largest module size gives the largest, and the recommended quiet zone
+      Assert.That(Options.Recommended(1_000_000, 10).ModuleSizePx, Is.EqualTo(FrameMarker.MaxModuleSizePx));
+      Assert.That(Options.Minimum(1080, 540), Is.EqualTo(new Options(4, FrameMarker.RecommendedQuietZoneModules)));
     }
 
     [Test]
     public void RecommendedOrigins()
     {
       var options = Options.Default;
-      Assert.That(FrameMarker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options), Is.EqualTo(new Point(32, 32)));
-      Assert.That(FrameMarker.RecommendedOrigin(MarkerKind.SequenceStart, 1920, 1080, options), Is.EqualTo(new Point(32, 32)));
-      Assert.That(FrameMarker.RecommendedOrigin(MarkerKind.Sync, 1920, 1080, options), Is.EqualTo(new Point(32, 1080 - 32 - 198)));
-      Assert.That(FrameMarker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 3), Is.EqualTo(new Point(33, 33)));
-      Assert.That(FrameMarker.RecommendedOrigin(MarkerKind.Sync, 1920, 1080, options, 3), Is.EqualTo(new Point(33, 849)));
-      Assert.That(FrameMarker.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, options, 4), Is.EqualTo(new Point(32, 32)));
+      Assert.That(options.RecommendedOrigin(MarkerKind.Frame, 1920, 1080), Is.EqualTo(new Point(32, 32)));
+      Assert.That(options.RecommendedOrigin(MarkerKind.SequenceStart, 1920, 1080), Is.EqualTo(new Point(32, 32)));
+      Assert.That(options.RecommendedOrigin(MarkerKind.Sync, 1920, 1080), Is.EqualTo(new Point(32, 1080 - 32 - 198)));
+      Assert.That(options.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, 3), Is.EqualTo(new Point(33, 33)));
+      Assert.That(options.RecommendedOrigin(MarkerKind.Sync, 1920, 1080, 3), Is.EqualTo(new Point(33, 849)));
+      Assert.That(options.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, 4), Is.EqualTo(new Point(32, 32)));
     }
 
     [Test]
@@ -160,7 +163,7 @@ namespace MB.FramePacing.Marker.UnitTest
       // The background quad comes first: its vertices in the documented order
       var matrix = TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2));
       var options = new Options(2, 4);
-      int size = FrameMarker.MarkerSizePx(options);
+      int size = options.MarkerSizePx();
       var triangles = new Vertex[FrameMarker.MaxTriangleVertexCount];
       Assert.That(FrameMarker.ModulesToTriangles(matrix, options, new Point(10, 20), triangles), Is.GreaterThan(6));
       Assert.That(
@@ -203,15 +206,9 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
-    public void InvalidOptions_OrSmallBuffers_GenerateNothing()
+    public void SmallBuffers_GenerateNothing()
     {
       var payload = new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2);
-      Assert.That(TestMarkers.GenerateQuads(payload, new Options(0), default, new MarkerQuad[FrameMarker.MaxQuadCount]), Is.Zero);
-      Assert.That(TestMarkers.GenerateTriangles(payload, new Options(6, -1), default, new Vertex[FrameMarker.MaxTriangleVertexCount]), Is.Zero);
-      Assert.That(
-        TestMarkers.GenerateQuads(payload, new Options(6, FrameMarker.MaxQuietZoneModules + 1), default, new MarkerQuad[FrameMarker.MaxQuadCount]),
-        Is.Zero
-      );
       Assert.That(TestMarkers.GenerateQuads(payload, Options.Default, default, new MarkerQuad[10]), Is.Zero);
       Assert.That(TestMarkers.GenerateTriangles(payload, Options.Default, default, new Vertex[12]), Is.Zero);
       var failed = TestMarkers.GenerateIndexed(payload, Options.Default, default, new Vertex[FrameMarker.MaxIndexedVertexCount], new int[12]);
@@ -279,12 +276,12 @@ namespace MB.FramePacing.Marker.UnitTest
     public void EmptyMatrix_DrawsNothing()
     {
       Assert.That(FrameMarker.ModulesToQuads(default, Options.Default, default, new MarkerQuad[4]), Is.Zero);
-      Assert.That(FrameMarker.ModulesToBitmap(default, new Options(1, 0), default, new byte[16], 4, 4, PixelFormat.Gray8), Is.False);
+      Assert.That(FrameMarker.ModulesToBitmap(default, new Options(1, 0), default, new byte[16], 4, 4, PixelFormat.R8), Is.False);
     }
 
-    [TestCase(PixelFormat.Gray8)]
-    [TestCase(PixelFormat.Rgb24)]
-    [TestCase(PixelFormat.Rgba32)]
+    [TestCase(PixelFormat.R8)]
+    [TestCase(PixelFormat.R8G8B8)]
+    [TestCase(PixelFormat.R8G8B8A8)]
     public void Bitmap_EqualsTheRasterizedQuads(PixelFormat format)
     {
       const int Width = 173;
@@ -345,8 +342,8 @@ namespace MB.FramePacing.Marker.UnitTest
       const int ModuleSize = 3;
       var small = new Options(1, 4);
       var large = new Options(ModuleSize, 4);
-      int smallSize = FrameMarker.MarkerSizePx(small);
-      int largeSize = FrameMarker.MarkerSizePx(large);
+      int smallSize = small.MarkerSizePx();
+      int largeSize = large.MarkerSizePx();
       var modules = new byte[smallSize * smallSize];
       var pixels = new byte[largeSize * largeSize];
       Assert.That(
@@ -357,7 +354,7 @@ namespace MB.FramePacing.Marker.UnitTest
           modules,
           smallSize,
           smallSize,
-          PixelFormat.Gray8
+          PixelFormat.R8
         )
       );
       Assert.That(
@@ -368,7 +365,7 @@ namespace MB.FramePacing.Marker.UnitTest
           pixels,
           largeSize,
           largeSize,
-          PixelFormat.Gray8
+          PixelFormat.R8
         )
       );
       for (int y = 0; y < largeSize; ++y)
@@ -387,24 +384,12 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(
         FrameMarker.ModulesToBitmap(
           TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
-          new Options(0),
-          default,
-          pixels,
-          64,
-          64,
-          PixelFormat.Gray8
-        ),
-        Is.False
-      );
-      Assert.That(
-        FrameMarker.ModulesToBitmap(
-          TestMarkers.Encode(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2)),
           options,
           default,
           pixels,
           64,
           64,
-          PixelFormat.Rgb24,
+          PixelFormat.R8G8B8,
           (64 * 3) - 1
         ),
         Is.False
@@ -417,7 +402,7 @@ namespace MB.FramePacing.Marker.UnitTest
           pixels.AsSpan(0, pixels.Length - 1),
           64,
           64,
-          PixelFormat.Rgba32
+          PixelFormat.R8G8B8A8
         ),
         Is.False
       );
@@ -429,7 +414,7 @@ namespace MB.FramePacing.Marker.UnitTest
           pixels,
           -1,
           64,
-          PixelFormat.Gray8
+          PixelFormat.R8
         ),
         Is.False
       );
@@ -442,13 +427,13 @@ namespace MB.FramePacing.Marker.UnitTest
           pixels,
           64,
           64,
-          PixelFormat.Gray8
+          PixelFormat.R8
         ),
         Is.True
       );
       Assert.That(pixels.All(p => p == 128), Is.True, "outside the buffer: nothing to draw");
       Assert.That(
-        (FrameMarker.BytesPerPixel(PixelFormat.Gray8), FrameMarker.BytesPerPixel(PixelFormat.Rgb24), FrameMarker.BytesPerPixel(PixelFormat.Rgba32)),
+        (FrameMarker.BytesPerPixel(PixelFormat.R8), FrameMarker.BytesPerPixel(PixelFormat.R8G8B8), FrameMarker.BytesPerPixel(PixelFormat.R8G8B8A8)),
         Is.EqualTo((1, 3, 4))
       );
     }
@@ -507,9 +492,8 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
-    public void Grid_InvalidOptionsOrSmallBuffers_GiveNothing()
+    public void Grid_SmallBuffers_GiveNothing()
     {
-      Assert.That(FrameMarker.GridVertices(MarkerKind.Frame, new Options(0), default, new Vertex[FrameMarker.MaxGridVertexCount]), Is.Zero);
       Assert.That(FrameMarker.GridVertices(MarkerKind.Frame, Options.Default, default, new Vertex[1767]), Is.Zero);
       Assert.That(FrameMarker.GridVertices(MarkerKind.Sync, Options.Default, default, new Vertex[680]), Is.EqualTo(680));
       Assert.That(
