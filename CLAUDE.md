@@ -380,6 +380,8 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   - hand-maintained SDK csproj files;
   - package versions only in the root `Directory.Packages.props`;
   - C# style: a boxed file header, 2-space indent, block namespaces, `m_`/`g_` field prefixes, CSharpier (`.csharpierrc`, width 150).
+  - SDK value types are `readonly struct`s with `public readonly` fields (derived values are expression-bodied properties) and
+    `GetHashCode` through `HashCode.Combine` (a `HashCode` builder past 8 fields, `Payload`).
 - **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored, GoogleTest
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):

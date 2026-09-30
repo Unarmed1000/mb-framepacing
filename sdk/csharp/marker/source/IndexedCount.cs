@@ -17,8 +17,8 @@ namespace MB.FramePacing.Marker
       IndexCount = indexCount;
     }
 
-    public int VertexCount { get; }
+    public readonly int VertexCount;
 
-    public int IndexCount { get; }
+    public readonly int IndexCount;
   }
 }

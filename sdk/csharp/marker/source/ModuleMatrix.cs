@@ -18,26 +18,24 @@ namespace MB.FramePacing.Marker
 {
   public readonly ref struct ModuleMatrix
   {
-    private readonly ReadOnlySpan<byte> m_bits;
-
     private ModuleMatrix(int size, ReadOnlySpan<byte> bits)
     {
       Size = size;
-      m_bits = bits;
+      Bits = bits;
     }
 
     /// <summary>Modules per side: 41 for the main marker, 25 for the sync marker, 0 for an empty (default) matrix.</summary>
-    public int Size { get; }
+    public readonly int Size;
 
     /// <summary>The packed bits: <see cref="FrameMarker.PackedModuleByteCount"/>(<see cref="Size"/>) bytes.</summary>
-    public ReadOnlySpan<byte> Bits => m_bits;
+    public readonly ReadOnlySpan<byte> Bits;
 
     public bool IsEmpty => Size == 0;
 
     public bool IsDark(int x, int y)
     {
       int index = (y * Size) + x;
-      return ((m_bits[index >> 3] >> (7 - (index & 7))) & 1) != 0;
+      return ((Bits[index >> 3] >> (7 - (index & 7))) & 1) != 0;
     }
 
     /// <summary>
@@ -63,10 +61,10 @@ namespace MB.FramePacing.Marker
         return false;
       if (Size == 0)
         return true;
-      int last = m_bits.Length - 1;
+      int last = Bits.Length - 1;
       int usedBits = (Size * Size) % 8;
       int mask = usedBits == 0 ? 0xFF : (0xFF << (8 - usedBits)) & 0xFF;
-      return m_bits.Slice(0, last).SequenceEqual(other.m_bits.Slice(0, last)) && (m_bits[last] & mask) == (other.m_bits[last] & mask);
+      return Bits.Slice(0, last).SequenceEqual(other.Bits.Slice(0, last)) && (Bits[last] & mask) == (other.Bits[last] & mask);
     }
   }
 }

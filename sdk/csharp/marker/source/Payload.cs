@@ -41,22 +41,22 @@ namespace MB.FramePacing.Marker
       CpuBusyTicks = cpuBusyTicks;
     }
 
-    public MarkerKind Kind { get; }
+    public readonly MarkerKind Kind;
 
     /// <summary>Identifies one test run. The start marker, every frame marker and the end marker of a run carry the same id.</summary>
-    public uint RunId { get; }
+    public readonly uint RunId;
 
     /// <summary>The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</summary>
-    public ulong FrameIndex { get; }
+    public readonly ulong FrameIndex;
 
     /// <summary>
     /// <see cref="MarkerFlags.StaticAfter"/> when nothing animates while this frame is on screen, <see cref="MarkerFlags.StaticBefore"/> when
     /// nothing animated while the frame before it was; the other bits are reserved (0).
     /// </summary>
-    public MarkerFlags Flags { get; }
+    public readonly MarkerFlags Flags;
 
     /// <summary>Animation time in TimeSpan ticks (100 ns): the time the frame's animation was evaluated for.</summary>
-    public long AnimationTicks { get; }
+    public readonly long AnimationTicks;
 
     /// <summary>
     /// The interval the application wants to run at, in ticks (100 ns): what it would aim for if nothing held it back. It differs from
@@ -64,32 +64,32 @@ namespace MB.FramePacing.Marker
     /// 333 333). A 30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, <see cref="FrameMarker.OnDemandFrameTicks"/> =
     /// frames only when something changes.
     /// </summary>
-    public uint PreferredFrameTicks { get; }
+    public readonly uint PreferredFrameTicks;
 
     /// <summary>
     /// The interval the frame pacer aims for between the previous frame and this one, in ticks (100 ns): 166 667 for 60 fps. 0 = unknown,
     /// <see cref="FrameMarker.OnDemandFrameTicks"/> = frames only when something changes.
     /// </summary>
-    public uint TargetFrameTicks { get; }
+    public readonly uint TargetFrameTicks;
 
     /// <summary>
     /// When the frame pacer intends this frame to become visible, in ticks (100 ns) on its steady clock (any epoch, the same clock for the
     /// whole run). 0 = unknown.
     /// </summary>
-    public long IntendedDisplayTicks { get; }
+    public readonly long IntendedDisplayTicks;
 
     /// <summary>
     /// CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in ticks (100 ns) on the same steady clock
     /// as <see cref="IntendedDisplayTicks"/>. Anywhere inside a refresh; frames can overlap. 0 = unknown.
     /// </summary>
-    public long CpuStartTicks { get; }
+    public readonly long CpuStartTicks;
 
     /// <summary>
     /// CPU busy: how long the CPU worked on this frame before presenting it (PresentMon's MsCPUBusy), from <see cref="CpuStartTicks"/> until
     /// Present is called, in ticks (100 ns). The marker is drawn last, so the application measures it as it draws the marker. It does not
     /// include the GPU's work. May span several refreshes. 0 = unknown.
     /// </summary>
-    public uint CpuBusyTicks { get; }
+    public readonly uint CpuBusyTicks;
 
     /// <summary>The same payload with another kind.</summary>
     public Payload WithKind(MarkerKind kind) =>
@@ -122,14 +122,19 @@ namespace MB.FramePacing.Marker
 
     public override int GetHashCode()
     {
-      unchecked
-      {
-        int hash = (((((int)Kind * 397) ^ (int)RunId) * 397) ^ FrameIndex.GetHashCode()) * 397;
-        hash = (((hash ^ (int)Flags) * 397) ^ AnimationTicks.GetHashCode()) * 397;
-        hash = (((hash ^ (int)PreferredFrameTicks) * 397) ^ (int)TargetFrameTicks) * 397;
-        hash = (((hash ^ IntendedDisplayTicks.GetHashCode()) * 397) ^ CpuStartTicks.GetHashCode()) * 397;
-        return hash ^ (int)CpuBusyTicks;
-      }
+      // Ten fields: more than HashCode.Combine takes
+      var hash = new HashCode();
+      hash.Add(Kind);
+      hash.Add(RunId);
+      hash.Add(FrameIndex);
+      hash.Add(Flags);
+      hash.Add(AnimationTicks);
+      hash.Add(PreferredFrameTicks);
+      hash.Add(TargetFrameTicks);
+      hash.Add(IntendedDisplayTicks);
+      hash.Add(CpuStartTicks);
+      hash.Add(CpuBusyTicks);
+      return hash.ToHashCode();
     }
 
     public static bool operator ==(Payload left, Payload right) => left.Equals(right);

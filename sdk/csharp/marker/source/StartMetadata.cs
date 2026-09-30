@@ -20,10 +20,10 @@ namespace MB.FramePacing.Marker
     }
 
     /// <summary>Wall clock start time as DateTime UTC ticks (100 ns since 0001-01-01), 0 = unknown.</summary>
-    public long UtcTicks { get; }
+    public readonly long UtcTicks;
 
     /// <summary>Identifies the capture sequence: 16 opaque bytes, any content as long as it is unique to it.</summary>
-    public SequenceId SequenceId { get; }
+    public readonly SequenceId SequenceId;
 
     /// <summary>Metadata for a run starting at <paramref name="startTime"/> (converted to UTC).</summary>
     public static StartMetadata Create(DateTime startTime, SequenceId sequenceId) =>

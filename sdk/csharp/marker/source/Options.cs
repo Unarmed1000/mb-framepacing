@@ -73,7 +73,7 @@ namespace MB.FramePacing.Marker
 
     public override bool Equals(object obj) => obj is Options other && Equals(other);
 
-    public override int GetHashCode() => unchecked((ModuleSizePx * 397) ^ QuietZoneModules);
+    public override int GetHashCode() => HashCode.Combine(m_moduleSizeFromDefault, m_quietZoneFromDefault);
 
     public static bool operator ==(Options left, Options right) => left.Equals(right);
 

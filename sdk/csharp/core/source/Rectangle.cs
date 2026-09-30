@@ -30,13 +30,13 @@ namespace MB.FramePacing
     public static Rectangle FromLeftTopRightBottom(int left, int top, int right, int bottom) =>
       new Rectangle(left, top, ValidSize(left, (long)right - left), ValidSize(top, (long)bottom - top));
 
-    public int X { get; }
+    public readonly int X;
 
-    public int Y { get; }
+    public readonly int Y;
 
-    public int Width { get; }
+    public readonly int Width;
 
-    public int Height { get; }
+    public readonly int Height;
 
     public int Left => X;
 
@@ -66,7 +66,7 @@ namespace MB.FramePacing
 
     public override bool Equals(object obj) => obj is Rectangle other && Equals(other);
 
-    public override int GetHashCode() => unchecked((((((X * 397) ^ Y) * 397) ^ Width) * 397) ^ Height);
+    public override int GetHashCode() => HashCode.Combine(X, Y, Width, Height);
 
     public static bool operator ==(Rectangle left, Rectangle right) => left.Equals(right);
 

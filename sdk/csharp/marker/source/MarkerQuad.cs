@@ -19,16 +19,16 @@ namespace MB.FramePacing.Marker
       Dark = dark;
     }
 
-    public Rectangle Rect { get; }
+    public readonly Rectangle Rect;
 
     /// <summary>True: draw black (luma 0). False: draw white (luma 255).</summary>
-    public bool Dark { get; }
+    public readonly bool Dark;
 
     public bool Equals(MarkerQuad other) => Rect == other.Rect && Dark == other.Dark;
 
     public override bool Equals(object obj) => obj is MarkerQuad other && Equals(other);
 
-    public override int GetHashCode() => unchecked((Rect.GetHashCode() * 397) ^ (Dark ? 1 : 0));
+    public override int GetHashCode() => HashCode.Combine(Rect, Dark);
 
     public static bool operator ==(MarkerQuad left, MarkerQuad right) => left.Equals(right);
 

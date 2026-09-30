@@ -19,15 +19,15 @@ namespace MB.FramePacing
       Y = y;
     }
 
-    public int X { get; }
+    public readonly int X;
 
-    public int Y { get; }
+    public readonly int Y;
 
     public bool Equals(Point other) => X == other.X && Y == other.Y;
 
     public override bool Equals(object obj) => obj is Point other && Equals(other);
 
-    public override int GetHashCode() => unchecked((X * 397) ^ Y);
+    public override int GetHashCode() => HashCode.Combine(X, Y);
 
     public static bool operator ==(Point left, Point right) => left.Equals(right);
 

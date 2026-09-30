@@ -21,17 +21,17 @@ namespace MB.FramePacing.Marker
       Luma = luma;
     }
 
-    public int X { get; }
+    public readonly int X;
 
-    public int Y { get; }
+    public readonly int Y;
 
-    public byte Luma { get; }
+    public readonly byte Luma;
 
     public bool Equals(Vertex other) => X == other.X && Y == other.Y && Luma == other.Luma;
 
     public override bool Equals(object obj) => obj is Vertex other && Equals(other);
 
-    public override int GetHashCode() => unchecked((((X * 397) ^ Y) * 397) ^ Luma);
+    public override int GetHashCode() => HashCode.Combine(X, Y, Luma);
 
     public static bool operator ==(Vertex left, Vertex right) => left.Equals(right);
 
