@@ -118,7 +118,8 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// Run the browser once: its exit code and error output. A browser that saved the whole PNG but does not exit (headless Chrome on macOS
-    /// can hang while shutting down) is ended and counts as done.
+    /// can hang while shutting down) is ended and counts as done. Only the browser's own process is ended: its helpers end with it, and ending
+    /// the whole process tree (Process.Kill(entireProcessTree)) took down the GitHub macOS runner that ran the tests.
     /// </summary>
     private static (int ExitCode, string Errors) Run(string browser, IReadOnlyList<string> arguments, string pngPath)
     {
@@ -138,7 +139,7 @@ namespace MB.FramePacing.Charts
       {
         if (IsCompletePng(pngPath))
         {
-          process.Kill(entireProcessTree: true);
+          process.Kill();
           // With a time limit: without one, WaitForExit also waits for the redirected output to close, which a helper process the browser
           // started on its own can keep open
           process.WaitForExit(5000);
@@ -146,7 +147,7 @@ namespace MB.FramePacing.Charts
         }
         if (elapsed.Elapsed > g_timeout)
         {
-          process.Kill(entireProcessTree: true);
+          process.Kill();
           throw new TimeoutException($"{browser} did not save {pngPath} within {g_timeout.TotalSeconds:0} s{Tail(Text(errors))}");
         }
       }
