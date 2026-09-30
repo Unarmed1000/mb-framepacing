@@ -7,6 +7,7 @@
     <Project Path="sdk/csharp/core/MB.FramePacing.csproj" />
     <Project Path="sdk/csharp/data/MB.FramePacing.Data.csproj" />
     <Project Path="sdk/csharp/marker/MB.FramePacing.Marker.csproj" />
+    <Project Path="sdk/csharp/pacer/MB.FramePacing.Pacer.csproj" />
   </Folder>
   <Folder Name="/app/">
     <Project Path="measure/app/FramePacing/FramePacing.csproj" />
@@ -26,6 +27,7 @@
     <Project Path="sdk/csharp/core/UnitTest/MB.FramePacing.UnitTest.csproj" />
     <Project Path="sdk/csharp/data/UnitTest/MB.FramePacing.Data.UnitTest.csproj" />
     <Project Path="sdk/csharp/marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj" />
+    <Project Path="sdk/csharp/pacer/UnitTest/MB.FramePacing.Pacer.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Analysis/UnitTest/MB.FramePacing.Analysis.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Capture/UnitTest/MB.FramePacing.Capture.UnitTest.csproj" />
     <Project Path="measure/libs/MB.FramePacing.Charts/UnitTest/MB.FramePacing.Charts.UnitTest.csproj" />

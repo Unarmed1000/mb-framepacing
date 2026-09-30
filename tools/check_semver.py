@@ -6,7 +6,8 @@
 1. sdk/VERSION and measure/VERSION are MAJOR.MINOR.PATCH, optionally with a pre-release (-alpha.N, -beta.N or -rc.N), and never lower
    than the newest release tag of their stream (sdk-v*, tools-v*), pre-releases included, in semantic version order:
    0.2.0-alpha.1 < 0.2.0-alpha.2 < 0.2.0-beta.1 < 0.2.0-rc.1 < 0.2.0.
-2. The public API of every C# module of the SDK (MB.FramePacing, MB.FramePacing.Marker, MB.FramePacing.Data) is compared with the newest stable sdk-v*
+2. The public API of every C# module of the SDK (MB.FramePacing, MB.FramePacing.Marker, MB.FramePacing.Data,
+   MB.FramePacing.Pacer) is compared with the newest stable sdk-v*
    release (Microsoft's ApiCompat, from the local tool manifest: dotnet tool restore). Pre-releases are not a baseline: the pre-releases
    of a version may change its API among themselves. The C++ marker API mirrors the C# one, so this also guards the C++ marker module.
    - A breaking change needs a new major version (a new minor version while the major version is 0).
@@ -54,6 +55,7 @@ API_STREAMS = (
     ApiStream("MB.FramePacing", Path("sdk/csharp/core/MB.FramePacing.csproj"), "sdk/VERSION", "sdk-v"),
     ApiStream("MB.FramePacing.Marker", Path("sdk/csharp/marker/MB.FramePacing.Marker.csproj"), "sdk/VERSION", "sdk-v"),
     ApiStream("MB.FramePacing.Data", Path("sdk/csharp/data/MB.FramePacing.Data.csproj"), "sdk/VERSION", "sdk-v"),
+    ApiStream("MB.FramePacing.Pacer", Path("sdk/csharp/pacer/MB.FramePacing.Pacer.csproj"), "sdk/VERSION", "sdk-v"),
 )
 
 # (major, minor, patch, 1 for a release or 0 for a pre-release, the pre-release label's rank, its number): sorts as semver does

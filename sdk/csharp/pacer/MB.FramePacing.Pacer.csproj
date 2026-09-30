@@ -1,0 +1,22 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The pacer module of the C# SDK: the frame pacer, the swap interval rule and the animation clock. Only the SDK's core, .NET Standard 2.1 and
+       C# 9 without nullable annotations, so the same sources also compile inside Unity (2021.3+). Nothing here may allocate on the per-frame path. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>MB.FramePacing.Pacer</AssemblyName>
+    <RootNamespace>MB.FramePacing.Pacer</RootNamespace>
+    <Product>MB Frame Pacing Pacer</Product>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.Pacer.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\core\MB.FramePacing.csproj" />
+  </ItemGroup>
+</Project>

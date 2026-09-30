@@ -487,26 +487,26 @@ flowchart TB
     AN --> GUI
 ```
 
-| Path                        | Contents                                                                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                    |
-| `sdk/VERSION`               | The SDK's version: every module, every language                                                                               |
-| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, `pacer/`), its Conan recipe           |
-| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10) |
-| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                       |
-| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                  |
-| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                            |
-| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats                                    |
-| `sdk/test-data/`            | Golden marker images (checked by every marker module) and the data modules' golden data                                       |
-| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                           |
-| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                 |
-| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                           |
-| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                     |
-| `measure/doc/`              | Platform, usage and camera guides, images                                                                                     |
-| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                               |
-| `doc/`                      | Release guide and roadmap                                                                                                     |
-| `tools/`                    | Repository scripts: checks, golden data                                                                                       |
-| `licenses/`                 | Licenses of every third-party component                                                                                       |
+| Path                        | Contents                                                                                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                                            |
+| `sdk/VERSION`               | The SDK's version: every module, every language                                                                                                       |
+| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, `pacer/`), its Conan recipe                                   |
+| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core), `MB.FramePacing.Marker` and `MB.FramePacing.Pacer` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10) |
+| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                                               |
+| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                                          |
+| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                                                    |
+| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats                                                            |
+| `sdk/test-data/`            | Golden marker images (checked by every marker module) and the data modules' golden data                                                               |
+| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                                                   |
+| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                                         |
+| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                                                   |
+| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                                             |
+| `measure/doc/`              | Platform, usage and camera guides, images                                                                                                             |
+| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                                                       |
+| `doc/`                      | Release guide and roadmap                                                                                                                             |
+| `tools/`                    | Repository scripts: checks, golden data                                                                                                               |
+| `licenses/`                 | Licenses of every third-party component                                                                                                               |
 
 ## License
 
