@@ -619,7 +619,10 @@ namespace MB.FramePacing.Charts.UnitTest
       if (excluded > 0)
       {
         Assert.That(fps.Detail, Does.EndWith($" · {excluded} static excluded"));
-        Assert.That(texts, Has.One.EqualTo($"Frame rates and display time steps excluding {excluded} static frames: nothing animates while they are on screen."));
+        Assert.That(
+          texts,
+          Has.One.EqualTo($"Frame rates and display time steps excluding {excluded} static frames: nothing animates while they are on screen.")
+        );
       }
       else
       {
