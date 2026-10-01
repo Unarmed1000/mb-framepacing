@@ -4,14 +4,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <limits>
 
 namespace MB::FramePacing
 {
   //! An integer pixel rectangle covering [X, X + Width) x [Y, Y + Height): [Left(),Right()) x [Top(),Bottom()). Origin at the top-left
-  //! corner, +x to the right, +y down. Always valid: the constructor makes a negative width or height 0, and cuts a size that would
-  //! put the right or bottom edge past the last int32_t coordinate, so every edge fits int32_t.
+  //! corner, +x to the right, +y down. Always valid: the constructor makes a negative width or height 0. Its edges must fit int32_t:
+  //! asserted, not checked.
   class Rectangle
   {
     int32_t m_x{0};
@@ -19,11 +20,9 @@ namespace MB::FramePacing
     int32_t m_width{0};
     int32_t m_height{0};
 
-    //! The size kept within 0 and what the coordinates right of (or below) origin leave room for.
-    static constexpr int32_t ValidSize(const int32_t origin, const int64_t size) noexcept
+    static constexpr bool FitsInt32(const int64_t value) noexcept
     {
-      constexpr int64_t Last = std::numeric_limits<int32_t>::max();
-      return static_cast<int32_t>(std::clamp<int64_t>(size, 0, std::min(Last, Last - origin)));
+      return value >= std::numeric_limits<int32_t>::min() && value <= std::numeric_limits<int32_t>::max();
     }
 
   public:
@@ -33,16 +32,17 @@ namespace MB::FramePacing
     constexpr Rectangle(const int32_t x, const int32_t y, const int32_t width, const int32_t height) noexcept
       : m_x(x)
       , m_y(y)
-      , m_width(ValidSize(x, width))
-      , m_height(ValidSize(y, height))
+      , m_width(std::max(width, 0))
+      , m_height(std::max(height, 0))
     {
+      assert(FitsInt32(int64_t{m_x} + m_width) && FitsInt32(int64_t{m_y} + m_height));
     }
 
-    //! The rectangle between the edges: an edge before the opposite one gives a size of 0, edges further apart than int32_t holds the
-    //! largest size.
+    //! The rectangle between the edges: an edge before the opposite one gives a size of 0.
     static constexpr Rectangle FromLeftTopRightBottom(const int32_t left, const int32_t top, const int32_t right, const int32_t bottom) noexcept
     {
-      return {left, top, ValidSize(left, int64_t{right} - left), ValidSize(top, int64_t{bottom} - top)};
+      assert(FitsInt32(int64_t{right} - left) && FitsInt32(int64_t{bottom} - top));
+      return {left, top, right - left, bottom - top};
     }
 
     [[nodiscard]] constexpr int32_t X() const noexcept

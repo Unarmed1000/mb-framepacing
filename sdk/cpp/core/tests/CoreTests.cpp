@@ -102,31 +102,23 @@ TEST(Rectangle, EveryMemberAtRunTime)
   EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(40, 60, 10, 20), FP::Rectangle(40, 60, 0, 0));
 }
 
-TEST(Rectangle, ItsEdgesAlwaysFitInt32)
+TEST(Rectangle, EdgesOutsideInt32AreAsserted)
 {
-  constexpr int32_t Min = std::numeric_limits<int32_t>::min();
-  constexpr int32_t Max = std::numeric_limits<int32_t>::max();
-  // A size that would put the right or bottom edge past the last coordinate is cut there
-  static_assert(FP::Rectangle(Max - 5, Max - 7, 100, 100) == FP::Rectangle(Max - 5, Max - 7, 5, 7));
-  static_assert(FP::Rectangle(Max - 5, Max - 7, 100, 100).Right() == Max && FP::Rectangle(Max - 5, Max - 7, 100, 100).Bottom() == Max);
-  static_assert(FP::Rectangle(Max, Max, 1, 1) == FP::Rectangle(Max, Max, 0, 0));
-  static_assert(FP::Rectangle(1, 1, Max, Max) == FP::Rectangle(1, 1, Max - 1, Max - 1));
-  // Nothing to cut left of 0: the largest size reaches at most the last coordinate
-  static_assert(FP::Rectangle(0, 0, Max, Max).Right() == Max && FP::Rectangle(0, 0, Max, Max).Bottom() == Max);
-  static_assert(FP::Rectangle(Min, Min, Max, Max).Right() == -1 && FP::Rectangle(Min, Min, Max, Max).Bottom() == -1);
-  // Edges further apart than a size holds: the size is the largest one
-  static_assert(FP::Rectangle::FromLeftTopRightBottom(Min, Min, Max, Max) == FP::Rectangle(Min, Min, Max, Max));
-  static_assert(FP::Rectangle::FromLeftTopRightBottom(-2, -3, Max, Max) == FP::Rectangle(-2, -3, Max, Max));
-  static_assert(FP::Rectangle::FromLeftTopRightBottom(Max, Max, Min, Min) == FP::Rectangle(Max, Max, 0, 0));
-  static_assert(FP::Rectangle::FromLeftTopRightBottom(Max - 3, Max - 4, Max, Max) == FP::Rectangle(Max - 3, Max - 4, 3, 4));
-  // The same at run time (coverage counts what runs)
-  const FP::Rectangle cut(Max - 5, Max - 7, 100, 100);
-  EXPECT_EQ(cut.Width(), 5);
-  EXPECT_EQ(cut.Height(), 7);
-  EXPECT_EQ(cut.Right(), Max);
-  EXPECT_EQ(cut.Bottom(), Max);
-  EXPECT_TRUE(cut.Contains(Max - 1, Max - 1));
-  EXPECT_EQ(FP::Rectangle(Min, Min, Max, Max).Right(), -1);
-  EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(Min, Min, Max, Max), FP::Rectangle(Min, Min, Max, Max));
-  EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(Max, Max, Min, Min), FP::Rectangle(Max, Max, 0, 0));
+#ifdef NDEBUG
+  GTEST_SKIP() << "without asserts the caller's edges must fit int32_t";
+#elif GTEST_HAS_DEATH_TEST
+  const int32_t min = std::numeric_limits<int32_t>::min();
+  const int32_t max = std::numeric_limits<int32_t>::max();
+  EXPECT_DEATH(static_cast<void>(FP::Rectangle(max, 0, 1, 0)), "") << "a right edge past the last coordinate";
+  EXPECT_DEATH(static_cast<void>(FP::Rectangle(0, max - 5, 0, 6)), "") << "a bottom edge past the last coordinate";
+  EXPECT_DEATH(static_cast<void>(FP::Rectangle::FromLeftTopRightBottom(min, 0, max, 0)), "") << "a width no int32_t holds";
+  EXPECT_DEATH(static_cast<void>(FP::Rectangle::FromLeftTopRightBottom(0, max, 0, min)), "") << "a height no int32_t holds";
+  // The limits themselves are fine
+  EXPECT_EQ(FP::Rectangle(max - 5, max - 6, 5, 6).Right(), max);
+  EXPECT_EQ(FP::Rectangle(max - 5, max - 6, 5, 6).Bottom(), max);
+  EXPECT_EQ(FP::Rectangle(min, min, max, max).Right(), -1);
+  EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(-1, -1, max - 1, max - 1), FP::Rectangle(-1, -1, max, max));
+#else
+  GTEST_SKIP() << "asserts are on and death tests are not available";
+#endif
 }

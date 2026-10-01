@@ -2,13 +2,15 @@
 //* File Description
 //* ----------------
 //* An integer pixel rectangle covering [X, X + Width) x [Y, Y + Height): [Left, Right) x [Top, Bottom). Origin at the top-left corner, +x to
-//* the right, +y down. Always valid: the constructor makes a negative width or height 0. Its edges must fit int (the C++ core's Rectangle).
+//* the right, +y down. Always valid: the constructor makes a negative width or height 0. Its edges must fit int: asserted in debug builds,
+//* not checked (the C++ core's Rectangle).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
 using System;
+using System.Diagnostics;
 
 namespace MB.FramePacing
 {
@@ -20,13 +22,21 @@ namespace MB.FramePacing
       Y = y;
       Width = Math.Max(width, 0);
       Height = Math.Max(height, 0);
+      Debug.Assert((long)X + Width <= int.MaxValue && (long)Y + Height <= int.MaxValue, "the right and bottom edges fit an int");
     }
 
     /// <summary>The empty rectangle at (0, 0).</summary>
     public static Rectangle Empty => default;
 
     /// <summary>The rectangle between the edges: an edge before the opposite one gives a size of 0.</summary>
-    public static Rectangle FromLeftTopRightBottom(int left, int top, int right, int bottom) => new Rectangle(left, top, right - left, bottom - top);
+    public static Rectangle FromLeftTopRightBottom(int left, int top, int right, int bottom)
+    {
+      Debug.Assert(
+        (long)right - left is >= int.MinValue and <= int.MaxValue && (long)bottom - top is >= int.MinValue and <= int.MaxValue,
+        "the size between the edges fits an int"
+      );
+      return new Rectangle(left, top, right - left, bottom - top);
+    }
 
     public readonly int X;
 
