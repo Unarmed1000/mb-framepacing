@@ -5,19 +5,11 @@
 
 from dataclasses import dataclass
 
-_INT32_MAX = 2**31 - 1
-
-
-def _valid_size(start: int, size: int) -> int:
-    """size, at least 0 and at most what keeps it and start + size within a 32-bit int (as C++ and C# must)."""
-    return max(0, min(size, _INT32_MAX, _INT32_MAX - start))
-
 
 @dataclass(frozen=True, slots=True, init=False)
 class Rectangle:
     """An integer pixel rectangle covering x <= px < x + width and y <= py < y + height (left <= px < right, top <= py < bottom). Origin at
-    the top-left corner, +x to the right, +y down. Always valid: a negative width or height is 0, and a size that would put the right or
-    bottom edge beyond a 32-bit int is cut to fit."""
+    the top-left corner, +x to the right, +y down. Always valid: a negative width or height is 0."""
 
     x: int
     y: int
@@ -27,8 +19,8 @@ class Rectangle:
     def __init__(self, x: int = 0, y: int = 0, width: int = 0, height: int = 0) -> None:
         object.__setattr__(self, "x", x)
         object.__setattr__(self, "y", y)
-        object.__setattr__(self, "width", _valid_size(x, width))
-        object.__setattr__(self, "height", _valid_size(y, height))
+        object.__setattr__(self, "width", max(width, 0))
+        object.__setattr__(self, "height", max(height, 0))
 
     @staticmethod
     def from_left_top_right_bottom(left: int, top: int, right: int, bottom: int) -> "Rectangle":

@@ -33,12 +33,39 @@ namespace MB.FramePacing.UnitTest
       // A negative size is 0
       Assert.That(new Rectangle(5, 6, -3, -4), Is.EqualTo(new Rectangle(5, 6, 0, 0)));
       Assert.That(Rectangle.FromLeftTopRightBottom(40, 60, 10, 20), Is.EqualTo(new Rectangle(40, 60, 0, 0)));
+      Assert.That(new Rectangle(0, 0, 7, -1).Height, Is.Zero);
       Assert.That(new Rectangle(5, 6, 0, 7).IsEmpty, Is.True);
-      // A size that would put an edge beyond int is cut to fit
-      Assert.That(new Rectangle(int.MaxValue - 10, int.MaxValue - 5, 100, 100).Right, Is.EqualTo(int.MaxValue));
-      Assert.That(new Rectangle(int.MaxValue - 10, int.MaxValue - 5, 100, 100).Bottom, Is.EqualTo(int.MaxValue));
-      Assert.That(new Rectangle(-int.MaxValue, 0, int.MaxValue, 1).Right, Is.Zero);
-      Assert.That(Rectangle.FromLeftTopRightBottom(int.MinValue, 0, int.MaxValue, 1).Width, Is.EqualTo(int.MaxValue));
+      Assert.That(new Rectangle(5, 6, 7, 0).IsEmpty, Is.True);
+      Assert.That(new Rectangle(5, 6, 7, 8).IsEmpty, Is.False);
+    }
+
+    [Test]
+    public void EveryEdgeIsCheckedByContains()
+    {
+      var rect = new Rectangle(10, 20, 30, 40);
+      Assert.That(rect.Contains(10, 20), Is.True);
+      Assert.That(rect.Contains(39, 59), Is.True);
+      Assert.That(rect.Contains(9, 20), Is.False);
+      Assert.That(rect.Contains(40, 20), Is.False);
+      Assert.That(rect.Contains(10, 19), Is.False);
+      Assert.That(rect.Contains(10, 60), Is.False);
+    }
+
+    [Test]
+    public void ComparesByValue_AndDeconstructs()
+    {
+      var rect = new Rectangle(10, 20, 30, 40);
+      Assert.That(rect == new Rectangle(10, 20, 30, 40), Is.True);
+      Assert.That(rect != new Rectangle(10, 20, 30, 41), Is.True);
+      Assert.That(rect.Equals(new Rectangle(11, 20, 30, 40)), Is.False);
+      Assert.That(rect.Equals(new Rectangle(10, 21, 30, 40)), Is.False);
+      Assert.That(rect.Equals(new Rectangle(10, 20, 31, 40)), Is.False);
+      Assert.That(rect.Equals((object)new Rectangle(10, 20, 30, 40)), Is.True);
+      Assert.That(rect.Equals("10,20,30,40"), Is.False);
+      Assert.That(rect.GetHashCode(), Is.EqualTo(new Rectangle(10, 20, 30, 40).GetHashCode()));
+      Assert.That(rect.GetHashCode(), Is.Not.EqualTo(new Rectangle(10, 20, 30, 41).GetHashCode()));
+      (int x, int y, int width, int height) = rect;
+      Assert.That((x, y, width, height), Is.EqualTo((10, 20, 30, 40)));
     }
   }
 }

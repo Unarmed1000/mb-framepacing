@@ -2,8 +2,7 @@
 //* File Description
 //* ----------------
 //* An integer pixel rectangle covering [X, X + Width) x [Y, Y + Height): [Left, Right) x [Top, Bottom). Origin at the top-left corner, +x to
-//* the right, +y down. Always valid: the constructor makes a negative width or height 0 and cuts a size that would put Right or Bottom
-//* beyond int, so every Rectangle has a size of at least 0 and edges that fit.
+//* the right, +y down. Always valid: the constructor makes a negative width or height 0. Its edges must fit int (the C++ core's Rectangle).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -19,16 +18,15 @@ namespace MB.FramePacing
     {
       X = x;
       Y = y;
-      Width = ValidSize(x, width);
-      Height = ValidSize(y, height);
+      Width = Math.Max(width, 0);
+      Height = Math.Max(height, 0);
     }
 
     /// <summary>The empty rectangle at (0, 0).</summary>
     public static Rectangle Empty => default;
 
     /// <summary>The rectangle between the edges: an edge before the opposite one gives a size of 0.</summary>
-    public static Rectangle FromLeftTopRightBottom(int left, int top, int right, int bottom) =>
-      new Rectangle(left, top, ValidSize(left, (long)right - left), ValidSize(top, (long)bottom - top));
+    public static Rectangle FromLeftTopRightBottom(int left, int top, int right, int bottom) => new Rectangle(left, top, right - left, bottom - top);
 
     public readonly int X;
 
@@ -74,8 +72,5 @@ namespace MB.FramePacing
 
     /// <summary>"x,y,width,height".</summary>
     public override string ToString() => FormattableString.Invariant($"{X},{Y},{Width},{Height}");
-
-    /// <summary>size, at least 0 and at most what keeps it and start + size within int.</summary>
-    private static int ValidSize(int start, long size) => (int)Math.Min(Math.Max(size, 0), Math.Min(int.MaxValue, (long)int.MaxValue - start));
   }
 }
