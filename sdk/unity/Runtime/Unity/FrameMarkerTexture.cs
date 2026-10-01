@@ -28,7 +28,7 @@ namespace MB.FramePacing.Marker.Unity
     /// Fill the texture with the encoded marker and its quiet zone: (matrix.Size + 2 x quietZoneModules) texels per side. Returns false (and
     /// leaves the texture unchanged) if the quiet zone is invalid or the matrix is empty.
     /// </summary>
-    public bool Update(ModuleMatrix matrix, int quietZoneModules = FrameMarker.RecommendedQuietZoneModules)
+    public bool Update(ModuleMatrix matrix, int quietZoneModules = Options.RecommendedQuietZoneModules)
     {
       var options = new Options(1, quietZoneModules);
       if (matrix.IsEmpty)

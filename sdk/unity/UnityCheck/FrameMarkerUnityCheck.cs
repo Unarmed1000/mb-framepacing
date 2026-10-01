@@ -65,7 +65,7 @@ public static class FrameMarkerUnityCheck
   {
     var lines = File.ReadAllLines(Path.Combine(testData, "modules.csv"));
     var generator = new MarkerGenerator();
-    var bits = new byte[FrameMarker.MaxPackedModuleByteCount];
+    var bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
     int mismatches = 0;
     for (int i = 1; i < lines.Length; ++i)
     {
@@ -75,12 +75,12 @@ public static class FrameMarkerUnityCheck
         uint.Parse(f[1], CultureInfo.InvariantCulture),
         ulong.Parse(f[2], CultureInfo.InvariantCulture),
         (MarkerFlags)byte.Parse(f[3], CultureInfo.InvariantCulture),
-        long.Parse(f[4], CultureInfo.InvariantCulture),
-        preferredFrameTicks: uint.Parse(f[5], CultureInfo.InvariantCulture),
-        targetFrameTicks: uint.Parse(f[6], CultureInfo.InvariantCulture),
-        intendedDisplayTicks: long.Parse(f[7], CultureInfo.InvariantCulture),
-        cpuStartTicks: long.Parse(f[8], CultureInfo.InvariantCulture),
-        cpuBusyTicks: uint.Parse(f[9], CultureInfo.InvariantCulture)
+        new TimeSpan(long.Parse(f[4], CultureInfo.InvariantCulture)),
+        preferredFrameTime: new TimeSpan32(uint.Parse(f[5], CultureInfo.InvariantCulture)),
+        targetFrameTime: new TimeSpan32(uint.Parse(f[6], CultureInfo.InvariantCulture)),
+        intendedDisplayTime: new TickCount64(long.Parse(f[7], CultureInfo.InvariantCulture)),
+        cpuStartTime: new TickCount64(long.Parse(f[8], CultureInfo.InvariantCulture)),
+        cpuBusy: new TimeSpan32(uint.Parse(f[9], CultureInfo.InvariantCulture))
       );
       // Columns (the payload's in the order of the wire format): kind, runId, frameIndex, flags, animationTicks, preferredFrameTicks,
       // targetFrameTicks, intendedDisplayTicks, cpuStartTicks, cpuBusyTicks, startUtcTicks, sequenceIdHex (empty for other kinds), size,
@@ -106,24 +106,24 @@ public static class FrameMarkerUnityCheck
     var cases = new[]
     {
       (
-        Payload: new Payload(MarkerKind.Frame, 7, 4242, MarkerFlags.None, 9_876_543),
+        Payload: new Payload(MarkerKind.Frame, 7, 4242, MarkerFlags.None, new TimeSpan(9_876_543)),
         Start: default(StartMetadata),
         Options: new Options(3, 4),
         Origin: new Point(17, 23)
       ),
       (
-        new Payload(MarkerKind.SequenceStart, 7, 77, MarkerFlags.None, 1_234),
+        new Payload(MarkerKind.SequenceStart, 7, 77, MarkerFlags.None, new TimeSpan(1_234)),
         new StartMetadata(638_000_000_000_000_000, new SequenceId(1, 2)),
         new Options(1, 0),
         new Point(33, 7)
       ),
-      (new Payload(MarkerKind.SequenceEnd, 7, 99, MarkerFlags.None, 5), default(StartMetadata), new Options(2, 2), new Point(151, 41)),
-      (new Payload(MarkerKind.Sync, 0, 4242, MarkerFlags.None, 0), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
+      (new Payload(MarkerKind.SequenceEnd, 7, 99, MarkerFlags.None, new TimeSpan(5)), default(StartMetadata), new Options(2, 2), new Point(151, 41)),
+      (new Payload(MarkerKind.Sync, 0, 4242, MarkerFlags.None, new TimeSpan(0)), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
     };
     int failures = 0;
     var generator = new MarkerGenerator();
-    var previous = new byte[FrameMarker.MaxPackedModuleByteCount];
-    var bits = new byte[FrameMarker.MaxPackedModuleByteCount];
+    var previous = new byte[ModuleMatrix.MaxPackedModuleByteCount];
+    var bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
     var material = FrameMarkerGL.CreateMaterial();
     FrameMarkerMesh mesh = null;
     FrameMarkerTexture texture = null;
@@ -276,7 +276,7 @@ public static class FrameMarkerUnityCheck
 
   private static int CheckTexture()
   {
-    var bits = new byte[FrameMarker.MaxPackedModuleByteCount];
+    var bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
     var texture = new FrameMarkerTexture();
     int differences = 0;
     try
@@ -284,7 +284,7 @@ public static class FrameMarkerUnityCheck
       foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.Sync })
       {
         if (
-          !new MarkerGenerator().TryGenerateModules(new Payload(kind, 5, 99, MarkerFlags.None, 1234), bits, out var matrix)
+          !new MarkerGenerator().TryGenerateModules(new Payload(kind, 5, 99, MarkerFlags.None, new TimeSpan(1234)), bits, out var matrix)
           || !texture.Update(matrix, 4)
         )
           throw new InvalidOperationException("FrameMarkerTexture.Update failed");

@@ -42,7 +42,7 @@ long nowTicks = (long)(Stopwatch.GetTimestamp() * ((double)TimeSpan.TicksPerSeco
 now_ticks = time.monotonic_ns() // 100
 ```
 
-An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `seconds_to_ticks` (Python) or
+An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to the tick on every runtime), `seconds_to_ticks` (Python) or
 `MB::FramePacing::TimeSpan::FromSeconds(seconds)` (C++).
 
 ## The fields
@@ -123,7 +123,7 @@ An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `
 - **Means:** the interval the application **wants** to run at: what it would aim for if nothing held it back. It differs from the
   target frame time only while the pacer runs slower than the application wants.
 - **Value:** `u32` ticks: `166'667` for 60 fps, `333'333` for 30 fps, `10'000'000` for 1 fps. `0xFFFFFFFF` (**on demand**,
-  `OnDemandFrameTicks`) for an application that presents only when something changes.
+  `Payload.OnDemandFrameTime` in C++ and C#) for an application that presents only when something changes.
 - **Changes:** when the application's own wish changes (a menu that wants 30 fps, an idle state that wants 1 fps); not when a pacer
   lowers the rate on its own.
 - **Unknown (`0`):** the analysis assumes the application wants the target frame rate given to the tools (`--target-fps`), else the

@@ -15,22 +15,20 @@ namespace MB.FramePacing.MarkerDecoding
 {
   public static class MarkerRenderer
   {
-    /// <summary>Every marker (frame, start and end) is QR version 6 (41x41 modules).</summary>
-    public const int QrVersion = FM.FrameMarker.QrVersion;
-
-    public const int QrModuleCount = FM.FrameMarker.QrModuleCount;
+    /// <summary>Every main marker (frame, start and end) is QR version 6: 41x41 modules.</summary>
+    public const int QrModuleCount = FM.ModuleMatrix.MainSize;
 
     /// <summary>The sync marker (<see cref="MarkerKind.Sync"/>) is QR version 2 (25x25 modules).</summary>
-    public const int SyncQrModuleCount = FM.FrameMarker.SyncQrModuleCount;
-    public const int RecommendedQuietZoneModules = FM.FrameMarker.RecommendedQuietZoneModules;
-    public const int RecommendedInsetPx = FM.FrameMarker.RecommendedInsetPx;
+    public const int SyncQrModuleCount = FM.ModuleMatrix.SyncSize;
+    public const int RecommendedQuietZoneModules = FM.Options.RecommendedQuietZoneModules;
+    public const int RecommendedInsetPx = FM.Options.RecommendedInsetPx;
 
     // The generator keeps scratch buffers and is not thread safe; captures and analyses render on several threads
     [ThreadStatic]
     private static FM.MarkerGenerator? g_generator;
 
     /// <summary>Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.</summary>
-    public static int QrModuleCountFor(MarkerKind kind) => FM.FrameMarker.QrModuleCountFor((FM.MarkerKind)kind);
+    public static int QrModuleCountFor(MarkerKind kind) => FM.ModuleMatrix.SizeFor((FM.MarkerKind)kind);
 
     /// <summary>Marker size (symbol + quiet zone): frame, start and end markers have one size, the sync marker is smaller.</summary>
     public static int MarkerSizePx(int moduleSizePx, int quietZoneModules = RecommendedQuietZoneModules, MarkerKind kind = MarkerKind.Frame) =>
@@ -48,7 +46,7 @@ namespace MB.FramePacing.MarkerDecoding
     {
       // The same encoder applications use (MB.FramePacing.Marker), so the synthetic capture shows exactly what a game draws
       var generator = g_generator ??= new FM.MarkerGenerator();
-      Span<byte> bits = stackalloc byte[FM.FrameMarker.MaxPackedModuleByteCount];
+      Span<byte> bits = stackalloc byte[FM.ModuleMatrix.MaxPackedModuleByteCount];
       if (!generator.TryGenerateModules(payload.ToFrameMarker(), (metadata ?? StartMetadata.Empty).ToFrameMarker(), bits, out var matrix))
         throw new InvalidOperationException("The marker payload does not fit its QR code");
 

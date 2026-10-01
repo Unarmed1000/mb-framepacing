@@ -49,8 +49,8 @@ namespace MB.FramePacing.Marker.Unity
     public FrameMarkerQuad(bool packedBits = false, Shader shader = null)
     {
       PackedBits = packedBits;
-      int width = packedBits ? FrameMarker.MaxPackedModuleByteCount : FrameMarker.QrModuleCount;
-      int height = packedBits ? 1 : FrameMarker.QrModuleCount;
+      int width = packedBits ? ModuleMatrix.MaxPackedModuleByteCount : ModuleMatrix.MainSize;
+      int height = packedBits ? 1 : ModuleMatrix.MainSize;
       m_texels = new byte[width * height];
       shader = shader != null ? shader : Shader.Find(packedBits ? PackedShaderName : ShaderName);
       if (shader == null || !shader.isSupported)
@@ -93,15 +93,7 @@ namespace MB.FramePacing.Marker.Unity
         matrix.Bits.CopyTo(m_texels);
       }
       else if (
-        !FrameMarker.ModulesToBitmap(
-          matrix,
-          new Options(1, 0),
-          default,
-          m_texels,
-          FrameMarker.QrModuleCount,
-          FrameMarker.QrModuleCount,
-          PixelFormat.R8
-        )
+        !FrameMarker.ModulesToBitmap(matrix, new Options(1, 0), default, m_texels, ModuleMatrix.MainSize, ModuleMatrix.MainSize, PixelFormat.R8)
       )
       {
         // One texel per module, top row first (the shader loads texel (column, row) directly)

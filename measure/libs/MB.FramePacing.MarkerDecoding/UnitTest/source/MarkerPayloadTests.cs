@@ -127,7 +127,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         CpuStartTicks: 60
       );
       var bytes = payload.Encode(metadata);
-      Assert.That(bytes, Has.Length.EqualTo(MarkerPayload.StartByteCount));
+      Assert.That(bytes, Has.Length.EqualTo(77), "a start marker's payload");
       Assert.That(MarkerPayload.TryDecode(bytes, out var decoded, out var start), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
       Assert.That(start, Is.EqualTo(metadata));
@@ -148,14 +148,14 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     public void FrameMarker_IgnoresMetadata()
     {
       var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2).Encode(StartMetadata.FromTag(5, "ignored"));
-      Assert.That(bytes, Has.Length.EqualTo(MarkerPayload.ByteCount));
+      Assert.That(bytes, Has.Length.EqualTo(53), "a frame marker's payload");
     }
 
     [Test]
     public void TryDecode_RejectsBadInput()
     {
       var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2).Encode();
-      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, MarkerPayload.ByteCount - 1), out _), Is.False);
+      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 52), out _), Is.False);
 
       bytes[0] = (byte)'X';
       Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.False);

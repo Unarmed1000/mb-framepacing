@@ -16,8 +16,9 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
     byte count from the type) for every module's file and wire formats; the core and the marker module have 100 % test coverage
     (regions, functions, lines, branches), measured with llvm-cov without asserts (`NDEBUG`); the C# core has the same `TickCount64`, `TickCount32` and `TimeSpan32`
-    (`sdk/csharp/core/source/Time/`, member for member, `System.TimeSpan` as the signed interval, .NET exceptions) and 100 % line and branch
-    coverage too: `python tools/check_csharp_coverage.py` (Microsoft code coverage through `dotnet test --collect`; CI's `dotnet-lint`), C# assembly `MB.FramePacing`, Python
+    (`sdk/csharp/core/source/Time/`, member for member, `System.TimeSpan` as the signed interval, .NET exceptions; `TimeSpanUtil.FromSeconds`
+    converts seconds to the tick on every runtime, since Unity's `TimeSpan.FromSeconds` rounds to a millisecond), and the C# core and
+    marker module have 100 % line and branch coverage too: `python tools/check_csharp_coverage.py` (Microsoft code coverage through `dotnet test --collect`; CI's `dotnet-lint`), C# assembly `MB.FramePacing`, Python
     `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
     helper). The core's types hide same-named types that a `using` brings into `MB.FramePacing.*` code: the GUI writes `Avalonia.Point`.
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
@@ -417,7 +418,10 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   `MarkerQuad` (a core `Rectangle` `Rect` and `Dark`). `Options` (module size and quiet zone) is always valid: C++ asserts a value outside its range and clamps it
   without asserts, C# and Python clamp (C# stores it relative to the defaults, so `default(Options)` is `Options.Default`); the sizing
   and placement are its members (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`). Pixel formats are named
-  by their channels: `R8`, `R8G8B8`, `R8G8B8A8`. The C# static
+  by their channels: `R8`, `R8G8B8`, `R8G8B8A8`. The C# marker mirrors the C++ one: the wire format is the internal `WireFormat`, the symbol sizes are `ModuleMatrix`'s
+  (`MainSize`, `SyncSize`, `SizeFor`, `PackedModuleByteCount`), the sizing limits `Options`', `Payload.MaxEncodedByteCount` and
+  `Payload.OnDemandFrameTime` the payload's, `PixelFormatUtil.BytesPerPixel` the pixel formats'; `Payload`'s fields are typed and named
+  as C++'s getters, and its constructor throws `ArgumentOutOfRangeException` for a kind that is not a `MarkerKind`. The C# static
   class is `FrameMarker` (not `Marker`: a class named like its namespace `MB.FramePacing.Marker` breaks lookups in `MB.FramePacing.*` code). C#'s `ModuleMatrix` is a `ref struct` view over the caller's bytes (no allocation), C++'s a
   value with an inline `std::array`. There are no payload-taking draw functions.
 - **.NET:**

@@ -19,24 +19,24 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void Encode_ProducesTheDocumentedLittleEndianLayout()
     {
-      var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount];
+      var bytes = new byte[Payload.MaxEncodedByteCount];
       int count = FrameMarker.EncodePayload(
         new Payload(
           MarkerKind.SequenceEnd,
           0x21222324u,
           0x0102030405060708u,
           MarkerFlags.StaticAfter,
-          0x1112131415161718,
-          preferredFrameTicks: 0x71727374u,
-          targetFrameTicks: 0x41424344u,
-          intendedDisplayTicks: 0x3132333435363738,
-          cpuStartTicks: 0x5152535455565758,
-          cpuBusyTicks: 0x61626364u
+          new TimeSpan(0x1112131415161718),
+          preferredFrameTime: new TimeSpan32(0x71727374u),
+          targetFrameTime: new TimeSpan32(0x41424344u),
+          intendedDisplayTime: new TickCount64(0x3132333435363738),
+          cpuStartTime: new TickCount64(0x5152535455565758),
+          cpuBusy: new TimeSpan32(0x61626364u)
         ),
         default,
         bytes
       );
-      Assert.That(count, Is.EqualTo(FrameMarker.PayloadByteCount));
+      Assert.That(count, Is.EqualTo(WireFormat.PayloadByteCount));
       var expected = new byte[]
       {
         (byte)'M',
@@ -108,8 +108,8 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void NegativeTicks_AreStoredAsTwosComplement()
     {
-      var bytes = new byte[FrameMarker.PayloadByteCount];
-      FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 0, 0, MarkerFlags.None, -1), default, bytes);
+      var bytes = new byte[WireFormat.PayloadByteCount];
+      FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 0, 0, MarkerFlags.None, new TimeSpan(-1)), default, bytes);
       Assert.That(bytes.AsSpan(17, 8).ToArray(), Is.All.EqualTo((byte)0xFF));
     }
 
@@ -120,8 +120,8 @@ namespace MB.FramePacing.Marker.UnitTest
     [TestCase(42ul, -1L, 3u, MarkerKind.SequenceEnd)]
     public void RoundTrips(ulong frame, long ticks, uint run, MarkerKind kind)
     {
-      var payload = new Payload(kind, run, frame, MarkerFlags.None, ticks);
-      var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount];
+      var payload = new Payload(kind, run, frame, MarkerFlags.None, new TimeSpan(ticks));
+      var bytes = new byte[Payload.MaxEncodedByteCount];
       int count = FrameMarker.EncodePayload(payload, default, bytes);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
@@ -140,25 +140,25 @@ namespace MB.FramePacing.Marker.UnitTest
           9,
           7,
           MarkerFlags.None,
-          8,
-          targetFrameTicks: targetFrameTicks,
-          intendedDisplayTicks: intendedDisplayTicks,
-          cpuStartTicks: -intendedDisplayTicks / 2,
-          cpuBusyTicks: targetFrameTicks / 3
+          new TimeSpan(8),
+          targetFrameTime: new TimeSpan32(targetFrameTicks),
+          intendedDisplayTime: new TickCount64(intendedDisplayTicks),
+          cpuStartTime: new TickCount64(-intendedDisplayTicks / 2),
+          cpuBusy: new TimeSpan32(targetFrameTicks / 3)
         );
-        var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount];
+        var bytes = new byte[Payload.MaxEncodedByteCount];
         int count = FrameMarker.EncodePayload(payload, new StartMetadata(1, new SequenceId(1, 2)), bytes);
         Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
         Assert.That(decoded, Is.EqualTo(payload));
-        Assert.That(decoded.IntendedDisplayTicks, Is.EqualTo(intendedDisplayTicks));
-        Assert.That(decoded.TargetFrameTicks, Is.EqualTo(targetFrameTicks));
-        Assert.That(decoded.CpuStartTicks, Is.EqualTo(-intendedDisplayTicks / 2));
-        Assert.That(decoded.CpuBusyTicks, Is.EqualTo(targetFrameTicks / 3));
+        Assert.That(decoded.IntendedDisplayTime.Ticks, Is.EqualTo(intendedDisplayTicks));
+        Assert.That(decoded.TargetFrameTime.Ticks, Is.EqualTo(targetFrameTicks));
+        Assert.That(decoded.CpuStartTime.Ticks, Is.EqualTo(-intendedDisplayTicks / 2));
+        Assert.That(decoded.CpuBusy.Ticks, Is.EqualTo(targetFrameTicks / 3));
       }
     }
 
     [TestCase(166_667u, MarkerFlags.None)]
-    [TestCase(FrameMarker.OnDemandFrameTicks, MarkerFlags.StaticAfter)]
+    [TestCase(uint.MaxValue, MarkerFlags.StaticAfter)] // Payload.OnDemandFrameTime
     [TestCase(10_000_000u, MarkerFlags.StaticAfter)]
     [TestCase(166_667u, MarkerFlags.StaticBefore)]
     [TestCase(166_667u, MarkerFlags.StaticAfter | MarkerFlags.StaticBefore)]
@@ -172,27 +172,27 @@ namespace MB.FramePacing.Marker.UnitTest
           9,
           7,
           flags,
-          8,
-          preferredFrameTicks: preferredFrameTicks,
-          targetFrameTicks: 333_333,
-          intendedDisplayTicks: 10,
-          cpuStartTicks: 11,
-          cpuBusyTicks: 12
+          new TimeSpan(8),
+          preferredFrameTime: new TimeSpan32(preferredFrameTicks),
+          targetFrameTime: new TimeSpan32(333_333),
+          intendedDisplayTime: new TickCount64(10),
+          cpuStartTime: new TickCount64(11),
+          cpuBusy: new TimeSpan32(12)
         );
-        var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount];
+        var bytes = new byte[Payload.MaxEncodedByteCount];
         int count = FrameMarker.EncodePayload(payload, new StartMetadata(1, new SequenceId(1, 2)), bytes);
         Assert.That(bytes[16], Is.EqualTo((byte)flags), "the flags byte, reserved bits included");
         Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
         Assert.That(decoded, Is.EqualTo(payload));
-        Assert.That((decoded.PreferredFrameTicks, decoded.Flags), Is.EqualTo((preferredFrameTicks, flags)));
+        Assert.That((decoded.PreferredFrameTime.Ticks, decoded.Flags), Is.EqualTo((preferredFrameTicks, flags)));
       }
     }
 
     [Test]
     public void OldHeaderLengths_AreRejected()
     {
-      var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount + 1];
-      int count = FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2), default, bytes);
+      var bytes = new byte[Payload.MaxEncodedByteCount + 1];
+      int count = FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, new TimeSpan(2)), default, bytes);
       Assert.That(count, Is.EqualTo(53));
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 52), out _, out _), Is.False);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 54), out _, out _), Is.False);
@@ -202,37 +202,45 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void SyncMarker_CarriesOnlyTheRunIdAndTheFrameIndex()
     {
-      var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount];
+      var bytes = new byte[Payload.MaxEncodedByteCount];
       int count = FrameMarker.EncodePayload(
-        new Payload(MarkerKind.Sync, 4, 0x0102030405060708u, MarkerFlags.None, 123, targetFrameTicks: 6, intendedDisplayTicks: 5),
+        new Payload(
+          MarkerKind.Sync,
+          4,
+          0x0102030405060708u,
+          MarkerFlags.None,
+          new TimeSpan(123),
+          targetFrameTime: new TimeSpan32(6),
+          intendedDisplayTime: new TickCount64(5)
+        ),
         default,
         bytes
       );
-      Assert.That(count, Is.EqualTo(FrameMarker.SyncPayloadByteCount));
+      Assert.That(count, Is.EqualTo(WireFormat.SyncPayloadByteCount));
       Assert.That(bytes.AsSpan(0, count).ToArray(), Is.EqualTo(new byte[] { (byte)'M', (byte)'F', 1, 3, 4, 0, 0, 0, 8, 7, 6, 5, 4, 3, 2, 1 }));
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
-      Assert.That(decoded, Is.EqualTo(new Payload(MarkerKind.Sync, 4, 0x0102030405060708u, MarkerFlags.None, 0)));
+      Assert.That(decoded, Is.EqualTo(new Payload(MarkerKind.Sync, 4, 0x0102030405060708u, MarkerFlags.None, new TimeSpan(0))));
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count + 1), out _, out _), Is.False);
     }
 
     [Test]
     public void StartMetadata_RoundTrips()
     {
-      var bytes = new byte[FrameMarker.MaxEncodedPayloadByteCount + 6];
+      var bytes = new byte[Payload.MaxEncodedByteCount + 6];
       var payload = new Payload(
         MarkerKind.SequenceStart,
         30,
         10,
         MarkerFlags.None,
-        20,
-        targetFrameTicks: 50,
-        intendedDisplayTicks: 40,
-        cpuStartTicks: 60,
-        cpuBusyTicks: 70
+        new TimeSpan(20),
+        targetFrameTime: new TimeSpan32(50),
+        intendedDisplayTime: new TickCount64(40),
+        cpuStartTime: new TickCount64(60),
+        cpuBusy: new TimeSpan32(70)
       );
       var id = new SequenceId(0x0011_2233_4455_6677, 0x8899_AABB_CCDD_EEFF);
       int count = FrameMarker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), bytes.AsSpan(5));
-      Assert.That(count, Is.EqualTo(FrameMarker.StartPayloadByteCount));
+      Assert.That(count, Is.EqualTo(WireFormat.StartPayloadByteCount));
       Assert.That(count, Is.EqualTo(77));
       // The sequence id's 16 bytes as they are, at offset 61
       Assert.That(
@@ -249,23 +257,27 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(5, count - 1), out _, out _), Is.False);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(5, count + 1), out _, out _), Is.False);
       Assert.That(
-        FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, 2), new StartMetadata(5, id), bytes),
-        Is.EqualTo(FrameMarker.PayloadByteCount)
+        FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.None, new TimeSpan(2)), new StartMetadata(5, id), bytes),
+        Is.EqualTo(WireFormat.PayloadByteCount)
       );
     }
 
     [Test]
     public void Encode_RejectsSmallBuffers()
     {
-      var start = new Payload(MarkerKind.SequenceStart, 3, 1, MarkerFlags.None, 2);
-      Assert.That(FrameMarker.EncodePayload(start, default, new byte[FrameMarker.StartPayloadByteCount - 1]), Is.Zero);
+      var start = new Payload(MarkerKind.SequenceStart, 3, 1, MarkerFlags.None, new TimeSpan(2));
+      Assert.That(FrameMarker.EncodePayload(start, default, new byte[WireFormat.StartPayloadByteCount - 1]), Is.Zero);
       Assert.That(
-        FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 0, 1, MarkerFlags.None, 2), default, new byte[FrameMarker.PayloadByteCount - 1]),
+        FrameMarker.EncodePayload(
+          new Payload(MarkerKind.Frame, 0, 1, MarkerFlags.None, new TimeSpan(2)),
+          default,
+          new byte[WireFormat.PayloadByteCount - 1]
+        ),
         Is.Zero
       );
       Assert.That(
-        FrameMarker.EncodePayload(start, default, new byte[FrameMarker.StartPayloadByteCount]),
-        Is.EqualTo(FrameMarker.StartPayloadByteCount)
+        FrameMarker.EncodePayload(start, default, new byte[WireFormat.StartPayloadByteCount]),
+        Is.EqualTo(WireFormat.StartPayloadByteCount)
       );
     }
 
@@ -308,9 +320,9 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void TryDecode_RejectsBadInput()
     {
-      var bytes = new byte[FrameMarker.PayloadByteCount];
-      FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 0, 1, MarkerFlags.None, 2), default, bytes);
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, FrameMarker.PayloadByteCount - 1), out _, out _), Is.False, "short");
+      var bytes = new byte[WireFormat.PayloadByteCount];
+      FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 0, 1, MarkerFlags.None, new TimeSpan(2)), default, bytes);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.PayloadByteCount - 1), out _, out _), Is.False, "short");
       bytes[0] = (byte)'X';
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "magic");
       bytes[0] = (byte)'M';
@@ -324,23 +336,22 @@ namespace MB.FramePacing.Marker.UnitTest
 
       // A start marker without its metadata block, or with a byte too many
       FrameMarker.EncodePayload(
-        new Payload(MarkerKind.SequenceStart, 3, 1, MarkerFlags.None, 2),
+        new Payload(MarkerKind.SequenceStart, 3, 1, MarkerFlags.None, new TimeSpan(2)),
         default,
-        bytes = new byte[FrameMarker.StartPayloadByteCount + 1]
+        bytes = new byte[WireFormat.StartPayloadByteCount + 1]
       );
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, FrameMarker.PayloadByteCount), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.PayloadByteCount), out _, out _), Is.False);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False);
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, FrameMarker.StartPayloadByteCount), out _, out _), Is.True);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.StartPayloadByteCount), out _, out _), Is.True);
     }
 
     [Test]
-    public void Ticks_MatchDateTimeAndTimeSpan()
+    public void StartMetadata_TakesTheStartTimeAsUtcDateTimeTicks()
     {
       var time = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-      Assert.That(FrameMarker.ToDateTimeTicks(time), Is.EqualTo(639_028_224_000_000_000));
-      Assert.That(StartMetadata.Create(time, new SequenceId(1, 2)).UtcTicks, Is.EqualTo(time.Ticks));
-      Assert.That(FrameMarker.SecondsToTicks(1.5), Is.EqualTo(TimeSpan.FromSeconds(1.5).Ticks));
-      Assert.That(FrameMarker.SecondsToTicks(1.0 / 60), Is.EqualTo(166_667));
+      Assert.That(StartMetadata.Create(time, new SequenceId(1, 2)).UtcTicks, Is.EqualTo(639_028_224_000_000_000));
+      Assert.That(StartMetadata.Create(time.ToLocalTime(), new SequenceId(1, 2)).UtcTicks, Is.EqualTo(time.Ticks), "a local time is converted");
+      Assert.That(StartMetadata.Create(time, new SequenceId(1, 2)).SequenceId, Is.EqualTo(new SequenceId(1, 2)));
     }
   }
 }

@@ -54,7 +54,7 @@ namespace MB.FramePacing.Marker.Unity
         && outputHeight == m_gridOutputHeight;
       if (!sameGrid)
       {
-        var kind = matrix.Size == FrameMarker.SyncQrModuleCount ? MarkerKind.Sync : MarkerKind.Frame;
+        var kind = matrix.Size == ModuleMatrix.SyncSize ? MarkerKind.Sync : MarkerKind.Frame;
         int vertexCount = FrameMarker.GridVertices(kind, options, origin, m_grid);
         for (int i = 0; i < vertexCount; ++i)
         {

@@ -12,6 +12,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Diagnostics;
 
 namespace MB.FramePacing.Marker
 {
@@ -20,24 +21,24 @@ namespace MB.FramePacing.Marker
     private readonly QrEncoder m_encoder = new QrEncoder();
 
     /// <summary>
-    /// Encode the payload's QR symbol into <paramref name="destination"/> (at least <see cref="FrameMarker.PackedModuleByteCount"/> of its size;
-    /// <see cref="FrameMarker.MaxPackedModuleByteCount"/> fits every marker) and view it as <paramref name="matrix"/>. The metadata is only used by
-    /// start markers. Returns false (an empty matrix) if the payload cannot be encoded or the destination is too small.
+    /// Encode the payload's QR symbol into <paramref name="destination"/> (at least <see cref="ModuleMatrix.PackedModuleByteCount"/> of its size;
+    /// <see cref="ModuleMatrix.MaxPackedModuleByteCount"/> fits every marker) and view it as <paramref name="matrix"/>. The metadata is only used by
+    /// start markers. Returns false (an empty matrix) if the destination is too small.
     /// </summary>
     public bool TryGenerateModules(in Payload payload, in StartMetadata metadata, Span<byte> destination, out ModuleMatrix matrix)
     {
       matrix = default;
-      Span<byte> payloadBytes = stackalloc byte[FrameMarker.MaxEncodedPayloadByteCount];
+      Span<byte> payloadBytes = stackalloc byte[Payload.MaxEncodedByteCount];
+      // The buffer fits every payload, and a Payload's kind is always a MarkerKind: this cannot fail
       int byteCount = FrameMarker.EncodePayload(payload, metadata, payloadBytes);
-      if (byteCount == 0)
-        return false;
-      // Every kind is pinned to one version, so the symbol never changes size between frames
-      int version = payload.Kind == MarkerKind.Sync ? FrameMarker.SyncQrVersion : FrameMarker.QrVersion;
-      if (!m_encoder.Encode(payloadBytes.Slice(0, byteCount), version, version))
-        return false;
+      // Every kind is pinned to one version, so the symbol never changes size between frames. Its bytes fit that version
+      // (WireFormat.QrCapacityBytes, SyncQrCapacityBytes), so the encoder cannot fail either
+      int version = payload.Kind == MarkerKind.Sync ? WireFormat.SyncQrVersion : WireFormat.QrVersion;
+      bool encoded = m_encoder.Encode(payloadBytes.Slice(0, byteCount), version, version);
+      Debug.Assert(encoded, "every kind's payload fits its QR version");
 
       int size = m_encoder.Size;
-      int packedCount = FrameMarker.PackedModuleByteCount(size);
+      int packedCount = ModuleMatrix.PackedModuleByteCount(size);
       if (destination.Length < packedCount)
         return false;
       // Pack the symbol: row-major, most significant bit first, continuous across rows

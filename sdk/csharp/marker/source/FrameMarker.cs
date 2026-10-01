@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The marker format and geometry: constants, sizing and placement, the payload wire format and quad to vertex conversion. The same API as
-//* the C++ library (MB::FramePacing::Marker); the specification is doc/marker-format.md. Nothing here allocates.
+//* The marker's functions: the payload's wire format, the buffer sizes and the drawing outputs. The same API as the C++ library's
+//* FrameMarker.hpp (MB::FramePacing::Marker); the specification is doc/marker-format.md. Nothing here allocates.
 //*
 //* Coordinates are pixels with the origin at the top-left corner, +x to the right and +y down. Every quad edge and every vertex lies on
 //* an integer pixel edge.
@@ -18,129 +18,51 @@ namespace MB.FramePacing.Marker
 {
   public static class FrameMarker
   {
-    /// <summary>
-    /// Every marker (frame, start and end) is QR version 6 (41x41 modules), error correction level M, byte mode, so the marker never changes
-    /// size. Version 6-M holds <see cref="QrCapacityBytes"/> bytes: a frame or end marker uses <see cref="PayloadByteCount"/> of them, a start
-    /// marker <see cref="StartPayloadByteCount"/>; the rest is room for future fields.
-    /// </summary>
-    public const int QrVersion = 6;
-
-    public const int QrModuleCount = (4 * QrVersion) + 17;
-    public const int QrCapacityBytes = 106;
-
-    /// <summary>The sync marker (<see cref="MarkerKind.Sync"/>) is QR version 2 (25x25 modules): magic | format version | kind | run id | frame index.</summary>
-    public const int SyncQrVersion = 2;
-
-    public const int SyncQrModuleCount = (4 * SyncQrVersion) + 17;
-    public const int SyncPayloadByteCount = 16;
-
-    /// <summary>Payload header, shared by every marker kind (little endian), grouped: magic "MF" | format version | kind | run id u32 |
-    /// frame index u64 | flags u8 | animation ticks i64 | preferred frame ticks u32 | target frame ticks u32 | intended display ticks i64 |
-    /// CPU start ticks i64 | CPU busy ticks u32. Start and end markers carry the values of the frame that shows them.</summary>
-    public const int PayloadByteCount = 53;
-    public const byte PayloadMagic0 = (byte)'M';
-    public const byte PayloadMagic1 = (byte)'F';
-    public const byte PayloadFormatVersion = 1;
-
-    /// <summary>The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.</summary>
-    public const uint OnDemandFrameTicks = uint.MaxValue;
-
-    /// <summary>Start marker payload: header | start time UTC i64 | sequence id (16 bytes).</summary>
-    public const int StartPayloadByteCount = PayloadByteCount + 8 + SequenceId.ByteCount;
-
-    /// <summary>The longest payload of any kind: the start marker's.</summary>
-    public const int MaxEncodedPayloadByteCount = StartPayloadByteCount;
-
-    /// <summary>TimeSpan / DateTime resolution.</summary>
-    public const long TicksPerSecond = TimeSpan.TicksPerSecond;
-
-    /// <summary>DateTime ticks (since 0001-01-01) at the Unix epoch.</summary>
-    public const long UnixEpochDateTimeTicks = 621_355_968_000_000_000;
-
-    /// <summary>Recommended distance in source pixels between the marker and the edge of the frame.</summary>
-    public const int RecommendedInsetPx = 32;
-
-    /// <summary>The module size of <see cref="Options.Default"/>.</summary>
-    public const int DefaultModuleSizePx = 6;
-
-    public const int MinModuleSizePx = 1;
-    public const int MaxModuleSizePx = 1024;
-    public const int MaxQuietZoneModules = 16;
-    public const int RecommendedQuietZoneModules = 4;
-
     /// <summary>Upper bound on the number of quads for any marker: one background quad plus at most one quad per dark run.</summary>
-    public const int MaxQuadCount = 1 + (QrModuleCount * ((QrModuleCount + 1) / 2));
+    public const int MaxQuadCount = 1 + (ModuleMatrix.MainSize * ((ModuleMatrix.MainSize + 1) / 2));
 
     public const int MaxTriangleVertexCount = MaxQuadCount * 6;
     public const int MaxIndexedVertexCount = MaxQuadCount * 4;
     public const int MaxIndexCount = MaxQuadCount * 6;
 
-    /// <summary>
-    /// The packed module matrix (<see cref="ModuleMatrix.Bits"/>) of the largest symbol: 1 bit per module, 211 bytes for 41x41. A buffer of this
-    /// size fits every marker.
-    /// </summary>
-    public const int MaxPackedModuleByteCount = ((QrModuleCount * QrModuleCount) + 7) / 8;
-
     /// <summary>Vertices of the main marker's static grid (<see cref="GridVertices"/>): 1768; the sync marker's is 680. Both fit 16-bit indices.</summary>
-    public const int MaxGridVertexCount = 4 + ((QrModuleCount + 1) * (QrModuleCount + 1));
-
-    private const int OffsetKind = 3;
-    private const int OffsetRunId = 4;
-    private const int OffsetFrameIndex = 8;
-    private const int OffsetFlags = 16;
-    private const int OffsetAnimationTicks = 17;
-    private const int OffsetPreferredFrameTicks = 25;
-    private const int OffsetTargetFrameTicks = 29;
-    private const int OffsetIntendedDisplayTicks = 33;
-    private const int OffsetCpuStartTicks = 41;
-    private const int OffsetCpuBusyTicks = 49;
-    private const int OffsetStartUtcTicks = PayloadByteCount;
-    private const int OffsetSequenceId = OffsetStartUtcTicks + 8;
-
-    /// <summary>Modules per side of a marker's symbol: the main marker (frame, start and end) or the smaller sync marker.</summary>
-    public static int QrModuleCountFor(MarkerKind kind) => kind == MarkerKind.Sync ? SyncQrModuleCount : QrModuleCount;
-
-    /// <summary>Convert a wall clock time to DateTime UTC ticks (the <see cref="StartMetadata.UtcTicks"/> format).</summary>
-    public static long ToDateTimeTicks(DateTime time) => time.ToUniversalTime().Ticks;
-
-    /// <summary>Convert seconds (for example an animation clock) to TimeSpan ticks, rounded to the nearest tick.</summary>
-    public static long SecondsToTicks(double seconds) => (long)Math.Round(seconds * TicksPerSecond);
+    public const int MaxGridVertexCount = 4 + ((ModuleMatrix.MainSize + 1) * (ModuleMatrix.MainSize + 1));
 
     /// <summary>
-    /// Serialize the payload into <paramref name="destination"/>. Start markers append the metadata, other kinds ignore it.
-    /// <see cref="MaxEncodedPayloadByteCount"/> bytes are always enough. Returns the number of bytes written, or 0 if the destination is too
-    /// small.
+    /// Serialize the payload into <paramref name="destination"/>. Start markers append the metadata, other kinds ignore it. A frame or end
+    /// marker is 53 bytes, a start marker 77, a sync marker 16; <see cref="Payload.MaxEncodedByteCount"/> bytes are always enough. Returns
+    /// the number of bytes written, or 0 if the destination is too small.
     /// </summary>
     public static int EncodePayload(in Payload payload, in StartMetadata metadata, Span<byte> destination)
     {
       bool isStart = payload.Kind == MarkerKind.SequenceStart;
       int byteCount =
-        isStart ? StartPayloadByteCount
-        : payload.Kind == MarkerKind.Sync ? SyncPayloadByteCount
-        : PayloadByteCount;
+        isStart ? WireFormat.StartPayloadByteCount
+        : payload.Kind == MarkerKind.Sync ? WireFormat.SyncPayloadByteCount
+        : WireFormat.PayloadByteCount;
       if (destination.Length < byteCount)
         return 0;
 
-      destination[0] = PayloadMagic0;
-      destination[1] = PayloadMagic1;
-      destination[2] = PayloadFormatVersion;
-      destination[OffsetKind] = (byte)payload.Kind;
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetRunId), payload.RunId);
-      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(OffsetFrameIndex), payload.FrameIndex);
+      destination[WireFormat.OffsetMagic0] = WireFormat.PayloadMagic0;
+      destination[WireFormat.OffsetMagic1] = WireFormat.PayloadMagic1;
+      destination[WireFormat.OffsetVersion] = WireFormat.PayloadFormatVersion;
+      destination[WireFormat.OffsetKind] = (byte)payload.Kind;
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetRunId), payload.RunId);
+      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetFrameIndex), payload.FrameIndex);
       // A sync marker is the start of the header: magic, format version, kind, run id and frame index
       if (payload.Kind == MarkerKind.Sync)
         return byteCount;
-      destination[OffsetFlags] = (byte)payload.Flags;
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetAnimationTicks), payload.AnimationTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetPreferredFrameTicks), payload.PreferredFrameTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetTargetFrameTicks), payload.TargetFrameTicks);
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetIntendedDisplayTicks), payload.IntendedDisplayTicks);
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetCpuStartTicks), payload.CpuStartTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(OffsetCpuBusyTicks), payload.CpuBusyTicks);
+      destination[WireFormat.OffsetFlags] = (byte)payload.Flags;
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetAnimationTicks), payload.AnimationTime.Ticks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetPreferredFrameTicks), payload.PreferredFrameTime.Ticks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetTargetFrameTicks), payload.TargetFrameTime.Ticks);
+      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetIntendedDisplayTicks), payload.IntendedDisplayTime.UnsignedTicks);
+      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetCpuStartTicks), payload.CpuStartTime.UnsignedTicks);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetCpuBusyTicks), payload.CpuBusy.Ticks);
       if (isStart)
       {
-        BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(OffsetStartUtcTicks), metadata.UtcTicks);
-        metadata.SequenceId.TryCopyTo(destination.Slice(OffsetSequenceId));
+        BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetStartUtcTicks), metadata.UtcTicks);
+        metadata.SequenceId.TryCopyTo(destination.Slice(WireFormat.OffsetSequenceId));
       }
       return byteCount;
     }
@@ -154,67 +76,64 @@ namespace MB.FramePacing.Marker
       payload = default;
       metadata = default;
       if (
-        source.Length < SyncPayloadByteCount
-        || source[0] != PayloadMagic0
-        || source[1] != PayloadMagic1
-        || source[2] != PayloadFormatVersion
-        || source[OffsetKind] > (byte)MarkerKind.Sync
+        source.Length < WireFormat.SyncPayloadByteCount
+        || source[WireFormat.OffsetMagic0] != WireFormat.PayloadMagic0
+        || source[WireFormat.OffsetMagic1] != WireFormat.PayloadMagic1
+        || source[WireFormat.OffsetVersion] != WireFormat.PayloadFormatVersion
+        || source[WireFormat.OffsetKind] > WireFormat.MaxMarkerKindValue
       )
         return false;
 
-      var kind = (MarkerKind)source[OffsetKind];
+      var kind = (MarkerKind)source[WireFormat.OffsetKind];
       if (kind == MarkerKind.Sync)
       {
-        if (source.Length != SyncPayloadByteCount)
+        if (source.Length != WireFormat.SyncPayloadByteCount)
           return false;
         payload = new Payload(
           kind,
-          BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
-          BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
+          BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetRunId)),
+          BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetFrameIndex)),
           MarkerFlags.None,
-          0
+          TimeSpan.Zero
         );
         return true;
       }
-      if (source.Length < PayloadByteCount)
+      if (source.Length < WireFormat.PayloadByteCount)
         return false;
       if (kind == MarkerKind.SequenceStart)
       {
-        if (source.Length != StartPayloadByteCount)
+        if (source.Length != WireFormat.StartPayloadByteCount)
           return false;
         metadata = new StartMetadata(
-          BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetStartUtcTicks)),
-          SequenceId.FromBytes(source.Slice(OffsetSequenceId, SequenceId.ByteCount))
+          BinaryPrimitives.ReadInt64LittleEndian(source.Slice(WireFormat.OffsetStartUtcTicks)),
+          SequenceId.FromBytes(source.Slice(WireFormat.OffsetSequenceId, SequenceId.ByteCount))
         );
       }
-      else if (source.Length != PayloadByteCount)
+      else if (source.Length != WireFormat.PayloadByteCount)
       {
         return false;
       }
 
       payload = new Payload(
         kind,
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetRunId)),
-        BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(OffsetFrameIndex)),
+        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetRunId)),
+        BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetFrameIndex)),
         // Every value is accepted: bits without a name are reserved and kept
-        (MarkerFlags)source[OffsetFlags],
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetAnimationTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetPreferredFrameTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetTargetFrameTicks)),
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetIntendedDisplayTicks)),
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(OffsetCpuStartTicks)),
-        BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(OffsetCpuBusyTicks))
+        (MarkerFlags)source[WireFormat.OffsetFlags],
+        new TimeSpan(BinaryPrimitives.ReadInt64LittleEndian(source.Slice(WireFormat.OffsetAnimationTicks))),
+        new TimeSpan32(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetPreferredFrameTicks))),
+        new TimeSpan32(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetTargetFrameTicks))),
+        TickCount64.FromUnsignedTicks(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetIntendedDisplayTicks))),
+        TickCount64.FromUnsignedTicks(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetCpuStartTicks))),
+        new TimeSpan32(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetCpuBusyTicks)))
       );
       return true;
     }
 
-    /// <summary>The bytes of a packed module matrix of <paramref name="size"/> x <paramref name="size"/> modules (79 for the sync marker's 25).</summary>
-    public static int PackedModuleByteCount(int size) => size <= 0 ? 0 : ((size * size) + 7) / 8;
-
     /// <summary>Vertices of a marker kind's static grid: 4 for the light background, then every module corner, (N + 1)².</summary>
     public static int GridVertexCount(MarkerKind kind)
     {
-      int corners = QrModuleCountFor(kind) + 1;
+      int corners = ModuleMatrix.SizeFor(kind) + 1;
       return 4 + (corners * corners);
     }
 
@@ -230,7 +149,7 @@ namespace MB.FramePacing.Marker
       int count = GridVertexCount(kind);
       if (destination.Length < count)
         return 0;
-      int modules = QrModuleCountFor(kind);
+      int modules = ModuleMatrix.SizeFor(kind);
       int moduleSize = options.ModuleSizePx;
       int markerSize = options.MarkerSizePx(kind);
       destination[0] = new Vertex(origin.X, origin.Y, 255);
@@ -284,15 +203,6 @@ namespace MB.FramePacing.Marker
       }
       return count;
     }
-
-    /// <summary>Bytes per pixel of a <see cref="PixelFormat"/>.</summary>
-    public static int BytesPerPixel(PixelFormat format) =>
-      format switch
-      {
-        PixelFormat.R8G8B8 => 3,
-        PixelFormat.R8G8B8A8 => 4,
-        _ => 1,
-      };
 
     /// <summary>
     /// The marker as quads: the light background (symbol + quiet zone) first, then one dark quad per horizontal run of dark modules. Draw them
@@ -367,7 +277,7 @@ namespace MB.FramePacing.Marker
 
     /// <summary>
     /// Draw the marker into a <paramref name="width"/> x <paramref name="height"/> pixel buffer, rows <paramref name="stride"/> bytes apart
-    /// (0 = width x <see cref="BytesPerPixel"/>): the light background (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in
+    /// (0 = width x <see cref="PixelFormatUtil.BytesPerPixel"/>): the light background (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in
     /// every colour channel and alpha 255. The marker is clipped to the buffer; other pixels are left as they are. With a module size of 1 and
     /// origin (0,0) this is a module-resolution image (a texture to scale up with point filtering). Returns false, writing nothing, if the
     /// matrix is empty, the stride is shorter than a row or <paramref name="destination"/> is too small.
@@ -385,7 +295,7 @@ namespace MB.FramePacing.Marker
     {
       if (matrix.IsEmpty || width < 0 || height < 0)
         return false;
-      int bytesPerPixel = BytesPerPixel(format);
+      int bytesPerPixel = PixelFormatUtil.BytesPerPixel(format);
       long rowBytes = (long)width * bytesPerPixel;
       long rowStride = stride == 0 ? rowBytes : stride;
       long required = height == 0 ? 0 : (rowStride * (height - 1)) + rowBytes;

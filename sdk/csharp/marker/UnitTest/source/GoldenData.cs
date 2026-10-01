@@ -93,12 +93,12 @@ namespace MB.FramePacing.Marker.UnitTest
         uint.Parse(row.Text("runId"), CultureInfo.InvariantCulture),
         ulong.Parse(row.Text("frameIndex"), CultureInfo.InvariantCulture),
         (MarkerFlags)byte.Parse(row.Text("flags"), CultureInfo.InvariantCulture),
-        row.Long("animationTicks"),
-        preferredFrameTicks: uint.Parse(row.Text("preferredFrameTicks"), CultureInfo.InvariantCulture),
-        targetFrameTicks: uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture),
-        intendedDisplayTicks: row.Long("intendedDisplayTicks"),
-        cpuStartTicks: row.Long("cpuStartTicks"),
-        cpuBusyTicks: uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture)
+        new TimeSpan(row.Long("animationTicks")),
+        preferredFrameTime: new TimeSpan32(uint.Parse(row.Text("preferredFrameTicks"), CultureInfo.InvariantCulture)),
+        targetFrameTime: new TimeSpan32(uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture)),
+        intendedDisplayTime: new TickCount64(row.Long("intendedDisplayTicks")),
+        cpuStartTime: new TickCount64(row.Long("cpuStartTicks")),
+        cpuBusy: new TimeSpan32(uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture))
       );
 
     private static StartMetadata Start(Row row) =>

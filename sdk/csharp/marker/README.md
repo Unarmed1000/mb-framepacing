@@ -23,16 +23,16 @@ using MB.FramePacing.Marker;
 
 // Once: output 1920x1080, capture stored at 960x540 (2:1)
 var options = Options.Recommended(1080, 540);               // 6 px modules, the recommended quiet zone
-Point origin = options.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, alignPx: 2);
+Point origin = options.RecommendedOrigin(MarkerKind.Frame, 1080, alignPx: 2);
 var grid = new Vertex[FrameMarker.MaxGridVertexCount];
 int gridCount = FrameMarker.GridVertices(MarkerKind.Frame, options, origin, grid);
 UploadVertices(grid.AsSpan(0, gridCount));                  // your renderer: a static vertex buffer, (X, Y) in pixels, color (Luma, Luma, Luma)
 var generator = new MarkerGenerator();                      // owns the QR encoder's buffers; reuse it
-var modules = new byte[FrameMarker.MaxPackedModuleByteCount];    // the encoded marker (or a stackalloc)
+var modules = new byte[ModuleMatrix.MaxPackedModuleByteCount];   // the encoded marker (or a stackalloc)
 var indices = new int[FrameMarker.MaxIndexCount];
 
 // Every frame, last (after post effects and UI), without blending:
-var payload = new Payload(MarkerKind.Frame, 1, frameIndex, MarkerFlags.None, FrameMarker.SecondsToTicks(animationSeconds));
+var payload = new Payload(MarkerKind.Frame, 1, frameIndex, MarkerFlags.None, TimeSpanUtil.FromSeconds(animationSeconds));
 generator.TryGenerateModules(payload, modules, out var matrix);   // encode once
 int count = FrameMarker.ModulesToGridIndices(matrix, indices);         // only the indices change
 DrawIndexed(indices.AsSpan(0, count));                            // triangles over the static vertices
@@ -43,13 +43,15 @@ This is the most efficient way without a dedicated shader; the shaders (1 and 2 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Flags:** `MarkerFlags.None`, or `MarkerFlags.StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags.StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame).
-- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`FrameMarker.SecondsToTicks`).
-- **Frame pacing (optional):** `preferredFrameTicks` (the interval the application wants to run at; it differs from the target only
-  while the pacer runs slower than wanted), `targetFrameTicks` (the interval the pacer aims for: `166_667` for 60 fps) and
-  `intendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady clock, any epoch). `0` = unknown,
-  `FrameMarker.OnDemandFrameTicks` = frames only when something changes.
-- **CPU start time and CPU busy (optional):** `cpuStartTicks` (when the CPU started working on the frame, on the same clock,
-  PresentMon's `CPUStartTime`) and `cpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
+- **Animation time:** the moment the frame shows, as the application animated it: a `TimeSpan` (`TimeSpanUtil.FromSeconds` converts
+  seconds to the tick on every runtime; Unity's `TimeSpan.FromSeconds` rounds to a millisecond).
+- **Frame pacing (optional):** `preferredFrameTime` (a `TimeSpan32`: the interval the application wants to run at; it differs from the
+  target only while the pacer runs slower than wanted), `targetFrameTime` (a `TimeSpan32`: the interval the pacer aims for, `166_667`
+  ticks for 60 fps) and `intendedDisplayTime` (a `TickCount64`: when the pacer intends the frame to be shown on its steady clock, any
+  epoch; `TickCount64.FromCounter(Stopwatch.GetTimestamp(), Stopwatch.Frequency)` converts yours). `0` = unknown,
+  `Payload.OnDemandFrameTime` = frames only when something changes.
+- **CPU start time and CPU busy (optional):** `cpuStartTime` (a `TickCount64`: when the CPU started working on the frame, on the same
+  clock, PresentMon's `CPUStartTime`) and `cpuBusy` (a `TimeSpan32`: how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind.SequenceStart`, encoded with its metadata
   (`TryGenerateModules(payload, StartMetadata.Create(DateTime.UtcNow, sequenceId), modules, out var matrix)`), and a payload of kind `MarkerKind.SequenceEnd`, each shown for a few frames. The sequence id is 16 opaque bytes
   unique to the run: `SequenceId.FromGuid(Guid.NewGuid())` or a text tag of up to 16 printable ASCII characters
@@ -79,17 +81,16 @@ Every option draws exactly the same pixels, from one encode per frame (the 211 b
 
 Buffers are spans: `ReadOnlySpan<T>` in, `Span<T>` out; an array or a `stackalloc` passes straight in. Nothing allocates per frame.
 
-| Type or member                                                                                                             | What it does                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                     | What a marker carries                                                                |
-| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`); `Point` (the core's)             | Size and place: always valid (a value outside its range is clamped)                  |
-| `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                            | Encode the marker into your bytes: its QR symbol, 1 bit per module                   |
-| `FrameMarker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                | A static grid uploaded once, and per frame only the indices                          |
-| `FrameMarker.ModulesToBitmap`, `PixelFormat`, `BytesPerPixel`                                                              | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
-| `FrameMarker.ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: `Rect`, a `Rectangle`, and `Dark`)   | Draw it as indexed triangles, a triangle list or rectangles                          |
-| `FrameMarker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
-| `FrameMarker.QrModuleCountFor`                                                                                             | Modules per side of a kind's symbol                                                  |
-| `FrameMarker.EncodePayload`, `TryDecodePayload`, `SecondsToTicks`, `ToDateTimeTicks`                                       | The wire format and its time units                                                   |
+| Type or member                                                                                                                          | What it does                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Payload` (`WithKind`, `MaxEncodedByteCount`, `OnDemandFrameTime`), `StartMetadata`, `SequenceId`, `MarkerKind`, `MarkerFlags`          | What a marker carries; a kind that is not a `MarkerKind` throws                       |
+| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`, its limits and defaults); `Point` (the core's) | Size and place: always valid (a value outside its range is clamped)                   |
+| `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`, `MainSize`, `SyncSize`, `SizeFor`)                      | Encode the marker into your bytes: its QR symbol, 1 bit per module                    |
+| `FrameMarker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                             | A static grid uploaded once, and per frame only the indices                           |
+| `FrameMarker.ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil.BytesPerPixel`                                                           | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride)  |
+| `FrameMarker.ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: `Rect`, a `Rectangle`, and `Dark`)                | Draw it as indexed triangles, a triangle list or rectangles                           |
+| `FrameMarker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix.MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                               |
+| `FrameMarker.EncodePayload`, `TryDecodePayload`                                                                                         | The wire format (its layout is internal: `sdk/doc/marker-format.md` is the reference) |
 
 `ModuleMatrix` is a `ref struct` view over the bytes you give `TryGenerateModules`: keep the bytes, not the view, in a field. One encode
 can feed several outputs. The drawing methods return 0 (an empty `IndexedCount`, false) when the matrix is empty or a buffer is too small.

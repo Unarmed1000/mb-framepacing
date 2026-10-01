@@ -7,13 +7,14 @@ shares. .NET Standard 2.1, C# 9, no dependencies, so the same sources also compi
 It is not published as a NuGet package: use the source at an `sdk-v*` tag, as a project reference to `MB.FramePacing.csproj` or as a
 copy of `source/`. **Unity:** the [Unity package](../../unity/README.md) contains it.
 
-| Type          | What it is                                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Point`       | A pixel position: origin at the top-left corner, +x to the right, +y down                                                                                                |
-| `Rectangle`   | An integer pixel rectangle, `[Left, Right) × [Top, Bottom)`. Always valid: a negative width or height is 0 (`FromLeftTopRightBottom` too)                                |
-| `TickCount64` | A point on your steady clock in ticks of 100 ns (`FromNanoseconds`, `FromCounter` for `Stopwatch.GetTimestamp`), stored unsigned; compares and subtracts across the wrap |
-| `TickCount32` | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap                                                                          |
-| `TimeSpan32`  | An unsigned 32-bit interval of 0 to 429.5 s: the form of the marker's 32-bit intervals                                                                                   |
+| Type           | What it is                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Point`        | A pixel position: origin at the top-left corner, +x to the right, +y down                                                                                                |
+| `Rectangle`    | An integer pixel rectangle, `[Left, Right) × [Top, Bottom)`. Always valid: a negative width or height is 0 (`FromLeftTopRightBottom` too)                                |
+| `TickCount64`  | A point on your steady clock in ticks of 100 ns (`FromNanoseconds`, `FromCounter` for `Stopwatch.GetTimestamp`), stored unsigned; compares and subtracts across the wrap |
+| `TickCount32`  | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap                                                                          |
+| `TimeSpanUtil` | `FromSeconds`: seconds to a `System.TimeSpan`, truncated to a tick on every runtime (Unity's `TimeSpan.FromSeconds` rounds to a millisecond)                             |
+| `TimeSpan32`   | An unsigned 32-bit interval of 0 to 429.5 s: the form of the marker's 32-bit intervals                                                                                   |
 
 The time types (`source/Time/`) are the C++ core's, member for member; a signed interval is .NET's `System.TimeSpan`, whose ticks
 are the SDK's unit. Out of range throws (`OverflowException` from the `From...` factories, `ArgumentOutOfRangeException` from

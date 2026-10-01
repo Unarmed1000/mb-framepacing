@@ -16,14 +16,14 @@ namespace MB.FramePacing.Marker.UnitTest
   public class AllocationTests
   {
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
-    private readonly byte[] m_bits = new byte[FrameMarker.MaxPackedModuleByteCount];
+    private readonly byte[] m_bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
     private readonly byte[] m_pixels = new byte[294 * 294 * 4];
     private readonly MarkerQuad[] m_quads = new MarkerQuad[FrameMarker.MaxQuadCount];
     private readonly Vertex[] m_triangles = new Vertex[FrameMarker.MaxTriangleVertexCount];
     private readonly Vertex[] m_indexedVertices = new Vertex[FrameMarker.MaxIndexedVertexCount];
     private readonly int[] m_indices = new int[FrameMarker.MaxIndexCount];
     private readonly Vertex[] m_grid = new Vertex[FrameMarker.MaxGridVertexCount];
-    private readonly byte[] m_payloadBytes = new byte[FrameMarker.MaxEncodedPayloadByteCount];
+    private readonly byte[] m_payloadBytes = new byte[Payload.MaxEncodedByteCount];
 
     private static readonly Guid g_guid = new Guid("0f8fad5b-d9cb-469f-a165-70867728950e");
 
@@ -48,11 +48,11 @@ namespace MB.FramePacing.Marker.UnitTest
     {
       long written = 0;
       var options = Options.Default;
-      var origin = options.RecommendedOrigin(MarkerKind.Frame, 1920, 1080, 2);
+      var origin = options.RecommendedOrigin(MarkerKind.Frame, 1080, 2);
       // The span path with stack buffers, as a caller without arrays uses it
       Span<MarkerQuad> stackQuads = stackalloc MarkerQuad[FrameMarker.MaxQuadCount];
-      Span<byte> stackBytes = stackalloc byte[FrameMarker.MaxEncodedPayloadByteCount];
-      Span<byte> stackBits = stackalloc byte[FrameMarker.MaxPackedModuleByteCount];
+      Span<byte> stackBytes = stackalloc byte[Payload.MaxEncodedByteCount];
+      Span<byte> stackBits = stackalloc byte[ModuleMatrix.MaxPackedModuleByteCount];
       for (int frame = 0; frame < frames; ++frame)
       {
         var payload = new Payload(
@@ -60,12 +60,12 @@ namespace MB.FramePacing.Marker.UnitTest
           7,
           (ulong)frame,
           MarkerFlags.StaticAfter,
-          FrameMarker.SecondsToTicks(frame / 60.0),
-          preferredFrameTicks: 166_667,
-          targetFrameTicks: 166_667,
-          intendedDisplayTicks: 1000 + frame,
-          cpuStartTicks: 900 + frame,
-          cpuBusyTicks: 80_000
+          TimeSpanUtil.FromSeconds(frame / 60.0),
+          preferredFrameTime: new TimeSpan32(166_667),
+          targetFrameTime: new TimeSpan32(166_667),
+          intendedDisplayTime: new TickCount64(1000 + frame),
+          cpuStartTime: new TickCount64(900 + frame),
+          cpuBusy: new TimeSpan32(80_000)
         );
         if (m_generator.TryGenerateModules(payload, m_bits, out var matrix))
         {

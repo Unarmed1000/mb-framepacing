@@ -76,7 +76,7 @@ namespace MB.FramePacing.Data.UnitTest
         {
           ++decodedPayloads;
           frameIndexSum += (long)payload.FrameIndex;
-          animationTicksSum += payload.AnimationTicks;
+          animationTicksSum += payload.AnimationTime.Ticks;
         }
       }
       return new JsonObject

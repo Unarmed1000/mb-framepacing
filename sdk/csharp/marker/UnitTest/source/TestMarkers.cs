@@ -17,7 +17,7 @@ namespace MB.FramePacing.Marker.UnitTest
   public static class TestMarkers
   {
     private static readonly MarkerGenerator g_generator = new MarkerGenerator();
-    private static readonly byte[] g_bits = new byte[FrameMarker.MaxPackedModuleByteCount];
+    private static readonly byte[] g_bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
 
     /// <summary>The payload's module matrix, in bytes the helper owns (valid until the next call).</summary>
     public static ModuleMatrix Encode(in Payload payload, in StartMetadata metadata = default)

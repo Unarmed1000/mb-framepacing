@@ -143,10 +143,9 @@ namespace MB.FramePacing.Marker
       int result = ((16 * version) + 128) * version + 64;
       if (version >= 2)
       {
-        int numAlign = (version / 7) + 2;
-        result -= (((25 * numAlign) - 10) * numAlign) - 55;
-        if (version >= 7)
-          result -= 36;
+        // Versions 2-6 (all this encoder makes) have two alignment positions per axis, and no version information
+        const int NumAlign = 2;
+        result -= (((25 * NumAlign) - 10) * NumAlign) - 55;
       }
       return result;
     }
@@ -261,27 +260,14 @@ namespace MB.FramePacing.Marker
       DrawFinderPattern(Size - 4, 3);
       DrawFinderPattern(3, Size - 4);
 
-      // Alignment patterns: versions 2-6 have one at (Size - 7, Size - 7), the others would overlap the finders
+      // The alignment pattern: versions 2-6 (all this encoder makes) have one, at (Size - 7, Size - 7); the other positions would
+      // overlap the finders
       if (version >= 2)
-      {
-        int numAlign = (version / 7) + 2;
-        int step = ((version * 8) + (numAlign * 3) + 5) / ((numAlign * 4) - 4) * 2;
-        for (int i = 0; i < numAlign; ++i)
-        {
-          for (int j = 0; j < numAlign; ++j)
-          {
-            if ((i == 0 && j == 0) || (i == 0 && j == numAlign - 1) || (i == numAlign - 1 && j == 0))
-              continue;
-            DrawAlignmentPattern(AlignmentPosition(i, numAlign, step), AlignmentPosition(j, numAlign, step));
-          }
-        }
-      }
+        DrawAlignmentPattern(Size - 7, Size - 7);
 
       // Format bits with a dummy mask (overwritten after the mask is chosen); versions below 7 have no version information
       DrawFormatBits(0);
     }
-
-    private int AlignmentPosition(int index, int numAlign, int step) => index == 0 ? 6 : Size - 7 - ((numAlign - 1 - index) * step);
 
     private void DrawFinderPattern(int centerX, int centerY)
     {

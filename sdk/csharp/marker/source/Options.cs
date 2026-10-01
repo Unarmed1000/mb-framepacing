@@ -15,25 +15,38 @@ namespace MB.FramePacing.Marker
 {
   public readonly struct Options : IEquatable<Options>
   {
+    /// <summary>The module size of <see cref="Default"/>.</summary>
+    public const int DefaultModuleSizePx = 6;
+
+    public const int MinModuleSizePx = 1;
+    public const int MaxModuleSizePx = 1024;
+    public const int MaxQuietZoneModules = 16;
+
+    /// <summary>The QR specification's quiet zone, and the default.</summary>
+    public const int RecommendedQuietZoneModules = 4;
+
+    /// <summary>Recommended distance in source pixels between the marker and the edge of the frame.</summary>
+    public const int RecommendedInsetPx = 32;
+
     // Kept relative to the defaults: a struct's zeroed default(Options) is then the default options, not an invalid module size of 0
     private readonly int m_moduleSizeFromDefault;
     private readonly int m_quietZoneFromDefault;
 
     /// <summary>See doc/marker-format.md "Sizing", or <see cref="Recommended"/> for a capture's scaling. The QR specification asks for a quiet zone of 4.</summary>
-    public Options(int moduleSizePx, int quietZoneModules = FrameMarker.RecommendedQuietZoneModules)
+    public Options(int moduleSizePx, int quietZoneModules = RecommendedQuietZoneModules)
     {
-      m_moduleSizeFromDefault = Math.Clamp(moduleSizePx, FrameMarker.MinModuleSizePx, FrameMarker.MaxModuleSizePx) - FrameMarker.DefaultModuleSizePx;
-      m_quietZoneFromDefault = Math.Clamp(quietZoneModules, 0, FrameMarker.MaxQuietZoneModules) - FrameMarker.RecommendedQuietZoneModules;
+      m_moduleSizeFromDefault = Math.Clamp(moduleSizePx, MinModuleSizePx, MaxModuleSizePx) - DefaultModuleSizePx;
+      m_quietZoneFromDefault = Math.Clamp(quietZoneModules, 0, MaxQuietZoneModules) - RecommendedQuietZoneModules;
     }
 
-    /// <summary><see cref="FrameMarker.DefaultModuleSizePx"/> pixel modules and the recommended quiet zone, the same defaults as the C++ library.</summary>
+    /// <summary><see cref="DefaultModuleSizePx"/> pixel modules and the recommended quiet zone, the same defaults as the C++ library.</summary>
     public static Options Default => default;
 
     /// <summary>Size of one QR module in source pixels.</summary>
-    public int ModuleSizePx => m_moduleSizeFromDefault + FrameMarker.DefaultModuleSizePx;
+    public int ModuleSizePx => m_moduleSizeFromDefault + DefaultModuleSizePx;
 
     /// <summary>White border around the symbol in modules.</summary>
-    public int QuietZoneModules => m_quietZoneFromDefault + FrameMarker.RecommendedQuietZoneModules;
+    public int QuietZoneModules => m_quietZoneFromDefault + RecommendedQuietZoneModules;
 
     /// <summary>The quiet zone in source pixels: the offset from the marker's origin to its symbol.</summary>
     public int QuietZonePx => QuietZoneModules * ModuleSizePx;
@@ -53,16 +66,16 @@ namespace MB.FramePacing.Marker
     /// Width and height in source pixels of a marker (symbol + quiet zone). Frame, start and end markers have one size, the sync marker is
     /// smaller.
     /// </summary>
-    public int MarkerSizePx(MarkerKind kind = MarkerKind.Frame) => (FrameMarker.QrModuleCountFor(kind) + (2 * QuietZoneModules)) * ModuleSizePx;
+    public int MarkerSizePx(MarkerKind kind = MarkerKind.Frame) => (ModuleMatrix.SizeFor(kind) + (2 * QuietZoneModules)) * ModuleSizePx;
 
     /// <summary>
-    /// Recommended origin of a marker in a <paramref name="sourceWidth"/> x <paramref name="sourceHeight"/> output: the main marker (frame, start
-    /// and end) top-left, the sync marker bottom-left, <see cref="FrameMarker.RecommendedInsetPx"/> from the edges. <paramref name="alignPx"/>
+    /// Recommended origin of a marker in an output <paramref name="sourceHeight"/> pixels high: the main marker (frame, start
+    /// and end) top-left, the sync marker bottom-left, <see cref="RecommendedInsetPx"/> from the edges. <paramref name="alignPx"/>
     /// should be the capture's integer downscale ratio (1 if none) so module edges land on stored pixel edges.
     /// </summary>
-    public Point RecommendedOrigin(MarkerKind kind, int sourceWidth, int sourceHeight, int alignPx = 1)
+    public Point RecommendedOrigin(MarkerKind kind, int sourceHeight, int alignPx = 1)
     {
-      int inset = AlignUp(FrameMarker.RecommendedInsetPx, alignPx);
+      int inset = AlignUp(RecommendedInsetPx, alignPx);
       if (kind == MarkerKind.Sync)
         return new Point(inset, AlignDown(sourceHeight - inset - MarkerSizePx(kind), alignPx));
       return new Point(inset, inset);
@@ -96,7 +109,7 @@ namespace MB.FramePacing.Marker
       if (sourceHeight <= 0 || storedHeight <= 0)
         return storedPxPerModule;
       long size = (((long)storedPxPerModule * sourceHeight) + storedHeight - 1) / storedHeight;
-      return (int)Math.Clamp(size, storedPxPerModule, FrameMarker.MaxModuleSizePx);
+      return (int)Math.Clamp(size, storedPxPerModule, MaxModuleSizePx);
     }
   }
 }

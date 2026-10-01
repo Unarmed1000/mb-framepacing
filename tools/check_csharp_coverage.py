@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Module: its assembly (the cobertura package) and the test project that must cover it
 MODULES = {
     "core": ("MB.FramePacing", ROOT / "sdk" / "csharp" / "core" / "UnitTest" / "MB.FramePacing.UnitTest.csproj"),
+    "marker": ("MB.FramePacing.Marker", ROOT / "sdk" / "csharp" / "marker" / "UnitTest" / "MB.FramePacing.Marker.UnitTest.csproj"),
 }
 
 

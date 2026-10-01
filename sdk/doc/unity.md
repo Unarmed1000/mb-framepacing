@@ -78,11 +78,11 @@ steady clock, and may give its own CPU busy:
 ```csharp
 overlay.StaticAfterProvider = () => nothingPending; // optional: nothing animates while this frame is on screen
 overlay.StaticBeforeProvider = () => wokeFromIdle; // optional: nothing animated while the previous frame was
-overlay.PreferredFrameTicksProvider = () => pacer.PreferredFrameTicks; // the rate the game wants; default: as the target
-overlay.TargetFrameTicksProvider = () => pacer.TargetFrameTicks; // the interval it aims for now; default: Unity's settings (below)
-overlay.IntendedDisplayTicksProvider = () => pacer.IntendedDisplayTicks;
-overlay.CpuStartTicksProvider = () => pacer.CpuStartTicks;
-overlay.CpuBusyTicksProvider = () => pacer.CpuBusyTicks; // optional
+overlay.PreferredFrameTimeProvider = () => pacer.PreferredFrameTime; // a TimeSpan32: the rate the game wants; default: as the target
+overlay.TargetFrameTimeProvider = () => pacer.TargetFrameTime; // a TimeSpan32: the interval it aims for now; default: Unity's settings (below)
+overlay.IntendedDisplayTimeProvider = () => pacer.IntendedDisplayTime; // a TickCount64 on the pacer's steady clock
+overlay.CpuStartTimeProvider = () => pacer.CpuStartTime; // a TickCount64 on the same clock
+overlay.CpuBusyProvider = () => pacer.CpuBusy; // optional, a TimeSpan32
 ```
 
 The **target frame time** without a provider is what Unity's settings aim for: on Android and iOS `Application.targetFrameRate`
@@ -90,11 +90,11 @@ The **target frame time** without a provider is what Unity's settings aim for: o
 `QualitySettings.vSyncCount` while vsync is on (`Application.targetFrameRate` is then ignored), else `Application.targetFrameRate`,
 else on the web the refresh rate, else unknown (0). XR platforms ignore both settings: give the XR display's rate as a provider. The
 **preferred frame time** is the rate the game wants to run at. Without a provider it is the same default, which Unity does not lower
-on its own; a pacer that runs the game slower than it wants gives its preferred rate here. `FrameMarker.OnDemandFrameTicks` says the game
+on its own; a pacer that runs the game slower than it wants gives its preferred rate here. `Payload.OnDemandFrameTime` says the game
 presents only when something changes. What each field means, and what to write for typical frame pacers, is in
 [Filling the marker fields](marker-fields.md).
 
-With only an `IntendedDisplayTicksProvider`, the CPU start time is left unknown (0) rather than mixing two clocks; CPU busy still
+With only an `IntendedDisplayTimeProvider`, the CPU start time is left unknown (0) rather than mixing two clocks; CPU busy still
 comes from Unity.
 
 ## Settings
@@ -139,14 +139,14 @@ using MB.FramePacing.Marker;
 using MB.FramePacing.Marker.Unity;
 
 var generator = new MarkerGenerator();                   // once
-var modules = new byte[FrameMarker.MaxPackedModuleByteCount]; // once: the encoded marker lives here
+var modules = new byte[ModuleMatrix.MaxPackedModuleByteCount]; // once: the encoded marker lives here
 var markerMesh = new FrameMarkerMesh();                  // once
 var material = FrameMarkerGL.CreateMaterial();            // once, or your own unlit vertex color material
 
 // every frame, as the last thing drawn into the output
 var options = Options.Recommended(Screen.height, 540);
-var origin = options.RecommendedOrigin(MarkerKind.Frame, Screen.width, Screen.height);
-var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.None, FrameMarker.SecondsToTicks(Time.timeAsDouble));
+var origin = options.RecommendedOrigin(MarkerKind.Frame, Screen.height);
+var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.None, TimeSpanUtil.FromSeconds(Time.timeAsDouble));
 if (generator.TryGenerateModules(payload, modules, out var matrix))
   markerMesh.Update(matrix, options, origin, Screen.height);
 commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Screen.width, Screen.height));
@@ -172,7 +172,7 @@ bytes you own (the `ModuleMatrix`), and `Marker` draws it straight into your arr
 
 ```csharp
 var generator = new MarkerGenerator();
-var modules = new byte[FrameMarker.MaxPackedModuleByteCount];
+var modules = new byte[ModuleMatrix.MaxPackedModuleByteCount];
 var vertices = new Vertex[FrameMarker.MaxTriangleVertexCount];
 
 if (generator.TryGenerateModules(payload, metadata, modules, out var matrix))  // the metadata only goes into start markers

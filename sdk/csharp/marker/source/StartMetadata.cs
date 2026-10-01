@@ -26,7 +26,6 @@ namespace MB.FramePacing.Marker
     public readonly SequenceId SequenceId;
 
     /// <summary>Metadata for a run starting at <paramref name="startTime"/> (converted to UTC).</summary>
-    public static StartMetadata Create(DateTime startTime, SequenceId sequenceId) =>
-      new StartMetadata(FrameMarker.ToDateTimeTicks(startTime), sequenceId);
+    public static StartMetadata Create(DateTime startTime, SequenceId sequenceId) => new StartMetadata(startTime.ToUniversalTime().Ticks, sequenceId);
   }
 }

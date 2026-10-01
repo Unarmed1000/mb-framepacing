@@ -25,7 +25,7 @@ namespace MB.FramePacing.Marker.UnitTest
     public void ModuleMatrices_MatchTheCppLibrary()
     {
       var generator = new MarkerGenerator();
-      var bits = new byte[FrameMarker.MaxPackedModuleByteCount];
+      var bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
       var rows = GoldenData.ModuleDigest().ToList();
       Assert.That(rows, Has.Count.EqualTo(512));
 
@@ -44,14 +44,8 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(mismatches, Is.Empty, string.Join("\n", mismatches.Take(10)));
 
       // Every main marker is version 6, every sync marker version 2
-      Assert.That(
-        rows.Select(r => r.Size).Distinct().OrderBy(s => s),
-        Is.EqualTo(new[] { FrameMarker.SyncQrModuleCount, FrameMarker.QrModuleCount })
-      );
-      Assert.That(
-        rows.Where(r => r.Payload.Kind == MarkerKind.Sync).Select(r => r.Size).Distinct(),
-        Is.EqualTo(new[] { FrameMarker.SyncQrModuleCount })
-      );
+      Assert.That(rows.Select(r => r.Size).Distinct().OrderBy(s => s), Is.EqualTo(new[] { ModuleMatrix.SyncSize, ModuleMatrix.MainSize }));
+      Assert.That(rows.Where(r => r.Payload.Kind == MarkerKind.Sync).Select(r => r.Size).Distinct(), Is.EqualTo(new[] { ModuleMatrix.SyncSize }));
     }
 
     [TestCaseSource(nameof(Golden))]

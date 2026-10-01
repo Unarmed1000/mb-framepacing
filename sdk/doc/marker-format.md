@@ -68,8 +68,9 @@ A sync marker belongs to the main marker with the same run id and frame index.
 
 Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, or an unknown kind.
 
-`AnimationTicks` must come from the same clock the application's animation uses (its "game time"), not from a separate
-wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `MB::FramePacing::TimeSpan::FromSeconds(t)` in C++, or
+The animation time must come from the same clock the application's animation uses (its "game time"), not from a separate
+wall clock. Examples: `TimeSpanUtil.FromSeconds(t)` in C# (not `TimeSpan.FromSeconds`, which Unity's runtime rounds to a
+millisecond), `MB::FramePacing::TimeSpan::FromSeconds(t)` in C++, or
 `MB::FramePacing::ToTimeSpan(d)` from `core/time/ChronoConversion.hpp` for a `std::chrono` duration (a finer one than
 ticks, such as nanoseconds, through `std::chrono::floor<MB::FramePacing::TickDuration>(d)` first).
 
@@ -214,7 +215,7 @@ A test run is bracketed by a start and an end marker:
    capture**: 100 ms covers a 30 fps recording, 50 ms 60 fps, and a few milliseconds a 500 fps capture card.
 3. Show **frame markers** for the measured part.
 4. Show the **end marker** afterwards, the same way (one complete captured frame is enough, three capture frames recommended).
-5. `FrameIndex` and `AnimationTicks` keep counting while the start and end markers are shown; they are real rendered frames.
+5. The frame index and the animation time keep counting while the start and end markers are shown; they are real rendered frames.
 
 The analyzer measures the frames between the last captured start marker and the first captured end marker with the same run id.
 A capture may contain several runs; each one is reported separately. Without start/end markers the whole capture is analysed as

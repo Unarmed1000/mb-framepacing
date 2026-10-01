@@ -78,7 +78,7 @@ namespace MB.FramePacing.Marker.Unity
     private Shader m_quadShader;
 
     private readonly MarkerGenerator m_generator = new MarkerGenerator();
-    private readonly byte[] m_modules = new byte[FrameMarker.MaxPackedModuleByteCount];
+    private readonly byte[] m_modules = new byte[ModuleMatrix.MaxPackedModuleByteCount];
     private readonly MarkerQuad[] m_quads = new MarkerQuad[FrameMarker.MaxQuadCount];
     private FrameMarkerTexture m_mainTexture;
     private FrameMarkerTexture m_syncTexture;
@@ -103,25 +103,25 @@ namespace MB.FramePacing.Marker.Unity
     public Func<double> AnimationTimeProvider { get; set; }
 
     /// <summary>
-    /// When the game's frame pacer intends the frame to become visible, in ticks (100 ns) on a steady clock, for example the desired present
-    /// time a pacing plugin schedules. Null (or 0) = unknown: Unity does not expose it.
+    /// When the game's frame pacer intends the frame to become visible, on a steady clock, for example the present time a pacing plugin
+    /// schedules. Null (or 0) = unknown: Unity does not expose it.
     /// </summary>
-    public Func<long> IntendedDisplayTicksProvider { get; set; }
+    public Func<TickCount64> IntendedDisplayTimeProvider { get; set; }
 
     /// <summary>
-    /// The interval the game aims for between frames, in ticks (100 ns). Null = what Unity's settings aim for: on Android and iOS
+    /// The interval the game aims for between frames. Null = what Unity's settings aim for: on Android and iOS
     /// Application.targetFrameRate (30 fps when unset); elsewhere the refresh rate divided by QualitySettings.vSyncCount while vsync is on,
     /// else Application.targetFrameRate; 0 when unknown (XR platforms: give the XR display's rate here).
     /// </summary>
-    public Func<uint> TargetFrameTicksProvider { get; set; }
+    public Func<TimeSpan32> TargetFrameTimeProvider { get; set; }
 
     /// <summary>
-    /// The interval the game wants to run at, in ticks (100 ns): what it would aim for if nothing held it back. It differs from the target
-    /// frame time only while a pacer runs the game slower than it wants. <see cref="FrameMarker.OnDemandFrameTicks"/> when the game presents only
+    /// The interval the game wants to run at: what it would aim for if nothing held it back. It differs from the target
+    /// frame time only while a pacer runs the game slower than it wants. <see cref="Payload.OnDemandFrameTime"/> when the game presents only
     /// when something changes. Null = the same default as the target frame time (Unity's Application.targetFrameRate is the rate the game
     /// asks for, and Unity does not lower it on its own).
     /// </summary>
-    public Func<uint> PreferredFrameTicksProvider { get; set; }
+    public Func<TimeSpan32> PreferredFrameTimeProvider { get; set; }
 
     /// <summary>
     /// True when nothing animates while this frame is on screen, until the next frame (no pending work after it: an idle screen, a paused
@@ -136,17 +136,17 @@ namespace MB.FramePacing.Marker.Unity
     public Func<bool> StaticBeforeProvider { get; set; }
 
     /// <summary>
-    /// CPU start time: when the CPU started working on the frame, in ticks (100 ns) on the same steady clock as
-    /// <see cref="IntendedDisplayTicksProvider"/>. Null = Unity's unscaled time at the beginning of the frame while no
-    /// IntendedDisplayTicksProvider is set (its clock is the game's own), otherwise 0 (unknown).
+    /// CPU start time: when the CPU started working on the frame, on the same steady clock as
+    /// <see cref="IntendedDisplayTimeProvider"/>. Null = Unity's unscaled time at the beginning of the frame while no
+    /// IntendedDisplayTimeProvider is set (its clock is the game's own), otherwise 0 (unknown).
     /// </summary>
-    public Func<long> CpuStartTicksProvider { get; set; }
+    public Func<TickCount64> CpuStartTimeProvider { get; set; }
 
     /// <summary>
-    /// CPU busy: how long the CPU worked on the frame before presenting it, in ticks (100 ns). Null = Unity's real time when the marker
+    /// CPU busy: how long the CPU worked on the frame before presenting it. Null = Unity's real time when the marker
     /// is drawn (the end of the frame, just before Present) minus the time at the beginning of the frame.
     /// </summary>
-    public Func<uint> CpuBusyTicksProvider { get; set; }
+    public Func<TimeSpan32> CpuBusyProvider { get; set; }
 
     /// <summary>
     /// Draw frame markers (run id 0) while no run is active (the Inspector's Draw When Idle). Turn it off to show markers only during
@@ -258,19 +258,19 @@ namespace MB.FramePacing.Marker.Unity
         (ulong)Time.frameCount,
         (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.None)
           | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.None),
-        FrameMarker.SecondsToTicks(AnimationTime()),
-        preferredFrameTicks: PreferredFrameTicksProvider != null ? PreferredFrameTicksProvider() : DefaultTargetFrameTicks(),
-        targetFrameTicks: TargetFrameTicksProvider != null ? TargetFrameTicksProvider() : DefaultTargetFrameTicks(),
-        intendedDisplayTicks: IntendedDisplayTicksProvider != null ? IntendedDisplayTicksProvider() : 0,
-        cpuStartTicks: CpuStartTicks(),
-        cpuBusyTicks: CpuBusyTicksProvider != null ? CpuBusyTicksProvider() : UnityCpuBusyTicks()
+        TimeSpanUtil.FromSeconds(AnimationTime()),
+        preferredFrameTime: PreferredFrameTimeProvider != null ? PreferredFrameTimeProvider() : DefaultTargetFrameTime(),
+        targetFrameTime: TargetFrameTimeProvider != null ? TargetFrameTimeProvider() : DefaultTargetFrameTime(),
+        intendedDisplayTime: IntendedDisplayTimeProvider != null ? IntendedDisplayTimeProvider() : default,
+        cpuStartTime: CpuStartTime(),
+        cpuBusy: CpuBusyProvider != null ? CpuBusyProvider() : UnityCpuBusy()
       );
 
-      DrawMarker(payload, options, options.RecommendedOrigin(payload.Kind, width, height, align), width, height, sync: false);
+      DrawMarker(payload, options, options.RecommendedOrigin(payload.Kind, height, align), width, height, sync: false);
       if (m_syncMarker)
       {
         var sync = payload.WithKind(MarkerKind.Sync);
-        DrawMarker(sync, options, options.RecommendedOrigin(MarkerKind.Sync, width, height, align), width, height, sync: true);
+        DrawMarker(sync, options, options.RecommendedOrigin(MarkerKind.Sync, height, align), width, height, sync: true);
       }
     }
 
@@ -322,21 +322,24 @@ namespace MB.FramePacing.Marker.Unity
     private double AnimationTime() => AnimationTimeProvider != null ? AnimationTimeProvider() : Time.timeAsDouble;
 
     /// <summary>Unity's real time now (the marker is drawn at the end of the frame) minus the time at the beginning of the frame.</summary>
-    private static uint UnityCpuBusyTicks()
+    private static TimeSpan32 UnityCpuBusy()
     {
       double seconds = Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble;
-      return seconds > 0 ? (uint)Math.Min(uint.MaxValue, FrameMarker.SecondsToTicks(seconds)) : 0u;
+      if (seconds <= 0)
+        return TimeSpan32.Zero;
+      TimeSpan busy = TimeSpanUtil.FromSeconds(seconds);
+      return busy > TimeSpan32.MaxValue.ToTimeSpan() ? TimeSpan32.MaxValue : TimeSpan32.FromTimeSpan(busy);
     }
 
-    private long CpuStartTicks()
+    private TickCount64 CpuStartTime()
     {
-      if (CpuStartTicksProvider != null)
-        return CpuStartTicksProvider();
-      if (IntendedDisplayTicksProvider != null)
-        return 0;
+      if (CpuStartTimeProvider != null)
+        return CpuStartTimeProvider();
+      if (IntendedDisplayTimeProvider != null)
+        return default;
       // The time at the beginning of this frame; 0 means unknown, so the very first frame reports 1 tick
-      long ticks = FrameMarker.SecondsToTicks(Time.unscaledTimeAsDouble);
-      return ticks > 0 ? ticks : 1;
+      long ticks = TimeSpanUtil.FromSeconds(Time.unscaledTimeAsDouble).Ticks;
+      return new TickCount64(ticks > 0 ? ticks : 1);
     }
 
     /// <summary>
@@ -345,7 +348,7 @@ namespace MB.FramePacing.Marker.Unity
     /// while vsync is on (targetFrameRate is then ignored), else the targetFrameRate, else on the web the refresh rate. 0 if unknown: a
     /// desktop without either renders as fast as it can, and XR platforms ignore both (their SDK sets the rate).
     /// </summary>
-    private static uint DefaultTargetFrameTicks()
+    private static TimeSpan32 DefaultTargetFrameTime()
     {
 #if UNITY_2022_2_OR_NEWER
       double refreshHz = Screen.currentResolution.refreshRateRatio.value;
@@ -368,7 +371,7 @@ namespace MB.FramePacing.Marker.Unity
             : 0;
           break;
       }
-      return fps > 0 ? (uint)Math.Round(FrameMarker.TicksPerSecond / fps) : 0u;
+      return fps > 0 ? new TimeSpan32((uint)Math.Round(TimeSpan.TicksPerSecond / fps)) : TimeSpan32.Zero;
     }
 
     private MarkerKind Kind()

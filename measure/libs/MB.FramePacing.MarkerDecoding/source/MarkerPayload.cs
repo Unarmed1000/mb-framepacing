@@ -44,16 +44,11 @@ namespace MB.FramePacing.MarkerDecoding
     uint CpuBusyTicks = 0
   )
   {
-    /// <summary>Size of the header, which is the complete payload of frame and end markers.</summary>
-    public const int ByteCount = FM.FrameMarker.PayloadByteCount;
-    public const int StartByteCount = FM.FrameMarker.StartPayloadByteCount;
-    public const int MaxEncodedByteCount = FM.FrameMarker.MaxEncodedPayloadByteCount;
-    public const byte Magic0 = FM.FrameMarker.PayloadMagic0;
-    public const byte Magic1 = FM.FrameMarker.PayloadMagic1;
-    public const byte FormatVersion = FM.FrameMarker.PayloadFormatVersion;
+    /// <summary>The most bytes a payload encodes to (a start marker's).</summary>
+    public const int MaxEncodedByteCount = FM.Payload.MaxEncodedByteCount;
 
     /// <summary>The target and preferred frame time of an application that presents only when something changes.</summary>
-    public const uint OnDemandFrameTicks = FM.FrameMarker.OnDemandFrameTicks;
+    public const uint OnDemandFrameTicks = uint.MaxValue; // FM.Payload.OnDemandFrameTime's ticks
 
     /// <summary>Nothing animates while this frame is on screen, until the next frame: the step from it to the next frame is not judged.</summary>
     public bool IsStaticAfter => (Flags & FM.MarkerFlags.StaticAfter) != 0;
@@ -90,12 +85,12 @@ namespace MB.FramePacing.MarkerDecoding
         decoded.RunId,
         decoded.FrameIndex,
         decoded.Flags,
-        decoded.AnimationTicks,
-        decoded.PreferredFrameTicks,
-        decoded.TargetFrameTicks,
-        decoded.IntendedDisplayTicks,
-        decoded.CpuStartTicks,
-        decoded.CpuBusyTicks
+        decoded.AnimationTime.Ticks,
+        decoded.PreferredFrameTime.Ticks,
+        decoded.TargetFrameTime.Ticks,
+        decoded.IntendedDisplayTime.Ticks,
+        decoded.CpuStartTime.Ticks,
+        decoded.CpuBusy.Ticks
       );
       if (decoded.Kind == FM.MarkerKind.SequenceStart)
         metadata = new StartMetadata(start.UtcTicks, start.SequenceId);
@@ -111,12 +106,12 @@ namespace MB.FramePacing.MarkerDecoding
         RunId,
         FrameIndex,
         Flags,
-        AnimationTicks,
-        PreferredFrameTicks,
-        TargetFrameTicks,
-        IntendedDisplayTicks,
-        CpuStartTicks,
-        CpuBusyTicks
+        new TimeSpan(AnimationTicks),
+        new TimeSpan32(PreferredFrameTicks),
+        new TimeSpan32(TargetFrameTicks),
+        new TickCount64(IntendedDisplayTicks),
+        new TickCount64(CpuStartTicks),
+        new TimeSpan32(CpuBusyTicks)
       );
   }
 }

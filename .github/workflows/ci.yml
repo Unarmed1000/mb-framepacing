@@ -157,7 +157,7 @@ jobs:
             echo "::error::vulnerable NuGet packages, see the log"; exit 1
           fi
       # The SDK modules that must be fully tested: every line and branch of the assembly, by its own tests
-      - name: C# coverage (100 % of the core)
+      - name: C# coverage (100 % of the core and the marker module)
         run: python3 tools/check_csharp_coverage.py
 
   cpp-analysis:
