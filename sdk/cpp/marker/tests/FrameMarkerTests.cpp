@@ -1243,15 +1243,15 @@ TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
   EXPECT_TRUE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8))
     << "outside the buffer: nothing to draw";
   EXPECT_TRUE(std::all_of(pixels.begin(), pixels.end(), [](const uint8_t value) { return value == 128u; }));
-  // A stride whose rows together are more bytes than a size_t counts: the wrapped product must not pass for a small buffer. (The
-  // origin is outside, so a wrong 'true' writes nothing.)
+  // A stride longer than the whole buffer cannot be right with more than one row, and is refused before it is multiplied by the rows
+  // (63 of these wrap a size_t; the origin is outside, so a wrong 'true' writes nothing)
   constexpr std::size_t HugeStride = (std::numeric_limits<std::size_t>::max() / 63u) + 1u;
-  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8, HugeStride)) << "63 strides wrap";
-  EXPECT_FALSE(
-    FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8, std::numeric_limits<std::size_t>::max()))
-    << "the last row's bytes wrap the sum";
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8, HugeStride));
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8, pixels.size() + 1u));
   EXPECT_TRUE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 1, FM::PixelFormat::R8, HugeStride))
     << "one row: the stride is never stepped";
+  EXPECT_TRUE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 2, FM::PixelFormat::R8, pixels.size() - 64u))
+    << "two rows that just fit";
 }
 
 TEST(Bitmap, BytesPerPixel)
