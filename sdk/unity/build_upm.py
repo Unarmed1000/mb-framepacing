@@ -9,8 +9,8 @@ The package is not kept as one folder on master (its assemblies would duplicate 
   README.md               sdk/unity/README.md
   LICENSE.md              sdk/LICENSE (BSD 3-Clause)
   Third Party Notices.md  qrcodegen (MIT), ported in the marker module
-  Runtime/Core/           sdk/csharp/core/source/*.cs + MB.FramePacing.asmdef (the SDK's core types, engine free)
-  Runtime/Marker/         sdk/csharp/marker/source/*.cs + MB.FramePacing.Marker.asmdef (engine free)
+  Runtime/Core/           sdk/csharp/core/source/**/*.cs + MB.FramePacing.asmdef (the SDK's core types, engine free)
+  Runtime/Marker/         sdk/csharp/marker/source/**/*.cs + MB.FramePacing.Marker.asmdef (engine free)
   Runtime/Unity/          the Unity helpers + MB.FramePacing.Marker.Unity.asmdef, and FrameMarker.hlsl from sdk/shaders/hlsl
   Samples~/               samples (imported on demand from the Package Manager)
 
@@ -113,6 +113,14 @@ def copy_sources(source: Path, destination: Path, pattern: str) -> None:
         _ = shutil.copy2(file, destination / file.name)
 
 
+def copy_module_sources(source: Path, destination: Path) -> None:
+    """A module's C# sources with their subfolders (core's Time/)."""
+    for file in sorted(source.rglob("*.cs")):
+        target = destination / file.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _ = shutil.copy2(file, target)
+
+
 def read_manifest(path: Path) -> dict[str, object]:
     return cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
 
@@ -143,7 +151,7 @@ def assemble(output: Path, version: str) -> None:
     _ = (output / "Third Party Notices.md").write_text(notices, encoding="utf-8")
 
     for folder, (sources, asmdef) in MODULES.items():
-        copy_sources(sources, output / "Runtime" / folder, "*.cs")
+        copy_module_sources(sources, output / "Runtime" / folder)
         _ = shutil.copy2(SCRIPT_DIR / "Runtime" / folder / asmdef, output / "Runtime" / folder / asmdef)
     copy_sources(SCRIPT_DIR / "Runtime" / "Unity", output / "Runtime" / "Unity", "*")
     # The shaders include the reference shaders' module lookup, the same code other engines use
@@ -186,10 +194,11 @@ def check(output: Path, version: str) -> list[str]:
         problems.append(f"package.json: name/version {name}/{manifest_version}, expected {PACKAGE_NAME}/{version}")
 
     for folder, (sources, _asmdef) in MODULES.items():
-        for source in sorted(sources.glob("*.cs")):
-            copy = output / "Runtime" / folder / source.name
+        for source in sorted(sources.rglob("*.cs")):
+            relative = source.relative_to(sources).as_posix()
+            copy = output / "Runtime" / folder / relative
             if not copy.exists() or copy.read_bytes() != source.read_bytes():
-                problems.append(f"Runtime/{folder}/{source.name}: differs from {source.parent.relative_to(REPOSITORY_ROOT).as_posix()}")
+                problems.append(f"Runtime/{folder}/{relative}: differs from {source.parent.relative_to(REPOSITORY_ROOT).as_posix()}")
     return problems
 
 
