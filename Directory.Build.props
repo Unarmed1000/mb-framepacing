@@ -16,8 +16,8 @@
          environment variables, so this pins it (an explicit -p:Platform=... still wins). -->
     <Platform>AnyCPU</Platform>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <!-- Each library keeps its tests in a UnitTest sub folder (and its benchmarks in Benchmarks); never compile them into the library
-         itself -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);UnitTest\**;Benchmarks\**</DefaultItemExcludes>
+    <!-- Each library keeps its tests in a UnitTest sub folder (and its benchmarks in Benchmarks, and what both compare it with in
+         Reference); never compile them into the library itself -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);UnitTest\**;Benchmarks\**;Reference\**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

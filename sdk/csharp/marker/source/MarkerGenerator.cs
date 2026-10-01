@@ -34,25 +34,31 @@ namespace MB.FramePacing.Marker
       // Every kind is pinned to one version, so the symbol never changes size between frames. Its bytes fit that version
       // (WireFormat.QrCapacityBytes, SyncQrCapacityBytes), so the encoder cannot fail either
       int version = payload.Kind == MarkerKind.Sync ? WireFormat.SyncQrVersion : WireFormat.QrVersion;
-      bool encoded = m_encoder.Encode(payloadBytes.Slice(0, byteCount), version, version);
+      bool encoded = m_encoder.Encode(payloadBytes.Slice(0, byteCount), version);
       Debug.Assert(encoded, "every kind's payload fits its QR version");
 
       int size = m_encoder.Size;
       int packedCount = ModuleMatrix.PackedModuleByteCount(size);
       if (destination.Length < packedCount)
         return false;
-      // Pack the symbol: row-major, most significant bit first, continuous across rows
+      // Pack the symbol: row-major, most significant bit first, continuous across rows. A row's modules are its word's highest bits, and
+      // at most 7 bits wait from the rows before
       var bits = destination.Slice(0, packedCount);
-      bits.Clear();
-      int index = 0;
+      ulong pending = 0;
+      int pendingBits = 0;
+      int count = 0;
       for (int y = 0; y < size; ++y)
       {
-        for (int x = 0; x < size; ++x, ++index)
+        pending = (pending << size) | (m_encoder.Row(y) >> (64 - size));
+        pendingBits += size;
+        while (pendingBits >= 8)
         {
-          if (m_encoder.IsDark(x, y))
-            bits[index >> 3] |= (byte)(0x80 >> (index & 7));
+          pendingBits -= 8;
+          bits[count++] = (byte)(pending >> pendingBits);
         }
       }
+      // A QR symbol's module count is odd: one module is left, in the last byte's highest bit
+      bits[count] = (byte)(pending << (8 - pendingBits));
       return ModuleMatrix.TryFromBits(size, bits, out matrix);
     }
 

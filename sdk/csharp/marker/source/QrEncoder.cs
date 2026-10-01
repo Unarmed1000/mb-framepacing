@@ -3,10 +3,10 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* QR code encoder for the marker: byte mode, error correction level M, versions 1-6, automatic mask selection. A port of the QR Code
-//* generator the C++ library is compared with (sdk/cpp/marker/reference/third_party/qrcodegen), limited to what the marker uses, so both
-//* produce exactly the same symbols; the tests check it module by module against test-data/markers/modules.csv. Every buffer is allocated
-//* once, Encode never allocates.
+//* QR code encoder for the marker's symbols: versions 2 and 6, error correction level M, byte mode, the mask with the lowest penalty
+//* (the C++ library's QrEncoder). It gives exactly the symbols of the encoder it replaces (Reference/ReferenceQrEncoder.cs, which the
+//* tests compare it with) and of the QR Code generator library both are ported from, and scores the masks on whole rows and columns
+//* instead of module by module (doc/encoding-performance.md). Every buffer is allocated once, Encode never allocates.
 //*
 //* Based on the QR Code generator library, https://www.nayuki.io/page/qr-code-generator-library
 //* Copyright (c) Project Nayuki. (MIT License)
@@ -29,462 +29,304 @@ namespace MB.FramePacing.Marker
 {
   internal sealed class QrEncoder
   {
-    public const int MinVersion = 1;
-    public const int MaxVersion = 6;
-    private const int MaxSize = (4 * MaxVersion) + 17;
+    /// <summary>Modules per side of the largest symbol the marker uses (QR version 6).</summary>
+    public const int MaxSize = 41;
 
-    // Error correction level M, indexed by version (index 0 unused). From the QR specification, as in qrcodegen.
-    private static readonly int[] g_eccCodewordsPerBlock = { -1, 10, 16, 26, 18, 24, 16 };
-    private static readonly int[] g_errorCorrectionBlocks = { -1, 1, 1, 1, 2, 2, 4 };
+    /// <summary><see cref="PenaltyScore"/>'s limit for the whole score.</summary>
+    public const int NoPenaltyLimit = int.MaxValue;
 
-    // Level M is 0 in the format information bits
-    private const int FormatBitsLevelM = 0;
-    private const int ModeIndicatorByte = 0x4;
-    private const int ByteModeCountBits = 8; // versions 1-9
-
+    // The QR standard's penalty weights: runs, 2x2 blocks, finder-like patterns, balance
     private const int PenaltyN1 = 3;
     private const int PenaltyN2 = 3;
     private const int PenaltyN3 = 40;
     private const int PenaltyN4 = 10;
 
-    private readonly bool[] m_modules = new bool[MaxSize * MaxSize];
-    private readonly bool[] m_isFunction = new bool[MaxSize * MaxSize];
-    private readonly byte[] m_dataCodewords = new byte[RawCodewords(MaxVersion)];
-    private readonly byte[] m_allCodewords = new byte[RawCodewords(MaxVersion)];
-    private readonly byte[] m_blocks;
-    private readonly byte[] m_eccRemainder;
-    private readonly byte[][] m_divisors = new byte[MaxVersion + 1][];
-    private readonly int[] m_runHistory = new int[7];
+    // LinePenalty works on a line moved this many bits down: eight light modules above it (and at least fifteen below) stand for the
+    // light border the standard gives every line
+    private const int LinePad = 8;
 
-    public QrEncoder()
-    {
-      int maxEcc = 0;
-      int maxBlockBytes = 0;
-      for (int version = MinVersion; version <= MaxVersion; ++version)
-      {
-        int eccLength = g_eccCodewordsPerBlock[version];
-        m_divisors[version] = ReedSolomonComputeDivisor(eccLength);
-        maxEcc = Math.Max(maxEcc, eccLength);
-        int numBlocks = g_errorCorrectionBlocks[version];
-        maxBlockBytes = Math.Max(maxBlockBytes, numBlocks * ((RawCodewords(version) / numBlocks) + 1));
-      }
-      m_eccRemainder = new byte[maxEcc];
-      m_blocks = new byte[maxBlockBytes];
-    }
+    private const int MaxCodewordCount = 172;
+
+    // The symbol as one word per row and one per column: module (x, y) is bit 63 - x of its row and bit 63 - y of its column
+    private ulong[] m_rows = new ulong[MaxSize];
+    private ulong[] m_columns = new ulong[MaxSize];
+    private ulong[] m_candidateRows = new ulong[MaxSize];
+    private ulong[] m_candidateColumns = new ulong[MaxSize];
+    private readonly ulong[] m_unmaskedRows = new ulong[MaxSize];
+    private readonly ulong[] m_unmaskedColumns = new ulong[MaxSize];
+    private readonly byte[] m_codewords = new byte[MaxCodewordCount];
+    private readonly byte[] m_interleaved = new byte[MaxCodewordCount];
+    private readonly byte[] m_errorCorrection = new byte[QrReedSolomon.EccCodewordsPerBlock];
 
     /// <summary>Modules per side of the last encoded symbol.</summary>
     public int Size { get; private set; }
 
-    public bool IsDark(int x, int y) => m_modules[(y * MaxSize) + x];
+    /// <summary>The bit of module <paramref name="position"/> of a line.</summary>
+    public static ulong Bit(int position) => 1UL << (63 - position);
+
+    public bool IsDark(int x, int y) => (m_rows[y] & Bit(x)) != 0;
+
+    /// <summary>Row y of the last encoded symbol: module x is bit 63 - x, the bits below the row are zero.</summary>
+    public ulong Row(int y) => m_rows[y];
+
+    /// <summary>Column x of the last encoded symbol: module y is bit 63 - y.</summary>
+    public ulong Column(int x) => m_columns[x];
 
     /// <summary>
-    /// Encode <paramref name="data"/> in byte mode with error correction level M, using the smallest version in
-    /// [<paramref name="minVersion"/>, <paramref name="maxVersion"/>] that fits and the mask with the lowest penalty.
-    /// Returns false when the data does not fit (or the version range is outside 1-6).
+    /// Encode <paramref name="data"/> in byte mode at error correction level M, with the mask that scores the lowest penalty (the lowest
+    /// numbered one of equals). Returns false, leaving the symbol unchanged, when <paramref name="version"/> is not 2 or 6 or the data
+    /// does not fit it (26 and 106 bytes).
     /// </summary>
-    public bool Encode(ReadOnlySpan<byte> data, int minVersion, int maxVersion)
+    public bool Encode(ReadOnlySpan<byte> data, int version)
     {
-      if (minVersion < MinVersion || maxVersion > MaxVersion || minVersion > maxVersion)
+      var tables = QrVersionTables.For(version);
+      if (tables == null || !BuildUnmasked(data, tables))
         return false;
-      int length = data.Length;
-
-      int usedBits = 4 + ByteModeCountBits + (8 * length);
-      int version = minVersion;
-      while (usedBits > DataCodewords(version) * 8)
+      // The first mask with the lowest penalty. A mask's scoring stops when it reaches the best score so far: it can not win any more
+      int bestScore = NoPenaltyLimit;
+      for (int mask = 0; mask < QrMaskPatterns.MaskCount; ++mask)
       {
-        if (version >= maxVersion)
-          return false;
-        ++version;
-      }
-
-      // Data codewords: mode, character count, data, terminator, bit padding, then alternating pad bytes
-      int capacityBytes = DataCodewords(version);
-      Array.Clear(m_dataCodewords, 0, m_dataCodewords.Length);
-      int bitLength = 0;
-      AppendBits(ModeIndicatorByte, 4, ref bitLength);
-      AppendBits(length, ByteModeCountBits, ref bitLength);
-      for (int i = 0; i < length; ++i)
-        AppendBits(data[i], 8, ref bitLength);
-      int capacityBits = capacityBytes * 8;
-      AppendBits(0, Math.Min(4, capacityBits - bitLength), ref bitLength);
-      AppendBits(0, (8 - (bitLength % 8)) % 8, ref bitLength);
-      for (int padByte = 0xEC; bitLength < capacityBits; padByte ^= 0xEC ^ 0x11)
-        AppendBits(padByte, 8, ref bitLength);
-
-      AddEccAndInterleave(version);
-
-      Size = (4 * version) + 17;
-      Array.Clear(m_modules, 0, m_modules.Length);
-      Array.Clear(m_isFunction, 0, m_isFunction.Length);
-      DrawFunctionPatterns(version);
-      DrawCodewords(RawCodewords(version));
-
-      int bestMask = 0;
-      long minPenalty = long.MaxValue;
-      for (int mask = 0; mask < 8; ++mask)
-      {
-        ApplyMask(mask);
-        DrawFormatBits(mask);
-        long penalty = GetPenaltyScore();
-        if (penalty < minPenalty)
+        ApplyMask(tables, mask);
+        int score = PenaltyScore(m_candidateRows, m_candidateColumns, tables.Size, bestScore);
+        if (score < bestScore)
         {
-          bestMask = mask;
-          minPenalty = penalty;
+          bestScore = score;
+          TakeCandidate(tables.Size);
         }
-        ApplyMask(mask); // undoes the mask (XOR)
       }
-      ApplyMask(bestMask);
-      DrawFormatBits(bestMask);
       return true;
     }
 
-    private static int RawDataModules(int version)
+    /// <summary>As <see cref="Encode"/>, with a given mask (0 to 7) instead of the best one. Also false for a mask outside 0 to 7.</summary>
+    public bool EncodeWithMask(ReadOnlySpan<byte> data, int version, int mask)
     {
-      int result = ((16 * version) + 128) * version + 64;
-      if (version >= 2)
-      {
-        // Versions 2-6 (all this encoder makes) have two alignment positions per axis, and no version information
-        const int NumAlign = 2;
-        result -= (((25 * NumAlign) - 10) * NumAlign) - 55;
-      }
-      return result;
+      var tables = QrVersionTables.For(version);
+      if (tables == null || mask < 0 || mask >= QrMaskPatterns.MaskCount || !BuildUnmasked(data, tables))
+        return false;
+      ApplyMask(tables, mask);
+      TakeCandidate(tables.Size);
+      return true;
     }
 
-    private static int RawCodewords(int version) => RawDataModules(version) / 8;
-
-    private static int DataCodewords(int version) => RawCodewords(version) - (g_eccCodewordsPerBlock[version] * g_errorCorrectionBlocks[version]);
-
-    private void AppendBits(int value, int count, ref int bitLength)
+    /// <summary>
+    /// The QR standard's penalty score of a symbol (its rows and its columns): runs of five or more modules of one colour and finder-like
+    /// patterns in every row and column, 2x2 blocks of one colour, and the balance of dark and light. The scoring stops once the score
+    /// reaches <paramref name="limit"/>: the result is then at least the limit, and no longer the whole score.
+    /// </summary>
+    public static int PenaltyScore(ReadOnlySpan<ulong> rows, ReadOnlySpan<ulong> columns, int size, int limit = NoPenaltyLimit)
     {
-      for (int i = count - 1; i >= 0; --i, ++bitLength)
-        m_dataCodewords[bitLength >> 3] |= (byte)(((value >> i) & 1) << (7 - (bitLength & 7)));
+      // 2x2 blocks of one colour, and the dark modules, from the rows
+      ulong pairs = ulong.MaxValue << (65 - size);
+      ulong previousRow = rows[0];
+      ulong previousSame = ~(previousRow ^ (previousRow << 1)) & pairs;
+      int dark = BitUtil.PopCount(previousRow);
+      int blocks = 0;
+      for (int y = 1; y < size; ++y)
+      {
+        ulong row = rows[y];
+        ulong same = ~(row ^ (row << 1)) & pairs;
+        blocks += BitUtil.PopCount(same & previousSame & ~(row ^ previousRow));
+        dark += BitUtil.PopCount(row);
+        previousRow = row;
+        previousSame = same;
+      }
+      // The balance: 10 for every 5 % the dark modules are away from 45 % to 55 %
+      int total = size * size;
+      int imbalance = Math.Abs((dark * 20) - (total * 10));
+      int score = (blocks * PenaltyN2) + ((((imbalance + total - 1) / total) - 1) * PenaltyN4);
+
+      // The runs and the finder-like patterns of every row and column
+      for (int i = 0; i < size; ++i)
+      {
+        if (score >= limit)
+          return score;
+        score += LinePenalty(rows[i], size) + LinePenalty(columns[i], size);
+      }
+      return score;
     }
 
-    private void AddEccAndInterleave(int version)
+    /// <summary>
+    /// The penalty of one line (a row or a column) of <paramref name="size"/> modules: its runs of one colour and its finder-like
+    /// patterns. A line with nine or more dark modules in a row is walked run by run; every other line needs a few word operations.
+    /// </summary>
+    public static int LinePenalty(ulong line, int size)
     {
-      int numBlocks = g_errorCorrectionBlocks[version];
-      int blockEccLength = g_eccCodewordsPerBlock[version];
-      int rawCodewords = RawCodewords(version);
-      int numShortBlocks = numBlocks - (rawCodewords % numBlocks);
-      int shortBlockLength = rawCodewords / numBlocks;
-      int blockStride = shortBlockLength + 1;
-      byte[] divisor = m_divisors[version];
+      // Module i is bit 55 - i of padded
+      ulong padded = line >> LinePad;
+      ulong light = ~padded;
 
-      // Split the data into blocks and append the ECC to each block (short blocks keep one unused padding byte)
-      int dataOffset = 0;
-      for (int i = 0; i < numBlocks; ++i)
-      {
-        int dataLength = shortBlockLength - blockEccLength + (i < numShortBlocks ? 0 : 1);
-        int block = i * blockStride;
-        Array.Clear(m_blocks, block, blockStride);
-        Array.Copy(m_dataCodewords, dataOffset, m_blocks, block, dataLength);
-        ReedSolomonComputeRemainder(m_dataCodewords, dataOffset, dataLength, divisor);
-        Array.Copy(m_eccRemainder, 0, m_blocks, block + blockStride - blockEccLength, blockEccLength);
-        dataOffset += dataLength;
-      }
+      // Runs of five or more of one colour: PenaltyN1 for the first five modules and 1 for each further one. A run of n modules has
+      // n - 4 places where five in a row start, so it scores those places plus PenaltyN1 - 1
+      ulong pairs = ((1UL << (size - 1)) - 1) << (56 - size);
+      ulong same = ~(padded ^ (padded >> 1)) & pairs;
+      ulong fives = same & (same >> 1) & (same >> 2) & (same >> 3);
+      int runs = BitUtil.PopCount(fives) + ((PenaltyN1 - 1) * BitUtil.PopCount(fives & ~(fives << 1)));
 
-      // Interleave (not concatenate) the bytes of every block into one sequence
-      int k = 0;
-      for (int i = 0; i < blockStride; ++i)
+      // Finder-like patterns of a larger unit than 2 have a dark run of nine or more: those lines are walked run by run
+      ulong dark2 = padded & (padded >> 1);
+      ulong dark4 = dark2 & (dark2 >> 2);
+      ulong dark8 = dark4 & (dark4 >> 4);
+      if ((dark8 & (padded >> 8)) != 0)
+        return runs + (FinderPatternsByRuns(line, size) * PenaltyN3);
+
+      // The light modules next to a pattern that starts at a bit: the 2, 4 and 8 below it
+      ulong below2 = (light << 1) & (light << 2);
+      ulong below4 = below2 & (below2 << 2);
+      ulong below8 = below4 & (below4 << 4);
+
+      // Unit 1: dark, light, three dark, light, dark, between light modules; it counts once for four light modules on either side
+      ulong core1 = padded & (light >> 1) & (dark2 >> 2) & (padded >> 4) & (light >> 5) & (padded >> 6) & (light << 1) & (light >> 7);
+      ulong above1x2 = (light >> 7) & (light >> 8);
+      ulong above1x4 = above1x2 & (above1x2 >> 2);
+
+      // Unit 2: every run twice as long, between two light modules on either side; eight on a side to count
+      ulong light2 = light & (light >> 1);
+      ulong above2x2 = light2 >> 14;
+      ulong above2x4 = above2x2 & (above2x2 >> 2);
+      ulong above2x8 = above2x4 & (above2x4 >> 4);
+      ulong core2 = dark2 & (light2 >> 2) & (dark4 >> 4) & (dark2 >> 8) & (light2 >> 10) & (dark2 >> 12) & below2 & above2x2;
+
+      int patterns =
+        BitUtil.PopCount(core1 & below4) + BitUtil.PopCount(core1 & above1x4) + BitUtil.PopCount(core2 & below8) + BitUtil.PopCount(core2 & above2x8);
+      return runs + (patterns * PenaltyN3);
+    }
+
+    /// <summary>
+    /// How many finder-like patterns a line has, found by walking its runs, as the reference does. <see cref="LinePenalty"/> uses it for a
+    /// line with nine or more dark modules in a row.
+    /// </summary>
+    public static int FinderPatternsByRuns(ulong line, int size)
+    {
+      // The last seven runs, the newest first; a line starts and ends in a light border of its own length
+      Span<int> history = stackalloc int[7];
+      history.Clear();
+      int patterns = 0;
+      int remaining = size;
+      bool dark = false;
+      while (true)
       {
-        for (int j = 0; j < numBlocks; ++j)
+        // The first run is light, and empty when the line starts dark
+        int length = Math.Min(BitUtil.LeadingZeroCount(dark ? ~line : line), remaining);
+        if (length == remaining)
         {
-          if (i != shortBlockLength - blockEccLength || j >= numShortBlocks)
-            m_allCodewords[k++] = m_blocks[(j * blockStride) + i];
-        }
-      }
-    }
-
-    private static byte[] ReedSolomonComputeDivisor(int degree)
-    {
-      var result = new byte[degree];
-      result[degree - 1] = 1; // start with the monomial x^0
-      int root = 1;
-      for (int i = 0; i < degree; ++i)
-      {
-        // Multiply the current product by (x - r^i)
-        for (int j = 0; j < degree; ++j)
-        {
-          result[j] = (byte)ReedSolomonMultiply(result[j], root);
-          if (j + 1 < degree)
-            result[j] ^= result[j + 1];
-        }
-        root = ReedSolomonMultiply(root, 0x02);
-      }
-      return result;
-    }
-
-    private void ReedSolomonComputeRemainder(byte[] data, int offset, int length, byte[] divisor)
-    {
-      int degree = divisor.Length;
-      Array.Clear(m_eccRemainder, 0, m_eccRemainder.Length);
-      for (int n = 0; n < length; ++n)
-      {
-        int factor = data[offset + n] ^ m_eccRemainder[0];
-        Array.Copy(m_eccRemainder, 1, m_eccRemainder, 0, degree - 1);
-        m_eccRemainder[degree - 1] = 0;
-        for (int i = 0; i < degree; ++i)
-          m_eccRemainder[i] ^= (byte)ReedSolomonMultiply(divisor[i], factor);
-      }
-    }
-
-    private static int ReedSolomonMultiply(int x, int y)
-    {
-      // Russian peasant multiplication in GF(2^8/0x11D)
-      int z = 0;
-      for (int i = 7; i >= 0; --i)
-      {
-        z = (z << 1) ^ ((z >> 7) * 0x11D);
-        z ^= ((y >> i) & 1) * x;
-      }
-      return z;
-    }
-
-    private void SetFunctionModule(int x, int y, bool dark)
-    {
-      m_modules[(y * MaxSize) + x] = dark;
-      m_isFunction[(y * MaxSize) + x] = true;
-    }
-
-    private void DrawFunctionPatterns(int version)
-    {
-      // Timing patterns
-      for (int i = 0; i < Size; ++i)
-      {
-        SetFunctionModule(6, i, i % 2 == 0);
-        SetFunctionModule(i, 6, i % 2 == 0);
-      }
-
-      // Finder patterns in three corners (overwrite some timing modules)
-      DrawFinderPattern(3, 3);
-      DrawFinderPattern(Size - 4, 3);
-      DrawFinderPattern(3, Size - 4);
-
-      // The alignment pattern: versions 2-6 (all this encoder makes) have one, at (Size - 7, Size - 7); the other positions would
-      // overlap the finders
-      if (version >= 2)
-        DrawAlignmentPattern(Size - 7, Size - 7);
-
-      // Format bits with a dummy mask (overwritten after the mask is chosen); versions below 7 have no version information
-      DrawFormatBits(0);
-    }
-
-    private void DrawFinderPattern(int centerX, int centerY)
-    {
-      for (int dy = -4; dy <= 4; ++dy)
-      {
-        for (int dx = -4; dx <= 4; ++dx)
-        {
-          int distance = Math.Max(Math.Abs(dx), Math.Abs(dy)); // Chebyshev distance
-          int x = centerX + dx;
-          int y = centerY + dy;
-          if (x >= 0 && x < Size && y >= 0 && y < Size)
-            SetFunctionModule(x, y, distance != 2 && distance != 4);
-        }
-      }
-    }
-
-    private void DrawAlignmentPattern(int centerX, int centerY)
-    {
-      for (int dy = -2; dy <= 2; ++dy)
-      {
-        for (int dx = -2; dx <= 2; ++dx)
-          SetFunctionModule(centerX + dx, centerY + dy, Math.Max(Math.Abs(dx), Math.Abs(dy)) != 1);
-      }
-    }
-
-    private void DrawFormatBits(int mask)
-    {
-      // Error correction level and mask, then a BCH(15,5) code and the fixed XOR pattern
-      int data = (FormatBitsLevelM << 3) | mask;
-      int remainder = data;
-      for (int i = 0; i < 10; ++i)
-        remainder = (remainder << 1) ^ ((remainder >> 9) * 0x537);
-      int bits = ((data << 10) | remainder) ^ 0x5412;
-
-      // First copy
-      for (int i = 0; i <= 5; ++i)
-        SetFunctionModule(8, i, GetBit(bits, i));
-      SetFunctionModule(8, 7, GetBit(bits, 6));
-      SetFunctionModule(8, 8, GetBit(bits, 7));
-      SetFunctionModule(7, 8, GetBit(bits, 8));
-      for (int i = 9; i < 15; ++i)
-        SetFunctionModule(14 - i, 8, GetBit(bits, i));
-
-      // Second copy
-      for (int i = 0; i < 8; ++i)
-        SetFunctionModule(Size - 1 - i, 8, GetBit(bits, i));
-      for (int i = 8; i < 15; ++i)
-        SetFunctionModule(8, Size - 15 + i, GetBit(bits, i));
-      SetFunctionModule(8, Size - 8, true); // always dark
-    }
-
-    private void DrawCodewords(int codewordCount)
-    {
-      // The zigzag scan: column pairs from the right, alternating up and down, skipping the vertical timing column
-      int bitIndex = 0;
-      int totalBits = codewordCount * 8;
-      for (int right = Size - 1; right >= 1; right -= 2)
-      {
-        if (right == 6)
-          right = 5;
-        for (int vertical = 0; vertical < Size; ++vertical)
-        {
-          for (int j = 0; j < 2; ++j)
+          if (dark)
           {
-            int x = right - j;
-            bool upward = ((right + 1) & 2) == 0;
-            int y = upward ? Size - 1 - vertical : vertical;
-            if (!m_isFunction[(y * MaxSize) + x] && bitIndex < totalBits)
-            {
-              m_modules[(y * MaxSize) + x] = GetBit(m_allCodewords[bitIndex >> 3], 7 - (bitIndex & 7));
-              ++bitIndex;
-            }
-            // Remainder bits (0 to 7) stay light
+            AddRun(history, length, size);
+            AddRun(history, size, size);
           }
-        }
-      }
-    }
-
-    private void ApplyMask(int mask)
-    {
-      for (int y = 0; y < Size; ++y)
-      {
-        for (int x = 0; x < Size; ++x)
-        {
-          int index = (y * MaxSize) + x;
-          if (m_isFunction[index])
-            continue;
-          bool invert;
-          switch (mask)
+          else
           {
-            case 0:
-              invert = (x + y) % 2 == 0;
-              break;
-            case 1:
-              invert = y % 2 == 0;
-              break;
-            case 2:
-              invert = x % 3 == 0;
-              break;
-            case 3:
-              invert = (x + y) % 3 == 0;
-              break;
-            case 4:
-              invert = ((x / 3) + (y / 2)) % 2 == 0;
-              break;
-            case 5:
-              invert = ((x * y) % 2) + ((x * y) % 3) == 0;
-              break;
-            case 6:
-              invert = (((x * y) % 2) + ((x * y) % 3)) % 2 == 0;
-              break;
-            default:
-              invert = (((x + y) % 2) + ((x * y) % 3)) % 2 == 0;
-              break;
+            AddRun(history, length + size, size);
           }
-          if (invert)
-            m_modules[index] = !m_modules[index];
+          return patterns + CountPatterns(history);
         }
+        AddRun(history, length, size);
+        if (!dark)
+          patterns += CountPatterns(history);
+        line <<= length;
+        remaining -= length;
+        dark = !dark;
       }
     }
 
-    private long GetPenaltyScore()
+    private static void AddRun(Span<int> history, int length, int size)
     {
-      long result = 0;
+      if (history[0] == 0)
+        length += size;
+      history.Slice(0, history.Length - 1).CopyTo(history.Slice(1));
+      history[0] = length;
+    }
 
-      // Adjacent modules in a row with the same color, and finder-like patterns
-      for (int y = 0; y < Size; ++y)
-        result += LinePenalty(y, horizontal: true);
-      // The same for columns
-      for (int x = 0; x < Size; ++x)
-        result += LinePenalty(x, horizontal: false);
+    // After a light run: dark, light, dark, light, dark runs of 1:1:3:1:1 before it, with four times the unit of light on one side and at
+    // least the unit on the other
+    private static int CountPatterns(ReadOnlySpan<int> history)
+    {
+      int unit = history[1];
+      if (unit <= 0 || history[2] != unit || history[3] != unit * 3 || history[4] != unit || history[5] != unit)
+        return 0;
+      return (history[0] >= unit * 4 && history[6] >= unit ? 1 : 0) + (history[6] >= unit * 4 && history[0] >= unit ? 1 : 0);
+    }
 
-      // 2x2 blocks of modules with the same color
-      for (int y = 0; y < Size - 1; ++y)
+    // The symbol of data before a mask, in the unmasked rows and columns: the function patterns (format bits light) and the codewords.
+    // False when data does not fit
+    private bool BuildUnmasked(ReadOnlySpan<byte> data, QrVersionTables tables)
+    {
+      int capacity = tables.DataCodewordCount;
+      // Byte mode (4 bits), the byte count (8 bits) and the terminator (4 bits) take two codewords
+      if (data.Length + 2 > capacity)
+        return false;
+
+      // The data codewords: the mode and the count put every byte half a byte further, then the pad bytes alternate
+      int previous = data.Length;
+      m_codewords[0] = (byte)(0x40 | (previous >> 4));
+      int count = 1;
+      for (int i = 0; i < data.Length; ++i)
       {
-        for (int x = 0; x < Size - 1; ++x)
-        {
-          bool color = IsDark(x, y);
-          if (color == IsDark(x + 1, y) && color == IsDark(x, y + 1) && color == IsDark(x + 1, y + 1))
-            result += PenaltyN2;
-        }
+        m_codewords[count++] = (byte)((previous << 4) | (data[i] >> 4));
+        previous = data[i];
       }
+      m_codewords[count++] = (byte)(previous << 4);
+      for (int pad = 0xEC; count < capacity; pad ^= 0xEC ^ 0x11)
+        m_codewords[count++] = (byte)pad;
 
-      // Balance of dark and light modules: the smallest k >= 0 with (45-5k)% <= dark/total <= (55+5k)%
-      int dark = 0;
-      for (int y = 0; y < Size; ++y)
+      // Every block's error correction, and the blocks interleaved: all first codewords, all second ones, ...
+      int blockCount = tables.BlockCount;
+      int blockLength = capacity / blockCount;
+      for (int block = 0; block < blockCount; ++block)
       {
-        for (int x = 0; x < Size; ++x)
-        {
-          if (IsDark(x, y))
-            ++dark;
-        }
+        var blockData = new ReadOnlySpan<byte>(m_codewords, block * blockLength, blockLength);
+        QrReedSolomon.ComputeErrorCorrection(blockData, m_errorCorrection);
+        for (int i = 0; i < blockLength; ++i)
+          m_interleaved[(i * blockCount) + block] = blockData[i];
+        for (int i = 0; i < m_errorCorrection.Length; ++i)
+          m_interleaved[capacity + (i * blockCount) + block] = m_errorCorrection[i];
       }
-      int total = Size * Size;
-      int k = (int)(((Math.Abs((dark * 20L) - (total * 10L)) + total - 1) / total) - 1);
-      result += k * PenaltyN4;
-      return result;
-    }
 
-    private long LinePenalty(int line, bool horizontal)
-    {
-      long result = 0;
-      bool runColor = false;
-      int runLength = 0;
-      Array.Clear(m_runHistory, 0, m_runHistory.Length);
-      for (int i = 0; i < Size; ++i)
+      // The function patterns, then the codeword bits onto their modules
+      Array.Copy(tables.FunctionRows, m_unmaskedRows, MaxSize);
+      Array.Copy(tables.FunctionColumns, m_unmaskedColumns, MaxSize);
+      var modules = tables.CodewordModules;
+      for (int i = 0; i < modules.Length; ++i)
       {
-        bool color = horizontal ? IsDark(i, line) : IsDark(line, i);
-        if (color == runColor)
-        {
-          ++runLength;
-          if (runLength == 5)
-            result += PenaltyN1;
-          else if (runLength > 5)
-            ++result;
-        }
-        else
-        {
-          FinderPenaltyAddHistory(runLength);
-          if (!runColor)
-            result += FinderPenaltyCountPatterns() * PenaltyN3;
-          runColor = color;
-          runLength = 1;
-        }
+        ulong bit = (ulong)((m_interleaved[i >> 3] >> (7 - (i & 7))) & 1);
+        int module = modules[i];
+        int x = QrVersionTables.ModuleX(module);
+        int y = QrVersionTables.ModuleY(module);
+        m_unmaskedRows[y] |= bit << (63 - x);
+        m_unmaskedColumns[x] |= bit << (63 - y);
       }
-      result += FinderPenaltyTerminateAndCount(runColor, runLength) * PenaltyN3;
-      return result;
+      return true;
     }
 
-    private int FinderPenaltyCountPatterns()
+    // The unmasked symbol with a mask applied to its data modules and the mask's format bits drawn, in the candidate rows and columns
+    private void ApplyMask(QrVersionTables tables, int mask)
     {
-      int n = m_runHistory[1];
-      bool core = n > 0 && m_runHistory[2] == n && m_runHistory[3] == n * 3 && m_runHistory[4] == n && m_runHistory[5] == n;
-      return (core && m_runHistory[0] >= n * 4 && m_runHistory[6] >= n ? 1 : 0) + (core && m_runHistory[6] >= n * 4 && m_runHistory[0] >= n ? 1 : 0);
-    }
-
-    private int FinderPenaltyTerminateAndCount(bool currentRunColor, int currentRunLength)
-    {
-      if (currentRunColor)
+      var rowPatterns = QrMaskPatterns.RowPatterns(mask);
+      var columnPatterns = QrMaskPatterns.ColumnPatterns(mask);
+      for (int i = 0; i < tables.Size; ++i)
       {
-        // Terminate the dark run
-        FinderPenaltyAddHistory(currentRunLength);
-        currentRunLength = 0;
+        m_candidateRows[i] = m_unmaskedRows[i] ^ (rowPatterns[i % QrMaskPatterns.MaskPeriod] & tables.DataRows[i]);
+        m_candidateColumns[i] = m_unmaskedColumns[i] ^ (columnPatterns[i % QrMaskPatterns.MaskPeriod] & tables.DataColumns[i]);
       }
-      currentRunLength += Size; // add the light border to the final run
-      FinderPenaltyAddHistory(currentRunLength);
-      return FinderPenaltyCountPatterns();
+      int format = QrMaskPatterns.FormatBits(mask);
+      var formatModules = tables.FormatModules;
+      for (int i = 0; i < formatModules.Length; ++i)
+      {
+        int module = formatModules[i];
+        ulong bit = (ulong)((format >> QrVersionTables.FormatBitOf(module)) & 1);
+        int x = QrVersionTables.ModuleX(module);
+        int y = QrVersionTables.ModuleY(module);
+        m_candidateRows[y] |= bit << (63 - x);
+        m_candidateColumns[x] |= bit << (63 - y);
+      }
     }
 
-    private void FinderPenaltyAddHistory(int currentRunLength)
+    // The candidate becomes the symbol; the symbol's buffers take the next candidate
+    private void TakeCandidate(int size)
     {
-      if (m_runHistory[0] == 0)
-        currentRunLength += Size; // add the light border to the initial run
-      Array.Copy(m_runHistory, 0, m_runHistory, 1, m_runHistory.Length - 1);
-      m_runHistory[0] = currentRunLength;
+      (m_rows, m_candidateRows) = (m_candidateRows, m_rows);
+      (m_columns, m_candidateColumns) = (m_candidateColumns, m_columns);
+      Size = size;
     }
-
-    private static bool GetBit(int value, int index) => ((value >> index) & 1) != 0;
   }
 }

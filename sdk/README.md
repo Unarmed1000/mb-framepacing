@@ -46,7 +46,7 @@ CI checks it):
 | Assembly                | Target         |     Size |
 | ----------------------- | -------------- | -------: |
 | `MB.FramePacing`        | netstandard2.1 | 13.5 KiB |
-| `MB.FramePacing.Marker` | netstandard2.1 | 25.5 KiB |
+| `MB.FramePacing.Marker` | netstandard2.1 | 27.0 KiB |
 | `MB.FramePacing.Data`   | net10.0        | 89.5 KiB |
 
 <!-- /sdk-csharp-size-table -->
@@ -128,6 +128,8 @@ The SDK has one version for every module and language, [`VERSION`](VERSION), rel
 ## License
 
 BSD 3-Clause, the same for everything under `sdk/`. [`LICENSE`](LICENSE) holds the text, and the release archives and packages ship
-it. The QR encoder in every marker library is based on the QR Code generator library by Project Nayuki (MIT): C++ and Python keep it in
-their own `third_party/` folder, and the C# port carries the notice in `QrEncoder.cs`. The C++ data module uses nlohmann/json (MIT)
+it. The QR encoder in every marker library is based on the QR Code generator library by Project Nayuki (MIT): the C++ and C# encoders
+are ports that carry its notice (`QrEncoder.cpp`, `QrEncoder.cs`), Python keeps its port in a `third_party/` folder, and the library
+itself is vendored next to the C++ module as the reference its tests and benchmarks compare with (`cpp/marker/reference/third_party`;
+see [Encoding performance](doc/encoding-performance.md)). The C++ data module uses nlohmann/json (MIT)
 inside the library. The license texts are listed in [`licenses/`](../licenses/README.md).

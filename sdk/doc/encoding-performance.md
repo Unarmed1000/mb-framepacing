@@ -4,27 +4,32 @@ An application encodes two QR symbols every frame: the main marker (QR version 6
 25×25). Measured with the benchmarks, that encoding took far longer than everything else the marker does: about 0.33 ms for a main
 marker and 0.11 ms for a sync marker, while drawing either takes a few microseconds.
 
-The C++ marker module now has its own QR encoder. It produces **exactly the same symbols** as the encoder it replaces, the
-[QR Code generator library](https://www.nayuki.io/page/qr-code-generator-library) by Project Nayuki (qrcodegen), and is about 40 times
-faster.
+The C++ and C# marker modules now have a QR encoder made for the marker. It produces **exactly the same symbols** as the encoders it
+replaces (in C++ the [QR Code generator library](https://www.nayuki.io/page/qr-code-generator-library) by Project Nayuki, qrcodegen;
+in C# a port of it), and is 20 to 40 times faster.
 
 ## Results
 
-C++, Release builds, one core of a 4.7 GHz desktop CPU. "Original" is qrcodegen, "own" is the module's encoder; both encode the same
-payloads, a new one every iteration, as an application does every frame.
+Release builds, one core of a 4.7 GHz desktop CPU. "Original" is qrcodegen (C++) or its module-by-module port (C#), "own" is the
+module's encoder; both encode the same payloads, a new one every iteration, as an application does every frame.
 
-| What                                     | Compiler | Original |    Own | Faster by |
-| ---------------------------------------- | -------- | -------: | -----: | --------: |
-| Main marker (frame, 53 bytes)            | MSVC     |   345 µs | 9.1 µs |       38× |
-| Main marker (start, 77 bytes)            | MSVC     |   341 µs | 9.3 µs |       37× |
-| Sync marker (16 bytes)                   | MSVC     |   108 µs | 3.9 µs |       28× |
-| Main marker (frame, 53 bytes)            | Clang    |   250 µs | 8.6 µs |       29× |
-| Main marker (start, 77 bytes)            | Clang    |   248 µs |  11 µs |       23× |
-| Sync marker (16 bytes)                   | Clang    |    74 µs | 4.6 µs |       16× |
-| A whole frame: both markers, as geometry | MSVC     |   492 µs |  20 µs |       25× |
+| What                                     | Language, compiler | Original |     Own | Faster by |
+| ---------------------------------------- | ------------------ | -------: | ------: | --------: |
+| Main marker (frame, 53 bytes)            | C++, MSVC          |   345 µs |  9.1 µs |       38× |
+| Main marker (start, 77 bytes)            | C++, MSVC          |   341 µs |  9.3 µs |       37× |
+| Sync marker (16 bytes)                   | C++, MSVC          |   108 µs |  3.9 µs |       28× |
+| Main marker (frame, 53 bytes)            | C++, Clang         |   250 µs |  8.6 µs |       29× |
+| Main marker (start, 77 bytes)            | C++, Clang         |   248 µs |   11 µs |       23× |
+| Sync marker (16 bytes)                   | C++, Clang         |    74 µs |  4.6 µs |       16× |
+| A whole frame: both markers, as geometry | C++, MSVC          |   492 µs |   20 µs |       25× |
+| Main marker (frame, 53 bytes)            | C#, .NET 10        |   279 µs | 11.9 µs |       24× |
+| Main marker (start, 77 bytes)            | C#, .NET 10        |   282 µs | 12.4 µs |       23× |
+| Sync marker (16 bytes)                   | C#, .NET 10        |    93 µs |  5.0 µs |       18× |
+| A whole frame: both markers, as geometry | C#, .NET 10        |   378 µs |   23 µs |       16× |
 
-The numbers move by a few percent from run to run. The C# module still has the module-by-module encoder (301 µs for a main marker);
-the same change is next there.
+The numbers move by a few percent from run to run. The C# frame's original time is the sum of its measured parts (the two encodes
+and the drawing); the others are measured as a whole. C# has no bit counting instructions in .NET Standard 2.1 (which Unity needs), so
+its encoder counts bits with plain arithmetic.
 
 ## Where the time went
 
@@ -117,14 +122,21 @@ Beyond the unit tests:
   and so on). The stress test reported every one within a second. A fifteenth change went unnoticed, rightly: it shortened the light
   border after a line from 41 to 40 modules, which no rule can tell apart.
 
-The golden markers (`sdk/test-data/markers`) are unchanged, and the C# and Python libraries, which have encoders of their own, still
-produce the same modules. The new encoder is covered completely by the tests (regions, functions, lines and branches).
+**C#** is checked the same way. Its reference is the encoder the library had before (`sdk/csharp/marker/Reference/ReferenceQrEncoder.cs`,
+module by module, compiled into the unit tests and benchmarks only), itself pinned to the golden modules by a test. `QrEncoderTests`
+compares symbols, masks, scores, ties and drawn symbols; `QrEncoderStressTests` is the stress test (one run with
+`MB_QR_STRESS_SCALE=200`: 4.8 million payloads, 4.8 million markers, 3.2 million drawn symbols, 800 million lines and every line of 25
+modules, without a difference), and ten deliberate mistakes in the C# encoder were each reported by it.
+
+The golden markers (`sdk/test-data/markers`) are unchanged, and all three libraries (the Python one keeps its module-by-module
+encoder) produce the same modules. The new encoder is covered completely by the tests (regions, functions, lines and branches).
 
 ## What it costs
 
 The tables are data in the library: about 8 KiB. An executable that uses the marker module grows by 20.0 KiB in a Release build
 (28.5 KiB with qrcodegen, whose code was larger) and by 18.0 KiB in a build optimized for size (12.0 KiB before: the tables do not
-shrink). See "What it adds to your executable" in `sdk/cpp/README.md`.
+shrink). See "What it adds to your executable" in `sdk/cpp/README.md`. The C# assembly `MB.FramePacing.Marker` grows from 25.5 to 27.0 KiB;
+its tables are made when the first encoder is created.
 
 ## What was left out
 
@@ -140,5 +152,12 @@ build/windows/marker/Release/mb_framepacing_marker_benchmarks --benchmark_filter
 ```
 
 `GenerateModules` is the module's encoder (with packing the result), `QrcodegenEncode` the original with the same payloads. The
-arguments are the marker kinds: 0 a frame marker, 1 a start marker, 3 the sync marker. Refresh the numbers in this document in the
-change that alters the encoder.
+arguments are the marker kinds: 0 a frame marker, 1 a start marker, 3 the sync marker.
+
+C# (BenchmarkDotNet; `ReferenceEncode` is the original):
+
+```
+dotnet run -c Release --project sdk/csharp/marker/Benchmarks/MB.FramePacing.Marker.Benchmarks.csproj -- --filter "*EncodeBenchmarks*"
+```
+
+Refresh the numbers in this document in the change that alters an encoder.

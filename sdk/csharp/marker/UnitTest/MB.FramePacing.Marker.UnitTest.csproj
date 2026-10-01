@@ -11,4 +11,9 @@
   <ItemGroup>
     <ProjectReference Include="..\MB.FramePacing.Marker.csproj" />
   </ItemGroup>
+
+  <!-- The reference the QR encoder is compared with and measured against (the encoder the module had before): not part of the library -->
+  <ItemGroup>
+    <Compile Include="..\Reference\ReferenceQrEncoder.cs" Link="Reference\ReferenceQrEncoder.cs" />
+  </ItemGroup>
 </Project>

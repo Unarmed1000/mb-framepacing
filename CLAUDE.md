@@ -123,6 +123,12 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     for about two million payloads on every core plus every 25-module line; ctest runs a short one) and, with Clang, the libFuzzer
     target (`marker/tests/fuzz`, `MB_FRAMEPACING_BUILD_FUZZERS`, on in `linux-sanitize`; CI's `cpp-analysis` fuzzes for a minute).
     Both compare with qrcodegen and stop at the first difference.
+    The C# marker has the same encoder (`sdk/csharp/marker/source/QrEncoder.cs` with `QrVersionTables`, `QrMaskPatterns`,
+    `QrReedSolomon`, `BitUtil`: .NET Standard 2.1 has no `BitOperations`). Its reference is the module-by-module encoder the library
+    had before, `sdk/csharp/marker/Reference/ReferenceQrEncoder.cs`: `Reference` folders, like `UnitTest` and `Benchmarks`, are kept
+    out of the library's compile by the root `Directory.Build.props`, and the unit tests and benchmarks link the file. `QrEncoderTests`
+    compares the two (and pins the reference to the golden modules), `QrEncoderStressTests` is the stress test (`MB_QR_STRESS_SCALE`
+    multiplies its amount; 200 for a long run), and the benchmark `ReferenceEncode` runs next to `GenerateModules`.
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
     (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally. The C# marker has the

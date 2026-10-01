@@ -4,8 +4,8 @@
 
 """QR code encoder for the marker: byte mode, error correction level M, versions 1-6, automatic mask selection.
 
-Third-party code under its own license (MIT, qrcodegen-LICENSE.txt next to this file): a port of the C# library's QrEncoder
-(sdk/csharp/marker/source/QrEncoder.cs), itself a port of the QR Code generator the C++ library is compared with
+Third-party code under its own license (MIT, qrcodegen-LICENSE.txt next to this file): a port of the C# library's module-by-module
+encoder (sdk/csharp/marker/Reference/ReferenceQrEncoder.cs), itself a port of the QR Code generator the C++ library is compared with
 (sdk/cpp/marker/reference/third_party/qrcodegen), limited to what the marker uses, so all of them produce exactly the same symbols; the
 tests check it module by module against test-data/markers/modules.csv.
 
