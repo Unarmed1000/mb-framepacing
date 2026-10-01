@@ -69,7 +69,12 @@ of C# rectification, well above 1000 fps on one core.
   intervals form clusters at whole refreshes; the refresh is the largest period that makes every well-populated cluster a whole
   multiple, so a game alternating 2 and 3 refreshes still gives the refresh. A steady game below the refresh rate (only
   2-refresh intervals) can not be told from a slower display; the rig's calibrated refresh settles that, and the analysis warns
-  when the two disagree by more than 1 %. The user can give the **expected display rate** (`--display-hz`, GUI "Display refresh
+  when the two disagree by more than 1 %. The period found that way is then measured with a least squares line through every
+  reliable first-seen time against its refresh number (`RefreshEstimator.RefinePeriodTicks`; the average of the intervals only uses
+  the two ends of each unbroken stretch). On simulated sightings its error is 10 to 20 times smaller, from 100 to 2000 fps on a
+  60 Hz display; `selftest --camera` finds 59.99 to 60.00 Hz at every rate of the table (59.90 to 60.11 Hz before). The line is
+  not taken when its own numbering does not hold up against it (a camera below about twice the refresh rate) or when it leaves
+  the estimate by more than 1 %. The user can give the **expected display rate** (`--display-hz`, GUI "Display refresh
   rate"): it settles the ambiguity first, and the analysis compares it with the calculated rate (`runs[].pacing.refreshDeviation`,
   a warning above 1 %). The calibration uses the same estimator, so a calibration clip must show one frame per
   refresh for most of it (vsync on, full rate).

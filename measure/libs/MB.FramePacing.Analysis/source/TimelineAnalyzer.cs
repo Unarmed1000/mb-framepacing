@@ -495,6 +495,8 @@ namespace MB.FramePacing.Analysis
           );
           return null;
         }
+        // Which period the intervals say; how long it is, the line through every reliable first-seen time
+        estimate = RefreshEstimator.RefinePeriodTicks(CameraFirstSeenTimes(frames), estimate);
         refresh = new TimeSpan((long)Math.Round(estimate));
         double calculatedHz = TimeSpan.TicksPerSecond / estimate;
         if (expected is { } expectedHz && !WithinTolerance(calculatedHz, expectedHz))
@@ -539,6 +541,20 @@ namespace MB.FramePacing.Analysis
       {
         if (frames[i].DisplayDelta is { } delta && (frames[i].Flags & Unreliable) == 0 && (frames[i - 1].Flags & PresentedFrameFlags.Torn) == 0)
           yield return delta.Ticks;
+      }
+    }
+
+    /// <summary>
+    /// The first-seen times a camera measured reliably: not a torn frame's or an uncertain start's, and not the run's first frame's
+    /// (it may have been on screen before the capture began). A frame that drops out leaves the others where they are.
+    /// </summary>
+    private static IEnumerable<TickCount64> CameraFirstSeenTimes(List<PresentedFrame> frames)
+    {
+      const PresentedFrameFlags Unreliable = PresentedFrameFlags.Torn | PresentedFrameFlags.UncertainStart;
+      for (int i = 1; i < frames.Count; ++i)
+      {
+        if ((frames[i].Flags & Unreliable) == 0)
+          yield return frames[i].FirstSeenTime;
       }
     }
 

@@ -181,8 +181,11 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
 - **The display's refresh rate** (`runs[].pacing.refreshPeriodMs`, `refreshCalculated: true`): a capture card captures at the
   refresh rate, a camera films faster, so the refresh is calculated from the frames. The first-seen intervals are whole refreshes
   quantised to camera periods; the refresh is the largest period that makes them whole multiples. A steady game below the refresh
-  rate is ambiguous alone: the rig's calibrated refresh settles it, and the analysis warns when the two disagree. Late frames
-  and the pacing verdict are measured against it.
+  rate is ambiguous alone: the rig's calibrated refresh settles it, and the analysis warns when the two disagree. That period is
+  then measured with every reliable first sighting at once: a line through the first-seen times against the refresh each fell on
+  (on the simulated camera the rate comes out within 0.01 Hz for a run of a few seconds; a camera slower than about twice the
+  refresh rate can not number the refreshes, and the average of the intervals stands). Late frames and the pacing verdict are
+  measured against it.
 - **The expected display rate** (`--display-hz 60` on `capture`, `import` or `analyze`; **Display refresh rate** in the GUI's
   Recording card, **Display Hz** on the Analyze page): the rate you believe the display runs at. It settles an ambiguous estimate
   before the rig's calibration, and the calculated rate is compared with it: the Analyze page shows "Display refresh 59.99 Hz

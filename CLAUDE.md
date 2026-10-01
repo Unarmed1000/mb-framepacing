@@ -313,7 +313,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     0.1 ms bins (`Histogram.DefaultBinWidth`), one error threshold (1 ms, `analyze --error-threshold-ms`,
     `TimelineOptions.ErrorThreshold`), and a display time step is off its target from half a refresh on. A source's precision (a
     camera's period) goes into warnings, never into the binning or the thresholds.
-  - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`, also used
+  - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`:
+    `EstimatePeriodTicks` finds which period from the intervals, `RefinePeriodTicks` measures it with a line through every
+    first-seen time, the maximum likelihood estimate once the refresh numbers are known; also used
     by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
     (`TimelineAnalyzer.RefreshTolerance`) is a warning.

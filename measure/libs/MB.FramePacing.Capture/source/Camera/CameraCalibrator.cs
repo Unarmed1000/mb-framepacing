@@ -371,15 +371,20 @@ namespace MB.FramePacing.Capture.Camera
           intervals.Add((ordered[k].Value - ordered[k - 1].Value).Ticks);
       }
       // The intervals are whole refreshes quantised to camera periods (16 or 17 ms for 60 Hz at 1000 fps)
-      double? refreshPeriod = RefreshEstimator.EstimatePeriodTicks(intervals, TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames)));
+      double? estimatedPeriod = RefreshEstimator.EstimatePeriodTicks(intervals, TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames)));
+      // Measured with every first sighting (not the frames already on screen when the capture began), skipped and held frames included
+      double? refreshPeriod = estimatedPeriod is { } estimated
+        ? RefreshEstimator.RefinePeriodTicks(ordered.Select(kv => kv.Value).Where(time => time != frames.Times[0]), estimated)
+        : null;
       double? refreshHz = refreshPeriod is { } refresh ? TimeSpan.TicksPerSecond / refresh : null;
       // What the estimate was made from, in full: the check's text rounds the rate to a tenth
       g_logger.Info(
         CultureInfo.InvariantCulture,
-        "Calibration timing: {0} camera frames, {1} frames first seen, {2} intervals between consecutive ones, refresh period {3} ticks ({4} Hz)",
+        "Calibration timing: {0} camera frames, {1} frames first seen, {2} intervals between consecutive ones, refresh period {3} ticks by the intervals, {4} by the line through the first-seen times ({5} Hz)",
         frames.Count,
         ordered.Count,
         intervals.Count,
+        estimatedPeriod,
         refreshPeriod,
         refreshHz
       );
