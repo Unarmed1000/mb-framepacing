@@ -8,7 +8,7 @@
 
 namespace MB::FramePacing::Data
 {
-  int64_t ParseTicks(const std::string_view milliseconds)
+  TimeSpan ParseMilliseconds(const std::string_view milliseconds)
   {
     // Decimal digits, not floating point: exact for any value the files hold
     std::string_view text = milliseconds;
@@ -36,6 +36,6 @@ namespace MB::FramePacing::Data
     {
       ++ticks;
     }
-    return negative ? -ticks : ticks;
+    return TimeSpan(negative ? -ticks : ticks);
   }
 }

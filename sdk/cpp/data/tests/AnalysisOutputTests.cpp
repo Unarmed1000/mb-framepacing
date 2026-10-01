@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // summary.json and the CSVs: the format version, columns by name, whole ticks.
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
@@ -13,6 +15,7 @@
 #include <string>
 #include <string_view>
 
+namespace FP = MB::FramePacing;
 namespace FD = MB::FramePacing::Data;
 
 namespace
@@ -69,12 +72,32 @@ TEST(AnalysisOutput, FramesAreReadByColumnNameWhateverTheOrder)
   std::filesystem::remove(path);
   ASSERT_EQ(rows.size(), 1u);
   EXPECT_EQ(rows[0].FrameIndex, 7u);
-  EXPECT_EQ(rows[0].AnimationTicks, 1'166'667);
-  EXPECT_EQ(rows[0].OnScreenTicks, 333'333);
-  EXPECT_EQ(rows[0].DriftTicks, -5'000);
+  EXPECT_EQ(rows[0].AnimationTime, FP::TimeSpan(1'166'667));
+  EXPECT_EQ(rows[0].OnScreen, FP::TimeSpan(333'333));
+  EXPECT_EQ(rows[0].Drift, FP::TimeSpan(-5'000));
   EXPECT_EQ(rows[0].Flags, (std::vector<std::string>{"SkippedBefore", "Late"}));
-  EXPECT_FALSE(rows[0].CpuBusyTicks.has_value()) << "an empty cell";
-  EXPECT_FALSE(rows[0].LastSeenTicks.has_value()) << "a column the file lacks";
+  EXPECT_FALSE(rows[0].CpuBusy.has_value()) << "an empty cell";
+  EXPECT_FALSE(rows[0].LastSeenTime.has_value()) << "a column the file lacks";
+}
+
+TEST(AnalysisOutput, TheMarkersValuesMustFit32Bits)
+{
+  const auto path = std::filesystem::temp_directory_path() / "mb_framepacing_data_test-marker-values.csv";
+  const auto read = [&path](const std::string_view cpuBusyMs)
+  {
+    {
+      std::ofstream out(path, std::ios::binary);
+      out << "segment,frameIndex,animationMs,firstCaptureIndex,firstSeenMs,onScreenMs,captures,skippedBefore,driftMs,flags,cpuBusyMs\r\n"
+          << "0,1,0,0,0,16.6667,1,0,0,," << cpuBusyMs << "\r\n";
+    }
+    auto rows = FD::ReadFrames(path);
+    std::filesystem::remove(path);
+    return rows;
+  };
+  EXPECT_EQ(read("429496.7295").at(0).CpuBusy, FP::TimeSpan32::MaxValue()) << "the largest";
+  EXPECT_EQ(read("8").at(0).CpuBusy, FP::TimeSpan32(80'000u));
+  EXPECT_THROW((void)read("429496.7296"), FD::DataFormatError);
+  EXPECT_THROW((void)read("-0.0001"), FD::DataFormatError);
 }
 
 TEST(AnalysisOutput, CapturesCarrySourceDropsMissedRefreshesAndTheSyncMarker)
@@ -97,16 +120,16 @@ TEST(AnalysisOutput, CapturesCarrySourceDropsMissedRefreshesAndTheSyncMarker)
   EXPECT_EQ(rows[0].SourceDropsBefore, 3);
   EXPECT_EQ(rows[0].MissedBefore, 1);
   EXPECT_EQ(rows[0].Payload, (std::vector<uint8_t>{0x4D, 0x46}));
-  EXPECT_FALSE(rows[1].CaptureTicks.has_value()) << "a capture the recorder dropped";
+  EXPECT_FALSE(rows[1].CaptureTime.has_value()) << "a capture the recorder dropped";
   EXPECT_FALSE(rows[1].SyncFrameIndex.has_value());
 }
 
 TEST(AnalysisOutput, MillisecondsAreWholeTicks)
 {
-  EXPECT_EQ(FD::ParseTicks("16.6667"), 166'667);
-  EXPECT_EQ(FD::ParseTicks("-0.0003"), -3);
-  EXPECT_EQ(FD::ParseTicks("12345678.9012"), 123'456'789'012);
-  EXPECT_EQ(FD::ParseTicks("0"), 0);
-  EXPECT_THROW((void)FD::ParseTicks("1e-5"), FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseTicks(""), FD::DataFormatError);
+  EXPECT_EQ(FD::ParseMilliseconds("16.6667"), FP::TimeSpan(166'667));
+  EXPECT_EQ(FD::ParseMilliseconds("-0.0003"), FP::TimeSpan(-3));
+  EXPECT_EQ(FD::ParseMilliseconds("12345678.9012"), FP::TimeSpan(123'456'789'012));
+  EXPECT_EQ(FD::ParseMilliseconds("0"), FP::TimeSpan());
+  EXPECT_THROW((void)FD::ParseMilliseconds("1e-5"), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseMilliseconds(""), FD::DataFormatError);
 }

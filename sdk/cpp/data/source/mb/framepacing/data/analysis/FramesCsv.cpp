@@ -20,16 +20,16 @@ namespace MB::FramePacing::Data
       FrameRow frame;
       frame.Segment = Detail::ParseInteger<int32_t>(table.Cell(row, "segment"));
       frame.FrameIndex = Detail::ParseInteger<uint64_t>(table.Cell(row, "frameIndex"));
-      frame.AnimationTicks = ParseTicks(table.Cell(row, "animationMs"));
+      frame.AnimationTime = ParseMilliseconds(table.Cell(row, "animationMs"));
       frame.FirstCaptureIndex = Detail::ParseInteger<int64_t>(table.Cell(row, "firstCaptureIndex"));
-      frame.FirstSeenTicks = ParseTicks(table.Cell(row, "firstSeenMs"));
-      frame.OnScreenTicks = ParseTicks(table.Cell(row, "onScreenMs"));
+      frame.FirstSeenTime = Detail::ParseTickCount64(table.Cell(row, "firstSeenMs"));
+      frame.OnScreen = ParseMilliseconds(table.Cell(row, "onScreenMs"));
       frame.Captures = Detail::ParseInteger<int32_t>(table.Cell(row, "captures"));
       frame.SkippedBefore = Detail::ParseInteger<uint64_t>(table.Cell(row, "skippedBefore"));
-      frame.DisplayDeltaTicks = Detail::OptionalTicks(table.Cell(row, "displayDeltaMs"));
-      frame.AnimationDeltaTicks = Detail::OptionalTicks(table.Cell(row, "animationDeltaMs"));
-      frame.AnimationErrorTicks = Detail::OptionalTicks(table.Cell(row, "animationErrorMs"));
-      frame.DriftTicks = ParseTicks(table.Cell(row, "driftMs"));
+      frame.DisplayDelta = Detail::OptionalTimeSpan(table.Cell(row, "displayDeltaMs"));
+      frame.AnimationDelta = Detail::OptionalTimeSpan(table.Cell(row, "animationDeltaMs"));
+      frame.AnimationError = Detail::OptionalTimeSpan(table.Cell(row, "animationErrorMs"));
+      frame.Drift = ParseMilliseconds(table.Cell(row, "driftMs"));
       const std::string_view flags = table.Cell(row, "flags");
       for (std::size_t start = 0; start < flags.size();)
       {
@@ -38,19 +38,19 @@ namespace MB::FramePacing::Data
         frame.Flags.emplace_back(flags.substr(start, stop - start));
         start = stop + 1;
       }
-      frame.IntendedDisplayTicks = Detail::OptionalTicks(table.Cell(row, "intendedDisplayMs"));
-      frame.MarkerTargetTicks = Detail::OptionalTicks(table.Cell(row, "markerTargetMs"));
-      frame.TargetTicks = Detail::OptionalTicks(table.Cell(row, "targetMs"));
-      frame.MarkerPreferredTicks = Detail::OptionalTicks(table.Cell(row, "markerPreferredMs"));
-      frame.PreferredTicks = Detail::OptionalTicks(table.Cell(row, "preferredMs"));
-      frame.PacingErrorTicks = Detail::OptionalTicks(table.Cell(row, "pacingErrorMs"));
-      frame.PredictionErrorTicks = Detail::OptionalTicks(table.Cell(row, "predictionErrorMs"));
-      frame.LatenessTicks = Detail::OptionalTicks(table.Cell(row, "latenessMs"));
-      frame.LastSeenTicks = Detail::OptionalTicks(table.Cell(row, "lastSeenMs"));
-      frame.CpuStartTicks = Detail::OptionalTicks(table.Cell(row, "cpuStartMs"));
-      frame.CpuBusyTicks = Detail::OptionalTicks(table.Cell(row, "cpuBusyMs"));
-      frame.FrameTimeTicks = Detail::OptionalTicks(table.Cell(row, "frameTimeMs"));
-      frame.CpuWaitTicks = Detail::OptionalTicks(table.Cell(row, "cpuWaitMs"));
+      frame.IntendedDisplayTime = Detail::OptionalTickCount64(table.Cell(row, "intendedDisplayMs"));
+      frame.MarkerTargetFrameTime = Detail::OptionalTimeSpan32(table.Cell(row, "markerTargetMs"));
+      frame.TargetFrameTime = Detail::OptionalTimeSpan(table.Cell(row, "targetMs"));
+      frame.MarkerPreferredFrameTime = Detail::OptionalTimeSpan32(table.Cell(row, "markerPreferredMs"));
+      frame.PreferredFrameTime = Detail::OptionalTimeSpan(table.Cell(row, "preferredMs"));
+      frame.PacingError = Detail::OptionalTimeSpan(table.Cell(row, "pacingErrorMs"));
+      frame.PredictionError = Detail::OptionalTimeSpan(table.Cell(row, "predictionErrorMs"));
+      frame.Lateness = Detail::OptionalTimeSpan(table.Cell(row, "latenessMs"));
+      frame.LastSeenTime = Detail::OptionalTickCount64(table.Cell(row, "lastSeenMs"));
+      frame.CpuStartTime = Detail::OptionalTickCount64(table.Cell(row, "cpuStartMs"));
+      frame.CpuBusy = Detail::OptionalTimeSpan32(table.Cell(row, "cpuBusyMs"));
+      frame.FrameTime = Detail::OptionalTimeSpan(table.Cell(row, "frameTimeMs"));
+      frame.CpuWait = Detail::OptionalTimeSpan(table.Cell(row, "cpuWaitMs"));
       // olderFrames: frameIndex@captureMs entries separated by |
       const std::string_view older = table.Cell(row, "olderFrames");
       for (std::size_t start = 0; start < older.size();)
@@ -63,11 +63,11 @@ namespace MB::FramePacing::Data
         {
           throw DataFormatError("Invalid olderFrames entry '" + std::string(entry) + "'");
         }
-        frame.OlderFrames.push_back({Detail::ParseInteger<uint64_t>(entry.substr(0, at)), ParseTicks(entry.substr(at + 1))});
+        frame.OlderFrames.push_back({Detail::ParseInteger<uint64_t>(entry.substr(0, at)), Detail::ParseTickCount64(entry.substr(at + 1))});
         start = stop + 1;
       }
-      frame.MainMarkerFirstSeenTicks = Detail::OptionalTicks(table.Cell(row, "mainMarkerFirstSeenMs"));
-      frame.ScanoutDelayTicks = Detail::OptionalTicks(table.Cell(row, "scanoutDelayMs"));
+      frame.MainMarkerFirstSeenTime = Detail::OptionalTickCount64(table.Cell(row, "mainMarkerFirstSeenMs"));
+      frame.ScanoutDelay = Detail::OptionalTimeSpan(table.Cell(row, "scanoutDelayMs"));
       frames.push_back(std::move(frame));
     }
     return frames;

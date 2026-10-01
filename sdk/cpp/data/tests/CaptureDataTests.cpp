@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // captures.mbcd: header fields at their offsets, newer and foreign files refused, records read back, a partial last record ignored.
 #include <mb/framepacing/core/Rectangle.hpp>
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/capture/CaptureDataHeader.hpp>
 #include <mb/framepacing/data/capture/CaptureDataReader.hpp>
@@ -17,6 +18,7 @@
 #include <vector>
 #include "mb/framepacing/data/capture/detail/CaptureDataFormat.hpp"
 
+namespace FP = MB::FramePacing;
 namespace FD = MB::FramePacing::Data;
 
 namespace
@@ -118,7 +120,7 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
   }
   const std::vector<uint8_t> second(FD::CaptureDataFormat::SecondMarkerCapacity, 0x5Au);
   auto file = HeaderBytes();
-  for (const auto& record : {RecordBytes(0, 200, 1, main, second), RecordBytes(2, FD::CaptureDataRecord::UnknownTicks, 0, {}, {})})
+  for (const auto& record : {RecordBytes(0, 200, 1, main, second), RecordBytes(2, FD::CaptureDataFormat::UnknownTicks, 0, {}, {})})
   {
     file.insert(file.end(), record.begin(), record.end());
   }
@@ -139,11 +141,11 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
   std::filesystem::remove(path);
 
   EXPECT_EQ(records[0].CaptureIndex, 0);
-  EXPECT_EQ(records[0].DeviceTicks, 200);
+  EXPECT_EQ(records[0].DeviceTime, FP::TickCount64(200));
   EXPECT_EQ(records[0].Status, FD::CaptureDataStatus::Decoded);
   EXPECT_EQ(records[0].MainBytes, main);
   EXPECT_EQ(records[0].SecondBytes, second);
   EXPECT_EQ(records[1].SourceDrops, 3u);
-  EXPECT_FALSE(records[1].HasDeviceTicks());
+  EXPECT_FALSE(records[1].DeviceTime.has_value());
   EXPECT_TRUE(records[1].MainBytes.empty());
 }

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include <mb/framepacing/core/ByteSpanUtil.hpp>
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/capture/CaptureDataRecord.hpp>
 #include <mb/framepacing/data/capture/CaptureDataStatus.hpp>
@@ -54,8 +55,12 @@ namespace MB::FramePacing::Data
     }
     CaptureDataRecord record;
     record.CaptureIndex = ByteSpanUtil::ReadLE<int64_t>(bytes, 0);
-    record.HostTicks = ByteSpanUtil::ReadLE<int64_t>(bytes, 8);
-    record.DeviceTicks = ByteSpanUtil::ReadLE<int64_t>(bytes, 16);
+    record.HostTime = TickCount64(ByteSpanUtil::ReadLE<int64_t>(bytes, 8));
+    const auto deviceTicks = ByteSpanUtil::ReadLE<int64_t>(bytes, 16);
+    if (deviceTicks != CaptureDataFormat::UnknownTicks)
+    {
+      record.DeviceTime = TickCount64(deviceTicks);
+    }
     record.SourceDrops = ByteSpanUtil::ReadLE<uint32_t>(bytes, 24);
     record.Status = static_cast<CaptureDataStatus>(status);
     const auto main = bytes.subspan(OffsetMain, mainLength);

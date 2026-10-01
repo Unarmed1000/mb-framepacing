@@ -39,7 +39,7 @@ int main()
     FP::TimeSpan32{frameTicks}};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
-  const int64_t ticks = FP::Data::ParseTicks("16.6667");
+  const int64_t ticks = FP::Data::ParseMilliseconds("16.6667").Ticks();
   const std::string_view version = FP::GetLibraryVersion().Text;
   std::printf("mb_framepacing %.*s: %zu vertices, %lld ticks, a %u tick frame\n", static_cast<int>(version.size()), version.data(), count,
               static_cast<long long>(ticks), static_cast<unsigned>(payload.TargetFrameTime().Ticks()));

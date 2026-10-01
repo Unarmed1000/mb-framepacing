@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace MB::FramePacing::Data::CaptureDataFormat
 {
@@ -15,6 +16,8 @@ namespace MB::FramePacing::Data::CaptureDataFormat
   inline constexpr std::size_t HeaderSize = 256;
   inline constexpr std::size_t RecordSize = 192;
   inline constexpr std::size_t MaxMarkerLocations = 4;
+  //! A record's device timestamp when the capture source gave none.
+  inline constexpr int64_t UnknownTicks = std::numeric_limits<int64_t>::min();
   //! Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes).
   inline constexpr std::size_t MainMarkerCapacity = 80;
   inline constexpr std::size_t SecondMarkerCapacity = 80;

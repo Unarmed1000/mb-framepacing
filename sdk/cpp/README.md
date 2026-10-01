@@ -143,10 +143,10 @@ for (const FD::SummaryRun& run : summary.Runs)
 {
   for (const FD::FrameRow& frame : FD::ReadFrames(*analysis / run.FramesFile))
   {
-    // Times are 100 ns ticks; an empty cell is an empty std::optional
-    if (frame.AnimationErrorTicks)
+    // Points in time are TickCount64s, spans TimeSpans; an empty cell is an empty std::optional
+    if (frame.AnimationError)
     {
-      std::printf("%llu: %.4f ms\n", static_cast<unsigned long long>(frame.FrameIndex), *frame.AnimationErrorTicks / 10'000.0);
+      std::printf("%llu: %.4f ms\n", static_cast<unsigned long long>(frame.FrameIndex), frame.AnimationError->TotalMilliseconds());
     }
   }
 }
@@ -162,19 +162,24 @@ for (const FD::CaptureDataRecord& record : reader.ReadAll())
 }
 ```
 
+The times are typed: points in time are `TickCount64`s, on the capture's clock (a frame's `FirstSeenTime`, a record's `HostTime`
+and `DeviceTime`, empty when the device gave none) or the frame pacer's (`IntendedDisplayTime`, `CpuStartTime`); spans are
+`TimeSpan`s (`DisplayDelta`, `AnimationError`, ...); the marker's own 32-bit values (`MarkerTargetFrameTime`, `CpuBusy`) are
+`TimeSpan32`s.
+
 Reading allocates and throws: `FD::DataFormatError` for a file it cannot read (another kind of file, damaged content, or a newer format
 version, whose message says to update), `std::runtime_error` for a file it cannot open. In `MB::FramePacing::Data`, each type and
 each group of functions in its own header (`<mb/framepacing/data/…>`: `AnalysisSummary.hpp` has `ReadSummary`, `FramesCsv.hpp`
-`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names, `Milliseconds.hpp` `ParseTicks`):
+`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names, `Milliseconds.hpp` `ParseMilliseconds`):
 
-| Function or type                                                            | What it does                                                       |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`               | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...) |
-| `CaptureDataStatus`, `MarkerLocation`, `CaptureDataRecord::UnknownTicks`    | A record's status, where the markers are, a missing device time    |
-| `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs | `summary.json` (capture.json inside it as JSON text)               |
-| `ReadFrames`, `FrameRow`                                                    | A run's frames CSV, by column name                                 |
-| `ReadCaptures`, `CaptureCsvRow`                                             | `captures.csv`, by column name                                     |
-| `FindAnalysis`, `FramesFileName`, `ParseTicks`, the file name constants     | The analysis folder, the file names, the CSV time format           |
+| Function or type                                                               | What it does                                                            |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                  | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...)      |
+| `CaptureDataStatus`, `MarkerLocation`                                          | A record's status, where the markers are                                |
+| `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs    | `summary.json` (capture.json inside it as JSON text)                    |
+| `ReadFrames`, `FrameRow`                                                       | A run's frames CSV, by column name                                      |
+| `ReadCaptures`, `CaptureCsvRow`                                                | `captures.csv`, by column name                                          |
+| `FindAnalysis`, `FramesFileName`, `ParseMilliseconds`, the file name constants | The analysis folder, the file names, the CSV time format (a `TimeSpan`) |
 
 ## The pacer
 

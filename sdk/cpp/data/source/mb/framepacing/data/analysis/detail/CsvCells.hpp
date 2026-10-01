@@ -5,6 +5,9 @@
 //
 // Private to the data module: parsing the cells of the CSV files (an empty cell is a missing value).
 
+#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/Milliseconds.hpp>
 #include <charconv>
@@ -36,9 +39,36 @@ namespace MB::FramePacing::Data::Detail
     return text.empty() ? std::nullopt : std::optional<T>(ParseInteger<T>(text));
   }
 
-  inline std::optional<int64_t> OptionalTicks(const std::string_view text)
+  //! A point on a clock from its milliseconds since the clock's zero.
+  inline TickCount64 ParseTickCount64(const std::string_view text)
   {
-    return text.empty() ? std::nullopt : std::optional<int64_t>(ParseTicks(text));
+    return TickCount64(ParseMilliseconds(text));
+  }
+
+  //! A marker's 32-bit span (0 to OnDemandFrameTime). Throws DataFormatError for a value outside.
+  inline TimeSpan32 ParseTimeSpan32(const std::string_view text)
+  {
+    const TimeSpan value = ParseMilliseconds(text);
+    if (value < TimeSpan::Zero() || value > TimeSpan32::MaxValue().ToTimeSpan())
+    {
+      throw DataFormatError("'" + std::string(text) + "' is not a 32-bit span of ticks");
+    }
+    return TimeSpan32::FromTimeSpan(value);
+  }
+
+  inline std::optional<TimeSpan> OptionalTimeSpan(const std::string_view text)
+  {
+    return text.empty() ? std::nullopt : std::optional<TimeSpan>(ParseMilliseconds(text));
+  }
+
+  inline std::optional<TickCount64> OptionalTickCount64(const std::string_view text)
+  {
+    return text.empty() ? std::nullopt : std::optional<TickCount64>(ParseTickCount64(text));
+  }
+
+  inline std::optional<TimeSpan32> OptionalTimeSpan32(const std::string_view text)
+  {
+    return text.empty() ? std::nullopt : std::optional<TimeSpan32>(ParseTimeSpan32(text));
   }
 }
 

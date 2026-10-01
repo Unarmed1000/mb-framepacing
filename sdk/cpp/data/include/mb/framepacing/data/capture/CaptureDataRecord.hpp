@@ -3,38 +3,31 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/data/capture/CaptureDataStatus.hpp>
 #include <mb/framepacing/marker/payload/Payload.hpp>
 #include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <cstdint>
-#include <limits>
+#include <optional>
 #include <span>
 #include <vector>
 
 namespace MB::FramePacing::Data
 {
   //! One capture of captures.mbcd: the source's frame counter (gaps are captures the recorder dropped), when it arrived on the host's
-  //! steady clock and the device's timestamp (100 ns ticks since the capture started), how many frames the source reported dropping since
+  //! steady clock and the device's timestamp (both since the capture started), how many frames the source reported dropping since
   //! the previous record, the status, and the main and second markers' bytes as read (empty when not read).
   struct CaptureDataRecord
   {
-    //! A device timestamp the capture source did not give.
-    static constexpr int64_t UnknownTicks = std::numeric_limits<int64_t>::min();
-
     int64_t CaptureIndex{0};
-    int64_t HostTicks{0};
-    //! UnknownTicks when the device gave none.
-    int64_t DeviceTicks{UnknownTicks};
+    TickCount64 HostTime;
+    //! Empty when the device gave none.
+    std::optional<TickCount64> DeviceTime;
     //! How many frames the capture source reported dropping since the previous record (0: none).
     uint32_t SourceDrops{0};
     CaptureDataStatus Status{CaptureDataStatus::Undecodable};
     std::vector<uint8_t> MainBytes;
     std::vector<uint8_t> SecondBytes;
-
-    [[nodiscard]] bool HasDeviceTicks() const noexcept
-    {
-      return DeviceTicks != UnknownTicks;
-    }
 
     //! The main marker's payload (and a start marker's metadata), decoded with the marker library. False when there is none or it is not
     //! a valid payload.
