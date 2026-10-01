@@ -85,7 +85,9 @@ def tidy_command(root: Path, build: Path, sources: list[str]) -> list[str]:
     flags = [
         "-std=c++20",
         *(f"-I{cpp / module / 'include'}" for module in (*MODULES, TEST_SUPPORT)),
-        f"-I{cpp / 'marker' / 'third_party' / 'qrcodegen'}",
+        # the marker's tests and benchmarks compare its QR encoder with the vendored reference
+        f"-I{cpp / 'marker' / 'reference' / 'third_party' / 'qrcodegen'}",
+        f"-I{cpp / 'marker' / 'reference'}",
         f"-I{cpp / 'pacer' / 'tests' / 'simulation'}",
         # the marker and data tests check their private formats
         f"-I{cpp / 'marker' / 'source'}",

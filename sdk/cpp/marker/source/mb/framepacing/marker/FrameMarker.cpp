@@ -26,8 +26,9 @@
 #include <array>
 #include <bit>
 #include <cassert>
+#include "detail/QrEncoder.hpp"
+#include "detail/QrSymbol.hpp"
 #include "detail/WireFormat.hpp"
-#include "qrcodegen.h"
 
 namespace MB::FramePacing::Marker
 {
@@ -55,9 +56,6 @@ namespace MB::FramePacing::Marker
       return bytes;
     }
 
-    constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(WireFormat::QrVersion);
-
-    static_assert(Payload::MaxEncodedByteCount <= QrBufferLength);
     static_assert(ModuleMatrix::MainSize == 41);
     static_assert(MaxQuadCount() == 862u);
     static_assert(MaxTriangleVertexCount() == std::size_t{862} * 6u);
@@ -339,9 +337,8 @@ namespace MB::FramePacing::Marker
 
   bool GenerateModules(const Payload& payload, ModuleMatrix& rMatrix, const StartMetadata& metadata) noexcept
   {
-    std::array<uint8_t, QrBufferLength> dataAndTemp{};
-    std::array<uint8_t, QrBufferLength> qrCode{};
-    const std::size_t byteCount = EncodePayload(payload, metadata, dataAndTemp);
+    std::array<uint8_t, Payload::MaxEncodedByteCount> data{};
+    const std::size_t byteCount = EncodePayload(payload, metadata, data);
     if (byteCount == 0)
     {
       return false;
@@ -350,25 +347,13 @@ namespace MB::FramePacing::Marker
     // Every kind is pinned to one version, so the symbol never changes size between frames.
     const int32_t version = payload.Kind() == MarkerKind::Sync ? WireFormat::SyncQrVersion : WireFormat::QrVersion;
     // Cannot fail: every kind's bytes fit its version (WireFormat::QrCapacityBytes, WireFormat::SyncQrCapacityBytes)
-    [[maybe_unused]] const bool encoded =
-      qrcodegen_encodeBinary(dataAndTemp.data(), byteCount, qrCode.data(), qrcodegen_Ecc_MEDIUM, version, version, qrcodegen_Mask_AUTO, false);
+    QrEncoder::QrSymbol symbol;
+    [[maybe_unused]] const bool encoded = QrEncoder::Encode(std::span<const uint8_t>(data).first(byteCount), version, symbol);
     assert(encoded);
 
-    // Pack the symbol: row-major, most significant bit first, continuous across rows
-    const int32_t size = qrcodegen_getSize(qrCode.data());
     std::array<uint8_t, ModuleMatrix::MaxPackedModuleByteCount> bits{};
-    std::size_t index = 0;
-    for (int32_t y = 0; y < size; ++y)
-    {
-      for (int32_t x = 0; x < size; ++x, ++index)
-      {
-        if (qrcodegen_getModule(qrCode.data(), x, y))
-        {
-          bits[index / 8u] = static_cast<uint8_t>(bits[index / 8u] | (0x80u >> (index % 8u)));
-        }
-      }
-    }
-    return ModuleMatrix::TryFromBits(size, bits, rMatrix);
+    QrEncoder::PackModules(symbol, bits);
+    return ModuleMatrix::TryFromBits(symbol.Size, bits, rMatrix);
   }
 
   std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<MarkerQuad> dst) noexcept

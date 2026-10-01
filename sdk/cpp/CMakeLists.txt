@@ -56,7 +56,7 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-# Warnings apply to our C++ sources only; vendored C sources (qrcodegen) are compiled as-is.
+# Warnings apply to our C++ sources only; vendored C sources (qrcodegen, the marker tests' reference) are compiled as-is.
 set(MB_FRAMEPACING_CXX_WARNINGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- $<$<BOOL:${MB_FRAMEPACING_WARNINGS_AS_ERRORS}>:/WX>>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Wconversion -Wshadow $<$<BOOL:${MB_FRAMEPACING_WARNINGS_AS_ERRORS}>:-Werror>>)

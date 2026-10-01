@@ -5,7 +5,8 @@
 
   mb-framepacing-cpp-<version>.tar.gz and .zip, each holding one folder mb-framepacing-cpp-<version>/ with
     the library source tree (sdk/cpp without build output: core, marker, data, pacer), VERSION, LICENSE,
-    licenses/ (qrcodegen and nlohmann/json: compiled in; GoogleTest: fetched by the tests; Google Benchmark: by the benchmarks), doc/ (the marker format, the integration
+    licenses/ (qrcodegen: ported into the marker module and its tests' reference; nlohmann/json: compiled in; GoogleTest: fetched by the
+    tests; Google Benchmark: by the benchmarks), doc/ (the marker format, the integration
     guide, the data formats, the pacer), shaders/ (the reference shaders) and test-data/data/ and test-data/pacer/ (the golden data the
     data and pacer modules' tests read)
   SHA256SUMS

@@ -4,9 +4,9 @@
 //* File Description
 //* ----------------
 //* QR code encoder for the marker: byte mode, error correction level M, versions 1-6, automatic mask selection. A port of the QR Code
-//* generator the C++ library vendors (sdk/cpp/marker/third_party/qrcodegen), limited to what the marker uses, so both produce exactly the same
-//* symbols; the tests check it module by module against test-data/markers/modules.csv. Every buffer is allocated once, Encode never
-//* allocates.
+//* generator the C++ library is compared with (sdk/cpp/marker/reference/third_party/qrcodegen), limited to what the marker uses, so both
+//* produce exactly the same symbols; the tests check it module by module against test-data/markers/modules.csv. Every buffer is allocated
+//* once, Encode never allocates.
 //*
 //* Based on the QR Code generator library, https://www.nayuki.io/page/qr-code-generator-library
 //* Copyright (c) Project Nayuki. (MIT License)

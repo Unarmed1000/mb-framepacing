@@ -245,8 +245,8 @@ frames CSVs and `captures.mbcd`, with nlohmann/json and `std::filesystem`).
 
 | Toolchain               | Compiler           | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | ------------------ | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0 | Release    | 3.5 KiB |      28.5 KiB |            230.0 KiB |
-| MSVC, Windows x64       | MSVC 19.51.36260.0 | MinSizeRel | 4.0 KiB |      12.0 KiB |            189.0 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0 | Release    | 3.5 KiB |      20.0 KiB |            221.5 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0 | MinSizeRel | 4.0 KiB |      18.0 KiB |            194.5 KiB |
 | GCC, Linux x64          | -                  | Release    |       - |             - |                    - |
 | GCC, Linux x64          | -                  | MinSizeRel |       - |             - |                    - |
 | Clang, Linux x64        | -                  | Release    |       - |             - |                    - |
@@ -285,6 +285,7 @@ build/windows/marker/Release/mb_framepacing_marker_benchmarks   # --benchmark_fi
 
 ## License
 
-BSD 3-Clause (`LICENSE`). The QR encoder (`marker/third_party/qrcodegen`) is the QR Code generator library by Project Nayuki, MIT;
+BSD 3-Clause (`LICENSE`). The QR encoder is a port of the QR Code generator library by Project Nayuki, MIT (vendored in
+`marker/reference/third_party/qrcodegen`, which only the tests and benchmarks build, to compare it with);
 the data module parses JSON with nlohmann/json, MIT; the tests use GoogleTest (BSD 3-Clause), which is not part of the library. Their
 license texts are in a release archive's `licenses/` folder (the repository's root `licenses/`).
