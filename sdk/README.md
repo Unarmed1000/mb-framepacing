@@ -24,6 +24,7 @@ Everything here is under the BSD 3-Clause License. The measuring tools themselve
 | Know what to write in each marker field      | [Filling the marker fields](doc/marker-fields.md)                                                                                                             |
 | Read the tools' results in your own code     | [The data module](#the-data-module), [the analysis output format](doc/analysis-output-format.md)                                                              |
 | Implement the marker or a reader yourself    | [The marker format](doc/marker-format.md), [the capture data format](doc/capture-data-format.md), [the analysis output format](doc/analysis-output-format.md) |
+| Know what the marker costs per frame         | [Encoding performance](doc/encoding-performance.md), and the benchmarks in the [C++ README](cpp/README.md)                                                    |
 
 ## Pick a library
 

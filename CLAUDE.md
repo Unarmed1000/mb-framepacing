@@ -35,7 +35,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                   |
 | `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`          |
 | `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, time types, `Point`, `Rectangle` + tests                     |
-| `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker`, vendored qrcodegen, `marker-render` tool, GoogleTest tests                |
+| `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker` with its own QR encoder, `reference/` (qrcodegen), `marker-render`, tests  |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
 | `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulation and `pacer-sim` (`tests/`, test code)  |
 | `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote) |
@@ -111,6 +111,14 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     `--check` fails beyond 10 % (at least 4 KiB). CI's `cpp-size` job checks MSVC, GCC, Clang and AppleClang and uploads each
     measurement (`--update-doc size-*.json` takes them). Refresh the table in the change that alters a module's size. `--csharp`
     measures the C# modules' Release assemblies for the table in `sdk/README.md` (`--check` in CI's `dotnet-lint`, `--update-doc` to rewrite).
+  - **QR encoder (`sdk/doc/encoding-performance.md`):** the marker module encodes with its own encoder
+    (`marker/source/mb/framepacing/marker/detail/QrEncoder.cpp`: versions 2 and 6, level M; the symbol as a 64-bit word per row and
+    column, compile-time tables, masks by XOR, the mask penalty scored with word operations), about 40 times faster than qrcodegen
+    with exactly its symbols: the mask rule (lowest penalty, the lowest numbered on a tie) is part of the format. qrcodegen stays
+    unchanged in `marker/reference/third_party/qrcodegen` (`QrcodegenReference` adds access to its penalty score), built only for the
+    tests and benchmarks: `QrEncoderTests` compares every symbol, every mask's score and drawn symbols with it, and the benchmark
+    `QrcodegenEncode` runs next to `GenerateModules`. Refresh the document's numbers and the size table in the change that alters the
+    encoder.
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
     (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally. The C# marker has the
@@ -445,7 +453,7 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   - C# style: a boxed file header, 2-space indent, block namespaces, `m_`/`g_` field prefixes, CSharpier (`.csharpierrc`, width 150).
   - SDK value types are `readonly struct`s with `public readonly` fields (derived values are expression-bodied properties) and
     `GetHashCode` through `HashCode.Combine` (a `HashCode` builder past 8 fields, `Payload`).
-- **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored, GoogleTest
+- **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored as the QR encoder's reference (tests and benchmarks only), GoogleTest
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):
   - BSD 3-Clause: everything under `sdk/`: the SDK's libraries in every language (`sdk/LICENSE` holds the text alone and is what the

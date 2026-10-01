@@ -150,7 +150,9 @@ where the next frame index was captured too. Leave the fields `0` when the appli
 
 ## Symbol
 
-- QR code, **ECC level M**, **byte mode**, mask chosen automatically.
+- QR code, **ECC level M**, **byte mode**, mask chosen automatically: the mask with the lowest penalty score of the QR standard
+  (ISO/IEC 18004), the lowest numbered one when masks score the same. Every implementation must pick the same mask, since the modules
+  must match; how the libraries find it quickly is in [encoding-performance.md](encoding-performance.md).
 - **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
   size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 53 of them and a start marker 77, which leaves room
   for future fields.

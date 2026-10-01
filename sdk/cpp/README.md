@@ -277,7 +277,9 @@ the library every documented way (`tests/consumer/check_consumers.py`).
 The marker's benchmarks (`marker/benchmarks`, Google Benchmark; `-DMB_FRAMEPACING_BUILD_BENCHMARKS=ON`, on in the `windows` and
 `linux-sanitize` presets) time every per-frame step: encoding (`EncodePayload`, `GenerateModules` for a frame, start and sync marker),
 every way to draw a matrix (quads, triangles, indexed triangles, the static grid and its indices, bitmaps in every pixel format) and a
-whole frame (encode and draw the main and the sync marker). Run a Release build:
+whole frame (encode and draw the main and the sync marker). `QrcodegenEncode` is the QR encoder the module's own replaced, with the
+same payloads: [Encoding performance](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/encoding-performance.md) (a
+release archive's `doc/encoding-performance.md`) has the numbers and how they came about. Run a Release build:
 
 ```sh
 build/windows/marker/Release/mb_framepacing_marker_benchmarks   # --benchmark_filter=GenerateModules for one group

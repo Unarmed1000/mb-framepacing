@@ -1,0 +1,127 @@
+# Encoding performance: how the marker's QR encoder was made faster
+
+An application encodes two QR symbols every frame: the main marker (QR version 6, 41×41 modules) and the sync marker (version 2,
+25×25). Measured with the benchmarks, that encoding took far longer than everything else the marker does: about 0.33 ms for a main
+marker and 0.11 ms for a sync marker, while drawing either takes a few microseconds.
+
+The C++ marker module now has its own QR encoder. It produces **exactly the same symbols** as the encoder it replaces, the
+[QR Code generator library](https://www.nayuki.io/page/qr-code-generator-library) by Project Nayuki (qrcodegen), and is about 40 times
+faster.
+
+## Results
+
+C++, Release builds, one core of a 4.7 GHz desktop CPU. "Original" is qrcodegen, "own" is the module's encoder; both encode the same
+payloads, a new one every iteration, as an application does every frame.
+
+| What                                     | Compiler | Original |    Own | Faster by |
+| ---------------------------------------- | -------- | -------: | -----: | --------: |
+| Main marker (frame, 53 bytes)            | MSVC     |   345 µs | 9.1 µs |       38× |
+| Main marker (start, 77 bytes)            | MSVC     |   341 µs | 9.3 µs |       37× |
+| Sync marker (16 bytes)                   | MSVC     |   108 µs | 3.9 µs |       28× |
+| Main marker (frame, 53 bytes)            | Clang    |   250 µs | 8.6 µs |       29× |
+| Main marker (start, 77 bytes)            | Clang    |   248 µs |  11 µs |       23× |
+| Sync marker (16 bytes)                   | Clang    |    74 µs | 4.6 µs |       16× |
+| A whole frame: both markers, as geometry | MSVC     |   492 µs |  20 µs |       25× |
+
+The numbers move by a few percent from run to run. The C# module still has the module-by-module encoder (301 µs for a main marker);
+the same change is next there.
+
+## Where the time went
+
+A QR symbol's data area is filled straight from the payload's bytes. Raw bytes can give large areas of one colour, or shapes that
+look like the three corner squares a reader finds the symbol by. So the QR standard XORs the data area with one of eight fixed
+patterns, the **masks**, and writes which one into the format bits next to the corner squares. A reader undoes it. Any reader decodes
+any mask: the choice only affects how easy the symbol is to find and sample.
+
+The standard recommends how to choose: build the symbol with each of the eight masks, give each a **penalty score**, and keep the
+lowest. The score has four parts:
+
+- runs of five or more modules of one colour in a row or column;
+- 2×2 blocks of one colour;
+- shapes like a corner square (dark, light, dark, light, dark in the proportions 1:1:3:1:1, with light beside them);
+- how far the share of dark modules is from one half.
+
+The marker format requires every implementation to produce the same modules (`marker-format.md`), so every implementation must pick
+the same mask: the rule is part of the format, and it stays.
+
+qrcodegen follows the rule one module at a time. For each mask it visits every module to apply the mask, draws the format bits,
+walks every row and every column module by module to score them, and visits every module again to remove the mask. With a fixed
+mask the same library encodes a main marker in 9 µs (Clang) to 40 µs (MSVC). **Choosing the mask was 90 to 96 % of the time.**
+
+## What changed
+
+The rule is the same. The symbol is held differently, so that the rule can be applied to whole lines at once.
+
+1. **A line is one 64-bit word.** The symbol is kept as one word per row and one per column (a main marker has 41 modules per
+   line). Both directions are then scored by the same code.
+2. **What never changes is computed at compile time.** For the two QR versions the marker uses: which modules carry data, the
+   function patterns (corner squares, timing, alignment), where the format bits go, and the order in which the data bits are placed.
+   Placing the data is one table lookup per bit, without testing each module for being a function module.
+3. **A mask is an XOR.** Every mask's pattern repeats after 12 rows and 12 columns. Twelve words per mask describe it, and applying a
+   mask to a line is one AND (with the line's data modules) and one XOR, instead of 41 module visits with a division each.
+4. **The error correction uses logarithm tables** (made at compile time) instead of eight shift-and-add steps per multiplication.
+5. **A line is scored with word operations:**
+   - runs of five or more: comparing a word with itself shifted by one marks equal neighbours; four such marks in a row are a run
+     of five, and counting bits gives the score;
+   - corner-square shapes of unit 1 and 2 (the only ones possible unless a line has nine or more dark modules in a row): the word is
+     matched against the shape with shifts and ANDs;
+   - 2×2 blocks: three XOR and AND operations and one bit count per pair of rows;
+   - the dark share: bit counts.
+
+   A line with nine or more dark modules in a row can hold a larger shape. It is rare, and walked run by run as qrcodegen walks
+   every line.
+
+6. **A mask that can no longer win is dropped.** The score only grows while it is added up, so scoring a mask stops when it reaches
+   the best score so far.
+7. **The result is packed from the row words**, not module by module.
+
+What each step gained, for a main marker with MSVC:
+
+| Step                                                                   |   Time |
+| ---------------------------------------------------------------------- | -----: |
+| qrcodegen                                                              | 326 µs |
+| Bit rows and columns, compile-time tables, masks by XOR (steps 1 to 4) |  73 µs |
+| Lines scored with word operations (step 5)                             | 9.2 µs |
+| Stopping a mask that can no longer win (step 6)                        | 9.1 µs |
+
+Almost all of it is steps 1 to 5. The early stop is worth about 5 %: the eight masks' scores are close, so a mask is rarely dropped
+early.
+
+## How "exactly the same symbols" is checked
+
+qrcodegen stays in the repository, unchanged, as the reference (`sdk/cpp/marker/reference/third_party/qrcodegen`). The library no
+longer contains it; only the tests and the benchmarks build it. The tests (`sdk/cpp/marker/tests/QrEncoderTests.cpp`) compare the
+two encoders:
+
+- every symbol, module by module, for every payload length of both versions, with random bytes and with the regular bytes a marker
+  is mostly made of, and for thousands of further payloads;
+- every one of the eight masks: the masked symbol and its penalty score;
+- payloads whose two best masks score the same: both encoders take the lower numbered one;
+- the penalty score of symbols drawn for the purpose: random, sparse, dense, striped, and corner-square shapes of every unit with
+  every amount of light beside them, in rows and in columns.
+
+The golden markers (`sdk/test-data/markers`) are unchanged, and the C# and Python libraries, which have encoders of their own, still
+produce the same modules. The new encoder is covered completely by the tests (regions, functions, lines and branches).
+
+## What it costs
+
+The tables are data in the library: about 8 KiB. An executable that uses the marker module grows by 20.0 KiB in a Release build
+(28.5 KiB with qrcodegen, whose code was larger) and by 18.0 KiB in a build optimized for size (12.0 KiB before: the tables do not
+shrink). See "What it adds to your executable" in `sdk/cpp/README.md`.
+
+## What was left out
+
+**A fixed mask.** Always using one mask would remove the choice altogether (a few microseconds per marker). It is a change of the
+marker format, and nothing would then guard against a payload that happens to give a symbol that is hard to find or read, which is
+what the rule exists for. With the choice down to a few microseconds there is little left to gain.
+
+## Run it yourself
+
+```
+cd sdk/cpp && cmake --preset windows && cmake --build --preset windows
+build/windows/marker/Release/mb_framepacing_marker_benchmarks --benchmark_filter="GenerateModules|QrcodegenEncode|Frame"
+```
+
+`GenerateModules` is the module's encoder (with packing the result), `QrcodegenEncode` the original with the same payloads. The
+arguments are the marker kinds: 0 a frame marker, 1 a start marker, 3 the sync marker. Refresh the numbers in this document in the
+change that alters the encoder.
