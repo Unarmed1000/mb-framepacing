@@ -89,7 +89,7 @@ namespace MB.FramePacing.Capture.UnitTest
               ModulePx
             );
           image.Pixels.CopyTo(sink.BeginFrame());
-          sink.EndFrame(clock.NowTicks, i * 41_667L, 0);
+          sink.EndFrame(clock.Now, new DeviceTimestamp(new TickCount64(i * 41_667L)), 0);
         }
       }
 

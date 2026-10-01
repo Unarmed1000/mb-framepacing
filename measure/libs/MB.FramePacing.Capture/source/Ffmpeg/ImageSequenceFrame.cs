@@ -9,5 +9,5 @@
 
 namespace MB.FramePacing.Capture.Ffmpeg
 {
-  public sealed record ImageSequenceFrame(string Path, long TimeTicks);
+  public sealed record ImageSequenceFrame(string Path, TickCount64 Time);
 }

@@ -26,7 +26,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
   {
     private const int MaxDiagnosticLines = 40;
 
-    private readonly ConcurrentDictionary<long, long> m_deviceTicks = new ConcurrentDictionary<long, long>();
+    private readonly ConcurrentDictionary<long, TickCount64> m_deviceTimes = new ConcurrentDictionary<long, TickCount64>();
     private readonly Queue<string> m_recentLines = new Queue<string>();
     private readonly object m_lock = new object();
     private readonly ManualResetEventSlim m_outputKnown = new ManualResetEventSlim(false);
@@ -97,16 +97,16 @@ namespace MB.FramePacing.Capture.Ffmpeg
         Interlocked.Increment(ref m_droppedFrames);
     }
 
-    /// <summary>Device timestamp (TimeSpan ticks) of output frame <paramref name="captureIndex"/>; removes it once taken.</summary>
-    public bool TryGetDeviceTicks(long captureIndex, out long deviceTicks) => m_deviceTicks.TryRemove(captureIndex, out deviceTicks);
+    /// <summary>Device timestamp of output frame <paramref name="captureIndex"/>; removes it once taken.</summary>
+    public bool TryGetDeviceTime(long captureIndex, out TickCount64 deviceTime) => m_deviceTimes.TryRemove(captureIndex, out deviceTime);
 
-    /// <summary>Convert a pts in the given time base to TimeSpan ticks without overflow.</summary>
-    public static long PtsToTicks(long pts, long timeBaseNumerator, long timeBaseDenominator)
+    /// <summary>Convert a pts in the given time base to a time, rounded to the nearest tick, without overflow.</summary>
+    public static TickCount64 PtsToTime(long pts, long timeBaseNumerator, long timeBaseDenominator)
     {
       Int128 scaled = (Int128)pts * timeBaseNumerator * TimeSpan.TicksPerSecond;
       Int128 rounded =
         scaled >= 0 ? (scaled + (timeBaseDenominator / 2)) / timeBaseDenominator : (scaled - (timeBaseDenominator / 2)) / timeBaseDenominator;
-      return (long)rounded;
+      return new TickCount64((long)rounded);
     }
 
     private bool TryParseShowInfoFrame(string line)
@@ -119,7 +119,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
       long numerator = Interlocked.Read(ref m_timeBaseNumerator);
       long denominator = Interlocked.Read(ref m_timeBaseDenominator);
       if (denominator > 0 && long.TryParse(frame.Groups[2].Value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long pts))
-        m_deviceTicks[number] = PtsToTicks(pts, numerator, denominator);
+        m_deviceTimes[number] = PtsToTime(pts, numerator, denominator);
       return true;
     }
 

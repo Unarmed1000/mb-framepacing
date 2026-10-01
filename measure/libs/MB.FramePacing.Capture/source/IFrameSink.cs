@@ -22,10 +22,10 @@ namespace MB.FramePacing.Capture
     Span<byte> BeginFrame();
 
     /// <summary>Complete the frame started with <see cref="BeginFrame"/>. Every call advances the capture index by one.</summary>
-    /// <param name="hostTicks">Capture clock ticks when the frame arrived.</param>
-    /// <param name="deviceTicks">Device timestamp in TimeSpan ticks, <see cref="CaptureRecordHeader.UnknownTicks"/> or
-    /// <see cref="DeviceTimestamps.PendingTicks"/> when the source resolves it later through <see cref="IDeviceTimestampSource"/>.</param>
+    /// <param name="hostTime">When the frame arrived, on the capture clock.</param>
+    /// <param name="deviceTime">The device's timestamp, <see cref="DeviceTimestamp.Unknown"/>, or <see cref="DeviceTimestamp.Pending"/>
+    /// when the source resolves it later through <see cref="IDeviceTimestampSource"/>.</param>
     /// <param name="sourceDrops">How many frames the source reported dropping since the previous frame (0: none).</param>
-    void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops);
+    void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops);
   }
 }

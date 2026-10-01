@@ -45,7 +45,13 @@ namespace MB.FramePacing.Capture.UnitTest
       for (int i = 0; i < 3; ++i)
       {
         var slot = record.AsSpan(i * header.RecordSize, header.RecordSize);
-        new CaptureRecordHeader(100 + i, 1000 * i, i == 1 ? CaptureRecordHeader.UnknownTicks : 5000 * i, 0, header.PixelByteCount).Write(slot);
+        new CaptureRecordHeader(
+          100 + i,
+          new TickCount64(1000 * i),
+          i == 1 ? DeviceTimestamp.Unknown : new DeviceTimestamp(new TickCount64(5000 * i)),
+          0,
+          header.PixelByteCount
+        ).Write(slot);
         slot.Slice(CaptureFileHeader.RecordHeaderSize, header.PixelByteCount).Fill((byte)(i + 1));
       }
 
@@ -60,10 +66,10 @@ namespace MB.FramePacing.Capture.UnitTest
       var image = reader.CreateFrameImage();
       var second = reader.ReadRecord(1, image);
       Assert.That(second.CaptureIndex, Is.EqualTo(101));
-      Assert.That(second.HostTicks, Is.EqualTo(1000));
-      Assert.That(second.HasDeviceTicks, Is.False);
+      Assert.That(second.HostTime.Ticks, Is.EqualTo(1000));
+      Assert.That(second.DeviceTime, Is.EqualTo(DeviceTimestamp.Unknown));
       Assert.That(image[16, 4], Is.EqualTo(2));
-      Assert.That(reader.ReadRecordHeader(2).DeviceTicks, Is.EqualTo(10000));
+      Assert.That(reader.ReadRecordHeader(2).DeviceTime.Time.Ticks, Is.EqualTo(10000));
     }
 
     [Test]

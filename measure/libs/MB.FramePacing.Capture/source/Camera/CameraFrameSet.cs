@@ -19,20 +19,20 @@ namespace MB.FramePacing.Capture.Camera
   /// <summary>A short run of whole camera frames held in memory for calibrating or verifying a camera rig.</summary>
   public sealed class CameraFrameSet
   {
-    public CameraFrameSet(IReadOnlyList<GrayImage> frames, IReadOnlyList<long> ticks, bool deviceTimestamps, string sourceDescription)
+    public CameraFrameSet(IReadOnlyList<GrayImage> frames, IReadOnlyList<TickCount64> times, bool deviceTimestamps, string sourceDescription)
     {
-      if (frames.Count != ticks.Count)
+      if (frames.Count != times.Count)
         throw new ArgumentException("Every frame needs a timestamp");
       Frames = frames;
-      Ticks = ticks;
+      Times = times;
       DeviceTimestamps = deviceTimestamps;
       SourceDescription = sourceDescription;
     }
 
     public IReadOnlyList<GrayImage> Frames { get; }
 
-    /// <summary>Capture time of every frame (device ticks when all frames had them, otherwise host ticks).</summary>
-    public IReadOnlyList<long> Ticks { get; }
+    /// <summary>Capture time of every frame (the device's when all frames had one, otherwise the host's).</summary>
+    public IReadOnlyList<TickCount64> Times { get; }
 
     public bool DeviceTimestamps { get; }
 
@@ -70,25 +70,25 @@ namespace MB.FramePacing.Capture.Camera
         throw new TimeoutException($"The source delivered no frames within {timeout.TotalSeconds:0.#} s");
 
       // Device timestamps may arrive after the pixels (ffmpeg's showinfo on stderr): give them a moment
-      bool device = ResolveDeviceTicks(source, sink);
-      var ticks = new long[sink.Frames.Count];
-      for (int i = 0; i < ticks.Length; ++i)
-        ticks[i] = device ? sink.DeviceTicks[i] : sink.HostTicks[i];
-      return new CameraFrameSet(sink.Frames, ticks, device, source.Description);
+      bool device = ResolveDeviceTimes(source, sink);
+      var times = new TickCount64[sink.Frames.Count];
+      for (int i = 0; i < times.Length; ++i)
+        times[i] = device ? sink.DeviceTimes[i].Time : sink.HostTimes[i];
+      return new CameraFrameSet(sink.Frames, times, device, source.Description);
     }
 
-    private static bool ResolveDeviceTicks(ICaptureSource source, Sink sink)
+    private static bool ResolveDeviceTimes(ICaptureSource source, Sink sink)
     {
       var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
       while (true)
       {
         bool complete = true;
-        for (int i = 0; i < sink.DeviceTicks.Count; ++i)
+        for (int i = 0; i < sink.DeviceTimes.Count; ++i)
         {
-          if (sink.DeviceTicks[i] != Capture.DeviceTimestamps.PendingTicks)
+          if (!sink.DeviceTimes[i].IsPending)
             continue;
-          if (source.DeviceTimestamps != null && source.DeviceTimestamps.TryGetDeviceTicks(i, out long ticks))
-            sink.DeviceTicks[i] = ticks;
+          if (source.DeviceTimestamps != null && source.DeviceTimestamps.TryGetDeviceTime(i, out var time))
+            sink.DeviceTimes[i] = new DeviceTimestamp(time);
           else
             complete = false;
         }
@@ -96,9 +96,9 @@ namespace MB.FramePacing.Capture.Camera
           break;
         Thread.Sleep(20);
       }
-      foreach (long ticks in sink.DeviceTicks)
+      foreach (var time in sink.DeviceTimes)
       {
-        if (ticks == Capture.DeviceTimestamps.PendingTicks || ticks == CaptureRecordHeader.UnknownTicks)
+        if (!time.IsKnown)
           return false;
       }
       return true;
@@ -121,8 +121,8 @@ namespace MB.FramePacing.Capture.Camera
       }
 
       public List<GrayImage> Frames { get; } = new List<GrayImage>();
-      public List<long> HostTicks { get; } = new List<long>();
-      public List<long> DeviceTicks { get; } = new List<long>();
+      public List<TickCount64> HostTimes { get; } = new List<TickCount64>();
+      public List<DeviceTimestamp> DeviceTimes { get; } = new List<DeviceTimestamp>();
 
       public Span<byte> BeginFrame()
       {
@@ -130,13 +130,13 @@ namespace MB.FramePacing.Capture.Camera
         return m_current.Pixels.AsSpan(0, m_width * m_height);
       }
 
-      public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
+      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
       {
         if (m_current == null || Frames.Count >= m_maxFrames)
           return;
         Frames.Add(m_current);
-        HostTicks.Add(hostTicks);
-        DeviceTicks.Add(deviceTicks);
+        HostTimes.Add(hostTime);
+        DeviceTimes.Add(deviceTime);
         m_current = null;
         if (Frames.Count >= m_maxFrames)
           m_stop.Cancel();

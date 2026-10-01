@@ -125,8 +125,8 @@ namespace MB.FramePacing.Analysis
     private static CaptureDataRecord ToRecord(CaptureRecordHeader header, FrameDecode decode) =>
       new CaptureDataRecord(
         header.CaptureIndex,
-        new TickCount64(header.HostTicks),
-        header.HasDeviceTicks ? new TickCount64(header.DeviceTicks) : null,
+        header.HostTime,
+        header.DeviceTime.ToNullable(),
         header.SourceDrops,
         decode.Status,
         decode.MainBytes,

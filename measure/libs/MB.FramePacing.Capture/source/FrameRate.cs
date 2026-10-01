@@ -20,8 +20,8 @@ namespace MB.FramePacing.Capture
 
     public double FramesPerSecond => IsKnown ? (double)Numerator / Denominator : 0;
 
-    /// <summary>Frame interval in TimeSpan ticks, 0 if unknown.</summary>
-    public long IntervalTicks => IsKnown ? (long)Math.Round(TimeSpan.TicksPerSecond * (double)Denominator / Numerator) : 0;
+    /// <summary>The time from one frame to the next, zero if unknown.</summary>
+    public TimeSpan Interval => IsKnown ? new TimeSpan((long)Math.Round(TimeSpan.TicksPerSecond * (double)Denominator / Numerator)) : TimeSpan.Zero;
 
     public static FrameRate FromFps(double fps)
     {

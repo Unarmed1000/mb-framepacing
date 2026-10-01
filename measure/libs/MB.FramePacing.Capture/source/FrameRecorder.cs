@@ -72,7 +72,7 @@ namespace MB.FramePacing.Capture
     private volatile bool m_armed;
     private volatile bool m_completing;
     private volatile Exception? m_writerError;
-    private long m_lastPreviewTicks = long.MinValue;
+    private TickCount64? m_lastPreviewTime;
     private long m_previewCaptureIndex = -1;
     private bool m_disposed;
 
@@ -206,7 +206,7 @@ namespace MB.FramePacing.Capture
       return m_ring.AsSpan(SlotOffset(head) + CaptureFileHeader.RecordHeaderSize, m_pixelByteCount);
     }
 
-    public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
+    public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
     {
       long captureIndex = m_nextCaptureIndex;
       Volatile.Write(ref m_nextCaptureIndex, captureIndex + 1);
@@ -228,7 +228,7 @@ namespace MB.FramePacing.Capture
         var slot = m_ring.AsSpan(offset, m_recordSize);
         uint drops = (uint)Math.Min(uint.MaxValue, (long)m_pendingSourceDrops + sourceDrops);
         m_pendingSourceDrops = 0;
-        new CaptureRecordHeader(captureIndex, hostTicks, deviceTicks, drops, m_pixelByteCount).Write(slot);
+        new CaptureRecordHeader(captureIndex, hostTime, deviceTime, drops, m_pixelByteCount).Write(slot);
         slot.Slice(CaptureFileHeader.RecordHeaderSize + m_pixelByteCount).Clear();
         pixels = slot.Slice(CaptureFileHeader.RecordHeaderSize, m_pixelByteCount);
         Volatile.Write(ref m_head, head + 1);
@@ -237,7 +237,7 @@ namespace MB.FramePacing.Capture
         else
           m_dataAvailable.Set();
       }
-      UpdatePreview(pixels.Slice(0, m_pixelByteCount), captureIndex, hostTicks);
+      UpdatePreview(pixels.Slice(0, m_pixelByteCount), captureIndex, hostTime);
     }
 
     /// <summary>Copy the newest preview frame (taken every <see cref="FrameRecorderOptions.PreviewInterval"/>). Returns its capture index or -1.</summary>
@@ -297,7 +297,7 @@ namespace MB.FramePacing.Capture
     {
       try
       {
-        long waitTicks = m_options.DeviceTicksWait.Ticks;
+        var wait = m_options.DeviceTimeWait;
         while (true)
         {
           // Read completion before the counters: once it is seen, the counters read afterwards are final
@@ -356,7 +356,7 @@ namespace MB.FramePacing.Capture
           int count = (int)Math.Min(Math.Min(end - tail, m_slotCount - (tail % m_slotCount)), m_options.MaxBatchRecords);
           // A live source drops frames when the ring is full, so late timestamps are given up first; a source that is not live waits
           bool ringPressure = !m_options.WaitWhenFull && (Volatile.Read(ref m_head) - tail) * 2 > m_slotCount;
-          int resolved = ResolveDeviceTicks(tail, count, completing || ringPressure, waitTicks);
+          int resolved = ResolveDeviceTimes(tail, count, completing || ringPressure, wait);
           if (resolved == 0)
           {
             Thread.Sleep(1);
@@ -373,8 +373,8 @@ namespace MB.FramePacing.Capture
               CaptureDataRecord.WriteCapture(
                 m_dataRing.AsSpan(DataSlotOffset(tail + i), CaptureDataRecord.Size),
                 header.CaptureIndex,
-                new TickCount64(header.HostTicks),
-                header.HasDeviceTicks ? new TickCount64(header.DeviceTicks) : null,
+                header.HostTime,
+                header.DeviceTime.ToNullable(),
                 header.SourceDrops
               );
             }
@@ -461,23 +461,23 @@ namespace MB.FramePacing.Capture
     }
 
     /// <summary>Fill in pending device timestamps. Returns how many records starting at <paramref name="first"/> are ready to write.</summary>
-    private int ResolveDeviceTicks(long first, int count, bool force, long waitTicks)
+    private int ResolveDeviceTimes(long first, int count, bool force, TimeSpan wait)
     {
       for (int i = 0; i < count; ++i)
       {
         var slot = m_ring.AsSpan(SlotOffset(first + i), CaptureFileHeader.RecordHeaderSize);
         var header = CaptureRecordHeader.Read(slot);
-        if (header.DeviceTicks != DeviceTimestamps.PendingTicks)
+        if (!header.DeviceTime.IsPending)
           continue;
 
-        if (m_timestamps != null && m_timestamps.TryGetDeviceTicks(header.CaptureIndex, out long deviceTicks))
+        if (m_timestamps != null && m_timestamps.TryGetDeviceTime(header.CaptureIndex, out var deviceTime))
         {
-          (header with { DeviceTicks = deviceTicks }).Write(slot);
+          (header with { DeviceTime = new DeviceTimestamp(deviceTime) }).Write(slot);
           continue;
         }
-        if (!force && m_clock.NowTicks - header.HostTicks < waitTicks)
+        if (!force && m_clock.Now - header.HostTime < wait)
           return i;
-        (header with { DeviceTicks = CaptureRecordHeader.UnknownTicks }).Write(slot);
+        (header with { DeviceTime = DeviceTimestamp.Unknown }).Write(slot);
       }
       return count;
     }
@@ -486,13 +486,13 @@ namespace MB.FramePacing.Capture
 
     private int DataSlotOffset(long sequence) => (int)(sequence % m_slotCount) * CaptureDataRecord.Size;
 
-    private void UpdatePreview(ReadOnlySpan<byte> pixels, long captureIndex, long hostTicks)
+    private void UpdatePreview(ReadOnlySpan<byte> pixels, long captureIndex, TickCount64 hostTime)
     {
       if (m_preview == null)
         return;
-      if (m_lastPreviewTicks != long.MinValue && hostTicks - m_lastPreviewTicks < m_options.PreviewInterval.Ticks)
+      if (m_lastPreviewTime is { } last && hostTime - last < m_options.PreviewInterval)
         return;
-      m_lastPreviewTicks = hostTicks;
+      m_lastPreviewTime = hostTime;
       lock (m_previewLock)
       {
         pixels.CopyTo(m_preview);

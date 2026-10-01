@@ -95,7 +95,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var errors = new List<double>();
       for (int i = 1; i < truth.Count; ++i)
       {
-        double expected = camera.ToCameraTicks(truth[i].DisplayTicks - truth[i - 1].DisplayTicks);
+        double expected = camera.ToCameraTicks(truth[i].DisplayTime.Ticks - truth[i - 1].DisplayTime.Ticks);
         errors.Add(Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - expected) / TimeSpan.TicksPerMillisecond);
       }
       TestContext.Out.WriteLine($"display delta error: mean {errors.Average():0.000} ms, max {errors.Max():0.000} ms");
@@ -111,13 +111,13 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.Torn, Is.EqualTo(0), "zones that disagree are scanout progress, not torn captures");
 
       // The camera films faster than the display, so the display's refresh is calculated from the frames; the stalls are late
-      double refreshMs = camera.ToCameraTicks(camera.Scenario.RefreshIntervalTicks) / TimeSpan.TicksPerMillisecond;
+      double refreshMs = camera.ToCameraTicks(camera.Scenario.RefreshInterval.Ticks) / TimeSpan.TicksPerMillisecond;
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshCalculated);
       Assert.That(run.Pacing.RefreshPeriodMs, Is.EqualTo(refreshMs).Within(0.1));
       int stalls = Enumerable
         .Range(1, truth.Count - 1)
-        .Count(i => truth[i].DisplayTicks - truth[i - 1].DisplayTicks > camera.Scenario.RefreshIntervalTicks);
+        .Count(i => truth[i].DisplayTime.Ticks - truth[i - 1].DisplayTime.Ticks > camera.Scenario.RefreshInterval.Ticks);
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
     }
 
@@ -130,7 +130,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = report.Timeline.Runs.Single();
       // The synthetic tear happens half a refresh after vsync: below the top zone, above the bottom one
       var torn = RunFrames(camera)
-        .Where(f => f.DisplayTicks % camera.Scenario.RefreshIntervalTicks != 0)
+        .Where(f => f.DisplayTime.Ticks % camera.Scenario.RefreshInterval.Ticks != 0)
         .Select(f => f.Payload.FrameIndex)
         .ToHashSet();
       var flagged = run.Frames.Where(f => f.Flags.HasFlag(PresentedFrameFlags.Torn)).Select(f => f.FrameIndex).ToHashSet();

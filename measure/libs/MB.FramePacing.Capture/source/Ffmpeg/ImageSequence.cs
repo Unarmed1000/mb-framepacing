@@ -44,7 +44,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
         throw new FileNotFoundException($"No images ({string.Join(", ", Extensions)}) found in '{folder}'");
 
       double interval = TimeSpan.TicksPerSecond / fps.Value;
-      return files.Select((file, index) => new ImageSequenceFrame(file, (long)Math.Round(index * interval))).ToList();
+      return files.Select((file, index) => new ImageSequenceFrame(file, new TickCount64((long)Math.Round(index * interval)))).ToList();
     }
 
     /// <summary>Write the ffconcat list ffmpeg plays. Returns the nominal frame rate (median interval).</summary>
@@ -61,7 +61,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
         long duration;
         if (i + 1 < frames.Count)
         {
-          duration = frames[i + 1].TimeTicks - frames[i].TimeTicks;
+          duration = (frames[i + 1].Time - frames[i].Time).Ticks;
           if (duration <= 0)
             throw new InvalidDataException(
               $"The image times must increase ('{Path.GetFileName(frames[i + 1].Path)}' is not later than the image before it)"
@@ -105,7 +105,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
         var path = Path.IsPathRooted(parts[0]) ? parts[0] : Path.Combine(folder, parts[0]);
         if (!File.Exists(path))
           throw new FileNotFoundException($"{timestampFile}:{lineNumber}: '{path}' does not exist");
-        frames.Add(new ImageSequenceFrame(path, (long)Math.Round(ms * TimeSpan.TicksPerMillisecond)));
+        frames.Add(new ImageSequenceFrame(path, new TickCount64((long)Math.Round(ms * TimeSpan.TicksPerMillisecond))));
       }
       if (frames.Count == 0)
         throw new InvalidDataException($"The timestamp file '{timestampFile}' lists no images");

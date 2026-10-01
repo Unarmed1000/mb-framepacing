@@ -33,7 +33,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var frames = ImageSequence.Collect(temp.Path, 250, null);
 
       Assert.That(frames.Select(f => Path.GetFileName(f.Path)), Is.EqualTo(new[] { "frame0.PNG", "frame1.png", "frame2.png", "frame10.png" }));
-      Assert.That(frames.Select(f => f.TimeTicks), Is.EqualTo(new long[] { 0, 40_000, 80_000, 120_000 }));
+      Assert.That(frames.Select(f => f.Time.Ticks), Is.EqualTo(new long[] { 0, 40_000, 80_000, 120_000 }));
     }
 
     [Test]
@@ -47,7 +47,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var frames = ImageSequence.Collect(temp.Path, null, csv);
 
       Assert.That(frames.Select(f => Path.GetFileName(f.Path)), Is.EqualTo(new[] { "c.png", "a.png", "b.png" }));
-      Assert.That(frames.Select(f => f.TimeTicks), Is.EqualTo(new long[] { 1_000_000, 1_045_000, 1_100_000 }));
+      Assert.That(frames.Select(f => f.Time.Ticks), Is.EqualTo(new long[] { 1_000_000, 1_045_000, 1_100_000 }));
     }
 
     [Test]
@@ -86,7 +86,11 @@ namespace MB.FramePacing.Capture.UnitTest
     {
       using var temp = new TempDirectory();
       Touch(temp, "a.png", "b.png");
-      var frames = new[] { new ImageSequenceFrame(temp.File("a.png"), 100), new ImageSequenceFrame(temp.File("b.png"), 100) };
+      var frames = new[]
+      {
+        new ImageSequenceFrame(temp.File("a.png"), new TickCount64(100)),
+        new ImageSequenceFrame(temp.File("b.png"), new TickCount64(100)),
+      };
       Assert.Throws<InvalidDataException>(() => ImageSequence.WriteConcatList(frames, temp.File("list.ffconcat")));
     }
 
@@ -112,7 +116,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var sequence = MediaInput.Create(images, new MediaInputOptions { Fps = 120 }, temp.File("out2"));
       Assert.That(sequence.Device.Kind, Is.EqualTo(FfmpegInputKind.ImageSequence));
       Assert.That(File.Exists(sequence.Device.Input), Is.True, "the ffconcat list is written into the capture folder");
-      Assert.That(sequence.FrameTimestamps, Is.EqualTo(new long[] { 0, 83_333 }));
+      Assert.That(sequence.FrameTimestamps, Is.EqualTo(new[] { new TickCount64(0), new TickCount64(83_333) }));
       Assert.That(sequence.Mode.Fps, Is.EqualTo(120).Within(0.01));
 
       var stream = MediaInput.Create("srt://127.0.0.1:9000", new MediaInputOptions(), temp.File("out3"));

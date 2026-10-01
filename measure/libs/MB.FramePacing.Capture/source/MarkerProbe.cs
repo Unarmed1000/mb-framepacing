@@ -33,7 +33,7 @@ namespace MB.FramePacing.Capture
       ArgumentNullException.ThrowIfNull(source);
       using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
       stop.CancelAfter(timeout);
-      var sink = new Sink(source.Format.Width, source.Format.Height, decodeInterval.Ticks, stop);
+      var sink = new Sink(source.Format.Width, source.Format.Height, decodeInterval, stop);
       source.Run(sink, new CaptureClock(), stop.Token);
       cancellationToken.ThrowIfCancellationRequested();
 
@@ -77,14 +77,14 @@ namespace MB.FramePacing.Capture
     {
       private readonly GrayImage m_frame;
       private readonly MarkerDecoder m_decoder = new MarkerDecoder(tryHarder: true);
-      private readonly long m_intervalTicks;
+      private readonly TimeSpan m_interval;
       private readonly CancellationTokenSource m_stop;
-      private long m_lastDecodeTicks = long.MinValue;
+      private TickCount64? m_lastDecodeTime;
 
-      public Sink(int width, int height, long intervalTicks, CancellationTokenSource stop)
+      public Sink(int width, int height, TimeSpan interval, CancellationTokenSource stop)
       {
         m_frame = new GrayImage(width, height);
-        m_intervalTicks = intervalTicks;
+        m_interval = interval;
         m_stop = stop;
       }
 
@@ -96,12 +96,12 @@ namespace MB.FramePacing.Capture
 
       public Span<byte> BeginFrame() => m_frame.Pixels.AsSpan(0, m_frame.Width * m_frame.Height);
 
-      public void EndFrame(long hostTicks, long deviceTicks, uint sourceDrops)
+      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
       {
         ++FramesSeen;
-        if (m_stop.IsCancellationRequested || (m_lastDecodeTicks != long.MinValue && hostTicks - m_lastDecodeTicks < m_intervalTicks))
+        if (m_stop.IsCancellationRequested || (m_lastDecodeTime is { } last && hostTime - last < m_interval))
           return;
-        m_lastDecodeTicks = hostTicks;
+        m_lastDecodeTime = hostTime;
 
         var result = m_decoder.DecodeMain(m_frame);
         if (!result.IsDecoded || result.ModuleSizePx <= 0)

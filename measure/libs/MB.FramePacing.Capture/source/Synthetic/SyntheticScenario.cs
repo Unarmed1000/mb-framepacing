@@ -37,20 +37,20 @@ namespace MB.FramePacing.Capture.Synthetic
 
     public long CaptureCount { get; }
 
-    public long RefreshIntervalTicks => (long)Math.Round(TimeSpan.TicksPerSecond / Options.RefreshHz);
+    public TimeSpan RefreshInterval => new TimeSpan((long)Math.Round(TimeSpan.TicksPerSecond / Options.RefreshHz));
 
     /// <summary>Where the synthetic pacer's steady clock starts.</summary>
-    public const long PacerEpochTicks = TimeSpan.TicksPerSecond;
+    public static readonly TickCount64 PacerEpoch = TickCount64.FromSeconds(1);
 
-    /// <summary>Capture instant of capture index <paramref name="captureIndex"/>, in TimeSpan ticks.</summary>
-    public long CaptureTicks(long captureIndex) =>
-      (long)Math.Round((captureIndex + Options.CapturePhase) * TimeSpan.TicksPerSecond / Options.CaptureFps);
+    /// <summary>Capture instant of capture index <paramref name="captureIndex"/>.</summary>
+    public TickCount64 CaptureTime(long captureIndex) =>
+      new TickCount64((long)Math.Round((captureIndex + Options.CapturePhase) * TimeSpan.TicksPerSecond / Options.CaptureFps));
 
     /// <summary>Index into <see cref="PresentedFrames"/> of the frame on screen at a capture, -1 if nothing is shown yet.</summary>
-    public int PresentedIndexAt(long captureIndex) => PresentedIndexAtTicks(CaptureTicks(captureIndex));
+    public int PresentedIndexAt(long captureIndex) => PresentedIndexAtTime(CaptureTime(captureIndex));
 
-    /// <summary>Index into <see cref="PresentedFrames"/> of the latest frame presented at or before <paramref name="ticks"/>, -1 if none.</summary>
-    public int PresentedIndexAtTicks(long ticks)
+    /// <summary>Index into <see cref="PresentedFrames"/> of the latest frame presented at or before <paramref name="time"/>, -1 if none.</summary>
+    public int PresentedIndexAtTime(TickCount64 time)
     {
       int lo = 0;
       int hi = m_presented.Count - 1;
@@ -58,7 +58,7 @@ namespace MB.FramePacing.Capture.Synthetic
       while (lo <= hi)
       {
         int mid = (lo + hi) / 2;
-        if (m_presented[mid].DisplayTicks <= ticks)
+        if (m_presented[mid].DisplayTime <= time)
         {
           found = mid;
           lo = mid + 1;
@@ -72,12 +72,13 @@ namespace MB.FramePacing.Capture.Synthetic
     private void BuildTimeline()
     {
       var o = Options;
-      long refresh = RefreshIntervalTicks;
-      long leadInEnd = SecondsToTicks(o.LeadInSeconds);
-      long startEnd = leadInEnd + SecondsToTicks(o.StartMarkerSeconds);
-      long runEnd = startEnd + SecondsToTicks(o.RunSeconds);
-      long endEnd = runEnd + SecondsToTicks(o.EndMarkerSeconds);
-      long totalEnd = SecondsToTicks(o.TotalSeconds);
+      var refresh = RefreshInterval;
+      // Display times, on the capture's clock
+      var leadInEnd = new TickCount64(Seconds(o.LeadInSeconds));
+      var startEnd = leadInEnd + Seconds(o.StartMarkerSeconds);
+      var runEnd = startEnd + Seconds(o.RunSeconds);
+      var endEnd = runEnd + Seconds(o.EndMarkerSeconds);
+      var totalEnd = new TickCount64(Seconds(o.TotalSeconds));
 
       long slot = 0;
       // The pacer's plan: every frame one vsync after the previous one. A stall shows a frame later than planned, a skipped frame (replaced
@@ -85,9 +86,9 @@ namespace MB.FramePacing.Capture.Synthetic
       long planned = 0;
       bool replan = false;
       ulong frameIndex = o.FirstFrameIndex;
-      long animationTicks = 0;
-      long previousCpuEnd = long.MinValue;
-      for (long k = 0; ; ++k, ++frameIndex, animationTicks += refresh)
+      var animationTime = TimeSpan.Zero;
+      TickCount64? previousCpuEnd = null;
+      for (long k = 0; ; ++k, ++frameIndex, animationTime += refresh)
       {
         if (k > 0)
         {
@@ -103,23 +104,25 @@ namespace MB.FramePacing.Capture.Synthetic
         // The CPU starts each frame one refresh before the vsync it is rendered for, but not before it has finished the previous frame (a
         // skipped frame can leave two frames planned for one vsync), and is busy for 60 % of a refresh; a stalled frame is busy that many
         // refreshes longer, so it is shown late and the next frame starts late
-        long intendedTicks = PacerEpochTicks + (intendedSlot * refresh);
-        long cpuStartTicks = Math.Max(intendedTicks - refresh, previousCpuEnd);
-        long cpuBusyTicks = refresh * 6 / 10;
+        var intendedDisplayTime = PacerEpoch + new TimeSpan(intendedSlot * refresh.Ticks);
+        var cpuStartTime = intendedDisplayTime - refresh;
+        if (previousCpuEnd is { } busyUntil && busyUntil > cpuStartTime)
+          cpuStartTime = busyUntil;
+        var cpuBusy = new TimeSpan(refresh.Ticks * 6 / 10);
         if (k > 0 && o.StallEvery > 0 && k % o.StallEvery == 0)
         {
           slot += o.StallSlots;
           planned += o.StallSlots;
-          cpuBusyTicks += o.StallSlots * refresh;
+          cpuBusy += new TimeSpan(o.StallSlots * refresh.Ticks);
         }
-        previousCpuEnd = cpuStartTicks + cpuBusyTicks;
-        long displayTicks = slot * refresh;
-        if (displayTicks >= totalEnd)
+        previousCpuEnd = cpuStartTime + cpuBusy;
+        var displayTime = new TickCount64(slot * refresh.Ticks);
+        if (displayTime >= totalEnd)
           break;
 
         // Vsync off: the frame is presented part way through the scanout, so the scanout shows the old frame above and the new one below
         if (o.TearEvery > 0 && k > 0 && k % o.TearEvery == 0)
-          displayTicks += (long)Math.Round(o.TearFraction * refresh);
+          displayTime += new TimeSpan((long)Math.Round(o.TearFraction * refresh.Ticks));
 
         // Skipped frames are rendered (frame index and animation advance) but never shown: the next frame takes this vsync.
         if (o.SkipEvery > 0 && k > 0 && k % o.SkipEvery == 0)
@@ -130,11 +133,11 @@ namespace MB.FramePacing.Capture.Synthetic
         }
 
         // Idle frame markers (run id 0) before the start and after the end marker
-        bool idle = displayTicks < leadInEnd || displayTicks >= endEnd;
+        bool idle = displayTime < leadInEnd || displayTime >= endEnd;
         var kind =
           idle ? MarkerKind.Frame
-          : displayTicks < startEnd ? MarkerKind.SequenceStart
-          : displayTicks < runEnd ? MarkerKind.Frame
+          : displayTime < startEnd ? MarkerKind.SequenceStart
+          : displayTime < runEnd ? MarkerKind.Frame
           : MarkerKind.SequenceEnd;
         // The pacer's clock has its own epoch: intended display times never start at 0 (which means unknown). The game aims for one frame
         // per refresh, and that is also the rate it prefers
@@ -144,18 +147,19 @@ namespace MB.FramePacing.Capture.Synthetic
             idle ? 0u : o.RunId,
             frameIndex,
             MB.FramePacing.Marker.MarkerFlags.None,
-            new TimeSpan(animationTicks),
-            PreferredFrameTime: new TimeSpan32((uint)refresh),
-            TargetFrameTime: new TimeSpan32((uint)refresh),
-            IntendedDisplayTime: new TickCount64(intendedTicks),
-            CpuStartTime: new TickCount64(cpuStartTicks),
-            CpuBusy: new TimeSpan32((uint)cpuBusyTicks)
+            animationTime,
+            PreferredFrameTime: TimeSpan32.FromTimeSpan(refresh),
+            TargetFrameTime: TimeSpan32.FromTimeSpan(refresh),
+            IntendedDisplayTime: intendedDisplayTime,
+            CpuStartTime: cpuStartTime,
+            CpuBusy: TimeSpan32.FromTimeSpan(cpuBusy)
           )
-          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(animationTicks));
-        m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
+          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, animationTime);
+        m_presented.Add(new SyntheticPresentedFrame(payload, displayTime));
       }
     }
 
-    private static long SecondsToTicks(double seconds) => (long)Math.Round(seconds * TimeSpan.TicksPerSecond);
+    /// <summary>Rounded to the nearest tick, as the scenario always was.</summary>
+    private static TimeSpan Seconds(double seconds) => new TimeSpan((long)Math.Round(seconds * TimeSpan.TicksPerSecond));
   }
 }

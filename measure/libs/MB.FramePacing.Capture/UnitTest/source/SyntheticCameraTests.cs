@@ -38,7 +38,7 @@ namespace MB.FramePacing.Capture.UnitTest
     /// <summary>The first capture whose exposure starts at least <paramref name="afterVsync"/> after a vsync, at or after <paramref name="seconds"/>.</summary>
     private static long CaptureAfterVsync(SyntheticCamera camera, double seconds, double afterVsync)
     {
-      double refresh = camera.Scenario.RefreshIntervalTicks;
+      double refresh = camera.Scenario.RefreshInterval.Ticks;
       double vsync = Math.Ceiling(seconds * TimeSpan.TicksPerSecond / refresh) * refresh;
       double target = vsync + (afterVsync * TimeSpan.TicksPerSecond);
       for (long i = 0; i < camera.CaptureCount; ++i)
@@ -61,7 +61,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var results = new MarkerDecoder(tryHarder: true).DecodeEach(frame, 2);
 
       Assert.That(results, Has.Count.EqualTo(2));
-      int shown = camera.Scenario.PresentedIndexAtTicks((long)camera.TrueTicks(capture));
+      int shown = camera.Scenario.PresentedIndexAtTime(new TickCount64((long)camera.TrueTicks(capture)));
       Assert.That(results[0].Payload, Is.EqualTo(camera.Scenario.PresentedFrames[shown].Payload));
       // The bottom zone is the sync marker: it only carries the run id and the frame index
       var older = camera.Scenario.PresentedFrames[shown - 1].Payload;
@@ -150,7 +150,7 @@ namespace MB.FramePacing.Capture.UnitTest
           if (!result.IsDecoded)
             continue;
           int zone = result.Bounds.Y < frame.Height / 2 ? 0 : 1;
-          firstSeen[zone].TryAdd(result.Payload.FrameIndex, camera.CameraTicks(i));
+          firstSeen[zone].TryAdd(result.Payload.FrameIndex, camera.CameraTime(i).Ticks);
         }
       }
 

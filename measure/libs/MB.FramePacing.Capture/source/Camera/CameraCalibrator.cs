@@ -339,14 +339,14 @@ namespace MB.FramePacing.Capture.Camera
         _ => { }
       );
 
-      var firstSeen = new Dictionary<long, long>[zoneCount];
+      var firstSeen = new Dictionary<long, TickCount64>[zoneCount];
       for (int z = 0; z < zoneCount; ++z)
       {
-        firstSeen[z] = new Dictionary<long, long>();
+        firstSeen[z] = new Dictionary<long, TickCount64>();
         for (int i = 0; i < frames.Count; ++i)
         {
           if (decoded[z][i] >= 0)
-            firstSeen[z].TryAdd(decoded[z][i], frames.Ticks[i]);
+            firstSeen[z].TryAdd(decoded[z][i], frames.Times[i]);
         }
       }
 
@@ -354,8 +354,8 @@ namespace MB.FramePacing.Capture.Camera
       var delays = new List<double>();
       foreach (var (frameIndex, first) in firstSeen[0])
       {
-        if (zoneCount > 1 && firstSeen[1].TryGetValue(frameIndex, out long second) && first != frames.Ticks[0] && second != frames.Ticks[0])
-          delays.Add((second - first) / (double)TimeSpan.TicksPerMillisecond);
+        if (zoneCount > 1 && firstSeen[1].TryGetValue(frameIndex, out var second) && first != frames.Times[0] && second != frames.Times[0])
+          delays.Add((second - first).Ticks / (double)TimeSpan.TicksPerMillisecond);
       }
       double? delay = delays.Count >= 3 ? Median(delays) : null;
 
@@ -364,8 +364,8 @@ namespace MB.FramePacing.Capture.Camera
       var intervals = new List<double>();
       for (int k = 1; k < ordered.Count; ++k)
       {
-        if (ordered[k].Key == ordered[k - 1].Key + 1 && ordered[k - 1].Value != frames.Ticks[0])
-          intervals.Add(ordered[k].Value - ordered[k - 1].Value);
+        if (ordered[k].Key == ordered[k - 1].Key + 1 && ordered[k - 1].Value != frames.Times[0])
+          intervals.Add((ordered[k].Value - ordered[k - 1].Value).Ticks);
       }
       // The intervals are whole refreshes quantised to camera periods (16 or 17 ms for 60 Hz at 1000 fps)
       double? refreshPeriod = RefreshEstimator.EstimatePeriodTicks(intervals, TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames)));
@@ -552,7 +552,7 @@ namespace MB.FramePacing.Capture.Camera
       var deltas = new List<double>();
       for (int i = 1; i < frames.Count; ++i)
       {
-        long delta = frames.Ticks[i] - frames.Ticks[i - 1];
+        long delta = (frames.Times[i] - frames.Times[i - 1]).Ticks;
         if (delta > 0)
           deltas.Add(delta);
       }

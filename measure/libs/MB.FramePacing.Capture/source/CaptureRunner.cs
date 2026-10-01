@@ -60,7 +60,7 @@ namespace MB.FramePacing.Capture
         StopAtEnd = options.StopAtEnd,
         EndTailFrames = (int)Math.Ceiling(options.EndTail.TotalSeconds * fps),
         WaitWhenFull = !source.IsLive,
-        DeviceTicksWait = source.IsLive ? new FrameRecorderOptions().DeviceTicksWait : FrameRecorderOptions.NotLiveDeviceTicksWait,
+        DeviceTimeWait = source.IsLive ? new FrameRecorderOptions().DeviceTimeWait : FrameRecorderOptions.NotLiveDeviceTimeWait,
         PreRollFrames = Math.Max(16, (int)Math.Ceiling(fps * 0.25)),
       };
 
@@ -101,15 +101,15 @@ namespace MB.FramePacing.Capture
 
       var preview = options.Preview != null ? new GrayImage(format.Width, format.Height) : null;
       long lastPreviewIndex = -1;
-      long recordingStartTicks = options.WaitForStart ? -1 : 0;
-      long stopAtTicks = -1;
+      TickCount64? recordingStart = options.WaitForStart ? null : default(TickCount64);
+      TickCount64? stopAt = null;
       string stopReason = "cancelled";
-      long lastReportTicks = 0;
+      var lastReport = default(TickCount64);
 
       while (sourceThread.IsAlive)
       {
         sourceThread.Join(20);
-        long now = clock.NowTicks;
+        var now = clock.Now;
 
         if (preview != null)
         {
@@ -122,36 +122,36 @@ namespace MB.FramePacing.Capture
         }
 
         // The recorder's inspector saw the start marker (in any frame) and started writing
-        if (options.WaitForStart && recordingStartTicks < 0 && !recorder.IsArmed)
+        if (options.WaitForStart && recordingStart == null && !recorder.IsArmed)
         {
           var start = monitor.Start;
           g_logger.Info("Start marker seen (run {0} '{1}'), recording", start?.Payload.RunId, start?.Start?.SequenceText);
-          recordingStartTicks = now;
+          recordingStart = now;
         }
         // ... and the end marker plus its end tail
-        if (recorder.StopRequested && stopAtTicks < 0)
+        if (recorder.StopRequested && stopAt == null)
         {
           g_logger.Info("End marker seen, stopping after the {0} ms end tail", options.EndTail.TotalMilliseconds);
-          stopAtTicks = now;
+          stopAt = now;
           stopReason = "end marker";
         }
 
-        if (recordingStartTicks >= 0 && options.Duration is { } limit && stopAtTicks < 0 && now - recordingStartTicks >= limit.Ticks)
+        if (recordingStart is { } started && options.Duration is { } limit && stopAt == null && now - started >= limit)
         {
-          stopAtTicks = now;
+          stopAt = now;
           stopReason = "duration";
         }
-        if (stopAtTicks >= 0 && now >= stopAtTicks && !stopSource.IsCancellationRequested)
+        if (stopAt is { } stop && now >= stop && !stopSource.IsCancellationRequested)
           stopSource.Cancel();
 
-        if (progress != null && now - lastReportTicks >= TimeSpan.TicksPerMillisecond * 200)
+        if (progress != null && now - lastReport >= TimeSpan.FromMilliseconds(200))
         {
-          lastReportTicks = now;
+          lastReport = now;
           var phase =
             stopSource.IsCancellationRequested ? CapturePhase.Stopping
             : recorder.IsArmed ? CapturePhase.WaitingForStart
             : CapturePhase.Recording;
-          progress(new CaptureProgress(phase, TimeSpan.FromTicks(now), recorder.Stats, source.SourceDroppedFrames, monitor.Last));
+          progress(new CaptureProgress(phase, now.ToTimeSpan(), recorder.Stats, source.SourceDroppedFrames, monitor.Last));
         }
       }
 
@@ -179,7 +179,7 @@ namespace MB.FramePacing.Capture
         NominalFps = format.FrameRate.FramesPerSecond,
         WaitedForStart = options.WaitForStart,
         StopAtEnd = options.StopAtEnd,
-        DurationSeconds = TimeSpan.FromTicks(clock.NowTicks).TotalSeconds,
+        DurationSeconds = clock.Now.TotalSeconds,
         FramesCaptured = stats.FramesCaptured,
         FramesWritten = stats.FramesWritten,
         FramesDroppedByRecorder = stats.FramesDropped,
@@ -196,9 +196,7 @@ namespace MB.FramePacing.Capture
         Camera = options.Camera,
       };
       session.Save(options.OutputDirectory);
-      progress?.Invoke(
-        new CaptureProgress(CapturePhase.Finished, TimeSpan.FromTicks(clock.NowTicks), stats, source.SourceDroppedFrames, monitor.Last)
-      );
+      progress?.Invoke(new CaptureProgress(CapturePhase.Finished, clock.Now.ToTimeSpan(), stats, source.SourceDroppedFrames, monitor.Last));
 
       if (sourceError != null)
         throw new InvalidOperationException("Capture source failed: " + sourceError.Message, sourceError);

@@ -47,7 +47,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
           return new MediaSource(
             new CaptureDevice(FfmpegInputKind.ImageSequence, list, $"{frames.Count} images in {folder}"),
             new RequestedMode(0, 0, fps),
-            frames.Select(frame => frame.TimeTicks).ToList()
+            frames.Select(frame => frame.Time).ToList()
           );
 
         default:

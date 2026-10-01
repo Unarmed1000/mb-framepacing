@@ -55,7 +55,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         if (payload.Kind != MarkerKind.Frame)
           continue;
         if (expected.Count == 0 || expected[^1].Item1 != payload.FrameIndex)
-          expected.Add((payload.FrameIndex, payload.AnimationTime.Ticks, scenario.CaptureTicks(i)));
+          expected.Add((payload.FrameIndex, payload.AnimationTime.Ticks, scenario.CaptureTime(i).Ticks));
       }
       return expected;
     }
@@ -135,8 +135,8 @@ namespace MB.FramePacing.Analysis.UnitTest
       int stalls = expected
         .Skip(1)
         .Count(e =>
-          truth[e.FrameIndex].DisplayTicks - (truth[e.FrameIndex].Payload.IntendedDisplayTime.Ticks - SyntheticScenario.PacerEpochTicks)
-          >= scenario.RefreshIntervalTicks / 2
+          truth[e.FrameIndex].DisplayTime.Ticks - (truth[e.FrameIndex].Payload.IntendedDisplayTime.Ticks - SyntheticScenario.PacerEpoch.Ticks)
+          >= scenario.RefreshInterval.Ticks / 2
         );
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(report.CapturePeriodMs), "a capture card captures at the display's refresh rate");
@@ -214,7 +214,9 @@ namespace MB.FramePacing.Analysis.UnitTest
               200,
               3
             );
-          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
+          new CaptureRecordHeader(i, new TickCount64(i * 41_667L), new DeviceTimestamp(new TickCount64(i * 41_667L)), 0, header.PixelByteCount).Write(
+            record
+          );
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }
@@ -254,7 +256,9 @@ namespace MB.FramePacing.Analysis.UnitTest
               8,
               3
             );
-          new CaptureRecordHeader(i, i * 41_667L, i * 41_667L, 0, header.PixelByteCount).Write(record);
+          new CaptureRecordHeader(i, new TickCount64(i * 41_667L), new DeviceTimestamp(new TickCount64(i * 41_667L)), 0, header.PixelByteCount).Write(
+            record
+          );
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }

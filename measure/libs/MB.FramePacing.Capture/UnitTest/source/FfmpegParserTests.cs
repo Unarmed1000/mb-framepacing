@@ -44,11 +44,11 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(parser.OutputKnown.WaitOne(0), Is.True);
       Assert.That(parser.DroppedFrames, Is.EqualTo(1));
       Assert.That(parser.LastFrameNumber, Is.EqualTo(1));
-      Assert.That(parser.TryGetDeviceTicks(0, out long first), Is.True);
-      Assert.That(first, Is.EqualTo(123456789000L));
-      Assert.That(parser.TryGetDeviceTicks(1, out long second), Is.True);
-      Assert.That(second, Is.EqualTo(123456955833L));
-      Assert.That(parser.TryGetDeviceTicks(0, out _), Is.False, "a timestamp is handed out once");
+      Assert.That(parser.TryGetDeviceTime(0, out var first), Is.True);
+      Assert.That(first.Ticks, Is.EqualTo(123456789000L));
+      Assert.That(parser.TryGetDeviceTime(1, out var second), Is.True);
+      Assert.That(second.Ticks, Is.EqualTo(123456955833L));
+      Assert.That(parser.TryGetDeviceTime(0, out _), Is.False, "a timestamp is handed out once");
     }
 
     [TestCase(90000L, 1L, 90000L, 10_000_000L)]
@@ -56,9 +56,9 @@ namespace MB.FramePacing.Capture.UnitTest
     [TestCase(3L, 1001L, 60000L, 500_500L)]
     [TestCase(-90000L, 1L, 90000L, -10_000_000L)]
     [TestCase(long.MaxValue / 2, 1L, 10_000_000L, long.MaxValue / 2)]
-    public void PtsToTicks(long pts, long numerator, long denominator, long expected)
+    public void PtsToTime(long pts, long numerator, long denominator, long expectedTicks)
     {
-      Assert.That(FfmpegStderrParser.PtsToTicks(pts, numerator, denominator), Is.EqualTo(expected));
+      Assert.That(FfmpegStderrParser.PtsToTime(pts, numerator, denominator).Ticks, Is.EqualTo(expectedTicks));
     }
 
     [Test]

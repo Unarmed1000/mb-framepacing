@@ -41,7 +41,7 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(frames[^1].Payload.Kind, Is.EqualTo(MarkerKind.SequenceEnd));
       for (int i = 1; i < frames.Count; ++i)
       {
-        Assert.That(frames[i].DisplayTicks, Is.GreaterThan(frames[i - 1].DisplayTicks));
+        Assert.That(frames[i].DisplayTime.Ticks, Is.GreaterThan(frames[i - 1].DisplayTime.Ticks));
         Assert.That(frames[i].Payload.FrameIndex, Is.GreaterThan(frames[i - 1].Payload.FrameIndex));
         // A frame starts only after the previous one was handed over, also after a skipped frame
         var previous = frames[i - 1].Payload;
@@ -94,7 +94,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var record = records[i];
         Assert.That(record.CaptureIndex, Is.EqualTo(i));
-        Assert.That(record.DeviceTime?.Ticks, Is.EqualTo(scenario.CaptureTicks(i)), "the display timer");
+        Assert.That(record.DeviceTime, Is.EqualTo(scenario.CaptureTime(i)), "the display timer");
         Assert.That(record.Status, Is.EqualTo(CaptureDataStatus.Decoded), $"record {i}");
         var expected = scenario.PresentedFrames[scenario.PresentedIndexAt(i)].Payload;
         var expectedStart = expected.Kind == MarkerKind.SequenceStart ? scenario.StartMetadata : null;
@@ -142,8 +142,8 @@ namespace MB.FramePacing.Capture.UnitTest
         var header = frames.ReadRecordHeader(i);
         var record = data.ReadRecord(i);
         Assert.That(record.CaptureIndex, Is.EqualTo(header.CaptureIndex));
-        Assert.That(record.HostTime.Ticks, Is.EqualTo(header.HostTicks));
-        Assert.That(record.DeviceTime?.Ticks, Is.EqualTo(header.HasDeviceTicks ? header.DeviceTicks : (long?)null));
+        Assert.That(record.HostTime, Is.EqualTo(header.HostTime));
+        Assert.That(record.DeviceTime, Is.EqualTo(header.DeviceTime.ToNullable()));
       }
     }
 

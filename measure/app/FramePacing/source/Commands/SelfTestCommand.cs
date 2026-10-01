@@ -214,7 +214,7 @@ namespace MB.FramePacing.App.Commands
       var failures = new List<string>();
       var scenario = camera.Scenario;
       var truth = scenario.PresentedFrames.Where(f => f.Payload.Kind == MarkerKind.Frame && f.Payload.RunId == scenario.Options.RunId).ToList();
-      var tears = truth.Where(f => f.DisplayTicks % scenario.RefreshIntervalTicks != 0).Select(f => f.Payload.FrameIndex).ToHashSet();
+      var tears = truth.Where(f => f.DisplayTime.Ticks % scenario.RefreshInterval.Ticks != 0).Select(f => f.Payload.FrameIndex).ToHashSet();
       var run = report.Timeline.Runs.FirstOrDefault();
       double period = TimeSpan.TicksPerSecond / scenario.Options.CaptureFps;
       int checkedFrames = 0;
@@ -235,7 +235,7 @@ namespace MB.FramePacing.App.Commands
           {
             if (tears.Contains(expected[i].Payload.FrameIndex) || tears.Contains(expected[i - 1].Payload.FrameIndex))
               continue;
-            double truthDelta = camera.ToCameraTicks(expected[i].DisplayTicks - expected[i - 1].DisplayTicks);
+            double truthDelta = camera.ToCameraTicks(expected[i].DisplayTime.Ticks - expected[i - 1].DisplayTime.Ticks);
             ++checkedFrames;
             errorsMs.Add(Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - truthDelta) / TimeSpan.TicksPerMillisecond);
             if (Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - truthDelta) > (2 * period) + 1)
@@ -307,7 +307,7 @@ namespace MB.FramePacing.App.Commands
           continue;
         var payload = scenario.PresentedFrames[index].Payload;
         if (payload.Kind == MarkerKind.Frame && (expected.Count == 0 || expected[^1].FrameIndex != payload.FrameIndex))
-          expected.Add((payload.FrameIndex, scenario.CaptureTicks(i)));
+          expected.Add((payload.FrameIndex, scenario.CaptureTime(i).Ticks));
       }
 
       var run = report.Timeline.Runs.FirstOrDefault();

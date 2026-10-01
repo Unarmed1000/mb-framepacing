@@ -75,7 +75,8 @@ namespace MB.FramePacing.Capture.Synthetic
       (captureIndex + Scenario.Options.CapturePhase) * TimeSpan.TicksPerSecond / Scenario.Options.CaptureFps;
 
     /// <summary>The timestamp the camera writes for a capture (its own, drifting clock).</summary>
-    public long CameraTicks(long captureIndex) => (long)Math.Round(TrueTicks(captureIndex) * (1 + (Options.ClockDriftPpm * 1e-6)));
+    public TickCount64 CameraTime(long captureIndex) =>
+      new TickCount64((long)Math.Round(TrueTicks(captureIndex) * (1 + (Options.ClockDriftPpm * 1e-6))));
 
     /// <summary>Converts a display clock time to the camera clock.</summary>
     public double ToCameraTicks(double displayTicks) => displayTicks * (1 + (Options.ClockDriftPpm * 1e-6));
@@ -119,7 +120,7 @@ namespace MB.FramePacing.Capture.Synthetic
       return new ImagePoint(ox + cx, oy + cy);
     }
 
-    private double ScanoutTicks => Options.ScanoutFraction * Scenario.RefreshIntervalTicks;
+    private double ScanoutTicks => Options.ScanoutFraction * Scenario.RefreshInterval.Ticks;
 
     /// <summary>Render capture <paramref name="captureIndex"/> into <paramref name="target"/> (camera sized).</summary>
     public void Render(long captureIndex, GrayImage target)
@@ -145,7 +146,7 @@ namespace MB.FramePacing.Capture.Synthetic
     /// <summary>Which frame each screen row of a zone shows at every time sample of the exposure, and how far the panel has switched.</summary>
     private void UpdateRows(Zone zone, double start, double exposure)
     {
-      double refresh = Scenario.RefreshIntervalTicks;
+      double refresh = Scenario.RefreshInterval.Ticks;
       double tau = Options.PanelResponseSeconds * TimeSpan.TicksPerSecond;
       for (int s = 0; s < Options.TimeSamples; ++s)
       {
@@ -154,8 +155,8 @@ namespace MB.FramePacing.Capture.Synthetic
         {
           double offset = (zone.RowMin + r + 0.5) / Options.ScreenHeight * ScanoutTicks;
           double scan = (Math.Floor((t - offset) / refresh) * refresh) + offset;
-          int current = Scenario.PresentedIndexAtTicks((long)Math.Floor(scan));
-          int previous = Scenario.PresentedIndexAtTicks((long)Math.Floor(scan - refresh));
+          int current = Scenario.PresentedIndexAtTime(new TickCount64((long)Math.Floor(scan)));
+          int previous = Scenario.PresentedIndexAtTime(new TickCount64((long)Math.Floor(scan - refresh)));
           int index = (s * zone.RowCount) + r;
           zone.Current[index] = MatrixFor(current, zone.Kind);
           zone.Previous[index] = MatrixFor(previous, zone.Kind);
@@ -303,7 +304,7 @@ namespace MB.FramePacing.Capture.Synthetic
     {
       if (m_matrices.Count < 64)
         return;
-      int oldest = Scenario.PresentedIndexAtTicks((long)(TrueTicks(captureIndex) - (4 * Scenario.RefreshIntervalTicks)));
+      int oldest = Scenario.PresentedIndexAtTime(new TickCount64((long)(TrueTicks(captureIndex) - (4 * Scenario.RefreshInterval.Ticks))));
       var stale = new List<int>();
       foreach (var key in m_matrices.Keys)
       {

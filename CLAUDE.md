@@ -153,10 +153,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
-  - **Typed times** (C++ and C#, the same names; the tools convert at `AnalysisDataMapping` and `CaptureDecoder` until they are typed): points in time are `TickCount64` (named `…Time`:
+  - **Typed times** (C++ and C#, the same names; the tools' Capture library is typed too, the Analysis converts at `AnalysisDataMapping` and `CaptureDecoder` until it is): points in time are `TickCount64` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
     `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`); the CSV's milliseconds parse
     with `ParseMilliseconds`. The files' bytes and the golden data do not change.
+  - **Capture times** (`MB.FramePacing.Capture`): `CaptureClock.Now` and a frame's host time are `TickCount64` (the time since the capture
+    started). A frame's device time is a `DeviceTimestamp`: a time, `Unknown` (the device gave none) or `Pending` (it arrives after the
+    pixels: ffmpeg's showinfo lines, resolved by the recorder through `IDeviceTimestampSource`). Pending exists only between a source and
+    the recorder; files hold a time or unknown, and everything after the recorder has a `TickCount64?`.
 - **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):** the C++ module is off (`MB_FRAMEPACING_BUILD_PACER` and Conan's
   `with_pacer` default to off) until it is reworked; build it with `-DMB_FRAMEPACING_BUILD_PACER=ON` to work on it.
   - Values in, values out: `FrameInput` (the platform's values) → `FrameSchedule` (what to apply, the marker's pacing values), `FrameEnd`

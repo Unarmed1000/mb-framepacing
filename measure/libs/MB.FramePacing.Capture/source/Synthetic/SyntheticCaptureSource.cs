@@ -55,13 +55,13 @@ namespace MB.FramePacing.Capture.Synthetic
       var o = m_scenario.Options;
       var frame = new GrayImage(o.Width, o.Height, BackgroundLuma);
       int shownIndex = int.MinValue;
-      long runStartTicks = clock.NowTicks;
+      var runStart = clock.Now;
 
       for (long captureIndex = 0; captureIndex < m_scenario.CaptureCount && !cancellationToken.IsCancellationRequested; ++captureIndex)
       {
-        long deviceTicks = m_scenario.CaptureTicks(captureIndex);
+        var captureTime = m_scenario.CaptureTime(captureIndex);
         if (m_paced)
-          WaitUntil(clock, runStartTicks + deviceTicks, cancellationToken);
+          WaitUntil(clock, runStart + captureTime.ToTimeSpan(), cancellationToken);
 
         int presentedIndex = m_scenario.PresentedIndexAt(captureIndex);
         if (presentedIndex != shownIndex)
@@ -72,7 +72,7 @@ namespace MB.FramePacing.Capture.Synthetic
 
         var dst = sink.BeginFrame();
         frame.Pixels.AsSpan(0, Format.PixelByteCount).CopyTo(dst);
-        sink.EndFrame(clock.NowTicks, deviceTicks, 0);
+        sink.EndFrame(clock.Now, new DeviceTimestamp(captureTime), 0);
       }
     }
 
@@ -89,14 +89,14 @@ namespace MB.FramePacing.Capture.Synthetic
       MarkerRenderer.Render(frame, payload, o.OriginX, o.OriginY, o.ModuleSizePx, MarkerRenderer.RecommendedQuietZoneModules, metadata);
     }
 
-    private static void WaitUntil(CaptureClock clock, long targetTicks, CancellationToken cancellationToken)
+    private static void WaitUntil(CaptureClock clock, TickCount64 target, CancellationToken cancellationToken)
     {
       while (!cancellationToken.IsCancellationRequested)
       {
-        long remaining = targetTicks - clock.NowTicks;
-        if (remaining <= 0)
+        var remaining = target - clock.Now;
+        if (remaining <= TimeSpan.Zero)
           return;
-        if (remaining > TimeSpan.TicksPerMillisecond * 2)
+        if (remaining > TimeSpan.FromMilliseconds(2))
           Thread.Sleep(1);
         else
           Thread.SpinWait(64);
