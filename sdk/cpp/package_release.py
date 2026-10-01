@@ -5,7 +5,7 @@
 
   mb-framepacing-cpp-<version>.tar.gz and .zip, each holding one folder mb-framepacing-cpp-<version>/ with
     the library source tree (sdk/cpp without build output: core, marker, data, pacer), VERSION, LICENSE,
-    licenses/ (qrcodegen and nlohmann/json: compiled in; GoogleTest: fetched by the tests), doc/ (the marker format, the integration
+    licenses/ (qrcodegen and nlohmann/json: compiled in; GoogleTest: fetched by the tests; Google Benchmark: by the benchmarks), doc/ (the marker format, the integration
     guide, the data formats, the pacer), shaders/ (the reference shaders) and test-data/data/ and test-data/pacer/ (the golden data the
     data and pacer modules' tests read)
   SHA256SUMS
@@ -39,6 +39,7 @@ EXTRA_FILES = {
     "licenses/qrcodegen-MIT.txt": REPOSITORY_ROOT / "licenses" / "qrcodegen-MIT.txt",
     "licenses/nlohmann-json-MIT.txt": REPOSITORY_ROOT / "licenses" / "nlohmann-json-MIT.txt",
     "licenses/googletest-BSD-3-Clause.txt": REPOSITORY_ROOT / "licenses" / "googletest-BSD-3-Clause.txt",
+    "licenses/googlebenchmark-Apache-2.0.txt": REPOSITORY_ROOT / "licenses" / "googlebenchmark-Apache-2.0.txt",
     "doc/marker-format.md": SDK_DIR / "doc" / "marker-format.md",
     "doc/integrating.md": SDK_DIR / "doc" / "integrating.md",
     "doc/marker-fields.md": SDK_DIR / "doc" / "marker-fields.md",

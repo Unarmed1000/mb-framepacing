@@ -28,8 +28,17 @@ from pathlib import Path
 LIBRARY = "sdk/cpp"
 MODULES = ("core", "marker", "data", "pacer")
 # Per module, relative to its folder: what to format, and what clang-tidy checks (it follows the headers they include)
-FORMAT_GLOBS = ("include/**/*.hpp", "source/**/*.cpp", "source/**/*.hpp", "tests/**/*.cpp", "tests/**/*.hpp", "tools/*/*.cpp")
-TIDY_GLOBS = ("source/**/*.cpp", "tests/**/*.cpp", "tools/*/*.cpp")
+FORMAT_GLOBS = (
+    "include/**/*.hpp",
+    "source/**/*.cpp",
+    "source/**/*.hpp",
+    "tests/**/*.cpp",
+    "tests/**/*.hpp",
+    "tools/*/*.cpp",
+    "benchmarks/*.cpp",
+    "benchmarks/*.hpp",
+)
+TIDY_GLOBS = ("source/**/*.cpp", "tests/**/*.cpp", "tools/*/*.cpp", "benchmarks/*.cpp")
 HEADER_FILTER = ".*mb/framepacing/.*"
 # The consumer project is its own CMake project, so clang-tidy only formats it
 CONSUMER_GLOB = "tests/consumer/*.cpp"
@@ -78,6 +87,7 @@ def tidy_command(root: Path, build: Path, sources: list[str]) -> list[str]:
         f"-I{cpp / 'data' / 'source'}",
         f"-I{build / 'include'}",
         f"-isystem{build / '_deps/googletest-src/googletest/include'}",
+        f"-isystem{build / '_deps/googlebenchmark-src/include'}",
         f"-isystem{build / '_deps/nlohmann_json-src/include'}",
         f'-DMB_FRAMEPACING_EXPECTED_VERSION="{version}"',
         f'-DMB_FRAMEPACING_DATA_SOURCE_DIR="{(cpp / "data").as_posix()}"',

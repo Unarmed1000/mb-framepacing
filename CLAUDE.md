@@ -100,6 +100,9 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
 COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
     Each module's tests are their own executable (the marker's allocation test replaces the global `operator new`).
+  - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
+    by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
+    (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally.
   - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
     pass: shift and combine small unsigned types after casting them to `uint32_t`.
   - The `linux-sanitize` preset (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, compile database) is what CI runs the tests

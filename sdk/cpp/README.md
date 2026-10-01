@@ -47,14 +47,15 @@ Or git (`GIT_TAG sdk-v0.1.0`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of th
 `find_package(mb_framepacing 0.1 CONFIG REQUIRED COMPONENTS marker data)`, or Conan 2 (`mb-framepacing/0.1.0` from the recipe in
 [`conan/`](conan), see the guide). Every way gives the same targets: link the modules you use.
 
-| Option                              | Default                                                                |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                     |
-| `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched |
-| `MB_FRAMEPACING_BUILD_PACER`        | off (the pacer is off until it is reworked)                            |
-| `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                      |
-| `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                               |
-| `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                 |
+| Option                              | Default                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                              |
+| `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched          |
+| `MB_FRAMEPACING_BUILD_PACER`        | off (the pacer is off until it is reworked)                                     |
+| `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                               |
+| `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                        |
+| `MB_FRAMEPACING_BUILD_BENCHMARKS`   | off (the marker's benchmarks; fetches Google Benchmark unless one is installed) |
+| `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                          |
 
 nlohmann/json is found with `find_package(nlohmann_json 3.12)` when installed, and downloaded (a pinned release) otherwise; GoogleTest
 likewise, only for the tests.
@@ -237,6 +238,15 @@ Every module has its tests (`<module>/tests`); they fetch GoogleTest (an install
 frame loop (`pacer/tests/simulation`, test code, not part of the library) and `pacer-sim` (`pacer/tests/pacer-sim`, built with the
 tests), which paces a scenario with it; `pacer-sim --golden <dir>` writes the pacer's golden results. `tests/consumer` is a project that uses
 the library every documented way (`tests/consumer/check_consumers.py`).
+
+The marker's benchmarks (`marker/benchmarks`, Google Benchmark; `-DMB_FRAMEPACING_BUILD_BENCHMARKS=ON`, on in the `windows` and
+`linux-sanitize` presets) time every per-frame step: encoding (`EncodePayload`, `GenerateModules` for a frame, start and sync marker),
+every way to draw a matrix (quads, triangles, indexed triangles, the static grid and its indices, bitmaps in every pixel format) and a
+whole frame (encode and draw the main and the sync marker). Run a Release build:
+
+```sh
+build/windows/marker/Release/mb_framepacing_marker_benchmarks   # --benchmark_filter=GenerateModules for one group
+```
 
 ## License
 

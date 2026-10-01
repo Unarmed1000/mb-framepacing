@@ -46,6 +46,7 @@ option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; n
 option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer); off until it is reworked" OFF)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
+option(MB_FRAMEPACING_BUILD_BENCHMARKS "Build the benchmarks (the marker module's; fetches Google Benchmark unless one is installed)" OFF)
 option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 
 if(MB_FRAMEPACING_BUILD_DATA AND NOT MB_FRAMEPACING_BUILD_MARKER)
@@ -79,6 +80,23 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   set(BUILD_GMOCK OFF CACHE BOOL "gmock is not used" FORCE)
   FetchContent_MakeAvailable(googletest)
   include(GoogleTest)
+endif()
+
+if(MB_FRAMEPACING_BUILD_BENCHMARKS)
+  include(FetchContent)
+  # An installed Google Benchmark is used when find_package finds one, otherwise the pinned release is downloaded.
+  FetchContent_Declare(googlebenchmark
+    URL https://github.com/google/benchmark/archive/refs/tags/v1.9.5.tar.gz
+    URL_HASH SHA256=9631341c82bac4a288bef951f8b26b41f69021794184ece969f8473977eaa340
+    EXCLUDE_FROM_ALL
+    SYSTEM
+    FIND_PACKAGE_ARGS NAMES benchmark CONFIG)
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Google Benchmark's own tests are not built" FORCE)
+  set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "Google Benchmark's own tests are not built" FORCE)
+  set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Never install Google Benchmark with mb_framepacing" FORCE)
+  set(BENCHMARK_INSTALL_DOCS OFF CACHE BOOL "Never install Google Benchmark with mb_framepacing" FORCE)
+  set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "Our warnings apply to our sources only" FORCE)
+  FetchContent_MakeAvailable(googlebenchmark)
 endif()
 
 # Every module installs its target into this export set: find_package(mb_framepacing CONFIG COMPONENTS ...) gives mb_framepacing::<module>.

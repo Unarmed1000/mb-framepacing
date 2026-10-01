@@ -56,3 +56,13 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   target_compile_options(mb_framepacing_marker_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   gtest_discover_tests(mb_framepacing_marker_tests)
 endif()
+
+if(MB_FRAMEPACING_BUILD_BENCHMARKS)
+  add_executable(mb_framepacing_marker_benchmarks
+    benchmarks/BitmapBenchmarks.cpp
+    benchmarks/DrawBenchmarks.cpp
+    benchmarks/EncodeBenchmarks.cpp
+    benchmarks/FrameBenchmarks.cpp)
+  target_link_libraries(mb_framepacing_marker_benchmarks PRIVATE mb_framepacing::marker benchmark::benchmark_main)
+  target_compile_options(mb_framepacing_marker_benchmarks PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+endif()
