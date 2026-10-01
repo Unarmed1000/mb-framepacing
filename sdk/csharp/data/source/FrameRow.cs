@@ -24,7 +24,7 @@ namespace MB.FramePacing.Data
   /// <param name="AnimationDelta">The animation time step: from the previous frame's animation time to this one's.</param>
   /// <param name="AnimationError">The animation time step minus the display time step.</param>
   /// <param name="Drift">The sum of the judged animation errors so far.</param>
-  /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late", "StaticAfter", "StaticBefore", "UncertainStep"; empty when none.</param>
+  /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late", "StaticAfter", "StaticBefore", "UncertainStep", "StaticAssumed"; empty when none.</param>
   /// <param name="IntendedDisplayTime">From the marker: when the pacer intended the frame to be shown (its own clock).</param>
   /// <param name="MarkerTargetFrameTime">From the marker: the pacer's target frame time; Payload.OnDemandFrameTime = on demand.</param>
   /// <param name="TargetFrameTime">The frame time this frame is measured against, in whole refreshes; null on demand.</param>

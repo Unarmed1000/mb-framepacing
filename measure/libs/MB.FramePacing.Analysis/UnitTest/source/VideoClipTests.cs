@@ -94,10 +94,53 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// prediction errors against the pacer's schedule in the markers, and the CPU start time, CPU busy, frametime and CPU wait.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
-    public void Clip_AnalysisMatchesItsManifest(string clip)
+    public void Clip_AnalysisMatchesItsManifest(string clip) => CheckAgainstManifest(clip, assumeStatic: true);
+
+    /// <summary>
+    /// The clips whose rest lost its static flag with a dropped frame, analysed without the static guess: the rest is judged like any other
+    /// step (−100 ms), and no frame is assumed static.
+    /// </summary>
+    [TestCase("60-on-demand-paused-clock-dropped-before-wake")]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-before-wake")]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-wake")]
+    public void Clip_WithoutTheStaticGuess_MatchesItsManifest(string clip) => CheckAgainstManifest(clip, assumeStatic: false);
+
+    /// <summary>
+    /// How many static frames the analysis assumes per clip: the one rest whose flag a dropped frame took, and none where frames are dropped
+    /// in the middle of the motion or after a stall with the animation clock running.
+    /// </summary>
+    [TestCase("60-on-demand-paused-clock-dropped-before-wake", 1, -100)]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-before-wake", 1, -100)]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-wake", 1, -100)]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-frames", 0, 0)]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-after-stall", 0, 0)]
+    [TestCase("60-on-demand-paused-clock-hindsight", 0, 0)]
+    [TestCase("60-naive-5ms-diagram-slow-frames-every-1s-dropped-frames", 0, null)]
+    public void StaticGuess_FiresOnlyWhereAFlagWasLost(string clip, int assumed, int? worstErrorMsWithoutIt)
     {
-      var manifest = VideoClips.Manifest(clip);
-      var run = CaptureAnalyzer.Analyze(Import(clip), new AnalysisOptions()).Timeline.Runs.Single();
+      string capture = Import(clip);
+      var guessed = CaptureAnalyzer.Analyze(capture, new AnalysisOptions()).Timeline.Runs.Single();
+      Assert.That(
+        guessed.Frames.Count(f => (f.Flags & PresentedFrameFlags.StaticAssumed) != 0),
+        Is.EqualTo(assumed),
+        $"{clip}: assumed static frames"
+      );
+      if (worstErrorMsWithoutIt is not { } worst)
+        return;
+      var judged = CaptureAnalyzer
+        .Analyze(capture, new AnalysisOptions { Timeline = new TimelineOptions { AssumeStatic = false } })
+        .Timeline.Runs.Single();
+      Assert.That(judged.Frames.Any(f => (f.Flags & PresentedFrameFlags.StaticAssumed) != 0), Is.False, $"{clip}: nothing assumed without the guess");
+      Assert.That(judged.Statistics.AnimationErrorMs.Min, Is.EqualTo(worst).Within(0.01), $"{clip}: the largest error without the guess");
+      Assert.That(guessed.Statistics.AnimationErrorMs.Min, Is.EqualTo(0).Within(0.01), $"{clip}: no error left with it");
+    }
+
+    private void CheckAgainstManifest(string clip, bool assumeStatic)
+    {
+      var manifest = VideoClips.Manifest(clip) with { AssumeStatic = assumeStatic };
+      var run = CaptureAnalyzer
+        .Analyze(Import(clip), new AnalysisOptions { Timeline = new TimelineOptions { AssumeStatic = assumeStatic } })
+        .Timeline.Runs.Single();
 
       Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), "the manifest's presented frames");
       Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(manifest.ExpectedSkippedFrameIndices), $"{clip}: frame indices never presented");
@@ -125,6 +168,17 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.UncertainStep), Is.False, where + ": the clip's capture has no gap");
         Assert.That(frame.SkippedBefore, Is.EqualTo(manifest.SkippedBefore(i)), where + ": frame indices skipped before it");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.StaticAfter), Is.EqualTo(manifest.IsStatic(i)), where + ": static");
+        Assert.That(
+          frame.Flags.HasFlag(PresentedFrameFlags.StaticAssumed),
+          Is.EqualTo(assumeStatic && manifest.IsAssumedStatic(i)),
+          where + ": static by the guess, not by a flag"
+        );
+        if (i > 0 && manifest.ExpectedStaticSteps is { } byFlags)
+          Assert.That(
+            manifest.IsStaticByFlags(i - 1),
+            Is.EqualTo(byFlags.Contains(manifest.Presented[i])),
+            where + ": the step into it is static by the flags alone, as the manifest lists"
+          );
         Assert.That(
           frame.PreferredFrameTime?.Ticks,
           Is.EqualTo(manifest.PreferredRefreshes(i) * refresh),

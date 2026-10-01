@@ -120,6 +120,13 @@ namespace MB.FramePacing.Charts
       int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
         description.Add($"Frame rates and display time steps {staticFrames}: nothing animates while they are on screen.");
+      // Static by assumption, not by a marker: said apart, so a stall that looks like a rest is not hidden
+      int assumed = section.Data.AssumedStatic.CountIn(section.Start, section.End);
+      if (assumed > 0)
+        description.Add(
+          $"{assumed.ToString("N0", CultureInfo.InvariantCulture)} static frame{(assumed == 1 ? " is" : "s are")} assumed: "
+            + $"{(assumed == 1 ? "its" : "their")} flag was lost with a dropped frame."
+        );
       // Capture gaps, by kind when the capture rows are known: the steps they made uncertain are not judged
       int uncertain = section.Data.UncertainSteps.CountIn(section.Start, section.End);
       string gaps = CaptureGaps(section);
@@ -483,10 +490,13 @@ namespace MB.FramePacing.Charts
 
     private const string StaticLabel = "static: nothing animates";
 
+    // A band with a frame the analysis assumed static (a dropped frame took its flag): said apart from what the markers stated
+    private const string AssumedStaticLabel = "static (assumed)";
+
     /// <summary>
     /// A violet band behind every stretch of static frames (nothing animates) from <paramref name="top"/> to <paramref name="bottom"/>: from the
     /// first static frame's display time to the next frame's. Bands closer than a pixel merge; with <paramref name="label"/>, a band wide enough
-    /// says what it is.
+    /// says what it is: static, or assumed static when one of its frames is (PresentedFrameFlags.StaticAssumed).
     /// </summary>
     private static bool StaticBands(List<CardShape> parts, PanelView view, double top, double bottom, bool label)
     {
@@ -506,7 +516,7 @@ namespace MB.FramePacing.Charts
         else
           hi = mid;
       }
-      var bands = new List<(double X0, double X1)>();
+      var bands = new List<(double X0, double X1, bool Assumed)>();
       for (int k = lo; k < stretches.Count && stretches[k].Start < section.End; ++k)
       {
         var (start, end) = stretches[k];
@@ -515,16 +525,18 @@ namespace MB.FramePacing.Charts
         double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + last.OnScreen.TotalSeconds));
         if (x1 <= x0)
           continue;
+        bool assumed = data.AssumedStatic.CountIn(start, end) > 0;
         if (bands.Count > 0 && x0 - bands[^1].X1 < 1)
-          bands[^1] = (bands[^1].X0, Math.Max(bands[^1].X1, x1));
+          bands[^1] = (bands[^1].X0, Math.Max(bands[^1].X1, x1), bands[^1].Assumed || assumed);
         else
-          bands.Add((x0, x1));
+          bands.Add((x0, x1, assumed));
       }
-      foreach (var (x0, x1) in bands)
+      foreach (var (x0, x1, assumed) in bands)
       {
         view.Move(parts, new RectShape("static-band", N(x0, 1), N(top, 1), N(Math.Max(1, x1 - x0), 1), N(bottom - top, 1)), top, bottom);
-        if (label && x1 - x0 >= SmallTextWidth(StaticLabel) + 12)
-          view.Move(parts, new TextShape(x0 + 6, top + 13, StaticLabel, "static-text", "start"), top, bottom);
+        string text = assumed ? AssumedStaticLabel : StaticLabel;
+        if (label && x1 - x0 >= SmallTextWidth(text) + 12)
+          view.Move(parts, new TextShape(x0 + 6, top + 13, text, "static-text", "start"), top, bottom);
       }
       return bands.Count > 0;
     }

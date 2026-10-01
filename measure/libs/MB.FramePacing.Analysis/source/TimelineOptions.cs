@@ -40,5 +40,12 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>EXPERIMENTAL camera captures: the refresh rate the rig measured at calibration, to settle an ambiguous estimate.</summary>
     public double? CalibratedRefreshHz { get; init; }
+
+    /// <summary>
+    /// Assume a rest is static when a frame the target dropped took its flag: the frame a StaticBefore flag speaks for was never shown, or,
+    /// in a run that uses the static flags, a frame was dropped after a hold over which the animation clock stood still. The frame is
+    /// flagged <see cref="PresentedFrameFlags.StaticAssumed"/>. Off: such a rest is judged like any other step.
+    /// </summary>
+    public bool AssumeStatic { get; init; } = true;
   }
 }

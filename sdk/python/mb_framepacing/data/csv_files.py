@@ -19,7 +19,7 @@ ON_DEMAND_FRAME_TICKS = 0xFFFF_FFFF
 class FrameRow:
     """One presented frame. first_seen_ticks is its display time (the capture's clock), display_delta_ticks the display time step,
     animation_error_ticks the animation time step minus the display time step (None for a step from a static frame). flags holds
-    SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore or UncertainStep. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
+    SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep or StaticAssumed. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
     frametime and CPU wait as PresentMon names them); marker_target_ticks and marker_preferred_ticks are ON_DEMAND_FRAME_TICKS on demand,
     target_ticks and preferred_ticks (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
     camera captures' only. older_frames are the captures that showed an older frame out of order while this frame was the newest:

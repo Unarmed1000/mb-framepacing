@@ -202,6 +202,7 @@ namespace MB.FramePacing.Analysis
       public TimeSpan32 PreferredFrameTime;
       public bool StaticAfter;
       public bool StaticBefore;
+      public bool StaticAssumed;
       public long FirstCaptureIndex;
       public TickCount64 FirstSeenTime;
       public TickCount64 LastSeenTime;
@@ -346,7 +347,7 @@ namespace MB.FramePacing.Analysis
       var cameraStatistics = camera ? AnalyzeCamera(builders, firstSecondary, period, warnings) : null;
       if (cameraStatistics != null)
         TimeBySyncMarker(builders, cameraStatistics);
-      var frames = BuildFrames(builders, period, camera);
+      var frames = BuildFrames(builders, period, threshold, camera, options.AssumeStatic);
       var pacing = AnalyzePacing(frames, period, threshold, camera, options, warnings);
       var statistics = RunStatistics.From(frames, threshold, period);
       var counts = new RunCounts(
@@ -584,7 +585,64 @@ namespace MB.FramePacing.Analysis
       return $"{afterGap * 100 / followers}% of the presented frames come after frame indices that were never captured: the capture is most likely slower than the display's refresh rate, or vsync is off, so the results describe what the capture saw, not what the display showed.{rates} Capture at the display's refresh rate with vsync on.";
     }
 
-    private static List<PresentedFrame> BuildFrames(List<FrameBuilder> builders, TimeSpan period, bool camera)
+    /// <summary>
+    /// A rest whose static flag a dropped frame took is assumed static (TimelineOptions.AssumeStatic). Between two presented frames A and B of
+    /// a segment with frame indices the target dropped in between (no capture gap, none shown out of order), A's time on screen is assumed
+    /// static when:
+    /// 1. B carries StaticBefore: the marker says nothing animated while the frame before B was on screen; that frame was never shown, so A
+    ///    held the rest; or
+    /// 2. the flag itself was lost, which takes all of: the run uses a static flag on another frame; B is presented on demand, or A's hold
+    ///    is half a refresh or more beyond what the frames in between were due; and the animation clock stood still across the hold (the
+    ///    animation step is no more than one frame time per frame rendered in between, and two refreshes or more short of the display
+    ///    step). The frame time is B's target or preferred frame time, else the animation step into A. A stall with a running clock, or an
+    ///    ordinary dropped frame, is neither.
+    /// </summary>
+    private static void AssumeStatic(List<FrameBuilder> builders, TimeSpan refresh, TimeSpan threshold)
+    {
+      var onDemandTime = MarkerPayload.OnDemandFrameTime;
+      bool usesStaticFlags = builders.Any(b => b.StaticAfter || b.StaticBefore);
+      // The frame indices each segment showed out of order: skipped, but not dropped
+      var older = builders
+        .Where(b => b.OlderFrames != null)
+        .GroupBy(b => b.Segment)
+        .ToDictionary(g => g.Key, g => g.SelectMany(b => b.OlderFrames!).Select(o => o.FrameIndex).ToHashSet());
+      for (int i = 1; i < builders.Count; ++i)
+      {
+        var a = builders[i - 1];
+        var b = builders[i];
+        if (a.Segment != b.Segment || b.SkippedBefore == 0 || a.StaticAfter || a.UncertainStart || b.UncertainStart)
+          continue;
+        if (older.TryGetValue(b.Segment, out var shown) && shown.Any(index => index > a.FrameIndex && index < b.FrameIndex))
+          continue;
+        if (!b.StaticBefore)
+        {
+          if (!usesStaticFlags)
+            continue;
+          bool onDemand = b.TargetFrameTime == onDemandTime || (b.TargetFrameTime == TimeSpan32.Zero && b.PreferredFrameTime == onDemandTime);
+          // What each frame in between was due: B's target, else what the application prefers. Without either (on demand, or unknown), the
+          // animation step into A: the last step of the motion before the hold. At least one refresh
+          var frameTime =
+            !onDemand && b.TargetFrameTime != TimeSpan32.Zero ? b.TargetFrameTime.ToTimeSpan()
+            : !onDemand && b.PreferredFrameTime != TimeSpan32.Zero && b.PreferredFrameTime != onDemandTime ? b.PreferredFrameTime.ToTimeSpan()
+            : i >= 2 && builders[i - 2].Segment == a.Segment ? a.AnimationTime - builders[i - 2].AnimationTime
+            : refresh;
+          if (frameTime < refresh)
+            frameTime = refresh;
+          long rendered = (long)b.SkippedBefore + 1;
+          var due = TimeSpan.FromTicks(frameTime.Ticks * rendered);
+          var hold = b.FirstSeenTime - a.FirstSeenTime;
+          var animation = b.AnimationTime - a.AnimationTime;
+          bool waited = onDemand || hold >= due + TimeSpan.FromTicks(refresh.Ticks / 2);
+          bool clockStoodStill = animation <= due + threshold && animation <= hold - TimeSpan.FromTicks(2 * refresh.Ticks);
+          if (!waited || !clockStoodStill)
+            continue;
+        }
+        a.StaticAfter = true;
+        a.StaticAssumed = true;
+      }
+    }
+
+    private static List<PresentedFrame> BuildFrames(List<FrameBuilder> builders, TimeSpan period, TimeSpan threshold, bool camera, bool assumeStatic)
     {
       var frames = new List<PresentedFrame>(builders.Count);
       // Static is a frame's time on screen, said by the frame itself (StaticAfter) or, when the application only knew it one frame later,
@@ -594,6 +652,9 @@ namespace MB.FramePacing.Analysis
         if (builders[i].StaticBefore && builders[i - 1].Segment == builders[i].Segment && builders[i - 1].FrameIndex + 1 == builders[i].FrameIndex)
           builders[i - 1].StaticAfter = true;
       }
+      // A capture card's captures only: a camera's steps have gaps in every scanout
+      if (assumeStatic && !camera)
+        AssumeStatic(builders, period, threshold);
       int segmentStart = 0;
       var drift = TimeSpan.Zero;
       for (int i = 0; i < builders.Count; ++i)
@@ -639,6 +700,8 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.Torn;
         if (b.StaticAfter)
           flags |= PresentedFrameFlags.StaticAfter;
+        if (b.StaticAssumed)
+          flags |= PresentedFrameFlags.StaticAssumed;
         if (staticStep)
           flags |= PresentedFrameFlags.StaticBefore;
         if (uncertainStep)

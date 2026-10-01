@@ -1,6 +1,6 @@
 # Test clips
 
-Eighteen 60 Hz clips (1280×720, lossless H.264 4:4:4, 8 s plus 3 refreshes of start and end marker) with the frame marker baked in,
+Twenty-two 60 Hz clips (1280×720, lossless H.264 4:4:4, 8 s plus 3 refreshes of start and end marker) with the frame marker baked in,
 one folder per scenario, each with its `video.mp4` and the generator's `manifest.json`.
 
 **Per rendered frame, the manifest gives:**
@@ -24,13 +24,14 @@ one folder per scenario, each with its `video.mp4` and the generator's `manifest
 The start marker also carries a sequence id: the mode's name, or a UUID made from it when the name is longer than 16 characters
 (`sequenceId`). The clips have no sync marker: they can not tear.
 
-**The fault clips** (`…-dropped-frames`, `…-out-of-order`, `…-dropped-before-wake`) also give, per box:
+**The fault clips** (`…-dropped-frames`, `…-out-of-order`, `…-dropped-before-wake`, `…-dropped-wake`, `…-dropped-after-stall`) also give, per box:
 
 - `screen`: the frame on screen in every refresh;
 - `presented`: the frames the analysis counts. A frame is presented when it first appears with an index above every frame shown
   before it;
 - `fault`: its kind and blocks;
-- `expected`: the frame indices never presented and the refreshes that showed a frame out of order.
+- `expected`: the frame indices never presented, the refreshes that showed a frame out of order and, in the idle fault clips,
+  `staticSteps`: the frames whose step from the presented frame before them is static by the flags alone.
 
 **The idle clips:**
 
@@ -42,7 +43,16 @@ The start marker also carries a sequence id: the mode's name, or a UUID made fro
   StaticBefore on the frame that wakes. It analyses as `60-on-demand-paused-clock` (only the last frame differs: its StaticBefore would
   come with the frame after the capture).
 - `60-on-demand-paused-clock-hindsight-dropped-before-wake`: as the hindsight clip, but the first rest's frame is rendered and never
-  shown, so the wake frame's StaticBefore marks nothing and that step is judged (−100 ms).
+  shown, so the wake frame's StaticBefore speaks for a frame that was never on screen. The analysis assumes the frame shown instead
+  held the rest (`StaticAssumed`); without the guess that step is judged (−100 ms).
+- `60-on-demand-paused-clock-dropped-before-wake`: the same fault on `60-on-demand-paused-clock`: the rest's frame and its StaticAfter
+  are never shown. Assumed static; −100 ms without the guess.
+- `60-on-demand-paused-clock-hindsight-dropped-wake`: the frame that wakes is never shown, and its StaticBefore with it: no flag
+  reaches the display. Assumed static (the clock stood still over the hold, in a run that uses the flags); −100 ms without the guess.
+- `60-on-demand-paused-clock-hindsight-dropped-frames`: frames dropped in the middle of the motion (16 runs of 1 to 4), the clock
+  running through each: ordinary dropped frames, nothing is assumed.
+- `60-on-demand-paused-clock-hindsight-dropped-after-stall`: the game renders nothing for 6 refreshes mid-motion while its clock runs
+  on, and the next frame is dropped: the index and hold pattern of `-dropped-wake`, but a stall, so nothing is assumed.
 - `60-static-rests-paused-clock`: every frame rendered, the clock standing still through each rest: the frame that reaches the rest
   pose carries StaticAfter, the frames inside the rest both flags.
 - `60-idle-1fps`: one frame per second while idle, preferring 1 s.

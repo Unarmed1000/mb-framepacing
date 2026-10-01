@@ -80,7 +80,15 @@ namespace MB.FramePacing.Gui.ViewModels
       TargetFpsText = settings.AnalysisTargetFps ?? string.Empty;
       DisplayHzText = settings.AnalysisDisplayHz ?? string.Empty;
       ClampStatic = settings.ClampStatic;
+      AssumeStatic = settings.AssumeStatic;
     }
+
+    /// <summary>
+    /// The next Analyze assumes a rest is static when a dropped frame took its static flag (the frames are flagged StaticAssumed). Off, such
+    /// a rest is judged like any other step.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool AssumeStatic { get; set; }
 
     /// <summary>The Timeline's items, and whether static frames' values set its scales (the Clamp static switch).</summary>
     public ReportOptions TimelineOptions => g_timelineItems with { ClampStatic = ClampStatic };
@@ -108,6 +116,7 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings.AnalysisTargetFps = TargetFpsText;
       m_settings.AnalysisDisplayHz = DisplayHzText;
       m_settings.ClampStatic = ClampStatic;
+      m_settings.AssumeStatic = AssumeStatic;
       if (!string.IsNullOrWhiteSpace(CaptureDirectory))
         m_settings.LastCaptureDirectory = CaptureDirectory;
     }
@@ -524,6 +533,7 @@ namespace MB.FramePacing.Gui.ViewModels
           {
             TargetFps = FrameRateText.ParseOptional(TargetFpsText),
             ExpectedRefreshHz = FrameRateText.ParseOptional(DisplayHzText),
+            AssumeStatic = AssumeStatic,
           },
           ToolVersion = MainWindowViewModel.Version,
         };

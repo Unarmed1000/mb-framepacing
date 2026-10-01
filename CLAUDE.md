@@ -340,6 +340,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
     `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
     into the static frame is judged. Independent flags, not an enum; bits 2 to 7 are reserved (write 0, decoders keep them).
+  - **Assumed static** (`TimelineOptions.AssumeStatic`, on by default; `analyze --no-static-guess`, the GUI's "Guess static",
+    `GuiSettings.AssumeStatic`): `TimelineAnalyzer.AssumeStatic` flags a frame `StaticAfter | StaticAssumed` when a frame the target
+    dropped took the rest's flag: the next presented frame carries `StaticBefore` for a frame never shown, or (the flag lost) the run
+    uses static flags, the next frame is on demand or later than the frames in between were due, and the animation clock stood still
+    (animation step at most one frame time per rendered frame and two refreshes short of the display step; the frame time is the next
+    frame's target or preferred frame time, else the animation step into the held frame). Never across a capture gap or for a camera.
+    The report's description and the hover say "assumed"; `ClipManifest.IsAssumedStatic` mirrors the rule for the clip tests.
   - **Field order:** every payload type (C++ and C# `Payload`, Python `Payload`, the tools' `MarkerPayload`) lists its fields in the
     order of the wire format: kind, run id, frame index, flags, animation time (required by every constructor; C++ also has a default
     constructor and stays trivially copyable and standard layout: private fields read through getters, `WithKind` for another kind; the

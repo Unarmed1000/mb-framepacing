@@ -51,9 +51,16 @@ namespace MB.FramePacing.Analysis.UnitTest
     int[] Screen,
     int[] Presented,
     long ExpectedSkippedFrameIndices,
-    long ExpectedOutOfOrderCaptures
+    long ExpectedOutOfOrderCaptures,
+    int[]? ExpectedStaticSteps
   )
   {
+    /// <summary>The analysis's |animation error| threshold: the slack of the static guess's clock rule.</summary>
+    private const long ErrorThresholdTicks = TimeSpan.TicksPerMillisecond;
+
+    /// <summary>The expectations follow the analysis's static guess (TimelineOptions.AssumeStatic, its default) or the flags alone.</summary>
+    public bool AssumeStatic { get; init; } = true;
+
     /// <summary>The presented frames.</summary>
     public int FrameCount => Presented.Length;
 
@@ -107,7 +114,12 @@ namespace MB.FramePacing.Analysis.UnitTest
         screen,
         presented,
         Expected("skippedFrameIndices"),
-        Expected("outOfOrderRefreshes")
+        Expected("outOfOrderRefreshes"),
+        // The rendered frames whose step from the presented frame before them is static by the flags alone (the idle fault clips)
+        expected is { } given
+        && given.TryGetProperty("staticSteps", out var staticSteps)
+          ? staticSteps.EnumerateArray().Select(e => e.GetInt32()).ToArray()
+          : null
       );
     }
 
@@ -164,12 +176,49 @@ namespace MB.FramePacing.Analysis.UnitTest
     public long AnimationStepTicks(int frame) => RenderedAnimationTicks[Presented[frame]] - RenderedAnimationTicks[Presented[frame - 1]];
 
     /// <summary>
-    /// Nothing animates while presented frame <paramref name="frame"/> is on screen: its own StaticAfter, or StaticBefore on the next presented
-    /// frame when that is the next rendered frame (a frame never shown marks nothing). The last one's next frame is after the capture.
+    /// Nothing animates while presented frame <paramref name="frame"/> is on screen, by the flags alone: its own StaticAfter, or StaticBefore on
+    /// the next presented frame when that is the next rendered frame. The last one's next frame is after the capture.
     /// </summary>
-    public bool IsStatic(int frame) =>
+    public bool IsStaticByFlags(int frame) =>
       RenderedStaticAfter[Presented[frame]]
       || (frame + 1 < FrameCount && Presented[frame + 1] == Presented[frame] + 1 && RenderedStaticBefore[Presented[frame + 1]]);
+
+    /// <summary>
+    /// The analysis's guess (TimelineOptions.AssumeStatic): presented frame <paramref name="frame"/> held a rest whose flag a dropped frame
+    /// took. Frames were dropped before the next presented frame (none of them shown out of order), and either that frame carries
+    /// StaticBefore, or the clip uses the static flags on frames it shows, the next frame is on demand or the hold is half a refresh beyond
+    /// what the frames in between were due, and the animation clock stood still: the animation step is at most one frame time per frame
+    /// rendered in between and two refreshes or more short of the display step (the frame time: the next frame's target, else the animation
+    /// step into the held frame).
+    /// </summary>
+    public bool IsAssumedStatic(int frame)
+    {
+      if (frame + 1 >= FrameCount || IsStaticByFlags(frame))
+        return false;
+      int held = Presented[frame];
+      int next = Presented[frame + 1];
+      int dropped = next - held - 1;
+      if (dropped <= 0 || Enumerable.Range(held + 1, dropped).Any(Screen.Contains))
+        return false;
+      if (RenderedStaticBefore[next])
+        return true;
+      if (!Presented.Any(shown => RenderedStaticAfter[shown] || RenderedStaticBefore[shown]))
+        return false;
+      long refresh = RefreshTicks(1) - RefreshTicks(0);
+      bool onDemand = RenderedSwapInterval[next] == null;
+      // The frame time: the next frame's target, else (on demand) the animation step into the held frame, at least one refresh
+      long frameTime =
+        !onDemand ? RenderedSwapInterval[next]!.Value * refresh
+        : frame >= 1 ? Math.Max(refresh, AnimationStepTicks(frame))
+        : refresh;
+      long due = (dropped + 1) * frameTime;
+      long hold = DisplayStepTicks(frame + 1);
+      long animation = AnimationStepTicks(frame + 1);
+      return (onDemand || hold >= due + (refresh / 2)) && animation <= due + ErrorThresholdTicks && animation <= hold - (2 * refresh);
+    }
+
+    /// <summary>Nothing animates while presented frame <paramref name="frame"/> is on screen: by the flags, or assumed when the guess is on.</summary>
+    public bool IsStatic(int frame) => IsStaticByFlags(frame) || (AssumeStatic && IsAssumedStatic(frame));
 
     /// <summary>A step from a static frame is not judged: it has no animation error (frame 1 on). The step into one is.</summary>
     public bool IsJudged(int frame) => !IsStatic(frame - 1);

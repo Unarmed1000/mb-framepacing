@@ -136,7 +136,11 @@ namespace MB.FramePacing.Charts
       if ((frame.Flags & PresentedFrameFlags.Torn) != 0)
         notes.Add("torn");
       if ((frame.Flags & PresentedFrameFlags.StaticAfter) != 0)
-        notes.Add("static: nothing animates while it is on screen");
+        notes.Add(
+          (frame.Flags & PresentedFrameFlags.StaticAssumed) != 0
+            ? "static (assumed: the frame with the flag was dropped)"
+            : "static: nothing animates while it is on screen"
+        );
       if (frame.SkippedBefore > 0)
         notes.Add($"{frame.SkippedBefore} frame indices skipped before it");
       return $"Frame {frame.FrameIndex} at {Invariant(seconds, "0.000")} s" + (notes.Count > 0 ? $" ({string.Join(", ", notes)})" : string.Empty);

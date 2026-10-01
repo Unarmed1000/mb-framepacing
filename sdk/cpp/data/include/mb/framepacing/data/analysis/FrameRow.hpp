@@ -34,7 +34,7 @@ namespace MB::FramePacing::Data
     std::optional<TimeSpan> AnimationDelta;
     std::optional<TimeSpan> AnimationError;
     TimeSpan Drift;
-    //! SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep.
+    //! SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep, StaticAssumed.
     std::vector<std::string> Flags;
     std::optional<TickCount64> IntendedDisplayTime;
     //! The marker's target frame time; Marker::Payload::OnDemandFrameTime on demand.

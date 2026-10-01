@@ -68,6 +68,9 @@ namespace MB.FramePacing.Gui
     /// <summary>The Timeline's value scales follow the frames that animate (ReportOptions.ClampStatic); on by default.</summary>
     public bool ClampStatic { get; set; } = true;
 
+    /// <summary>The analysis assumes a rest is static when a dropped frame took its flag (TimelineOptions.AssumeStatic); on by default.</summary>
+    public bool AssumeStatic { get; set; } = true;
+
     /// <summary>EXPERIMENTAL camera capture: film the screen with the calibrated rig, its file, a slow motion clip's recorded fps.</summary>
     public bool UseCamera { get; set; }
     public string? CameraRig { get; set; }

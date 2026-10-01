@@ -94,7 +94,14 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
   - The report draws static stretches in violet, and leaves them out of the display time step and frametime scales.
   - A static step is never in the late share's amber ("held longer than the preferred frame time"). It can still be late: see
     "A renderer that sleeps until something changes" below for a renderer that stops presenting while static.
-  - Static before speaks for the frame index before it only: when that frame was never shown, it marks nothing.
+  - Static before speaks for the frame index before it only. When the target dropped a frame next to a rest, the flag can be lost
+    (the dropped frame carried it) or orphaned (it speaks for the dropped frame). The analysis then **assumes** the rest is static and
+    flags the frame that held it `StaticAssumed`, so the report says it apart from a rest the markers stated:
+    - a `StaticBefore` whose frame was dropped: the frame shown before it held the rest;
+    - a flag lost with its frame: only in a run that uses the static flags, when the frame after the dropped one is on demand or came
+      later than the frames in between were due, and the animation clock stood still over the hold (a stall with a running clock is a
+      stall).
+      `analyze --no-static-guess` (the GUI's **Guess static** check box) judges such a rest like any other step.
 - **Goes wrong when:**
   - A bit is set while something still moves (a spinner, a blinking cursor, a video): its errors are hidden and its time is missing
     from the frame rates.

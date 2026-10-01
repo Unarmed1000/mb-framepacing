@@ -217,6 +217,12 @@ inside its frame) and for the target and preferred frame time of an idle stretch
 default: `render --no-static-clamp` and the GUI's **Clamp static** check box (next to Save charts, which follows it) let the static
 values set the scales too.
 
+**A rest whose static flag a dropped frame took** is assumed static: the analysis flags the frame that held it `StaticAssumed`, the
+report's description counts such frames ("1 static frame is assumed: its flag was lost with a dropped frame.") and the hover says so.
+It happens when the target drops the frame that carried the flag, or the frame a `StaticBefore` spoke for; a flag lost without a
+trace is only assumed in a run that uses the static flags, over a hold where the animation clock stood still. `analyze
+--no-static-guess` and the GUI's **Guess static** check box (used at the next Analyze) judge such a rest like any other step.
+
 The **distribution cards** are drawn next to the report for the same run or section: `run-<id>-error-histogram.svg`,
 `-display-time-step-histogram.svg`, `-error-percentiles.svg` and `-drift.svg` (with the section's `-<from>s-<to>s`). The histograms
 use the fixed 0.1 ms bins with the counts on a log scale, so a handful of bad frames stay visible next to thousands of good ones;

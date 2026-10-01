@@ -11,6 +11,7 @@ using System;
 using System.CommandLine;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Charts;
 using Spectre.Console;
@@ -54,6 +55,13 @@ namespace MB.FramePacing.App.Commands
         },
       };
 
+      var noStaticGuessOption = new Option<bool>("--no-static-guess")
+      {
+        Description =
+          "Do not assume a rest is static when a dropped frame took its static flag: judge it like any other step. By default such a rest "
+          + "counts as static, flagged StaticAssumed.",
+      };
+
       var command = new Command("analyze", "Report the animation error of a capture (decoding its frames first when it only has frames).")
       {
         directoryArgument,
@@ -65,6 +73,7 @@ namespace MB.FramePacing.App.Commands
         nameOption,
         displayOption,
         thresholdOption,
+        noStaticGuessOption,
         chartsOption,
       };
       command.SetAction(parseResult =>
@@ -82,6 +91,7 @@ namespace MB.FramePacing.App.Commands
             ErrorThreshold = parseResult.GetValue(thresholdOption) is { } ms
               ? new TimeSpan((long)Math.Round(ms * TimeSpan.TicksPerMillisecond))
               : TimelineAnalyzer.DefaultErrorThreshold,
+            AssumeStatic = !parseResult.GetValue(noStaticGuessOption),
           },
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,
@@ -178,6 +188,11 @@ namespace MB.FramePacing.App.Commands
         AnsiConsole.MarkupLineInterpolated(
           $"{s.FramesWithAnimationError} frame(s) with |animation error| above {report.ErrorThresholdMs:0.###} ms (the error threshold, --error-threshold-ms)."
         );
+        int assumedStatic = run.Frames.Count(f => (f.Flags & PresentedFrameFlags.StaticAssumed) != 0);
+        if (assumedStatic > 0)
+          AnsiConsole.MarkupLineInterpolated(
+            $"{assumedStatic} static frame(s) assumed: their static flag was lost with a dropped frame (--no-static-guess judges them)."
+          );
         AnsiConsole.MarkupLineInterpolated(
           $"Error per frame {s.ErrorPerFrameMs:0.00} ms (the mean |animation error|), percent error {s.PercentError:0.0} % (all |animation error| over the time on screen), as Gamers Nexus report them."
         );

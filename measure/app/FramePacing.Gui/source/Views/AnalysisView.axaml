@@ -12,7 +12,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
         <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
         <ComboBox
@@ -35,17 +35,24 @@
           PlaceholderText="Display Hz"
           ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Empty = the rate stored with the capture, or no comparison."
         />
-        <Button Grid.Column="5" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
-        <Button Grid.Column="6" Content="Open reports" Command="{Binding OpenReportsCommand}" />
+        <CheckBox
+          Grid.Column="5"
+          Content="Guess static"
+          IsChecked="{Binding AssumeStatic}"
+          VerticalAlignment="Center"
+          ToolTip.Tip="Assume a rest is static when a dropped frame took its static flag (used at the next Analyze). Such frames are flagged StaticAssumed; off, the rest is judged like any other step."
+        />
+        <Button Grid.Column="6" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
+        <Button Grid.Column="7" Content="Open reports" Command="{Binding OpenReportsCommand}" />
         <Button
-          Grid.Column="7"
+          Grid.Column="8"
           Content="Save charts"
           Command="{Binding SaveChartsCommand}"
           IsEnabled="{Binding HasRun}"
           ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
         />
         <CheckBox
-          Grid.Column="8"
+          Grid.Column="9"
           Content="Clamp static"
           IsChecked="{Binding ClampStatic}"
           VerticalAlignment="Center"

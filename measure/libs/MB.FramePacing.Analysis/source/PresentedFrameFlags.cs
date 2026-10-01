@@ -50,5 +50,11 @@ namespace MB.FramePacing.Analysis
     /// error, no late verdict, and the frame rate numbers leave it out.
     /// </summary>
     UncertainStep = 64,
+
+    /// <summary>
+    /// This frame's <see cref="StaticAfter"/> is assumed, not said by a marker: a frame dropped next to it took the flag with it, or was the
+    /// frame a StaticBefore flag spoke for (TimelineOptions.AssumeStatic). It counts as static everywhere; the flag tells it apart.
+    /// </summary>
+    StaticAssumed = 128,
   }
 }

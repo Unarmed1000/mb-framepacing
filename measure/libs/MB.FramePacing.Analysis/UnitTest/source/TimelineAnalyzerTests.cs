@@ -231,21 +231,103 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// StaticBefore speaks for the frame index before it only: when that frame was never shown, the frame shown before it had motion after it
-    /// (the frame never shown), so nothing is static and the step is judged.
+    /// StaticBefore speaks for the frame index before it. When the target dropped that frame (frame 4, the rest's), the flag still arrived:
+    /// the frame shown before it held the rest, and the analysis assumes it static (StaticAssumed). Without the guess the flag marks nothing
+    /// and the rest is judged like a stall.
     /// </summary>
-    [Test]
-    public void StaticBefore_AfterAFrameNeverShown_MarksNothing()
+    [TestCase(true)]
+    [TestCase(false)]
+    public void StaticBefore_AfterADroppedFrame_IsAssumedStatic_UnlessTheGuessIsOff(bool assume)
     {
       var rows = new RowBuilder().Start(1);
-      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4);
+      // Frame 3 stays 120 ms: frame 4, the rest's, is never shown; the animation clock stands still through the rest
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 30);
       rows.Show(5, 64, 4, flags: MB.FramePacing.Marker.MarkerFlags.StaticBefore).Show(6, 80, 4);
       rows.End(1);
 
-      var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
+      var run = TimelineAnalyzer.Analyze(rows.Rows, new TimelineOptions { AssumeStatic = assume }).Runs.Single();
+      var frames = run.Frames;
 
-      Assert.That(frames.Any(f => (f.Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticBefore)) != 0), Is.False);
-      Assert.That(frames[3].AnimationError?.Ticks, Is.EqualTo(16 * Ms), "judged: frame 4's motion is in it");
+      var held = assume ? PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed : PresentedFrameFlags.None;
+      Assert.That(frames[2].Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed), Is.EqualTo(held), "frame 3 held the rest");
+      Assert.That(frames[3].Flags.HasFlag(PresentedFrameFlags.StaticBefore), Is.EqualTo(assume));
+      Assert.That(frames[3].AnimationError?.Ticks, Is.EqualTo(assume ? null : (32 - 120) * Ms), "the rest: assumed static, or judged");
+      Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(assume ? 1 : 0));
+      Assert.That(frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.StaticAssumed)), Is.EqualTo(assume ? 1 : 0));
+    }
+
+    /// <summary>
+    /// A 62.5 fps run (16 ms target, 4 captures per frame) in which frame 6 stays on screen and the frame after it may be dropped: the frames
+    /// after frame 6, and whether the analysis assumed frame 6 static. With <paramref name="staticElsewhere"/> frame 2 is a flagged rest.
+    /// </summary>
+    private static (PresentedFrame Held, PresentedFrame After) LostFlag(
+      bool staticElsewhere = true,
+      long animationStepMs = 32,
+      int holdCaptures = 30,
+      bool captureGap = false,
+      bool dropped = true,
+      bool onDemand = false,
+      bool assume = true
+    )
+    {
+      const uint Target = 160_000;
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4, targetFrameTicks: Target);
+      if (staticElsewhere)
+        rows.Show(2, 16, 30, targetFrameTicks: Target, flags: MB.FramePacing.Marker.MarkerFlags.StaticAfter);
+      else
+        rows.Show(2, 16, 4, targetFrameTicks: Target);
+      rows.Show(3, 32, 4, targetFrameTicks: Target).Show(4, 48, 4, targetFrameTicks: Target).Show(5, 64, 4, targetFrameTicks: Target);
+      rows.Show(6, 80, holdCaptures, targetFrameTicks: Target);
+      if (captureGap)
+        rows.Status(CaptureStatus.Undecodable, 2);
+      ulong next = dropped ? 8u : 7u;
+      uint aim = onDemand ? uint.MaxValue : Target;
+      rows.Show(next, 80 + animationStepMs, 4, targetFrameTicks: aim).Show(next + 1, 96 + animationStepMs, 4, targetFrameTicks: aim);
+      rows.End(1);
+      var frames = TimelineAnalyzer.Analyze(rows.Rows, new TimelineOptions { AssumeStatic = assume }).Runs.Single().Frames;
+      return (frames[5], frames[6]);
+    }
+
+    /// <summary>
+    /// The frame that woke the application was dropped, and its StaticBefore with it. In a run that uses the static flags, a hold beyond what
+    /// the frames in between were due, over which the animation clock stood still, is assumed to be that rest.
+    /// </summary>
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LostStaticFlag_IsAssumed_WhenTheClockStoodStillOverALongHold(bool onDemand)
+    {
+      var (held, after) = LostFlag(onDemand: onDemand);
+
+      Assert.That(held.Flags.HasFlag(PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed), "frame 6 held a rest");
+      Assert.That(after.Flags.HasFlag(PresentedFrameFlags.StaticBefore));
+      Assert.That(after.AnimationError, Is.Null, "the rest is not judged");
+    }
+
+    /// <summary>
+    /// Nothing is assumed without all of it: static flags elsewhere in the run, a dropped frame, no capture gap, a hold beyond what was due,
+    /// a clock that stood still (a stall with a running clock is a stall), and the guess switched on. The step is then judged.
+    /// </summary>
+    [Test]
+    public void LostStaticFlag_IsNotAssumed_WithoutEveryCondition()
+    {
+      void Judged((PresentedFrame Held, PresentedFrame After) frames, long errorMs, string why)
+      {
+        Assert.That(
+          frames.Held.Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed),
+          Is.EqualTo(PresentedFrameFlags.None),
+          why
+        );
+        Assert.That(frames.After.AnimationError?.Ticks, Is.EqualTo(errorMs * Ms), why);
+      }
+      Judged(LostFlag(staticElsewhere: false), 32 - 120, "the run does not use the static flags");
+      Judged(LostFlag(animationStepMs: 120), 0, "the animation clock kept running: a stall");
+      Judged(LostFlag(holdCaptures: 8), 0, "the hold is what two frames were due");
+      Judged(LostFlag(dropped: false), 32 - 120, "no frame was dropped: a long hold is a stall");
+      Judged(LostFlag(assume: false), 32 - 120, "the guess is switched off");
+      var gap = LostFlag(captureGap: true);
+      Assert.That(gap.Held.Flags.HasFlag(PresentedFrameFlags.StaticAssumed), Is.False, "a capture gap: the frame may have been shown");
+      Assert.That(gap.After.Flags.HasFlag(PresentedFrameFlags.UncertainStep), "and the step is uncertain, not static");
     }
 
     /// <summary>An application that presents on demand has no interval to be late against: a long wait for its next frame is not late.</summary>

@@ -120,7 +120,8 @@ say the same fact, for applications that know it at different moments:
   frame (it has no pending work after it). Set it on every such frame.
 - **Bit 1, static before:** nothing animated while the frame before this one was on screen. For an application that only knows it
   once it renders the next frame (it woke up on input after waiting); set it on that next frame. It speaks for the frame index before
-  it: when that frame was never shown, it marks nothing.
+  it. When that frame was never shown (the target dropped it), no frame carries the flag's meaning; the mb-framepacing tools then
+  assume the frame that was on screen instead held the rest (see [Filling the marker fields](marker-fields.md#flags-static-after-and-static-before)).
 - Either bit, or both, makes the step from that frame to the next a **static step**. The analysis does not judge its animation
   error, because there is no motion to be off: an animation clock that pauses while nothing animates would otherwise make the first
   frame after an idle stretch look as far off as the stretch was long. The step into the static frame is judged as usual. A static

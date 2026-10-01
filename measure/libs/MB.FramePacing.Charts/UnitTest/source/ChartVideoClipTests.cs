@@ -666,6 +666,36 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(events.CapturesKnown, $"{clip}: the capture rows are there");
     }
 
+    /// <summary>
+    /// A rest whose flag a dropped frame took is shown as assumed, never as plain static: the report's description counts it, and the hover
+    /// on the frame that held it says so. A clip whose static frames all carry their flag says neither.
+    /// </summary>
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-wake", true)]
+    [TestCase("60-on-demand-paused-clock-hindsight-dropped-before-wake", true)]
+    [TestCase("60-on-demand-paused-clock-hindsight", false)]
+    public void AssumedStatic_IsSaidInTheDescriptionAndTheHover(string clip, bool assumed)
+    {
+      var (_, _, chart) = Analyze(clip);
+      var section = RunSection.Whole(chart);
+      const string Line = "1 static frame is assumed: its flag was lost with a dropped frame.";
+
+      var texts = ReportCard.Build(section).FlatShapes.OfType<TextShape>().Select(t => t.Content).ToList();
+      Assert.That(texts.Contains(Line), Is.EqualTo(assumed), $"{clip}: the description");
+
+      var hover = new CardHover(section);
+      var plot = ReportCard.Build(section).Plots.Single(p => p.Id == ReportItem.DisplayTimeStep);
+      var notes = chart
+        .Run.Frames.Where(f => (f.Flags & PresentedFrameFlags.StaticAfter) != 0)
+        .Select(f => hover.Describe(plot, (f.FirstSeenTime - chart.Run.Frames[0].FirstSeenTime).TotalSeconds, 0)!)
+        .ToList();
+      Assert.That(
+        notes.Count(n => n.Contains("static (assumed: the frame with the flag was dropped)")),
+        Is.EqualTo(assumed ? 1 : 0),
+        $"{clip}: the hover"
+      );
+      Assert.That(notes.Count(n => n.Contains("static: nothing animates while it is on screen")), Is.EqualTo(notes.Count - (assumed ? 1 : 0)));
+    }
+
     private (ClipManifest Manifest, AnalysisReport Report, ChartRun Chart) Analyze(string clip)
     {
       var manifest = VideoClips.Manifest(clip);

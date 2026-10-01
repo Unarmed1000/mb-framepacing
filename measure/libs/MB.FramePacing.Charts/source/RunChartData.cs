@@ -44,6 +44,7 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<RankBits> m_spans;
     private readonly Lazy<WaveletMatrix> m_frameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_animatingCpuBusy;
+    private readonly Lazy<RankBits> m_assumedStatic;
     private readonly Lazy<WaveletMatrix> m_allFrameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_drift;
     private readonly Lazy<LateShareData?> m_lateShare;
@@ -155,6 +156,7 @@ namespace MB.FramePacing.Charts
           i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTime?.Ticks is > 0 and var t ? t : null
         )
       );
+      m_assumedStatic = Once(() => new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.StaticAssumed) != 0));
       m_animatingCpuBusy = Once(() =>
         new FrameSequence(
           count,
@@ -299,6 +301,9 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The frametimes of the frames that animate: a static frame's (an idle wait) is left out, as the frametime scale is.</summary>
     public FrameSequence AnimatingFrameTimes => m_animatingFrameTimes.Value;
+
+    /// <summary>The static frames the analysis assumed: a dropped frame took their flag (PresentedFrameFlags.StaticAssumed).</summary>
+    public RankBits AssumedStatic => m_assumedStatic.Value;
 
     /// <summary>The CPU busy of the frames that animate: a static frame's (an idle wait inside the frame) is left out, as the frametime scale is.</summary>
     public FrameSequence AnimatingCpuBusy => m_animatingCpuBusy.Value;
