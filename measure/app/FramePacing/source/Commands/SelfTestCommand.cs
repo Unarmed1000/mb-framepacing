@@ -235,7 +235,7 @@ namespace MB.FramePacing.App.Commands
           {
             if (tears.Contains(expected[i].Payload.FrameIndex) || tears.Contains(expected[i - 1].Payload.FrameIndex))
               continue;
-            double truthDelta = camera.ToCameraTicks(expected[i].DisplayTime.Ticks - expected[i - 1].DisplayTime.Ticks);
+            double truthDelta = camera.ToCameraTicks((expected[i].DisplayTime - expected[i - 1].DisplayTime).Ticks);
             ++checkedFrames;
             errorsMs.Add(Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - truthDelta) / TimeSpan.TicksPerMillisecond);
             if (Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - truthDelta) > (2 * period) + 1)
@@ -299,7 +299,7 @@ namespace MB.FramePacing.App.Commands
         );
 
       // Ground truth: the application frame visible at each capture, collapsed to presented frames
-      var expected = new List<(ulong FrameIndex, long FirstSeen)>();
+      var expected = new List<(ulong FrameIndex, TickCount64 FirstSeen)>();
       for (long i = 0; i < scenario.CaptureCount; ++i)
       {
         int index = scenario.PresentedIndexAt(i);
@@ -307,7 +307,7 @@ namespace MB.FramePacing.App.Commands
           continue;
         var payload = scenario.PresentedFrames[index].Payload;
         if (payload.Kind == MarkerKind.Frame && (expected.Count == 0 || expected[^1].FrameIndex != payload.FrameIndex))
-          expected.Add((payload.FrameIndex, scenario.CaptureTime(i).Ticks));
+          expected.Add((payload.FrameIndex, scenario.CaptureTime(i)));
       }
 
       var run = report.Timeline.Runs.FirstOrDefault();
@@ -315,7 +315,7 @@ namespace MB.FramePacing.App.Commands
         failures.Add("no run was found");
       else if (session.FramesDroppedByRecorder == 0)
       {
-        var actual = run.Frames.Select(f => (f.FrameIndex, f.FirstSeenTime.Ticks)).ToList();
+        var actual = run.Frames.Select(f => (f.FrameIndex, f.FirstSeenTime)).ToList();
         int mismatches = expected.Zip(actual).Count(pair => pair.First != pair.Second) + Math.Abs(expected.Count - actual.Count);
         if (mismatches > 0)
           failures.Add($"{mismatches} of {expected.Count} presented frames differ from the ground truth");

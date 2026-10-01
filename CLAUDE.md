@@ -153,7 +153,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
-  - **Typed times** (C++ and C#, the same names; the tools' Capture and Analysis libraries are typed too, with these names: `PresentedFrame`, `CaptureRow`): points in time are `TickCount64` (named `…Time`:
+  - **Typed times** (C++ and C#, the same names; the tools are typed throughout too, with these names: `PresentedFrame`, `CaptureRow`,
+    `ChartRun`): points in time are `TickCount64` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
     `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`); the CSV's milliseconds parse
     with `ParseMilliseconds`. The files' bytes and the golden data do not change.
@@ -166,6 +167,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     (`DisplayDelta`, `TargetFrameTime`, `Lateness`). `IntendedDisplayTime` and `CpuStartTime` are on the pacer's clock, `FirstSeenTime`
     on the capture's: `PacingAnalyzer.CaptureMinusPacer` is where the analysis subtracts them. Milliseconds are
     `TimeSpan.TotalMilliseconds` (on .NET 10 the same bits as ticks / 10000.0, so the output does not change).
+    The charts read the typed values; what they keep in ticks is integer arithmetic (whole refreshes, strip cells) and the prepared
+    sequences (`FrameSequence`, `WaveletMatrix`), which rank plain integers. The GUI's `Stopwatch` timestamps stay raw.
 - **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):** the C++ module is off (`MB_FRAMEPACING_BUILD_PACER` and Conan's
   `with_pacer` default to off) until it is reworked; build it with `-DMB_FRAMEPACING_BUILD_PACER=ON` to work on it.
   - Values in, values out: `FrameInput` (the platform's values) → `FrameSchedule` (what to apply, the marker's pacing values), `FrameEnd`
