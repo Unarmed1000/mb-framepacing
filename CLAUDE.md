@@ -102,6 +102,12 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     Each module's tests are their own executable. What they share is in `sdk/cpp/testing` (`mb_framepacing_test_support`, an OBJECT
     library built with the tests only, never installed): `Testing::AllocationCounter` and the counting global `operator new`/`delete`
     the allocation tests link.
+  - **Executable size:** `sdk/cpp/tests/size` holds size probes (a baseline program, then one using the core, the marker, the marker
+    and data modules), linked so unused code is dropped (the modules are built with `-ffunction-sections -fdata-sections`).
+    `tools/measure_sdk_size.py --toolchain <id>` builds them in Release and MinSizeRel (in `sdk/cpp/build/size`) and reports each
+    one's size minus the baseline's; `--update-doc` rewrites the table in `sdk/cpp/README.md` (between `sdk-size-table` markers),
+    `--check` fails beyond 10 % (at least 4 KiB). CI's `cpp-size` job checks MSVC, GCC, Clang and AppleClang and uploads each
+    measurement (`--update-doc size-*.json` takes them). Refresh the table in the change that alters a module's size.
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
     (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally.

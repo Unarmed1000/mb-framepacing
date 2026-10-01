@@ -32,7 +32,7 @@ target_sources(mb_framepacing_marker
 target_compile_features(mb_framepacing_marker PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_marker PUBLIC mb_framepacing::core)
 target_include_directories(mb_framepacing_marker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/qrcodegen)
-target_compile_options(mb_framepacing_marker PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MB_FRAMEPACING_CXX_WARNINGS}>)
+target_compile_options(mb_framepacing_marker PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MB_FRAMEPACING_CXX_WARNINGS}> ${MB_FRAMEPACING_SECTION_FLAGS})
 
 install(TARGETS mb_framepacing_marker EXPORT mb_framepacingTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

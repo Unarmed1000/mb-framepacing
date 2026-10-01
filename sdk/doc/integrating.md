@@ -16,7 +16,8 @@ whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precis
 ## 1. Add the C++ library
 
 CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`, `::pacer`); the marker
-module needs only the core and has no dependencies. Pick one of five ways:
+module needs only the core and has no dependencies ([what each module adds to your executable](../cpp/README.md#what-it-adds-to-your-executable)).
+Pick one of five ways:
 
 **a) The release archive (recommended):** a small download, no git, and pinned by its hash. The release page lists the hash for
 each version (`SHA256SUMS`):

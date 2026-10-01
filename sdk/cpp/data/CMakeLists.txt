@@ -61,7 +61,7 @@ target_sources(mb_framepacing_data
       include/mb/framepacing/data/analysis/ValueStatistics.hpp)
 target_compile_features(mb_framepacing_data PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_data PUBLIC mb_framepacing::marker PRIVATE $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>)
-target_compile_options(mb_framepacing_data PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+target_compile_options(mb_framepacing_data PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
 install(TARGETS mb_framepacing_data EXPORT mb_framepacingTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

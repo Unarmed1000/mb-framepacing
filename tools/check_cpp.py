@@ -2,7 +2,8 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the C++ library (sdk/cpp: the core, marker and data modules) with clang-format and clang-tidy (config: sdk/cpp/.clang-format and
-.clang-tidy). The consumer project (sdk/cpp/tests/consumer) and the Conan recipe's test package (sdk/cpp/conan) are only formatted.
+.clang-tidy). The consumer project (sdk/cpp/tests/consumer), the size probes (sdk/cpp/tests/size) and the Conan recipe's test package
+(sdk/cpp/conan) are only formatted.
 
 Only our sources are checked, never third_party/ or fetched dependencies. clang-tidy needs a configured build of the library (GoogleTest
 and nlohmann/json headers, the generated Version.hpp), found at sdk/cpp/build/<preset>:
@@ -44,6 +45,8 @@ TIDY_GLOBS = ("source/**/*.cpp", "tests/**/*.cpp", "tools/*/*.cpp", "benchmarks/
 HEADER_FILTER = ".*mb/framepacing/.*"
 # The consumer project is its own CMake project, so clang-tidy only formats it
 CONSUMER_GLOB = "tests/consumer/*.cpp"
+# The size probes (tools/measure_sdk_size.py): formatted only, as the consumer project
+SIZE_GLOB = "tests/size/*.cpp"
 # The Conan recipe's test package builds against the package, not in the library's build, so it is only formatted
 CONAN_TEST_PACKAGES = "sdk/cpp/conan/recipes/*/all/test_package/*.cpp"
 
@@ -111,6 +114,7 @@ def main() -> int:
     formatted = files(cpp, modules, FORMAT_GLOBS)
     if args.module == "all":
         formatted += sorted(str(path.relative_to(cpp).as_posix()) for path in cpp.glob(CONSUMER_GLOB))
+        formatted += sorted(str(path.relative_to(cpp).as_posix()) for path in cpp.glob(SIZE_GLOB))
     ok = run([tool("clang-format"), "--dry-run", "--Werror", *formatted], cpp)
     if args.module == "all":
         test_packages = sorted(path.relative_to(root).as_posix() for path in root.glob(CONAN_TEST_PACKAGES))

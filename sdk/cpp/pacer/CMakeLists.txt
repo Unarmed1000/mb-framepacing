@@ -29,7 +29,7 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/rule/WindowState.hpp)
 target_compile_features(mb_framepacing_pacer PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_pacer PUBLIC mb_framepacing::core)
-target_compile_options(mb_framepacing_pacer PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+target_compile_options(mb_framepacing_pacer PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
 install(TARGETS mb_framepacing_pacer EXPORT mb_framepacingTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

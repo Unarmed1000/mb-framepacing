@@ -61,6 +61,10 @@ set(MB_FRAMEPACING_CXX_WARNINGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- $<$<BOOL:${MB_FRAMEPACING_WARNINGS_AS_ERRORS}>:/WX>>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Wconversion -Wshadow $<$<BOOL:${MB_FRAMEPACING_WARNINGS_AS_ERRORS}>:-Werror>>)
 
+# Every function and object in a section of its own, so an application's linker drops what it does not call (--gc-sections,
+# -dead_strip); MSVC's /O2 has /Gy
+set(MB_FRAMEPACING_SECTION_FLAGS "$<$<NOT:$<STREQUAL:$<CXX_COMPILER_FRONTEND_VARIANT>,MSVC>>:-ffunction-sections;-fdata-sections>")
+
 # The generated headers (core's Version.hpp) go here; the core target adds it to its header file set.
 set(MB_FRAMEPACING_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 configure_file(cmake/Version.hpp.in ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Version.hpp @ONLY)

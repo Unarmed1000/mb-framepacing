@@ -37,6 +37,7 @@ Everything here is under the BSD 3-Clause License. The measuring tools themselve
 | Python 3.12+                     | [`mb_framepacing`](python/README.md): `mb_framepacing.marker`, `mb_framepacing.data`                                            | One package, standard library only                                                     |
 
 The Unity package contains the C# core and marker modules plus Unity helpers (an overlay component that does everything for you).
+What the C++ modules add to an executable, per compiler, is in [the C++ README](cpp/README.md#what-it-adds-to-your-executable).
 
 ## What is here
 

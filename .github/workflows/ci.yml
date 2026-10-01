@@ -177,6 +177,37 @@ jobs:
       - name: clang-format and clang-tidy
         run: python3 tools/check_cpp.py --preset linux-sanitize
 
+  # What the C++ SDK adds to an executable, per toolchain: fails when sdk/cpp/README.md's table is off by more than the tolerance;
+  # the measurement is in the job summary and an artifact (tools/measure_sdk_size.py --update-doc <files> refreshes the table)
+  cpp-size:
+    name: C++ size ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, toolchain: msvc-x64 }
+          - { os: ubuntu-latest, toolchain: gcc-x64 }
+          - { os: ubuntu-latest, toolchain: clang-x64, cc: clang, cxx: clang++ }
+          - { os: macos-latest, toolchain: appleclang-arm64 }
+    steps:
+      - uses: actions/checkout@v7
+      - name: CMake 4
+        uses: lukka/get-cmake@v4.4.2
+      - name: Measure and compare with the README
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.cxx }}" ]; then export CC="${{ matrix.cc }}" CXX="${{ matrix.cxx }}"; fi
+          # Windows runners have 'python', Linux and macOS 'python3'
+          "$(command -v python3 || command -v python)" tools/measure_sdk_size.py --toolchain ${{ matrix.toolchain }} --check --json size-${{ matrix.toolchain }}.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: size-${{ matrix.toolchain }}
+          path: size-${{ matrix.toolchain }}.json
+          if-no-files-found: ignore
+
   conan:
     name: Conan recipe ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

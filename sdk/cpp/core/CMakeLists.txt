@@ -25,7 +25,7 @@ target_sources(mb_framepacing_core
       include/mb/framepacing/core/time/TimeSpan32.hpp
       ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Version.hpp)
 target_compile_features(mb_framepacing_core PUBLIC cxx_std_20)
-target_compile_options(mb_framepacing_core PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+target_compile_options(mb_framepacing_core PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
 install(TARGETS mb_framepacing_core EXPORT mb_framepacingTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
