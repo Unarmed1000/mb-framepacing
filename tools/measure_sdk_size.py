@@ -4,8 +4,10 @@
 """Measure what the SDK adds to an application, and keep the tables in sdk/cpp/README.md and sdk/README.md up to date.
 
 Builds the size probes (sdk/cpp/tests/size: a baseline program and one that uses the core, the marker, and the marker and data
-modules) with the compiler CMake finds, in Release and MinSizeRel, linked so that unused code is dropped, and reports each probe's size
-minus the baseline's (stripped on Linux and macOS; without the PDB on Windows). The builds go in sdk/cpp/build/size.
+modules) with the compiler CMake finds, in Release and MinSizeRel, linked so that unused code is dropped, and reports what each probe
+loads from its file minus what the baseline loads: the sum of the executable's sections (executable_sections.py), which has no
+padding. The file's own size would not do: it grows a page at a time (4 KiB on Linux, 16 KiB on macOS arm64), so a module could
+measure as nothing or as a whole page. The builds go in sdk/cpp/build/size.
 
   python tools/measure_sdk_size.py --toolchain msvc-x64                     # measure and print
   python tools/measure_sdk_size.py --toolchain msvc-x64 --check             # fail when the README's row is off by more than the tolerance
@@ -27,13 +29,13 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+
+import executable_sections  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
 
 ROOT = Path(__file__).resolve().parent.parent
 PROBE_DIR = ROOT / "sdk" / "cpp" / "tests" / "size"
@@ -118,16 +120,6 @@ def find_executable(build: Path, build_type: str, name: str) -> Path:
     sys.exit(f"{name} was not built in {build}")
 
 
-def stripped_size(executable: Path, work: Path) -> int:
-    """The executable's size without its symbols: on Windows the symbols are in the PDB already."""
-    if sys.platform == "win32":
-        return executable.stat().st_size
-    copy = work / f"{executable.name}.stripped"
-    _ = shutil.copyfile(executable, copy)
-    run(["strip", str(copy)])
-    return copy.stat().st_size
-
-
 def compiler_name(build: Path) -> str:
     for path in (build / "CMakeFiles").glob("*/CMakeCXXCompiler.cmake"):
         text = path.read_text(encoding="utf-8")
@@ -141,19 +133,16 @@ def compiler_name(build: Path) -> str:
 def measure(toolchain: str) -> Measurement:
     sizes: dict[str, dict[str, float]] = {}
     compiler = "unknown"
-    # Next to the presets' builds (ignored by git), kept between runs; stripped copies go in a temporary folder
-    with tempfile.TemporaryDirectory(prefix="mb-framepacing-size-") as temporary:
-        work = Path(temporary)
-        for build_type in BUILD_TYPES:
-            build = BUILD_DIR / build_type
-            run(["cmake", "-S", str(PROBE_DIR), "-B", str(build), f"-DCMAKE_BUILD_TYPE={build_type}"])
-            targets = [BASELINE, *(target for _, target, _ in COLUMNS)]
-            run(["cmake", "--build", str(build), "--config", build_type, "--parallel", "--target", *targets])
-            compiler = compiler_name(build)
-            baseline = stripped_size(find_executable(build, build_type, BASELINE), work)
-            sizes[build_type] = {
-                key: round((stripped_size(find_executable(build, build_type, target), work) - baseline) / 1024.0, 1) for key, target, _ in COLUMNS
-            }
+    # Next to the presets' builds (ignored by git), kept between runs
+    for build_type in BUILD_TYPES:
+        build = BUILD_DIR / build_type
+        run(["cmake", "-S", str(PROBE_DIR), "-B", str(build), f"-DCMAKE_BUILD_TYPE={build_type}"])
+        targets = [BASELINE, *(target for _, target, _ in COLUMNS)]
+        run(["cmake", "--build", str(build), "--config", build_type, "--parallel", "--target", *targets])
+        compiler = compiler_name(build)
+        loaded = {target: executable_sections.loaded_bytes(find_executable(build, build_type, target)) for target in targets}
+        print(f"{build_type}: " + ", ".join(f"{target} {size} bytes" for target, size in loaded.items()), flush=True)
+        sizes[build_type] = {key: round((loaded[target] - loaded[BASELINE]) / 1024.0, 1) for key, target, _ in COLUMNS}
     return Measurement(toolchain, compiler, sizes)
 
 

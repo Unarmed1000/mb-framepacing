@@ -107,8 +107,9 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     the allocation tests link.
   - **Executable size:** `sdk/cpp/tests/size` holds size probes (a baseline program, then one using the core, the marker, the marker
     and data modules), linked so unused code is dropped (the modules are built with `-ffunction-sections -fdata-sections`).
-    `tools/measure_sdk_size.py --toolchain <id>` builds them in Release and MinSizeRel (in `sdk/cpp/build/size`) and reports each
-    one's size minus the baseline's; `--update-doc` rewrites the table in `sdk/cpp/README.md` (between `sdk-size-table` markers),
+    `tools/measure_sdk_size.py --toolchain <id>` builds them in Release and MinSizeRel (in `sdk/cpp/build/size`) and reports what each
+    one loads from its file minus what the baseline loads (the sum of its sections, `tools/executable_sections.py`: file sizes grow a
+    page at a time, 16 KiB on macOS); `--update-doc` rewrites the table in `sdk/cpp/README.md` (between `sdk-size-table` markers),
     `--check` fails beyond 10 % (at least 4 KiB). CI's `cpp-size` job checks MSVC, GCC, Clang and AppleClang and uploads each
     measurement (`--update-doc size-*.json` takes them). Refresh the table in the change that alters a module's size. `--csharp`
     measures the C# modules' Release assemblies for the table in `sdk/README.md` (`--check` in CI's `dotnet-lint`, `--update-doc` to rewrite).
