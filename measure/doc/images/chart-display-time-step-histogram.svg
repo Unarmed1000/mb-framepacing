@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="495" viewBox="0 0 1180 495" role="img" aria-label="Run 1  '60-busy-swappy': display time step distribution">
-<title>Run 1  '60-busy-swappy': display time step distribution</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="495" viewBox="0 0 1180 495" role="img" aria-label="Run 1  '60-busy-adaptive': display time step distribution">
+<title>Run 1  '60-busy-adaptive': display time step distribution</title>
 <style>
   text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
          font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
@@ -108,7 +108,7 @@
   .key-light { fill: #adbac7; }
 </style>
 <rect class="card" x="0.5" y="0.5" width="1179" height="494" rx="14"/>
-<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '60-busy-swappy': display time step distribution</text>
+<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '60-busy-adaptive': display time step distribution</text>
 <text x="20.0" y="54.0" text-anchor="start" class="sub">How long each frame stayed on screen, in 0.1 ms bins: steady pacing is one tall bar, uneven pacing adds bars at other steps.</text>
 <text x="20.0" y="73.0" text-anchor="start" class="sub">The whole run: 8.0 s, 336 presented frames.</text>
 <text x="20.0" y="115.0" text-anchor="start" class="label">DISPLAY TIME STEP DISTRIBUTION</text>

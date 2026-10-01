@@ -397,7 +397,7 @@ namespace MB.FramePacing.DocImages
         Console.WriteLine("  report-example-*.svg skipped: ffmpeg is not installed");
         return;
       }
-      foreach (var (clip, name) in new[] { ("60-busy-swappy", "swappy"), ("60-busy-full-rate", "busy"), ("60-naive-5ms", "jitter") })
+      foreach (var (clip, name) in new[] { ("60-busy-adaptive", "adaptive"), ("60-busy-full-rate", "busy"), ("60-naive-5ms", "jitter") })
       {
         string video = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "videos", clip, "video.mp4");
         string imported = Path.Combine(work, clip);
@@ -413,7 +413,7 @@ namespace MB.FramePacing.DocImages
           name switch
           {
             "jitter" => new[] { DistributionCard.ErrorHistogram, DistributionCard.ErrorPercentiles },
-            "swappy" => new[] { DistributionCard.DisplayTimeStepHistogram },
+            "adaptive" => new[] { DistributionCard.DisplayTimeStepHistogram },
             _ => Array.Empty<string>(),
           },
           output

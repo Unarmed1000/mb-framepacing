@@ -333,7 +333,7 @@ above: the frames that miss a refresh are late, and each is off by a whole refre
 pacer does: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says, while their preferred
 frame time stays 60 fps) for a while, then 60 again:
 
-![The report of a game adapting its rate](measure/doc/images/report-example-swappy.svg)
+![The report of a game adapting its rate](measure/doc/images/report-example-adaptive.svg)
 
 A naive delta time timer: every frame is shown on time, but the timer is off by up to 5 ms either way, so the animation steps
 are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing):

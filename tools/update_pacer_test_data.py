@@ -25,7 +25,7 @@ from typing import cast
 ROOT = Path(__file__).resolve().parent.parent
 VIDEOS = ROOT / "measure" / "test-data" / "videos"
 # The golden scenarios given frame by frame: the scenario's name and the clip it comes from
-CLIPS = {"60-busy": "60-busy-swappy", "60-busy-full-rate": "60-busy-full-rate"}
+CLIPS = {"60-busy": "60-busy-adaptive", "60-busy-full-rate": "60-busy-full-rate"}
 TARGET = ROOT / "sdk" / "test-data" / "pacer"
 REFRESH_HZ = 60
 

@@ -293,7 +293,7 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public void ChartFiles_WriteEveryChart()
     {
-      var (_, report, _) = Analyze("60-busy-swappy");
+      var (_, report, _) = Analyze("60-busy-adaptive");
       var files = ChartFiles.Write(report);
       Assert.That(
         files.Select(Path.GetFileName),
@@ -420,7 +420,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// starts when the previous one is shown, so every CPU start lands on the previous frame's display time.
     /// </summary>
     [TestCase("60-busy-full-rate")]
-    [TestCase("60-busy-swappy")]
+    [TestCase("60-busy-adaptive")]
     public void FrameTimeline_BusyFramesStartWhenThePreviousOneIsShown(string clip)
     {
       var (_, report, _) = Analyze(clip);
@@ -523,7 +523,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// time step panel in whole refreshes), none on demand; the preferred line only where it differs from the target.
     /// </summary>
     [TestCase("30")]
-    [TestCase("60-busy-swappy")]
+    [TestCase("60-busy-adaptive")]
     [TestCase("60-on-demand")]
     public void ReferenceLines_FollowTheManifestsTargetAndPreferred(string clip)
     {
@@ -549,7 +549,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var paths = ReportCard.Build(RunSection.Whole(chart)).FlatShapes.OfType<PathShape>().Select(p => p.Class).ToList();
       Assert.That(paths.Contains("ref-target"), Is.EqualTo(byHold.Values.Any(v => v.Target != null)), $"{clip}: the target line");
       Assert.That(paths.Contains("ref-preferred"), Is.EqualTo(differing > 0), $"{clip}: the preferred line only where it differs");
-      if (clip == "60-busy-swappy")
+      if (clip == "60-busy-adaptive")
         Assert.That(differing, Is.GreaterThan(0), "the pacer ran slower than the game wanted");
     }
 
@@ -557,7 +557,7 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public void Headline_ShowsTheRunsNumbers()
     {
-      var (manifest, _, chart) = Analyze("60-busy-swappy");
+      var (manifest, _, chart) = Analyze("60-busy-adaptive");
       var tiles = RunHeadline.Tiles(chart);
       Assert.That(
         tiles.Select(t => t.Caption),
@@ -607,7 +607,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// </summary>
     [TestCase("60-naive-5ms-static-rests")]
     [TestCase("60-idle-1fps")]
-    [TestCase("60-busy-swappy")]
+    [TestCase("60-busy-adaptive")]
     public void FrameRates_SayHowManyStaticFramesTheyExclude(string clip)
     {
       var (manifest, _, chart) = Analyze(clip);
@@ -642,7 +642,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// </summary>
     [TestCase("60-naive-5ms-diagram-slow-frames-every-1s-dropped-frames")]
     [TestCase("60-naive-5ms-diagram-slow-frames-every-1s-out-of-order")]
-    [TestCase("60-busy-swappy")]
+    [TestCase("60-busy-adaptive")]
     public void FaultTiles_CountWhatTheManifestSays(string clip)
     {
       var (manifest, _, chart) = Analyze(clip);

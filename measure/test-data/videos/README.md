@@ -17,7 +17,7 @@ one folder per scenario, each with its `video.mp4` and the generator's `manifest
 **Every marker carries:**
 
 - the pacer's intended display time: the refresh the frame was rendered for, 0 = the clip's first refresh;
-- the target and preferred frame time. `60-busy-swappy` keeps preferring 60 fps while its busy stretch aims for 30; `30` and the two
+- the target and preferred frame time. `60-busy-adaptive` keeps preferring 60 fps while its busy stretch aims for 30; `30` and the two
   half-rate clips prefer 30; the on-demand clips write `0xFFFFFFFF` for both;
 - the flags.
 

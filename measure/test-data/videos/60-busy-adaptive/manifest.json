@@ -68,16 +68,16 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 336,
-      "sequenceId": "60-busy-swappy",
-      "sequenceIdHex": "36302d627573792d7377617070790000",
+      "sequenceId": "60-busy-adaptive",
+      "sequenceIdHex": "36302d627573792d6164617074697665",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
-        "mode": "60-busy-swappy",
+        "mode": "60-busy-adaptive",
         "rate": 60,
         "timer": "ideal",
         "noise": null,
         "noiseWindowMs": null,
-        "label": "60 Hz, a busy stretch, adapting like the Swappy frame pacer",
+        "label": "60 Hz, a busy stretch, adapting its rate",
         "targetFps": 60,
         "frames": {
           "refresh": [
