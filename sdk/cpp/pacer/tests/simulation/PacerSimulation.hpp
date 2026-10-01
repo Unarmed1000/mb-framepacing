@@ -6,7 +6,7 @@
 // The frame model of mb-framepacing-explained's simulations (tools/frame_pacing_video/adaptive_rate.py): a frame starts when the previous
 // one is shown, works its work time, and is shown at the refresh it targets, or at the first refresh after it is done when it is done too
 // late. The pacer paces it through its public API (BeginFrame, EndFrame; no display-time feedback: it infers the display as the model
-// shows it). pacer-sim writes the golden results with it (sdk/test-data/pacer); the C++ and C# tests compare with them.
+// shows it). pacer-sim writes the golden results with it (sdk/test-data/pacer); the tests compare with them.
 
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>

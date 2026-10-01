@@ -10,13 +10,11 @@ time it will be shown at.
 It is **values in, values out**: every frame the application passes what its platform knows and gets back a plan. The pacer calls no
 graphics or platform API, has no callbacks and never reads a clock. Made once (it allocates its window then), it never allocates again.
 
-| Language | Module                                                                                                    |
-| -------- | --------------------------------------------------------------------------------------------------------- |
-| C++20    | `mb_framepacing::pacer`, `<mb/framepacing/pacer/…>`, namespace `MB::FramePacing::Pacer`                   |
-| C#       | [`MB.FramePacing.Pacer`](../csharp/pacer/README.md) (.NET Standard 2.1), namespace `MB.FramePacing.Pacer` |
+| Language | Module                                                                                  |
+| -------- | --------------------------------------------------------------------------------------- |
+| C++20    | `mb_framepacing::pacer`, `<mb/framepacing/pacer/…>`, namespace `MB::FramePacing::Pacer` |
 
-Both have the same types and the same integer arithmetic: they plan every frame alike to the tick. The examples below are C++; the C#
-names are the same (`FrameInput`'s optional values are constructor parameters, the getters properties).
+The C# port (`MB.FramePacing.Pacer`) is out of the tree until the pacer is reworked; it returns then, a line for line port again.
 
 ## The frame loop
 
@@ -89,8 +87,8 @@ a `std::chrono` clock through `core/time/ChronoConversion.hpp` (`FP::ToTickCount
 ## The swap interval rule
 
 The rule is the adaptive swap interval rule as [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) describes and simulates it
-(`tools/frame_pacing_video/adaptive_rate.py`), with that repository's proposed fix as the default. Integer arithmetic only, so the C++
-and C# pacers decide alike to the tick.
+(`tools/frame_pacing_video/adaptive_rate.py`), with that repository's proposed fix as the default. Integer arithmetic only, so every port
+decides alike to the tick.
 
 - **The window** holds the frames of the last `WindowTicks` since the last change of swap interval, and one frame beyond it. It is
   **full** when its oldest frame is more than `WindowTicks` older than its newest. Every change of swap interval empties it.
@@ -114,7 +112,7 @@ swap interval it decides.
 ## Settings
 
 `PacerSettings` is always valid: its constructor takes the refresh period, and every setter asserts that its value is within its range
-(without asserts it clamps a value outside into the range; C# clamps). The rule's defaults are those of the simulation it reproduces; they are settings, not properties of frame
+(without asserts it clamps a value outside into the range). The rule's defaults are those of the simulation it reproduces; they are settings, not properties of frame
 pacing in general.
 
 | Setting                 | Default   | Range                     | What it is                                                                                                       |
@@ -131,8 +129,7 @@ pacing in general.
 | `WindowCapacity`        | 0         | 0, or 2 to 1 048 576      | Frames the window holds; 0: enough for `WindowTicks` at the preferred swap interval, twice over                  |
 
 `RefreshPeriod` is always valid too: from 1 tick (10 MHz) to 1 s (1 Hz), with no default. The application gives the pacer its
-display's period. In C#, `default(RefreshPeriod)` is the one value that is not a period (`IsDefault`): the pacer's types throw an
-`ArgumentException` for it, at setup.
+display's period.
 
 ## Filling the marker
 
@@ -163,7 +160,7 @@ the vsync timer of mb-framepacing-explained (`doc/frame-pacing-strategies.md`): 
 
 ## Tests and golden data
 
-`sdk/test-data/pacer` holds the pacer's golden results, which the C++ and the C# tests must both reproduce to the byte. `python tools/update_pacer_test_data.py` regenerates them with `pacer-sim --golden`:
+`sdk/test-data/pacer` holds the pacer's golden results, which the tests must reproduce to the byte. `python tools/update_pacer_test_data.py` regenerates them with `pacer-sim --golden`:
 
 - `60-busy`: the busy stretch of mb-framepacing-explained's 60-busy clip. The full-window rule reproduces that simulation's swap
   intervals and display refreshes frame by frame.

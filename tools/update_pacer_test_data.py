@@ -8,11 +8,11 @@
    2) and the refresh it was shown on. 60-busy is the busy stretch of the 60-busy clip (the full-window rule), 60-busy-full-rate the clip of that name (every
    refresh, no adapting).
 2. <scenario>-<rule>.csv: pacer-sim --golden, every golden scenario paced with its rules (both, or -Fixed at a fixed swap interval; the
-   C++ tool; the C# tests must produce the same bytes).
+   C++ tool; a port's tests must produce the same bytes).
 
     python tools/update_pacer_test_data.py [--pacer-sim <path to pacer-sim>]
 
-Run it after a change to the pacer's rule or planning, then review the difference: the C++ and C# pacer tests compare with these files.
+Run it after a change to the pacer's rule or planning, then review the difference: the pacer's tests compare with these files.
 """
 
 import argparse

@@ -10,7 +10,7 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
-  - **pacer** (C++ `MB::FramePacing::Pacer`, C# `MB.FramePacing.Pacer`): plans every frame on the display's refreshes with the adaptive swap interval rule
+  - **pacer** (C++ `MB::FramePacing::Pacer`; off, and its C# port out of the tree, until it is reworked): plans every frame on the display's refreshes with the adaptive swap interval rule
     (the full-window rule of mb-framepacing-explained's simulation, and its fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
@@ -41,7 +41,6 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Rectangle`; .NET Standard 2.1, C# 9, no dependencies) + NUnit tests             |
 | `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                 |
 | `sdk/csharp/data/`                                | C# data module `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output            |
-| `sdk/csharp/pacer/`                               | C# pacer module `MB.FramePacing.Pacer` (.NET Standard 2.1, C# 9) + NUnit tests with the simulation's C# port      |
 | `sdk/python/`                                     | Python package `mb_framepacing` (`marker`, `data`; standard library only, Python 3.12) + unittest tests           |
 | `sdk/unity/`                                      | Unity package `com.manabattery.framepacing` sources (helpers, samples), `build_upm.py`, `check_in_unity.py`       |
 | `sdk/shaders/`                                    | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan    |
@@ -163,10 +162,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Always valid:** `RefreshPeriod` (1 tick to 1 s, no default: the application gives its display's period) and `PacerSettings`
     (constructed from the period; setters assert, then clamp). The ranges keep the rule's Q32 arithmetic within 64 bits; nothing
     downstream sanitizes. A reported period of another nanosecond, or `SetRefreshPeriod` with another period, restarts the pacer.
-  - Integer arithmetic only (periods and grids in 2⁻³² ticks): the C# pacer (`sdk/csharp/pacer`) is a line for line port and must give
-    the golden data's bytes too (its tests port the simulation). C#: `RefreshPeriod` is a `readonly struct` whose `default` is its one
-    invalid value (`IsDefault`, refused with an `ArgumentException` at setup), `PacerSettings` a `sealed class` with clamping setters that
-    the pacer copies. Change both languages together.
+  - Integer arithmetic only (periods and grids in 2⁻³² ticks): a port must give the golden data's bytes too. The C#
+    port (`MB.FramePacing.Pacer`, last in commit e7ff58b's tree) was removed until the rework: port it again from the reworked C++.
   - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the
     tests only: never part of the library.
   - Golden data: `python tools/update_pacer_test_data.py` writes the scenarios' frames from the test clips and runs `pacer-sim --golden`;

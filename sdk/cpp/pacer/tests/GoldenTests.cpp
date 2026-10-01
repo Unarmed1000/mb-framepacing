@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The golden data (test-data/pacer, written by pacer-sim --golden, python tools/update_pacer_test_data.py): every golden scenario paced
-// with its rules must give exactly the file's bytes (the C# tests compare with the same files). On top: the full-window rule reproduces the
+// with its rules must give exactly the file's bytes (a port's tests compare with the same files). On top: the full-window rule reproduces the
 // swap intervals and display refreshes of mb-framepacing-explained's simulation of it, frame by frame, the pacer at a fixed swap interval
 // shows every frame of the full-rate clip on its refresh, and the late count fix never slows down later than the full-window rule.
 #include <gtest/gtest.h>

@@ -83,7 +83,6 @@ jobs:
           dotnet test sdk/csharp/core/UnitTest/MB.FramePacing.UnitTest.csproj -c Release
           dotnet test sdk/csharp/marker/UnitTest/MB.FramePacing.Marker.UnitTest.csproj -c Release
           dotnet test sdk/csharp/data/UnitTest/MB.FramePacing.Data.UnitTest.csproj -c Release
-          dotnet test sdk/csharp/pacer/UnitTest/MB.FramePacing.Pacer.UnitTest.csproj -c Release
       - name: Python library
         shell: bash
         run: |
@@ -160,10 +159,10 @@ jobs:
           https://github.com/${GITHUB_REPOSITORY}.git#upm/v${VERSION}
           \`\`\`
 
-          ## C# (.NET Standard 2.1 core, marker and pacer modules, .NET 10 data module)
+          ## C# (.NET Standard 2.1 core and marker modules, .NET 10 data module)
 
-          The modules are \`sdk/csharp/core\` (\`MB.FramePacing\`), \`sdk/csharp/marker\` (\`MB.FramePacing.Marker\`), \`sdk/csharp/data\`
-          (\`MB.FramePacing.Data\`) and \`sdk/csharp/pacer\` (\`MB.FramePacing.Pacer\`) at this tag.
+          The modules are \`sdk/csharp/core\` (\`MB.FramePacing\`), \`sdk/csharp/marker\` (\`MB.FramePacing.Marker\`) and \`sdk/csharp/data\`
+          (\`MB.FramePacing.Data\`) at this tag.
 
           ## Python (3.12+)
 
