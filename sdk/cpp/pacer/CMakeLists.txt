@@ -49,7 +49,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   target_compile_options(pacer-sim PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
 
   add_executable(mb_framepacing_pacer_tests tests/PacerTests.cpp tests/AllocationTests.cpp tests/DiagramTests.cpp tests/GoldenTests.cpp)
-  target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation GTest::gtest_main)
+  target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests
   target_compile_definitions(mb_framepacing_pacer_tests PRIVATE MB_FRAMEPACING_PACER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

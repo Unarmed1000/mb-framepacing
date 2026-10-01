@@ -99,7 +99,9 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     full at every use: no `using namespace`), namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
 COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
-    Each module's tests are their own executable (the marker's allocation test replaces the global `operator new`).
+    Each module's tests are their own executable. What they share is in `sdk/cpp/testing` (`mb_framepacing_test_support`, an OBJECT
+    library built with the tests only, never installed): `Testing::AllocationCounter` and the counting global `operator new`/`delete`
+    the allocation tests link.
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
     (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally.

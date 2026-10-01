@@ -41,7 +41,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
     tests/time/TickCount64Tests.cpp
     tests/time/TimeSpan32Tests.cpp
     tests/time/TimeSpanTests.cpp)
-  target_link_libraries(mb_framepacing_core_tests PRIVATE mb_framepacing::core GTest::gtest_main)
+  target_link_libraries(mb_framepacing_core_tests PRIVATE mb_framepacing::core mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_core_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   target_compile_definitions(mb_framepacing_core_tests PRIVATE MB_FRAMEPACING_EXPECTED_VERSION="${MB_FRAMEPACING_VERSION}")
   gtest_discover_tests(mb_framepacing_core_tests)

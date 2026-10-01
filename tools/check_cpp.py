@@ -27,6 +27,8 @@ from pathlib import Path
 
 LIBRARY = "sdk/cpp"
 MODULES = ("core", "marker", "data", "pacer")
+# The modules' shared test support (sdk/cpp/testing): checked with them, never part of the library
+TEST_SUPPORT = "testing"
 # Per module, relative to its folder: what to format, and what clang-tidy checks (it follows the headers they include)
 FORMAT_GLOBS = (
     "include/**/*.hpp",
@@ -79,7 +81,7 @@ def tidy_command(root: Path, build: Path, sources: list[str]) -> list[str]:
     cpp = root / LIBRARY
     flags = [
         "-std=c++20",
-        *(f"-I{cpp / module / 'include'}" for module in MODULES),
+        *(f"-I{cpp / module / 'include'}" for module in (*MODULES, TEST_SUPPORT)),
         f"-I{cpp / 'marker' / 'third_party' / 'qrcodegen'}",
         f"-I{cpp / 'pacer' / 'tests' / 'simulation'}",
         # the marker and data tests check their private formats
@@ -105,7 +107,7 @@ def main() -> int:
 
     root = Path(__file__).resolve().parent.parent
     cpp = root / LIBRARY
-    modules = list(MODULES) if args.module == "all" else [args.module]
+    modules = [*MODULES, TEST_SUPPORT] if args.module == "all" else [args.module]
     formatted = files(cpp, modules, FORMAT_GLOBS)
     if args.module == "all":
         formatted += sorted(str(path.relative_to(cpp).as_posix()) for path in cpp.glob(CONSUMER_GLOB))

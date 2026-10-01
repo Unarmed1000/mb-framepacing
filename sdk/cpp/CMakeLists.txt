@@ -80,6 +80,8 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   set(BUILD_GMOCK OFF CACHE BOOL "gmock is not used" FORCE)
   FetchContent_MakeAvailable(googletest)
   include(GoogleTest)
+  # What the modules' tests share (the allocation counter): test code, never installed
+  add_subdirectory(testing)
 endif()
 
 if(MB_FRAMEPACING_BUILD_BENCHMARKS)

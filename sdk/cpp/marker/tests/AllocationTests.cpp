@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// The marker is generated every frame, so the library must never allocate. This test binary replaces the global operator new/delete
-// with counting versions and checks that every generate / encode / convert call stays at zero allocations.
+// The marker is generated every frame, so the library must never allocate. This test binary links the counting global operator
+// new/delete (mb_framepacing_test_support) and checks that every generate / encode / convert call stays at zero allocations.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
@@ -19,120 +19,15 @@
 #include <mb/framepacing/marker/payload/Payload.hpp>
 #include <mb/framepacing/marker/payload/SequenceId.hpp>
 #include <mb/framepacing/marker/payload/StartMetadata.hpp>
+#include <mb/framepacing/testing/AllocationCounter.hpp>
 #include <gtest/gtest.h>
 #include <array>
-#include <atomic>
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 #include <span>
 
-namespace
-{
-  std::atomic<bool> g_countAllocations{false};
-  std::atomic<std::size_t> g_allocationCount{0};
-
-  //! Counts the allocations made while it is alive (the tests run on one thread).
-  class AllocationCounter
-  {
-  public:
-    AllocationCounter() noexcept
-    {
-      g_allocationCount = 0;
-      g_countAllocations = true;
-    }
-
-    ~AllocationCounter()
-    {
-      g_countAllocations = false;
-    }
-
-    AllocationCounter(const AllocationCounter&) = delete;
-    AllocationCounter& operator=(const AllocationCounter&) = delete;
-    AllocationCounter(AllocationCounter&&) = delete;
-    AllocationCounter& operator=(AllocationCounter&&) = delete;
-
-    static std::size_t Count() noexcept
-    {
-      return g_allocationCount;
-    }
-  };
-}
-
-// Counting replacements of the global allocation functions. Every non-aligned new (throwing and nothrow; libstdc++'s
-// std::stable_sort uses the nothrow one) allocates with malloc, because every non-aligned delete below frees with free: a
-// sanitizer reports any mismatched pair. The aligned variants keep their default, matching pair.
-// No top-level const on the parameters: clang 22 then treats the sized operator delete as "non-usual" and rejects libstdc++'s
-// __builtin_operator_delete calls (clang-tidy on Linux).
-// NOLINTBEGIN(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
-namespace
-{
-  void* CountedMalloc(const std::size_t size) noexcept
-  {
-    if (g_countAllocations)
-    {
-      ++g_allocationCount;
-    }
-    return std::malloc(size == 0 ? 1 : size);
-  }
-}
-
-void* operator new(std::size_t size)
-{
-  if (void* const memory = CountedMalloc(size))
-  {
-    return memory;
-  }
-  throw std::bad_alloc();
-}
-
-void* operator new[](std::size_t size)
-{
-  return operator new(size);
-}
-
-void* operator new(std::size_t size, const std::nothrow_t& /*tag*/) noexcept
-{
-  return CountedMalloc(size);
-}
-
-void* operator new[](std::size_t size, const std::nothrow_t& /*tag*/) noexcept
-{
-  return CountedMalloc(size);
-}
-
-void operator delete(void* memory, const std::nothrow_t& /*tag*/) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete[](void* memory, const std::nothrow_t& /*tag*/) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete(void* memory) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete[](void* memory) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete(void* memory, std::size_t /*size*/) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete[](void* memory, std::size_t /*size*/) noexcept
-{
-  std::free(memory);
-}
-// NOLINTEND(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
-
 namespace FP = MB::FramePacing;
+namespace FT = MB::FramePacing::Testing;
 namespace FM = MB::FramePacing::Marker;
 
 namespace
@@ -156,11 +51,11 @@ namespace
 
 TEST(Allocations, CountingWorks)
 {
-  const AllocationCounter counter;
+  const FT::AllocationCounter counter;
   // An explicit call: compilers may elide a new-expression pair like 'delete new int(1)' (clang does), but not this.
   void* const memory = ::operator new(sizeof(int));
   ::operator delete(memory);
-  EXPECT_EQ(AllocationCounter::Count(), 1u);
+  EXPECT_EQ(FT::AllocationCounter::Count(), 1u);
 }
 
 TEST(Allocations, GeneratingMarkersDoesNotAllocate)
@@ -171,7 +66,7 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
 
   std::size_t written = 0;
   {
-    const AllocationCounter counter;
+    const FT::AllocationCounter counter;
     for (uint64_t frame = 0; frame < 200u; ++frame)
     {
       const auto ticks = static_cast<int64_t>(frame) * (MB::FramePacing::TimeSpan::TicksPerSecond / 60);
@@ -212,7 +107,7 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       const std::size_t startByteCount = FM::EncodePayload(startPayload, metadata, g_payloadBytes);
       written += FM::TryDecodePayload(std::span<const uint8_t>(g_payloadBytes.data(), startByteCount), decoded, &decodedMetadata) ? 1u : 0u;
     }
-    EXPECT_EQ(AllocationCounter::Count(), 0u);
+    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }
   EXPECT_GT(written, 0u) << "the calls must actually have produced output";
 }

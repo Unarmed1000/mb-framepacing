@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// The pacer runs every frame, so it must never allocate after it is made. This test binary replaces the global operator new/delete with
-// counting versions and checks that every per-frame call stays at zero allocations.
+// The pacer runs every frame, so it must never allocate after it is made. This test binary links the counting global operator new/delete
+// (mb_framepacing_test_support) and checks that every per-frame call stays at zero allocations.
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
@@ -11,125 +11,23 @@
 #include <mb/framepacing/pacer/frame/FrameInput.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
+#include <mb/framepacing/testing/AllocationCounter.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
-#include <atomic>
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 
-namespace
-{
-  std::atomic<bool> g_countAllocations{false};
-  std::atomic<std::size_t> g_allocationCount{0};
-
-  //! Counts the allocations made while it is alive (the tests run on one thread).
-  class AllocationCounter
-  {
-  public:
-    AllocationCounter() noexcept
-    {
-      g_allocationCount = 0;
-      g_countAllocations = true;
-    }
-
-    ~AllocationCounter()
-    {
-      g_countAllocations = false;
-    }
-
-    AllocationCounter(const AllocationCounter&) = delete;
-    AllocationCounter& operator=(const AllocationCounter&) = delete;
-    AllocationCounter(AllocationCounter&&) = delete;
-    AllocationCounter& operator=(AllocationCounter&&) = delete;
-
-    static std::size_t Count() noexcept
-    {
-      return g_allocationCount;
-    }
-  };
-}
-
-// Counting replacements of the global allocation functions, as in the marker module's AllocationTests.cpp (see its notes: every
-// non-aligned new allocates with malloc because every non-aligned delete frees with free; no top-level const on the parameters).
-// NOLINTBEGIN(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
-namespace
-{
-  void* CountedMalloc(const std::size_t size) noexcept
-  {
-    if (g_countAllocations)
-    {
-      ++g_allocationCount;
-    }
-    return std::malloc(size == 0 ? 1 : size);
-  }
-}
-
-void* operator new(std::size_t size)
-{
-  if (void* const memory = CountedMalloc(size))
-  {
-    return memory;
-  }
-  throw std::bad_alloc();
-}
-
-void* operator new[](std::size_t size)
-{
-  return operator new(size);
-}
-
-void* operator new(std::size_t size, const std::nothrow_t& /*tag*/) noexcept
-{
-  return CountedMalloc(size);
-}
-
-void* operator new[](std::size_t size, const std::nothrow_t& /*tag*/) noexcept
-{
-  return CountedMalloc(size);
-}
-
-void operator delete(void* memory, const std::nothrow_t& /*tag*/) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete[](void* memory, const std::nothrow_t& /*tag*/) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete(void* memory) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete[](void* memory) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete(void* memory, std::size_t /*size*/) noexcept
-{
-  std::free(memory);
-}
-
-void operator delete[](void* memory, std::size_t /*size*/) noexcept
-{
-  std::free(memory);
-}
-// NOLINTEND(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-new-delete-overloads)
-
 namespace FP = MB::FramePacing;
+namespace FT = MB::FramePacing::Testing;
 namespace PC = MB::FramePacing::Pacer;
 
 TEST(Allocations, CountingWorks)
 {
-  const AllocationCounter counter;
+  const FT::AllocationCounter counter;
   // An explicit call: compilers may elide a new-expression pair like 'delete new int(1)' (clang does), but not this.
   void* const memory = ::operator new(sizeof(int));
   ::operator delete(memory);
-  EXPECT_EQ(AllocationCounter::Count(), 1u);
+  EXPECT_EQ(FT::AllocationCounter::Count(), 1u);
 }
 
 TEST(Allocations, PacingFramesDoesNotAllocate)
@@ -149,7 +47,7 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
 
   int64_t written = 0;
   {
-    const AllocationCounter counter;
+    const FT::AllocationCounter counter;
     int64_t now = FP::TimeSpan::TicksPerSecond;
     for (int64_t frame = 0; frame < 10'000; ++frame)
     {
@@ -182,7 +80,7 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       }
       now = std::max(schedule.IntendedDisplayTicks, now + work);
     }
-    EXPECT_EQ(AllocationCounter::Count(), 0u);
+    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }
   EXPECT_GT(written, 0) << "the calls must actually have produced output";
 }

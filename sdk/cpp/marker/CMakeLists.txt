@@ -50,7 +50,7 @@ endif()
 
 if(MB_FRAMEPACING_BUILD_TESTS)
   add_executable(mb_framepacing_marker_tests tests/FrameMarkerTests.cpp tests/AllocationTests.cpp)
-  target_link_libraries(mb_framepacing_marker_tests PRIVATE mb_framepacing::marker GTest::gtest_main)
+  target_link_libraries(mb_framepacing_marker_tests PRIVATE mb_framepacing::marker mb_framepacing_test_support GTest::gtest_main)
   # The tests check the private wire format too (source/mb/framepacing/marker/detail/WireFormat.hpp)
   target_include_directories(mb_framepacing_marker_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
   target_compile_options(mb_framepacing_marker_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})

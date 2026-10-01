@@ -232,7 +232,8 @@ In `MB::FramePacing`, each in its own header (`<mb/framepacing/core/…>`, the t
 cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # or linux, linux-clang, linux-sanitize, macos
 ```
 
-Every module has its tests (`<module>/tests`); they fetch GoogleTest (an installed or Conan GTest wins). `marker-render`
+Every module has its tests (`<module>/tests`); they fetch GoogleTest (an installed or Conan GTest wins). What they share, such as the
+allocation counter of the zero-allocation tests, is in `testing` (test code, never installed). `marker-render`
 (`marker/tools/marker-render`) writes marker images (PGM) for any payload, to compare your renderer's output pixel by pixel;
 `marker-render --golden <dir>` writes the golden set the other libraries are tested against. The pacer's tests hold a simulation of a
 frame loop (`pacer/tests/simulation`, test code, not part of the library) and `pacer-sim` (`pacer/tests/pacer-sim`, built with the
