@@ -8,9 +8,11 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
+
 namespace MB.FramePacing.Data
 {
-  /// <param name="CaptureTicks">When the capture was taken (the analysis's clock); null for a capture the recorder dropped.</param>
+  /// <param name="CaptureTime">When the capture was taken (the analysis's clock); null for a capture the recorder dropped.</param>
   /// <param name="Status">"Decoded", "Undecodable", "Torn" or "NotRecorded".</param>
   /// <param name="Kind">The main marker's kind ("Frame", "SequenceStart", "SequenceEnd", "Sync"), when one was read.</param>
   /// <param name="Payload">The main marker's encoded bytes, when one was read.</param>
@@ -22,18 +24,18 @@ namespace MB.FramePacing.Data
   /// <param name="SyncFrameIndex">The sync marker's frame index, when it was read.</param>
   public sealed record CaptureCsvRow(
     long CaptureIndex,
-    long? CaptureTicks,
+    TickCount64? CaptureTime,
     string Status,
     string? Kind,
     uint? RunId,
     ulong? FrameIndex,
-    long? AnimationTicks,
+    TimeSpan? AnimationTime,
     long SourceDropsBefore,
     long MissedBefore,
     uint? SyncRunId,
     ulong? SyncFrameIndex,
-    long? HostTicks,
-    long? DeviceTicks,
+    TickCount64? HostTime,
+    TickCount64? DeviceTime,
     byte[]? Payload
   );
 }

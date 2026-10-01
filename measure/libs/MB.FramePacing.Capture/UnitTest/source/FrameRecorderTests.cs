@@ -177,8 +177,8 @@ namespace MB.FramePacing.Capture.UnitTest
       using var reader = new CaptureDataReader(path);
       var records = reader.ReadAll();
       Assert.That(records.Select(r => r.CaptureIndex), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long)i)));
-      Assert.That(records.Select(r => r.HostTicks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
-      Assert.That(records.Select(r => r.DeviceTicks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 3L)));
+      Assert.That(records.Select(r => r.HostTime.Ticks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
+      Assert.That(records.Select(r => r.DeviceTime?.Ticks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long?)(i * 3L))));
       Assert.That(records.Select(r => r.SourceDrops), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i == 5 ? 3u : 0u)));
       Assert.That(records.All(r => r.Status == CaptureDataStatus.Undecodable && r.MainBytes == null), "no marker in these frames");
       Assert.That(System.IO.File.Exists(temp.File("frames.mbfc")), Is.False);
@@ -212,8 +212,8 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var header = frameReader.ReadRecordHeader(i);
         var record = dataReader.ReadRecord(i);
-        Assert.That((record.CaptureIndex, record.DeviceTicks), Is.EqualTo((header.CaptureIndex, header.DeviceTicks)));
-        Assert.That(record.DeviceTicks, Is.EqualTo(i * 10), "the late device timestamp, resolved by the writer");
+        Assert.That((record.CaptureIndex, record.DeviceTime?.Ticks), Is.EqualTo((header.CaptureIndex, (long?)header.DeviceTicks)));
+        Assert.That(record.DeviceTime?.Ticks, Is.EqualTo(i * 10), "the late device timestamp, resolved by the writer");
       }
     }
 

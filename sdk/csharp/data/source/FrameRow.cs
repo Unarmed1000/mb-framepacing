@@ -1,76 +1,77 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* One line of a run's frames CSV (run-<id>-frames.csv, doc/analysis-output-format.md): one presented frame. Times are 100 ns ticks; null is
-//* an empty cell. The display side comes from the capture, the pacing and CPU fields from the markers.
+//* One line of a run's frames CSV (run-<id>-frames.csv, doc/analysis-output-format.md): one presented frame. Points in time are
+//* TickCount64s, on the capture's clock or the frame pacer's; spans are TimeSpans; the marker's own 32-bit values TimeSpan32s; null is an
+//* empty cell. The display side comes from the capture, the pacing and CPU fields from the markers. The C++ data module's FrameRow.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
 using System.Collections.Generic;
 
 namespace MB.FramePacing.Data
 {
   /// <param name="Segment">The part of the run between two gaps in the capture (0 first).</param>
-  /// <param name="FirstSeenTicks">The frame's display time: when it was first seen (the capture's clock).</param>
-  /// <param name="OnScreenTicks">How long it stayed on screen.</param>
+  /// <param name="AnimationTime">From the marker: the animation time.</param>
+  /// <param name="FirstSeenTime">The frame's display time: when it was first seen (the capture's clock).</param>
+  /// <param name="OnScreen">How long it stayed on screen.</param>
   /// <param name="Captures">How many captures showed it.</param>
   /// <param name="SkippedBefore">Frame indices before this one that were never seen.</param>
-  /// <param name="DisplayDeltaTicks">The display time step: from the previous frame's display time to this one's.</param>
-  /// <param name="AnimationErrorTicks">The animation time step minus the display time step.</param>
+  /// <param name="DisplayDelta">The display time step: from the previous frame's display time to this one's.</param>
+  /// <param name="AnimationDelta">The animation time step: from the previous frame's animation time to this one's.</param>
+  /// <param name="AnimationError">The animation time step minus the display time step.</param>
+  /// <param name="Drift">The sum of the judged animation errors so far.</param>
   /// <param name="Flags">"SkippedBefore", "UncertainStart", "Torn", "Late", "StaticAfter", "StaticBefore", "UncertainStep"; empty when none.</param>
-  /// <param name="IntendedDisplayTicks">From the marker: when the pacer intended the frame to be shown (its own clock).</param>
-  /// <param name="MarkerTargetTicks">From the marker: the pacer's target frame time; <see cref="OnDemandFrameTicks"/> = on demand.</param>
-  /// <param name="TargetTicks">The frame time this frame is measured against, in whole refreshes; null on demand.</param>
-  /// <param name="MarkerPreferredTicks">
-  /// From the marker: the frame time the application wants to run at; <see cref="OnDemandFrameTicks"/> = on demand.
+  /// <param name="IntendedDisplayTime">From the marker: when the pacer intended the frame to be shown (its own clock).</param>
+  /// <param name="MarkerTargetFrameTime">From the marker: the pacer's target frame time; Payload.OnDemandFrameTime = on demand.</param>
+  /// <param name="TargetFrameTime">The frame time this frame is measured against, in whole refreshes; null on demand.</param>
+  /// <param name="MarkerPreferredFrameTime">
+  /// From the marker: the frame time the application wants to run at; Payload.OnDemandFrameTime = on demand.
   /// </param>
-  /// <param name="PreferredTicks">
+  /// <param name="PreferredFrameTime">
   /// The preferred frame time the late share is measured against, in whole refreshes: the marker's, else the target frame rate given to the
   /// tools, else one refresh; null on demand.
   /// </param>
-  /// <param name="LastSeenTicks">When the last capture showing it was taken; null in output written before it existed.</param>
-  /// <param name="CpuStartTicks">From the marker: the CPU start time (PresentMon's CPUStartTime, the pacer's clock).</param>
-  /// <param name="CpuBusyTicks">From the marker: CPU busy (PresentMon's MsCPUBusy).</param>
-  /// <param name="FrameTimeTicks">From this frame's CPU start to the next frame's (PresentMon's MsBetweenAppStart).</param>
-  /// <param name="CpuWaitTicks">The frametime minus CPU busy (PresentMon's MsCPUWait).</param>
+  /// <param name="LastSeenTime">When the last capture showing it was taken; null in output written before it existed.</param>
+  /// <param name="CpuStartTime">From the marker: the CPU start time (PresentMon's CPUStartTime, the pacer's clock).</param>
+  /// <param name="CpuBusy">From the marker: CPU busy (PresentMon's MsCPUBusy).</param>
+  /// <param name="FrameTime">From this frame's CPU start to the next frame's (PresentMon's MsBetweenAppStart).</param>
+  /// <param name="CpuWait">The frametime minus CPU busy (PresentMon's MsCPUWait).</param>
   /// <param name="OlderFrames">The captures that showed an older frame out of order while this frame was the newest, in capture order.</param>
-  /// <param name="MainMarkerFirstSeenTicks">EXPERIMENTAL camera captures: when the main marker first showed the frame.</param>
-  /// <param name="ScanoutDelayTicks">EXPERIMENTAL camera captures: first seen minus the main marker's first seen.</param>
+  /// <param name="MainMarkerFirstSeenTime">EXPERIMENTAL camera captures: when the main marker first showed the frame.</param>
+  /// <param name="ScanoutDelay">EXPERIMENTAL camera captures: first seen minus the main marker's first seen.</param>
   public sealed record FrameRow(
     int Segment,
     ulong FrameIndex,
-    long AnimationTicks,
+    TimeSpan AnimationTime,
     long FirstCaptureIndex,
-    long FirstSeenTicks,
-    long OnScreenTicks,
+    TickCount64 FirstSeenTime,
+    TimeSpan OnScreen,
     int Captures,
     ulong SkippedBefore,
-    long? DisplayDeltaTicks,
-    long? AnimationDeltaTicks,
-    long? AnimationErrorTicks,
-    long DriftTicks,
+    TimeSpan? DisplayDelta,
+    TimeSpan? AnimationDelta,
+    TimeSpan? AnimationError,
+    TimeSpan Drift,
     IReadOnlyList<string> Flags,
-    long? IntendedDisplayTicks,
-    long? MarkerTargetTicks,
-    long? TargetTicks,
-    long? MarkerPreferredTicks,
-    long? PreferredTicks,
-    long? PacingErrorTicks,
-    long? PredictionErrorTicks,
-    long? LatenessTicks,
-    long? LastSeenTicks,
-    long? CpuStartTicks,
-    long? CpuBusyTicks,
-    long? FrameTimeTicks,
-    long? CpuWaitTicks,
+    TickCount64? IntendedDisplayTime,
+    TimeSpan32? MarkerTargetFrameTime,
+    TimeSpan? TargetFrameTime,
+    TimeSpan32? MarkerPreferredFrameTime,
+    TimeSpan? PreferredFrameTime,
+    TimeSpan? PacingError,
+    TimeSpan? PredictionError,
+    TimeSpan? Lateness,
+    TickCount64? LastSeenTime,
+    TickCount64? CpuStartTime,
+    TimeSpan32? CpuBusy,
+    TimeSpan? FrameTime,
+    TimeSpan? CpuWait,
     IReadOnlyList<OlderFrame> OlderFrames,
-    long? MainMarkerFirstSeenTicks = null,
-    long? ScanoutDelayTicks = null
-  )
-  {
-    /// <summary>The marker's target and preferred frame time of an application that presents only when something changes (429496.7295 ms).</summary>
-    public const long OnDemandFrameTicks = uint.MaxValue;
-  }
+    TickCount64? MainMarkerFirstSeenTime = null,
+    TimeSpan? ScanoutDelay = null
+  );
 }

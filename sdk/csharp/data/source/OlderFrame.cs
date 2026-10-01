@@ -10,6 +10,6 @@
 namespace MB.FramePacing.Data
 {
   /// <param name="FrameIndex">The older frame index the capture showed.</param>
-  /// <param name="CaptureTicks">When the capture was taken, in 100 ns ticks on the analysis's capture clock (as FirstSeenTicks).</param>
-  public readonly record struct OlderFrame(ulong FrameIndex, long CaptureTicks);
+  /// <param name="CaptureTime">When the capture was taken, on the analysis's capture clock (as FrameRow.FirstSeenTime).</param>
+  public readonly record struct OlderFrame(ulong FrameIndex, TickCount64 CaptureTime);
 }

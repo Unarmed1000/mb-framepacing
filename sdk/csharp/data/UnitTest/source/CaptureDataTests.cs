@@ -65,9 +65,9 @@ namespace MB.FramePacing.Data.UnitTest
       Array.Fill(second, (byte)0x5A);
       var records = new[]
       {
-        new CaptureDataRecord(0, 100, 200, 0, CaptureDataStatus.Decoded, main, second),
-        new CaptureDataRecord(2, 300, CaptureDataRecord.UnknownTicks, 2u, CaptureDataStatus.Undecodable, null, null),
-        new CaptureDataRecord(3, 400, 500, 0, CaptureDataStatus.Torn, null, second),
+        new CaptureDataRecord(0, new TickCount64(100), new TickCount64(200), 0, CaptureDataStatus.Decoded, main, second),
+        new CaptureDataRecord(2, new TickCount64(300), null, 2u, CaptureDataStatus.Undecodable, null, null),
+        new CaptureDataRecord(3, new TickCount64(400), new TickCount64(500), 0, CaptureDataStatus.Torn, null, second),
       };
       string path = Path.Combine(Path.GetTempPath(), $"mb-framepacing-data-{Guid.NewGuid():N}.mbcd");
       try
@@ -90,7 +90,7 @@ namespace MB.FramePacing.Data.UnitTest
           Assert.That(read[i].MainBytes, Is.EqualTo(records[i].MainBytes));
           Assert.That(read[i].SecondBytes, Is.EqualTo(records[i].SecondBytes));
         }
-        Assert.That(read[1].HasDeviceTicks, Is.False);
+        Assert.That(read[1].DeviceTime, Is.Null, "a device that gave no timestamp");
       }
       finally
       {
@@ -101,7 +101,7 @@ namespace MB.FramePacing.Data.UnitTest
     [Test]
     public void Records_RefuseMarkersTooLongForTheirSlot()
     {
-      var record = new CaptureDataRecord(0, 0, 0, 0, CaptureDataStatus.Decoded, new byte[CaptureDataRecord.MainCapacity + 1], null);
+      var record = new CaptureDataRecord(0, default, null, 0, CaptureDataStatus.Decoded, new byte[CaptureDataRecord.MainCapacity + 1], null);
       Assert.Throws<ArgumentException>(() => record.Write(new byte[CaptureDataRecord.Size]));
     }
   }

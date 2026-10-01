@@ -65,9 +65,9 @@ namespace MB.FramePacing.Capture.UnitTest
       sync.AsSpan().Fill(7);
       var records = new[]
       {
-        new CaptureDataRecord(0, 100, 200, 0, CaptureDataStatus.Decoded, start, sync),
-        new CaptureDataRecord(1, 300, CaptureRecordHeader.UnknownTicks, 2, CaptureDataStatus.Undecodable, null, null),
-        new CaptureDataRecord(5, 500, 600, 0, CaptureDataStatus.Torn, null, sync),
+        new CaptureDataRecord(0, new TickCount64(100), new TickCount64(200), 0, CaptureDataStatus.Decoded, start, sync),
+        new CaptureDataRecord(1, new TickCount64(300), null, 2, CaptureDataStatus.Undecodable, null, null),
+        new CaptureDataRecord(5, new TickCount64(500), new TickCount64(600), 0, CaptureDataStatus.Torn, null, sync),
       };
 
       using var temp = new TempDirectory();
@@ -91,14 +91,14 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var (expected, actual) = (records[i], read[i]);
         Assert.That(
-          (actual.CaptureIndex, actual.HostTicks, actual.DeviceTicks, actual.SourceDrops, actual.Status),
-          Is.EqualTo((expected.CaptureIndex, expected.HostTicks, expected.DeviceTicks, expected.SourceDrops, expected.Status))
+          (actual.CaptureIndex, actual.HostTime, actual.DeviceTime, actual.SourceDrops, actual.Status),
+          Is.EqualTo((expected.CaptureIndex, expected.HostTime, expected.DeviceTime, expected.SourceDrops, expected.Status))
         );
         Assert.That(actual.MainBytes, Is.EqualTo(expected.MainBytes));
         Assert.That(actual.SecondBytes, Is.EqualTo(expected.SecondBytes));
         Assert.That(reader.ReadRecord(i).MainBytes, Is.EqualTo(expected.MainBytes));
       }
-      Assert.That(read[1].HasDeviceTicks, Is.False);
+      Assert.That(read[1].DeviceTime, Is.Null);
       Assert.That(MarkerPayload.TryDecode(read[0].MainBytes, out var payload, out var metadata), Is.True);
       Assert.That(
         (payload.Kind, metadata!.SequenceId),
@@ -109,7 +109,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Record_RefusesMarkersThatDoNotFit()
     {
-      var record = new CaptureDataRecord(0, 0, 0, 0, CaptureDataStatus.Decoded, new byte[CaptureDataRecord.MainCapacity + 1], null);
+      var record = new CaptureDataRecord(0, default, null, 0, CaptureDataStatus.Decoded, new byte[CaptureDataRecord.MainCapacity + 1], null);
       Assert.Throws<ArgumentException>(() => record.Write(new byte[CaptureDataRecord.Size]));
     }
 
@@ -123,7 +123,9 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var buffer = new byte[2 * CaptureDataRecord.Size];
         for (int i = 0; i < 2; ++i)
-          new CaptureDataRecord(i, i, i, 0, CaptureDataStatus.Undecodable, null, null).Write(buffer.AsSpan(i * CaptureDataRecord.Size));
+          new CaptureDataRecord(i, new TickCount64(i), new TickCount64(i), 0, CaptureDataStatus.Undecodable, null, null).Write(
+            buffer.AsSpan(i * CaptureDataRecord.Size)
+          );
         writer.WriteRecords(buffer);
       }
       using (var stream = new FileStream(path, FileMode.Append))

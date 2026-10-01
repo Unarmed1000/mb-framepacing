@@ -7,6 +7,7 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
 using System.IO;
 using NUnit.Framework;
 
@@ -60,12 +61,12 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(rows, Has.Count.EqualTo(1));
       var row = rows[0];
       Assert.That(
-        (row.FrameIndex, row.Segment, row.AnimationTicks, row.OnScreenTicks, row.DriftTicks),
-        Is.EqualTo((7UL, 0, 1_166_667L, 333_333L, -5_000L))
+        (row.FrameIndex, row.Segment, row.AnimationTime, row.OnScreen, row.Drift),
+        Is.EqualTo((7UL, 0, new TimeSpan(1_166_667), new TimeSpan(333_333), new TimeSpan(-5_000)))
       );
       Assert.That(row.Flags, Is.EqualTo(new[] { "SkippedBefore", "Late" }));
-      Assert.That(row.CpuBusyTicks, Is.Null, "an empty cell");
-      Assert.That(row.LastSeenTicks, Is.Null, "a column the file lacks");
+      Assert.That(row.CpuBusy, Is.Null, "an empty cell");
+      Assert.That(row.LastSeenTime, Is.Null, "a column the file lacks");
     }
 
     [Test]
@@ -79,7 +80,7 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That((torn.Status, torn.FrameIndex, torn.SyncRunId, torn.SyncFrameIndex), Is.EqualTo(("Torn", (ulong?)12, (uint?)7, (ulong?)11)));
       Assert.That((torn.SourceDropsBefore, torn.MissedBefore), Is.EqualTo((3L, 1L)));
       Assert.That(torn.Payload, Is.EqualTo(new byte[] { 0x4D, 0x46 }));
-      Assert.That((rows[1].CaptureTicks, rows[1].SyncFrameIndex), Is.EqualTo(((long?)null, (ulong?)null)));
+      Assert.That((rows[1].CaptureTime, rows[1].SyncFrameIndex), Is.EqualTo(((TickCount64?)null, (ulong?)null)));
 
       var written = new StringWriter { NewLine = "\r\n" };
       CapturesCsv.Write(written, rows);
@@ -90,8 +91,11 @@ namespace MB.FramePacing.Data.UnitTest
     public void Milliseconds_AreWholeTicks()
     {
       foreach (long ticks in new[] { 0L, 1L, 166_667L, -3L, 123_456_789_012L })
-        Assert.That(Milliseconds.ParseTicks(Milliseconds.Format(ticks)), Is.EqualTo(ticks));
-      Assert.That(Milliseconds.Format(166_667), Is.EqualTo("16.6667"));
+        Assert.That(Milliseconds.ParseMilliseconds(Milliseconds.Format(new TimeSpan(ticks))).Ticks, Is.EqualTo(ticks));
+      Assert.That(Milliseconds.Format(new TimeSpan(166_667)), Is.EqualTo("16.6667"));
+      Assert.That(Milliseconds.Format(new TickCount64(166_667)), Is.EqualTo("16.6667"), "a point in time: since its clock's zero");
+      Assert.That(Milliseconds.Format(new TimeSpan32(166_667)), Is.EqualTo("16.6667"));
+      Assert.That(Milliseconds.FromMilliseconds(16.66675), Is.EqualTo(new TimeSpan(166_668)), "rounded to the nearest tick");
     }
   }
 }

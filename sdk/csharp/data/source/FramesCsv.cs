@@ -42,35 +42,35 @@ namespace MB.FramePacing.Data
             ',',
             row.Segment.ToString(CultureInfo.InvariantCulture),
             row.FrameIndex.ToString(CultureInfo.InvariantCulture),
-            Milliseconds.Format(row.AnimationTicks),
+            Milliseconds.Format(row.AnimationTime),
             row.FirstCaptureIndex.ToString(CultureInfo.InvariantCulture),
-            Milliseconds.Format(row.FirstSeenTicks),
-            Milliseconds.Format(row.OnScreenTicks),
+            Milliseconds.Format(row.FirstSeenTime),
+            Milliseconds.Format(row.OnScreen),
             row.Captures.ToString(CultureInfo.InvariantCulture),
             row.SkippedBefore.ToString(CultureInfo.InvariantCulture),
-            Optional(row.DisplayDeltaTicks),
-            Optional(row.AnimationDeltaTicks),
-            Optional(row.AnimationErrorTicks),
-            Milliseconds.Format(row.DriftTicks),
+            Optional(row.DisplayDelta),
+            Optional(row.AnimationDelta),
+            Optional(row.AnimationError),
+            Milliseconds.Format(row.Drift),
             string.Join('|', row.Flags),
-            Optional(row.IntendedDisplayTicks),
-            Optional(row.MarkerTargetTicks),
-            Optional(row.TargetTicks),
-            Optional(row.MarkerPreferredTicks),
-            Optional(row.PreferredTicks),
-            Optional(row.PacingErrorTicks),
-            Optional(row.PredictionErrorTicks),
-            Optional(row.LatenessTicks),
-            Optional(row.LastSeenTicks),
-            Optional(row.CpuStartTicks),
-            Optional(row.CpuBusyTicks),
-            Optional(row.FrameTimeTicks),
-            Optional(row.CpuWaitTicks),
+            Optional(row.IntendedDisplayTime),
+            Optional(row.MarkerTargetFrameTime),
+            Optional(row.TargetFrameTime),
+            Optional(row.MarkerPreferredFrameTime),
+            Optional(row.PreferredFrameTime),
+            Optional(row.PacingError),
+            Optional(row.PredictionError),
+            Optional(row.Lateness),
+            Optional(row.LastSeenTime),
+            Optional(row.CpuStartTime),
+            Optional(row.CpuBusy),
+            Optional(row.FrameTime),
+            Optional(row.CpuWait),
             string.Join(
               '|',
-              row.OlderFrames.Select(o => o.FrameIndex.ToString(CultureInfo.InvariantCulture) + "@" + Milliseconds.Format(o.CaptureTicks))
+              row.OlderFrames.Select(o => o.FrameIndex.ToString(CultureInfo.InvariantCulture) + "@" + Milliseconds.Format(o.CaptureTime))
             )
-          ) + (camera ? "," + Optional(row.MainMarkerFirstSeenTicks) + "," + Optional(row.ScanoutDelayTicks) : string.Empty)
+          ) + (camera ? "," + Optional(row.MainMarkerFirstSeenTime) + "," + Optional(row.ScanoutDelay) : string.Empty)
         );
       }
     }
@@ -127,33 +127,33 @@ namespace MB.FramePacing.Data
           new FrameRow(
             int.Parse(row.Cell(segment), CultureInfo.InvariantCulture),
             ulong.Parse(row.Cell(frameIndex), CultureInfo.InvariantCulture),
-            Milliseconds.ParseTicks(row.Cell(animation)),
+            Milliseconds.ParseMilliseconds(row.Cell(animation)),
             long.Parse(row.Cell(firstCapture), CultureInfo.InvariantCulture),
-            Milliseconds.ParseTicks(row.Cell(firstSeen)),
-            Milliseconds.ParseTicks(row.Cell(onScreen)),
+            new TickCount64(Milliseconds.ParseMilliseconds(row.Cell(firstSeen))),
+            Milliseconds.ParseMilliseconds(row.Cell(onScreen)),
             int.Parse(row.Cell(captures), CultureInfo.InvariantCulture),
             ulong.Parse(row.Cell(skipped), CultureInfo.InvariantCulture),
-            row.Ticks(display),
-            row.Ticks(animationDelta),
-            row.Ticks(error),
-            Milliseconds.ParseTicks(row.Cell(drift)),
+            row.Span(display),
+            row.Span(animationDelta),
+            row.Span(error),
+            Milliseconds.ParseMilliseconds(row.Cell(drift)),
             flagText.Length == 0 ? Array.Empty<string>() : flagText.Split('|'),
-            row.Ticks(intended),
-            row.Ticks(markerTarget),
-            row.Ticks(target),
-            row.Ticks(markerPreferred),
-            row.Ticks(preferred),
-            row.Ticks(pacing),
-            row.Ticks(prediction),
-            row.Ticks(lateness),
-            row.Ticks(lastSeen),
-            row.Ticks(cpuStart),
-            row.Ticks(cpuBusy),
-            row.Ticks(frameTime),
-            row.Ticks(cpuWait),
+            row.Time(intended),
+            row.Span32(markerTarget),
+            row.Span(target),
+            row.Span32(markerPreferred),
+            row.Span(preferred),
+            row.Span(pacing),
+            row.Span(prediction),
+            row.Span(lateness),
+            row.Time(lastSeen),
+            row.Time(cpuStart),
+            row.Span32(cpuBusy),
+            row.Span(frameTime),
+            row.Span(cpuWait),
             OlderFrames(row.Cell(older)),
-            row.Ticks(mainSeen),
-            row.Ticks(scanoutDelay)
+            row.Time(mainSeen),
+            row.Span(scanoutDelay)
           )
         );
       }
@@ -170,10 +170,17 @@ namespace MB.FramePacing.Data
             int at = entry.IndexOf('@', StringComparison.Ordinal);
             if (at <= 0)
               throw new InvalidDataException($"Invalid olderFrames entry '{entry}'");
-            return new OlderFrame(ulong.Parse(entry.AsSpan(0, at), CultureInfo.InvariantCulture), Milliseconds.ParseTicks(entry.Substring(at + 1)));
+            return new OlderFrame(
+              ulong.Parse(entry.AsSpan(0, at), CultureInfo.InvariantCulture),
+              new TickCount64(Milliseconds.ParseMilliseconds(entry.Substring(at + 1)))
+            );
           })
           .ToArray();
 
-    private static string Optional(long? ticks) => ticks is { } value ? Milliseconds.Format(value) : string.Empty;
+    private static string Optional(TimeSpan? span) => span is { } value ? Milliseconds.Format(value) : string.Empty;
+
+    private static string Optional(TickCount64? time) => time is { } value ? Milliseconds.Format(value) : string.Empty;
+
+    private static string Optional(TimeSpan32? span) => span is { } value ? Milliseconds.Format(value) : string.Empty;
   }
 }

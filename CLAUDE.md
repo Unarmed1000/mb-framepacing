@@ -152,7 +152,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
-  - **Typed times** (C++ now, C# and measure/ to follow, the same names): points in time are `TickCount64` (named `…Time`:
+  - **Typed times** (C++ and C#, the same names; the tools convert at `AnalysisDataMapping` and `CaptureDecoder` until they are typed): points in time are `TickCount64` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
     `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`); the CSV's milliseconds parse
     with `ParseMilliseconds`. The files' bytes and the golden data do not change.

@@ -123,15 +123,15 @@ namespace MB.FramePacing.Charts
       long lastTicks = frames.Max(f => f.LastSeenTicks);
       int start = RunChartData.FirstWhere(0, rows.Count, i => rows[i].CaptureIndex >= firstIndex);
       // A capture the recorder dropped has no time: it is placed a period per capture index after the last one recorded
-      long knownTicks = start < rows.Count ? rows[start].CaptureTicks ?? frames[0].FirstSeenTicks : 0;
+      long knownTicks = start < rows.Count ? rows[start].CaptureTime?.Ticks ?? frames[0].FirstSeenTicks : 0;
       long knownIndex = start < rows.Count ? rows[start].CaptureIndex : 0;
       for (int i = start; i < rows.Count; ++i)
       {
         var row = rows[i];
-        long ticks = row.CaptureTicks ?? knownTicks + ((row.CaptureIndex - knownIndex) * period);
+        long ticks = row.CaptureTime?.Ticks ?? knownTicks + ((row.CaptureIndex - knownIndex) * period);
         if (ticks > lastTicks)
           break;
-        if (row.CaptureTicks is { } recorded)
+        if (row.CaptureTime?.Ticks is { } recorded)
         {
           knownTicks = recorded;
           knownIndex = row.CaptureIndex;

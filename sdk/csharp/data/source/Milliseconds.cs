@@ -18,12 +18,17 @@ namespace MB.FramePacing.Data
     public const long TicksPerMillisecond = TimeSpan.TicksPerMillisecond;
 
     /// <summary>"16.6667" for 166 667 ticks: invariant culture, at most four decimals, no trailing zeros.</summary>
-    public static string Format(long ticks) => (ticks / (double)TicksPerMillisecond).ToString("0.####", CultureInfo.InvariantCulture);
+    public static string Format(TimeSpan span) => (span.Ticks / (double)TicksPerMillisecond).ToString("0.####", CultureInfo.InvariantCulture);
 
-    /// <summary>The ticks of a milliseconds value (rounded to the nearest tick).</summary>
-    public static long ToTicks(double milliseconds) => (long)Math.Round(milliseconds * TicksPerMillisecond);
+    /// <summary>A point in time as the milliseconds since its clock's zero.</summary>
+    public static string Format(TickCount64 time) => Format(time.ToTimeSpan());
 
-    /// <summary>The ticks of a milliseconds text (invariant culture).</summary>
-    public static long ParseTicks(string text) => ToTicks(double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture));
+    public static string Format(TimeSpan32 span) => Format(span.ToTimeSpan());
+
+    /// <summary>The span of a milliseconds value (rounded to the nearest tick).</summary>
+    public static TimeSpan FromMilliseconds(double milliseconds) => new TimeSpan((long)Math.Round(milliseconds * TicksPerMillisecond));
+
+    /// <summary>The span of a milliseconds text (invariant culture).</summary>
+    public static TimeSpan ParseMilliseconds(string text) => FromMilliseconds(double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture));
   }
 }

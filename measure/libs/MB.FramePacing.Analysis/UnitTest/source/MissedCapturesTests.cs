@@ -57,8 +57,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         records.Add(
           new CaptureDataRecord(
             records.Count,
-            time,
-            deviceClock ? time : CaptureDataRecord.UnknownTicks,
+            new TickCount64(time),
+            deviceClock ? new TickCount64(time) : null,
             0,
             CaptureDataStatus.Decoded,
             payload.Encode(start),

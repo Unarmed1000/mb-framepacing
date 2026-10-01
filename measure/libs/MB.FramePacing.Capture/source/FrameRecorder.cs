@@ -373,8 +373,8 @@ namespace MB.FramePacing.Capture
               CaptureDataRecord.WriteCapture(
                 m_dataRing.AsSpan(DataSlotOffset(tail + i), CaptureDataRecord.Size),
                 header.CaptureIndex,
-                header.HostTicks,
-                header.DeviceTicks,
+                new TickCount64(header.HostTicks),
+                header.HasDeviceTicks ? new TickCount64(header.DeviceTicks) : null,
                 header.SourceDrops
               );
             }

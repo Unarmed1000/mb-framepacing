@@ -36,18 +36,18 @@ namespace MB.FramePacing.Data
           string.Join(
             ',',
             row.CaptureIndex.ToString(CultureInfo.InvariantCulture),
-            row.CaptureTicks is { } capture ? Milliseconds.Format(capture) : string.Empty,
+            row.CaptureTime is { } capture ? Milliseconds.Format(capture) : string.Empty,
             row.Status,
             row.Kind ?? string.Empty,
             row.RunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.FrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.AnimationTicks is { } animation ? Milliseconds.Format(animation) : string.Empty,
+            row.AnimationTime is { } animation ? Milliseconds.Format(animation) : string.Empty,
             row.SourceDropsBefore.ToString(CultureInfo.InvariantCulture),
             row.MissedBefore.ToString(CultureInfo.InvariantCulture),
             row.SyncRunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.SyncFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.HostTicks is { } host ? Milliseconds.Format(host) : string.Empty,
-            row.DeviceTicks is { } device ? Milliseconds.Format(device) : string.Empty,
+            row.HostTime is { } host ? Milliseconds.Format(host) : string.Empty,
+            row.DeviceTime is { } device ? Milliseconds.Format(device) : string.Empty,
             row.Payload != null ? Convert.ToHexString(row.Payload) : string.Empty
           )
         );
@@ -89,18 +89,18 @@ namespace MB.FramePacing.Data
         rows.Add(
           new CaptureCsvRow(
             long.Parse(row.Cell(captureIndex), CultureInfo.InvariantCulture),
-            row.Ticks(captureMs),
+            row.Time(captureMs),
             row.Cell(status),
             row.Cell(kind) is { Length: > 0 } kindText ? kindText : null,
             (uint?)row.Long(runId),
             row.ULong(frameIndex),
-            row.Ticks(animation),
+            row.Span(animation),
             row.Long(sourceDrops) ?? 0,
             row.Long(missed) ?? 0,
             (uint?)row.Long(syncRunId),
             row.ULong(syncFrameIndex),
-            row.Ticks(host),
-            row.Ticks(device),
+            row.Time(host),
+            row.Time(device),
             row.Cell(payload) is { Length: > 0 } hex ? Convert.FromHexString(hex) : null
           )
         );

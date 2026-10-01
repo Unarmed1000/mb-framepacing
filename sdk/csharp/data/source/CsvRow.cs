@@ -7,8 +7,10 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 
 namespace MB.FramePacing.Data
 {
@@ -20,7 +22,21 @@ namespace MB.FramePacing.Data
 
     public string Cell(int index) => index >= 0 && index < m_cells.Length ? m_cells[index] : string.Empty;
 
-    public long? Ticks(int index) => Cell(index) is { Length: > 0 } text ? Milliseconds.ParseTicks(text) : null;
+    /// <summary>A span's cell; null when it is empty.</summary>
+    public TimeSpan? Span(int index) => Cell(index) is { Length: > 0 } text ? Milliseconds.ParseMilliseconds(text) : null;
+
+    /// <summary>A point in time's cell (milliseconds since its clock's zero); null when it is empty.</summary>
+    public TickCount64? Time(int index) => Span(index) is { } span ? new TickCount64(span) : null;
+
+    /// <summary>A marker's 32-bit span (0 to Payload.OnDemandFrameTime); null when the cell is empty.</summary>
+    public TimeSpan32? Span32(int index)
+    {
+      if (!(Span(index) is { } span))
+        return null;
+      if (span < TimeSpan.Zero || span > TimeSpan32.MaxValue.ToTimeSpan())
+        throw new InvalidDataException($"'{Cell(index)}' is not a 32-bit span of ticks");
+      return TimeSpan32.FromTimeSpan(span);
+    }
 
     public long? Long(int index) => Cell(index) is { Length: > 0 } text ? long.Parse(text, CultureInfo.InvariantCulture) : null;
 

@@ -33,8 +33,8 @@ namespace MB.FramePacing.Charts
     {
       string directory = Directory(folder);
       var summary = AnalysisSummary.Read(Path.Combine(directory, AnalysisFiles.SummaryFileName));
-      long capturePeriod = Milliseconds.ToTicks(summary.CapturePeriodMs);
-      long threshold = Milliseconds.ToTicks(summary.ErrorThresholdMs);
+      long capturePeriod = Milliseconds.FromMilliseconds(summary.CapturePeriodMs).Ticks;
+      long threshold = Milliseconds.FromMilliseconds(summary.ErrorThresholdMs).Ticks;
       bool camera = summary.Scanout == nameof(ScanoutModel.Camera);
       // What the capture missed, for every run's events (an analysis without the file draws its capture lane as not known)
       string capturesPath = Path.Combine(directory, AnalysisFiles.CapturesFileName);

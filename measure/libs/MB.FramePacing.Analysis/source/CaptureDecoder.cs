@@ -103,7 +103,9 @@ namespace MB.FramePacing.Analysis
         );
       var layout = MarkerLayout.For(locks, header.Camera);
       var effectiveTime =
-        timeSource == TimeSource.Auto ? (records.Count > 0 && records.All(r => r.HasDeviceTicks) ? TimeSource.Device : TimeSource.Host) : timeSource;
+        timeSource == TimeSource.Auto
+          ? (records.Count > 0 && records.All(r => r.DeviceTime.HasValue) ? TimeSource.Device : TimeSource.Host)
+          : timeSource;
 
       var rows = new List<CaptureRow>(records.Count + 64);
       long expectedIndex = records.Count > 0 ? records[0].CaptureIndex : 0;
@@ -123,8 +125,8 @@ namespace MB.FramePacing.Analysis
     private static CaptureDataRecord ToRecord(CaptureRecordHeader header, FrameDecode decode) =>
       new CaptureDataRecord(
         header.CaptureIndex,
-        header.HostTicks,
-        header.DeviceTicks,
+        new TickCount64(header.HostTicks),
+        header.HasDeviceTicks ? new TickCount64(header.DeviceTicks) : null,
         header.SourceDrops,
         decode.Status,
         decode.MainBytes,
@@ -133,7 +135,7 @@ namespace MB.FramePacing.Analysis
 
     private static CaptureRow ToRow(CaptureDataRecord record, TimeSource time)
     {
-      long ticks = time == TimeSource.Device && record.HasDeviceTicks ? record.DeviceTicks : record.HostTicks;
+      long ticks = time == TimeSource.Device && record.DeviceTime is { } device ? device.Ticks : record.HostTime.Ticks;
       // The sync marker: a camera's second zone measures the scanout with it; a capture card's tearing check is already in the status
       MarkerPayload? sync = record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second : null;
 
@@ -155,8 +157,8 @@ namespace MB.FramePacing.Analysis
       }
       return new CaptureRow(record.CaptureIndex, ticks, status, payload, start, record.SourceDrops, sync)
       {
-        HostTicks = record.HostTicks,
-        DeviceTicks = record.HasDeviceTicks ? record.DeviceTicks : null,
+        HostTicks = record.HostTime.Ticks,
+        DeviceTicks = record.DeviceTime?.Ticks,
         MarkerBytes = record.MainBytes,
       };
     }

@@ -16,16 +16,16 @@ using MB.FramePacing.Marker;
 namespace MB.FramePacing.Data
 {
   /// <param name="CaptureIndex">The capture source's frame counter; gaps are captures the recorder dropped.</param>
-  /// <param name="HostTicks">When the frame arrived, on the host's steady clock (TimeSpan ticks since the capture started).</param>
-  /// <param name="DeviceTicks">The capture device's timestamp (TimeSpan ticks), <see cref="UnknownTicks"/> if none.</param>
+  /// <param name="HostTime">When the frame arrived, on the host's steady clock (since the capture started).</param>
+  /// <param name="DeviceTime">The capture device's timestamp; null if it gave none.</param>
   /// <param name="SourceDrops">How many frames the capture source reported dropping since the previous record (0: none).</param>
   /// <param name="Status">Decoded, undecodable or torn.</param>
   /// <param name="MainBytes">The main marker's encoded bytes as read (frame, start or end marker), when it was read.</param>
   /// <param name="SecondBytes">The second marker's encoded bytes (sync marker, a camera's second zone), when it was read.</param>
   public readonly record struct CaptureDataRecord(
     long CaptureIndex,
-    long HostTicks,
-    long DeviceTicks,
+    TickCount64 HostTime,
+    TickCount64? DeviceTime,
     uint SourceDrops,
     CaptureDataStatus Status,
     byte[]? MainBytes,
@@ -34,8 +34,8 @@ namespace MB.FramePacing.Data
   {
     public const int Size = 192;
 
-    /// <summary>A device timestamp that the capture source did not give.</summary>
-    public const long UnknownTicks = long.MinValue;
+    // The file's device timestamp when the capture source gave none
+    private const long UnknownTicks = long.MinValue;
 
     public const int StatusOffset = 28;
     public const int MainLengthOffset = 29;
@@ -46,8 +46,6 @@ namespace MB.FramePacing.Data
     public const int MainCapacity = 80;
     public const int SecondOffset = MainOffset + MainCapacity;
     public const int SecondCapacity = Size - SecondOffset;
-
-    public bool HasDeviceTicks => DeviceTicks != UnknownTicks;
 
     /// <summary>The main marker's payload, decoded with the marker library. False when there is none or it is not a valid payload.</summary>
     public bool TryDecodeMain(out Payload payload, out StartMetadata metadata) => TryDecode(MainBytes, out payload, out metadata);
@@ -60,7 +58,7 @@ namespace MB.FramePacing.Data
       if (destination.Length < Size)
         throw new ArgumentException("Record buffer too small", nameof(destination));
       destination.Slice(0, Size).Clear();
-      WriteCapture(destination, CaptureIndex, HostTicks, DeviceTicks, SourceDrops);
+      WriteCapture(destination, CaptureIndex, HostTime, DeviceTime, SourceDrops);
       WriteDecoded(destination, Status, MainBytes, SecondBytes);
     }
 
@@ -77,12 +75,12 @@ namespace MB.FramePacing.Data
       second.CopyTo(destination.Slice(SecondOffset));
     }
 
-    /// <summary>Write the capture part (index, host and device ticks, source drops: bytes 0 to 27) of a record.</summary>
-    public static void WriteCapture(Span<byte> destination, long captureIndex, long hostTicks, long deviceTicks, uint sourceDrops)
+    /// <summary>Write the capture part (index, host and device time, source drops: bytes 0 to 27) of a record.</summary>
+    public static void WriteCapture(Span<byte> destination, long captureIndex, TickCount64 hostTime, TickCount64? deviceTime, uint sourceDrops)
     {
       BinaryPrimitives.WriteInt64LittleEndian(destination, captureIndex);
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(8), hostTicks);
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(16), deviceTicks);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(8), hostTime.Ticks);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(16), deviceTime?.Ticks ?? UnknownTicks);
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(24), sourceDrops);
     }
 
@@ -95,10 +93,11 @@ namespace MB.FramePacing.Data
       int secondLength = source[SecondLengthOffset];
       if (status > (byte)CaptureDataStatus.Torn || mainLength > MainCapacity || secondLength > SecondCapacity)
         throw new InvalidDataException("Invalid capture data record");
+      long deviceTicks = BinaryPrimitives.ReadInt64LittleEndian(source.Slice(16));
       return new CaptureDataRecord(
         BinaryPrimitives.ReadInt64LittleEndian(source),
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(8)),
-        BinaryPrimitives.ReadInt64LittleEndian(source.Slice(16)),
+        new TickCount64(BinaryPrimitives.ReadInt64LittleEndian(source.Slice(8))),
+        deviceTicks == UnknownTicks ? (TickCount64?)null : new TickCount64(deviceTicks),
         BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(24)),
         (CaptureDataStatus)status,
         mainLength > 0 ? source.Slice(MainOffset, mainLength).ToArray() : null,

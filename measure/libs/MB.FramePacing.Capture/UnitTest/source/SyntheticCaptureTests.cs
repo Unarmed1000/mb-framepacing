@@ -94,7 +94,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var record = records[i];
         Assert.That(record.CaptureIndex, Is.EqualTo(i));
-        Assert.That(record.DeviceTicks, Is.EqualTo(scenario.CaptureTicks(i)), "the display timer");
+        Assert.That(record.DeviceTime?.Ticks, Is.EqualTo(scenario.CaptureTicks(i)), "the display timer");
         Assert.That(record.Status, Is.EqualTo(CaptureDataStatus.Decoded), $"record {i}");
         var expected = scenario.PresentedFrames[scenario.PresentedIndexAt(i)].Payload;
         var expectedStart = expected.Kind == MarkerKind.SequenceStart ? scenario.StartMetadata : null;
@@ -142,8 +142,8 @@ namespace MB.FramePacing.Capture.UnitTest
         var header = frames.ReadRecordHeader(i);
         var record = data.ReadRecord(i);
         Assert.That(record.CaptureIndex, Is.EqualTo(header.CaptureIndex));
-        Assert.That(record.HostTicks, Is.EqualTo(header.HostTicks));
-        Assert.That(record.DeviceTicks, Is.EqualTo(header.DeviceTicks));
+        Assert.That(record.HostTime.Ticks, Is.EqualTo(header.HostTicks));
+        Assert.That(record.DeviceTime?.Ticks, Is.EqualTo(header.HasDeviceTicks ? header.DeviceTicks : (long?)null));
       }
     }
 
