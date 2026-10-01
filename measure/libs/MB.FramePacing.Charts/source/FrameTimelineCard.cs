@@ -58,11 +58,11 @@ namespace MB.FramePacing.Charts
       var (offset, alignedBySchedule) = PacerToCapture(run.Frames);
 
       // The refresh grid starts at the first frame's display time; each frame's first refresh on it
-      long first = frames[0].FirstSeenTicks;
+      long first = frames[0].FirstSeenTime.Ticks;
       int RefreshOf(long ticks) => (int)Math.Round((ticks - first) / (double)refresh);
-      var shownAt = frames.Select(f => RefreshOf(f.FirstSeenTicks)).ToArray();
+      var shownAt = frames.Select(f => RefreshOf(f.FirstSeenTime.Ticks)).ToArray();
       var last = frames[^1];
-      int endRefresh = shownAt[^1] + Math.Max(1, (int)Math.Round(last.OnScreenTicks / (double)refresh));
+      int endRefresh = shownAt[^1] + Math.Max(1, (int)Math.Round(last.OnScreen.Ticks / (double)refresh));
 
       // The CPU boxes, on the capture's clock, and the lanes that keep overlapping boxes apart
       var boxes = new List<(int Frame, long Start, long End, int Lane)>();
@@ -72,10 +72,10 @@ namespace MB.FramePacing.Charts
         for (int i = 0; i < frames.Count; ++i)
         {
           var frame = frames[i];
-          if (frame.CpuStartTicks == 0 || frame.CpuBusyTicks == 0)
+          if (frame.CpuStartTime.Ticks == 0 || frame.CpuBusy.Ticks == 0)
             continue;
-          long start = frame.CpuStartTicks + shift;
-          long stop = start + frame.CpuBusyTicks;
+          long start = frame.CpuStartTime.Ticks + shift;
+          long stop = start + frame.CpuBusy.Ticks;
           int lane = laneEnds.FindIndex(e => e <= start);
           if (lane < 0)
           {
@@ -132,7 +132,7 @@ namespace MB.FramePacing.Charts
       var targetable = new HashSet<int>(shownAt);
       for (int i = 1; i < frames.Count; ++i)
       {
-        int step = Math.Max(1, (int)Math.Round((frames[i].TargetTicks ?? refresh) / (double)refresh));
+        int step = Math.Max(1, (int)Math.Round((frames[i].TargetFrameTime?.Ticks ?? refresh) / (double)refresh));
         for (int at = shownAt[i - 1] + step; at <= shownAt[i]; at += step)
           targetable.Add(at);
       }
@@ -156,7 +156,7 @@ namespace MB.FramePacing.Charts
         parts.Add(new TextShape(20, rowsY + (i * RowStep), rowLabels[i], "label", "start"));
 
       // CPU boxes and present arrows
-      long firstAnimation = frames[0].AnimationTicks;
+      long firstAnimation = frames[0].AnimationTime.Ticks;
       foreach (var (index, start, stop, lane) in boxes)
       {
         double x0 = XOf(start);
@@ -171,7 +171,12 @@ namespace MB.FramePacing.Charts
         {
           parts.Add(new TextShape(cx, y + 19, Label(frames[index]), "frame"));
           parts.Add(
-            new TextShape(cx, y + 36, $"{Ms((frames[index].AnimationTicks - firstAnimation) / (double)TimeSpan.TicksPerMillisecond)} ms", "box-time")
+            new TextShape(
+              cx,
+              y + 36,
+              $"{Ms((frames[index].AnimationTime.Ticks - firstAnimation) / (double)TimeSpan.TicksPerMillisecond)} ms",
+              "box-time"
+            )
           );
         }
         else if (boxWidth >= 38)
@@ -199,7 +204,7 @@ namespace MB.FramePacing.Charts
         // How long the frame is meant to stay: the next frame's target (its swap interval), the last frame's own. A frame presented on
         // demand has no interval to aim for: the wait for it is never late
         var next = i + 1 < frames.Count ? frames[i + 1] : frame;
-        long intendedHold = OnDemand(next) ? long.MaxValue : next.TargetTicks ?? refresh;
+        long intendedHold = OnDemand(next) ? long.MaxValue : next.TargetFrameTime?.Ticks ?? refresh;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         for (int k = from; k < to; ++k)
@@ -207,7 +212,7 @@ namespace MB.FramePacing.Charts
           bool firstRefresh = k == from;
           string kind =
             isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
-            : firstRefresh ? (frame.AnimationErrorTicks is { } e && Math.Abs(e) > threshold ? "off" : "ok")
+            : firstRefresh ? (frame.AnimationError?.Ticks is { } e && Math.Abs(e) > threshold ? "off" : "ok")
             : (k - from) * refresh < intendedHold - (refresh / 2) ? "hold"
             : "again";
           used.Add(kind == "strip-static-b" ? "strip-static-a" : kind);
@@ -219,19 +224,19 @@ namespace MB.FramePacing.Charts
 
         double cx = (XOf(first + (from * refresh)) + XOf(first + ((from + 1) * refresh))) / 2;
         // A static step (from a frame nothing animated after) has no animation error: the steps it has, and "static" for the error
-        if (frame.AnimationErrorTicks is null && (frame.Flags & PresentedFrameFlags.StaticBefore) != 0)
+        if (frame.AnimationError?.Ticks is null && (frame.Flags & PresentedFrameFlags.StaticBefore) != 0)
         {
-          parts.Add(new TextShape(cx, rowsY, frame.AnimationDeltaTicks is { } a ? $"{Ms(a / (double)TimeSpan.TicksPerMillisecond)} ms" : "–"));
+          parts.Add(new TextShape(cx, rowsY, frame.AnimationDelta?.Ticks is { } a ? $"{Ms(a / (double)TimeSpan.TicksPerMillisecond)} ms" : "–"));
           parts.Add(
-            new TextShape(cx, rowsY + RowStep, frame.DisplayDeltaTicks is { } d ? $"{Ms(d / (double)TimeSpan.TicksPerMillisecond)} ms" : "–")
+            new TextShape(cx, rowsY + RowStep, frame.DisplayDelta?.Ticks is { } d ? $"{Ms(d / (double)TimeSpan.TicksPerMillisecond)} ms" : "–")
           );
           parts.Add(new TextShape(cx, rowsY + (2 * RowStep), "static", "zero"));
           continue;
         }
         if (
-          frame.DisplayDeltaTicks is not { } display
-          || frame.AnimationDeltaTicks is not { } animation
-          || frame.AnimationErrorTicks is not { } error
+          frame.DisplayDelta?.Ticks is not { } display
+          || frame.AnimationDelta?.Ticks is not { } animation
+          || frame.AnimationError?.Ticks is not { } error
         )
         {
           for (int row = 0; row < 3; ++row)
@@ -266,12 +271,12 @@ namespace MB.FramePacing.Charts
     {
       foreach (var frame in frames)
       {
-        if (frame.IntendedDisplayTicks != 0 && frame.LatenessTicks is { } lateness)
-          return (frame.FirstSeenTicks - frame.IntendedDisplayTicks - lateness, true);
+        if (frame.IntendedDisplayTime.Ticks != 0 && frame.Lateness?.Ticks is { } lateness)
+          return (frame.FirstSeenTime.Ticks - frame.IntendedDisplayTime.Ticks - lateness, true);
       }
       var presented = frames
-        .Where(f => f.CpuStartTicks != 0 && f.CpuBusyTicks != 0)
-        .Select(f => f.FirstSeenTicks - (f.CpuStartTicks + f.CpuBusyTicks))
+        .Where(f => f.CpuStartTime.Ticks != 0 && f.CpuBusy.Ticks != 0)
+        .Select(f => f.FirstSeenTime.Ticks - (f.CpuStartTime.Ticks + f.CpuBusy.Ticks))
         .ToList();
       return presented.Count > 0 ? (presented.Min(), false) : (null, false);
     }
@@ -280,7 +285,8 @@ namespace MB.FramePacing.Charts
     private static bool OnDemand(PresentedFrame frame)
     {
       uint OnDemandTicks = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks;
-      return frame.MarkerTargetFrameTicks == OnDemandTicks || (frame.MarkerTargetFrameTicks == 0 && frame.MarkerPreferredFrameTicks == OnDemandTicks);
+      return frame.MarkerTargetFrameTime.Ticks == OnDemandTicks
+        || (frame.MarkerTargetFrameTime.Ticks == 0 && frame.MarkerPreferredFrameTime.Ticks == OnDemandTicks);
     }
 
     /// <summary>A frame's short name in the boxes and cells: the last three digits of its frame index.</summary>

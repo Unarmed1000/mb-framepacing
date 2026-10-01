@@ -17,7 +17,8 @@ namespace MB.FramePacing.Analysis
   {
     public static readonly Statistics Empty = new Statistics(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-    public static Statistics FromTicks(IEnumerable<long> ticks) => From(ticks.Select(t => t / (double)TimeSpan.TicksPerMillisecond));
+    /// <summary>The statistics of <paramref name="spans"/>, in milliseconds.</summary>
+    public static Statistics From(IEnumerable<TimeSpan> spans) => From(spans.Select(s => s.TotalMilliseconds));
 
     public static Statistics From(IEnumerable<double> values)
     {

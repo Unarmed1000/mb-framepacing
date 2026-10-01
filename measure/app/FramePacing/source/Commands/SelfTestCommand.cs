@@ -237,8 +237,8 @@ namespace MB.FramePacing.App.Commands
               continue;
             double truthDelta = camera.ToCameraTicks(expected[i].DisplayTime.Ticks - expected[i - 1].DisplayTime.Ticks);
             ++checkedFrames;
-            errorsMs.Add(Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - truthDelta) / TimeSpan.TicksPerMillisecond);
-            if (Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - truthDelta) > (2 * period) + 1)
+            errorsMs.Add(Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - truthDelta) / TimeSpan.TicksPerMillisecond);
+            if (Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - truthDelta) > (2 * period) + 1)
               failures.Add($"frame {expected[i].Payload.FrameIndex}: display delta off by more than two camera periods");
           }
         }
@@ -315,7 +315,7 @@ namespace MB.FramePacing.App.Commands
         failures.Add("no run was found");
       else if (session.FramesDroppedByRecorder == 0)
       {
-        var actual = run.Frames.Select(f => (f.FrameIndex, f.FirstSeenTicks)).ToList();
+        var actual = run.Frames.Select(f => (f.FrameIndex, f.FirstSeenTime.Ticks)).ToList();
         int mismatches = expected.Zip(actual).Count(pair => pair.First != pair.Second) + Math.Abs(expected.Count - actual.Count);
         if (mismatches > 0)
           failures.Add($"{mismatches} of {expected.Count} presented frames differ from the ground truth");

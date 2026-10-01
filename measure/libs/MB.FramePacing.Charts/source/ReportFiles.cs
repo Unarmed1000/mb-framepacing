@@ -81,10 +81,10 @@ namespace MB.FramePacing.Charts
       var frames = run.Run.Frames;
       if (frames.Count == 0)
         yield break;
-      long origin = frames[0].FirstSeenTicks;
-      double Seconds(PresentedFrame f) => (f.FirstSeenTicks - origin) / (double)TimeSpan.TicksPerSecond;
-      var worstError = frames.Where(f => f.AnimationErrorTicks.HasValue).MaxBy(f => Math.Abs(f.AnimationErrorTicks!.Value));
-      if (worstError != null && worstError.AnimationErrorTicks != 0)
+      long origin = frames[0].FirstSeenTime.Ticks;
+      double Seconds(PresentedFrame f) => (f.FirstSeenTime.Ticks - origin) / (double)TimeSpan.TicksPerSecond;
+      var worstError = frames.Where(f => f.AnimationError.HasValue).MaxBy(f => Math.Abs(f.AnimationError!.Value.Ticks));
+      if (worstError != null && worstError.AnimationError?.Ticks != 0)
       {
         double t = Seconds(worstError);
         yield return ("worst-error", RunSection.Create(run, t - DetailSeconds, t + DetailSeconds));
@@ -92,11 +92,11 @@ namespace MB.FramePacing.Charts
       if (run.Run.Pacing is { LateFrames: > 0 })
       {
         // As LateShare.Worst: only the windows that lie completely inside the run (the first frames' windows are nearly empty)
-        var shares = LateShare.Rolling(frames, LateShare.WindowTicks);
+        var shares = LateShare.Rolling(frames, LateShare.Window);
         int worst = 0;
         for (int i = 0; i < frames.Count; ++i)
         {
-          if (frames[i].FirstSeenTicks - origin >= LateShare.WindowTicks && shares[i] > shares[worst])
+          if (frames[i].FirstSeenTime.Ticks - origin >= LateShare.Window.Ticks && shares[i] > shares[worst])
             worst = i;
         }
         double t = Seconds(frames[worst]);

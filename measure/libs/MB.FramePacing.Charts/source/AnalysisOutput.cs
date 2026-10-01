@@ -55,6 +55,6 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The presented frames of a run-&lt;id&gt;-frames.csv, by column name.</summary>
     public static IReadOnlyList<PresentedFrame> ReadFrames(string path, long capturePeriodTicks) =>
-      FramesCsv.Read(path).Select(row => row.ToFrame(capturePeriodTicks)).ToList();
+      FramesCsv.Read(path).Select(row => row.ToFrame(new TimeSpan(capturePeriodTicks))).ToList();
   }
 }

@@ -8,6 +8,8 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System;
+
 namespace MB.FramePacing.Analysis
 {
   public sealed record TimelineOptions
@@ -25,7 +27,7 @@ namespace MB.FramePacing.Analysis
     /// The |animation error| above which a frame counts as off, the same for every capture source. The animation error is measured exactly
     /// (the marker's animation time step against the display time step), so the default is small: 1 ms.
     /// </summary>
-    public long ErrorThresholdTicks { get; init; } = TimelineAnalyzer.DefaultErrorThresholdTicks;
+    public TimeSpan ErrorThreshold { get; init; } = TimelineAnalyzer.DefaultErrorThreshold;
 
     /// <summary>The frame rate the application aims for (null = the markers' pacing, else one refresh per frame).</summary>
     public double? TargetFps { get; init; }

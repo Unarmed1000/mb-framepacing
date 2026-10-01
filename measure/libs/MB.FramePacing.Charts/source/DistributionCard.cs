@@ -217,7 +217,7 @@ namespace MB.FramePacing.Charts
       if ((card.PlotX1 - PlotX0) / frameCount >= 1)
       {
         for (int i = section.Start; i < section.End; ++i)
-          Point(XOfFrame(i), TicksMs(data.Frames[i].DriftTicks));
+          Point(XOfFrame(i), TicksMs(data.Frames[i].Drift.Ticks));
       }
       else
       {

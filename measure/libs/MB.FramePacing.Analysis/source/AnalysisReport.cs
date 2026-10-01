@@ -22,9 +22,9 @@ namespace MB.FramePacing.Analysis
     IReadOnlyList<string> Warnings
   )
   {
-    public double CapturePeriodMs => Timeline.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond;
+    public double CapturePeriodMs => Timeline.CapturePeriod.TotalMilliseconds;
 
-    /// <summary>The |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThresholdTicks"/>).</summary>
-    public double ErrorThresholdMs => Timeline.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+    /// <summary>The |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>).</summary>
+    public double ErrorThresholdMs => Timeline.ErrorThreshold.TotalMilliseconds;
   }
 }

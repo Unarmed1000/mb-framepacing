@@ -39,7 +39,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     {
       var rows = new List<CaptureRow>();
       void Add(MarkerPayload payload, StartMetadata? start = null) =>
-        rows.Add(new CaptureRow(rows.Count, rows.Count * refresh, CaptureStatus.Decoded, payload, start));
+        rows.Add(new CaptureRow(rows.Count, new TickCount64(rows.Count * refresh), CaptureStatus.Decoded, payload, start));
 
       for (int i = 0; i < 3; ++i)
         Add(
@@ -100,7 +100,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[9] = (2, 16);
       var run = Analyze(Rows(frames));
 
-      Assert.That(run.Frames[10].DisplayDeltaTicks, Is.EqualTo(32 * Ms));
+      Assert.That(run.Frames[10].DisplayDelta?.Ticks, Is.EqualTo(32 * Ms));
       Assert.That(IsLate(run.Frames[10]));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(run.Statistics.FramesWithAnimationError, Is.EqualTo(1), "an error of one refresh is real at the display's refresh rate");
@@ -118,8 +118,8 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames.AddRange(Steady(10));
       var run = Analyze(Rows(frames));
 
-      Assert.That(run.Frames[10].AnimationErrorTicks, Is.EqualTo(-16 * Ms));
-      Assert.That(run.Frames[11].AnimationErrorTicks, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[10].AnimationError?.Ticks, Is.EqualTo(-16 * Ms));
+      Assert.That(run.Frames[11].AnimationError?.Ticks, Is.EqualTo(16 * Ms));
       Assert.That(IsLate(run.Frames[11]), Is.False);
       Assert.That(run.Pacing!.ErrorFramesWithUnevenDisplay, Is.EqualTo(2));
       Assert.That(run.Pacing.ErrorFramesWithEvenDisplay, Is.Zero);
@@ -162,7 +162,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(32));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
-      Assert.That(run.Frames.Skip(1).All(f => f.PreferredTicks == 32 * Ms));
+      Assert.That(run.Frames.Skip(1).All(f => f.PreferredFrameTime?.Ticks == 32 * Ms));
     }
 
     [Test]
@@ -198,7 +198,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.TargetFrameTime));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1), "the chosen 30 fps stretch is not late, the miss is");
       Assert.That(IsLate(run.Frames[26]));
-      Assert.That(run.Frames[15].TargetTicks, Is.EqualTo(32 * Ms));
+      Assert.That(run.Frames[15].TargetFrameTime?.Ticks, Is.EqualTo(32 * Ms));
     }
 
     [Test]
@@ -214,8 +214,8 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule));
       Assert.That(run.Frames.Take(10).Count(IsLate), Is.Zero);
       Assert.That(run.Frames.Skip(10).All(IsLate), Is.True, "every frame after the hitch stays a refresh late");
-      Assert.That(run.Frames[20].LatenessTicks, Is.EqualTo(16 * Ms));
-      Assert.That(run.Frames[20].DisplayDeltaTicks, Is.EqualTo(16 * Ms), "the steps look even; only the schedule shows the delay");
+      Assert.That(run.Frames[20].Lateness?.Ticks, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[20].DisplayDelta?.Ticks, Is.EqualTo(16 * Ms), "the steps look even; only the schedule shows the delay");
     }
 
     [Test]
@@ -237,12 +237,12 @@ namespace MB.FramePacing.Analysis.UnitTest
         );
       var run = Analyze(PacedRows(frames));
 
-      var errors = run.Frames.Where(f => f.AnimationErrorTicks is { } e && e != 0).ToList();
+      var errors = run.Frames.Where(f => f.AnimationError?.Ticks is { } e && e != 0).ToList();
       Assert.That(errors, Is.Not.Empty);
       foreach (var frame in errors)
       {
-        Assert.That(frame.PacingErrorTicks, Is.Zero);
-        Assert.That(frame.AnimationErrorTicks, Is.EqualTo(frame.PredictionErrorTicks - frame.PacingErrorTicks));
+        Assert.That(frame.PacingError?.Ticks, Is.Zero);
+        Assert.That(frame.AnimationError?.Ticks, Is.EqualTo(frame.PredictionError?.Ticks - frame.PacingError?.Ticks));
       }
       Assert.That(run.Pacing!.LateFrames, Is.Zero);
       Assert.That(run.Pacing.PredictionErrorMs!.Max, Is.EqualTo(16));
@@ -304,7 +304,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing!.LateFrames, Is.EqualTo(20));
       Assert.That(run.Pacing.LateShare, Is.LessThan(0.05));
       Assert.That(run.Pacing.WorstLateShare, Is.GreaterThan(0.1), "the busy stretch stands out");
-      var rolling = LateShare.Rolling(run.Frames, LateShare.WindowTicks);
+      var rolling = LateShare.Rolling(run.Frames, LateShare.Window);
       Assert.That(rolling[^1], Is.Zero, "the last 2 s are clean");
     }
   }

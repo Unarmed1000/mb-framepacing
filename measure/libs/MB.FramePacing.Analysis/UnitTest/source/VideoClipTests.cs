@@ -118,17 +118,21 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.FrameIndex, Is.EqualTo(manifest.FrameIndex(i)), where + ": frame index");
         // The refreshes after it that showed an older frame out of order: kept with the frame, at their capture's time
         Assert.That(
-          (frame.OlderFrames ?? Array.Empty<OlderFrameCapture>()).Select(o => (o.FrameIndex, o.CaptureTicks)),
+          (frame.OlderFrames ?? Array.Empty<OlderFrameCapture>()).Select(o => (o.FrameIndex, o.CaptureTime.Ticks)),
           Is.EqualTo(manifest.OlderFramesAfter(i).Select(o => (o.FrameIndex, manifest.VideoFrameTicks(o.Refresh)))),
           where + ": older frames shown out of order after it"
         );
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.UncertainStep), Is.False, where + ": the clip's capture has no gap");
         Assert.That(frame.SkippedBefore, Is.EqualTo(manifest.SkippedBefore(i)), where + ": frame indices skipped before it");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.StaticAfter), Is.EqualTo(manifest.IsStatic(i)), where + ": static");
-        Assert.That(frame.PreferredTicks, Is.EqualTo(manifest.PreferredRefreshes(i) * refresh), where + ": preferred frame time (null on demand)");
-        Assert.That(frame.DriftTicks, Is.EqualTo(manifest.DriftTicks(i)), where + ": drift");
         Assert.That(
-          frame.LatenessTicks,
+          frame.PreferredFrameTime?.Ticks,
+          Is.EqualTo(manifest.PreferredRefreshes(i) * refresh),
+          where + ": preferred frame time (null on demand)"
+        );
+        Assert.That(frame.Drift.Ticks, Is.EqualTo(manifest.DriftTicks(i)), where + ": drift");
+        Assert.That(
+          frame.Lateness?.Ticks,
           Is.EqualTo(manifest.IntendedTicks(i) != 0 ? Behind(manifest, i) - onTime : null),
           where + ": how late (0 = unknown intended time)"
         );
@@ -144,14 +148,14 @@ namespace MB.FramePacing.Analysis.UnitTest
           && manifest.CpuStartTicks(i + 1) != 0
             ? manifest.CpuStartTicks(i + 1) - cpuStart
             : null;
-        Assert.That(frame.CpuStartTicks, Is.EqualTo(cpuStart), where + ": CPU start time");
-        Assert.That(frame.CpuBusyTicks, Is.EqualTo((uint)cpuBusy), where + ": CPU busy");
-        Assert.That(frame.FrameTimeTicks, Is.EqualTo(frameTime), where + ": frametime");
-        Assert.That(frame.CpuWaitTicks, Is.EqualTo(frameTime.HasValue && cpuBusy != 0 ? frameTime - cpuBusy : null), where + ": CPU wait");
+        Assert.That(frame.CpuStartTime.Ticks, Is.EqualTo(cpuStart), where + ": CPU start time");
+        Assert.That(frame.CpuBusy.Ticks, Is.EqualTo((uint)cpuBusy), where + ": CPU busy");
+        Assert.That(frame.FrameTime?.Ticks, Is.EqualTo(frameTime), where + ": frametime");
+        Assert.That(frame.CpuWait?.Ticks, Is.EqualTo(frameTime.HasValue && cpuBusy != 0 ? frameTime - cpuBusy : null), where + ": CPU wait");
         if (i == 0)
         {
           // The manifest measures its first frame against the last frame of the previous loop, which the capture does not hold
-          Assert.That(frame.DisplayDeltaTicks, Is.Null, where + ": no display time step");
+          Assert.That(frame.DisplayDelta?.Ticks, Is.Null, where + ": no display time step");
           Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.StaticBefore), Is.False, where + ": nothing before it");
           continue;
         }
@@ -160,15 +164,15 @@ namespace MB.FramePacing.Analysis.UnitTest
           Is.EqualTo(!manifest.CountsTowardFrameRate(i)),
           where + ": the frame before it is static"
         );
-        Assert.That(frame.DisplayDeltaTicks, Is.EqualTo(manifest.DisplayStepTicks(i)), where + ": display time step");
-        Assert.That(frame.AnimationDeltaTicks, Is.EqualTo(manifest.AnimationStepTicks(i)), where + ": animation time step");
-        Assert.That(frame.AnimationErrorTicks, Is.EqualTo(manifest.AnimationErrorTicks(i)), where + ": animation error");
+        Assert.That(frame.DisplayDelta?.Ticks, Is.EqualTo(manifest.DisplayStepTicks(i)), where + ": display time step");
+        Assert.That(frame.AnimationDelta?.Ticks, Is.EqualTo(manifest.AnimationStepTicks(i)), where + ": animation time step");
+        Assert.That(frame.AnimationError?.Ticks, Is.EqualTo(manifest.AnimationErrorTicks(i)), where + ": animation error");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Late), Is.EqualTo(manifest.IsLate(i)), where + ": late");
-        Assert.That(frame.TargetTicks, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
+        Assert.That(frame.TargetFrameTime?.Ticks, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
         long? intended = manifest.IntendedStepTicks(i);
-        Assert.That(frame.PacingErrorTicks, Is.EqualTo(manifest.DisplayStepTicks(i) - intended), where + ": pacing error");
+        Assert.That(frame.PacingError?.Ticks, Is.EqualTo(manifest.DisplayStepTicks(i) - intended), where + ": pacing error");
         Assert.That(
-          frame.PredictionErrorTicks,
+          frame.PredictionError?.Ticks,
           Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepTicks(i) - intended : null),
           where + ": prediction error (not judged from a static frame)"
         );

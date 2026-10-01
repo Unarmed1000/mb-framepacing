@@ -34,7 +34,7 @@ namespace MB.FramePacing.Charts.UnitTest
       void Add(MarkerPayload payload, int captures)
       {
         for (int k = 0; k < captures; ++k)
-          rows.Add(new CaptureRow(rows.Count, rows.Count * Period, CaptureStatus.Decoded, payload));
+          rows.Add(new CaptureRow(rows.Count, new TickCount64(rows.Count * Period), CaptureStatus.Decoded, payload));
       }
       for (int i = 0; i < 3; ++i)
         Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)), 1);
@@ -69,7 +69,7 @@ namespace MB.FramePacing.Charts.UnitTest
       for (int i = 0; i < 3; ++i)
         Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)), 1);
       var result = TimelineAnalyzer.Analyze(rows);
-      return new ChartRun(result.Runs.Single(), result.CapturePeriodTicks, result.ErrorThresholdTicks, Camera: false);
+      return new ChartRun(result.Runs.Single(), result.CapturePeriod.Ticks, result.ErrorThreshold.Ticks, Camera: false);
     }
 
     private static (double Step, double FrameTime) Tops(CardDrawing card) =>
@@ -107,7 +107,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var data = RunChartData.Of(Run());
       int lastAnimating = data.StaticStretches[0].Start - 1;
-      long idle = FrameTimeRounding.WholeRefreshes(Idle, Period);
+      long idle = FrameTimeRounding.WholeRefreshes(new TimeSpan(Idle), new TimeSpan(Period)).Ticks;
 
       Assert.That(data.AnimatingStepReferences.Frames[lastAnimating], Is.False, "its line comes from an idle frame");
       Assert.That(data.AllStepReferences.Frames[lastAnimating], Is.True);

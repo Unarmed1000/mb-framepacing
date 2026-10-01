@@ -512,7 +512,7 @@ namespace MB.FramePacing.Charts
         var (start, end) = stretches[k];
         var last = data.Frames[end - 1];
         double x0 = Math.Max(PlotX0 - 1, view.XOfFrame(Math.Max(start, section.Start)));
-        double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + (last.OnScreenTicks / (double)TimeSpan.TicksPerSecond)));
+        double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + (last.OnScreen.Ticks / (double)TimeSpan.TicksPerSecond)));
         if (x1 <= x0)
           continue;
         if (bands.Count > 0 && x0 - bands[^1].X1 < 1)
@@ -589,7 +589,7 @@ namespace MB.FramePacing.Charts
         double barW = Math.Max(1.0, (section.FrameCount > 0 ? view.PixelsPerFrame : view.PlotX1 - PlotX0) - 0.6);
         foreach (int i in errors.FramesIn(section.Start, section.End))
         {
-          double value = TicksMs(data.Frames[i].AnimationErrorTicks!.Value);
+          double value = TicksMs(data.Frames[i].AnimationError!.Value.Ticks);
           if (Math.Abs(value) < 1e-9)
             continue;
           double x = view.XOfFrame(i);
@@ -749,7 +749,7 @@ namespace MB.FramePacing.Charts
         foreach (int i in holds.FramesIn(section.Start, holdEnd))
         {
           var next = data.Frames[i + 1];
-          double level = TicksMs(next.DisplayDeltaTicks!.Value);
+          double level = TicksMs(next.DisplayDelta!.Value.Ticks);
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
           double y = YOf(level);
@@ -909,7 +909,7 @@ namespace MB.FramePacing.Charts
         {
           double x0 = view.XOfFrame(i);
           double x1 = x1Of(i);
-          double y = yOf(TicksMs(view.Data.Frames[i + 1].AnimationDeltaTicks!.Value));
+          double y = yOf(TicksMs(view.Data.Frames[i + 1].AnimationDelta!.Value.Ticks));
           // Joined to the hold before when it ends where this one starts (a gap in the segment starts a new line)
           line.Append(
             previousX1 is { } before && Math.Abs(before - x0) < 1e-6
@@ -1005,7 +1005,7 @@ namespace MB.FramePacing.Charts
           view.EndX,
           i + 1 < section.End && frames[i + 1].Segment == frames[i].Segment
             ? view.XOfFrame(i + 1)
-            : view.XOf(data.Seconds(i) + (frames[i].OnScreenTicks / (double)TimeSpan.TicksPerSecond))
+            : view.XOf(data.Seconds(i) + (frames[i].OnScreen.Ticks / (double)TimeSpan.TicksPerSecond))
         );
       plots.Add(new CardPlot(ReportItem.FrameTime, PlotX0, frameTimeY, view.PlotX1, frameTimeY + FrameTimeH, view.ViewFrom, view.ViewTo, 0, top));
       foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
@@ -1040,8 +1040,8 @@ namespace MB.FramePacing.Charts
         {
           if (!data.Spans[i])
             continue;
-          double frameTime = frames[i].FrameTimeTicks is { } ticks ? TicksMs(ticks) : 0;
-          double cpuBusyMs = TicksMs(frames[i].CpuBusyTicks);
+          double frameTime = frames[i].FrameTime?.Ticks is { } ticks ? TicksMs(ticks) : 0;
+          double cpuBusyMs = TicksMs(frames[i].CpuBusy.Ticks);
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
           if (cpuBusyMs > 0)
@@ -1260,12 +1260,12 @@ namespace MB.FramePacing.Charts
       for (int i = section.Start; i < section.End; ++i)
       {
         var frame = frames[i];
-        long onScreen = frame.OnScreenTicks > 0 ? frame.OnScreenTicks : chart.CapturePeriodTicks;
+        long onScreen = frame.OnScreen.Ticks > 0 ? frame.OnScreen.Ticks : chart.CapturePeriodTicks;
         int cells = Math.Max(1, Cells(onScreen));
         int seen = cells;
         if (!chart.Camera && i + 1 < section.End && frames[i + 1].Segment == frame.Segment)
         {
-          long shown = Math.Min(frame.LastSeenTicks + chart.CapturePeriodTicks, frames[i + 1].FirstSeenTicks) - frame.FirstSeenTicks;
+          long shown = Math.Min(frame.LastSeenTime.Ticks + chart.CapturePeriodTicks, frames[i + 1].FirstSeenTime.Ticks) - frame.FirstSeenTime.Ticks;
           seen = Math.Clamp(Cells(shown), 1, cells);
         }
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
@@ -1283,7 +1283,7 @@ namespace MB.FramePacing.Charts
         int repeats = 0;
         if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment && view.Data.DroppedBeforeFrame[i + 1] is > 0 and var dropped)
         {
-          long target = frames[i + 1].TargetTicks is > 0 and var t ? t : refreshTicks;
+          long target = frames[i + 1].TargetFrameTime?.Ticks is > 0 and var t ? t : refreshTicks;
           repeats = (int)Math.Min(seen - 1, dropped * Math.Max(1, Cells(target)));
         }
         for (int c = 0; c < cells; ++c)
@@ -1293,8 +1293,8 @@ namespace MB.FramePacing.Charts
             break;
           // A refresh that showed an older frame out of order (also between two sightings of this frame); after the frame's last
           // sighting, else one the capture did not tell; the refreshes where dropped frames were due repeat this frame
-          long at = frame.FirstSeenTicks + (c * refreshTicks);
-          bool older = frame.OlderFrames is { } shown && shown.Any(o => Math.Abs(o.CaptureTicks - at) * 2 < refreshTicks);
+          long at = frame.FirstSeenTime.Ticks + (c * refreshTicks);
+          bool older = frame.OlderFrames is { } shown && shown.Any(o => Math.Abs(o.CaptureTime.Ticks - at) * 2 < refreshTicks);
           string cell =
             older ? "strip-older"
             : c >= seen ? "neutral"

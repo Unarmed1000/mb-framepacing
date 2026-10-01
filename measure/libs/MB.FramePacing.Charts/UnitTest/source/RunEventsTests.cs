@@ -33,7 +33,7 @@ namespace MB.FramePacing.Charts.UnitTest
       CaptureRow Add(CaptureStatus status, MarkerPayload payload, uint sourceDrops = 0, MarkerPayload? sync = null, long missed = 0)
       {
         time += missed * Period;
-        var row = new CaptureRow(rows.Count, time, status, payload, null, sourceDrops, sync) { MissedBefore = missed };
+        var row = new CaptureRow(rows.Count, new TickCount64(time), status, payload, null, sourceDrops, sync) { MissedBefore = missed };
         rows.Add(row);
         time += Period;
         return row;
@@ -42,19 +42,19 @@ namespace MB.FramePacing.Charts.UnitTest
         Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)));
       Add(CaptureStatus.Decoded, Frame(1));
       Add(CaptureStatus.Decoded, Frame(2));
-      at[RunEventKind.NotDecoded] = Add(CaptureStatus.Undecodable, default).CaptureTicks;
+      at[RunEventKind.NotDecoded] = Add(CaptureStatus.Undecodable, default).CaptureTime.Ticks;
       Add(CaptureStatus.Decoded, Frame(3));
-      at[RunEventKind.NotRecorded] = Add(CaptureStatus.NotRecorded, default).CaptureTicks;
+      at[RunEventKind.NotRecorded] = Add(CaptureStatus.NotRecorded, default).CaptureTime.Ticks;
       Add(CaptureStatus.Decoded, Frame(4));
-      at[RunEventKind.Torn] = Add(CaptureStatus.Torn, Frame(5), sync: Frame(4)).CaptureTicks;
-      at[RunEventKind.SourceDropped] = Add(CaptureStatus.Decoded, Frame(5), sourceDrops: 2).CaptureTicks - Period;
+      at[RunEventKind.Torn] = Add(CaptureStatus.Torn, Frame(5), sync: Frame(4)).CaptureTime.Ticks;
+      at[RunEventKind.SourceDropped] = Add(CaptureStatus.Decoded, Frame(5), sourceDrops: 2).CaptureTime.Ticks - Period;
       Add(CaptureStatus.Decoded, Frame(5));
-      at[RunEventKind.Missed] = Add(CaptureStatus.Decoded, Frame(6), missed: 1).CaptureTicks - Period;
+      at[RunEventKind.Missed] = Add(CaptureStatus.Decoded, Frame(6), missed: 1).CaptureTime.Ticks - Period;
       Add(CaptureStatus.Decoded, Frame(6));
       // Frame 7 never shown over a capture without gaps: dropped, due in the refresh before frame 8
-      at[RunEventKind.FramesDropped] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTicks - Period;
+      at[RunEventKind.FramesDropped] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTime.Ticks - Period;
       Add(CaptureStatus.Decoded, Frame(9));
-      at[RunEventKind.OutOfOrder] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTicks;
+      at[RunEventKind.OutOfOrder] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTime.Ticks;
       Add(CaptureStatus.Decoded, Frame(10));
       Add(CaptureStatus.Decoded, Frame(10));
       for (int i = 0; i < 3; ++i)
@@ -65,7 +65,7 @@ namespace MB.FramePacing.Charts.UnitTest
     private static ChartRun Chart(List<CaptureRow> rows, bool withCaptures = true)
     {
       var result = TimelineAnalyzer.Analyze(rows);
-      return new ChartRun(result.Runs.Single(), result.CapturePeriodTicks, result.ErrorThresholdTicks, Camera: false)
+      return new ChartRun(result.Runs.Single(), result.CapturePeriod.Ticks, result.ErrorThreshold.Ticks, Camera: false)
       {
         Captures = withCaptures ? rows.Select(r => r.ToCsvRow()).ToList() : null,
       };

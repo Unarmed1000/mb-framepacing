@@ -63,22 +63,25 @@ namespace MB.FramePacing.Charts
       // Display order (a run's frames are in it); a run that is not keeps a sorted copy here
       bool sorted = true;
       for (int i = 1; i < frames.Count && sorted; ++i)
-        sorted = frames[i].FirstSeenTicks >= frames[i - 1].FirstSeenTicks;
-      Frames = sorted ? frames : frames.OrderBy(f => f.FirstSeenTicks).ToArray();
-      OriginTicks = run.Run.Frames.Count > 0 ? run.Run.Frames[0].FirstSeenTicks : 0;
+        sorted = frames[i].FirstSeenTime.Ticks >= frames[i - 1].FirstSeenTime.Ticks;
+      Frames = sorted ? frames : frames.OrderBy(f => f.FirstSeenTime.Ticks).ToArray();
+      OriginTicks = run.Run.Frames.Count > 0 ? run.Run.Frames[0].FirstSeenTime.Ticks : 0;
       int count = Frames.Count;
 
       Lazy<T> Once<T>(Func<T> create) => new Lazy<T>(create, LazyThreadSafetyMode.ExecutionAndPublication);
       bool HasNext(int i) => i + 1 < count && Frames[i + 1].Segment == Frames[i].Segment;
-      m_errors = Once(() => new FrameSequence(count, i => Frames[i].AnimationErrorTicks));
-      m_absoluteErrors = Once(() => new FrameSequence(count, i => Frames[i].AnimationErrorTicks is { } e ? Math.Abs(e) : null));
+      m_errors = Once(() => new FrameSequence(count, i => Frames[i].AnimationError?.Ticks));
+      m_absoluteErrors = Once(() => new FrameSequence(count, i => Frames[i].AnimationError?.Ticks is { } e ? Math.Abs(e) : null));
       m_frameRateSteps = Once(() =>
-        new FrameSequence(count, i => RunStatistics.CountsTowardFrameRate(Frames[i]) ? Frames[i].DisplayDeltaTicks : null)
+        new FrameSequence(count, i => RunStatistics.CountsTowardFrameRate(Frames[i]) ? Frames[i].DisplayDelta?.Ticks : null)
       );
-      m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDeltaTicks));
-      m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDeltaTicks : null));
+      m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDelta?.Ticks));
+      m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDelta?.Ticks : null));
       m_animatingHolds = Once(() =>
-        new FrameSequence(count, i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDeltaTicks : null)
+        new FrameSequence(
+          count,
+          i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDelta?.Ticks : null
+        )
       );
       m_staticStretches = Once(() =>
       {
@@ -96,18 +99,18 @@ namespace MB.FramePacing.Charts
         return stretches.ToArray();
       });
       m_lateHolds = Once(() =>
-        new FrameSequence(count, i => HasNext(i) && (Frames[i + 1].Flags & PresentedFrameFlags.Late) != 0 ? Frames[i + 1].DisplayDeltaTicks : null)
+        new FrameSequence(count, i => HasNext(i) && (Frames[i + 1].Flags & PresentedFrameFlags.Late) != 0 ? Frames[i + 1].DisplayDelta?.Ticks : null)
       );
-      m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDeltaTicks : null));
+      m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDelta?.Ticks : null));
       m_animatingAnimationHolds = Once(() =>
         new FrameSequence(
           count,
-          i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDeltaTicks : null
+          i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDelta?.Ticks : null
         )
       );
-      m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTimeTicks is > 0 and var t ? t : null));
-      m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null));
-      m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTimeTicks is > 0 || Frames[i].CpuBusyTicks > 0));
+      m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTime?.Ticks is > 0 and var t ? t : null));
+      m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusy.Ticks > 0 ? Frames[i].CpuBusy.Ticks : null));
+      m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTime?.Ticks is > 0 || Frames[i].CpuBusy.Ticks > 0));
       m_droppedBefore = Once(() => DroppedFrames.Before(Frames));
       m_holdKinds = Once(() =>
       {
@@ -132,30 +135,30 @@ namespace MB.FramePacing.Charts
         Enum.GetValues<HoldKind>()
           .ToDictionary(
             kind => kind,
-            kind => new FrameSequence(count, i => HasNext(i) && HoldKinds[i] == kind ? Frames[i + 1].DisplayDeltaTicks : null)
+            kind => new FrameSequence(count, i => HasNext(i) && HoldKinds[i] == kind ? Frames[i + 1].DisplayDelta?.Ticks : null)
           )
       );
       m_uncertainSteps = Once(() =>
         new RankBits(
           count,
           i =>
-            Frames[i].DisplayDeltaTicks.HasValue
+            Frames[i].DisplayDelta.HasValue
             && (Frames[i].Flags & (PresentedFrameFlags.UncertainStep | PresentedFrameFlags.StaticBefore)) == PresentedFrameFlags.UncertainStep
         )
       );
       m_staticSteps = Once(() =>
-        new RankBits(count, i => Frames[i].DisplayDeltaTicks.HasValue && (Frames[i].Flags & PresentedFrameFlags.StaticBefore) != 0)
+        new RankBits(count, i => Frames[i].DisplayDelta.HasValue && (Frames[i].Flags & PresentedFrameFlags.StaticBefore) != 0)
       );
       m_animatingFrameTimes = Once(() =>
         new FrameSequence(
           count,
-          i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTimeTicks is > 0 and var t ? t : null
+          i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTime?.Ticks is > 0 and var t ? t : null
         )
       );
       m_animatingCpuBusy = Once(() =>
         new FrameSequence(
           count,
-          i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusyTicks > 0 ? Frames[i].CpuBusyTicks : null
+          i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusy.Ticks > 0 ? Frames[i].CpuBusy.Ticks : null
         )
       );
       // Per frame its frametime, then its CPU busy (each when above 0; a static frame's left out unless static values count: an application
@@ -167,16 +170,16 @@ namespace MB.FramePacing.Charts
         {
           if (!withStatic && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) != 0)
             continue;
-          if (Frames[i].FrameTimeTicks is > 0 and var t)
+          if (Frames[i].FrameTime?.Ticks is > 0 and var t)
             values.Add(t);
-          if (Frames[i].CpuBusyTicks > 0)
-            values.Add(Frames[i].CpuBusyTicks);
+          if (Frames[i].CpuBusy.Ticks > 0)
+            values.Add(Frames[i].CpuBusy.Ticks);
         }
         return new WaveletMatrix(values.ToArray());
       }
       m_frameTimesAndCpuBusy = Once(() => FrameTimesAndCpuBusyOf(withStatic: false));
       m_allFrameTimesAndCpuBusy = Once(() => FrameTimesAndCpuBusyOf(withStatic: true));
-      m_drift = Once(() => new FrameSequence(count, i => Frames[i].DriftTicks));
+      m_drift = Once(() => new FrameSequence(count, i => Frames[i].Drift.Ticks));
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
       m_events = Once(() => RunEvents.Of(this));
@@ -184,7 +187,7 @@ namespace MB.FramePacing.Charts
       // What each hold was aimed at: the target and preferred frame time of the frame that ends it. The display time step panel draws them
       // in whole refreshes, as the analysis compares; the frametime panel as written. Without pacing (no refresh rate) there are none
       long refresh = run.Run.Pacing is { } pacing ? (long)Math.Round(pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond) : 0;
-      long? Rounded(long? ticks) => ticks is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
+      long? Rounded(long? ticks) => ticks is { } t ? FrameTimeRounding.WholeRefreshes(new TimeSpan(t), new TimeSpan(refresh)).Ticks : null;
       ReferenceStretch[] Stretches(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred)
       {
         var stretches = new List<ReferenceStretch>();
@@ -339,7 +342,7 @@ namespace MB.FramePacing.Charts
     public IReadOnlyList<int> SegmentEnds => m_segmentEnds.Value;
 
     /// <summary>Frame <paramref name="index"/>'s display time in seconds since the run's first frame.</summary>
-    public double Seconds(int index) => (Frames[index].FirstSeenTicks - OriginTicks) / (double)TimeSpan.TicksPerSecond;
+    public double Seconds(int index) => (Frames[index].FirstSeenTime.Ticks - OriginTicks) / (double)TimeSpan.TicksPerSecond;
 
     /// <summary>The frames first seen from <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> (both included), as a range.</summary>
     public (int Start, int End) Range(double fromSeconds, double toSeconds) =>

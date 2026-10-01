@@ -22,8 +22,8 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     public static List<CaptureRow> Mark(List<CaptureRow> rows)
     {
-      long period = TimelineAnalyzer.EstimateCapturePeriod(rows);
-      if (period <= 0)
+      var period = TimelineAnalyzer.EstimateCapturePeriod(rows);
+      if (period <= TimeSpan.Zero)
         return rows;
       for (int i = 1; i < rows.Count; ++i)
       {
@@ -31,15 +31,17 @@ namespace MB.FramePacing.Analysis
         var row = rows[i];
         if (previous.Status == CaptureStatus.NotRecorded || row.Status == CaptureStatus.NotRecorded)
           continue;
-        long missed = Before(row.CaptureTicks - previous.CaptureTicks, period);
+        long missed = Before(row.CaptureTime - previous.CaptureTime, period);
         if (missed > 0)
           rows[i] = row with { MissedBefore = missed };
       }
       return rows;
     }
 
-    /// <summary>The refreshes missed in a step of <paramref name="stepTicks"/> between two consecutive captures: 0 below 1.5 periods.</summary>
-    public static long Before(long stepTicks, long periodTicks) =>
-      periodTicks > 0 && 2 * stepTicks >= 3 * periodTicks ? (long)Math.Round(stepTicks / (double)periodTicks, MidpointRounding.AwayFromZero) - 1 : 0;
+    /// <summary>The refreshes missed in a <paramref name="step"/> between two consecutive captures: 0 below 1.5 periods.</summary>
+    public static long Before(TimeSpan step, TimeSpan period) =>
+      period > TimeSpan.Zero && 2 * step.Ticks >= 3 * period.Ticks
+        ? (long)Math.Round(step.Ticks / (double)period.Ticks, MidpointRounding.AwayFromZero) - 1
+        : 0;
   }
 }

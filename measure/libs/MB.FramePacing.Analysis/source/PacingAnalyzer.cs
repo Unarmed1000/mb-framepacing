@@ -33,83 +33,73 @@ namespace MB.FramePacing.Analysis
     /// <item>Otherwise a frame is late when it is shown at least one refresh later than its target frame time after the previous frame.</item>
     /// </list>
     /// </summary>
-    public static RunPacing Analyze(
-      List<PresentedFrame> frames,
-      long refreshTicks,
-      bool refreshCalculated,
-      double? targetFps,
-      long errorThresholdTicks
-    )
+    public static RunPacing Analyze(List<PresentedFrame> frames, TimeSpan refresh, bool refreshCalculated, double? targetFps, TimeSpan errorThreshold)
     {
-      long half = refreshTicks / 2;
-      bool schedule = frames.Count(f => f.IntendedDisplayTicks != 0) >= Math.Max(2, frames.Count / 2);
+      var half = new TimeSpan(refresh.Ticks / 2);
+      bool schedule = frames.Count(f => f.IntendedDisplayTime != default) >= Math.Max(2, frames.Count / 2);
       var source =
         schedule ? PacingSource.Schedule
-        : frames.Any(f => f.MarkerTargetFrameTicks != 0) ? PacingSource.TargetFrameTime
-        : frames.Any(f => f.MarkerPreferredFrameTicks != 0) ? PacingSource.PreferredFrameTime
+        : frames.Any(f => f.MarkerTargetFrameTime != TimeSpan32.Zero) ? PacingSource.TargetFrameTime
+        : frames.Any(f => f.MarkerPreferredFrameTime != TimeSpan32.Zero) ? PacingSource.PreferredFrameTime
         : targetFps is > 0 ? PacingSource.GivenTarget
         : PacingSource.NativeRefresh;
-      long givenTarget = targetFps is { } fps && fps > 0 ? WholeRefreshes(TimeSpan.TicksPerSecond / fps, refreshTicks) : refreshTicks;
+      var givenTarget = targetFps is { } fps && fps > 0 ? FrameTimeRounding.WholeRefreshesAtRate(fps, refresh) : refresh;
 
       // How far after its intended time each frame appeared, relative to the run's on-time frames (the pacer and capture clocks differ)
-      long? scheduleOffset = null;
+      TimeSpan? scheduleOffset = null;
       if (schedule)
       {
-        var offsets = frames.Where(f => f.IntendedDisplayTicks != 0).Select(f => f.FirstSeenTicks - f.IntendedDisplayTicks).Order().ToArray();
+        var offsets = frames.Where(f => f.IntendedDisplayTime != default).Select(CaptureMinusPacer).Order().ToArray();
         scheduleOffset = OnTimeOffset(offsets, half);
       }
 
       // Frames the target dropped before each frame: without a schedule, the frame after them is due their frame times later too
       var dropped = DroppedFrames.Before(frames);
-      var pacingErrors = new List<long>();
-      var predictionErrors = new List<long>();
+      var pacingErrors = new List<TimeSpan>();
+      var predictionErrors = new List<TimeSpan>();
       long late = 0;
       long counted = 0;
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
         var previous = i > 0 && frames[i - 1].Segment == frame.Segment ? frames[i - 1] : null;
-        long? intendedStep =
-          schedule && previous != null && frame.IntendedDisplayTicks != 0 && previous.IntendedDisplayTicks != 0
-            ? frame.IntendedDisplayTicks - previous.IntendedDisplayTicks
+        TimeSpan? intendedStep =
+          schedule && previous != null && frame.IntendedDisplayTime != default && previous.IntendedDisplayTime != default
+            ? frame.IntendedDisplayTime - previous.IntendedDisplayTime
             : null;
         // What the frame is measured against: the schedule's step, the pacer's target, else the rate the application wants (a game that
         // wants 30 fps on 60 Hz aims for two refreshes), else the rate given to the tools, else one refresh. An application that presents on
         // demand has no interval to aim for: no target, so only a schedule can make its frames late. Without a schedule, a frame after
         // frames the target dropped is due one frame time per frame later (1 + dropped): the drop explains the longer step, not lateness
-        uint markerTarget = frame.MarkerTargetFrameTicks;
-        uint markerWants = frame.MarkerPreferredFrameTicks;
-        uint OnDemand = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks;
-        bool onDemand = markerTarget == OnDemand || (markerTarget == 0 && markerWants == OnDemand);
-        long? target =
-          intendedStep is { } step ? WholeRefreshes(step, refreshTicks)
+        var markerTarget = frame.MarkerTargetFrameTime;
+        var markerWants = frame.MarkerPreferredFrameTime;
+        var onDemandTime = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
+        bool onDemand = markerTarget == onDemandTime || (markerTarget == TimeSpan32.Zero && markerWants == onDemandTime);
+        TimeSpan? target =
+          intendedStep is { } step ? WholeRefreshes(step, refresh)
           : onDemand ? null
-          : (1 + dropped[i])
-            * (
-              markerTarget != 0 ? WholeRefreshes(markerTarget, refreshTicks)
-              : markerWants != 0 ? WholeRefreshes(markerWants, refreshTicks)
-              : givenTarget
-            );
+          : new TimeSpan(
+            (1 + dropped[i])
+              * (
+                markerTarget != TimeSpan32.Zero ? WholeRefreshes(markerTarget.ToTimeSpan(), refresh)
+                : markerWants != TimeSpan32.Zero ? WholeRefreshes(markerWants.ToTimeSpan(), refresh)
+                : givenTarget
+              ).Ticks
+          );
         // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
         // to the tools, else one refresh
-        uint markerPreferred = frame.MarkerPreferredFrameTicks;
-        long? preferred =
-          markerPreferred == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks ? null
-          : markerPreferred != 0 ? WholeRefreshes(markerPreferred, refreshTicks)
+        TimeSpan? preferred =
+          markerWants == onDemandTime ? null
+          : markerWants != TimeSpan32.Zero ? WholeRefreshes(markerWants.ToTimeSpan(), refresh)
           : givenTarget;
         // A static step (nothing animated while the frame before was on screen) has no prediction error; its pacing error still counts
         bool animates = (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
 
         // A step a capture gap made uncertain is not judged: no pacing or prediction error, no late verdict
         bool uncertain = (frame.Flags & PresentedFrameFlags.UncertainStep) != 0;
-        long? pacingError = null;
-        long? predictionError = null;
-        if (
-          !uncertain
-          && intendedStep is { } intended
-          && frame.DisplayDeltaTicks is { } displayStep
-          && frame.AnimationDeltaTicks is { } animationStep
-        )
+        TimeSpan? pacingError = null;
+        TimeSpan? predictionError = null;
+        if (!uncertain && intendedStep is { } intended && frame.DisplayDelta is { } displayStep && frame.AnimationDelta is { } animationStep)
         {
           pacingError = displayStep - intended;
           pacingErrors.Add(pacingError.Value);
@@ -119,11 +109,10 @@ namespace MB.FramePacing.Analysis
             predictionErrors.Add(predictionError.Value);
           }
         }
-        long? lateness =
-          scheduleOffset is { } offset && frame.IntendedDisplayTicks != 0 ? frame.FirstSeenTicks - frame.IntendedDisplayTicks - offset : null;
+        TimeSpan? lateness = scheduleOffset is { } offset && frame.IntendedDisplayTime != default ? CaptureMinusPacer(frame) - offset : null;
 
         bool isLate = false;
-        if (!uncertain && frame.DisplayDeltaTicks is { } display)
+        if (!uncertain && frame.DisplayDelta is { } display)
         {
           ++counted;
           isLate = lateness is { } behind ? behind >= half : target is { } aim && display >= aim + half;
@@ -133,43 +122,49 @@ namespace MB.FramePacing.Analysis
         frames[i] = frame with
         {
           Flags = isLate ? frame.Flags | PresentedFrameFlags.Late : frame.Flags,
-          TargetTicks = target,
-          PreferredTicks = preferred,
-          PacingErrorTicks = pacingError,
-          PredictionErrorTicks = predictionError,
-          LatenessTicks = lateness,
+          TargetFrameTime = target,
+          PreferredFrameTime = preferred,
+          PacingError = pacingError,
+          PredictionError = predictionError,
+          Lateness = lateness,
         };
       }
 
-      var (uneven, even) = Split(frames, half, errorThresholdTicks);
+      var (uneven, even) = Split(frames, half, errorThreshold);
       var targets = frames
-        .Where(f => f.DisplayDeltaTicks.HasValue && f.TargetTicks.HasValue)
-        .Select(f => (double)f.TargetTicks!.Value)
+        .Where(f => f.DisplayDelta.HasValue && f.TargetFrameTime.HasValue)
+        .Select(f => (double)f.TargetFrameTime!.Value.Ticks)
         .Order()
         .ToArray();
       return new RunPacing(
-        refreshTicks / (double)TimeSpan.TicksPerMillisecond,
+        refresh.TotalMilliseconds,
         refreshCalculated,
-        (targets.Length > 0 ? Statistics.Percentile(targets, 0.5) : givenTarget) / TimeSpan.TicksPerMillisecond,
+        (targets.Length > 0 ? Statistics.Percentile(targets, 0.5) : givenTarget.Ticks) / TimeSpan.TicksPerMillisecond,
         source,
         late,
         counted > 0 ? late / (double)counted : 0,
-        LateShare.Worst(frames, LateShare.WindowTicks),
+        LateShare.Worst(frames, LateShare.Window),
         uneven,
         even,
         Verdict(uneven, even)
       )
       {
-        PacingErrorMs = pacingErrors.Count > 0 ? Statistics.FromTicks(pacingErrors) : null,
-        PredictionErrorMs = predictionErrors.Count > 0 ? Statistics.FromTicks(predictionErrors) : null,
+        PacingErrorMs = pacingErrors.Count > 0 ? Statistics.From(pacingErrors) : null,
+        PredictionErrorMs = predictionErrors.Count > 0 ? Statistics.From(predictionErrors) : null,
       };
     }
+
+    /// <summary>
+    /// A frame's first-seen time minus its intended display time. The first is on the capture's clock, the second on the pacer's, so this
+    /// is the two clocks' offset plus how late the frame was: only the difference between two frames' values says something.
+    /// </summary>
+    private static TimeSpan CaptureMinusPacer(PresentedFrame frame) => frame.FirstSeenTime - frame.IntendedDisplayTime;
 
     /// <summary>
     /// The earliest offset (capture time minus intended time, sorted) that at least <see cref="OnTimeShare"/> of the frames share within half a
     /// refresh: the run's on-time frames.
     /// </summary>
-    private static long OnTimeOffset(long[] sorted, long half)
+    private static TimeSpan OnTimeOffset(TimeSpan[] sorted, TimeSpan half)
     {
       int needed = Math.Max(1, (int)Math.Ceiling(sorted.Length * OnTimeShare));
       int end = 0;
@@ -184,7 +179,7 @@ namespace MB.FramePacing.Analysis
       return sorted[0];
     }
 
-    private static long WholeRefreshes(double ticks, long refreshTicks) => FrameTimeRounding.WholeRefreshes(ticks, refreshTicks);
+    private static TimeSpan WholeRefreshes(TimeSpan frameTime, TimeSpan refresh) => FrameTimeRounding.WholeRefreshes(frameTime, refresh);
 
     /// <summary>
     /// Which cause each frame with an error counts for: bad pacing (uneven) or delta time jitter (even).
@@ -197,21 +192,21 @@ namespace MB.FramePacing.Analysis
     /// </item>
     /// </list>
     /// </summary>
-    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, long half, long errorThresholdTicks)
+    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, TimeSpan half, TimeSpan errorThreshold)
     {
       bool OffTarget(PresentedFrame f) =>
         f.Flags.HasFlag(PresentedFrameFlags.Torn)
-        || (f.DisplayDeltaTicks is { } display && f.TargetTicks is { } target && Math.Abs(display - target) >= half);
+        || (f.DisplayDelta is { } display && f.TargetFrameTime is { } target && (display - target).Duration() >= half);
       long uneven = 0;
       long even = 0;
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
-        if (frame.AnimationErrorTicks is not { } error || Math.Abs(error) <= errorThresholdTicks)
+        if (frame.AnimationError is not { } error || error.Duration() <= errorThreshold)
           continue;
         bool pacing =
-          frame.PacingErrorTicks is { } p && frame.PredictionErrorTicks is { } q
-            ? Math.Abs(p) >= Math.Abs(q)
+          frame.PacingError is { } p && frame.PredictionError is { } q
+            ? p.Duration() >= q.Duration()
             : OffTarget(frame) || frame.SkippedBefore > 0 || (i > 0 && frames[i - 1].Segment == frame.Segment && OffTarget(frames[i - 1]));
         if (pacing)
           ++uneven;

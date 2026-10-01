@@ -185,11 +185,13 @@ namespace MB.FramePacing.Charts
       // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate,
       // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
       var refreshes = frames
-        .Where(f => f.DisplayDeltaTicks.HasValue && (Known(f.MarkerTargetFrameTicks) || f.TargetTicks.HasValue))
+        .Where(f => f.DisplayDelta.HasValue && (Known(f.MarkerTargetFrameTime.Ticks) || f.TargetFrameTime.HasValue))
         .Select(f =>
           (int)
             Math.Round(
-              (Known(f.MarkerTargetFrameTicks) ? f.MarkerTargetFrameTicks : f.TargetTicks!.Value) / (double)TimeSpan.TicksPerMillisecond / refreshMs
+              (Known(f.MarkerTargetFrameTime.Ticks) ? f.MarkerTargetFrameTime.Ticks : f.TargetFrameTime!.Value.Ticks)
+                / (double)TimeSpan.TicksPerMillisecond
+                / refreshMs
             )
         )
         .Distinct()
@@ -209,12 +211,12 @@ namespace MB.FramePacing.Charts
     private static string Wants(IReadOnlyList<PresentedFrame> frames)
     {
       var preferredFps = frames
-        .Where(f => Known(f.MarkerPreferredFrameTicks))
-        .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTicks, 1))
+        .Where(f => Known(f.MarkerPreferredFrameTime.Ticks))
+        .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTime.Ticks, 1))
         .Distinct()
         .Order()
         .ToArray();
-      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTicks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks);
+      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTime.Ticks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks);
       var wants = new List<string>();
       if (preferredFps.Length > 0)
       {

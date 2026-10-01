@@ -18,14 +18,8 @@ namespace MB.FramePacing.Analysis
     {
       // The animation errors of the frames with one; the display time steps of the frames that count toward the frame rate
       return new RunHistograms(
-        Histogram.FromTicks(
-          run.Frames.Where(f => f.AnimationErrorTicks.HasValue).Select(f => f.AnimationErrorTicks!.Value),
-          Histogram.DefaultBinWidthTicks
-        ),
-        Histogram.FromTicks(
-          run.Frames.Where(RunStatistics.CountsTowardFrameRate).Select(f => f.DisplayDeltaTicks!.Value),
-          Histogram.DefaultBinWidthTicks
-        )
+        Histogram.From(run.Frames.Where(f => f.AnimationError.HasValue).Select(f => f.AnimationError!.Value), Histogram.DefaultBinWidth),
+        Histogram.From(run.Frames.Where(RunStatistics.CountsTowardFrameRate).Select(f => f.DisplayDelta!.Value), Histogram.DefaultBinWidth)
       );
     }
   }

@@ -7,14 +7,15 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System;
 using System.Collections.Generic;
 
 namespace MB.FramePacing.Analysis
 {
-  /// <param name="ErrorThresholdTicks">The |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThresholdTicks"/>).</param>
+  /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>).</param>
   public sealed record TimelineResult(
-    long CapturePeriodTicks,
-    long ErrorThresholdTicks,
+    TimeSpan CapturePeriod,
+    TimeSpan ErrorThreshold,
     IReadOnlyList<RunAnalysis> Runs,
     IReadOnlyList<string> Warnings
   );

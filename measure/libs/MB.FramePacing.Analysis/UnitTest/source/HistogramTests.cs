@@ -18,17 +18,19 @@ namespace MB.FramePacing.Analysis.UnitTest
   {
     private const long Ms = TimeSpan.TicksPerMillisecond;
 
+    private static TimeSpan[] Spans(params long[] ticks) => ticks.Select(t => new TimeSpan(t)).ToArray();
+
     [Test]
     public void Empty()
     {
-      Assert.That(Histogram.FromTicks(Array.Empty<long>(), 4 * Ms), Is.SameAs(Histogram.Empty));
+      Assert.That(Histogram.From(Array.Empty<TimeSpan>(), new TimeSpan(4 * Ms)), Is.SameAs(Histogram.Empty));
     }
 
     [Test]
     public void BinsAreCentredOnMultiplesOfTheWidth_AndCoverTheRangeWithoutGaps()
     {
       // Quantised errors at a 4 ms capture period: -8, 0 (x3), +4, +12 and a slightly jittered 0
-      var histogram = Histogram.FromTicks(new[] { -8 * Ms, 0, 0, 0, 4 * Ms, 12 * Ms, Ms }, 4 * Ms);
+      var histogram = Histogram.From(Spans(-8 * Ms, 0, 0, 0, 4 * Ms, 12 * Ms, Ms), new TimeSpan(4 * Ms));
 
       Assert.That(histogram.BinWidthMs, Is.EqualTo(4));
       Assert.That(histogram.Total, Is.EqualTo(7));
@@ -39,14 +41,14 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void BinEdges_BelongToTheUpperBin()
     {
-      var histogram = Histogram.FromTicks(new[] { -2 * Ms, 2 * Ms }, 4 * Ms);
+      var histogram = Histogram.From(Spans(-2 * Ms, 2 * Ms), new TimeSpan(4 * Ms));
       Assert.That(histogram.Bins.Select(b => (b.CenterMs, b.Count)), Is.EqualTo(new[] { (0.0, 1L), (4.0, 1L) }));
     }
 
     [Test]
     public void WideRanges_UseAMultipleOfTheWidth()
     {
-      var histogram = Histogram.FromTicks(new[] { 0, 1000 * Ms }, 2 * Ms, maxBins: 100);
+      var histogram = Histogram.From(Spans(0, 1000 * Ms), new TimeSpan(2 * Ms), maxBins: 100);
 
       Assert.That(histogram.Bins, Has.Count.LessThanOrEqualTo(100));
       Assert.That(histogram.BinWidthMs % 2, Is.Zero, "still a multiple of the requested width");
@@ -56,7 +58,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void NoWidth_FallsBackToOneMillisecond()
     {
-      var histogram = Histogram.FromTicks(new[] { 0L, 3 * Ms }, 0);
+      var histogram = Histogram.From(Spans(0, 3 * Ms), TimeSpan.Zero);
       Assert.That(histogram.BinWidthMs, Is.EqualTo(1));
       Assert.That(histogram.Bins, Has.Count.EqualTo(4));
     }

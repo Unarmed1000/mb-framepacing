@@ -23,7 +23,7 @@ namespace MB.FramePacing.Analysis
     Statistics AbsoluteAnimationErrorMs,
     Statistics DriftMs,
     Statistics OnScreenMs,
-    // Presented frames whose |animation error| exceeds the error threshold (TimelineResult.ErrorThresholdTicks)
+    // Presented frames whose |animation error| exceeds the error threshold (TimelineResult.ErrorThreshold)
     long FramesWithAnimationError,
     // Gamers Nexus's "error per frame": the mean |animation error| of the frames with one
     double ErrorPerFrameMs,
@@ -49,35 +49,33 @@ namespace MB.FramePacing.Analysis
     /// <summary>
     /// The statistics of <paramref name="frames"/> (a run, or a section of one): the frames with an animation error give the animation time
     /// steps and the errors, the frames that count toward the frame rate (<see cref="CountsTowardFrameRate"/>) the display time steps and the
-    /// frame rates; every frame the drift and time on screen. <paramref name="thresholdTicks"/> is the error threshold,
-    /// <paramref name="capturePeriodTicks"/> the capture period (no frame counts as off without one).
+    /// frame rates; every frame the drift and time on screen. <paramref name="threshold"/> is the error threshold,
+    /// <paramref name="capturePeriod"/> the capture period (no frame counts as off without one).
     /// </summary>
-    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, long thresholdTicks, long capturePeriodTicks)
+    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, TimeSpan threshold, TimeSpan capturePeriod)
     {
-      var withMetrics = frames.Where(f => f.AnimationErrorTicks.HasValue).ToList();
+      var withMetrics = frames.Where(f => f.AnimationError.HasValue).ToList();
       var frameRate = frames.Where(CountsTowardFrameRate).ToList();
-      var (errorPerFrameMs, percentError) = ErrorSummary(
-        withMetrics.Select(f => (f.AnimationErrorTicks!.Value, f.DisplayDeltaTicks!.Value)).ToList()
-      );
+      var (errorPerFrameMs, percentError) = ErrorSummary(withMetrics.Select(f => (f.AnimationError!.Value, f.DisplayDelta!.Value)).ToList());
       return new RunStatistics(
-        Statistics.FromTicks(frameRate.Select(f => f.DisplayDeltaTicks!.Value)),
-        Statistics.FromTicks(withMetrics.Select(f => f.AnimationDeltaTicks!.Value)),
-        Statistics.FromTicks(withMetrics.Select(f => f.AnimationErrorTicks!.Value)),
-        Statistics.FromTicks(withMetrics.Select(f => Math.Abs(f.AnimationErrorTicks!.Value))),
-        Statistics.FromTicks(frames.Select(f => f.DriftTicks)),
-        Statistics.FromTicks(frames.Select(f => f.OnScreenTicks)),
-        withMetrics.LongCount(f => capturePeriodTicks > 0 && Math.Abs(f.AnimationErrorTicks!.Value) > thresholdTicks),
+        Statistics.From(frameRate.Select(f => f.DisplayDelta!.Value)),
+        Statistics.From(withMetrics.Select(f => f.AnimationDelta!.Value)),
+        Statistics.From(withMetrics.Select(f => f.AnimationError!.Value)),
+        Statistics.From(withMetrics.Select(f => f.AnimationError!.Value.Duration())),
+        Statistics.From(frames.Select(f => f.Drift)),
+        Statistics.From(frames.Select(f => f.OnScreen)),
+        withMetrics.LongCount(f => capturePeriod > TimeSpan.Zero && f.AnimationError!.Value.Duration() > threshold),
         errorPerFrameMs,
         percentError,
         AverageFpsOf(frameRate),
         LowFps(frameRate, 0.99, MinFramesForOnePercentLow),
         LowFps(frameRate, 0.999, MinFramesForPointOnePercentLow),
-        Statistics.FromTicks(frames.Where(f => f.CpuBusyTicks != 0).Select(f => (long)f.CpuBusyTicks)),
-        Statistics.FromTicks(frames.Where(f => f.FrameTimeTicks.HasValue).Select(f => f.FrameTimeTicks!.Value)),
-        Statistics.FromTicks(frames.Where(f => f.CpuWaitTicks.HasValue).Select(f => f.CpuWaitTicks!.Value)),
-        frames.LongCount(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0),
+        Statistics.From(frames.Where(f => f.CpuBusy != TimeSpan32.Zero).Select(f => f.CpuBusy.ToTimeSpan())),
+        Statistics.From(frames.Where(f => f.FrameTime.HasValue).Select(f => f.FrameTime!.Value)),
+        Statistics.From(frames.Where(f => f.CpuWait.HasValue).Select(f => f.CpuWait!.Value)),
+        frames.LongCount(f => f.DisplayDelta.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0),
         frames.LongCount(f =>
-          f.DisplayDeltaTicks.HasValue
+          f.DisplayDelta.HasValue
           && (f.Flags & (PresentedFrameFlags.UncertainStep | PresentedFrameFlags.StaticBefore)) == PresentedFrameFlags.UncertainStep
         )
       );
@@ -88,7 +86,7 @@ namespace MB.FramePacing.Analysis
     /// capture gap made it uncertain.
     /// </summary>
     public static bool CountsTowardFrameRate(PresentedFrame frame) =>
-      frame.DisplayDeltaTicks.HasValue && (frame.Flags & (PresentedFrameFlags.StaticBefore | PresentedFrameFlags.UncertainStep)) == 0;
+      frame.DisplayDelta.HasValue && (frame.Flags & (PresentedFrameFlags.StaticBefore | PresentedFrameFlags.UncertainStep)) == 0;
 
     /// <summary>A 1 % low needs at least this many frames to rest on more than the single slowest one.</summary>
     public const int MinFramesForOnePercentLow = 100;
@@ -98,7 +96,7 @@ namespace MB.FramePacing.Analysis
 
     private static double AverageFpsOf(IReadOnlyCollection<PresentedFrame> frames)
     {
-      long ticks = frames.Sum(f => f.DisplayDeltaTicks!.Value);
+      long ticks = frames.Sum(f => f.DisplayDelta!.Value.Ticks);
       return ticks > 0 ? frames.Count * (double)TimeSpan.TicksPerSecond / ticks : 0;
     }
 
@@ -106,18 +104,18 @@ namespace MB.FramePacing.Analysis
     {
       if (frames.Count < minFrames)
         return null;
-      var steps = frames.Select(f => f.DisplayDeltaTicks!.Value).OrderBy(t => t).ToArray();
-      long step = steps[Math.Max(0, (int)Math.Ceiling(fraction * steps.Length) - 1)];
-      return step > 0 ? TimeSpan.TicksPerSecond / (double)step : null;
+      var steps = frames.Select(f => f.DisplayDelta!.Value).OrderBy(t => t).ToArray();
+      var step = steps[Math.Max(0, (int)Math.Ceiling(fraction * steps.Length) - 1)];
+      return step > TimeSpan.Zero ? TimeSpan.TicksPerSecond / (double)step.Ticks : null;
     }
 
-    /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display time steps, in ticks.</summary>
-    public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(IReadOnlyCollection<(long ErrorTicks, long DisplayStepTicks)> frames)
+    /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display time steps.</summary>
+    public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(IReadOnlyCollection<(TimeSpan Error, TimeSpan DisplayStep)> frames)
     {
       if (frames.Count == 0)
         return (0, 0);
-      long absolute = frames.Sum(f => Math.Abs(f.ErrorTicks));
-      long display = frames.Sum(f => f.DisplayStepTicks);
+      long absolute = frames.Sum(f => Math.Abs(f.Error.Ticks));
+      long display = frames.Sum(f => f.DisplayStep.Ticks);
       return (absolute / (double)frames.Count / TimeSpan.TicksPerMillisecond, display > 0 ? absolute * 100.0 / display : 0);
     }
   }

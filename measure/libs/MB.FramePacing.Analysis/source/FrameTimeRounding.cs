@@ -18,10 +18,17 @@ namespace MB.FramePacing.Analysis
     public const double Slack = 0.05;
 
     /// <summary>
-    /// <paramref name="ticks"/> in whole refreshes of <paramref name="refreshTicks"/>, rounded up, at least one (a 60 fps target on 144 Hz
+    /// <paramref name="frameTime"/> in whole refreshes of <paramref name="refresh"/>, rounded up, at least one (a 60 fps target on 144 Hz
     /// alternates 2 and 3 refreshes: 3 is the target).
     /// </summary>
-    public static long WholeRefreshes(double ticks, long refreshTicks) =>
-      Math.Max(1, (long)Math.Ceiling((ticks / refreshTicks) - Slack)) * refreshTicks;
+    public static TimeSpan WholeRefreshes(TimeSpan frameTime, TimeSpan refresh) => WholeRefreshes((double)frameTime.Ticks, refresh);
+
+    /// <summary>The frame time of <paramref name="framesPerSecond"/> in whole refreshes of <paramref name="refresh"/>, as <see cref="WholeRefreshes(TimeSpan, TimeSpan)"/>.</summary>
+    public static TimeSpan WholeRefreshesAtRate(double framesPerSecond, TimeSpan refresh) =>
+      WholeRefreshes(TimeSpan.TicksPerSecond / framesPerSecond, refresh);
+
+    // A rate's frame time is not a whole number of ticks: the rounding takes it as it is
+    private static TimeSpan WholeRefreshes(double frameTimeTicks, TimeSpan refresh) =>
+      new TimeSpan(Math.Max(1, (long)Math.Ceiling((frameTimeTicks / refresh.Ticks) - Slack)) * refresh.Ticks);
   }
 }

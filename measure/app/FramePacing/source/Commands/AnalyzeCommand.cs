@@ -43,7 +43,7 @@ namespace MB.FramePacing.App.Commands
       var thresholdOption = new Option<double?>("--error-threshold-ms")
       {
         Description =
-          $"The |animation error| above which a frame counts as off, in ms (default {TimelineAnalyzer.DefaultErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond:0.###}).",
+          $"The |animation error| above which a frame counts as off, in ms (default {TimelineAnalyzer.DefaultErrorThreshold.TotalMilliseconds:0.###}).",
         Validators =
         {
           result =>
@@ -79,9 +79,9 @@ namespace MB.FramePacing.App.Commands
             RunId = parseResult.GetValue(runOption),
             TargetFps = parseResult.GetValue(targetOption),
             ExpectedRefreshHz = parseResult.GetValue(displayOption),
-            ErrorThresholdTicks = parseResult.GetValue(thresholdOption) is { } ms
-              ? (long)Math.Round(ms * TimeSpan.TicksPerMillisecond)
-              : TimelineAnalyzer.DefaultErrorThresholdTicks,
+            ErrorThreshold = parseResult.GetValue(thresholdOption) is { } ms
+              ? new TimeSpan((long)Math.Round(ms * TimeSpan.TicksPerMillisecond))
+              : TimelineAnalyzer.DefaultErrorThreshold,
           },
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,

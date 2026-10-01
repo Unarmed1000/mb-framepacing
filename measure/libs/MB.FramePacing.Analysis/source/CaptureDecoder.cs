@@ -112,7 +112,7 @@ namespace MB.FramePacing.Analysis
       foreach (var record in records)
       {
         for (; expectedIndex < record.CaptureIndex; ++expectedIndex)
-          rows.Add(new CaptureRow(expectedIndex, 0, CaptureStatus.NotRecorded, default));
+          rows.Add(new CaptureRow(expectedIndex, default, CaptureStatus.NotRecorded, default));
         rows.Add(ToRow(record, effectiveTime));
         expectedIndex = record.CaptureIndex + 1;
       }
@@ -135,7 +135,7 @@ namespace MB.FramePacing.Analysis
 
     private static CaptureRow ToRow(CaptureDataRecord record, TimeSource time)
     {
-      long ticks = time == TimeSource.Device && record.DeviceTime is { } device ? device.Ticks : record.HostTime.Ticks;
+      var captureTime = time == TimeSource.Device && record.DeviceTime is { } device ? device : record.HostTime;
       // The sync marker: a camera's second zone measures the scanout with it; a capture card's tearing check is already in the status
       MarkerPayload? sync = record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second : null;
 
@@ -155,10 +155,10 @@ namespace MB.FramePacing.Analysis
         if (status == CaptureStatus.Decoded)
           status = CaptureStatus.Undecodable;
       }
-      return new CaptureRow(record.CaptureIndex, ticks, status, payload, start, record.SourceDrops, sync)
+      return new CaptureRow(record.CaptureIndex, captureTime, status, payload, start, record.SourceDrops, sync)
       {
-        HostTicks = record.HostTime.Ticks,
-        DeviceTicks = record.DeviceTime?.Ticks,
+        HostTime = record.HostTime,
+        DeviceTime = record.DeviceTime,
         MarkerBytes = record.MainBytes,
       };
     }

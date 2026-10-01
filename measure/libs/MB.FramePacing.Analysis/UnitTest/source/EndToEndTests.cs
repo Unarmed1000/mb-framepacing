@@ -121,12 +121,12 @@ namespace MB.FramePacing.Analysis.UnitTest
       for (int i = 0; i < expected.Count; ++i)
       {
         var frame = run.Frames[i];
-        Assert.That(frame.FirstSeenTicks, Is.EqualTo(expected[i].FirstSeenTicks), $"frame {frame.FrameIndex}");
+        Assert.That(frame.FirstSeenTime.Ticks, Is.EqualTo(expected[i].FirstSeenTicks), $"frame {frame.FrameIndex}");
         if (i > 0)
         {
           long expectedError =
             (expected[i].AnimationTicks - expected[i - 1].AnimationTicks) - (expected[i].FirstSeenTicks - expected[i - 1].FirstSeenTicks);
-          Assert.That(frame.AnimationErrorTicks, Is.EqualTo(expectedError), $"frame {frame.FrameIndex}");
+          Assert.That(frame.AnimationError?.Ticks, Is.EqualTo(expectedError), $"frame {frame.FrameIndex}");
         }
       }
 
@@ -160,12 +160,12 @@ namespace MB.FramePacing.Analysis.UnitTest
       using (var summary = System.Text.Json.JsonDocument.Parse(File.ReadAllText(summaryPath)))
       {
         var histograms = summary.RootElement.GetProperty("runs")[0].GetProperty("histograms");
-        long withError = run.Frames.LongCount(f => f.AnimationErrorTicks.HasValue);
+        long withError = run.Frames.LongCount(f => f.AnimationError.HasValue);
         Assert.That(histograms.GetProperty("animationErrorMs").GetProperty("total").GetInt64(), Is.EqualTo(withError));
         long binWidthTicks = (long)
           Math.Round(histograms.GetProperty("displayDeltaMs").GetProperty("binWidthMs").GetDouble() * TimeSpan.TicksPerMillisecond);
         Assert.That(
-          binWidthTicks % Histogram.DefaultBinWidthTicks,
+          binWidthTicks % Histogram.DefaultBinWidth.Ticks,
           Is.Zero,
           "the fixed bin width (or a multiple for a wide range), whatever the capture period"
         );

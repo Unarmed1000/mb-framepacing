@@ -153,7 +153,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
-  - **Typed times** (C++ and C#, the same names; the tools' Capture library is typed too, the Analysis converts at `AnalysisDataMapping` and `CaptureDecoder` until it is): points in time are `TickCount64` (named `…Time`:
+  - **Typed times** (C++ and C#, the same names; the tools' Capture and Analysis libraries are typed too, with these names: `PresentedFrame`, `CaptureRow`): points in time are `TickCount64` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
     `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`); the CSV's milliseconds parse
     with `ParseMilliseconds`. The files' bytes and the golden data do not change.
@@ -161,6 +161,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     started). A frame's device time is a `DeviceTimestamp`: a time, `Unknown` (the device gave none) or `Pending` (it arrives after the
     pixels: ffmpeg's showinfo lines, resolved by the recorder through `IDeviceTimestampSource`). Pending exists only between a source and
     the recorder; files hold a time or unknown, and everything after the recorder has a `TickCount64?`.
+  - **Analysis times** (`PresentedFrame`, `CaptureRow`): the marker's own values keep the marker's 0 = unknown (`IntendedDisplayTime`,
+    `CpuStartTime`, `MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`); what the analysis works out is nullable
+    (`DisplayDelta`, `TargetFrameTime`, `Lateness`). `IntendedDisplayTime` and `CpuStartTime` are on the pacer's clock, `FirstSeenTime`
+    on the capture's: `PacingAnalyzer.CaptureMinusPacer` is where the analysis subtracts them. Milliseconds are
+    `TimeSpan.TotalMilliseconds` (on .NET 10 the same bits as ticks / 10000.0, so the output does not change).
 - **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):** the C++ module is off (`MB_FRAMEPACING_BUILD_PACER` and Conan's
   `with_pacer` default to off) until it is reworked; build it with `-DMB_FRAMEPACING_BUILD_PACER=ON` to work on it.
   - Values in, values out: `FrameInput` (the platform's values) → `FrameSchedule` (what to apply, the marker's pacing values), `FrameEnd`
@@ -280,8 +285,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `AnimatingCpuBusy`, `FrameTimesAndCpuBusy`, `AnimatingStepReferences`); they get edge marks with their value. Off, the `All…`
       and unfiltered sequences set the scales.
   - **The report is the same for every capture source** (it only pairs decoded markers with display times): histograms in fixed
-    0.1 ms bins (`Histogram.DefaultBinWidthTicks`), one error threshold (1 ms, `analyze --error-threshold-ms`,
-    `TimelineOptions.ErrorThresholdTicks`), and a display time step is off its target from half a refresh on. A source's precision (a
+    0.1 ms bins (`Histogram.DefaultBinWidth`), one error threshold (1 ms, `analyze --error-threshold-ms`,
+    `TimelineOptions.ErrorThreshold`), and a display time step is off its target from half a refresh on. A source's precision (a
     camera's period) goes into warnings, never into the binning or the thresholds.
   - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`, also used
     by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
@@ -324,7 +329,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     (`RunStatistics.CountsTowardFrameRate`, `RunChartData.FrameRateSteps`), and counted (`excludedStaticFrames`); the tile, the report's
     description and the statistics tables say "excluding N static frames" (`RunHeadline.ExcludedStatic`).
   - **Late share:** amber = on screen at least half a refresh longer than the preferred frame time (the marker's, else
-    `--target-fps`, else one refresh) without being late; never for static steps or on-demand frames (`LateShareData`, `PresentedFrame.PreferredTicks`).
+    `--target-fps`, else one refresh) without being late; never for static steps or on-demand frames (`LateShareData`, `PresentedFrame.PreferredFrameTime`).
   - The start marker (77 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
     most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
     captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 16 bytes: the header's start, run id and frame index; matched to its main marker by both) is QR version 2 (25×25), drawn

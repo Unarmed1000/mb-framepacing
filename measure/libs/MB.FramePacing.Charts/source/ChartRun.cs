@@ -27,7 +27,7 @@ namespace MB.FramePacing.Charts
 
     /// <param name="captures">The report's capture rows as <see cref="Captures"/> (<see cref="CapturesOf"/>, once for every run), or null to map them.</param>
     public static ChartRun From(AnalysisReport report, RunAnalysis run, IReadOnlyList<CaptureCsvRow>? captures = null) =>
-      new ChartRun(run, report.Timeline.CapturePeriodTicks, report.Timeline.ErrorThresholdTicks, report.Session?.Camera != null)
+      new ChartRun(run, report.Timeline.CapturePeriod.Ticks, report.Timeline.ErrorThreshold.Ticks, report.Session?.Camera != null)
       {
         Captures = captures ?? CapturesOf(report),
       };

@@ -96,7 +96,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       for (int i = 1; i < truth.Count; ++i)
       {
         double expected = camera.ToCameraTicks(truth[i].DisplayTime.Ticks - truth[i - 1].DisplayTime.Ticks);
-        errors.Add(Math.Abs(run.Frames[i].DisplayDeltaTicks!.Value - expected) / TimeSpan.TicksPerMillisecond);
+        errors.Add(Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - expected) / TimeSpan.TicksPerMillisecond);
       }
       TestContext.Out.WriteLine($"display delta error: mean {errors.Average():0.000} ms, max {errors.Max():0.000} ms");
       Assert.That(errors.Max(), Is.LessThanOrEqualTo(2.0));

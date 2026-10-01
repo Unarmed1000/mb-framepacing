@@ -21,18 +21,18 @@ namespace MB.FramePacing.Analysis
     public const int DefaultMaxBins = 400;
 
     /// <summary>The width of the reported bins: 0.1 ms, fine enough to show a spread well below a refresh.</summary>
-    public const long DefaultBinWidthTicks = TimeSpan.TicksPerMillisecond / 10;
+    public static readonly TimeSpan DefaultBinWidth = new TimeSpan(TimeSpan.TicksPerMillisecond / 10);
 
     public static readonly Histogram Empty = new Histogram(0, 0, Array.Empty<HistogramBin>());
 
-    /// <summary>Bin <paramref name="ticks"/>; bin k covers [(k - 0.5) * width, (k + 0.5) * width).</summary>
-    public static Histogram FromTicks(IEnumerable<long> ticks, long binWidthTicks, int maxBins = DefaultMaxBins)
+    /// <summary>Bin <paramref name="spans"/>; bin k covers [(k - 0.5) * width, (k + 0.5) * width). A width of zero or less is 1 ms.</summary>
+    public static Histogram From(IEnumerable<TimeSpan> spans, TimeSpan binWidth, int maxBins = DefaultMaxBins)
     {
       ArgumentOutOfRangeException.ThrowIfLessThan(maxBins, 1);
-      var values = ticks.ToArray();
+      var values = spans.Select(s => s.Ticks).ToArray();
       if (values.Length == 0)
         return Empty;
-      long width = binWidthTicks > 0 ? binWidthTicks : TimeSpan.TicksPerMillisecond;
+      long width = binWidth > TimeSpan.Zero ? binWidth.Ticks : TimeSpan.TicksPerMillisecond;
 
       long first = BinOf(values.Min(), width);
       long last = BinOf(values.Max(), width);

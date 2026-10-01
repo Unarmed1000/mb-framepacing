@@ -24,21 +24,21 @@ namespace MB.FramePacing.Analysis
     /// <summary>How far the refresh rate may differ from the expected or calibrated one before the analysis warns (relative).</summary>
     public const double RefreshTolerance = 0.01;
 
-    /// <summary>The default |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThresholdTicks"/>): 1 ms.</summary>
-    public const long DefaultErrorThresholdTicks = TimeSpan.TicksPerMillisecond;
+    /// <summary>The default |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>): 1 ms.</summary>
+    public static readonly TimeSpan DefaultErrorThreshold = TimeSpan.FromMilliseconds(1);
 
     public static TimelineResult Analyze(IReadOnlyList<CaptureRow> rows, TimelineOptions? options = null)
     {
       options ??= new TimelineOptions();
       var warnings = new List<string>();
-      long period = EstimateCapturePeriod(rows);
-      long threshold = options.ErrorThresholdTicks;
+      var period = EstimateCapturePeriod(rows);
+      var threshold = options.ErrorThreshold;
       // The report is the same for every source; a camera's coarser timing shows as noise in the errors, and the warning says how much
       if (options.Scanout == ScanoutModel.Camera && period > threshold)
         warnings.Add(
-          $"The camera times each frame to about one camera period ({period / (double)TimeSpan.TicksPerMillisecond:0.##} ms), more than the "
-            + $"{threshold / (double)TimeSpan.TicksPerMillisecond:0.###} ms error threshold: smaller animation errors are measurement noise. "
-            + $"--error-threshold-ms {period / (double)TimeSpan.TicksPerMillisecond:0.##} counts only the errors the camera resolves."
+          $"The camera times each frame to about one camera period ({period.TotalMilliseconds:0.##} ms), more than the "
+            + $"{threshold.TotalMilliseconds:0.###} ms error threshold: smaller animation errors are measurement noise. "
+            + $"--error-threshold-ms {period.TotalMilliseconds:0.##} counts only the errors the camera resolves."
         );
 
       var runRows = SplitIntoRuns(rows, warnings);
@@ -54,10 +54,10 @@ namespace MB.FramePacing.Analysis
       return new TimelineResult(period, threshold, runs, warnings);
     }
 
-    /// <summary>Median interval between consecutive recorded captures.</summary>
-    public static long EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
+    /// <summary>Median interval between consecutive recorded captures; zero when there is none.</summary>
+    public static TimeSpan EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
     {
-      var deltas = new List<long>();
+      var deltas = new List<TimeSpan>();
       CaptureRow? previous = null;
       foreach (var row in rows)
       {
@@ -66,12 +66,12 @@ namespace MB.FramePacing.Analysis
           previous = null;
           continue;
         }
-        if (previous is { } p && row.CaptureIndex == p.CaptureIndex + 1 && row.CaptureTicks > p.CaptureTicks)
-          deltas.Add(row.CaptureTicks - p.CaptureTicks);
+        if (previous is { } p && row.CaptureIndex == p.CaptureIndex + 1 && row.CaptureTime > p.CaptureTime)
+          deltas.Add(row.CaptureTime - p.CaptureTime);
         previous = row;
       }
       if (deltas.Count == 0)
-        return 0;
+        return TimeSpan.Zero;
       deltas.Sort();
       return deltas[deltas.Count / 2];
     }
@@ -194,27 +194,27 @@ namespace MB.FramePacing.Analysis
     {
       public int Segment;
       public ulong FrameIndex;
-      public long AnimationTicks;
-      public long IntendedDisplayTicks;
-      public uint TargetFrameTicks;
-      public long CpuStartTicks;
-      public uint CpuBusyTicks;
-      public uint PreferredFrameTicks;
+      public TimeSpan AnimationTime;
+      public TickCount64 IntendedDisplayTime;
+      public TimeSpan32 TargetFrameTime;
+      public TickCount64 CpuStartTime;
+      public TimeSpan32 CpuBusy;
+      public TimeSpan32 PreferredFrameTime;
       public bool StaticAfter;
       public bool StaticBefore;
       public long FirstCaptureIndex;
-      public long FirstSeenTicks;
-      public long LastSeenTicks;
+      public TickCount64 FirstSeenTime;
+      public TickCount64 LastSeenTime;
       public int CaptureCount;
       public ulong SkippedBefore;
       public bool UncertainStart;
       public int GapCaptures;
-      public long? FirstSeenSecondaryTicks;
+      public TickCount64? FirstSeenSecondaryTime;
       public bool Torn;
       public List<OlderFrameCapture>? OlderFrames;
     }
 
-    private static RunAnalysis AnalyzeRun(RunRows run, long period, long threshold, TimelineOptions options)
+    private static RunAnalysis AnalyzeRun(RunRows run, TimeSpan period, TimeSpan threshold, TimelineOptions options)
     {
       var warnings = new List<string>(run.Warnings);
       long decoded = 0;
@@ -234,7 +234,7 @@ namespace MB.FramePacing.Analysis
       bool gapSinceLastFrame = false;
       int gapCaptures = 0;
       bool camera = options.Scanout == ScanoutModel.Camera;
-      var firstSecondary = new Dictionary<ulong, long>();
+      var firstSecondary = new Dictionary<ulong, TickCount64>();
 
       for (int i = 0; i <= lastDecoded; ++i)
       {
@@ -249,7 +249,7 @@ namespace MB.FramePacing.Analysis
         }
         // The second zone may still show the previous run's frames: only this run's frame indices count
         if (camera && row.Sync is { } secondary && secondary.RunId == run.RunId && row.Status != CaptureStatus.NotRecorded)
-          firstSecondary.TryAdd(secondary.FrameIndex, row.CaptureTicks);
+          firstSecondary.TryAdd(secondary.FrameIndex, row.CaptureTime);
         switch (row.Status)
         {
           case CaptureStatus.Undecodable:
@@ -272,7 +272,7 @@ namespace MB.FramePacing.Analysis
         var payload = row.Payload;
         if (current != null && payload.FrameIndex == current.FrameIndex)
         {
-          current.LastSeenTicks = row.CaptureTicks;
+          current.LastSeenTime = row.CaptureTime;
           current.CaptureCount++;
           gapSinceLastFrame = false;
           gapCaptures = 0;
@@ -293,7 +293,7 @@ namespace MB.FramePacing.Analysis
             {
               // An older frame shown again: kept with the newest frame, which stays the one presented
               ++outOfOrder;
-              (current.OlderFrames ??= new List<OlderFrameCapture>()).Add(new OlderFrameCapture(row.CaptureTicks, payload.FrameIndex));
+              (current.OlderFrames ??= new List<OlderFrameCapture>()).Add(new OlderFrameCapture(row.CaptureTime, payload.FrameIndex));
               continue;
             }
           }
@@ -305,17 +305,17 @@ namespace MB.FramePacing.Analysis
         {
           Segment = segment,
           FrameIndex = payload.FrameIndex,
-          AnimationTicks = payload.AnimationTime.Ticks,
-          IntendedDisplayTicks = payload.IntendedDisplayTime.Ticks,
-          TargetFrameTicks = payload.TargetFrameTime.Ticks,
-          CpuStartTicks = payload.CpuStartTime.Ticks,
-          CpuBusyTicks = payload.CpuBusy.Ticks,
-          PreferredFrameTicks = payload.PreferredFrameTime.Ticks,
+          AnimationTime = payload.AnimationTime,
+          IntendedDisplayTime = payload.IntendedDisplayTime,
+          TargetFrameTime = payload.TargetFrameTime,
+          CpuStartTime = payload.CpuStartTime,
+          CpuBusy = payload.CpuBusy,
+          PreferredFrameTime = payload.PreferredFrameTime,
           StaticAfter = payload.IsStaticAfter,
           StaticBefore = payload.IsStaticBefore,
           FirstCaptureIndex = row.CaptureIndex,
-          FirstSeenTicks = row.CaptureTicks,
-          LastSeenTicks = row.CaptureTicks,
+          FirstSeenTime = row.CaptureTime,
+          LastSeenTime = row.CaptureTime,
           CaptureCount = 1,
           SkippedBefore = builders.Count > 0 && builders[^1].Segment == segment ? skipped : 0,
           UncertainStart = gapSinceLastFrame,
@@ -363,7 +363,7 @@ namespace MB.FramePacing.Analysis
         outOfOrder,
         frames.Count > 0 ? frames[^1].Segment + 1 : 0
       );
-      if (period <= 0)
+      if (period <= TimeSpan.Zero)
         warnings.Add("The capture period could not be determined");
       if (SlowCaptureWarning(frames, period) is { } slowCapture)
         warnings.Add(slowCapture);
@@ -391,29 +391,29 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     private static CameraRunStatistics AnalyzeCamera(
       List<FrameBuilder> builders,
-      Dictionary<ulong, long> firstSecondary,
-      long period,
+      Dictionary<ulong, TickCount64> firstSecondary,
+      TimeSpan period,
       List<string> warnings
     )
     {
-      var delays = new List<long>();
+      var delays = new List<TimeSpan>();
       foreach (var builder in builders)
       {
-        if (firstSecondary.TryGetValue(builder.FrameIndex, out long secondary))
+        if (firstSecondary.TryGetValue(builder.FrameIndex, out var secondary))
         {
-          builder.FirstSeenSecondaryTicks = secondary;
-          delays.Add(secondary - builder.FirstSeenTicks);
+          builder.FirstSeenSecondaryTime = secondary;
+          delays.Add(secondary - builder.FirstSeenTime);
         }
       }
 
-      long typical = Median(delays);
+      var typical = Median(delays);
       long tornFrames = 0;
-      if (delays.Count >= 3 && period > 0 && typical > 4 * period)
+      if (delays.Count >= 3 && period > TimeSpan.Zero && typical.Ticks > 4 * period.Ticks)
       {
-        long margin = Math.Max(3 * period, typical / 2);
+        var margin = new TimeSpan(Math.Max(3 * period.Ticks, typical.Ticks / 2));
         foreach (var builder in builders)
         {
-          if (builder.FirstSeenSecondaryTicks is { } secondary && secondary - builder.FirstSeenTicks < typical - margin)
+          if (builder.FirstSeenSecondaryTime is { } secondary && secondary - builder.FirstSeenTime < typical - margin)
           {
             builder.Torn = true;
             ++tornFrames;
@@ -442,28 +442,26 @@ namespace MB.FramePacing.Analysis
       foreach (var builder in builders)
         builder.UncertainStart = builder.GapCaptures > usualGap + 2;
 
-      var normal = builders
-        .Where(b => b.FirstSeenSecondaryTicks.HasValue && !b.Torn)
-        .Select(b => b.FirstSeenSecondaryTicks!.Value - b.FirstSeenTicks);
-      return new CameraRunStatistics(Statistics.FromTicks(normal), delays.Count, tornFrames, secondZoneOnly);
+      var normal = builders.Where(b => b.FirstSeenSecondaryTime.HasValue && !b.Torn).Select(b => b.FirstSeenSecondaryTime!.Value - b.FirstSeenTime);
+      return new CameraRunStatistics(Statistics.From(normal), delays.Count, tornFrames, secondZoneOnly);
     }
 
     /// <summary>
     /// EXPERIMENTAL camera captures: the sync marker times the frames. The scanout crosses the small marker quickly, so the first camera
     /// frame that shows it complete is sharp; the main marker is taller and only identifies the frame (its payload). A frame the sync marker
-    /// missed is timed by its main marker plus the usual scanout delay. Afterwards <see cref="FrameBuilder.FirstSeenSecondaryTicks"/> holds
+    /// missed is timed by its main marker plus the usual scanout delay. Afterwards <see cref="FrameBuilder.FirstSeenSecondaryTime"/> holds
     /// the main marker's first-seen time.
     /// </summary>
     private static void TimeBySyncMarker(List<FrameBuilder> builders, CameraRunStatistics camera)
     {
-      long typicalDelay = (long)Math.Round(camera.ScanoutDelay.P50 * TimeSpan.TicksPerMillisecond);
+      var typicalDelay = new TimeSpan((long)Math.Round(camera.ScanoutDelay.P50 * TimeSpan.TicksPerMillisecond));
       foreach (var builder in builders)
       {
-        long main = builder.FirstSeenTicks;
-        long sync = builder.FirstSeenSecondaryTicks ?? (main + typicalDelay);
-        builder.LastSeenTicks += sync - main;
-        builder.FirstSeenTicks = sync;
-        builder.FirstSeenSecondaryTicks = main;
+        var main = builder.FirstSeenTime;
+        var sync = builder.FirstSeenSecondaryTime ?? (main + typicalDelay);
+        builder.LastSeenTime += sync - main;
+        builder.FirstSeenTime = sync;
+        builder.FirstSeenSecondaryTime = main;
       }
     }
 
@@ -473,30 +471,30 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     private static RunPacing? AnalyzePacing(
       List<PresentedFrame> frames,
-      long period,
-      long threshold,
+      TimeSpan period,
+      TimeSpan threshold,
       bool camera,
       TimelineOptions options,
       List<string> warnings
     )
     {
-      if (period <= 0)
+      if (period <= TimeSpan.Zero)
         return null;
       double? expected = options.ExpectedRefreshHz is > 0 ? options.ExpectedRefreshHz : null;
-      long refresh = period;
+      var refresh = period;
       if (camera)
       {
         // The user's expected rate settles an ambiguous estimate (a steady game below the refresh rate) before the rig's calibration
         double? hintHz = expected ?? (options.CalibratedRefreshHz is > 0 ? options.CalibratedRefreshHz : null);
         double? hint = hintHz is { } hz ? TimeSpan.TicksPerSecond / hz : null;
-        if (RefreshEstimator.EstimatePeriodTicks(CameraIntervals(frames), period, hint) is not { } estimate)
+        if (RefreshEstimator.EstimatePeriodTicks(CameraIntervals(frames), period.Ticks, hint) is not { } estimate)
         {
           warnings.Add(
             "Camera capture: the display's refresh rate could not be calculated from the frames (too few, or the camera is too slow), so late frames are not marked."
           );
           return null;
         }
-        refresh = (long)Math.Round(estimate);
+        refresh = new TimeSpan((long)Math.Round(estimate));
         double calculatedHz = TimeSpan.TicksPerSecond / estimate;
         if (expected is { } expectedHz && !WithinTolerance(calculatedHz, expectedHz))
           warnings.Add(
@@ -513,18 +511,18 @@ namespace MB.FramePacing.Analysis
             )
           );
       }
-      else if (expected is { } expectedHz && !WithinTolerance(TimeSpan.TicksPerSecond / (double)period, expectedHz))
+      else if (expected is { } expectedHz && !WithinTolerance(TimeSpan.TicksPerSecond / (double)period.Ticks, expectedHz))
       {
         warnings.Add(
           string.Create(
             CultureInfo.InvariantCulture,
-            $"The capture runs at {TimeSpan.TicksPerSecond / (double)period:0.##} fps, but a {expectedHz:0.##} Hz display was expected. A capture card must capture at the display's refresh rate: check the card's mode and the display's refresh rate."
+            $"The capture runs at {TimeSpan.TicksPerSecond / (double)period.Ticks:0.##} fps, but a {expectedHz:0.##} Hz display was expected. A capture card must capture at the display's refresh rate: check the card's mode and the display's refresh rate."
           )
         );
       }
       // A camera's animation error is the difference of two first-seen times, each good to about one camera period: the verdict only
       // attributes errors beyond that noise
-      return PacingAnalyzer.Analyze(frames, refresh, camera, options.TargetFps, camera ? 2 * threshold : threshold) with
+      return PacingAnalyzer.Analyze(frames, refresh, camera, options.TargetFps, camera ? threshold + threshold : threshold) with
       {
         ExpectedRefreshHz = expected,
       };
@@ -538,15 +536,16 @@ namespace MB.FramePacing.Analysis
       const PresentedFrameFlags Unreliable = PresentedFrameFlags.Torn | PresentedFrameFlags.UncertainStart;
       for (int i = 1; i < frames.Count; ++i)
       {
-        if (frames[i].DisplayDeltaTicks is { } delta && (frames[i].Flags & Unreliable) == 0 && (frames[i - 1].Flags & PresentedFrameFlags.Torn) == 0)
-          yield return delta;
+        if (frames[i].DisplayDelta is { } delta && (frames[i].Flags & Unreliable) == 0 && (frames[i - 1].Flags & PresentedFrameFlags.Torn) == 0)
+          yield return delta.Ticks;
       }
     }
 
-    private static long Median(List<long> values)
+    private static T Median<T>(List<T> values)
+      where T : struct
     {
       if (values.Count == 0)
-        return 0;
+        return default;
       var sorted = values.OrderBy(v => v).ToList();
       return sorted[sorted.Count / 2];
     }
@@ -556,7 +555,7 @@ namespace MB.FramePacing.Analysis
     /// skipped frames). When most presented frames come after frame indices that were never captured, the capture is slower than the
     /// display, or vsync is off: the results then describe what the capture saw, not what the display showed.
     /// </summary>
-    private static string? SlowCaptureWarning(List<PresentedFrame> frames, long period)
+    private static string? SlowCaptureWarning(List<PresentedFrame> frames, TimeSpan period)
     {
       int followers = 0;
       int afterGap = 0;
@@ -570,22 +569,22 @@ namespace MB.FramePacing.Analysis
         if (frames[i].SkippedBefore > 0)
           ++afterGap;
         indices += frames[i].FrameIndex - frames[i - 1].FrameIndex;
-        seconds += (frames[i].FirstSeenTicks - frames[i - 1].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
+        seconds += (frames[i].FirstSeenTime - frames[i - 1].FirstSeenTime).TotalSeconds;
       }
       if (followers < SlowCaptureMinFrames || afterGap * 2 < followers)
         return null;
 
       string rates =
-        seconds > 0 && period > 0
+        seconds > 0 && period > TimeSpan.Zero
           ? string.Create(
             CultureInfo.InvariantCulture,
-            $" The frame index advances about {indices / seconds:0} times per second; the capture records {TimeSpan.TicksPerSecond / (double)period:0} frames per second."
+            $" The frame index advances about {indices / seconds:0} times per second; the capture records {TimeSpan.TicksPerSecond / (double)period.Ticks:0} frames per second."
           )
           : string.Empty;
       return $"{afterGap * 100 / followers}% of the presented frames come after frame indices that were never captured: the capture is most likely slower than the display's refresh rate, or vsync is off, so the results describe what the capture saw, not what the display showed.{rates} Capture at the display's refresh rate with vsync on.";
     }
 
-    private static List<PresentedFrame> BuildFrames(List<FrameBuilder> builders, long period, bool camera)
+    private static List<PresentedFrame> BuildFrames(List<FrameBuilder> builders, TimeSpan period, bool camera)
     {
       var frames = new List<PresentedFrame>(builders.Count);
       // Static is a frame's time on screen, said by the frame itself (StaticAfter) or, when the application only knew it one frame later,
@@ -596,21 +595,21 @@ namespace MB.FramePacing.Analysis
           builders[i - 1].StaticAfter = true;
       }
       int segmentStart = 0;
-      long drift = 0;
+      var drift = TimeSpan.Zero;
       for (int i = 0; i < builders.Count; ++i)
       {
         var b = builders[i];
         if (i > 0 && b.Segment != builders[i - 1].Segment)
         {
           segmentStart = i;
-          drift = 0;
+          drift = TimeSpan.Zero;
         }
         bool hasPrevious = i > segmentStart;
         var previous = hasPrevious ? builders[i - 1] : null;
         bool hasNext = i + 1 < builders.Count && builders[i + 1].Segment == b.Segment;
 
-        long? displayDelta = previous != null ? b.FirstSeenTicks - previous.FirstSeenTicks : null;
-        long? animationDelta = previous != null ? b.AnimationTicks - previous.AnimationTicks : null;
+        TimeSpan? displayDelta = previous != null ? b.FirstSeenTime - previous.FirstSeenTime : null;
+        TimeSpan? animationDelta = previous != null ? b.AnimationTime - previous.AnimationTime : null;
         // A step whose start or end was first seen after a capture gap (captures not decoded, not recorded, or dropped by the source) has
         // an uncertain display time: the frame may have appeared in the refresh the capture missed. A capture card's gaps only; a camera
         // decides uncertain starts itself (AnalyzeCamera), where gaps are part of every scanout
@@ -619,15 +618,18 @@ namespace MB.FramePacing.Analysis
         // adds up only the judged errors (without static steps that is animation time minus display time since the segment began). The step
         // into a static frame is judged: that frame may still have moved (it often reaches the rest pose)
         bool staticStep = previous is { StaticAfter: true };
-        long? error = displayDelta.HasValue && !staticStep && !uncertainStep ? animationDelta!.Value - displayDelta.Value : null;
-        drift += error ?? 0;
-        long onScreen = hasNext ? builders[i + 1].FirstSeenTicks - b.FirstSeenTicks : b.LastSeenTicks - b.FirstSeenTicks + period;
+        TimeSpan? error = displayDelta.HasValue && !staticStep && !uncertainStep ? animationDelta!.Value - displayDelta.Value : null;
+        drift += error ?? TimeSpan.Zero;
+        var onScreen = hasNext ? builders[i + 1].FirstSeenTime - b.FirstSeenTime : b.LastSeenTime - b.FirstSeenTime + period;
         // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured
-        long? frameTime =
-          i + 1 < builders.Count && builders[i + 1].FrameIndex == b.FrameIndex + 1 && b.CpuStartTicks != 0 && builders[i + 1].CpuStartTicks != 0
-            ? builders[i + 1].CpuStartTicks - b.CpuStartTicks
+        TimeSpan? frameTime =
+          i + 1 < builders.Count
+          && builders[i + 1].FrameIndex == b.FrameIndex + 1
+          && b.CpuStartTime != default
+          && builders[i + 1].CpuStartTime != default
+            ? builders[i + 1].CpuStartTime - b.CpuStartTime
             : null;
-        long? cpuWait = frameTime.HasValue && b.CpuBusyTicks != 0 ? frameTime.Value - b.CpuBusyTicks : null;
+        TimeSpan? cpuWait = frameTime.HasValue && b.CpuBusy != TimeSpan32.Zero ? frameTime.Value - b.CpuBusy.ToTimeSpan() : null;
         var flags = PresentedFrameFlags.None;
         if (b.SkippedBefore > 0)
           flags |= PresentedFrameFlags.SkippedBefore;
@@ -646,10 +648,10 @@ namespace MB.FramePacing.Analysis
           new PresentedFrame(
             b.Segment,
             b.FrameIndex,
-            b.AnimationTicks,
+            b.AnimationTime,
             b.FirstCaptureIndex,
-            b.FirstSeenTicks,
-            b.LastSeenTicks,
+            b.FirstSeenTime,
+            b.LastSeenTime,
             b.CaptureCount,
             onScreen,
             b.SkippedBefore,
@@ -658,14 +660,14 @@ namespace MB.FramePacing.Analysis
             error,
             drift,
             flags,
-            b.FirstSeenSecondaryTicks,
-            b.IntendedDisplayTicks,
-            b.TargetFrameTicks,
-            CpuStartTicks: b.CpuStartTicks,
-            CpuBusyTicks: b.CpuBusyTicks,
-            FrameTimeTicks: frameTime,
-            CpuWaitTicks: cpuWait,
-            MarkerPreferredFrameTicks: b.PreferredFrameTicks,
+            b.FirstSeenSecondaryTime,
+            b.IntendedDisplayTime,
+            b.TargetFrameTime,
+            CpuStartTime: b.CpuStartTime,
+            CpuBusy: b.CpuBusy,
+            FrameTime: frameTime,
+            CpuWait: cpuWait,
+            MarkerPreferredFrameTime: b.PreferredFrameTime,
             OlderFrames: b.OlderFrames
           )
         );

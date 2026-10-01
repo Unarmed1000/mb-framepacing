@@ -17,10 +17,10 @@ namespace MB.FramePacing.Analysis
   /// EXPERIMENTAL camera's second (lower) zone, which times the frames.
   /// </param>
   /// <param name="SourceDrops">How many frames the capture source reported dropping before this capture.</param>
-  /// <param name="CaptureTicks">The capture time used for analysis (device or host clock, TimeSpan ticks). Unknown for NotRecorded rows.</param>
+  /// <param name="CaptureTime">The capture time used for analysis (device or host clock). Unknown (default) for NotRecorded rows.</param>
   public readonly record struct CaptureRow(
     long CaptureIndex,
-    long CaptureTicks,
+    TickCount64 CaptureTime,
     CaptureStatus Status,
     MarkerPayload Payload,
     StartMetadata? Start = null,
@@ -30,11 +30,11 @@ namespace MB.FramePacing.Analysis
   {
     public bool IsDecoded => Status == CaptureStatus.Decoded;
 
-    /// <summary>The capture data's host clock timestamp (TimeSpan ticks), when the row came from it.</summary>
-    public long? HostTicks { get; init; }
+    /// <summary>The capture data's host clock timestamp, when the row came from it.</summary>
+    public TickCount64? HostTime { get; init; }
 
-    /// <summary>The capture data's device clock timestamp (TimeSpan ticks), when the row came from it and the device gave one.</summary>
-    public long? DeviceTicks { get; init; }
+    /// <summary>The capture data's device clock timestamp, when the row came from it and the device gave one.</summary>
+    public TickCount64? DeviceTime { get; init; }
 
     /// <summary>
     /// How many refreshes the capture's device clock says were missed since the previous capture (<see cref="MissedCaptures"/>); 0 on the

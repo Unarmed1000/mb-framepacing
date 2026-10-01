@@ -158,7 +158,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
       Assert.That(report.CapturePeriodMs, Is.EqualTo(capturePeriodMs).Within(0.01));
       var expected = ExpectedFrames(scenario);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(expected));
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(expected));
     }
 
     [Test]
@@ -187,7 +187,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       // Matroska stores millisecond timestamps, so the period is 4 ms (+-1) rather than 4.167 ms; the frames must still all be there
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(ExpectedFrames(scenario)));
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(ExpectedFrames(scenario)));
     }
 
     /// <summary>Fast capture (--roi auto): locate the marker, store only its region downscaled, and still recover every frame.</summary>
@@ -220,7 +220,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTicks)), Is.EqualTo(ExpectedFrames(scenario)));
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(ExpectedFrames(scenario)));
     }
   }
 }

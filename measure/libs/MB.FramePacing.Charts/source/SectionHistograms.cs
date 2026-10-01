@@ -25,7 +25,7 @@ namespace MB.FramePacing.Charts
     private static Histogram Of(FrameSequence sequence, RunSection section)
     {
       var (start, end) = sequence.Of(section.Start, section.End);
-      return end > start ? FromMatrix(sequence.Values, start, end, Histogram.DefaultBinWidthTicks) : Histogram.Empty;
+      return end > start ? FromMatrix(sequence.Values, start, end, Histogram.DefaultBinWidth.Ticks) : Histogram.Empty;
     }
 
     /// <summary>Histogram.FromTicks of positions <paramref name="start"/> to <paramref name="end"/> of <paramref name="values"/>: bin k covers [(k - 0.5) * width, (k + 0.5) * width).</summary>

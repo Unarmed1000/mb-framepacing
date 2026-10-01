@@ -94,15 +94,15 @@ namespace MB.FramePacing.Charts
         var frame = frames[i];
         // Where the dropped frames were due: the refresh before the frame after them
         if (data.DroppedBeforeFrame[i] is > 0 and var dropped)
-          Add(RunEventKind.FramesDropped, new RunEvent(frame.FirstSeenTicks - period, dropped, frame.FrameIndex));
+          Add(RunEventKind.FramesDropped, new RunEvent(frame.FirstSeenTime.Ticks - period, dropped, frame.FrameIndex));
         if (frame.OlderFrames is { } older)
         {
           foreach (var capture in older)
-            Add(RunEventKind.OutOfOrder, new RunEvent(capture.CaptureTicks, 1, capture.FrameIndex));
+            Add(RunEventKind.OutOfOrder, new RunEvent(capture.CaptureTime.Ticks, 1, capture.FrameIndex));
         }
         // A camera's tears are found per frame; a capture card's are its torn captures (below)
         if (chart.Camera && (frame.Flags & PresentedFrameFlags.Torn) != 0)
-          Add(RunEventKind.Torn, new RunEvent(frame.FirstSeenTicks, 1, frame.FrameIndex));
+          Add(RunEventKind.Torn, new RunEvent(frame.FirstSeenTime.Ticks, 1, frame.FrameIndex));
       }
 
       if (chart.Captures is { } rows && frames.Count > 0)
@@ -120,10 +120,10 @@ namespace MB.FramePacing.Charts
     )
     {
       long firstIndex = frames.Min(f => f.FirstCaptureIndex);
-      long lastTicks = frames.Max(f => f.LastSeenTicks);
+      long lastTicks = frames.Max(f => f.LastSeenTime.Ticks);
       int start = RunChartData.FirstWhere(0, rows.Count, i => rows[i].CaptureIndex >= firstIndex);
       // A capture the recorder dropped has no time: it is placed a period per capture index after the last one recorded
-      long knownTicks = start < rows.Count ? rows[start].CaptureTime?.Ticks ?? frames[0].FirstSeenTicks : 0;
+      long knownTicks = start < rows.Count ? rows[start].CaptureTime?.Ticks ?? frames[0].FirstSeenTime.Ticks : 0;
       long knownIndex = start < rows.Count ? rows[start].CaptureIndex : 0;
       for (int i = start; i < rows.Count; ++i)
       {

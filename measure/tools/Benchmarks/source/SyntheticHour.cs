@@ -44,22 +44,22 @@ namespace MB.FramePacing.Benchmarks
           new PresentedFrame(
             0,
             (ulong)i,
-            time,
+            new TimeSpan(time),
             i,
-            time,
-            time,
+            new TickCount64(time),
+            new TickCount64(time),
             1,
-            Refresh,
+            new TimeSpan(Refresh),
             0,
-            first ? null : display,
-            first ? null : display + error,
-            first ? null : error,
-            0,
+            first ? null : new TimeSpan(display),
+            first ? null : new TimeSpan(display + error),
+            first ? null : new TimeSpan(error),
+            TimeSpan.Zero,
             late ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
-            TargetTicks: first ? null : Refresh,
-            CpuStartTicks: time - (Refresh / 2),
-            CpuBusyTicks: (uint)(Refresh / 3),
-            FrameTimeTicks: first ? null : display
+            TargetFrameTime: first ? null : new TimeSpan(Refresh),
+            CpuStartTime: new TickCount64(time - (Refresh / 2)),
+            CpuBusy: new TimeSpan32((uint)(Refresh / 3)),
+            FrameTime: first ? null : new TimeSpan(display)
           )
         );
       }
@@ -72,7 +72,7 @@ namespace MB.FramePacing.Benchmarks
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(count - 1),
-        LateShare.Worst(frames, LateShare.WindowTicks),
+        LateShare.Worst(frames, LateShare.Window),
         lateCount,
         0,
         PacingVerdict.BadPacing
@@ -84,7 +84,7 @@ namespace MB.FramePacing.Benchmarks
         true,
         true,
         new RunCounts(count, count, 0, 0, 0, 0, 0, count, 0, 0, 0, 1),
-        RunStatistics.From(frames, TimeSpan.TicksPerMillisecond, Refresh),
+        RunStatistics.From(frames, TimeSpan.FromMilliseconds(1), new TimeSpan(Refresh)),
         frames,
         Array.Empty<string>(),
         Pacing: pacing

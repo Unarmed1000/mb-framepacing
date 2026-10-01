@@ -268,7 +268,7 @@ namespace MB.FramePacing.Charts.UnitTest
 
       var display = DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section);
       AssertCardBars(display, counted.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
-      double median = Analysis.Statistics.FromTicks(counted.Select(manifest.DisplayStepTicks)).P50;
+      double median = Analysis.Statistics.From(counted.Select(manifest.DisplayStepTicks).Select(ticks => new TimeSpan(ticks))).P50;
       var medianLine = display.FlatShapes.OfType<LineShape>().Single(l => l.Class == "average-line");
       Assert.That(display.Plots.Single().ValueX(medianLine.X1.Value), Is.EqualTo(median).Within(1e-9), $"{clip}: median display time step");
 
@@ -433,10 +433,10 @@ namespace MB.FramePacing.Charts.UnitTest
       int checkedFrames = 0;
       for (int i = 1; i < frames.Count; ++i)
       {
-        if (frames[i].CpuStartTicks == 0)
+        if (frames[i].CpuStartTime.Ticks == 0)
           continue;
         // Within a tick: the manifest and the capture round 1/60 s to ticks independently
-        Assert.That(frames[i].CpuStartTicks + offset!.Value, Is.EqualTo(frames[i - 1].FirstSeenTicks).Within(1), $"{clip}: frame {i}");
+        Assert.That(frames[i].CpuStartTime.Ticks + offset!.Value, Is.EqualTo(frames[i - 1].FirstSeenTime.Ticks).Within(1), $"{clip}: frame {i}");
         ++checkedFrames;
       }
       Assert.That(checkedFrames, Is.GreaterThan(frames.Count - 3), $"{clip}: nearly every frame has a CPU start");
@@ -455,7 +455,7 @@ namespace MB.FramePacing.Charts.UnitTest
       IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
       // The key's box sits at x 20; every other box is a frame's CPU work
       int boxes = Of("box").Count(e => (string?)e.Attribute("x") != "20");
-      Assert.That(boxes, Is.EqualTo(frames.Count(f => f.CpuStartTicks != 0 && f.CpuBusyTicks != 0)), "a CPU box per frame with CPU times");
+      Assert.That(boxes, Is.EqualTo(frames.Count(f => f.CpuStartTime.Ticks != 0 && f.CpuBusy.Ticks != 0)), "a CPU box per frame with CPU times");
       Assert.That(Of("arrow").Count(), Is.EqualTo(boxes + 1), "a present arrow per box, and the key's");
       // Every frame appears on a bright vsync: the line at the left edge of its first refresh (ok or off cell, 2 px inside it) is not faint
       var brightX = Of("vsync").Select(e => double.Parse((string)e.Attribute("x1")!, System.Globalization.CultureInfo.InvariantCulture)).ToHashSet();
@@ -473,7 +473,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(firstRefreshes, Is.EqualTo(frames.Count), "a first refresh per frame");
       Assert.That(
         Of("err-pill").Count(),
-        Is.EqualTo(frames.Count(f => f.AnimationErrorTicks is { } e && Math.Abs(e) > chart.ErrorThresholdTicks)),
+        Is.EqualTo(frames.Count(f => f.AnimationError?.Ticks is { } e && Math.Abs(e) > chart.ErrorThresholdTicks)),
         "an error pill per frame off by more than the threshold"
       );
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
@@ -515,7 +515,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(cells.Select(c => c.Class), Has.None.EqualTo("again"), "a frame presented on demand is never late for waiting");
       Assert.That(
         texts.Count(t => t == "static"),
-        Is.EqualTo(frames.Count(f => f.AnimationErrorTicks is null && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)),
+        Is.EqualTo(frames.Count(f => f.AnimationError?.Ticks is null && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)),
         $"{clip}: \"static\" for each step from a static frame"
       );
       Assert.That(texts, Does.Contain("static: nothing animates"), $"{clip}: the key");
@@ -635,7 +635,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var half = RunSection.Create(chart, 0, RunSection.Whole(chart).ToSeconds / 2);
       Assert.That(
         half.Section.Run.Statistics.ExcludedStaticFrames,
-        Is.EqualTo(half.Section.Run.Frames.Count(f => f.DisplayDeltaTicks.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0))
+        Is.EqualTo(half.Section.Run.Frames.Count(f => f.DisplayDelta.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0))
       );
     }
 
@@ -700,7 +700,7 @@ namespace MB.FramePacing.Charts.UnitTest
       int start = 0;
       for (int i = 0; i < manifest.FrameCount; ++i)
       {
-        while (manifest.ShownTicks(i) - manifest.ShownTicks(start) >= LateShare.WindowTicks)
+        while (manifest.ShownTicks(i) - manifest.ShownTicks(start) >= LateShare.Window.Ticks)
           ++start;
         var window = Enumerable.Range(start, i - start + 1).Where(j => j > 0).ToArray();
         int late = window.Count(j => manifest.IsLate(j) || Longer(j));
@@ -752,7 +752,7 @@ namespace MB.FramePacing.Charts.UnitTest
     private static void AssertCardBars(CardDrawing card, IEnumerable<long> ticks, string what)
     {
       var values = ticks.ToArray();
-      long width = Histogram.DefaultBinWidthTicks;
+      long width = Histogram.DefaultBinWidth.Ticks;
       long Bin(long value) => (long)Math.Floor((value / (double)width) + 0.5);
       long needed = Bin(values.Max()) - Bin(values.Min()) + 1;
       if (needed > Histogram.DefaultMaxBins)

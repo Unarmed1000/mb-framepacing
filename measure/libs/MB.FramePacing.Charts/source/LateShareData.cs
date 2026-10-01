@@ -64,8 +64,8 @@ namespace MB.FramePacing.Charts
         held[i] =
           (frame.Flags & (PresentedFrameFlags.Late | PresentedFrameFlags.StaticBefore)) == 0
           && Analysis.LateShare.Counts(frame)
-          && frame.DisplayDeltaTicks is { } display
-          && frame.PreferredTicks is { } preferred
+          && frame.DisplayDelta?.Ticks is { } display
+          && frame.PreferredFrameTime?.Ticks is { } preferred
           && display >= preferred + half;
         anyHeldLonger |= held[i];
       }
@@ -90,7 +90,7 @@ namespace MB.FramePacing.Charts
       for (int i = 0; i < frames.Count; ++i)
       {
         Add(i, 1);
-        while (frames[i].FirstSeenTicks - frames[start].FirstSeenTicks >= Analysis.LateShare.WindowTicks)
+        while (frames[i].FirstSeenTime.Ticks - frames[start].FirstSeenTime.Ticks >= Analysis.LateShare.Window.Ticks)
           Add(start++, -1);
         percent[i] = (counted > 0 ? (late + heldCount) / (double)counted : 0) * 100;
         anyLate[i] = late > 0;

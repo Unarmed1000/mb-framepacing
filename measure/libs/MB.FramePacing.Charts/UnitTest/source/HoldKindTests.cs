@@ -32,7 +32,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var rows = new List<CaptureRow>();
       void Add(CaptureStatus status, MarkerPayload payload) =>
-        rows.Add(new CaptureRow(rows.Count, status == CaptureStatus.NotRecorded ? 0 : rows.Count * Period, status, payload));
+        rows.Add(new CaptureRow(rows.Count, status == CaptureStatus.NotRecorded ? default : new TickCount64(rows.Count * Period), status, payload));
       for (int i = 0; i < 3; ++i)
         Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)));
       foreach (var index in shown)
@@ -55,7 +55,7 @@ namespace MB.FramePacing.Charts.UnitTest
       for (int i = 0; i < 3; ++i)
         Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)));
       var result = TimelineAnalyzer.Analyze(rows);
-      return RunChartData.Of(new ChartRun(result.Runs.Single(), result.CapturePeriodTicks, result.ErrorThresholdTicks, Camera: false));
+      return RunChartData.Of(new ChartRun(result.Runs.Single(), result.CapturePeriod.Ticks, result.ErrorThreshold.Ticks, Camera: false));
     }
 
     /// <summary>Frame 4 never shown while every refresh was captured: the target dropped it, and frame 3's hold says so.</summary>
@@ -80,7 +80,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var data = Data(schedule: false, 1, 2, 3, 3, 5, 6, 7);
 
       Assert.That(data.Run.Run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
-      Assert.That(data.Frames[3].TargetTicks, Is.EqualTo(2 * Period), "frame 5 is due two refreshes after frame 3");
+      Assert.That(data.Frames[3].TargetFrameTime?.Ticks, Is.EqualTo(2 * Period), "frame 5 is due two refreshes after frame 3");
       Assert.That(data.Frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.All.False);
       Assert.That(data.HoldKinds[2], Is.EqualTo(HoldKind.FramesDropped));
     }

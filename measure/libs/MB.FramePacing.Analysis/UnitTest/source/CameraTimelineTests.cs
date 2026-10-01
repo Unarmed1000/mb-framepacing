@@ -60,14 +60,14 @@ namespace MB.FramePacing.Analysis.UnitTest
           primary.TryGetValue(c, out var p)
             ? new CaptureRow(
               c,
-              c * Period,
+              new TickCount64(c * Period),
               CaptureStatus.Decoded,
               new MarkerPayload(MarkerKind.Frame, 1, p, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan((long)(p - 100) * 16 * Period)),
               null,
               0,
               second
             )
-            : new CaptureRow(c, c * Period, CaptureStatus.Undecodable, default, null, 0, second)
+            : new CaptureRow(c, new TickCount64(c * Period), CaptureStatus.Undecodable, default, null, 0, second)
         );
       }
       return rows;

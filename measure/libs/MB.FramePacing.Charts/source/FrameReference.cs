@@ -19,7 +19,7 @@ namespace MB.FramePacing.Charts
   {
     /// <summary>The target frame time before <paramref name="frame"/>, as written (ticks): the marker's, else its preferred frame time.</summary>
     public static long? Target(PresentedFrame frame) =>
-      frame.MarkerTargetFrameTicks switch
+      frame.MarkerTargetFrameTime.Ticks switch
       {
         uint.MaxValue => null, // MarkerPayload.OnDemandFrameTime
         0 => Preferred(frame),
@@ -31,10 +31,10 @@ namespace MB.FramePacing.Charts
     /// to the tools, else one refresh).
     /// </summary>
     public static long? Preferred(PresentedFrame frame) =>
-      frame.MarkerPreferredFrameTicks switch
+      frame.MarkerPreferredFrameTime.Ticks switch
       {
         uint.MaxValue => null, // MarkerPayload.OnDemandFrameTime
-        0 => frame.PreferredTicks,
+        0 => frame.PreferredFrameTime?.Ticks,
         var ticks => ticks,
       };
   }

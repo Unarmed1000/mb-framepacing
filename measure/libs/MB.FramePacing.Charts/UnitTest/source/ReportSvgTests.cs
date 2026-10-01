@@ -120,13 +120,13 @@ namespace MB.FramePacing.Charts.UnitTest
     public void OneHour_Section_DrawsEveryFrame()
     {
       var run = OneHour();
-      double hitch = run.Run.Frames[HitchFrame].FirstSeenTicks / (double)TimeSpan.TicksPerSecond;
+      double hitch = run.Run.Frames[HitchFrame].FirstSeenTime.Ticks / (double)TimeSpan.TicksPerSecond;
       var section = RunSection.Create(run, hitch - 1, hitch + 1);
       string svg = ReportCard.Render(section);
 
       var frames = section.Section.Run.Frames;
       Assert.That(frames, Has.Count.LessThan(1000));
-      int withError = frames.Count(f => f.AnimationErrorTicks is { } e && e != 0);
+      int withError = frames.Count(f => f.AnimationError?.Ticks is { } e && e != 0);
       Assert.That(Count(svg, "<rect class=\"bar\""), Is.EqualTo(withError), "a bar per frame with an error");
       Assert.That(svg, Does.Not.Contain("render a section of at most"));
       Assert.That(Count(svg, "<rect class=\"strip-late\""), Is.GreaterThanOrEqualTo(frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0)));
@@ -215,7 +215,7 @@ namespace MB.FramePacing.Charts.UnitTest
       // The application prefers one refresh per frame; from frame 1400 its pacer runs at two
       var (drawing, frames) = LateShareCard(i => Refresh);
       var plot = drawing.Plots.Single();
-      double Seconds(int i) => (frames[i].FirstSeenTicks - frames[0].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(int i) => (frames[i].FirstSeenTime.Ticks - frames[0].FirstSeenTime.Ticks) / (double)TimeSpan.TicksPerSecond;
       (double X, double Y)[] Points(string cls) =>
         drawing
           .FlatShapes.OfType<PathShape>()
@@ -280,11 +280,11 @@ namespace MB.FramePacing.Charts.UnitTest
         frames.Add(
           f with
           {
-            FirstSeenTicks = time,
-            LastSeenTicks = time,
-            DisplayDeltaTicks = i > 0 ? display : null,
-            MarkerTargetFrameTicks = (uint)(i < 1400 ? Refresh : 2 * Refresh),
-            PreferredTicks = preferred(i),
+            FirstSeenTime = new TickCount64(time),
+            LastSeenTime = new TickCount64(time),
+            DisplayDelta = i > 0 ? new TimeSpan(display) : null,
+            MarkerTargetFrameTime = new TimeSpan32((uint)(i < 1400 ? Refresh : 2 * Refresh)),
+            PreferredFrameTime = new TimeSpan(preferred(i)),
             Flags = i == 1800 ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
           }
         );
@@ -320,19 +320,19 @@ namespace MB.FramePacing.Charts.UnitTest
           new PresentedFrame(
             0,
             (ulong)i,
-            time,
+            new TimeSpan(time),
             i,
-            time,
-            time,
+            new TickCount64(time),
+            new TickCount64(time),
             1,
-            Refresh,
+            new TimeSpan(Refresh),
             0,
-            first ? null : display,
-            first ? null : display + error,
-            first ? null : error,
-            0,
+            first ? null : new TimeSpan(display),
+            first ? null : new TimeSpan(display + error),
+            first ? null : new TimeSpan(error),
+            TimeSpan.Zero,
             late ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
-            TargetTicks: first ? null : Refresh
+            TargetFrameTime: first ? null : new TimeSpan(Refresh)
           )
         );
       }
@@ -344,7 +344,7 @@ namespace MB.FramePacing.Charts.UnitTest
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(Count - 1),
-        LateShare.Worst(frames, LateShare.WindowTicks),
+        LateShare.Worst(frames, LateShare.Window),
         lateCount,
         0,
         PacingVerdict.BadPacing
@@ -356,7 +356,7 @@ namespace MB.FramePacing.Charts.UnitTest
         true,
         true,
         new RunCounts(Count, Count, 0, 0, 0, 0, 0, Count, 0, 0, 0, 1),
-        RunStatistics.From(frames, TimeSpan.TicksPerMillisecond, Refresh),
+        RunStatistics.From(frames, TimeSpan.FromMilliseconds(1), new TimeSpan(Refresh)),
         frames,
         Array.Empty<string>(),
         Pacing: pacing
@@ -494,7 +494,10 @@ namespace MB.FramePacing.Charts.UnitTest
       // Every 50th frame's animation time step four refreshes long: the scale covers it only with the overlay
       var longSteps = run with
       {
-        Run = run.Run with { Frames = run.Run.Frames.Select((f, i) => i % 50 == 25 ? f with { AnimationDeltaTicks = 4 * Refresh } : f).ToList() },
+        Run = run.Run with
+        {
+          Frames = run.Run.Frames.Select((f, i) => i % 50 == 25 ? f with { AnimationDelta = new TimeSpan(4 * Refresh) } : f).ToList(),
+        },
       };
       double Top(ReportOptions options) =>
         ReportCard.Build(RunSection.Whole(longSteps), options).Plots.Single(p => p.Id == ReportItem.DisplayTimeStep).YTo;
@@ -530,7 +533,7 @@ namespace MB.FramePacing.Charts.UnitTest
 
       var drawing = ReportCard.Build(section, only with { StripSeconds = 1 });
       // A refresh is a whole number of ticks, a little under 1/240 s: the frame that appears just before 1 s starts its cell at the edge
-      int shown = run.Run.Frames.Count(f => f.FirstSeenTicks < TimeSpan.TicksPerSecond);
+      int shown = run.Run.Frames.Count(f => f.FirstSeenTime.Ticks < TimeSpan.TicksPerSecond);
       Assert.That(shown, Is.EqualTo(241));
       Assert.That(drawing.FlatShapes.OfType<RectShape>().Count(), Is.EqualTo(shown), "a cell per refresh of the first second");
       var plot = drawing.Plots.Single();
@@ -656,7 +659,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var section = RunSection.Whole(run);
       var hover = new CardHover(section);
       var frames = run.Run.Frames;
-      double Seconds(int i) => (frames[i].FirstSeenTicks - frames[0].FirstSeenTicks) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(int i) => (frames[i].FirstSeenTime.Ticks - frames[0].FirstSeenTime.Ticks) / (double)TimeSpan.TicksPerSecond;
       Assert.That(hover.FrameAt(Seconds(100)), Is.SameAs(frames[100]));
       Assert.That(hover.FrameAt((Seconds(100) + Seconds(101)) / 2), Is.SameAs(frames[100]), "until the next frame appears");
       Assert.That(hover.FrameAt(-1), Is.SameAs(frames[0]));
@@ -695,15 +698,24 @@ namespace MB.FramePacing.Charts.UnitTest
           (f, i) =>
             i switch
             {
-              5 => f with { OnScreenTicks = 3 * Refresh },
-              10 => f with { FirstSeenTicks = f.FirstSeenTicks + (2 * Refresh), LastSeenTicks = f.LastSeenTicks + (2 * Refresh), SkippedBefore = 2 },
+              5 => f with { OnScreen = new TimeSpan(3 * Refresh) },
+              10 => f with
+              {
+                FirstSeenTime = f.FirstSeenTime + new TimeSpan(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + new TimeSpan(2 * Refresh),
+                SkippedBefore = 2,
+              },
               12 => f with
               {
-                FirstSeenTicks = f.FirstSeenTicks + (2 * Refresh),
-                LastSeenTicks = f.LastSeenTicks + (2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + new TimeSpan(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + new TimeSpan(2 * Refresh),
                 Flags = PresentedFrameFlags.Torn,
               },
-              > 5 => f with { FirstSeenTicks = f.FirstSeenTicks + (2 * Refresh), LastSeenTicks = f.LastSeenTicks + (2 * Refresh) },
+              > 5 => f with
+              {
+                FirstSeenTime = f.FirstSeenTime + new TimeSpan(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + new TimeSpan(2 * Refresh),
+              },
               _ => f,
             }
         )

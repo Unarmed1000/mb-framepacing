@@ -42,7 +42,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     [TestCase(2.5, 2)]
     [TestCase(3.0, 2)]
     public void Before_CountsTheRefreshesAStepLeftOut(double periods, long missed) =>
-      Assert.That(MissedCaptures.Before((long)Math.Round(periods * Period), Period), Is.EqualTo(missed));
+      Assert.That(MissedCaptures.Before(new TimeSpan((long)Math.Round(periods * Period)), new TimeSpan(Period)), Is.EqualTo(missed));
 
     /// <summary>
     /// Records of a 60 Hz capture showing frames 1 to 6, one capture each; the capture of <paramref name="gapBefore"/> comes a refresh late
