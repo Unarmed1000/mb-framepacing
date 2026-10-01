@@ -61,10 +61,10 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
-    public void LatestRequest_PassesOnOtherErrors()
+    public async Task LatestRequest_PassesOnOtherErrors()
     {
       var requests = new LatestRequest<string>();
-      Assert.ThrowsAsync<InvalidOperationException>(() => requests.Run(_ => throw new InvalidOperationException("broken")));
+      await Assert.ThrowsAsync<InvalidOperationException>(() => requests.Run(_ => throw new InvalidOperationException("broken")));
     }
 
     /// <summary>A section's histograms from the wavelet matrix are exactly RunHistograms' of the section's frames: bins, widths and counts.</summary>
