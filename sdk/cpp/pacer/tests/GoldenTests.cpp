@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The golden data (test-data/pacer, written by pacer-sim --golden, python tools/update_pacer_test_data.py): every golden scenario paced
-// with its rules must give exactly the file's bytes (the C# tests compare with the same files). On top: Swappy's rule reproduces the
+// with its rules must give exactly the file's bytes (the C# tests compare with the same files). On top: the full-window rule reproduces the
 // swap intervals and display refreshes of mb-framepacing-explained's simulation of it, frame by frame, the pacer at a fixed swap interval
-// shows every frame of the full-rate clip on its refresh, and the late count fix never slows down later than Swappy's rule.
+// shows every frame of the full-rate clip on its refresh, and the late count fix never slows down later than the full-window rule.
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
@@ -138,7 +138,7 @@ TEST(Golden, EveryScenarioGivesItsFileExactly)
   }
 }
 
-TEST(Golden, SwappysRuleReproducesTheSisterRepositorysSimulation)
+TEST(Golden, TheFullWindowRuleReproducesTheSisterRepositorysSimulation)
 {
   const auto testData = FindTestData();
   if (!testData)
@@ -166,7 +166,7 @@ TEST(Golden, AtAFixedSwapIntervalThePacerShowsTheFullRateClipsFrames)
   EXPECT_EQ(LateFrames(rows), 92);
 }
 
-TEST(Golden, TheLateCountFixSlowsDownNoLaterThanSwappysRule)
+TEST(Golden, TheLateCountFixSlowsDownNoLaterThanTheFullWindowRule)
 {
   const auto testData = FindTestData();
   if (!testData)
@@ -180,11 +180,11 @@ TEST(Golden, TheLateCountFixSlowsDownNoLaterThanSwappysRule)
     {
       continue;
     }
-    const std::vector<ResultRow> swappy = Parse(Sim::Simulate(scenario, PC::SlowDownRule::FullWindow));
+    const std::vector<ResultRow> fullWindow = Parse(Sim::Simulate(scenario, PC::SlowDownRule::FullWindow));
     const std::vector<ResultRow> fix = Parse(Sim::Simulate(scenario, PC::SlowDownRule::LateCount));
     EXPECT_GE(FirstSlower(fix), 0) << scenario.Name;
-    EXPECT_LE(FirstSlower(fix), FirstSlower(swappy)) << scenario.Name;
-    EXPECT_LE(LateFrames(fix), LateFrames(swappy)) << scenario.Name;
+    EXPECT_LE(FirstSlower(fix), FirstSlower(fullWindow)) << scenario.Name;
+    EXPECT_LE(LateFrames(fix), LateFrames(fullWindow)) << scenario.Name;
   }
   // The staged load slows down step after step: there the fix does not wait a full window after each step
   const Sim::Scenario& stages = Named(scenarios, "100-stages");

@@ -76,13 +76,13 @@ ticks, such as nanoseconds, through `std::chrono::floor<MB::FramePacing::TickDur
 ### Frame pacing: intended display time, target frame time and preferred frame time
 
 Only the application's frame pacer knows what it is aiming for. A capture cannot tell a pacer that deliberately runs at 30 fps
-(Swappy dropping to 30 for a busy stretch, a 30 fps cap) from a game that fails to hold 60, it cannot tell a game that wants 30 fps from
+(an adaptive pacer dropping to 30 for a busy stretch, a 30 fps cap) from a game that fails to hold 60, it cannot tell a game that wants 30 fps from
 one that was forced down to it, and it cannot see that every frame after a hitch stays a refresh late in a full frame queue. The
 pacing fields tell the analysis:
 
 - **Intended display time:** the time the pacer aims for this frame to become visible: the vsync it targets, the present time it
   requests from a present timing API (`desiredPresentTime` in `VK_GOOGLE_display_timing`, the target present time of
-  `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`, Swappy), or the **predicted display time** the platform gives it and it
+  `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`), or the **predicted display time** the platform gives it and it
   adopts (OpenXR `predictedDisplayTime`, Android Choreographer's expected presentation time, `CADisplayLink.targetTimestamp`). It is the
   pacer's plan; what the game animated the frame for is its animation time, and in a well paced game the two agree. Use a steady clock
   (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) converted to 100 ns ticks; its epoch does not matter, only the
@@ -93,7 +93,7 @@ pacing fields tell the analysis:
 - **Preferred frame time:** the interval the application wants to run at: what it would aim for if nothing held it back. It differs
   from the target frame time only while the pacer runs slower than it wants:
   - A game locked to 30 fps: preferred and target `333'333`. It runs as it wants.
-  - Swappy or another adaptive pacer that drops from 60 to 30 fps for a busy stretch: preferred `166'667`, target `333'333` while
+  - An adaptive pacer that drops from 60 to 30 fps for a busy stretch: preferred `166'667`, target `333'333` while
     lowered. The analysis shows that stretch as below its preferred rate.
   - A device that saves power while idle and presents 1 frame per second: preferred and target `10'000'000` while idle. Idle at the
     rate it wants is not a problem.

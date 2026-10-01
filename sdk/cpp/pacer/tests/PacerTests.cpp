@@ -123,7 +123,7 @@ TEST(RefreshPeriod, ItIsAlwaysValid)
 // PacerSettings
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
-TEST(PacerSettings, TheRefreshIsRequiredAndTheRestAreSwappysDefaults)
+TEST(PacerSettings, TheRefreshIsRequiredAndTheRestHaveDefaults)
 {
   constexpr PC::PacerSettings Defaults(Hz60);
   static_assert(Defaults.Refresh() == Hz60);
@@ -201,7 +201,7 @@ TEST(RefreshPeriod, RefreshesInATime)
 // SwapIntervalRule
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
-TEST(SwapIntervalRule, SwappysRuleWaitsForAFullWindow)
+TEST(SwapIntervalRule, TheFullWindowRuleWaitsForAFullWindow)
 {
   PC::SwapIntervalRule rule(Settings(Hz60, PC::SlowDownRule::FullWindow));
   int64_t refresh = 0;

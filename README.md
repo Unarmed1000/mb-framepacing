@@ -329,11 +329,11 @@ animation error and display time step histograms (0.1 ms bins, counts on a log s
 cumulative drift; `--cards` picks them (`--cards none` for the report only).
 
 The test clips (`measure/test-data/videos`, made by mb-framepacing-explained) as reports. The busy stretch at the full rate is the example
-above: the frames that miss a refresh are late, and each is off by a whole refresh. Its companion adapts its rate like Android's
-Swappy: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says, while their preferred
+above: the frames that miss a refresh are late, and each is off by a whole refresh. Its companion adapts its rate as an adaptive
+pacer does: late frames at first, then 30 fps (two refreshes per frame, as its markers' target frame time says, while their preferred
 frame time stays 60 fps) for a while, then 60 again:
 
-![The report of a game adapting its rate like Swappy](measure/doc/images/report-example-swappy.svg)
+![The report of a game adapting its rate](measure/doc/images/report-example-swappy.svg)
 
 A naive delta time timer: every frame is shown on time, but the timer is off by up to 5 ms either way, so the animation steps
 are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing):

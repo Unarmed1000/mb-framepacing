@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// The swap interval rule of sdk/doc/pacer.md: Swappy's (SwappyCommon::updateSwapInterval, as mb-framepacing-explained simulates it in
+// The swap interval rule of sdk/doc/pacer.md: the adaptive swap interval rule (as mb-framepacing-explained simulates it in
 // tools/frame_pacing_video/adaptive_rate.py) and the late count fix. Integer arithmetic only, so C++ and C# decide exactly alike.
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
 #include <algorithm>
@@ -11,7 +11,7 @@ namespace MB::FramePacing::Pacer
   namespace
   {
     constexpr int64_t OneTickQ32 = RefreshPeriod::OneTickQ32;
-    //! Swappy's calculateSwapInterval: a remainder of at most 500 ns does not need another refresh
+    //! A remainder of at most 500 ns does not need another refresh
     constexpr int64_t RemainderMarginTicks = 5;
     std::size_t Capacity(const PacerSettings& settings) noexcept
     {
@@ -24,7 +24,7 @@ namespace MB::FramePacing::Pacer
       return static_cast<std::size_t>(std::min(frames * 2, int64_t{PacerSettings::MaxWindowCapacity}));
     }
 
-    //! The refreshes a frame of frameTicks needs (Swappy's calculateSwapInterval): at least 1, and one more for a remainder beyond 500 ns;
+    //! The refreshes a frame of frameTicks needs: at least 1, and one more for a remainder beyond 500 ns;
     //! at most PacerSettings::MaxSwapInterval. frameTicks is at most a window and two margins, so frameTicks * 2^32 fits 64 bits.
     uint32_t NeededSwapInterval(const int64_t frameTicks, const RefreshPeriod period) noexcept
     {
@@ -69,7 +69,7 @@ namespace MB::FramePacing::Pacer
                                                 const RefreshPeriod period) noexcept
   {
     // The frames of the last WindowTicks: the oldest go once the second oldest is more than WindowTicks older than this one (so the
-    // window keeps one frame beyond it, as Swappy's does), and when the window is full
+    // window keeps one frame beyond it, as the reference simulation's does), and when the window is full
     if (m_count == m_entries.size())
     {
       PopFront();

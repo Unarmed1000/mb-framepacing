@@ -88,8 +88,7 @@ a `std::chrono` clock through `core/time/ChronoConversion.hpp` (`FP::ToTickCount
 
 ## The swap interval rule
 
-The rule is Swappy's, the adaptive swap interval of Android's [frame pacing library](https://developer.android.com/games/sdk/frame-pacing)
-(`SwappyCommon.cpp`), as [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) describes and simulates it
+The rule is the adaptive swap interval rule as [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) describes and simulates it
 (`tools/frame_pacing_video/adaptive_rate.py`), with that repository's proposed fix as the default. Integer arithmetic only, so the C++
 and C# pacers decide alike to the tick.
 
@@ -99,10 +98,10 @@ and C# pacers decide alike to the tick.
   not need another refresh), at least 1.
 - **Slow down**, only while the current swap interval is at most `SlowestFrameTicks + FrameMarginTicks` long, to the larger of one
   refresh more and the frames' need:
-  - `SlowDownRule::FullWindow` (Swappy's rule): when the window is full and more than `SlowDownLatePercent` of its frames were late
+  - `SlowDownRule::FullWindow` (the full-window rule): when the window is full and more than `SlowDownLatePercent` of its frames were late
     (the share rounded to a whole percent, a half to the even one).
   - `SlowDownRule::LateCount` (the fix, the default): the same, and also as soon as the late frames since the last change pass
-    `SlowDownLatePercent` of the frames a full window holds at the current swap interval. Swappy's rule waits for a full window after
+    `SlowDownLatePercent` of the frames a full window holds at the current swap interval. The full-window rule waits for a full window after
     every change, so a load that comes back right after a speed-up is late for a whole window first; the fix slows down after the
     late frames of one.
 - **Speed up** (both rules) when the window is full, none of its frames was late, the swap interval is above the preferred one and the
@@ -115,7 +114,7 @@ swap interval it decides.
 ## Settings
 
 `PacerSettings` is always valid: its constructor takes the refresh period, and every setter asserts that its value is within its range
-(without asserts it clamps a value outside into the range; C# clamps). The rule's defaults are Swappy's; they are settings, not properties of frame
+(without asserts it clamps a value outside into the range; C# clamps). The rule's defaults are those of the simulation it reproduces; they are settings, not properties of frame
 pacing in general.
 
 | Setting                 | Default   | Range                     | What it is                                                                                                       |
@@ -166,8 +165,8 @@ the vsync timer of mb-framepacing-explained (`doc/frame-pacing-strategies.md`): 
 
 `sdk/test-data/pacer` holds the pacer's golden results, which the C++ and the C# tests must both reproduce to the byte. `python tools/update_pacer_test_data.py` regenerates them with `pacer-sim --golden`:
 
-- `60-busy`: the busy stretch of mb-framepacing-explained's `60-busy-swappy` clip. Swappy's rule reproduces that simulation's swap
+- `60-busy`: the busy stretch of mb-framepacing-explained's 60-busy clip. The full-window rule reproduces that simulation's swap
   intervals and display refreshes frame by frame.
 - `60-busy-full-rate`: the `60-busy-full-rate` clip at a fixed swap interval: every frame is shown on the clip's refresh.
-- `100-stages` and `60-relapse`: seeded staged loads. The fix is never late more often than Swappy's rule and never slows down later;
+- `100-stages` and `60-relapse`: seeded staged loads. The fix is never late more often than the full-window rule and never slows down later;
   on `100-stages` and `60-relapse` it is late less often.

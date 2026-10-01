@@ -12,8 +12,8 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! How a FramePacer paces. The display's refresh period is required; every other value has a default, the rule's being Swappy's
-  //! (Android's frame pacing library, SwappyCommon.cpp, as the mb-framepacing-explained repository describes its rule): they are
+  //! How a FramePacer paces. The display's refresh period is required; every other value has a default, the rule's being those of
+  //! the adaptive swap interval rule the mb-framepacing-explained repository describes and simulates: they are
   //! settings, not properties of frame pacing in general. Always valid: every setter asserts that its value is within its range; without
   //! asserts it clamps a value outside into it. The ranges keep the rule's arithmetic within 64 bits.
   class PacerSettings

@@ -141,7 +141,7 @@ An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `
 
 - **Means:** the interval the pacer aims for **now**, between the previous frame and this one: `1 / target frame rate`.
 - **Value:** `u32` ticks, as the preferred frame time. `0xFFFFFFFF` (on demand) is allowed here too.
-- **Changes:** on the frame where the pacer changes its rate (Swappy dropping from 60 to 30 fps writes `333'333` from the first
+- **Changes:** on the frame where the pacer changes its rate (an adaptive pacer dropping from 60 to 30 fps writes `333'333` from the first
   frame it paces at 30).
 - **Unknown (`0`):** the preferred frame time stands in, then `--target-fps`, then one refresh.
 - **What the analysis does:** without the pacer's schedule, every frame is measured against the frame before it: it is **late**
@@ -153,7 +153,7 @@ An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `
 
 - **Means:** when the pacer intends this frame to become visible: the vsync it targets, the present time it requests from a present
   timing API (`desiredPresentTime` in `VK_GOOGLE_display_timing`, the target present time of `VK_EXT_present_timing`,
-  `EGL_ANDROID_presentation_time`, Swappy), or the predicted display time the platform gives it and it adopts (OpenXR
+  `EGL_ANDROID_presentation_time`), or the predicted display time the platform gives it and it adopts (OpenXR
   `predictedDisplayTime`, Android Choreographer's expected presentation time, `CADisplayLink.targetTimestamp`).
 - **Value:** `i64` ticks on the pacer's steady clock, the same clock for the whole run and the same one as the CPU start time. It is
   the plan, known before the frame is presented, not a measurement taken afterwards.
@@ -223,8 +223,8 @@ more is late, unless the frame index shows that frames between were dropped.
 **A 30 fps lock on a 60 Hz display.** Preferred and target frame time `333'333`. Steps of two refreshes are on target; a step of three
 is late. Nothing is amber: the game runs at the rate it wants. Without the preferred frame time every frame would be amber.
 
-**Swappy lowering from 60 to 30 fps for a busy stretch.** The preferred frame time stays `166'667`; the target frame time is
-`166'667`, then `333'333` from the first frame paced at 30; the intended display times are the present times Swappy requests:
+**An adaptive pacer lowering from 60 to 30 fps for a busy stretch.** The preferred frame time stays `166'667`; the target frame time is
+`166'667`, then `333'333` from the first frame paced at 30; the intended display times are the present times the pacer requests:
 
 | Frame | Target    | Preferred | Intended display time | Report                                   |
 | ----- | --------- | --------- | --------------------- | ---------------------------------------- |

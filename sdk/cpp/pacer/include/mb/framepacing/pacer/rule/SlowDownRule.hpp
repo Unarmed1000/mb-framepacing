@@ -13,7 +13,7 @@ namespace MB::FramePacing::Pacer
     //! The default: as FullWindow, and also as soon as the late frames since the last change pass the share of a full window's frames
     //! (SlowDownLatePercent of the frames the window holds at the current rate), without waiting for the window to fill again.
     LateCount = 0,
-    //! Swappy's rule: only on a full window (more than WindowTicks of frames) with more than SlowDownLatePercent of them late.
+    //! The full-window rule: only on a full window (more than WindowTicks of frames) with more than SlowDownLatePercent of them late.
     FullWindow = 1,
   };
 }

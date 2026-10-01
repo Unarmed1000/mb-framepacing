@@ -11,7 +11,7 @@ The repository has two parts, and the license follows them (see Conventions):
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
   - **pacer** (C++ `MB::FramePacing::Pacer`, C# `MB.FramePacing.Pacer`): plans every frame on the display's refreshes with the adaptive swap interval rule
-    (Swappy's, and mb-framepacing-explained's fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
+    (the full-window rule of mb-framepacing-explained's simulation, and its fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
     byte count from the type) for every module's file and wire formats; the core and the marker module have 100 % test coverage
@@ -158,7 +158,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the
     tests only: never part of the library.
   - Golden data: `python tools/update_pacer_test_data.py` writes the scenarios' frames from the test clips and runs `pacer-sim --golden`;
-    the tests compare every scenario's result byte for byte, and cross-check the clips (`60-busy`: Swappy's rule reproduces the
+    the tests compare every scenario's result byte for byte, and cross-check the clips (`60-busy`: the full-window rule reproduces the
     sister repo's swap intervals and refreshes; `60-busy-full-rate`: at a fixed swap interval every frame is on the clip's refresh).
     Run it after a change to the rule or the planning and review the difference.
 - **Capture data (the default):** a capture decodes every frame's markers live and stores only them, with the timestamps, in
@@ -290,7 +290,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Pacing terms:** the intended display time is the pacer's aim; the animation time is the predicted display time the game
     animated for (`sdk/doc/vocabulary.md`). The target frame time is what the pacer aims for now, the **preferred frame time** what the
     application wants (it differs only while the pacer runs slower); `0xFFFFFFFF` in both = on demand. Never call the preferred frame
-    time "desired": that is Vulkan's and Swappy's word for a present time point.
+    time "desired": that is Vulkan's word for a present time point.
   - **Flags:** static is a frame's time on screen (nothing animates until the next frame; the frame itself may have moved). Bit 0
     `StaticAfter` says it on the frame (known upfront: no pending work), bit 1 `StaticBefore` on the next frame (known in hindsight,
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and

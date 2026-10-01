@@ -133,7 +133,7 @@ namespace MB::FramePacing::Pacer::Simulation
 
   std::vector<Scenario> GoldenScenarios(const std::filesystem::path& testDataPacer)
   {
-    // The busy stretch of mb-framepacing-explained's 60-busy-swappy clip, frame by frame, played twice as its simulation does (so the clip
+    // The busy stretch of mb-framepacing-explained's 60-busy clip, frame by frame, played twice as its simulation does (so the clip
     // starts in the state it ends in); its swap intervals and refreshes are the reference
     Scenario busy;
     busy.Name = "60-busy";
@@ -166,7 +166,7 @@ namespace MB::FramePacing::Pacer::Simulation
     };
     // The case mb-framepacing-explained gives for the late count fix (web/content/slides/adapt-rate.md): the busy stretch of the 60-busy
     // clip (12 to 24 ms frames from 1.5 s, calm 9 to 13 ms frames around it), and the load back again right after the rule has sped up
-    // (it does so at 6.47 s): Swappy's rule waits a full window before it slows down again, the fix slows down after the late frames of one
+    // (it does so at 6.47 s): the full-window rule waits a full window before it slows down again, the fix slows down after the late frames of one
     Scenario relapse;
     relapse.Name = "60-relapse";
     relapse.RateNumerator = 60;
