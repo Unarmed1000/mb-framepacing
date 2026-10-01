@@ -87,8 +87,8 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var crop = MarkerCrop.For(sourceLock, Width, Height);
       var decoder = new MarkerDecoder();
 
-      var frame = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.None, 5_678_000);
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 7, 1, MB.FramePacing.Marker.MarkerFlags.None, 0);
+      var frame = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(5_678_000));
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 7, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0));
       var metadata = new StartMetadata(638_000_000_000_000_000, new MB.FramePacing.Marker.SequenceId(0xFEDC_BA98_7654_3210, 0x0123_4567_89AB_CDEF));
       foreach (var (payload, startMetadata) in new[] { (frame, (StartMetadata?)null), (start, metadata) })
       {

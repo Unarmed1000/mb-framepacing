@@ -144,14 +144,14 @@ namespace MB.FramePacing.Capture.Synthetic
             idle ? 0u : o.RunId,
             frameIndex,
             MB.FramePacing.Marker.MarkerFlags.None,
-            animationTicks,
-            PreferredFrameTicks: (uint)refresh,
-            TargetFrameTicks: (uint)refresh,
-            IntendedDisplayTicks: intendedTicks,
-            CpuStartTicks: cpuStartTicks,
-            CpuBusyTicks: (uint)cpuBusyTicks
+            new TimeSpan(animationTicks),
+            PreferredFrameTime: new TimeSpan32((uint)refresh),
+            TargetFrameTime: new TimeSpan32((uint)refresh),
+            IntendedDisplayTime: new TickCount64(intendedTicks),
+            CpuStartTime: new TickCount64(cpuStartTicks),
+            CpuBusy: new TimeSpan32((uint)cpuBusyTicks)
           )
-          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, animationTicks);
+          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(animationTicks));
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTicks));
       }
     }

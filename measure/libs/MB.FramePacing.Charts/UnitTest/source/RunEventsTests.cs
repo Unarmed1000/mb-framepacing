@@ -28,7 +28,8 @@ namespace MB.FramePacing.Charts.UnitTest
       var rows = new List<CaptureRow>();
       var at = new Dictionary<RunEventKind, long>();
       long time = 0;
-      MarkerPayload Frame(ulong index) => new MarkerPayload(MarkerKind.Frame, 1, index, MB.FramePacing.Marker.MarkerFlags.None, (long)index * Period);
+      MarkerPayload Frame(ulong index) =>
+        new MarkerPayload(MarkerKind.Frame, 1, index, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan((long)index * Period));
       CaptureRow Add(CaptureStatus status, MarkerPayload payload, uint sourceDrops = 0, MarkerPayload? sync = null, long missed = 0)
       {
         time += missed * Period;
@@ -38,7 +39,7 @@ namespace MB.FramePacing.Charts.UnitTest
         return row;
       }
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, 0));
+        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)));
       Add(CaptureStatus.Decoded, Frame(1));
       Add(CaptureStatus.Decoded, Frame(2));
       at[RunEventKind.NotDecoded] = Add(CaptureStatus.Undecodable, default).CaptureTicks;
@@ -57,7 +58,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Add(CaptureStatus.Decoded, Frame(10));
       Add(CaptureStatus.Decoded, Frame(10));
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 11, MB.FramePacing.Marker.MarkerFlags.None, 0));
+        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 11, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)));
       return (rows, at);
     }
 

@@ -27,7 +27,7 @@ namespace MB.FramePacing.Analysis
         hasMarker ? row.Payload.Kind.ToString() : null,
         hasMarker ? row.Payload.RunId : null,
         hasMarker ? row.Payload.FrameIndex : null,
-        hasMarker ? new TimeSpan(row.Payload.AnimationTicks) : null,
+        hasMarker ? row.Payload.AnimationTime : null,
         row.SourceDrops,
         row.MissedBefore,
         row.Sync?.RunId,

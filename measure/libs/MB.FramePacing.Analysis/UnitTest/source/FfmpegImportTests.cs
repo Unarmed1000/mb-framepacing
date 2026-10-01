@@ -92,7 +92,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       {
         var payload = scenario.PresentedFrames[scenario.PresentedIndexAt(i)].Payload;
         if (payload.Kind == MarkerKind.Frame && (expected.Count == 0 || expected[^1].Item1 != payload.FrameIndex))
-          expected.Add((payload.FrameIndex, payload.AnimationTicks));
+          expected.Add((payload.FrameIndex, payload.AnimationTime.Ticks));
       }
       return expected;
     }

@@ -46,8 +46,8 @@ namespace MB.FramePacing.Capture.UnitTest
         // A frame starts only after the previous one was handed over, also after a skipped frame
         var previous = frames[i - 1].Payload;
         Assert.That(
-          frames[i].Payload.CpuStartTicks,
-          Is.GreaterThanOrEqualTo(previous.CpuStartTicks + previous.CpuBusyTicks),
+          frames[i].Payload.CpuStartTime.Ticks,
+          Is.GreaterThanOrEqualTo(previous.CpuStartTime.Ticks + previous.CpuBusy.Ticks),
           $"frame {i}: CPU start"
         );
       }

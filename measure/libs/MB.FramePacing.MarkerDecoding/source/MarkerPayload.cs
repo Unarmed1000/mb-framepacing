@@ -20,43 +20,40 @@ namespace MB.FramePacing.MarkerDecoding
   /// The marker's flags: <see cref="FM.MarkerFlags.StaticAfter"/> when nothing animates while the frame is on screen,
   /// <see cref="FM.MarkerFlags.StaticBefore"/> when nothing animated while the frame before it was.
   /// </param>
-  /// <param name="AnimationTicks">The animation time the frame was rendered for, in <see cref="TimeSpan"/> ticks (100ns).</param>
-  /// <param name="PreferredFrameTicks">
-  /// The interval the application wants to run at, in ticks (100ns); 0 = unknown, <see cref="OnDemandFrameTicks"/> = frames only when
-  /// something changes.
+  /// <param name="AnimationTime">The animation time the frame was rendered for.</param>
+  /// <param name="PreferredFrameTime">
+  /// The interval the application wants to run at; 0 = unknown, <see cref="OnDemandFrameTime"/> = frames only when something changes.
   /// </param>
-  /// <param name="TargetFrameTicks">The interval the frame pacer aims for before this frame, in ticks (100ns); 0 = unknown.</param>
-  /// <param name="IntendedDisplayTicks">
-  /// When the application's frame pacer intends the frame to become visible, in ticks (100ns) on its steady clock; 0 = unknown.
+  /// <param name="TargetFrameTime">The interval the frame pacer aims for before this frame; 0 = unknown.</param>
+  /// <param name="IntendedDisplayTime">
+  /// When the application's frame pacer intends the frame to become visible, on its steady clock; 0 = unknown.
   /// </param>
-  /// <param name="CpuStartTicks">CPU start time: when the CPU started working on the frame, in ticks (100ns) on the frame pacer's steady clock; 0 = unknown.</param>
-  /// <param name="CpuBusyTicks">CPU busy: how long the CPU worked on the frame before presenting it, in ticks (100ns); 0 = unknown.</param>
+  /// <param name="CpuStartTime">CPU start time: when the CPU started working on the frame, on the frame pacer's steady clock; 0 = unknown.</param>
+  /// <param name="CpuBusy">CPU busy: how long the CPU worked on the frame before presenting it; 0 = unknown.</param>
   public readonly record struct MarkerPayload(
     MarkerKind Kind,
     uint RunId,
     ulong FrameIndex,
     FM.MarkerFlags Flags,
-    long AnimationTicks,
-    uint PreferredFrameTicks = 0,
-    uint TargetFrameTicks = 0,
-    long IntendedDisplayTicks = 0,
-    long CpuStartTicks = 0,
-    uint CpuBusyTicks = 0
+    TimeSpan AnimationTime,
+    TimeSpan32 PreferredFrameTime = default,
+    TimeSpan32 TargetFrameTime = default,
+    TickCount64 IntendedDisplayTime = default,
+    TickCount64 CpuStartTime = default,
+    TimeSpan32 CpuBusy = default
   )
   {
     /// <summary>The most bytes a payload encodes to (a start marker's).</summary>
     public const int MaxEncodedByteCount = FM.Payload.MaxEncodedByteCount;
 
     /// <summary>The target and preferred frame time of an application that presents only when something changes.</summary>
-    public const uint OnDemandFrameTicks = uint.MaxValue; // FM.Payload.OnDemandFrameTime's ticks
+    public static readonly TimeSpan32 OnDemandFrameTime = FM.Payload.OnDemandFrameTime;
 
     /// <summary>Nothing animates while this frame is on screen, until the next frame: the step from it to the next frame is not judged.</summary>
     public bool IsStaticAfter => (Flags & FM.MarkerFlags.StaticAfter) != 0;
 
     /// <summary>Nothing animated while the frame before this one was on screen: that frame is static after, known one frame later.</summary>
     public bool IsStaticBefore => (Flags & FM.MarkerFlags.StaticBefore) != 0;
-
-    public TimeSpan AnimationTime => TimeSpan.FromTicks(AnimationTicks);
 
     /// <summary>
     /// The same frame as <paramref name="other"/>: the same run id and frame index, which is all a sync marker carries. Frame indices of
@@ -85,12 +82,12 @@ namespace MB.FramePacing.MarkerDecoding
         decoded.RunId,
         decoded.FrameIndex,
         decoded.Flags,
-        decoded.AnimationTime.Ticks,
-        decoded.PreferredFrameTime.Ticks,
-        decoded.TargetFrameTime.Ticks,
-        decoded.IntendedDisplayTime.Ticks,
-        decoded.CpuStartTime.Ticks,
-        decoded.CpuBusy.Ticks
+        decoded.AnimationTime,
+        decoded.PreferredFrameTime,
+        decoded.TargetFrameTime,
+        decoded.IntendedDisplayTime,
+        decoded.CpuStartTime,
+        decoded.CpuBusy
       );
       if (decoded.Kind == FM.MarkerKind.SequenceStart)
         metadata = new StartMetadata(start.UtcTicks, start.SequenceId);
@@ -106,12 +103,12 @@ namespace MB.FramePacing.MarkerDecoding
         RunId,
         FrameIndex,
         Flags,
-        new TimeSpan(AnimationTicks),
-        new TimeSpan32(PreferredFrameTicks),
-        new TimeSpan32(TargetFrameTicks),
-        new TickCount64(IntendedDisplayTicks),
-        new TickCount64(CpuStartTicks),
-        new TimeSpan32(CpuBusyTicks)
+        AnimationTime,
+        PreferredFrameTime,
+        TargetFrameTime,
+        IntendedDisplayTime,
+        CpuStartTime,
+        CpuBusy
       );
   }
 }

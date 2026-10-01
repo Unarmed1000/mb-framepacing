@@ -7,6 +7,7 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System;
 using NUnit.Framework;
 
 namespace MB.FramePacing.MarkerDecoding.UnitTest
@@ -35,7 +36,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     private static void AssertGeometryMatches(ImagePoint[] view)
     {
       var screenToCamera = ScreenToCamera(view);
-      var camera = FilmScreen(screenToCamera, new MarkerPayload(MarkerKind.Frame, 1, 7, MB.FramePacing.Marker.MarkerFlags.None, 70));
+      var camera = FilmScreen(screenToCamera, new MarkerPayload(MarkerKind.Frame, 1, 7, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(70)));
 
       var result = new MarkerDecoder(tryHarder: true).Decode(camera);
 
@@ -57,7 +58,13 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     public void DecodeLocked_PureFastPath_HasNoGeometry()
     {
       var image = new GrayImage(ScreenSize, ScreenSize, 96);
-      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2), Origin, Origin, ModulePx);
+      MarkerRenderer.Render(
+        image,
+        new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2)),
+        Origin,
+        Origin,
+        ModulePx
+      );
       var markerLock = new MarkerLock(
         new PixelRect(Origin, Origin, MarkerRenderer.MarkerSizePx(ModulePx), MarkerRenderer.MarkerSizePx(ModulePx)),
         ModulePx

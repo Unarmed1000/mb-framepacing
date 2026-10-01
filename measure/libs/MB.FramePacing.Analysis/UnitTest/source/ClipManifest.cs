@@ -131,12 +131,12 @@ namespace MB.FramePacing.Analysis.UnitTest
         ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
         (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.None)
           | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.None),
-        RenderedAnimationTicks[frame] + (loop * DurationTicks),
-        PreferredFrameTicks: FrameTicks(RenderedPreferredInterval[frame]),
-        TargetFrameTicks: FrameTicks(RenderedSwapInterval[frame]),
-        IntendedDisplayTicks: RefreshTicks(intendedRefresh),
-        CpuStartTicks: RenderedCpuStartTicks[frame] + (loop * DurationTicks),
-        CpuBusyTicks: (uint)RenderedCpuBusyTicks[frame]
+        new TimeSpan(RenderedAnimationTicks[frame] + (loop * DurationTicks)),
+        PreferredFrameTime: new TimeSpan32(FrameTicks(RenderedPreferredInterval[frame])),
+        TargetFrameTime: new TimeSpan32(FrameTicks(RenderedSwapInterval[frame])),
+        IntendedDisplayTime: new TickCount64(RefreshTicks(intendedRefresh)),
+        CpuStartTime: new TickCount64(RenderedCpuStartTicks[frame] + (loop * DurationTicks)),
+        CpuBusy: new TimeSpan32((uint)RenderedCpuBusyTicks[frame])
       );
     }
 
@@ -258,7 +258,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     private long RefreshTicks(long refreshes) => RoundedDivision(refreshes * TimeSpan.TicksPerSecond, Fps);
 
     /// <summary>A marker's target or preferred frame time: whole refreshes in ticks, or on demand.</summary>
-    private uint FrameTicks(long? refreshes) => refreshes is { } count ? (uint)RefreshTicks(count) : MarkerPayload.OnDemandFrameTicks;
+    private uint FrameTicks(long? refreshes) => refreshes is { } count ? (uint)RefreshTicks(count) : MarkerPayload.OnDemandFrameTime.Ticks;
 
     /// <summary>A manifest time that must be a whole number of ticks, as the marker stores it.</summary>
     private static long WholeTicks(decimal ticks) => WholeNumber(ticks, "ticks");

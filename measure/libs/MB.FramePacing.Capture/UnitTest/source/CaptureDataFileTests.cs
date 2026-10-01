@@ -57,7 +57,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Records_RoundTrip_WithTheLargestMarkers()
     {
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2).Encode(
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2)).Encode(
         new StartMetadata(123, new MB.FramePacing.Marker.SequenceId(ulong.MaxValue, ulong.MaxValue))
       );
       Assert.That(start, Has.Length.EqualTo(MarkerPayload.MaxEncodedByteCount));

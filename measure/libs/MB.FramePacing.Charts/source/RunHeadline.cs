@@ -214,7 +214,7 @@ namespace MB.FramePacing.Charts
         .Distinct()
         .Order()
         .ToArray();
-      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTicks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTicks);
+      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTicks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks);
       var wants = new List<string>();
       if (preferredFps.Length > 0)
       {
@@ -228,7 +228,7 @@ namespace MB.FramePacing.Charts
       return string.Join(", ", wants);
     }
 
-    private static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTicks;
+    private static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks;
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
 

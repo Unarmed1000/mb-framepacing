@@ -132,7 +132,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
           (uint)random.Next(),
           (ulong)random.NextInt64(),
           MB.FramePacing.Marker.MarkerFlags.None,
-          random.NextInt64()
+          new TimeSpan(random.NextInt64())
         );
         var image = new GrayImage(size + 80, size + 80, 128);
         MarkerRenderer.Render(image, payload, 32, 32, moduleSize);
@@ -148,7 +148,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     {
       var frameLock = new MarkerLock(new PixelRect(32, 32, MarkerRenderer.MarkerSizePx(6), MarkerRenderer.MarkerSizePx(6)), 6);
       var start = new StartMetadata(639_257_616_000_000_000, new MB.FramePacing.Marker.SequenceId(0xFEDC_BA98_7654_3210, 0x0123_4567_89AB_CDEF));
-      var payload = new MarkerPayload(MarkerKind.SequenceStart, 7, 5, MB.FramePacing.Marker.MarkerFlags.None, 6);
+      var payload = new MarkerPayload(MarkerKind.SequenceStart, 7, 5, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(6));
       var image = new GrayImage(400, 400, 128);
       MarkerRenderer.Render(image, payload, 32, 32, 6, metadata: start);
 

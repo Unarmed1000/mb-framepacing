@@ -21,7 +21,7 @@ namespace MB.FramePacing.Charts
     public static long? Target(PresentedFrame frame) =>
       frame.MarkerTargetFrameTicks switch
       {
-        MarkerPayload.OnDemandFrameTicks => null,
+        uint.MaxValue => null, // MarkerPayload.OnDemandFrameTime
         0 => Preferred(frame),
         var ticks => ticks,
       };
@@ -33,7 +33,7 @@ namespace MB.FramePacing.Charts
     public static long? Preferred(PresentedFrame frame) =>
       frame.MarkerPreferredFrameTicks switch
       {
-        MarkerPayload.OnDemandFrameTicks => null,
+        uint.MaxValue => null, // MarkerPayload.OnDemandFrameTime
         0 => frame.PreferredTicks,
         var ticks => ticks,
       };

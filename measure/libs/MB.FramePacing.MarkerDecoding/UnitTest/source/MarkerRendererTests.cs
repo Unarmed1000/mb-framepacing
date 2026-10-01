@@ -7,6 +7,7 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System;
 using NUnit.Framework;
 
 namespace MB.FramePacing.MarkerDecoding.UnitTest
@@ -18,14 +19,14 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     public void EveryMarkerKind_IsVersion6()
     {
       Assert.That(
-        MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2)).Size,
+        MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2))).Size,
         Is.EqualTo(41)
       );
       Assert.That(
-        MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.SequenceEnd, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2)).Size,
+        MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.SequenceEnd, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2))).Size,
         Is.EqualTo(41)
       );
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, 2);
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2));
       Assert.That(MarkerRenderer.GenerateModules(start).Size, Is.EqualTo(41));
       var full = MarkerRenderer.GenerateModules(
         start,
@@ -42,9 +43,9 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         30,
         10,
         MB.FramePacing.Marker.MarkerFlags.None,
-        20,
-        TargetFrameTicks: 166_667,
-        IntendedDisplayTicks: 1_234_567_890_123
+        new TimeSpan(20),
+        TargetFrameTime: new TimeSpan32(166_667),
+        IntendedDisplayTime: new TickCount64(1_234_567_890_123)
       );
       var image = new GrayImage(400, 400, 96);
       MarkerRenderer.Render(image, payload, 20, 20, 3, MarkerRenderer.RecommendedQuietZoneModules);
@@ -71,9 +72,9 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     {
       // 294 px markers at the top, middle and bottom of the frame
       var image = new GrayImage(640, 1100, 128);
-      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.None, 100), 32, 32, 6);
-      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.None, 100), 32, 400, 6);
-      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 11, MB.FramePacing.Marker.MarkerFlags.None, 200), 32, 768, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(100)), 32, 32, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(100)), 32, 400, 6);
+      MarkerRenderer.Render(image, new MarkerPayload(MarkerKind.Frame, 1, 11, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(200)), 32, 768, 6);
 
       var results = new MarkerDecoder(tryHarder: true).DecodeAll(image);
 

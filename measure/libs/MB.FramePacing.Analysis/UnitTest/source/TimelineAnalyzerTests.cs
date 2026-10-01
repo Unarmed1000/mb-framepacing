@@ -45,9 +45,9 @@ namespace MB.FramePacing.Analysis.UnitTest
           runId,
           frameIndex,
           flags,
-          animationMs * Ms,
-          PreferredFrameTicks: preferredFrameTicks,
-          TargetFrameTicks: targetFrameTicks
+          new TimeSpan(animationMs * Ms),
+          PreferredFrameTime: new TimeSpan32(preferredFrameTicks),
+          TargetFrameTime: new TimeSpan32(targetFrameTicks)
         );
         for (int i = 0; i < captures; ++i)
           Rows.Add(new CaptureRow(Next, Next * Period, CaptureStatus.Decoded, payload, start));
@@ -252,7 +252,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void OnDemand_IsNeverLateByTheTargetRule()
     {
-      const uint OnDemand = MarkerPayload.OnDemandFrameTicks;
+      uint OnDemand = MarkerPayload.OnDemandFrameTime.Ticks;
       var rows = new RowBuilder().Start(1);
       rows.Show(1, 0, 4, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
       rows.Show(2, 16, 500, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);

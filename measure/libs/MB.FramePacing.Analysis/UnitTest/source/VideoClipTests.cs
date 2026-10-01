@@ -71,12 +71,12 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(payload.Kind, Is.EqualTo(expected.Kind), where + ": kind");
         Assert.That(payload.FrameIndex, Is.EqualTo(expected.FrameIndex), where + ": frame index");
         Assert.That(payload.RunId, Is.EqualTo(expected.RunId), where + ": run id");
-        Assert.That(payload.AnimationTicks, Is.EqualTo(expected.AnimationTicks), where + ": animation time");
-        Assert.That(payload.IntendedDisplayTicks, Is.EqualTo(expected.IntendedDisplayTicks), where + ": intended display time");
-        Assert.That(payload.TargetFrameTicks, Is.EqualTo(expected.TargetFrameTicks), where + ": target frame time");
-        Assert.That(payload.CpuStartTicks, Is.EqualTo(expected.CpuStartTicks), where + ": CPU start time");
-        Assert.That(payload.CpuBusyTicks, Is.EqualTo(expected.CpuBusyTicks), where + ": CPU busy");
-        Assert.That(payload.PreferredFrameTicks, Is.EqualTo(expected.PreferredFrameTicks), where + ": preferred frame time");
+        Assert.That(payload.AnimationTime.Ticks, Is.EqualTo(expected.AnimationTime.Ticks), where + ": animation time");
+        Assert.That(payload.IntendedDisplayTime.Ticks, Is.EqualTo(expected.IntendedDisplayTime.Ticks), where + ": intended display time");
+        Assert.That(payload.TargetFrameTime.Ticks, Is.EqualTo(expected.TargetFrameTime.Ticks), where + ": target frame time");
+        Assert.That(payload.CpuStartTime.Ticks, Is.EqualTo(expected.CpuStartTime.Ticks), where + ": CPU start time");
+        Assert.That(payload.CpuBusy.Ticks, Is.EqualTo(expected.CpuBusy.Ticks), where + ": CPU busy");
+        Assert.That(payload.PreferredFrameTime.Ticks, Is.EqualTo(expected.PreferredFrameTime.Ticks), where + ": preferred frame time");
         Assert.That(payload.Flags, Is.EqualTo(expected.Flags), where + ": flags");
         if (expected.Kind == MarkerKind.SequenceStart)
         {
