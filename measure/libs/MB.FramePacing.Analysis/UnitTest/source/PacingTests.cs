@@ -178,7 +178,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void MarkerTargetFrameTime_FollowsARateSwitch()
     {
-      // A Swappy-like pacer: 60 fps, then a stretch at 30 fps it chose itself, then 60 again. A frame's target frame time is the interval
+      // An adaptive pacer: 60 fps, then a stretch at 30 fps it chose itself, then 60 again. A frame's target frame time is the interval
       // before it, so the 30 fps targets start one frame after the first frame shown for two refreshes
       const uint Full = 160_000;
       const uint Half = 320_000;

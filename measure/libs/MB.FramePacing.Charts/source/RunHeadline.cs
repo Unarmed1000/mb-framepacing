@@ -182,7 +182,7 @@ namespace MB.FramePacing.Charts
       if (pacing?.ExpectedRefreshHz is { } expected && mismatch)
         kind += $", expected {expected.ToString("0.##", CultureInfo.InvariantCulture)} Hz";
 
-      // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate, like Swappy,
+      // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate,
       // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
       var refreshes = frames
         .Where(f => f.DisplayDeltaTicks.HasValue && (Known(f.MarkerTargetFrameTicks) || f.TargetTicks.HasValue))

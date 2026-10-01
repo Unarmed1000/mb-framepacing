@@ -376,8 +376,8 @@ namespace MB.FramePacing.DocImages
     }
 
     /// <summary>
-    /// The SVG report examples of the README, from test clips made by mb-framepacing-explained (measure/test-data/videos): a game adapting its rate like
-    /// Swappy, a busy stretch at the full rate, and delta time jitter from a naive timer. Imported through ffmpeg; skipped without it.
+    /// The SVG report examples of the README, from test clips made by mb-framepacing-explained (measure/test-data/videos): a game adapting its
+    /// rate, a busy stretch at the full rate, and delta time jitter from a naive timer. Imported through ffmpeg; skipped without it.
     /// </summary>
     private static void WriteReportExamples(string output, string work)
     {

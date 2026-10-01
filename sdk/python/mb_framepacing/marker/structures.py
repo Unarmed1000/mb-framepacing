@@ -58,7 +58,7 @@ class Payload:
     animation_ticks: int
     preferred_frame_ticks: int = 0
     """The interval the application wants to run at, in ticks (100 ns, u32): what it would aim for if nothing held it back. It differs
-    from target_frame_ticks only while the pacer runs slower than it wants (Swappy lowered to 30 fps: preferred 166_667, target 333_333). A
+    from target_frame_ticks only while the pacer runs slower than it wants (a pacer lowered to 30 fps: preferred 166_667, target 333_333). A
     30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, ON_DEMAND_FRAME_TICKS = frames only when something
     changes (also allowed in target_frame_ticks)."""
     target_frame_ticks: int = 0
