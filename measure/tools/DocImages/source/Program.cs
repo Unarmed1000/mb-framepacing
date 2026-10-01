@@ -85,8 +85,14 @@ namespace MB.FramePacing.DocImages
         directory,
         GuiLogging.FilePrefix + DateTime.Now.ToString(GuiLogging.DateFormat, CultureInfo.InvariantCulture) + ".log"
       );
-      if (!File.Exists(today) || !File.ReadAllText(today).Contains("mb-framepacing-gui", StringComparison.Ordinal))
+      string log = File.Exists(today) ? File.ReadAllText(today) : string.Empty;
+      if (!log.Contains("mb-framepacing-gui", StringComparison.Ordinal))
         throw new InvalidOperationException($"No log in {today}");
+      // The libraries log through the same file: the camera wizard's calibration says what it measured the refresh rate from
+      string? calibration = log.Split('\n').FirstOrDefault(line => line.Contains("Calibration timing", StringComparison.Ordinal));
+      if (calibration == null)
+        throw new InvalidOperationException($"The camera calibration is not in {today}");
+      Console.WriteLine(calibration.Trim());
       if (File.Exists(oldLog))
         throw new InvalidOperationException($"The old log file {oldLog} was not deleted");
       Console.WriteLine($"GUI log checked: {today}");

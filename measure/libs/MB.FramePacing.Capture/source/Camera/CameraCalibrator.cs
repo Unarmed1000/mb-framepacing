@@ -17,11 +17,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MB.FramePacing.MarkerDecoding;
+using NLog;
 
 namespace MB.FramePacing.Capture.Camera
 {
   public static class CameraCalibrator
   {
+    private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
+
     public const int RequiredZones = 2;
 
     /// <summary>Below this many camera pixels per module decoding is unreliable; below the recommended size it is marginal.</summary>
@@ -370,6 +373,18 @@ namespace MB.FramePacing.Capture.Camera
       // The intervals are whole refreshes quantised to camera periods (16 or 17 ms for 60 Hz at 1000 fps)
       double? refreshPeriod = RefreshEstimator.EstimatePeriodTicks(intervals, TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames)));
       double? refreshHz = refreshPeriod is { } refresh ? TimeSpan.TicksPerSecond / refresh : null;
+      // What the estimate was made from, in full: the check's text rounds the rate to a tenth
+      g_logger.Info(
+        CultureInfo.InvariantCulture,
+        "Calibration timing: {0} camera frames, {1} frames first seen, {2} intervals between consecutive ones, refresh period {3} ticks ({4} Hz)",
+        frames.Count,
+        ordered.Count,
+        intervals.Count,
+        refreshPeriod,
+        refreshHz
+      );
+      if (g_logger.IsTraceEnabled)
+        g_logger.Trace("Calibration first seen (frame@ticks): {0}", string.Join(" ", ordered.Select(kv => $"{kv.Key}@{kv.Value.Ticks}")));
 
       var decodeRate = decoded.Select(d => d.Count(v => v >= 0) / (double)Math.Max(1, frames.Count)).ToArray();
       var whiteVariation = new double[zoneCount];
