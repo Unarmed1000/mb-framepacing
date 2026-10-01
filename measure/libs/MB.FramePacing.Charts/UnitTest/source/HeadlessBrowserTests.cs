@@ -2,8 +2,8 @@
 //* File Description
 //* ----------------
 //* The headless browser that saves the PNGs: when it is run again (once more after a failure, and without the sandbox where Linux forbids
-//* it), that its error text is read while a helper keeps the output open (a script stands in for the browser), and that an image from an
-//* earlier run is never taken for the new one (with a real browser; skipped without one).
+//* it), and that its error text is read while a helper keeps the output open (a script stands in for the browser). The real browser is in
+//* ReportSvgTests.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -140,47 +140,6 @@ namespace MB.FramePacing.Charts.UnitTest
         var error = Assert.Throws<InvalidOperationException>(() => HeadlessBrowser.SavePng(svg, Path.Combine(directory, "card.png"), browser));
         Assert.That(error!.Message, Does.Contain("exit code 134"));
         Assert.That(error.Message, Does.Contain("No usable sandbox"));
-      }
-      finally
-      {
-        Directory.Delete(directory, recursive: true);
-      }
-    }
-
-    /// <summary>
-    /// A whole PNG already at the target (rendering to the same path twice) is replaced: the browser is ended as soon as the file is whole,
-    /// so the old image would be taken for the new one.
-    /// </summary>
-    [Test]
-    public void SavePng_ReplacesAnImageThatIsAlreadyThere()
-    {
-      if (HeadlessBrowser.Find() is not { } browser)
-      {
-        Assert.Ignore("No Edge or Chrome on this machine");
-        return;
-      }
-      string directory = Path.Combine(Path.GetTempPath(), "mb-framepacing-tests", Guid.NewGuid().ToString("N"));
-      Directory.CreateDirectory(directory);
-      try
-      {
-        string svg = Path.Combine(directory, "card.svg");
-        string png = Path.Combine(directory, "card.png");
-        File.WriteAllText(
-          svg,
-          "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"40\"><rect width=\"120\" height=\"40\" fill=\"#204060\"/></svg>",
-          new UTF8Encoding(false)
-        );
-        // Not an image, but whole as the browser's check sees it: it ends with a PNG's last chunk
-        var old = new byte[64];
-        Encoding.ASCII.GetBytes("IEND").CopyTo(old, old.Length - 8);
-        File.WriteAllBytes(png, old);
-
-        HeadlessBrowser.SavePng(svg, png, browser);
-
-        byte[] saved = File.ReadAllBytes(png);
-        Assert.That(saved.AsSpan(0, 8).ToArray(), Is.EqualTo(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A }), "a PNG");
-        int BigEndian(int offset) => (saved[offset] << 24) | (saved[offset + 1] << 16) | (saved[offset + 2] << 8) | saved[offset + 3];
-        Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((240, 80)), "the SVG at twice its size");
       }
       finally
       {

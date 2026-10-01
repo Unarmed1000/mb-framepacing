@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using MB.FramePacing.Analysis;
 using NUnit.Framework;
@@ -140,7 +141,11 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.DoesNotThrow(() => System.Xml.Linq.XDocument.Parse(svg), "well formed");
     }
 
-    /// <summary>The PNG is the SVG drawn by a headless Edge or Chrome at twice its size; skipped where there is none.</summary>
+    /// <summary>
+    /// The PNG is the SVG drawn by a headless Edge or Chrome at twice its size; skipped where there is none. A whole PNG that is already at
+    /// the target (rendering to the same path twice) is replaced: the browser is ended as soon as the file is whole, so the older image
+    /// would be taken for the new one.
+    /// </summary>
     [Test]
     public void Png_IsTwiceTheSize()
     {
@@ -154,11 +159,17 @@ namespace MB.FramePacing.Charts.UnitTest
       Directory.CreateDirectory(directory);
       try
       {
+        // Not an image, but whole as the browser's check sees it: it ends with a PNG's last chunk
+        var older = new byte[64];
+        Encoding.ASCII.GetBytes("IEND").CopyTo(older, older.Length - 8);
+        File.WriteAllBytes(Path.Combine(directory, "run-1-report-100s-104s.png"), older);
+
         var files = ReportFiles.Write(run, "run-1", directory, 100, 104, png: true);
         Assert.That(files.Select(Path.GetFileName), Is.EqualTo(new[] { "run-1-report-100s-104s.svg", "run-1-report-100s-104s.png" }));
         var header = new byte[24];
         using (var stream = File.OpenRead(files[1]))
           stream.ReadExactly(header);
+        Assert.That(header.AsSpan(0, 8).ToArray(), Is.EqualTo(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A }), "a PNG");
         int BigEndian(int offset) => (header[offset] << 24) | (header[offset + 1] << 16) | (header[offset + 2] << 8) | header[offset + 3];
         int svgHeight = int.Parse(Regex.Match(File.ReadAllText(files[0]), "height=\"(\\d+)\"").Groups[1].Value);
         Assert.That((BigEndian(16), BigEndian(20)), Is.EqualTo((2 * ReportCard.Width, 2 * svgHeight)), browser);
