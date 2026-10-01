@@ -109,7 +109,8 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     `tools/measure_sdk_size.py --toolchain <id>` builds them in Release and MinSizeRel (in `sdk/cpp/build/size`) and reports each
     one's size minus the baseline's; `--update-doc` rewrites the table in `sdk/cpp/README.md` (between `sdk-size-table` markers),
     `--check` fails beyond 10 % (at least 4 KiB). CI's `cpp-size` job checks MSVC, GCC, Clang and AppleClang and uploads each
-    measurement (`--update-doc size-*.json` takes them). Refresh the table in the change that alters a module's size.
+    measurement (`--update-doc size-*.json` takes them). Refresh the table in the change that alters a module's size. `--csharp`
+    measures the C# modules' Release assemblies for the table in `sdk/README.md` (`--check` in CI's `dotnet-lint`, `--update-doc` to rewrite).
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
     (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally. The C# marker has the

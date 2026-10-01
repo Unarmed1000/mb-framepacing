@@ -128,7 +128,7 @@ jobs:
         run: python3 sdk/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
 
   dotnet-lint:
-    name: .NET lint (CSharpier, dotnet format, vulnerable packages, coverage)
+    name: .NET lint (CSharpier, dotnet format, vulnerable packages, coverage, sizes)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -159,6 +159,8 @@ jobs:
       # The SDK modules that must be fully tested: every line and branch of the assembly, by its own tests
       - name: C# coverage (100 % of the core and the marker module)
         run: python3 tools/check_csharp_coverage.py
+      - name: C# assembly sizes (the table in sdk/README.md)
+        run: python3 tools/measure_sdk_size.py --csharp --check
 
   cpp-analysis:
     name: C++ sanitizers and clang-tidy
