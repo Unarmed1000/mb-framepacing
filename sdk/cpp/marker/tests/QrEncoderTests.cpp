@@ -486,14 +486,14 @@ TEST(QrEncoder, TheFirstOfEqualMasksWins)
       ASSERT_TRUE(QR::EncodeWithMask(payload, 2, mask, masked));
       scores[static_cast<std::size_t>(mask)] = QR::PenaltyScore(masked);
     }
-    const auto best = std::ranges::min_element(scores);
-    if (std::ranges::count(scores, *best) < 2)
+    const auto best = static_cast<int32_t>(std::ranges::min_element(scores) - scores.begin());
+    if (std::ranges::count(scores, scores[static_cast<std::size_t>(best)]) < 2)
     {
       continue;
     }
     ++ties;
     QR::QrSymbol expected;
-    ASSERT_TRUE(QR::EncodeWithMask(payload, 2, static_cast<int32_t>(best - scores.begin()), expected));
+    ASSERT_TRUE(QR::EncodeWithMask(payload, 2, best, expected));
     ReferenceSymbol reference{};
     ASSERT_TRUE(ReferenceEncode(payload, 2, qrcodegen_Mask_AUTO, reference));
     QR::QrSymbol symbol;
