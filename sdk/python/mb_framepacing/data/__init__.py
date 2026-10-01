@@ -27,8 +27,6 @@ from .analysis_files import (
     TICKS_PER_MILLISECOND,
     find_analysis,
     frames_file_name,
-    ms_to_ticks,
-    parse_ticks,
     run_file_prefix,
 )
 from .capture_data import (
@@ -98,9 +96,7 @@ __all__ = [
     "ValueStatistics",
     "find_analysis",
     "frames_file_name",
-    "ms_to_ticks",
     "parse_summary",
-    "parse_ticks",
     "read_captures",
     "read_frames",
     "read_summary",

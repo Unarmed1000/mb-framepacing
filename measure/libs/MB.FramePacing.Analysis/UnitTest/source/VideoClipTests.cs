@@ -146,7 +146,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(manifest.ExpectedSkippedFrameIndices), $"{clip}: frame indices never presented");
       Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(manifest.ExpectedOutOfOrderCaptures), $"{clip}: captures out of order");
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule), "the markers carry the pacer's schedule");
-      long refresh = (long)Math.Round(run.Pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond);
+      long refresh = run.Pacing.RefreshPeriod.Ticks;
       Assert.That(refresh, Is.AnyOf(166666L, 166667L), "the refresh is the capture period: 1/60 s in whole ticks");
 
       // Lateness is measured from the run's on-time frames: the earliest (shown - intended) of the frames on time (an out-of-order frame is early)

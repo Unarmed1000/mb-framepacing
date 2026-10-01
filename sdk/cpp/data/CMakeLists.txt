@@ -26,7 +26,6 @@ target_sources(mb_framepacing_data
     source/mb/framepacing/data/capture/CaptureDataRecord.cpp
     source/mb/framepacing/data/analysis/CapturesCsv.cpp
     source/mb/framepacing/data/analysis/FramesCsv.cpp
-    source/mb/framepacing/data/analysis/Milliseconds.cpp
     source/mb/framepacing/data/analysis/detail/CsvCells.hpp
     source/mb/framepacing/data/analysis/detail/CsvTable.cpp
     source/mb/framepacing/data/analysis/detail/CsvTable.hpp
@@ -47,7 +46,6 @@ target_sources(mb_framepacing_data
       include/mb/framepacing/data/analysis/FrameRow.hpp
       include/mb/framepacing/data/analysis/FramesCsv.hpp
       include/mb/framepacing/data/capture/MarkerLocation.hpp
-      include/mb/framepacing/data/analysis/Milliseconds.hpp
       include/mb/framepacing/data/analysis/OlderFrame.hpp
       include/mb/framepacing/data/analysis/SummaryCamera.hpp
       include/mb/framepacing/data/analysis/SummaryCounts.hpp

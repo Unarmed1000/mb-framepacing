@@ -202,9 +202,9 @@ namespace MB.FramePacing.Analysis
         report.Session != null ? JsonSerializer.SerializeToElement(report.Session, AnalysisSummary.JsonOptions) : null,
         $"{report.Capture.Header.Width}x{report.Capture.Header.Height}",
         report.Capture.TimeSource.ToString(),
-        report.CapturePeriodMs,
-        report.CapturePeriodMs,
-        report.ErrorThresholdMs,
+        report.Timeline.CapturePeriod,
+        report.Timeline.CapturePeriod,
+        report.Timeline.ErrorThreshold,
         report.Capture.Layout.Locks.Select(l => new SummaryMarker(l.Bounds.ToString(), l.ModuleSizePx)).ToList(),
         report.Warnings,
         report.Timeline.Runs.Select((run, i) => run.ToSummary(runFiles[i])).ToList()

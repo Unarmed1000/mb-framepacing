@@ -1,6 +1,6 @@
 {
   "toolVersion": "0.1.0",
-  "startedUtc": "2026-09-29T22:17:06.5060989Z",
+  "startedUtc": "2026-10-01T23:10:07.2007939Z",
   "source": "ffmpeg Media \u0027video.mp4\u0027",
   "ffmpegVersion": "ffmpeg version 2026-03-15-git-6ba0b59d8b-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
   "ffmpegCommandLine": "-hide_banner -nostats -loglevel info -i measure/test-data/videos/60-busy-full-rate/video.mp4 -an -sn -copyts -fps_mode passthrough -vf format=gray,showinfo -f rawvideo -pix_fmt gray pipe:1",
@@ -11,7 +11,7 @@
   "nominalFps": 60,
   "waitedForStart": false,
   "stopAtEnd": false,
-  "durationSeconds": 0.5014647,
+  "durationSeconds": 0.5656978,
   "framesCaptured": 486,
   "framesWritten": 486,
   "framesDroppedByRecorder": 0,

@@ -76,7 +76,7 @@ namespace MB.FramePacing.Analysis
 
     private static TimeSpan32? Known(TimeSpan32 span) => span != TimeSpan32.Zero ? span : null;
 
-    /// <summary>A presented frame read back. Output written before lastSeenMs existed: the last capture its time on screen allows.</summary>
+    /// <summary>A presented frame read back. Output written before lastSeenTicks existed: the last capture its time on screen allows.</summary>
     public static PresentedFrame ToFrame(this FrameRow row, TimeSpan capturePeriod) =>
       new PresentedFrame(
         row.Segment,
@@ -224,9 +224,9 @@ namespace MB.FramePacing.Analysis
 
     private static SummaryPacing ToSummary(this RunPacing p) =>
       new SummaryPacing(
-        p.RefreshPeriodMs,
+        p.RefreshPeriod,
         p.RefreshCalculated,
-        p.TargetFrameMs,
+        p.TargetFrameTime,
         p.Source.ToString(),
         p.LateFrames,
         p.LateShare,
@@ -244,9 +244,9 @@ namespace MB.FramePacing.Analysis
 
     private static RunPacing ToPacing(this SummaryPacing p) =>
       new RunPacing(
-        p.RefreshPeriodMs,
+        p.RefreshPeriod,
         p.RefreshCalculated,
-        p.TargetFrameMs,
+        p.TargetFrameTime,
         Enum.Parse<PacingSource>(p.Source),
         p.LateFrames,
         p.LateShare,

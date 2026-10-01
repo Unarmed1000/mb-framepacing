@@ -7,20 +7,22 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System.Text.Json.Serialization;
+
 namespace MB.FramePacing.Data
 {
   public sealed record SummaryCounts(
-    long Captures,
-    long Decoded,
-    long Undecodable,
-    long Torn,
-    long NotRecorded,
-    long SourceDroppedFrames,
-    long MissedCaptures,
-    long PresentedFrames,
-    long SkippedFrameIndices,
-    long DroppedFrames,
-    long OutOfOrderCaptures,
-    int Segments
+    [property: JsonRequired] long Captures,
+    [property: JsonRequired] long Decoded,
+    [property: JsonRequired] long Undecodable,
+    [property: JsonRequired] long Torn,
+    [property: JsonRequired] long NotRecorded,
+    [property: JsonRequired] long SourceDroppedFrames,
+    [property: JsonRequired] long MissedCaptures,
+    [property: JsonRequired] long PresentedFrames,
+    [property: JsonRequired] long SkippedFrameIndices,
+    [property: JsonRequired] long DroppedFrames,
+    [property: JsonRequired] long OutOfOrderCaptures,
+    [property: JsonRequired] int Segments
   );
 }

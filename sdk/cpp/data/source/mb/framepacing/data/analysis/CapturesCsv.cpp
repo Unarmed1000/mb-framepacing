@@ -4,7 +4,9 @@
 #include <mb/framepacing/data/analysis/CaptureCsvRow.hpp>
 #include <mb/framepacing/data/analysis/CapturesCsv.hpp>
 #include <charconv>
+#include <cstddef>
 #include <string>
+#include <string_view>
 #include "detail/CsvCells.hpp"
 #include "detail/CsvTable.hpp"
 
@@ -32,32 +34,47 @@ namespace MB::FramePacing::Data
     }
   }
 
-  std::vector<CaptureCsvRow> ReadCaptures(const std::filesystem::path& path)
+  namespace
   {
-    const Detail::CsvTable table = Detail::CsvTable::Read(path);
-    std::vector<CaptureCsvRow> captures;
-    captures.reserve(table.Rows.size());
-    for (const auto& row : table.Rows)
+    CaptureCsvRow ToCapture(const Csv::CsvTable& table, const std::vector<std::string>& row)
     {
       CaptureCsvRow capture;
-      capture.CaptureIndex = Detail::ParseInteger<int64_t>(table.Cell(row, "captureIndex"));
-      capture.CaptureTime = Detail::OptionalTickCount64(table.Cell(row, "captureMs"));
+      capture.CaptureIndex = Csv::ParseInteger<int64_t>(table.Cell(row, "captureIndex"));
+      capture.CaptureTime = Csv::OptionalTickCount64(table.Cell(row, "captureTicks"));
       capture.Status = std::string(table.Cell(row, "status"));
       if (const std::string_view kind = table.Cell(row, "kind"); !kind.empty())
       {
         capture.Kind = std::string(kind);
       }
-      capture.RunId = Detail::OptionalInteger<uint32_t>(table.Cell(row, "runId"));
-      capture.FrameIndex = Detail::OptionalInteger<uint64_t>(table.Cell(row, "frameIndex"));
-      capture.AnimationTime = Detail::OptionalTimeSpan(table.Cell(row, "animationMs"));
-      capture.SourceDropsBefore = Detail::OptionalInteger<int64_t>(table.Cell(row, "sourceDropsBefore")).value_or(0);
-      capture.MissedBefore = Detail::OptionalInteger<int64_t>(table.Cell(row, "missedBefore")).value_or(0);
-      capture.SyncRunId = Detail::OptionalInteger<uint32_t>(table.Cell(row, "syncRunId"));
-      capture.SyncFrameIndex = Detail::OptionalInteger<uint64_t>(table.Cell(row, "syncFrameIndex"));
-      capture.HostTime = Detail::OptionalTickCount64(table.Cell(row, "hostMs"));
-      capture.DeviceTime = Detail::OptionalTickCount64(table.Cell(row, "deviceMs"));
+      capture.RunId = Csv::OptionalInteger<uint32_t>(table.Cell(row, "runId"));
+      capture.FrameIndex = Csv::OptionalInteger<uint64_t>(table.Cell(row, "frameIndex"));
+      capture.AnimationTime = Csv::OptionalTimeSpan(table.Cell(row, "animationTicks"));
+      capture.SourceDropsBefore = Csv::OptionalInteger<int64_t>(table.Cell(row, "sourceDropsBefore")).value_or(0);
+      capture.MissedBefore = Csv::OptionalInteger<int64_t>(table.Cell(row, "missedBefore")).value_or(0);
+      capture.SyncRunId = Csv::OptionalInteger<uint32_t>(table.Cell(row, "syncRunId"));
+      capture.SyncFrameIndex = Csv::OptionalInteger<uint64_t>(table.Cell(row, "syncFrameIndex"));
+      capture.HostTime = Csv::OptionalTickCount64(table.Cell(row, "hostTicks"));
+      capture.DeviceTime = Csv::OptionalTickCount64(table.Cell(row, "deviceTicks"));
       capture.Payload = FromHex(table.Cell(row, "payloadHex"));
-      captures.push_back(std::move(capture));
+      return capture;
+    }
+  }
+
+  std::vector<CaptureCsvRow> ReadCaptures(const std::filesystem::path& path)
+  {
+    const Csv::CsvTable table = Csv::CsvTable::Read(path);
+    std::vector<CaptureCsvRow> captures;
+    captures.reserve(table.Rows.size());
+    for (std::size_t i = 0; i < table.Rows.size(); ++i)
+    {
+      try
+      {
+        captures.push_back(ToCapture(table, table.Rows[i]));
+      }
+      catch (const DataFormatError& error)
+      {
+        throw table.InRow(i, error);
+      }
     }
     return captures;
   }

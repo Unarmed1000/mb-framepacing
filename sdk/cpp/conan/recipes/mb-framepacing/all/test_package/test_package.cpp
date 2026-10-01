@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// The Conan package's test: encode the frame marker of one frame at 60 fps and draw it as a triangle list (marker), parse a CSV
-// time (data), and print what came out with the library version (core).
+// The Conan package's test: encode the frame marker of one frame at 60 fps and draw it as a triangle list (marker), read a
+// summary's capture period (data), and print what came out with the library version (core).
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
-#include <mb/framepacing/data/analysis/Milliseconds.hpp>
+#include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -39,7 +39,7 @@ int main()
     FP::TimeSpan32{frameTicks}};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
-  const int64_t ticks = FP::Data::ParseMilliseconds("16.6667").Ticks();
+  const int64_t ticks = FP::Data::ParseSummary(R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000 })").CapturePeriod.Ticks();
   const std::string_view version = FP::GetLibraryVersion().Text;
   std::printf("mb_framepacing %.*s: %zu vertices, %lld ticks, a %u tick frame\n", static_cast<int>(version.size()), version.data(), count,
               static_cast<long long>(ticks), static_cast<unsigned>(payload.TargetFrameTime().Ticks()));

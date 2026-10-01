@@ -3,72 +3,94 @@
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/FrameRow.hpp>
 #include <mb/framepacing/data/analysis/FramesCsv.hpp>
-#include <mb/framepacing/data/analysis/Milliseconds.hpp>
+#include <cstddef>
 #include <string>
+#include <string_view>
 #include "detail/CsvCells.hpp"
 #include "detail/CsvTable.hpp"
 
 namespace MB::FramePacing::Data
 {
-  std::vector<FrameRow> ReadFrames(const std::filesystem::path& path)
+  namespace
   {
-    const Detail::CsvTable table = Detail::CsvTable::Read(path);
-    std::vector<FrameRow> frames;
-    frames.reserve(table.Rows.size());
-    for (const auto& row : table.Rows)
+    //! The cell's entries, separated by '|': none for an empty cell. Throws DataFormatError for an empty entry.
+    template <typename TEntry>
+    void ForEachEntry(const std::string_view cell, const char* column, const TEntry& entry)
+    {
+      for (std::size_t start = 0; start < cell.size();)
+      {
+        const std::size_t bar = cell.find('|', start);
+        const std::size_t stop = bar == std::string_view::npos ? cell.size() : bar;
+        if (stop == start || stop + 1 == cell.size())
+        {
+          throw DataFormatError(std::string("An empty entry in ") + column + " '" + std::string(cell) + "'");
+        }
+        entry(cell.substr(start, stop - start));
+        start = stop + 1;
+      }
+    }
+
+    FrameRow ToFrame(const Csv::CsvTable& table, const std::vector<std::string>& row)
     {
       FrameRow frame;
-      frame.Segment = Detail::ParseInteger<int32_t>(table.Cell(row, "segment"));
-      frame.FrameIndex = Detail::ParseInteger<uint64_t>(table.Cell(row, "frameIndex"));
-      frame.AnimationTime = ParseMilliseconds(table.Cell(row, "animationMs"));
-      frame.FirstCaptureIndex = Detail::ParseInteger<int64_t>(table.Cell(row, "firstCaptureIndex"));
-      frame.FirstSeenTime = Detail::ParseTickCount64(table.Cell(row, "firstSeenMs"));
-      frame.OnScreen = ParseMilliseconds(table.Cell(row, "onScreenMs"));
-      frame.Captures = Detail::ParseInteger<int32_t>(table.Cell(row, "captures"));
-      frame.SkippedBefore = Detail::ParseInteger<uint64_t>(table.Cell(row, "skippedBefore"));
-      frame.DisplayDelta = Detail::OptionalTimeSpan(table.Cell(row, "displayDeltaMs"));
-      frame.AnimationDelta = Detail::OptionalTimeSpan(table.Cell(row, "animationDeltaMs"));
-      frame.AnimationError = Detail::OptionalTimeSpan(table.Cell(row, "animationErrorMs"));
-      frame.Drift = ParseMilliseconds(table.Cell(row, "driftMs"));
-      const std::string_view flags = table.Cell(row, "flags");
-      for (std::size_t start = 0; start < flags.size();)
+      frame.Segment = Csv::ParseInteger<int32_t>(table.Cell(row, "segment"));
+      frame.FrameIndex = Csv::ParseInteger<uint64_t>(table.Cell(row, "frameIndex"));
+      frame.AnimationTime = Csv::ParseTimeSpan(table.Cell(row, "animationTicks"));
+      frame.FirstCaptureIndex = Csv::ParseInteger<int64_t>(table.Cell(row, "firstCaptureIndex"));
+      frame.FirstSeenTime = Csv::ParseTickCount64(table.Cell(row, "firstSeenTicks"));
+      frame.OnScreen = Csv::ParseTimeSpan(table.Cell(row, "onScreenTicks"));
+      frame.Captures = Csv::ParseInteger<int32_t>(table.Cell(row, "captures"));
+      frame.SkippedBefore = Csv::ParseInteger<uint64_t>(table.Cell(row, "skippedBefore"));
+      frame.DisplayDelta = Csv::OptionalTimeSpan(table.Cell(row, "displayDeltaTicks"));
+      frame.AnimationDelta = Csv::OptionalTimeSpan(table.Cell(row, "animationDeltaTicks"));
+      frame.AnimationError = Csv::OptionalTimeSpan(table.Cell(row, "animationErrorTicks"));
+      frame.Drift = Csv::ParseTimeSpan(table.Cell(row, "driftTicks"));
+      ForEachEntry(table.Cell(row, "flags"), "flags", [&frame](const std::string_view flag) { frame.Flags.emplace_back(flag); });
+      frame.IntendedDisplayTime = Csv::OptionalTickCount64(table.Cell(row, "intendedDisplayTicks"));
+      frame.MarkerTargetFrameTime = Csv::OptionalTimeSpan32(table.Cell(row, "markerTargetTicks"));
+      frame.TargetFrameTime = Csv::OptionalTimeSpan(table.Cell(row, "targetTicks"));
+      frame.MarkerPreferredFrameTime = Csv::OptionalTimeSpan32(table.Cell(row, "markerPreferredTicks"));
+      frame.PreferredFrameTime = Csv::OptionalTimeSpan(table.Cell(row, "preferredTicks"));
+      frame.PacingError = Csv::OptionalTimeSpan(table.Cell(row, "pacingErrorTicks"));
+      frame.PredictionError = Csv::OptionalTimeSpan(table.Cell(row, "predictionErrorTicks"));
+      frame.Lateness = Csv::OptionalTimeSpan(table.Cell(row, "latenessTicks"));
+      frame.LastSeenTime = Csv::OptionalTickCount64(table.Cell(row, "lastSeenTicks"));
+      frame.CpuStartTime = Csv::OptionalTickCount64(table.Cell(row, "cpuStartTicks"));
+      frame.CpuBusy = Csv::OptionalTimeSpan32(table.Cell(row, "cpuBusyTicks"));
+      frame.FrameTime = Csv::OptionalTimeSpan(table.Cell(row, "frameTimeTicks"));
+      frame.CpuWait = Csv::OptionalTimeSpan(table.Cell(row, "cpuWaitTicks"));
+      // olderFrames: frameIndex@captureTicks entries separated by |
+      ForEachEntry(table.Cell(row, "olderFrames"), "olderFrames",
+                   [&frame](const std::string_view entry)
+                   {
+                     const std::size_t at = entry.find('@');
+                     if (at == std::string_view::npos || at == 0)
+                     {
+                       throw DataFormatError("Invalid olderFrames entry '" + std::string(entry) + "'");
+                     }
+                     frame.OlderFrames.push_back({Csv::ParseInteger<uint64_t>(entry.substr(0, at)), Csv::ParseTickCount64(entry.substr(at + 1))});
+                   });
+      frame.MainMarkerFirstSeenTime = Csv::OptionalTickCount64(table.Cell(row, "mainMarkerFirstSeenTicks"));
+      frame.ScanoutDelay = Csv::OptionalTimeSpan(table.Cell(row, "scanoutDelayTicks"));
+      return frame;
+    }
+  }
+
+  std::vector<FrameRow> ReadFrames(const std::filesystem::path& path)
+  {
+    const Csv::CsvTable table = Csv::CsvTable::Read(path);
+    std::vector<FrameRow> frames;
+    frames.reserve(table.Rows.size());
+    for (std::size_t i = 0; i < table.Rows.size(); ++i)
+    {
+      try
       {
-        const std::size_t bar = flags.find('|', start);
-        const std::size_t stop = bar == std::string_view::npos ? flags.size() : bar;
-        frame.Flags.emplace_back(flags.substr(start, stop - start));
-        start = stop + 1;
+        frames.push_back(ToFrame(table, table.Rows[i]));
       }
-      frame.IntendedDisplayTime = Detail::OptionalTickCount64(table.Cell(row, "intendedDisplayMs"));
-      frame.MarkerTargetFrameTime = Detail::OptionalTimeSpan32(table.Cell(row, "markerTargetMs"));
-      frame.TargetFrameTime = Detail::OptionalTimeSpan(table.Cell(row, "targetMs"));
-      frame.MarkerPreferredFrameTime = Detail::OptionalTimeSpan32(table.Cell(row, "markerPreferredMs"));
-      frame.PreferredFrameTime = Detail::OptionalTimeSpan(table.Cell(row, "preferredMs"));
-      frame.PacingError = Detail::OptionalTimeSpan(table.Cell(row, "pacingErrorMs"));
-      frame.PredictionError = Detail::OptionalTimeSpan(table.Cell(row, "predictionErrorMs"));
-      frame.Lateness = Detail::OptionalTimeSpan(table.Cell(row, "latenessMs"));
-      frame.LastSeenTime = Detail::OptionalTickCount64(table.Cell(row, "lastSeenMs"));
-      frame.CpuStartTime = Detail::OptionalTickCount64(table.Cell(row, "cpuStartMs"));
-      frame.CpuBusy = Detail::OptionalTimeSpan32(table.Cell(row, "cpuBusyMs"));
-      frame.FrameTime = Detail::OptionalTimeSpan(table.Cell(row, "frameTimeMs"));
-      frame.CpuWait = Detail::OptionalTimeSpan(table.Cell(row, "cpuWaitMs"));
-      // olderFrames: frameIndex@captureMs entries separated by |
-      const std::string_view older = table.Cell(row, "olderFrames");
-      for (std::size_t start = 0; start < older.size();)
+      catch (const DataFormatError& error)
       {
-        const std::size_t bar = older.find('|', start);
-        const std::size_t stop = bar == std::string_view::npos ? older.size() : bar;
-        const std::string_view entry = older.substr(start, stop - start);
-        const std::size_t at = entry.find('@');
-        if (at == std::string_view::npos || at == 0)
-        {
-          throw DataFormatError("Invalid olderFrames entry '" + std::string(entry) + "'");
-        }
-        frame.OlderFrames.push_back({Detail::ParseInteger<uint64_t>(entry.substr(0, at)), Detail::ParseTickCount64(entry.substr(at + 1))});
-        start = stop + 1;
+        throw table.InRow(i, error);
       }
-      frame.MainMarkerFirstSeenTime = Detail::OptionalTickCount64(table.Cell(row, "mainMarkerFirstSeenMs"));
-      frame.ScanoutDelay = Detail::OptionalTimeSpan(table.Cell(row, "scanoutDelayMs"));
-      frames.push_back(std::move(frame));
     }
     return frames;
   }

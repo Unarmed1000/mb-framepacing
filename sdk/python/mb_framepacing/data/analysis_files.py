@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""The file names of an analysis output folder (doc/analysis-output-format.md), finding it next to a capture, and its time format:
-milliseconds with at most four decimals, which is exactly a whole number of 100 ns ticks."""
+"""The file names of an analysis output folder (doc/analysis-output-format.md) and finding it next to a capture."""
 
 from pathlib import Path
 
@@ -10,6 +9,7 @@ DIRECTORY_NAME = "analysis"
 SUMMARY_FILE_NAME = "summary.json"
 CAPTURES_FILE_NAME = "captures.csv"
 TICKS_PER_MILLISECOND = 10_000
+"""The files hold every time as 100 ns ticks; this many are a millisecond, for showing one."""
 
 
 def run_file_prefix(run_id: int, ordinal: int = 0) -> str:
@@ -29,13 +29,3 @@ def find_analysis(folder: str | Path) -> Path | None:
         return folder
     analysis = folder / DIRECTORY_NAME
     return analysis if (analysis / SUMMARY_FILE_NAME).is_file() else None
-
-
-def ms_to_ticks(milliseconds: float) -> int:
-    """The 100 ns ticks of a milliseconds value (rounded to the nearest tick)."""
-    return round(milliseconds * TICKS_PER_MILLISECOND)
-
-
-def parse_ticks(text: str) -> int:
-    """The ticks of a milliseconds text from the CSV files."""
-    return ms_to_ticks(float(text))

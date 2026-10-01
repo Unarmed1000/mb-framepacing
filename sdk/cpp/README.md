@@ -171,7 +171,8 @@ and `DeviceTime`, empty when the device gave none) or the frame pacer's (`Intend
 Reading allocates and throws: `FD::DataFormatError` for a file it cannot read (another kind of file, damaged content, or a newer format
 version, whose message says to update), `std::runtime_error` for a file it cannot open. In `MB::FramePacing::Data`, each type and
 each group of functions in its own header (`<mb/framepacing/data/…>`: `AnalysisSummary.hpp` has `ReadSummary`, `FramesCsv.hpp`
-`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names, `Milliseconds.hpp` `ParseMilliseconds`):
+`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names). The files hold every time as whole 100 ns
+ticks, in the integer type it has, so a value is read exactly as it was written:
 
 | Function or type                                                               | What it does                                                            |
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |

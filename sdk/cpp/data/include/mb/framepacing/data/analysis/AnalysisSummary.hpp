@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/data/analysis/SummaryMarker.hpp>
 #include <mb/framepacing/data/analysis/SummaryRun.hpp>
 #include <cstdint>
@@ -29,9 +30,12 @@ namespace MB::FramePacing::Data
     std::optional<std::string> FrameSize;
     //! Device or Host.
     std::optional<std::string> TimeSource;
-    double CapturePeriodMs{0.0};
-    double MeasurementResolutionMs{0.0};
-    double ErrorThresholdMs{0.0};
+    //! The capture period (capturePeriodTicks).
+    TimeSpan CapturePeriod;
+    //! How precisely a display time is known (measurementResolutionTicks); a file without it, or with 0, reads as the capture period.
+    TimeSpan MeasurementResolution;
+    //! The |animation error| above which a frame counts as off (errorThresholdTicks).
+    TimeSpan ErrorThreshold;
     std::vector<SummaryMarker> Markers;
     std::vector<std::string> Warnings;
     std::vector<SummaryRun> Runs;
@@ -42,9 +46,10 @@ namespace MB::FramePacing::Data
   AnalysisSummary ReadSummary(const std::filesystem::path& path);
 
   //! Parse summary.json's text (C#'s AnalysisSummary.Parse). A file without formatVersion is format 1 and unknown fields are ignored.
-  //! Throws DataFormatError for text that is not a summary: the fields every summary has are required (capturePeriodMs,
-  //! errorThresholdMs, and a run's runId, hasStartMarker, hasEndMarker, framesFile, counts and statistics; doc/analysis-output-format.md
-  //! marks them), and a value must have its field's type and fit its range. An optional field the file lacks is empty or 0.
+  //! Throws DataFormatError for text that is not a summary: the fields every summary has are required (capturePeriodTicks,
+  //! errorThresholdTicks, and a run's runId, hasStartMarker, hasEndMarker, framesFile, counts and statistics; doc/analysis-output-format.md
+  //! marks them), and a value must have its field's type and fit its range: a time ("...Ticks") is a whole number of ticks. An optional
+  //! field the file lacks is empty or 0.
   AnalysisSummary ParseSummary(std::string_view json);
 }
 

@@ -2,8 +2,8 @@
 //* File Description
 //* ----------------
 //* Reads an analysis output folder back (summary.json and every run's run-<id>-frames.csv), so reports can be drawn from what an analysis
-//* wrote without the capture: the runs, their pacing, statistics and counts, and every presented frame. The CSV's milliseconds have four
-//* decimals, which is whole 100 ns ticks, so the frames come back to the tick.
+//* wrote without the capture: the runs, their pacing, statistics and counts, and every presented frame. The files hold every time as its
+//* 100 ns ticks, so the frames come back exactly.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -33,8 +33,8 @@ namespace MB.FramePacing.Charts
     {
       string directory = Directory(folder);
       var summary = AnalysisSummary.Read(Path.Combine(directory, AnalysisFiles.SummaryFileName));
-      var capturePeriod = Milliseconds.FromMilliseconds(summary.CapturePeriodMs);
-      var threshold = Milliseconds.FromMilliseconds(summary.ErrorThresholdMs);
+      var capturePeriod = summary.CapturePeriod;
+      var threshold = summary.ErrorThreshold;
       bool camera = summary.Scanout == nameof(ScanoutModel.Camera);
       // What the capture missed, for every run's events (an analysis without the file draws its capture lane as not known)
       string capturesPath = Path.Combine(directory, AnalysisFiles.CapturesFileName);

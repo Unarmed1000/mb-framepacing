@@ -84,9 +84,9 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(60)));
 
       var pacing = run.Pacing!;
-      Assert.That(pacing.RefreshPeriodMs, Is.EqualTo(16));
+      Assert.That(pacing.RefreshPeriod, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
       Assert.That(pacing.RefreshCalculated, Is.False, "a capture card's refresh is its capture period");
-      Assert.That(pacing.TargetFrameMs, Is.EqualTo(16));
+      Assert.That(pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
       Assert.That(pacing.Source, Is.EqualTo(PacingSource.NativeRefresh));
       Assert.That(pacing.LateFrames, Is.Zero);
       Assert.That(pacing.Verdict, Is.EqualTo(PacingVerdict.None));
@@ -146,7 +146,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(20, refreshes: 2)));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
-      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(16));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(19));
     }
 
@@ -159,7 +159,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(frames, preferredTicks: 320_000));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.PreferredFrameTime));
-      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(32));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(32)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
       Assert.That(run.Frames.Skip(1).All(f => f.PreferredFrameTime?.Ticks == 32 * Ms));
@@ -173,7 +173,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[9] = (3, 32);
       var run = Analyze(Rows(frames), targetFps: 31.25);
 
-      Assert.That(run.Pacing!.TargetFrameMs, Is.EqualTo(32));
+      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(32)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
     }
@@ -256,7 +256,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(20, refreshes: 2)), targetFps: 62.5);
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.GivenTarget));
-      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(16));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(19), "all but the first frame, which has no display time step");
     }
 
@@ -270,7 +270,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[11] = (4, 21);
       var run = Analyze(Rows(frames, refresh: 7 * Ms), targetFps: 60);
 
-      Assert.That(run.Pacing!.TargetFrameMs, Is.EqualTo(21));
+      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(21)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[12]));
     }
@@ -287,7 +287,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       var wrong = Expecting(120);
       Assert.That(wrong.Pacing!.MatchesExpectedRefresh, Is.False);
-      Assert.That(wrong.Pacing.RefreshPeriodMs, Is.EqualTo(16), "a capture card's refresh stays the capture period");
+      Assert.That(wrong.Pacing.RefreshPeriod, Is.EqualTo(TimeSpan.FromMilliseconds(16)), "a capture card's refresh stays the capture period");
       Assert.That(wrong.Warnings, Has.Some.Contains("capture runs at 62.5 fps, but a 120 Hz display was expected"));
     }
 

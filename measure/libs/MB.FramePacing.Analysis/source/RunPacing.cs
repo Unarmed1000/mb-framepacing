@@ -13,12 +13,15 @@ using System;
 namespace MB.FramePacing.Analysis
 {
   /// <summary>Pacing of one run. A frame is late when it is shown at least one refresh later than the target frame time.</summary>
-  /// <param name="RefreshPeriodMs">
+  /// <param name="RefreshPeriod">
   /// The display's refresh period: the capture period for a capture card (it captures at the display's refresh rate), calculated from the
   /// frames for an EXPERIMENTAL camera capture.
   /// </param>
   /// <param name="RefreshCalculated">True when the refresh was calculated from a camera capture's frames.</param>
-  /// <param name="TargetFrameMs">The frame time the run is measured against, in whole refreshes (the median of every frame's target).</param>
+  /// <param name="TargetFrameTime">
+  /// The frame time the run is measured against, in whole refreshes: the median of every frame's target (the lower of the two middle ones
+  /// for an even number of frames, so it is always a target a frame had).
+  /// </param>
   /// <param name="Source">Where the targets come from: the pacer's schedule or target frame time in the markers, a given target frame rate, or
   /// the display's native refresh rate.</param>
   /// <param name="LateFrames">
@@ -34,9 +37,9 @@ namespace MB.FramePacing.Analysis
   /// <param name="Verdict">Which of the two dominates.</param>
   /// <param name="ExpectedRefreshHz">The display refresh rate the user expects, if given (compared with <see cref="RefreshHz"/>).</param>
   public sealed record RunPacing(
-    double RefreshPeriodMs,
+    TimeSpan RefreshPeriod,
     bool RefreshCalculated,
-    double TargetFrameMs,
+    TimeSpan TargetFrameTime,
     PacingSource Source,
     long LateFrames,
     double LateShare,
@@ -57,7 +60,7 @@ namespace MB.FramePacing.Analysis
     public Statistics? PredictionErrorMs { get; init; }
 
     /// <summary>The refresh rate the run was measured with (Hz).</summary>
-    public double RefreshHz => RefreshPeriodMs > 0 ? 1000 / RefreshPeriodMs : 0;
+    public double RefreshHz => RefreshPeriod > TimeSpan.Zero ? TimeSpan.TicksPerSecond / (double)RefreshPeriod.Ticks : 0;
 
     /// <summary><see cref="RefreshHz"/> relative to <see cref="ExpectedRefreshHz"/>: 0.01 = 1 % faster; null without an expected rate.</summary>
     public double? RefreshDeviation => ExpectedRefreshHz is > 0 && RefreshHz > 0 ? (RefreshHz / ExpectedRefreshHz.Value) - 1 : null;

@@ -46,14 +46,15 @@ foreach (var record in reader.ReadAll())
 | `FramesCsv`, `FrameRow`                                         | A run's frames CSV                                                                                                                                             |
 | `CapturesCsv`, `CaptureCsvRow`                                  | `captures.csv`                                                                                                                                                 |
 | `AnalysisFiles`                                                 | The file names, and finding the analysis folder of a capture                                                                                                   |
-| `Milliseconds`                                                  | The CSV time format: milliseconds with at most four decimals, which are whole ticks                                                                            |
 
 The times are typed, with the C++ data module's names: points in time are `TickCount64`s, on the capture's clock (a frame's
 `FirstSeenTime`, a record's `HostTime` and `DeviceTime`, null when the device gave none) or the frame pacer's (`IntendedDisplayTime`,
 `CpuStartTime`); spans are `TimeSpan`s (`DisplayDelta`, `AnimationError`, ...); the marker's own 32-bit values (`MarkerTargetFrameTime`,
-`CpuBusy`) are `TimeSpan32`s. `Milliseconds` formats and parses each as the files write them.
+`CpuBusy`) are `TimeSpan32`s. The files hold each as its whole 100 ns ticks, in the integer type it has, so a value is read
+exactly as it was written: nothing goes through a floating point number.
 
-Readers refuse a newer format version than they know (an `InvalidDataException` that says to update).
+Readers throw `InvalidDataException` for a file that is not in the format: a newer format version than they know (the message says
+to update), a required field or column missing, or a value that is not of its type or outside its range.
 
 ## Tests
 

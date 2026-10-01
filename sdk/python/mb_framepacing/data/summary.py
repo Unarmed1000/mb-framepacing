@@ -2,12 +2,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """summary.json (doc/analysis-output-format.md): the capture, the analysis settings and every run's counts, statistics, pacing and
-histograms. Its formatVersion covers the CSV files it names; a file without it is format 1, a newer one is refused. Fields a file lacks
-read as None (or an empty statistics), and fields this reader does not know are ignored."""
+histograms. Its formatVersion covers the CSV files it names; a file without it is format 1, a newer one is refused. A time setting is a
+whole number of 100 ns ticks (the '...Ticks' fields); the statistics and histograms are in milliseconds. The fields every summary has are
+required (doc/analysis-output-format.md marks them) and a value must be of its field's type and within its range: anything else raises
+DataFormatError. Optional fields a file lacks read as None (or an empty statistics), and fields this reader does not know are ignored."""
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -16,11 +18,16 @@ from .errors import DataFormatError
 FORMAT_VERSION = 1
 """The analysis output format this library reads."""
 
+INT32 = (-(2**31), 2**31 - 1)
+INT64 = (-(2**63), 2**63 - 1)
+UINT32 = (0, 2**32 - 1)
+
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 
 
 class _Object:
-    """Typed access to a JSON object's fields."""
+    """Typed access to a JSON object's fields. A field that is absent or null is 'not there'; one of another type than its field's, or
+    outside its range, raises DataFormatError."""
 
     def __init__(self, value: JsonValue, where: str) -> None:
         if not isinstance(value, dict):
@@ -34,25 +41,36 @@ class _Object:
     def value(self, name: str) -> JsonValue:
         return self._fields.get(name)
 
-    def number(self, name: str) -> float:
+    def _required(self, name: str) -> JsonValue:
         value = self._fields.get(name)
+        if value is None:
+            raise DataFormatError(f"{self._where} lacks '{name}'")
+        return value
+
+    def number(self, name: str) -> float:
+        value = self._required(name)
         if isinstance(value, bool) or not isinstance(value, int | float):
             raise DataFormatError(f"{self._where}.{name} is not a number")
-        return float(value)
+        try:
+            return float(value)
+        except OverflowError as error:
+            raise DataFormatError(f"{self._where}.{name} is beyond what a number holds") from error
 
     def optional_number(self, name: str) -> float | None:
         return self.number(name) if self.has(name) else None
 
-    def integer(self, name: str, default: int | None = None) -> int:
-        value = self._fields.get(name)
-        if value is None and default is not None:
-            return default
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise DataFormatError(f"{self._where}.{name} is not an integer")
+    def integer(self, name: str, limits: tuple[int, int] = INT64) -> int:
+        """A whole number within the limits: never a real one (1.0), which the other languages' readers refuse too."""
+        value = self._required(name)
+        if isinstance(value, bool) or not isinstance(value, int) or not limits[0] <= value <= limits[1]:
+            raise DataFormatError(f"{self._where}.{name} is not a whole number in its range ({limits[0]} to {limits[1]})")
         return value
 
+    def optional_integer(self, name: str, limits: tuple[int, int] = INT64) -> int | None:
+        return self.integer(name, limits) if self.has(name) else None
+
     def boolean(self, name: str) -> bool:
-        value = self._fields.get(name)
+        value = self._required(name)
         if not isinstance(value, bool):
             raise DataFormatError(f"{self._where}.{name} is not true or false")
         return value
@@ -61,7 +79,7 @@ class _Object:
         return self.boolean(name) if self.has(name) else None
 
     def text(self, name: str) -> str:
-        value = self._fields.get(name)
+        value = self._required(name)
         if not isinstance(value, str):
             raise DataFormatError(f"{self._where}.{name} is not a string")
         return value
@@ -70,15 +88,22 @@ class _Object:
         return self.text(name) if self.has(name) else None
 
     def optional_time(self, name: str) -> datetime | None:
-        return _parse_time(self.text(name)) if self.has(name) else None
+        if not self.has(name):
+            return None
+        text = self.text(name)
+        try:
+            return _parse_time(text)
+        except ValueError as error:
+            raise DataFormatError(f"{self._where}.{name} '{text}' is not a time") from error
 
     def child(self, name: str) -> "_Object":
-        return _Object(self._fields.get(name), f"{self._where}.{name}")
+        return _Object(self._required(name), f"{self._where}.{name}")
 
     def optional_child(self, name: str) -> "_Object | None":
         return self.child(name) if self.has(name) else None
 
     def items(self, name: str) -> list[JsonValue]:
+        """A list; none when the field is absent."""
         value = self._fields.get(name)
         if value is None:
             return []
@@ -86,8 +111,18 @@ class _Object:
             raise DataFormatError(f"{self._where}.{name} is not an array")
         return value
 
+    def required_items(self, name: str) -> list[JsonValue]:
+        _ = self._required(name)
+        return self.items(name)
+
+    def children(self, name: str) -> list["_Object"]:
+        return [_Object(item, f"{self._where}.{name}[]") for item in self.items(name)]
+
     def texts(self, name: str) -> tuple[str, ...]:
-        return tuple(item for item in self.items(name) if isinstance(item, str))
+        items = self.items(name)
+        if not all(isinstance(item, str) for item in items):
+            raise DataFormatError(f"{self._where}.{name} is not an array of strings")
+        return tuple(cast(list[str], items))
 
 
 @dataclass(frozen=True)
@@ -158,11 +193,12 @@ class SummaryStatistics:
 class SummaryPacing:
     """The refresh, the target the frames are measured against (source: Schedule, TargetFrameTime, PreferredFrameTime, GivenTarget or
     NativeRefresh), late
-    frames and the verdict (None, BadPacing, DeltaTimeJitter or Both)."""
+    frames and the verdict (None, BadPacing, DeltaTimeJitter or Both). refresh_period_ticks is the display's refresh period,
+    target_frame_ticks the frame time the run is measured against, in whole refreshes."""
 
-    refresh_period_ms: float
+    refresh_period_ticks: int
     refresh_calculated: bool
-    target_frame_ms: float
+    target_frame_ticks: int
     source: str
     late_frames: int
     late_share: float
@@ -239,7 +275,9 @@ class SummaryMarker:
 @dataclass(frozen=True)
 class AnalysisSummary:
     """summary.json. scanout is 'SingleScanout' (a capture card) or 'Camera'; time_source 'Device' or 'Host'; capture is the capture's
-    capture.json as it was when analysed."""
+    capture.json as it was when analysed. capture_period_ticks, measurement_resolution_ticks (how precisely a display time is known: the
+    capture period in a file without it) and error_threshold_ticks (the |animation error| above which a frame counts as off) are 100 ns
+    ticks."""
 
     format_version: int
     tool_version: str | None
@@ -250,9 +288,9 @@ class AnalysisSummary:
     capture: dict[str, JsonValue] | None
     frame_size: str | None
     time_source: str | None
-    capture_period_ms: float
-    measurement_resolution_ms: float
-    error_threshold_ms: float
+    capture_period_ticks: int
+    measurement_resolution_ticks: int
+    error_threshold_ticks: int
     markers: tuple[SummaryMarker, ...]
     warnings: tuple[str, ...]
     runs: tuple[SummaryRun, ...]
@@ -260,12 +298,22 @@ class AnalysisSummary:
 
 def read_summary(path: str | Path) -> AnalysisSummary:
     """Read summary.json. Raises DataFormatError for a newer format version or content that is not a summary."""
-    return parse_summary(Path(path).read_text(encoding="utf-8"))
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise DataFormatError(f"'{path}' is not UTF-8 text") from error
+    return parse_summary(text)
 
 
 def parse_summary(text: str) -> AnalysisSummary:
-    root = _Object(cast(JsonValue, json.loads(text)), "summary.json")
-    version = root.integer("formatVersion", default=1)
+    """Parse summary.json's text. Raises DataFormatError as read_summary does."""
+    try:
+        value = cast(JsonValue, json.loads(text, parse_constant=_no_constant))
+    except json.JSONDecodeError as error:
+        raise DataFormatError(f"summary.json is not JSON: {error}") from error
+    root = _Object(value, "summary.json")
+    # 0 is a file without the field, as C# reads it
+    version = (root.optional_integer("formatVersion", (0, INT32[1])) or 0) or 1
     if version > FORMAT_VERSION:
         raise DataFormatError(
             f"The analysis output has format version {version}, newer than this reader reads ({FORMAT_VERSION}): update the tools or the library"
@@ -281,12 +329,13 @@ def parse_summary(text: str) -> AnalysisSummary:
         capture=capture if isinstance(capture, dict) else None,
         frame_size=root.optional_text("frameSize"),
         time_source=root.optional_text("timeSource"),
-        capture_period_ms=root.number("capturePeriodMs"),
-        measurement_resolution_ms=root.optional_number("measurementResolutionMs") or root.number("capturePeriodMs"),
-        error_threshold_ms=root.number("errorThresholdMs"),
-        markers=tuple(_marker(_Object(item, "markers[]")) for item in root.items("markers")),
+        capture_period_ticks=root.integer("capturePeriodTicks"),
+        # 0 is a file without the field, as C# reads it
+        measurement_resolution_ticks=root.optional_integer("measurementResolutionTicks") or root.integer("capturePeriodTicks"),
+        error_threshold_ticks=root.integer("errorThresholdTicks"),
+        markers=tuple(_marker(item) for item in root.children("markers")),
         warnings=root.texts("warnings"),
-        runs=tuple(_run(_Object(item, "runs[]")) for item in root.items("runs")),
+        runs=tuple(_run(item) for item in root.children("runs")),
     )
 
 
@@ -296,7 +345,7 @@ def _marker(value: _Object) -> SummaryMarker:
 
 def _run(value: _Object) -> SummaryRun:
     return SummaryRun(
-        run_id=value.integer("runId"),
+        run_id=value.integer("runId", UINT32),
         name=value.optional_text("name"),
         sequence_id=value.optional_text("sequenceId"),
         start_time_utc=value.optional_time("startTimeUtc"),
@@ -330,16 +379,19 @@ def _counts(value: _Object) -> SummaryCounts:
 
 
 def _statistics(value: _Object) -> SummaryStatistics:
+    def required(name: str) -> ValueStatistics:
+        return _value_statistics(value.child(name))
+
     def stats(name: str) -> ValueStatistics:
         return _value_statistics(value.optional_child(name))
 
     return SummaryStatistics(
-        display_delta_ms=stats("displayDeltaMs"),
-        animation_delta_ms=stats("animationDeltaMs"),
-        animation_error_ms=stats("animationErrorMs"),
-        absolute_animation_error_ms=stats("absoluteAnimationErrorMs"),
-        drift_ms=stats("driftMs"),
-        on_screen_ms=stats("onScreenMs"),
+        display_delta_ms=required("displayDeltaMs"),
+        animation_delta_ms=required("animationDeltaMs"),
+        animation_error_ms=required("animationErrorMs"),
+        absolute_animation_error_ms=required("absoluteAnimationErrorMs"),
+        drift_ms=required("driftMs"),
+        on_screen_ms=required("onScreenMs"),
         frames_with_animation_error=value.integer("framesWithAnimationError"),
         error_per_frame_ms=value.number("errorPerFrameMs"),
         percent_error=value.number("percentError"),
@@ -360,9 +412,9 @@ def _pacing(value: _Object) -> SummaryPacing:
         return _value_statistics(child) if child is not None else None
 
     return SummaryPacing(
-        refresh_period_ms=value.number("refreshPeriodMs"),
+        refresh_period_ticks=value.integer("refreshPeriodTicks"),
         refresh_calculated=value.boolean("refreshCalculated"),
-        target_frame_ms=value.number("targetFrameMs"),
+        target_frame_ticks=value.integer("targetFrameTicks"),
         source=value.text("source"),
         late_frames=value.integer("lateFrames"),
         late_share=value.number("lateShare"),
@@ -380,7 +432,8 @@ def _pacing(value: _Object) -> SummaryPacing:
 
 
 def _histogram(value: _Object) -> SummaryHistogram:
-    bins = tuple(SummaryHistogramBin(center_ms=(b := _Object(item, "bins[]")).number("centerMs"), count=b.integer("count")) for item in value.items("bins"))
+    _ = value.required_items("bins")
+    bins = tuple(SummaryHistogramBin(center_ms=item.number("centerMs"), count=item.integer("count")) for item in value.children("bins"))
     return SummaryHistogram(bin_width_ms=value.number("binWidthMs"), total=value.integer("total"), bins=bins)
 
 
@@ -413,13 +466,19 @@ def _value_statistics(value: _Object | None) -> ValueStatistics:
     )
 
 
+def _no_constant(name: str) -> float:
+    """NaN and Infinity are not JSON; json.loads takes them unless told otherwise."""
+    raise DataFormatError(f"summary.json holds {name}, which is not a JSON number")
+
+
 def _parse_time(text: str) -> datetime:
     """An ISO 8601 time as .NET writes it ('2026-09-28T20:12:40.4753868Z'): Python keeps microseconds, so a seventh fractional digit is
-    dropped."""
+    dropped. The summary's times are UTC: one without an offset is taken as UTC, one with another offset converted."""
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
     if "." in text:
         head, _, rest = text.partition(".")
         digits = len(rest) - len(rest.lstrip("0123456789"))
         text = head + "." + rest[:digits][:6].ljust(6, "0") + rest[digits:]
-    return datetime.fromisoformat(text)
+    time = datetime.fromisoformat(text)
+    return time.replace(tzinfo=UTC) if time.tzinfo is None else time.astimezone(UTC)

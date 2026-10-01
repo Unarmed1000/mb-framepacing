@@ -64,11 +64,10 @@ namespace MB.FramePacing.Benchmarks
         );
       }
       int lateCount = frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
-      double refreshMs = Refresh / (double)TimeSpan.TicksPerMillisecond;
       var pacing = new RunPacing(
-        refreshMs,
+        new TimeSpan(Refresh),
         false,
-        refreshMs,
+        new TimeSpan(Refresh),
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(count - 1),

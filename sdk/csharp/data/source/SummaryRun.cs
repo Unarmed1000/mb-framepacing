@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace MB.FramePacing.Data
 {
@@ -18,15 +19,15 @@ namespace MB.FramePacing.Data
   /// <param name="Pacing">How the run was paced; null in output written before pacing was measured.</param>
   /// <param name="Camera">EXPERIMENTAL camera captures only.</param>
   public sealed record SummaryRun(
-    uint RunId,
+    [property: JsonRequired] uint RunId,
     string? Name,
     string? SequenceId,
     DateTime? StartTimeUtc,
-    bool HasStartMarker,
-    bool HasEndMarker,
-    string FramesFile,
-    SummaryCounts Counts,
-    SummaryStatistics Statistics,
+    [property: JsonRequired] bool HasStartMarker,
+    [property: JsonRequired] bool HasEndMarker,
+    [property: JsonRequired] string FramesFile,
+    [property: JsonRequired] SummaryCounts Counts,
+    [property: JsonRequired] SummaryStatistics Statistics,
     SummaryPacing? Pacing,
     SummaryHistograms? Histograms,
     SummaryCamera? Camera,

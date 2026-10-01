@@ -4,8 +4,9 @@
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <fstream>
 #include <stdexcept>
+#include <string>
 
-namespace MB::FramePacing::Data::Detail
+namespace MB::FramePacing::Data::Csv
 {
   namespace
   {
@@ -34,10 +35,13 @@ namespace MB::FramePacing::Data::Detail
       throw std::runtime_error("Cannot open '" + path.string() + "'");
     }
     CsvTable table;
+    table.Name = path.filename().string();
     std::string line;
     bool header = true;
+    std::size_t lineNumber = 0;
     while (std::getline(file, line))
     {
+      ++lineNumber;
       if (!line.empty() && line.back() == '\r')
       {
         line.pop_back();
@@ -54,6 +58,7 @@ namespace MB::FramePacing::Data::Detail
       else if (!line.empty())
       {
         table.Rows.push_back(Split(line));
+        table.Lines.push_back(lineNumber);
       }
     }
     if (header)
@@ -61,5 +66,10 @@ namespace MB::FramePacing::Data::Detail
       throw DataFormatError("'" + path.string() + "' is empty");
     }
     return table;
+  }
+
+  DataFormatError CsvTable::InRow(const std::size_t rowIndex, const DataFormatError& error) const
+  {
+    return DataFormatError("'" + Name + "' line " + std::to_string(Lines[rowIndex]) + ": " + error.what());
   }
 }

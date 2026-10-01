@@ -269,7 +269,7 @@ namespace MB.FramePacing.Charts
       return step * 10;
     }
 
-    private static double RefreshMs(ChartRun chart) => chart.Run.Pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
+    private static double RefreshMs(ChartRun chart) => (chart.Run.Pacing?.RefreshPeriod ?? chart.CapturePeriod).TotalMilliseconds;
 
     /// <summary>A card being built: the header, one plot area under its label, the axes, and the card's height under the plot.</summary>
     private sealed class Card

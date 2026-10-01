@@ -349,9 +349,9 @@ namespace MB.FramePacing.Charts.UnitTest
       }
       int lateCount = frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
       var pacing = new RunPacing(
-        Refresh / (double)TimeSpan.TicksPerMillisecond,
+        new TimeSpan(Refresh),
         false,
-        Refresh / (double)TimeSpan.TicksPerMillisecond,
+        new TimeSpan(Refresh),
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(Count - 1),

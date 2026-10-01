@@ -172,7 +172,7 @@ namespace MB.FramePacing.Charts
     {
       var chart = section.Run;
       var pacing = chart.Run.Pacing;
-      double refreshMs = pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
+      double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).TotalMilliseconds;
       var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
       bool mismatch = pacing?.MatchesExpectedRefresh == false;
       string kind =

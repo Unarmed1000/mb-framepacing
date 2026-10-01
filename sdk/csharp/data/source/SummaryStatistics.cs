@@ -7,6 +7,8 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System.Text.Json.Serialization;
+
 namespace MB.FramePacing.Data
 {
   /// <param name="FramesWithAnimationError">Frames whose |animation error| exceeds the error threshold.</param>
@@ -24,20 +26,20 @@ namespace MB.FramePacing.Data
   /// <param name="FrameTimeMs">The frametime, from one frame's CPU start to the next one's (PresentMon's MsBetweenAppStart).</param>
   /// <param name="CpuWaitMs">The frametime minus CPU busy (PresentMon's MsCPUWait).</param>
   public sealed record SummaryStatistics(
-    ValueStatistics DisplayDeltaMs,
-    ValueStatistics AnimationDeltaMs,
-    ValueStatistics AnimationErrorMs,
-    ValueStatistics AbsoluteAnimationErrorMs,
-    ValueStatistics DriftMs,
-    ValueStatistics OnScreenMs,
-    long FramesWithAnimationError,
-    double ErrorPerFrameMs,
-    double PercentError,
+    [property: JsonRequired] ValueStatistics DisplayDeltaMs,
+    [property: JsonRequired] ValueStatistics AnimationDeltaMs,
+    [property: JsonRequired] ValueStatistics AnimationErrorMs,
+    [property: JsonRequired] ValueStatistics AbsoluteAnimationErrorMs,
+    [property: JsonRequired] ValueStatistics DriftMs,
+    [property: JsonRequired] ValueStatistics OnScreenMs,
+    [property: JsonRequired] long FramesWithAnimationError,
+    [property: JsonRequired] double ErrorPerFrameMs,
+    [property: JsonRequired] double PercentError,
     double AverageFps,
     double? OnePercentLowFps,
     double? PointOnePercentLowFps,
-    long ExcludedStaticFrames,
-    long UncertainSteps,
+    [property: JsonRequired] long ExcludedStaticFrames,
+    [property: JsonRequired] long UncertainSteps,
     ValueStatistics? CpuBusyMs,
     ValueStatistics? FrameTimeMs,
     ValueStatistics? CpuWaitMs

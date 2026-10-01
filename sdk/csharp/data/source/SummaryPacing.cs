@@ -7,10 +7,15 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System;
+using System.Text.Json.Serialization;
+
 namespace MB.FramePacing.Data
 {
-  /// <param name="RefreshPeriodMs">The display's refresh period (a capture card's capture period, or calculated from a camera's frames).</param>
-  /// <param name="TargetFrameMs">The frame time the run is measured against, in whole refreshes.</param>
+  /// <param name="RefreshPeriod">
+  /// The display's refresh period (refreshPeriodTicks): a capture card's capture period, or calculated from a camera's frames.
+  /// </param>
+  /// <param name="TargetFrameTime">The frame time the run is measured against, in whole refreshes (targetFrameTicks).</param>
   /// <param name="Source">
   /// "Schedule", "TargetFrameTime", "PreferredFrameTime", "GivenTarget" or "NativeRefresh": where the targets come from.
   /// </param>
@@ -22,16 +27,16 @@ namespace MB.FramePacing.Data
   /// <param name="PredictionErrorMs">With a schedule: animation time step minus intended step.</param>
   /// <param name="RefreshDeviation">The refresh rate relative to the expected one (0.01 = 1 % faster), null without one.</param>
   public sealed record SummaryPacing(
-    double RefreshPeriodMs,
-    bool RefreshCalculated,
-    double TargetFrameMs,
-    string Source,
-    long LateFrames,
-    double LateShare,
-    double WorstLateShare,
-    long ErrorFramesWithUnevenDisplay,
-    long ErrorFramesWithEvenDisplay,
-    string Verdict,
+    [property: JsonPropertyName("refreshPeriodTicks"), JsonConverter(typeof(TicksJsonConverter)), JsonRequired] TimeSpan RefreshPeriod,
+    [property: JsonRequired] bool RefreshCalculated,
+    [property: JsonPropertyName("targetFrameTicks"), JsonConverter(typeof(TicksJsonConverter)), JsonRequired] TimeSpan TargetFrameTime,
+    [property: JsonRequired] string Source,
+    [property: JsonRequired] long LateFrames,
+    [property: JsonRequired] double LateShare,
+    [property: JsonRequired] double WorstLateShare,
+    [property: JsonRequired] long ErrorFramesWithUnevenDisplay,
+    [property: JsonRequired] long ErrorFramesWithEvenDisplay,
+    [property: JsonRequired] string Verdict,
     double? ExpectedRefreshHz,
     ValueStatistics? PacingErrorMs,
     ValueStatistics? PredictionErrorMs,

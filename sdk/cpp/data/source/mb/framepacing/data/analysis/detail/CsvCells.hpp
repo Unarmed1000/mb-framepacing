@@ -3,22 +3,23 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// Private to the data module: parsing the cells of the CSV files (an empty cell is a missing value).
+// Private to the data module: parsing the cells of the CSV files. Every number is a whole one, written as its digits with a '-' in front
+// when negative; a time is its 100 ns ticks. An empty cell is a missing value.
 
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
-#include <mb/framepacing/data/analysis/Milliseconds.hpp>
 #include <charconv>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
 
-namespace MB::FramePacing::Data::Detail
+namespace MB::FramePacing::Data::Csv
 {
-  //! A whole number, all of the text. Throws DataFormatError for anything else.
+  //! A whole number in T's range, all of the text. Throws DataFormatError for anything else: a fraction, an exponent, a '+', a space, an
+  //! empty cell.
   template <typename T>
   T ParseInteger(const std::string_view text)
   {
@@ -28,7 +29,8 @@ namespace MB::FramePacing::Data::Detail
     const auto result = std::from_chars(first, end, value);
     if (text.empty() || result.ec != std::errc() || result.ptr != end)
     {
-      throw DataFormatError("'" + std::string(text) + "' is not an integer");
+      throw DataFormatError(text.empty() ? std::string("An empty cell where a whole number is required")
+                                         : "'" + std::string(text) + "' is not a whole number in its range");
     }
     return value;
   }
@@ -39,26 +41,27 @@ namespace MB::FramePacing::Data::Detail
     return text.empty() ? std::nullopt : std::optional<T>(ParseInteger<T>(text));
   }
 
-  //! A point on a clock from its milliseconds since the clock's zero.
-  inline TickCount64 ParseTickCount64(const std::string_view text)
+  //! A span from its ticks.
+  inline TimeSpan ParseTimeSpan(const std::string_view text)
   {
-    return TickCount64(ParseMilliseconds(text));
+    return TimeSpan(ParseInteger<int64_t>(text));
   }
 
-  //! A marker's 32-bit span (0 to OnDemandFrameTime). Throws DataFormatError for a value outside.
+  //! A point on a clock from its ticks since the clock's zero.
+  inline TickCount64 ParseTickCount64(const std::string_view text)
+  {
+    return TickCount64(ParseInteger<int64_t>(text));
+  }
+
+  //! A marker's 32-bit span (0 to OnDemandFrameTime) from its ticks, as the marker carried it.
   inline TimeSpan32 ParseTimeSpan32(const std::string_view text)
   {
-    const TimeSpan value = ParseMilliseconds(text);
-    if (value < TimeSpan::Zero() || value > TimeSpan32::MaxValue().ToTimeSpan())
-    {
-      throw DataFormatError("'" + std::string(text) + "' is not a 32-bit span of ticks");
-    }
-    return TimeSpan32::FromTimeSpan(value);
+    return TimeSpan32(ParseInteger<uint32_t>(text));
   }
 
   inline std::optional<TimeSpan> OptionalTimeSpan(const std::string_view text)
   {
-    return text.empty() ? std::nullopt : std::optional<TimeSpan>(ParseMilliseconds(text));
+    return text.empty() ? std::nullopt : std::optional<TimeSpan>(ParseTimeSpan(text));
   }
 
   inline std::optional<TickCount64> OptionalTickCount64(const std::string_view text)

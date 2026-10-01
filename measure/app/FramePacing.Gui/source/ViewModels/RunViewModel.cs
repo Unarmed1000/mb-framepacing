@@ -42,7 +42,7 @@ namespace MB.FramePacing.Gui.ViewModels
       var s = run.Statistics;
       if (run.Pacing is { } pacing)
       {
-        string target = pacing.TargetFrameMs.ToString("0.##", CultureInfo.InvariantCulture);
+        string target = pacing.TargetFrameTime.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
         TargetText = pacing.Source switch
         {
           PacingSource.Schedule =>

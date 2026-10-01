@@ -7,8 +7,10 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System.Text.Json.Serialization;
+
 namespace MB.FramePacing.Data
 {
   /// <param name="Bounds">"x,y,width,height" in stored pixels, including the quiet zone.</param>
-  public sealed record SummaryMarker(string Bounds, double ModuleSizePx);
+  public sealed record SummaryMarker([property: JsonRequired] string Bounds, [property: JsonRequired] double ModuleSizePx);
 }

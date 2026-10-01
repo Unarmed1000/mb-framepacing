@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
+#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/data/analysis/SummaryCamera.hpp>
@@ -159,6 +160,12 @@ namespace MB::FramePacing::Data
       }
     }
 
+    //! A time: a whole number of ticks.
+    TimeSpan RequiredTicks(const Json& object, const char* name)
+    {
+      return TimeSpan(Required<int64_t>(object, name));
+    }
+
     std::vector<std::string> Texts(const Json& object, const char* name)
     {
       std::vector<std::string> texts;
@@ -195,13 +202,15 @@ namespace MB::FramePacing::Data
       SummaryHistogram histogram;
       histogram.BinWidthMs = Required<double>(value, "binWidthMs");
       histogram.Total = Required<int64_t>(value, "total");
-      if (const Json* bins = OptionalList(value, "bins"))
+      const Json* bins = OptionalList(value, "bins");
+      if (bins == nullptr)
       {
-        for (const Json& bin : *bins)
-        {
-          RequireObject(bin, "bins");
-          histogram.Bins.push_back({Required<double>(bin, "centerMs"), Required<int64_t>(bin, "count")});
-        }
+        ThrowLacks("bins");
+      }
+      for (const Json& bin : *bins)
+      {
+        RequireObject(bin, "bins");
+        histogram.Bins.push_back({Required<double>(bin, "centerMs"), Required<int64_t>(bin, "count")});
       }
       return histogram;
     }
@@ -233,12 +242,12 @@ namespace MB::FramePacing::Data
 
       const Json& statistics = RequiredObject(value, "statistics");
       auto& s = run.Statistics;
-      s.DisplayDeltaMs = ToStatistics(OptionalObject(statistics, "displayDeltaMs"));
-      s.AnimationDeltaMs = ToStatistics(OptionalObject(statistics, "animationDeltaMs"));
-      s.AnimationErrorMs = ToStatistics(OptionalObject(statistics, "animationErrorMs"));
-      s.AbsoluteAnimationErrorMs = ToStatistics(OptionalObject(statistics, "absoluteAnimationErrorMs"));
-      s.DriftMs = ToStatistics(OptionalObject(statistics, "driftMs"));
-      s.OnScreenMs = ToStatistics(OptionalObject(statistics, "onScreenMs"));
+      s.DisplayDeltaMs = ToStatistics(&RequiredObject(statistics, "displayDeltaMs"));
+      s.AnimationDeltaMs = ToStatistics(&RequiredObject(statistics, "animationDeltaMs"));
+      s.AnimationErrorMs = ToStatistics(&RequiredObject(statistics, "animationErrorMs"));
+      s.AbsoluteAnimationErrorMs = ToStatistics(&RequiredObject(statistics, "absoluteAnimationErrorMs"));
+      s.DriftMs = ToStatistics(&RequiredObject(statistics, "driftMs"));
+      s.OnScreenMs = ToStatistics(&RequiredObject(statistics, "onScreenMs"));
       s.FramesWithAnimationError = Required<int64_t>(statistics, "framesWithAnimationError");
       s.ErrorPerFrameMs = Required<double>(statistics, "errorPerFrameMs");
       s.PercentError = Required<double>(statistics, "percentError");
@@ -254,9 +263,9 @@ namespace MB::FramePacing::Data
       if (const Json* pacing = OptionalObject(value, "pacing"))
       {
         SummaryPacing p;
-        p.RefreshPeriodMs = Required<double>(*pacing, "refreshPeriodMs");
+        p.RefreshPeriod = RequiredTicks(*pacing, "refreshPeriodTicks");
         p.RefreshCalculated = Required<bool>(*pacing, "refreshCalculated");
-        p.TargetFrameMs = Required<double>(*pacing, "targetFrameMs");
+        p.TargetFrameTime = RequiredTicks(*pacing, "targetFrameTicks");
         p.Source = Required<std::string>(*pacing, "source");
         p.LateFrames = Required<int64_t>(*pacing, "lateFrames");
         p.LateShare = Required<double>(*pacing, "lateShare");
@@ -285,7 +294,7 @@ namespace MB::FramePacing::Data
       }
       if (const Json* camera = OptionalObject(value, "camera"))
       {
-        run.Camera = SummaryCamera{ToStatistics(OptionalObject(*camera, "scanoutDelay")), Required<int64_t>(*camera, "framesSeenInBothZones"),
+        run.Camera = SummaryCamera{ToStatistics(&RequiredObject(*camera, "scanoutDelay")), Required<int64_t>(*camera, "framesSeenInBothZones"),
                                    Required<int64_t>(*camera, "tornFrames"), Required<int64_t>(*camera, "secondZoneOnlyFrames")};
       }
       run.Warnings = Texts(value, "warnings");
@@ -335,9 +344,14 @@ namespace MB::FramePacing::Data
     }
     summary.FrameSize = Optional<std::string>(root, "frameSize");
     summary.TimeSource = Optional<std::string>(root, "timeSource");
-    summary.CapturePeriodMs = Required<double>(root, "capturePeriodMs");
-    summary.MeasurementResolutionMs = OrDefault<double>(root, "measurementResolutionMs", summary.CapturePeriodMs);
-    summary.ErrorThresholdMs = Required<double>(root, "errorThresholdMs");
+    summary.CapturePeriod = RequiredTicks(root, "capturePeriodTicks");
+    // 0 is a file without the field, as C# reads it
+    summary.MeasurementResolution = TimeSpan(OrDefault<int64_t>(root, "measurementResolutionTicks", 0));
+    if (summary.MeasurementResolution == TimeSpan::Zero())
+    {
+      summary.MeasurementResolution = summary.CapturePeriod;
+    }
+    summary.ErrorThreshold = RequiredTicks(root, "errorThresholdTicks");
     if (const Json* markers = OptionalList(root, "markers"))
     {
       for (const Json& marker : *markers)

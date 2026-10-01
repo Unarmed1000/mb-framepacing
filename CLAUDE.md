@@ -176,8 +176,17 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Typed times** (C++ and C#, the same names; the tools are typed throughout too, with these names: `PresentedFrame`, `CaptureRow`,
     `ChartRun`): points in time are `TickCount64` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
-    `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`); the CSV's milliseconds parse
-    with `ParseMilliseconds`. The files' bytes and the golden data do not change.
+    `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`).
+  - **The files hold times as whole ticks** (`…Ticks` columns and fields), in the integer type the value has: a marker's value is in
+    the CSV exactly as the marker carried it (`animationTicks` an `i64`, `markerTargetTicks` a `u32`, 4294967295 = on demand), and
+    `summary.json`'s settings too (`capturePeriodTicks`, `errorThresholdTicks`, `pacing.refreshPeriodTicks`, `targetFrameTicks`).
+    Nothing between a marker and a file goes through a floating point number: never add a milliseconds column or field for a time.
+    Only `summary.json`'s statistics and histograms are milliseconds (`…Ms`): a mean or an interpolated percentile is no whole tick.
+    A whole number is digits with a `-` in front when negative, in every language's reader (no `+`, spaces, fraction or exponent).
+  - **Readers are strict, and alike:** what every file has is required (`sdk/doc/analysis-output-format.md` marks it), a value must be
+    of its field's type and in its range, and content that is not is one error type per module (C++ `DataFormatError`, C#
+    `InvalidDataException`, Python `DataFormatError`), with the file and line for a CSV. A file that cannot be opened is the
+    platform's error, not a format error.
   - **Capture times** (`MB.FramePacing.Capture`): `CaptureClock.Now` and a frame's host time are `TickCount64` (the time since the capture
     started). A frame's device time is a `DeviceTimestamp`: a time, `Unknown` (the device gave none) or `Pending` (it arrives after the
     pixels: ffmpeg's showinfo lines, resolved by the recorder through `IDeviceTimestampSource`). Pending exists only between a source and

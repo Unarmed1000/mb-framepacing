@@ -74,7 +74,7 @@ namespace MB.FramePacing.Charts.UnitTest
       double limit = ChartScale.ErrorLimit(judged.Select(Error).ToList());
       Assert.That((error.YFrom, error.YTo), Is.EqualTo((-limit, limit)), $"{clip}: symmetric scale");
       // A refresh line at every whole refresh an error reaches (within a tenth of one), inside the scale
-      double refreshMs = chart.Run.Pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
+      double refreshMs = (chart.Run.Pacing?.RefreshPeriod ?? chart.CapturePeriod).TotalMilliseconds;
       var expectedLines = new List<double>();
       foreach (int sign in new[] { 1, -1 })
       {
@@ -708,7 +708,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// <summary>The refresh the run is measured with: the capture period, 1/60 s in whole ticks.</summary>
     private static long RefreshTicks(ChartRun chart)
     {
-      long refresh = (long)Math.Round(chart.Run.Pacing!.RefreshPeriodMs * TimeSpan.TicksPerMillisecond);
+      long refresh = chart.Run.Pacing!.RefreshPeriod.Ticks;
       Assert.That(refresh, Is.AnyOf(166666L, 166667L));
       return refresh;
     }

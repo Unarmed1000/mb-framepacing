@@ -139,7 +139,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           >= scenario.RefreshInterval.Ticks / 2
         );
       Assert.That(run.Pacing, Is.Not.Null);
-      Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(report.CapturePeriodMs), "a capture card captures at the display's refresh rate");
+      Assert.That(run.Pacing!.RefreshPeriod, Is.EqualTo(report.Timeline.CapturePeriod), "a capture card captures at the display's refresh rate");
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
       if (stallEvery > 0)
       {

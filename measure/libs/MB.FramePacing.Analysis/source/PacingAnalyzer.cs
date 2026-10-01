@@ -131,15 +131,14 @@ namespace MB.FramePacing.Analysis
       }
 
       var (uneven, even) = Split(frames, half, errorThreshold);
-      var targets = frames
-        .Where(f => f.DisplayDelta.HasValue && f.TargetFrameTime.HasValue)
-        .Select(f => (double)f.TargetFrameTime!.Value.Ticks)
-        .Order()
-        .ToArray();
+      var targets = frames.Where(f => f.DisplayDelta.HasValue && f.TargetFrameTime.HasValue).Select(f => f.TargetFrameTime!.Value).Order().ToArray();
       return new RunPacing(
-        refresh.TotalMilliseconds,
+        refresh,
         refreshCalculated,
-        (targets.Length > 0 ? Statistics.Percentile(targets, 0.5) : givenTarget.Ticks) / TimeSpan.TicksPerMillisecond,
+        // The median, as a target a frame had: the lower of the two middle ones for an even number of frames
+        targets.Length > 0
+          ? targets[(targets.Length - 1) / 2]
+          : givenTarget,
         source,
         late,
         counted > 0 ? late / (double)counted : 0,

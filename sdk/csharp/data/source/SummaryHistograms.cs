@@ -7,7 +7,12 @@
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
+using System.Text.Json.Serialization;
+
 namespace MB.FramePacing.Data
 {
-  public sealed record SummaryHistograms(SummaryHistogram AnimationErrorMs, SummaryHistogram DisplayDeltaMs);
+  public sealed record SummaryHistograms(
+    [property: JsonRequired] SummaryHistogram AnimationErrorMs,
+    [property: JsonRequired] SummaryHistogram DisplayDeltaMs
+  );
 }

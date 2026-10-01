@@ -90,7 +90,7 @@ namespace MB.FramePacing.Charts
       var chart = section.Run;
       var run = chart.Run;
       var pacing = run.Pacing;
-      double refreshMs = pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
+      double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).TotalMilliseconds;
       double from = section.FromSeconds;
       double to = section.ToSeconds;
       var (viewFrom, viewTo) = visible ?? (from, to);
@@ -111,7 +111,7 @@ namespace MB.FramePacing.Charts
             : $"A section of {Ms1(to - from)} s of the run's {Ms1(RunSection.Whole(chart).ToSeconds)} s"
         )
           + $", {frameCount.ToString("N0", CultureInfo.InvariantCulture)} presented frames on a {Hz(pacing)} display"
-          + (pacing != null ? $", measured against a {Ms1(pacing.TargetFrameMs)} ms target." : "."),
+          + (pacing != null ? $", measured against a {Ms1(pacing.TargetFrameTime.TotalMilliseconds)} ms target." : "."),
         $"Resolution {Ms1(chart.CapturePeriod.TotalMilliseconds)} ms (one capture period); error threshold "
           + $"{Ms(chart.ErrorThreshold.TotalMilliseconds)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",

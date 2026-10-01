@@ -96,7 +96,11 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshCalculated);
-      Assert.That(run.Pacing.RefreshPeriodMs, Is.EqualTo(CapturesPerFrame).Within(0.01), "one frame per refresh, 17 camera periods apart");
+      Assert.That(
+        run.Pacing.RefreshPeriod.TotalMilliseconds,
+        Is.EqualTo(CapturesPerFrame).Within(0.01),
+        "one frame per refresh, 17 camera periods apart"
+      );
       Assert.That(run.Pacing.LateFrames, Is.Zero);
 
       var mismatch = TimelineAnalyzer.Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera, CalibratedRefreshHz = 60 }).Runs.Single();
@@ -131,10 +135,10 @@ namespace MB.FramePacing.Analysis.UnitTest
         .Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera, ExpectedRefreshHz = 2000.0 / CapturesPerFrame })
         .Runs.Single();
 
-      Assert.That(run.Pacing!.RefreshPeriodMs, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
+      Assert.That(run.Pacing!.RefreshPeriod.TotalMilliseconds, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
       Assert.That(run.Pacing.MatchesExpectedRefresh, Is.True);
       // Without pacing information the target is the native rate, so every frame of the half rate game is a refresh late
-      Assert.That(run.Pacing.TargetFrameMs, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
+      Assert.That(run.Pacing.TargetFrameTime.TotalMilliseconds, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(run.Frames.Count - 1));
     }
 

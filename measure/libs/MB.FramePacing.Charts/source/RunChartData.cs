@@ -188,9 +188,7 @@ namespace MB.FramePacing.Charts
 
       // What each hold was aimed at: the target and preferred frame time of the frame that ends it. The display time step panel draws them
       // in whole refreshes, as the analysis compares; the frametime panel as written. Without pacing (no refresh rate) there are none
-      var refresh = run.Run.Pacing is { } pacing
-        ? new TimeSpan((long)Math.Round(pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond))
-        : TimeSpan.Zero;
+      var refresh = run.Run.Pacing?.RefreshPeriod ?? TimeSpan.Zero;
       TimeSpan? Rounded(TimeSpan? frameTime) => frameTime is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
       ReferenceStretch[] Stretches(Func<PresentedFrame, TimeSpan?> target, Func<PresentedFrame, TimeSpan?> preferred)
       {

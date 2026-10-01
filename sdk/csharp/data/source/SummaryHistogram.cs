@@ -8,8 +8,13 @@
 //****************************************************************************************************************************************************
 
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace MB.FramePacing.Data
 {
-  public sealed record SummaryHistogram(double BinWidthMs, long Total, IReadOnlyList<SummaryHistogramBin> Bins);
+  public sealed record SummaryHistogram(
+    [property: JsonRequired] double BinWidthMs,
+    [property: JsonRequired] long Total,
+    [property: JsonRequired] IReadOnlyList<SummaryHistogramBin> Bins
+  );
 }

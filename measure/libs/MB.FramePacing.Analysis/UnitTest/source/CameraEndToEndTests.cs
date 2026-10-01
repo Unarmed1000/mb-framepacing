@@ -114,7 +114,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       double refreshMs = camera.ToCameraTicks(camera.Scenario.RefreshInterval.Ticks) / TimeSpan.TicksPerMillisecond;
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshCalculated);
-      Assert.That(run.Pacing.RefreshPeriodMs, Is.EqualTo(refreshMs).Within(0.1));
+      Assert.That(run.Pacing.RefreshPeriod.TotalMilliseconds, Is.EqualTo(refreshMs).Within(0.1));
       int stalls = Enumerable
         .Range(1, truth.Count - 1)
         .Count(i => truth[i].DisplayTime.Ticks - truth[i - 1].DisplayTime.Ticks > camera.Scenario.RefreshInterval.Ticks);

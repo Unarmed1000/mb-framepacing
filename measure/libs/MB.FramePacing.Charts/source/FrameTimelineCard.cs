@@ -52,9 +52,7 @@ namespace MB.FramePacing.Charts
           $"The section has {frames.Count} presented frames; the frame timeline draws at most {MaxFrames}: choose a shorter section (--from, --to)"
         );
 
-      var refresh = run.Pacing is { RefreshPeriodMs: > 0 } pacing
-        ? new TimeSpan((long)Math.Round(pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond))
-        : chart.CapturePeriod;
+      var refresh = run.Pacing is { } pacing && pacing.RefreshPeriod > TimeSpan.Zero ? pacing.RefreshPeriod : chart.CapturePeriod;
       var (offset, alignedBySchedule) = PacerToCapture(run.Frames);
 
       // The refresh grid starts at the first frame's display time; each frame's first refresh on it
