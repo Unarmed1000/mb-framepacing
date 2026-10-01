@@ -16,7 +16,8 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
     byte count from the type) for every module's file and wire formats; the core and the marker module have 100 % test coverage
     (regions, functions, lines, branches), measured with llvm-cov without asserts (`NDEBUG`); the C# core has the same `TickCount64`, `TickCount32` and `TimeSpan32`
-    (`sdk/csharp/core/source/Time/`, member for member, `System.TimeSpan` as the signed interval, .NET exceptions), C# assembly `MB.FramePacing`, Python
+    (`sdk/csharp/core/source/Time/`, member for member, `System.TimeSpan` as the signed interval, .NET exceptions) and 100 % line and branch
+    coverage too: `python tools/check_csharp_coverage.py` (Microsoft code coverage through `dotnet test --collect`; CI's `dotnet-lint`), C# assembly `MB.FramePacing`, Python
     `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
     helper). The core's types hide same-named types that a `using` brings into `MB.FramePacing.*` code: the GUI writes `Avalonia.Point`.
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.

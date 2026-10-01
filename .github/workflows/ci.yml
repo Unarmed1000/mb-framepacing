@@ -128,7 +128,7 @@ jobs:
         run: python3 sdk/unity/build_upm.py --output "$RUNNER_TEMP/upm" --check
 
   dotnet-lint:
-    name: .NET lint (CSharpier, dotnet format, vulnerable packages)
+    name: .NET lint (CSharpier, dotnet format, vulnerable packages, coverage)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -156,6 +156,9 @@ jobs:
           if grep -q "has the following vulnerable packages" <<< "$report"; then
             echo "::error::vulnerable NuGet packages, see the log"; exit 1
           fi
+      # The SDK modules that must be fully tested: every line and branch of the assembly, by its own tests
+      - name: C# coverage (100 % of the core)
+        run: python3 tools/check_csharp_coverage.py
 
   cpp-analysis:
     name: C++ sanitizers and clang-tidy

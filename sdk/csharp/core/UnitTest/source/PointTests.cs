@@ -23,6 +23,12 @@ namespace MB.FramePacing.UnitTest
       Assert.That(point == new Point(3, -4), Is.True);
       Assert.That(point != new Point(-4, 3), Is.True);
       Assert.That(point.ToString(), Is.EqualTo("{3,-4}"));
+      Assert.That(point.Equals(new Point(3, -5)), Is.False);
+      Assert.That(point.Equals(new Point(4, -4)), Is.False);
+      Assert.That(point.Equals((object)new Point(3, -4)), Is.True);
+      Assert.That(point.Equals("{3,-4}"), Is.False);
+      Assert.That(point.GetHashCode(), Is.EqualTo(new Point(3, -4).GetHashCode()));
+      Assert.That(point.GetHashCode(), Is.Not.EqualTo(new Point(-4, 3).GetHashCode()));
     }
   }
 }
