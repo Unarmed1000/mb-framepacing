@@ -92,7 +92,8 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
   - `python tools/check_cpp.py` runs both on our sources only (never `third_party/` or fetched dependencies) of every module
     (`--module core|marker|data|pacer` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a
     configured build: `sdk/cpp/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
-    include paths); `--preset` takes another one. To apply formatting: `clang-format -i` on the files the script lists.
+    include paths); `--preset` takes another one. With a compile database (`linux-sanitize`, CI) clang-tidy checks the sources that build
+    compiles: a module that is switched off (the pacer) is skipped, and the script says so. To apply formatting: `clang-format -i` on the files the script lists.
   - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,source,tests}`),
     each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`
     (no umbrella headers: callers include each type's header; functions live in a header of their own, e.g. `marker/FrameMarker.hpp`, as

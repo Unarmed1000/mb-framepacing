@@ -21,10 +21,12 @@ come from PATH.
 """
 
 import argparse
+import json
 import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 LIBRARY = "sdk/cpp"
 MODULES = ("core", "marker", "data", "pacer")
@@ -103,6 +105,21 @@ def tidy_command(root: Path, build: Path, sources: list[str]) -> list[str]:
     return [*command, *sources, "--", *flags]
 
 
+def built_sources(cpp: Path, build: Path, sources: list[str]) -> list[str]:
+    """The sources the build compiles, when it wrote a compile database: clang-tidy can only check those (a module that is switched
+    off, like the pacer, has no include paths there). Without a database every source is checked, with tidy_command's flags."""
+    database = build / "compile_commands.json"
+    if not database.is_file():
+        return sources
+    entries = cast("list[dict[str, str]]", json.loads(database.read_text(encoding="utf-8")))
+    compiled = {Path(entry["file"]).resolve() for entry in entries}
+    kept = [source for source in sources if (cpp / source).resolve() in compiled]
+    if len(kept) < len(sources):
+        skipped = sorted({source.split("/")[0] for source in sources if source not in kept})
+        print(f"clang-tidy: {len(sources) - len(kept)} sources are not part of this build and are skipped (in: {', '.join(skipped)})")
+    return kept
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     _ = parser.add_argument("--preset", help="the CMake preset whose build clang-tidy uses (default: windows)")
@@ -126,7 +143,7 @@ def main() -> int:
         if not (build / "include").is_dir():
             print(f"error: {build} is not a configured build of {LIBRARY} (run cmake --preset {args.preset} there first)")
             return 1
-        ok = run(tidy_command(root, build, files(cpp, modules, TIDY_GLOBS)), cpp) and ok
+        ok = run(tidy_command(root, build, built_sources(cpp, build, files(cpp, modules, TIDY_GLOBS))), cpp) and ok
     print("C++ checks passed" if ok else "C++ checks FAILED")
     return 0 if ok else 1
 
