@@ -99,6 +99,19 @@ TEST(TickCount64, ACounterConvertsExactlyAtAnyValue)
   static_assert(FP::TickCount64::FromCounter(20'000'000, 10'000'000).Ticks() == 20'000'000);
 }
 
+TEST(TickCount64, ASlowCounterPastTheRangeWrapsAsTheCountDoes)
+{
+  // A counter slower than the tick can count more seconds than a TickCount64 holds (2^63 - 1 seconds at 1 Hz): the count wraps, as
+  // every TickCount64 does, and the difference of two such counts is still their distance
+  constexpr auto Wrapped = static_cast<int64_t>(static_cast<uint64_t>(MaxTicks) * static_cast<uint64_t>(FP::TickCount64::TicksPerSecond));
+  static_assert(FP::TickCount64::FromCounter(MaxTicks, 1).Ticks() == Wrapped);
+  EXPECT_EQ(FP::TickCount64::FromCounter(MaxTicks, 1).Ticks(), Wrapped);
+  EXPECT_EQ(FP::TickCount64::FromCounter(MaxTicks, 1) - FP::TickCount64::FromCounter(MaxTicks - 3, 1), FP::TimeSpan::FromSeconds(3));
+  EXPECT_EQ(FP::TickCount64::FromCounter(std::numeric_limits<int64_t>::min(), 1000) -
+              FP::TickCount64::FromCounter(std::numeric_limits<int64_t>::min() + 1, 1000),
+            FP::TimeSpan::FromMilliseconds(-1));
+}
+
 TEST(TickCount64, ACounterFrequencyOutsideItsRangeThrows)
 {
   EXPECT_THROW(static_cast<void>(FP::TickCount64::FromCounter(123, 0)), std::out_of_range);

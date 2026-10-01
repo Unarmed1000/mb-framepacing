@@ -38,11 +38,13 @@ namespace MB::FramePacing::Data
   };
 
   //! Read summary.json (C#'s AnalysisSummary.Read). Allocates; throws DataFormatError for a newer format version or content that is not a
-  //! summary.
+  //! summary, std::runtime_error when the file cannot be opened.
   AnalysisSummary ReadSummary(const std::filesystem::path& path);
 
-  //! Parse summary.json's text (C#'s AnalysisSummary.Parse). A file without formatVersion is format 1; fields it lacks keep their defaults,
-  //! unknown fields are ignored.
+  //! Parse summary.json's text (C#'s AnalysisSummary.Parse). A file without formatVersion is format 1 and unknown fields are ignored.
+  //! Throws DataFormatError for text that is not a summary: the fields every summary has are required (capturePeriodMs,
+  //! errorThresholdMs, and a run's runId, hasStartMarker, hasEndMarker, framesFile, counts and statistics; doc/analysis-output-format.md
+  //! marks them), and a value must have its field's type and fit its range. An optional field the file lacks is empty or 0.
   AnalysisSummary ParseSummary(std::string_view json);
 }
 

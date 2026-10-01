@@ -56,3 +56,19 @@ TEST(ChronoConversion, ADateTimeIsTicksSinceYearOne)
   const auto newYear = std::chrono::system_clock::time_point{std::chrono::seconds{1'767'225'600}};
   EXPECT_EQ(FP::ToDateTimeTicks(newYear), 639'028'224'000'000'000);
 }
+
+TEST(ChronoConversion, ADateTimeIsRoundedDownToItsTick)
+{
+  // A clock finer than the tick (system_clock counts nanoseconds on Linux), before and after its epoch: the tick the time is in, as
+  // ToTickCount64
+  using SystemNanoseconds = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>;
+  constexpr int64_t Epoch = 621'355'968'000'000'000;
+  static_assert(FP::ToDateTimeTicks(SystemNanoseconds{std::chrono::nanoseconds{150}}) == Epoch + 1);
+  EXPECT_EQ(FP::ToDateTimeTicks(SystemNanoseconds{std::chrono::nanoseconds{150}}), Epoch + 1);
+  EXPECT_EQ(FP::ToDateTimeTicks(SystemNanoseconds{std::chrono::nanoseconds{-100}}), Epoch - 1);
+  EXPECT_EQ(FP::ToDateTimeTicks(SystemNanoseconds{std::chrono::nanoseconds{-150}}), Epoch - 2) << "1969-12-31T23:59:59.99999985";
+  EXPECT_EQ(FP::ToDateTimeTicks(SystemNanoseconds{std::chrono::nanoseconds{-1}}), Epoch - 1);
+  // A coarser clock converts exactly
+  using SystemSeconds = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>;
+  EXPECT_EQ(FP::ToDateTimeTicks(SystemSeconds{std::chrono::seconds{-1}}), Epoch - FP::TimeSpan::TicksPerSecond);
+}

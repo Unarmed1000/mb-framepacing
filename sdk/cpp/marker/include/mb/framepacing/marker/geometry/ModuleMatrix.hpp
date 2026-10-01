@@ -6,6 +6,7 @@
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -14,8 +15,8 @@ namespace MB::FramePacing::Marker
 {
   //! The encoded marker: the QR symbol's modules, 1 bit each (1 = dark), packed row-major, most significant bit first, continuous across
   //! rows, the last byte zero padded (exactly test-data/markers/modules.csv's modulesHex). GenerateModules fills it once per marker; every
-  //! drawing output (ModulesToQuads, ModulesToTriangles, ModulesToIndexed, ModulesToBitmap) is made from it. A plain value (211 bytes):
-  //! it lives on the stack or as a member, never on the heap.
+  //! drawing output (ModulesToQuads, ModulesToTriangles, ModulesToIndexed, ModulesToGridIndices, ModulesToBitmap) is made from it. A
+  //! plain value (its size and 211 bytes of bits): it lives on the stack or as a member, never on the heap.
   class ModuleMatrix
   {
   public:
@@ -50,8 +51,10 @@ namespace MB::FramePacing::Marker
       return m_size;
     }
 
+    //! Whether the module in column x of row y is dark. x and y must be 0 to Size() - 1 (asserted): there is no module outside.
     [[nodiscard]] constexpr bool IsDark(const int32_t x, const int32_t y) const noexcept
     {
+      assert(x >= 0 && x < m_size && y >= 0 && y < m_size);
       const auto index = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_size)) + static_cast<std::size_t>(x);
       return ((static_cast<uint32_t>(m_bits[index / 8u]) >> (7u - static_cast<uint32_t>(index % 8u))) & 1u) != 0u;
     }
@@ -63,19 +66,20 @@ namespace MB::FramePacing::Marker
     }
 
     //! A matrix of Size x Size modules from packed bits (at least PackedModuleByteCount(size) bytes; bits past the last module are
-    //! ignored). Returns false, leaving rMatrix unchanged, for a size that is not a QR symbol's (21 to 41, in steps of 4) or too few bytes.
+    //! ignored). Returns false, leaving rMatrix unchanged, for a size that is not a marker's (MainSize or SyncSize: the sizes the drawing
+    //! functions and the grid know) or too few bytes.
     static constexpr bool TryFromBits(const int32_t size, const std::span<const uint8_t> bits, ModuleMatrix& rMatrix) noexcept
     {
       const std::size_t byteCount = PackedModuleByteCount(size);
-      if (size < 21 || size > MainSize || (size - 17) % 4 != 0 || bits.size() < byteCount)
+      if ((size != MainSize && size != SyncSize) || bits.size() < byteCount)
       {
         return false;
       }
       ModuleMatrix matrix;
       matrix.m_size = size;
       std::copy_n(bits.begin(), byteCount, matrix.m_bits.begin());
-      // Zero the padding, so equal symbols compare equal. A QR size is odd and an odd square is 1 more than a multiple of 8, so the last
-      // byte always holds 1 module and 7 bits of padding.
+      // Zero the padding, so equal symbols compare equal. Both sizes are odd and an odd square is 1 more than a multiple of 8, so the
+      // last byte always holds 1 module and 7 bits of padding.
       matrix.m_bits[byteCount - 1u] = static_cast<uint8_t>(matrix.m_bits[byteCount - 1u] & 0x80u);
       rMatrix = matrix;
       return true;

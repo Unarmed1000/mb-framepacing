@@ -28,6 +28,117 @@ namespace
   "errorThresholdMs": 1,
   "runs": []
 })";
+
+  constexpr std::string_view Counts = R"("counts": { "captures": 10, "decoded": 9, "undecodable": 1, "torn": 0, "notRecorded": 0,
+    "sourceDroppedFrames": 0, "missedCaptures": 0, "presentedFrames": 8, "skippedFrameIndices": 0, "droppedFrames": 0,
+    "outOfOrderCaptures": 0, "segments": 1 })";
+
+  constexpr std::string_view Statistics = R"("statistics": { "framesWithAnimationError": 2, "errorPerFrameMs": 0.5, "percentError": 25,
+    "excludedStaticFrames": 0, "uncertainSteps": 0 })";
+
+  constexpr std::string_view RunStart = R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "run-7-frames.csv")";
+
+  //! A summary whose one run has the given members.
+  std::string SummaryWithRun(const std::string& members)
+  {
+    return R"({ "capturePeriodMs": 16.6667, "errorThresholdMs": 1, "runs": [ { )" + members + " } ] }";
+  }
+
+  std::string OneRun(const std::string_view start = RunStart, const std::string_view counts = Counts, const std::string_view statistics = Statistics,
+                     const std::string_view more = {})
+  {
+    std::string members;
+    for (const std::string_view part : {start, counts, statistics, more})
+    {
+      if (!part.empty())
+      {
+        members += (members.empty() ? "" : ", ") + std::string(part);
+      }
+    }
+    return SummaryWithRun(members);
+  }
+
+  //! The minimal summary with one more member in front.
+  std::string MinimalWith(const std::string& member)
+  {
+    return "{ " + member + "," + std::string(MinimalSummary.substr(1));
+  }
+}
+
+TEST(AnalysisOutput, ARunIsReadWithItsCountsAndStatistics)
+{
+  const auto summary = FD::ParseSummary(OneRun());
+  ASSERT_EQ(summary.Runs.size(), 1u);
+  EXPECT_EQ(summary.Runs[0].RunId, 7u);
+  EXPECT_EQ(summary.Runs[0].FramesFile, "run-7-frames.csv");
+  EXPECT_EQ(summary.Runs[0].Counts.Captures, 10);
+  EXPECT_EQ(summary.Runs[0].Counts.PresentedFrames, 8);
+  EXPECT_EQ(summary.Runs[0].Statistics.FramesWithAnimationError, 2);
+  EXPECT_EQ(summary.Runs[0].Statistics.PercentError, 25.0);
+  EXPECT_EQ(summary.MeasurementResolutionMs, 16.6667) << "a file without it: the capture period";
+}
+
+TEST(AnalysisOutput, ARunWithoutItsCountsOrStatisticsIsNotASummary)
+{
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, {}, Statistics)), FD::DataFormatError) << "no counts";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, {})), FD::DataFormatError) << "no statistics";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, R"("counts": 3)", Statistics)), FD::DataFormatError) << "counts that are a number";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, R"("statistics": [])")), FD::DataFormatError) << "statistics that are an array";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics, R"("histograms": {})")), FD::DataFormatError) << "empty histograms";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics, R"("histograms": { "animationErrorMs": 1, "displayDeltaMs": 2 })")),
+               FD::DataFormatError)
+    << "histograms that are numbers";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics, R"("pacing": 1)")), FD::DataFormatError) << "pacing that is a number";
+}
+
+TEST(AnalysisOutput, ListsMustBeLists)
+{
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodMs": 16.6667, "errorThresholdMs": 1, "runs": { "a": 1 } })"), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodMs": 16.6667, "errorThresholdMs": 1, "runs": [ 5 ] })"), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("markers": { "bounds": "0,0,1,1", "moduleSizePx": 3 })")), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("warnings": "one text")")), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("warnings": [ 1 ])")), FD::DataFormatError);
+  EXPECT_EQ(FD::ParseSummary(MinimalWith(R"("warnings": [ "one", "two" ])")).Warnings, (std::vector<std::string>{"one", "two"}));
+}
+
+TEST(AnalysisOutput, NumbersMustFitTheirFields)
+{
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": -1, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")),
+               FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 4294967296, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")),
+               FD::DataFormatError);
+  EXPECT_EQ(FD::ParseSummary(OneRun(R"("runId": 4294967295, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")).Runs[0].RunId,
+            4294967295u);
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1.5, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")),
+               FD::DataFormatError)
+    << "a fraction for a whole number";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1, "hasStartMarker": 1, "hasEndMarker": false, "framesFile": "f")")), FD::DataFormatError)
+    << "a number for a flag";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1, "hasStartMarker": true, "hasEndMarker": false, "framesFile": 5)")), FD::DataFormatError)
+    << "a number for a text";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, R"("statistics": { "framesWithAnimationError": 1e300, "errorPerFrameMs": 0.5,
+    "percentError": 25, "excludedStaticFrames": 0, "uncertainSteps": 0 })")),
+               FD::DataFormatError)
+    << "a count beyond 64 bits";
+  EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("formatVersion": 4294967297)")), FD::DataFormatError) << "not format 1 by wrapping";
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodMs": "16", "errorThresholdMs": 1 })"), FD::DataFormatError) << "a text for a number";
+  EXPECT_EQ(FD::ParseSummary(R"({ "capturePeriodMs": 16, "errorThresholdMs": 1 })").CapturePeriodMs, 16.0) << "a whole number for a real one";
+}
+
+TEST(AnalysisOutput, RequiredFieldsAreRequired)
+{
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "errorThresholdMs": 1 })"), FD::DataFormatError) << "no capture period";
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodMs": 16.6667 })"), FD::DataFormatError) << "no error threshold";
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodMs": null, "errorThresholdMs": 1 })"), FD::DataFormatError) << "null is absent";
+  EXPECT_THROW((void)FD::ParseSummary("[]"), FD::DataFormatError) << "not an object";
+  EXPECT_THROW((void)FD::ParseSummary("{ \"capturePeriodMs\": "), FD::DataFormatError) << "not JSON";
+  EXPECT_THROW((void)FD::ParseSummary(""), FD::DataFormatError) << "empty";
+}
+
+TEST(AnalysisOutput, FormatVersionZeroIsFormatOne)
+{
+  EXPECT_EQ(FD::ParseSummary(MinimalWith(R"("formatVersion": 0)")).FormatVersion, 1) << "as a file without it (C# reads both as 0)";
+  EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("formatVersion": -1)")), FD::DataFormatError);
 }
 
 TEST(AnalysisOutput, ASummaryWithoutAFormatVersionIsFormatOne)

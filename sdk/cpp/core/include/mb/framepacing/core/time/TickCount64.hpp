@@ -117,8 +117,9 @@ namespace MB::FramePacing
     }
 
     //! A counter value of a clock that counts frequency times a second (QueryPerformanceCounter with QueryPerformanceFrequency, .NET's
-    //! Stopwatch), rounded down to the tick it is in. Exact for any counter value: the whole seconds and the rest are converted apart,
-    //! so nothing overflows. Throws std::out_of_range for a frequency that is not 1 to MaxCounterFrequency.
+    //! Stopwatch), rounded down to the tick it is in. The whole seconds and the rest are converted apart, so it is exact for every
+    //! counter value whose time fits a TickCount64 (every one, from 10 MHz on); a slower counter's time past that wraps, as the count
+    //! does. Throws std::out_of_range for a frequency that is not 1 to MaxCounterFrequency.
     static constexpr TickCount64 FromCounter(const int64_t counter, const int64_t frequency)
     {
       if (frequency <= 0 || frequency > MaxCounterFrequency)
@@ -132,8 +133,10 @@ namespace MB::FramePacing
         --seconds;
         rest += frequency;
       }
-      // rest < frequency <= MaxCounterFrequency, so rest * TicksPerSecond fits
-      return TickCount64((seconds * TicksPerSecond) + ((rest * TicksPerSecond) / frequency));
+      // rest < frequency <= MaxCounterFrequency, so rest * TicksPerSecond fits. The seconds are multiplied unsigned: they wrap when a
+      // slow counter's time is past the range, where the signed product would be undefined.
+      const uint64_t wholeSeconds = static_cast<uint64_t>(seconds) * static_cast<uint64_t>(TicksPerSecond);
+      return TickCount64(static_cast<int64_t>(wholeSeconds + static_cast<uint64_t>((rest * TicksPerSecond) / frequency)));
     }
 
     //! The count as a signed number of ticks.

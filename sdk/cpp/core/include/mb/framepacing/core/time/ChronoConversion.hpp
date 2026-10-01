@@ -63,12 +63,14 @@ namespace MB::FramePacing
     return std::chrono::time_point<TClock, TickDuration>(TickDuration(count.Ticks()));
   }
 
-  //! Convert a wall clock time to C# DateTime UTC ticks (the marker's StartMetadata::UtcTicks format).
-  constexpr int64_t ToDateTimeTicks(const std::chrono::system_clock::time_point timePoint) noexcept
+  //! Convert a wall clock time to C# DateTime UTC ticks (the marker's StartMetadata::UtcTicks format), rounded down to the tick it is
+  //! in (as ToTickCount64: times before 1970 too).
+  template <typename TDuration>
+  constexpr int64_t ToDateTimeTicks(const std::chrono::time_point<std::chrono::system_clock, TDuration> timePoint) noexcept
   {
     // C# DateTime ticks (since 0001-01-01) at the Unix epoch, system_clock's epoch
     constexpr int64_t UnixEpochDateTimeTicks = 621'355'968'000'000'000;
-    return UnixEpochDateTimeTicks + std::chrono::duration_cast<TickDuration>(timePoint.time_since_epoch()).count();
+    return UnixEpochDateTimeTicks + std::chrono::floor<TickDuration>(timePoint.time_since_epoch()).count();
   }
 }
 

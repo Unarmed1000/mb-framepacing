@@ -8,6 +8,7 @@
 #include <mb/framepacing/core/Version.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 #include "SteadyClock.hpp"
@@ -99,4 +100,33 @@ TEST(Rectangle, EveryMemberAtRunTime)
   // Always valid: a negative size is 0
   EXPECT_EQ(FP::Rectangle(5, 6, -3, -4), FP::Rectangle(5, 6, 0, 0));
   EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(40, 60, 10, 20), FP::Rectangle(40, 60, 0, 0));
+}
+
+TEST(Rectangle, ItsEdgesAlwaysFitInt32)
+{
+  constexpr int32_t Min = std::numeric_limits<int32_t>::min();
+  constexpr int32_t Max = std::numeric_limits<int32_t>::max();
+  // A size that would put the right or bottom edge past the last coordinate is cut there
+  static_assert(FP::Rectangle(Max - 5, Max - 7, 100, 100) == FP::Rectangle(Max - 5, Max - 7, 5, 7));
+  static_assert(FP::Rectangle(Max - 5, Max - 7, 100, 100).Right() == Max && FP::Rectangle(Max - 5, Max - 7, 100, 100).Bottom() == Max);
+  static_assert(FP::Rectangle(Max, Max, 1, 1) == FP::Rectangle(Max, Max, 0, 0));
+  static_assert(FP::Rectangle(1, 1, Max, Max) == FP::Rectangle(1, 1, Max - 1, Max - 1));
+  // Nothing to cut left of 0: the largest size reaches at most the last coordinate
+  static_assert(FP::Rectangle(0, 0, Max, Max).Right() == Max && FP::Rectangle(0, 0, Max, Max).Bottom() == Max);
+  static_assert(FP::Rectangle(Min, Min, Max, Max).Right() == -1 && FP::Rectangle(Min, Min, Max, Max).Bottom() == -1);
+  // Edges further apart than a size holds: the size is the largest one
+  static_assert(FP::Rectangle::FromLeftTopRightBottom(Min, Min, Max, Max) == FP::Rectangle(Min, Min, Max, Max));
+  static_assert(FP::Rectangle::FromLeftTopRightBottom(-2, -3, Max, Max) == FP::Rectangle(-2, -3, Max, Max));
+  static_assert(FP::Rectangle::FromLeftTopRightBottom(Max, Max, Min, Min) == FP::Rectangle(Max, Max, 0, 0));
+  static_assert(FP::Rectangle::FromLeftTopRightBottom(Max - 3, Max - 4, Max, Max) == FP::Rectangle(Max - 3, Max - 4, 3, 4));
+  // The same at run time (coverage counts what runs)
+  const FP::Rectangle cut(Max - 5, Max - 7, 100, 100);
+  EXPECT_EQ(cut.Width(), 5);
+  EXPECT_EQ(cut.Height(), 7);
+  EXPECT_EQ(cut.Right(), Max);
+  EXPECT_EQ(cut.Bottom(), Max);
+  EXPECT_TRUE(cut.Contains(Max - 1, Max - 1));
+  EXPECT_EQ(FP::Rectangle(Min, Min, Max, Max).Right(), -1);
+  EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(Min, Min, Max, Max), FP::Rectangle(Min, Min, Max, Max));
+  EXPECT_EQ(FP::Rectangle::FromLeftTopRightBottom(Max, Max, Min, Min), FP::Rectangle(Max, Max, 0, 0));
 }

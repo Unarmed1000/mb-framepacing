@@ -1088,7 +1088,7 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
   EXPECT_EQ(FM::ModuleMatrix::PackedModuleByteCount(-1), 0u);
 }
 
-TEST(ModuleMatrix, TryFromBitsTakesQrSizesAndIgnoresThePadding)
+TEST(ModuleMatrix, TryFromBitsTakesTheMarkerSizesAndIgnoresThePadding)
 {
   const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
   std::array<uint8_t, FM::ModuleMatrix::MaxPackedModuleByteCount> bits{};
@@ -1101,10 +1101,21 @@ TEST(ModuleMatrix, TryFromBitsTakesQrSizesAndIgnoresThePadding)
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(24, bits, copy));
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(17, bits, copy));
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(0, bits, copy));
+  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(-25, bits, copy));
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(45, bits, copy));
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(25, std::span<const uint8_t>(bits).first(78), copy));
+  // The other QR sizes are not markers: nothing draws their grid
+  for (const int32_t size : {21, 29, 33, 37})
+  {
+    EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(size, bits, copy)) << size;
+  }
   EXPECT_EQ(copy, matrix) << "a refused call leaves the matrix unchanged";
   EXPECT_NE(copy, FM::ModuleMatrix{});
+
+  const FM::ModuleMatrix main = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  ASSERT_TRUE(FM::ModuleMatrix::TryFromBits(FM::ModuleMatrix::MainSize, main.Bits(), copy));
+  EXPECT_EQ(copy, main);
+  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(FM::ModuleMatrix::MainSize, main.Bits().first(210), copy));
 }
 
 TEST(ModuleMatrix, AnEmptyMatrixDrawsNothing)
@@ -1232,6 +1243,15 @@ TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
   EXPECT_TRUE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8))
     << "outside the buffer: nothing to draw";
   EXPECT_TRUE(std::all_of(pixels.begin(), pixels.end(), [](const uint8_t value) { return value == 128u; }));
+  // A stride whose rows together are more bytes than a size_t counts: the wrapped product must not pass for a small buffer. (The
+  // origin is outside, so a wrong 'true' writes nothing.)
+  constexpr std::size_t HugeStride = (std::numeric_limits<std::size_t>::max() / 63u) + 1u;
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8, HugeStride)) << "63 strides wrap";
+  EXPECT_FALSE(
+    FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 64, FM::PixelFormat::R8, std::numeric_limits<std::size_t>::max()))
+    << "the last row's bytes wrap the sum";
+  EXPECT_TRUE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {500, 500}, pixels, 64, 1, FM::PixelFormat::R8, HugeStride))
+    << "one row: the stride is never stepped";
 }
 
 TEST(Bitmap, BytesPerPixel)

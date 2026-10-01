@@ -445,10 +445,19 @@ namespace MB::FramePacing::Marker
     const auto bytesPerPixel = static_cast<std::size_t>(PixelFormatUtil::BytesPerPixel(format));
     const std::size_t rowBytes = static_cast<std::size_t>(width) * bytesPerPixel;
     const std::size_t rowStride = stride == 0 ? rowBytes : stride;
-    const std::size_t required = height == 0 ? 0u : (rowStride * static_cast<std::size_t>(height - 1)) + rowBytes;
-    if (rowStride < rowBytes || dst.size() < required)
+    if (rowStride < rowBytes)
     {
       return false;
+    }
+    if (height > 0)
+    {
+      // The last row needs no stride after it. dst.size() >= rowBytes is checked first, so the subtraction cannot wrap, and dividing
+      // instead of multiplying keeps a huge stride from wrapping the bytes needed into a small number.
+      const auto steps = static_cast<std::size_t>(height - 1);
+      if (dst.size() < rowBytes || (steps > 0 && rowStride > (dst.size() - rowBytes) / steps))
+      {
+        return false;
+      }
     }
     return WalkQuads(matrix, options, origin,
                      [&](const MarkerQuad& quad) noexcept

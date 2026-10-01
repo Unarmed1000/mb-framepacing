@@ -9,9 +9,15 @@
 #include <mb/framepacing/data/analysis/SummaryRun.hpp>
 #include <mb/framepacing/data/analysis/ValueStatistics.hpp>
 #include <nlohmann/json.hpp>
+#include <concepts>
+#include <cstdint>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace MB::FramePacing::Data
 {
@@ -22,10 +28,70 @@ namespace MB::FramePacing::Data
 
     using Json = nlohmann::json;
 
+    //! The member, or null when the object lacks it or holds null: absent and null are the same (the writer leaves nulls out).
     const Json* Field(const Json& object, const char* name)
     {
       const auto found = object.find(name);
       return found != object.end() && !found->is_null() ? &*found : nullptr;
+    }
+
+    [[noreturn]] void ThrowLacks(const char* name)
+    {
+      throw DataFormatError(std::string("summary.json lacks '") + name + "'");
+    }
+
+    [[noreturn]] void ThrowNot(const char* name, const char* what)
+    {
+      throw DataFormatError(std::string("summary.json: '") + name + "' is not " + what);
+    }
+
+    //! The value as a T, exactly: a whole number within T's range for an integer, any number for a real one, and never one kind as
+    //! another (nlohmann's get<T> casts: -1 becomes 4294967295 as a uint32_t).
+    template <typename T>
+    T Convert(const Json& value, const char* name)
+    {
+      if constexpr (std::same_as<T, bool>)
+      {
+        if (!value.is_boolean())
+        {
+          ThrowNot(name, "true or false");
+        }
+        return value.template get<bool>();
+      }
+      else if constexpr (std::integral<T>)
+      {
+        if (value.is_number_unsigned())
+        {
+          if (const auto number = value.template get<uint64_t>(); std::in_range<T>(number))
+          {
+            return static_cast<T>(number);
+          }
+        }
+        else if (value.is_number_integer())
+        {
+          if (const auto number = value.template get<int64_t>(); std::in_range<T>(number))
+          {
+            return static_cast<T>(number);
+          }
+        }
+        ThrowNot(name, "a whole number in its range");
+      }
+      else if constexpr (std::floating_point<T>)
+      {
+        if (!value.is_number())
+        {
+          ThrowNot(name, "a number");
+        }
+        return value.template get<T>();
+      }
+      else
+      {
+        if (!value.is_string())
+        {
+          ThrowNot(name, "a text");
+        }
+        return value.template get<T>();
+      }
     }
 
     template <typename T>
@@ -34,26 +100,16 @@ namespace MB::FramePacing::Data
       const Json* value = Field(object, name);
       if (value == nullptr)
       {
-        throw DataFormatError(std::string("summary.json lacks '") + name + "'");
+        ThrowLacks(name);
       }
-      try
-      {
-        return value->get<T>();
-      }
-      catch (const Json::exception& error)
-      {
-        throw DataFormatError(std::string("summary.json: '") + name + "' " + error.what());
-      }
+      return Convert<T>(*value, name);
     }
 
     template <typename T>
     std::optional<T> Optional(const Json& object, const char* name)
     {
-      if (Field(object, name) == nullptr)
-      {
-        return std::nullopt;
-      }
-      return Required<T>(object, name);
+      const Json* value = Field(object, name);
+      return value != nullptr ? std::optional<T>(Convert<T>(*value, name)) : std::nullopt;
     }
 
     template <typename T>
@@ -62,17 +118,55 @@ namespace MB::FramePacing::Data
       return Optional<T>(object, name).value_or(fallback);
     }
 
+    //! The member when it is an object, null when absent. Throws DataFormatError for anything else.
+    const Json* OptionalObject(const Json& object, const char* name)
+    {
+      const Json* value = Field(object, name);
+      if (value != nullptr && !value->is_object())
+      {
+        ThrowNot(name, "an object");
+      }
+      return value;
+    }
+
+    const Json& RequiredObject(const Json& object, const char* name)
+    {
+      const Json* value = OptionalObject(object, name);
+      if (value == nullptr)
+      {
+        ThrowLacks(name);
+      }
+      return *value;
+    }
+
+    //! The member when it is a list, null when absent. Throws DataFormatError for anything else.
+    const Json* OptionalList(const Json& object, const char* name)
+    {
+      const Json* value = Field(object, name);
+      if (value != nullptr && !value->is_array())
+      {
+        ThrowNot(name, "a list");
+      }
+      return value;
+    }
+
+    //! A list's entry must be an object.
+    void RequireObject(const Json& entry, const char* name)
+    {
+      if (!entry.is_object())
+      {
+        ThrowNot(name, "a list of objects");
+      }
+    }
+
     std::vector<std::string> Texts(const Json& object, const char* name)
     {
       std::vector<std::string> texts;
-      if (const Json* values = Field(object, name))
+      if (const Json* values = OptionalList(object, name))
       {
         for (const Json& value : *values)
         {
-          if (value.is_string())
-          {
-            texts.push_back(value.get<std::string>());
-          }
+          texts.push_back(Convert<std::string>(value, name));
         }
       }
       return texts;
@@ -101,10 +195,11 @@ namespace MB::FramePacing::Data
       SummaryHistogram histogram;
       histogram.BinWidthMs = Required<double>(value, "binWidthMs");
       histogram.Total = Required<int64_t>(value, "total");
-      if (const Json* bins = Field(value, "bins"))
+      if (const Json* bins = OptionalList(value, "bins"))
       {
         for (const Json& bin : *bins)
         {
+          RequireObject(bin, "bins");
           histogram.Bins.push_back({Required<double>(bin, "centerMs"), Required<int64_t>(bin, "count")});
         }
       }
@@ -122,7 +217,7 @@ namespace MB::FramePacing::Data
       run.HasEndMarker = Required<bool>(value, "hasEndMarker");
       run.FramesFile = Required<std::string>(value, "framesFile");
 
-      const Json& counts = value.at("counts");
+      const Json& counts = RequiredObject(value, "counts");
       run.Counts.Captures = Required<int64_t>(counts, "captures");
       run.Counts.Decoded = Required<int64_t>(counts, "decoded");
       run.Counts.Undecodable = Required<int64_t>(counts, "undecodable");
@@ -136,14 +231,14 @@ namespace MB::FramePacing::Data
       run.Counts.OutOfOrderCaptures = Required<int64_t>(counts, "outOfOrderCaptures");
       run.Counts.Segments = Required<int64_t>(counts, "segments");
 
-      const Json& statistics = value.at("statistics");
+      const Json& statistics = RequiredObject(value, "statistics");
       auto& s = run.Statistics;
-      s.DisplayDeltaMs = ToStatistics(Field(statistics, "displayDeltaMs"));
-      s.AnimationDeltaMs = ToStatistics(Field(statistics, "animationDeltaMs"));
-      s.AnimationErrorMs = ToStatistics(Field(statistics, "animationErrorMs"));
-      s.AbsoluteAnimationErrorMs = ToStatistics(Field(statistics, "absoluteAnimationErrorMs"));
-      s.DriftMs = ToStatistics(Field(statistics, "driftMs"));
-      s.OnScreenMs = ToStatistics(Field(statistics, "onScreenMs"));
+      s.DisplayDeltaMs = ToStatistics(OptionalObject(statistics, "displayDeltaMs"));
+      s.AnimationDeltaMs = ToStatistics(OptionalObject(statistics, "animationDeltaMs"));
+      s.AnimationErrorMs = ToStatistics(OptionalObject(statistics, "animationErrorMs"));
+      s.AbsoluteAnimationErrorMs = ToStatistics(OptionalObject(statistics, "absoluteAnimationErrorMs"));
+      s.DriftMs = ToStatistics(OptionalObject(statistics, "driftMs"));
+      s.OnScreenMs = ToStatistics(OptionalObject(statistics, "onScreenMs"));
       s.FramesWithAnimationError = Required<int64_t>(statistics, "framesWithAnimationError");
       s.ErrorPerFrameMs = Required<double>(statistics, "errorPerFrameMs");
       s.PercentError = Required<double>(statistics, "percentError");
@@ -152,11 +247,11 @@ namespace MB::FramePacing::Data
       s.PointOnePercentLowFps = Optional<double>(statistics, "pointOnePercentLowFps");
       s.ExcludedStaticFrames = Required<int64_t>(statistics, "excludedStaticFrames");
       s.UncertainSteps = Required<int64_t>(statistics, "uncertainSteps");
-      s.CpuBusyMs = ToStatistics(Field(statistics, "cpuBusyMs"));
-      s.FrameTimeMs = ToStatistics(Field(statistics, "frameTimeMs"));
-      s.CpuWaitMs = ToStatistics(Field(statistics, "cpuWaitMs"));
+      s.CpuBusyMs = ToStatistics(OptionalObject(statistics, "cpuBusyMs"));
+      s.FrameTimeMs = ToStatistics(OptionalObject(statistics, "frameTimeMs"));
+      s.CpuWaitMs = ToStatistics(OptionalObject(statistics, "cpuWaitMs"));
 
-      if (const Json* pacing = Field(value, "pacing"))
+      if (const Json* pacing = OptionalObject(value, "pacing"))
       {
         SummaryPacing p;
         p.RefreshPeriodMs = Required<double>(*pacing, "refreshPeriodMs");
@@ -170,11 +265,11 @@ namespace MB::FramePacing::Data
         p.ErrorFramesWithEvenDisplay = Required<int64_t>(*pacing, "errorFramesWithEvenDisplay");
         p.Verdict = Required<std::string>(*pacing, "verdict");
         p.ExpectedRefreshHz = Optional<double>(*pacing, "expectedRefreshHz");
-        if (const Json* pacingError = Field(*pacing, "pacingErrorMs"))
+        if (const Json* pacingError = OptionalObject(*pacing, "pacingErrorMs"))
         {
           p.PacingErrorMs = ToStatistics(pacingError);
         }
-        if (const Json* predictionError = Field(*pacing, "predictionErrorMs"))
+        if (const Json* predictionError = OptionalObject(*pacing, "predictionErrorMs"))
         {
           p.PredictionErrorMs = ToStatistics(predictionError);
         }
@@ -183,13 +278,14 @@ namespace MB::FramePacing::Data
         p.MatchesExpectedRefresh = Optional<bool>(*pacing, "matchesExpectedRefresh");
         run.Pacing = p;
       }
-      if (const Json* histograms = Field(value, "histograms"))
+      if (const Json* histograms = OptionalObject(value, "histograms"))
       {
-        run.Histograms = SummaryHistograms{ToHistogram(histograms->at("animationErrorMs")), ToHistogram(histograms->at("displayDeltaMs"))};
+        run.Histograms =
+          SummaryHistograms{ToHistogram(RequiredObject(*histograms, "animationErrorMs")), ToHistogram(RequiredObject(*histograms, "displayDeltaMs"))};
       }
-      if (const Json* camera = Field(value, "camera"))
+      if (const Json* camera = OptionalObject(value, "camera"))
       {
-        run.Camera = SummaryCamera{ToStatistics(Field(*camera, "scanoutDelay")), Required<int64_t>(*camera, "framesSeenInBothZones"),
+        run.Camera = SummaryCamera{ToStatistics(OptionalObject(*camera, "scanoutDelay")), Required<int64_t>(*camera, "framesSeenInBothZones"),
                                    Required<int64_t>(*camera, "tornFrames"), Required<int64_t>(*camera, "secondZoneOnlyFrames")};
       }
       run.Warnings = Texts(value, "warnings");
@@ -213,7 +309,16 @@ namespace MB::FramePacing::Data
       throw DataFormatError("summary.json is not a JSON object");
     }
     AnalysisSummary summary;
-    summary.FormatVersion = OrDefault<int32_t>(root, "formatVersion", 1);
+    // 0 is a file without the field, as C# reads it
+    summary.FormatVersion = OrDefault<int32_t>(root, "formatVersion", 0);
+    if (summary.FormatVersion < 0)
+    {
+      ThrowNot("formatVersion", "a format version");
+    }
+    if (summary.FormatVersion == 0)
+    {
+      summary.FormatVersion = 1;
+    }
     if (summary.FormatVersion > AnalysisFormatVersion)
     {
       throw DataFormatError("The analysis output has format version " + std::to_string(summary.FormatVersion) + ", newer than this reader reads (" +
@@ -233,18 +338,20 @@ namespace MB::FramePacing::Data
     summary.CapturePeriodMs = Required<double>(root, "capturePeriodMs");
     summary.MeasurementResolutionMs = OrDefault<double>(root, "measurementResolutionMs", summary.CapturePeriodMs);
     summary.ErrorThresholdMs = Required<double>(root, "errorThresholdMs");
-    if (const Json* markers = Field(root, "markers"))
+    if (const Json* markers = OptionalList(root, "markers"))
     {
       for (const Json& marker : *markers)
       {
+        RequireObject(marker, "markers");
         summary.Markers.push_back({Required<std::string>(marker, "bounds"), Required<double>(marker, "moduleSizePx")});
       }
     }
     summary.Warnings = Texts(root, "warnings");
-    if (const Json* runs = Field(root, "runs"))
+    if (const Json* runs = OptionalList(root, "runs"))
     {
       for (const Json& run : *runs)
       {
+        RequireObject(run, "runs");
         summary.Runs.push_back(ToRun(run));
       }
     }
