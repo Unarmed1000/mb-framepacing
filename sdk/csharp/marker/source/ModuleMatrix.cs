@@ -47,6 +47,10 @@ namespace MB.FramePacing.Marker
     /// <summary>The bytes of a packed matrix of <paramref name="size"/> x <paramref name="size"/> modules (79 for the sync marker's 25).</summary>
     public static int PackedModuleByteCount(int size) => size <= 0 ? 0 : ((size * size) + 7) / 8;
 
+    /// <summary>
+    /// Whether the module in column <paramref name="x"/> of row <paramref name="y"/> is dark. Both must be 0 to <see cref="Size"/> - 1:
+    /// there is no module outside (a column past the row's end reads the next row's, a row past the last throws).
+    /// </summary>
     public bool IsDark(int x, int y)
     {
       int index = (y * Size) + x;
@@ -55,12 +59,13 @@ namespace MB.FramePacing.Marker
 
     /// <summary>
     /// A view of <paramref name="size"/> x <paramref name="size"/> modules over packed bits (at least <see cref="PackedModuleByteCount"/>
-    /// bytes; bits past the last module are ignored). False for a size that is not a QR symbol's (21 to 41, in steps of 4) or too few bytes.
+    /// bytes; bits past the last module are ignored). False for a size that is not a marker's (<see cref="MainSize"/> or
+    /// <see cref="SyncSize"/>: the sizes the drawing functions and the grid know) or too few bytes.
     /// </summary>
     public static bool TryFromBits(int size, ReadOnlySpan<byte> bits, out ModuleMatrix matrix)
     {
       int byteCount = PackedModuleByteCount(size);
-      if (size < 21 || size > MainSize || (size - 17) % 4 != 0 || bits.Length < byteCount)
+      if ((size != MainSize && size != SyncSize) || bits.Length < byteCount)
       {
         matrix = default;
         return false;
@@ -77,7 +82,7 @@ namespace MB.FramePacing.Marker
       if (Size == 0)
         return true;
       int last = Bits.Length - 1;
-      // A QR size is odd and an odd square is 1 more than a multiple of 8: the last byte holds 1 module and 7 bits of padding
+      // Both sizes are odd and an odd square is 1 more than a multiple of 8: the last byte holds 1 module and 7 bits of padding
       return Bits.Slice(0, last).SequenceEqual(other.Bits.Slice(0, last)) && (Bits[last] & 0x80) == (other.Bits[last] & 0x80);
     }
   }

@@ -43,6 +43,10 @@ namespace MB.FramePacing.Data
 
     public long RecordCount { get; }
 
+    /// <summary>
+    /// The record at <paramref name="recordIndex"/> (0 to <see cref="RecordCount"/> - 1; another index is an
+    /// <see cref="ArgumentOutOfRangeException"/>). Throws <see cref="InvalidDataException"/> for bytes that are not a record.
+    /// </summary>
     public CaptureDataRecord ReadRecord(long recordIndex)
     {
       if (recordIndex < 0 || recordIndex >= RecordCount)
@@ -76,7 +80,7 @@ namespace MB.FramePacing.Data
       {
         int read = RandomAccess.Read(m_handle, buffer, offset);
         if (read <= 0)
-          throw new EndOfStreamException("Unexpected end of capture data file");
+          throw new InvalidDataException("Unexpected end of capture data file");
         buffer = buffer.Slice(read);
         offset += read;
       }

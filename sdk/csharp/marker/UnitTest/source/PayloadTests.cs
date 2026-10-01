@@ -291,6 +291,13 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(SequenceId.TryFromText("seventeen chars!!", out _), Is.False, "too long");
       Assert.That(SequenceId.TryFromText("tab\there", out _), Is.False, "not printable");
       Assert.That(SequenceId.TryFromText("æøå", out _), Is.False, "not ASCII");
+      Assert.That(SequenceId.TryFromText(string.Empty, out var empty), Is.False, "no text");
+      Assert.That(empty.IsEmpty, Is.True);
+      Assert.That(SequenceId.TryFromText(null!, out _), Is.False, "no text at all");
+      Assert.That(SequenceId.TryFromText("~ ", out var edges), Is.True, "the first and the last printable character");
+      Assert.That(edges.ToString(), Is.EqualTo("~ "));
+      Assert.That(SequenceId.TryFromText("a\u007Fb", out _), Is.False, "DEL is not printable");
+      Assert.That(SequenceId.TryFromText("a\0b", out _), Is.False, "a zero inside the text is not padding");
 
       var guid = Guid.Parse("3f2a1b4c-5d6e-7f80-9102-a3b4c5d6e7f8");
       var fromGuid = SequenceId.FromGuid(guid);
@@ -330,7 +337,18 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "format version");
       bytes[2] = 1;
       bytes[3] = 3;
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "kind");
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "a sync marker is 16 bytes");
+      foreach (byte kind in new byte[] { 4, 5, 127, 128, 255 })
+      {
+        bytes[3] = kind;
+        Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "an unknown kind: " + kind);
+        // The same in a sync marker's 16 bytes: the kind is checked before the length it implies
+        Assert.That(
+          FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.SyncPayloadByteCount), out _, out _),
+          Is.False,
+          "sync length, kind " + kind
+        );
+      }
       bytes[3] = 0;
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.True);
 

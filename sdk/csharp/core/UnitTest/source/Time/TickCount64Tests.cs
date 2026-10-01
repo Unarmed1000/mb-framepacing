@@ -109,6 +109,20 @@ namespace MB.FramePacing.UnitTest
     }
 
     [Test]
+    public void ASlowCounterPastTheRangeWrapsAsTheCountDoes()
+    {
+      // A counter slower than the tick can count more seconds than a TickCount64 holds (2^63 - 1 seconds at 1 Hz): the count wraps, as
+      // every TickCount64 does, and the difference of two such counts is still their distance
+      long wrapped = unchecked((long)((ulong)MaxTicks * (ulong)TickCount64.TicksPerSecond));
+      Assert.That(TickCount64.FromCounter(MaxTicks, 1).Ticks, Is.EqualTo(wrapped));
+      Assert.That(TickCount64.FromCounter(MaxTicks, 1) - TickCount64.FromCounter(MaxTicks - 3, 1), Is.EqualTo(TimeSpan.FromSeconds(3)));
+      Assert.That(
+        TickCount64.FromCounter(long.MinValue, 1000) - TickCount64.FromCounter(long.MinValue + 1, 1000),
+        Is.EqualTo(TimeSpan.FromMilliseconds(-1))
+      );
+    }
+
+    [Test]
     public void ACounterFrequencyOutsideItsRangeThrows()
     {
       Assert.That(() => TickCount64.FromCounter(123, 0), Throws.TypeOf<ArgumentOutOfRangeException>());

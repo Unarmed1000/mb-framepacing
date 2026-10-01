@@ -248,6 +248,44 @@ namespace MB.FramePacing.Data.UnitTest
     }
 
     [Test]
+    public void FileNames_AndTheAnalysisFolder()
+    {
+      Assert.That(AnalysisFiles.RunFilePrefix(3, 0), Is.EqualTo("run-3"));
+      Assert.That(AnalysisFiles.RunFilePrefix(uint.MaxValue, 2), Is.EqualTo("run-4294967295-3"));
+
+      string folder = Path.Combine(Path.GetTempPath(), $"mb-framepacing-data-{Guid.NewGuid():N}");
+      string analysis = Path.Combine(folder, AnalysisFiles.DirectoryName);
+      Directory.CreateDirectory(analysis);
+      try
+      {
+        Assert.That(AnalysisFiles.Find(folder), Is.Null, "no summary.json anywhere");
+        Assert.That(AnalysisFiles.Find(Path.Combine(folder, "no-such-folder")), Is.Null);
+
+        var summary = AnalysisSummary.Parse(MinimalSummary);
+        summary.Write(Path.Combine(analysis, AnalysisFiles.SummaryFileName));
+        Assert.That(AnalysisFiles.Find(folder), Is.EqualTo(analysis), "a capture folder");
+        Assert.That(AnalysisFiles.Find(analysis), Is.EqualTo(analysis), "the analysis folder itself");
+        summary.Write(Path.Combine(folder, AnalysisFiles.SummaryFileName));
+        Assert.That(AnalysisFiles.Find(folder), Is.EqualTo(folder), "the folder's own summary wins");
+
+        // Written as UTF-8 without a byte order mark, and read back as it was
+        byte[] bytes = File.ReadAllBytes(Path.Combine(folder, AnalysisFiles.SummaryFileName));
+        Assert.That(bytes[0], Is.EqualTo((byte)'{'));
+        var read = AnalysisSummary.Read(Path.Combine(folder, AnalysisFiles.SummaryFileName));
+        Assert.That(
+          (read.CapturePeriod, read.ErrorThreshold, read.Scanout, read.AnalysedUtc),
+          Is.EqualTo((summary.CapturePeriod, summary.ErrorThreshold, summary.Scanout, summary.AnalysedUtc))
+        );
+        Assert.That(read.ToJson(), Is.EqualTo(summary.ToJson()));
+        Assert.That(() => AnalysisSummary.Read(Path.Combine(folder, "no-such-file.json")), Throws.InstanceOf<FileNotFoundException>());
+      }
+      finally
+      {
+        Directory.Delete(folder, recursive: true);
+      }
+    }
+
+    [Test]
     public void FramesCsv_ReadsByColumnName_WhateverTheOrderAndExtraColumns()
     {
       const string csv =

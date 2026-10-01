@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* One record of captures.mbcd (doc/capture-data-format.md): 192 bytes per capture, little endian. The capture part (index, host and device
-//* ticks, flags) is laid out like a frames.mbfc record header; then the status and the markers' encoded bytes as they were read.
+//* ticks, source drops) is laid out like a frames.mbfc record header; then the status and the markers' encoded bytes as they were read.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -84,10 +84,14 @@ namespace MB.FramePacing.Data
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(24), sourceDrops);
     }
 
+    /// <summary>
+    /// Parse a record. Throws <see cref="InvalidDataException"/> for bytes that are not one: fewer than <see cref="Size"/>, an unknown
+    /// status, or a marker longer than its slot.
+    /// </summary>
     public static CaptureDataRecord Read(ReadOnlySpan<byte> source)
     {
       if (source.Length < Size)
-        throw new ArgumentException("Record buffer too small", nameof(source));
+        throw new InvalidDataException($"A capture data record is {Size} bytes");
       byte status = source[StatusOffset];
       int mainLength = source[MainLengthOffset];
       int secondLength = source[SecondLengthOffset];

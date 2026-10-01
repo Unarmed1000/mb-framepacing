@@ -273,7 +273,7 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
-    public void ModuleMatrix_TryFromBits_TakesQrSizesAndIgnoresThePadding()
+    public void ModuleMatrix_TryFromBits_TakesAMarkersBitsAndIgnoresThePadding()
     {
       var bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
       Assert.That(

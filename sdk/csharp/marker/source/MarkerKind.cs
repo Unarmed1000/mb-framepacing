@@ -16,7 +16,7 @@ namespace MB.FramePacing.Marker
     SequenceStart = 1,
     SequenceEnd = 2,
 
-    /// <summary>The small second marker for tearing checks and camera timing: it only carries the frame index.</summary>
+    /// <summary>The small second marker for tearing checks and camera timing: it only carries the run id and the frame index.</summary>
     Sync = 3,
   }
 }

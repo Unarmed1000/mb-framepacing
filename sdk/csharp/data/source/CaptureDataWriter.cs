@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* Writes captures.mbcd: the header first (rewritten by Complete once the marker locations are known), then whole records as they come. A new
-//* file only: it never replaces an existing one.
+//* file only: it never replaces an existing one, and a header that cannot be written leaves no file behind.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -24,8 +24,20 @@ namespace MB.FramePacing.Data
     public CaptureDataWriter(string path, CaptureDataHeader header)
     {
       Header = header ?? throw new ArgumentNullException(nameof(header));
+      // The header's bytes first: one that cannot be written (too many markers) throws before there is a file
+      Span<byte> bytes = stackalloc byte[CaptureDataHeader.HeaderSize];
+      header.Write(bytes);
       m_handle = File.OpenHandle(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
-      WriteHeader(header);
+      try
+      {
+        RandomAccess.Write(m_handle, bytes, 0);
+      }
+      catch
+      {
+        m_handle.Dispose();
+        File.Delete(path);
+        throw;
+      }
       m_offset = CaptureDataHeader.HeaderSize;
     }
 
@@ -60,12 +72,18 @@ namespace MB.FramePacing.Data
       }
     }
 
-    /// <summary>Rewrite the header with what is known at the end of the capture (the marker locations).</summary>
+    /// <summary>
+    /// Rewrite the header with what is known at the end of the capture (the marker locations). A header that cannot be written throws and
+    /// leaves the file's and <see cref="Header"/> as they were.
+    /// </summary>
     public void Complete(CaptureDataHeader header)
     {
       ObjectDisposedException.ThrowIf(m_disposed, this);
-      Header = header ?? throw new ArgumentNullException(nameof(header));
-      WriteHeader(header);
+      ArgumentNullException.ThrowIfNull(header);
+      Span<byte> bytes = stackalloc byte[CaptureDataHeader.HeaderSize];
+      header.Write(bytes);
+      RandomAccess.Write(m_handle, bytes, 0);
+      Header = header;
     }
 
     public void Dispose()
@@ -74,13 +92,6 @@ namespace MB.FramePacing.Data
         return;
       m_disposed = true;
       m_handle.Dispose();
-    }
-
-    private void WriteHeader(CaptureDataHeader header)
-    {
-      Span<byte> bytes = stackalloc byte[CaptureDataHeader.HeaderSize];
-      header.Write(bytes);
-      RandomAccess.Write(m_handle, bytes, 0);
     }
   }
 }

@@ -98,8 +98,9 @@ namespace MB.FramePacing
 
     /// <summary>
     /// A counter value of a clock that counts frequency times a second (Stopwatch.GetTimestamp with Stopwatch.Frequency,
-    /// QueryPerformanceCounter), rounded down to the tick it is in. Exact for any counter value: the whole seconds and the rest are
-    /// converted apart, so nothing overflows. Throws ArgumentOutOfRangeException for a frequency that is not 1 to MaxCounterFrequency.
+    /// QueryPerformanceCounter), rounded down to the tick it is in. The whole seconds and the rest are converted apart, so it is exact for
+    /// every counter value whose time fits a TickCount64 (every one, from 10 MHz on); a slower counter's time past that wraps, as the
+    /// count does. Throws ArgumentOutOfRangeException for a frequency that is not 1 to MaxCounterFrequency.
     /// </summary>
     public static TickCount64 FromCounter(long counter, long frequency)
     {

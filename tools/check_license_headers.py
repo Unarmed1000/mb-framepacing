@@ -17,6 +17,9 @@ Source files are code and build files that can hold a comment: C#, C and C++, Py
 workflows. Code files (all but MSBuild, solutions and workflows) carry the copyright line too. Third-party code (third_party/) keeps
 its own notices. Documentation, JSON and test data are covered by LICENSE alone.
 
+A source file must be text: one that holds a NUL byte is reported too (git treats it as binary, so it gets no diffs and text
+searches skip it).
+
 Run from anywhere inside the repository:
   python tools/check_license_headers.py          exits with 1 and lists files without the right lines
   python tools/check_license_headers.py --fix    adds the lines where they are missing (the copyright with this year)
@@ -114,6 +117,10 @@ def tracked_files(root: Path) -> list[str]:
 def check(root: Path, relative: str, fix: bool) -> str | None:
     path = root / relative
     data = path.read_bytes()
+    if b"\0" in data:
+        # A NUL byte makes git treat the file as binary: no diffs, and text searches (git grep -I) skip it
+        line = data[: data.index(b"\0")].count(b"\n") + 1
+        return f"{relative}:{line}: holds a NUL byte, so git treats the file as binary; write it as an escape ('\\0')"
     bom = data.startswith(b"\xef\xbb\xbf")
     text = data.decode("utf-8-sig")
     newline = "\r\n" if "\r\n" in text else "\n"

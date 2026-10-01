@@ -63,6 +63,26 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
+    public void TryFromBits_TakesTheMarkerSizesOnly()
+    {
+      var bits = new byte[ModuleMatrix.PackedModuleByteCount(ModuleMatrix.MainSize)];
+      Assert.That(ModuleMatrix.TryFromBits(ModuleMatrix.SyncSize, bits, out var sync), Is.True);
+      Assert.That((sync.Size, sync.Bits.Length), Is.EqualTo((25, 79)));
+      Assert.That(ModuleMatrix.TryFromBits(ModuleMatrix.MainSize, bits, out var main), Is.True);
+      Assert.That((main.Size, main.Bits.Length), Is.EqualTo((41, 211)));
+      // The other QR sizes are not markers: nothing draws their grid
+      foreach (int size in new[] { 21, 29, 33, 37 })
+      {
+        Assert.That(ModuleMatrix.TryFromBits(size, bits, out var other), Is.False, size.ToString());
+        Assert.That(other.IsEmpty, Is.True);
+      }
+      foreach (int size in new[] { -25, 0, 17, 24, 26, 45 })
+        Assert.That(ModuleMatrix.TryFromBits(size, bits, out _), Is.False, size.ToString());
+      Assert.That(ModuleMatrix.TryFromBits(ModuleMatrix.MainSize, bits.AsSpan(0, 210), out _), Is.False, "a byte too few");
+      Assert.That(ModuleMatrix.TryFromBits(ModuleMatrix.SyncSize, bits.AsSpan(0, 78), out _), Is.False, "a byte too few");
+    }
+
+    [Test]
     public void AnEmptyMatrixDrawsNothing()
     {
       ModuleMatrix empty = default;
