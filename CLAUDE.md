@@ -119,6 +119,10 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     tests and benchmarks: `QrEncoderTests` compares every symbol, every mask's score and drawn symbols with it, and the benchmark
     `QrcodegenEncode` runs next to `GenerateModules`. Refresh the document's numbers and the size table in the change that alters the
     encoder.
+    After any change to the encoder also run the stress test (`mb_framepacing_marker_qr_stress`, `marker/tests/stress`: no arguments
+    for about two million payloads on every core plus every 25-module line; ctest runs a short one) and, with Clang, the libFuzzer
+    target (`marker/tests/fuzz`, `MB_FRAMEPACING_BUILD_FUZZERS`, on in `linux-sanitize`; CI's `cpp-analysis` fuzzes for a minute).
+    Both compare with qrcodegen and stop at the first difference.
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
     (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally. The C# marker has the

@@ -55,6 +55,7 @@ Or git (`GIT_TAG sdk-v0.1.0`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of th
 | `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                               |
 | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                        |
 | `MB_FRAMEPACING_BUILD_BENCHMARKS`   | off (the marker's benchmarks; fetches Google Benchmark unless one is installed) |
+| `MB_FRAMEPACING_BUILD_FUZZERS`      | off (the libFuzzer target of the marker's QR encoder; needs Clang)              |
 | `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                          |
 
 nlohmann/json is found with `find_package(nlohmann_json 3.12)` when installed, and downloaded (a pinned release) otherwise; GoogleTest

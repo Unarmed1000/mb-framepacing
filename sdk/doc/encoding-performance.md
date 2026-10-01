@@ -100,6 +100,23 @@ two encoders:
 - the penalty score of symbols drawn for the purpose: random, sparse, dense, striped, and corner-square shapes of every unit with
   every amount of light beside them, in rows and in columns.
 
+Beyond the unit tests:
+
+- **A stress test** (`sdk/cpp/marker/tests/stress`, `mb_framepacing_marker_qr_stress`) compares the encoders on far more input, on
+  every core: payloads of many kinds (random, mostly zero, mostly 0xFF, repeated patterns, the previous payload with one bit or byte
+  changed, the shortest and longest that fit, and too long ones both must refuse), real markers through `GenerateModules` with its
+  packing, drawn symbols made of runs that form corner-square shapes, symbols with a dark share exactly on a step of the balance rule,
+  and the scoring of single lines. One run compared 12 million payloads (each also as a marker, every eighth with all eight masks and
+  their scores), 4 million drawn symbols, 2 billion lines of 25 and 41 modules, and **every possible line of 25 modules** (33 million),
+  without a difference. The tests run a short version of it; `mb_framepacing_marker_qr_stress` without arguments runs a long one.
+- **A fuzz target** (`sdk/cpp/marker/tests/fuzz`, libFuzzer with AddressSanitizer, `-DMB_FRAMEPACING_BUILD_FUZZERS=ON` with Clang)
+  lets the fuzzer choose payloads and drawn symbols to reach every branch of the encoder; a difference from qrcodegen aborts. CI runs
+  it for a minute on every change.
+- **The checks were checked.** Fourteen deliberate mistakes were put into the encoder, one at a time (a wrong run length in the
+  corner-square rule, a wrong shift, a tie taking the last mask, a wrong pad byte, a wrong mask rule, a wrong rounding in the balance,
+  and so on). The stress test reported every one within a second. A fifteenth change went unnoticed, rightly: it shortened the light
+  border after a line from 41 to 40 modules, which no rule can tell apart.
+
 The golden markers (`sdk/test-data/markers`) are unchanged, and the C# and Python libraries, which have encoders of their own, still
 produce the same modules. The new encoder is covered completely by the tests (regions, functions, lines and branches).
 

@@ -69,6 +69,16 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   target_include_directories(mb_framepacing_marker_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
   target_compile_options(mb_framepacing_marker_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   gtest_discover_tests(mb_framepacing_marker_tests)
+
+  # The QR encoder against its reference with far more input than the unit tests (tests/stress): a short run with the tests, the long
+  # one by hand (no arguments: about two million payloads on every core, and every line of 25 modules)
+  find_package(Threads REQUIRED)
+  add_executable(mb_framepacing_marker_qr_stress tests/stress/QrEncoderStress.cpp)
+  target_link_libraries(mb_framepacing_marker_qr_stress PRIVATE mb_framepacing::marker mb_framepacing_qrcodegen_reference Threads::Threads)
+  target_include_directories(mb_framepacing_marker_qr_stress PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
+  target_compile_options(mb_framepacing_marker_qr_stress PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+  add_test(NAME QrEncoderStress.ShortRun
+    COMMAND mb_framepacing_marker_qr_stress --payloads 20000 --symbols 4000 --lines 2000000 --no-exhaustive)
 endif()
 
 if(MB_FRAMEPACING_BUILD_BENCHMARKS)
@@ -79,4 +89,26 @@ if(MB_FRAMEPACING_BUILD_BENCHMARKS)
     benchmarks/FrameBenchmarks.cpp)
   target_link_libraries(mb_framepacing_marker_benchmarks PRIVATE mb_framepacing::marker mb_framepacing_qrcodegen_reference benchmark::benchmark_main)
   target_compile_options(mb_framepacing_marker_benchmarks PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+endif()
+
+if(MB_FRAMEPACING_BUILD_FUZZERS)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "MB_FRAMEPACING_BUILD_FUZZERS needs Clang (libFuzzer)")
+  endif()
+  # The QR encoder against its reference, with inputs libFuzzer chooses (tests/fuzz). The encoder's source is compiled into the fuzzer,
+  # so that the fuzzer sees which of its branches an input reaches
+  add_executable(mb_framepacing_marker_qr_fuzz
+    tests/fuzz/QrEncoderFuzz.cpp
+    source/mb/framepacing/marker/detail/QrEncoder.cpp
+    reference/QrcodegenReference.c)
+  set_target_properties(mb_framepacing_marker_qr_fuzz PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+  target_compile_features(mb_framepacing_marker_qr_fuzz PRIVATE cxx_std_20)
+  target_link_libraries(mb_framepacing_marker_qr_fuzz PRIVATE mb_framepacing::core)
+  target_include_directories(mb_framepacing_marker_qr_fuzz PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference/third_party/qrcodegen)
+  target_compile_options(mb_framepacing_marker_qr_fuzz PRIVATE -fsanitize=fuzzer,address)
+  target_link_options(mb_framepacing_marker_qr_fuzz PRIVATE -fsanitize=fuzzer,address)
 endif()

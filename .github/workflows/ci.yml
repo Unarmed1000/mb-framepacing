@@ -179,6 +179,10 @@ jobs:
       - name: Tests with AddressSanitizer and UndefinedBehaviorSanitizer
         working-directory: sdk/cpp
         run: cmake --preset linux-sanitize && cmake --build --preset linux-sanitize --parallel && ctest --preset linux-sanitize
+      # The QR encoder against its reference (qrcodegen) with inputs libFuzzer chooses: a difference, or a sanitizer finding, fails
+      - name: Fuzz the QR encoder for a minute
+        working-directory: sdk/cpp
+        run: build/linux-sanitize/marker/mb_framepacing_marker_qr_fuzz -max_len=256 -max_total_time=60
       - name: clang-format and clang-tidy
         run: python3 tools/check_cpp.py --preset linux-sanitize
 

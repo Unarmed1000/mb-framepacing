@@ -47,6 +47,7 @@ option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_BENCHMARKS "Build the benchmarks (the marker module's; fetches Google Benchmark unless one is installed)" OFF)
+option(MB_FRAMEPACING_BUILD_FUZZERS "Build the libFuzzer targets (needs Clang): the marker's QR encoder against its reference" OFF)
 option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 
 if(MB_FRAMEPACING_BUILD_DATA AND NOT MB_FRAMEPACING_BUILD_MARKER)
