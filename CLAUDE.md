@@ -253,7 +253,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
-      (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`).
+      (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`):
+      a run that fails gets one more (CI's browsers abort or hang now and then), Linux drops the sandbox when the browser says it has
+      none, and an image already at the target is deleted first (the browser is ended as soon as the file is whole).
     - `ReportOptions` picks the items (`ReportItem` ids: `--hide`/`--only`); overlays (`ReportItem.Overlays`, now the animation time
       step on the display time step panel) are opt-in (`Show`, `--show`) and need their panel. The tiles frames dropped and out of order
       (`ReportItem.AutoTiles`) show only when the run or section has either (`RunHeadline.Shown`, which the GUI uses too), unless shown

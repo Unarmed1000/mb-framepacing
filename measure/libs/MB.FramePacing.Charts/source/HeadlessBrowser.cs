@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -62,28 +63,82 @@ namespace MB.FramePacing.Charts
     /// </summary>
     public static void SavePng(string svgPath, string pngPath, string? browser = null)
     {
-      browser ??= Find() ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
+      string found =
+        browser ?? Find() ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
       string content = File.ReadAllText(svgPath);
       int width = int.Parse(Regex.Match(content, "width=\"(\\d+)\"").Groups[1].Value);
       int height = int.Parse(Regex.Match(content, "height=\"(\\d+)\"").Groups[1].Value);
+
+      var result = SaveWithRetries(noSandbox => Attempt(found, svgPath, pngPath, width, height, noSandbox), OperatingSystem.IsLinux());
+      if (result.Saved)
+        return;
+      if (result.TimedOut)
+        throw new TimeoutException($"{found} did not save {pngPath} within {g_timeout.TotalSeconds:0} s{Tail(result.Errors)}");
+      throw new InvalidOperationException($"{found} failed to save {pngPath} (exit code {result.ExitCode}){Tail(result.Errors)}");
+    }
+
+    /// <summary>
+    /// Runs the browser (<paramref name="attempt"/>; its argument: without the sandbox) until it has saved the PNG, and gives the last run.
+    /// <list type="bullet">
+    /// <item>
+    /// Linux without unprivileged user namespaces (Ubuntu 24.04's AppArmor rule, containers, CI machines): the browser falls back to its
+    /// setuid sandbox helper and aborts when that is not installed as root. It opens only this local SVG and loads nothing else, so it
+    /// runs without the sandbox from then on.
+    /// </item>
+    /// <item>
+    /// A browser that fails otherwise gets one more run: on a busy machine a headless browser now and then aborts or hangs while it starts
+    /// (CI machines did both in one run, and saved the same image on the next).
+    /// </item>
+    /// </list>
+    /// </summary>
+    internal static BrowserAttempt SaveWithRetries(Func<bool, BrowserAttempt> attempt, bool linux)
+    {
+      bool noSandbox = false;
+      bool repeated = false;
+      while (true)
+      {
+        var result = attempt(noSandbox);
+        if (result.Saved)
+          return result;
+        if (linux && !noSandbox && result.Errors.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
+        {
+          noSandbox = true;
+          continue;
+        }
+        if (repeated)
+          return result;
+        repeated = true;
+      }
+    }
+
+    /// <summary>One run of the browser, in a profile of its own that is deleted afterwards.</summary>
+    private static BrowserAttempt Attempt(string browser, string svgPath, string pngPath, int width, int height, bool noSandbox)
+    {
+      // An image that is already there would count as this run's: the browser is ended as soon as the file is whole
+      File.Delete(pngPath);
       string profile = Path.Combine(Path.GetTempPath(), "mb-framepacing-browser-" + Guid.NewGuid().ToString("N"));
       try
       {
-        var arguments = new List<string>
-        {
-          "--default-background-color=00000000",
-          "--headless=new",
-          "--disable-gpu",
-          "--hide-scrollbars",
-          "--force-device-scale-factor=2",
-          // A fresh profile every time: no first run dialogs, no default browser question, no extensions
-          "--no-first-run",
-          "--no-default-browser-check",
-          "--disable-extensions",
-          $"--user-data-dir={profile}",
-          $"--window-size={width},{height}",
-          $"--screenshot={Path.GetFullPath(pngPath)}",
-        };
+        var arguments = new List<string>();
+        if (noSandbox)
+          arguments.Add("--no-sandbox");
+        arguments.AddRange(
+          new[]
+          {
+            "--default-background-color=00000000",
+            "--headless=new",
+            "--disable-gpu",
+            "--hide-scrollbars",
+            "--force-device-scale-factor=2",
+            // A fresh profile every time: no first run dialogs, no default browser question, no extensions
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            $"--user-data-dir={profile}",
+            $"--window-size={width},{height}",
+            $"--screenshot={Path.GetFullPath(pngPath)}",
+          }
+        );
         // macOS: a new profile would ask the keychain for its encryption key, which blocks a headless browser
         if (OperatingSystem.IsMacOS())
           arguments.Add("--use-mock-keychain");
@@ -91,18 +146,7 @@ namespace MB.FramePacing.Charts
         if (OperatingSystem.IsLinux())
           arguments.Add("--disable-dev-shm-usage");
         arguments.Add(new Uri(Path.GetFullPath(svgPath)).AbsoluteUri);
-
-        var (exitCode, errors) = Run(browser, arguments, pngPath);
-        // Linux without unprivileged user namespaces (Ubuntu 24.04's AppArmor rule, containers, CI machines): the browser falls back to its
-        // setuid sandbox helper and aborts when that is not installed as root. It opens only this local SVG and loads nothing else, so it
-        // runs without the sandbox then
-        if (exitCode != 0 && OperatingSystem.IsLinux() && errors.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
-        {
-          arguments.Insert(0, "--no-sandbox");
-          (exitCode, errors) = Run(browser, arguments, pngPath);
-        }
-        if (exitCode != 0 || !IsCompletePng(pngPath))
-          throw new InvalidOperationException($"{browser} failed to save {pngPath} (exit code {exitCode}){Tail(errors)}");
+        return Run(browser, arguments, pngPath);
       }
       finally
       {
@@ -117,11 +161,11 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// Run the browser once: its exit code and error output. A browser that saved the whole PNG but does not exit (headless Chrome on macOS
-    /// can hang while shutting down) is ended and counts as done. Only the browser's own process is ended: its helpers end with it, and ending
-    /// the whole process tree (Process.Kill(entireProcessTree)) took down the GitHub macOS runner that ran the tests.
+    /// Run the browser once. A browser that saved the whole PNG but does not exit (headless Chrome on macOS can hang while shutting down) is
+    /// ended and counts as done. Only the browser's own process is ended: its helpers end with it, and ending the whole process tree
+    /// (Process.Kill(entireProcessTree)) took down the GitHub macOS runner that ran the tests.
     /// </summary>
-    private static (int ExitCode, string Errors) Run(string browser, IReadOnlyList<string> arguments, string pngPath)
+    private static BrowserAttempt Run(string browser, IReadOnlyList<string> arguments, string pngPath)
     {
       var start = new ProcessStartInfo(browser)
       {
@@ -133,7 +177,8 @@ namespace MB.FramePacing.Charts
         start.ArgumentList.Add(argument);
       using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {browser}");
       _ = process.StandardOutput.ReadToEndAsync();
-      var errors = process.StandardError.ReadToEndAsync();
+      var errors = new StringBuilder();
+      var reading = ReadInto(process.StandardError, errors);
       var elapsed = Stopwatch.StartNew();
       while (!process.WaitForExit(250))
       {
@@ -143,15 +188,37 @@ namespace MB.FramePacing.Charts
           // With a time limit: without one, WaitForExit also waits for the redirected output to close, which a helper process the browser
           // started on its own can keep open
           process.WaitForExit(5000);
-          return (0, Text(errors));
+          return new BrowserAttempt(true, 0, Text(reading, errors));
         }
         if (elapsed.Elapsed > g_timeout)
         {
           process.Kill();
-          throw new TimeoutException($"{browser} did not save {pngPath} within {g_timeout.TotalSeconds:0} s{Tail(Text(errors))}");
+          return new BrowserAttempt(false, null, Text(reading, errors));
         }
       }
-      return (process.ExitCode, Text(errors));
+      int exitCode = process.ExitCode;
+      return new BrowserAttempt(exitCode == 0 && IsCompletePng(pngPath), exitCode, Text(reading, errors));
+    }
+
+    /// <summary>
+    /// Collects the browser's error output as it arrives. Reading it to its end instead would lose all of it whenever a helper process the
+    /// browser started keeps the output open after the browser is gone: the text that says why it failed, which decides the next run.
+    /// </summary>
+    private static async Task ReadInto(StreamReader reader, StringBuilder text)
+    {
+      var buffer = new char[1024];
+      try
+      {
+        int count;
+        while ((count = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+        {
+          lock (text)
+            text.Append(buffer, 0, count);
+        }
+      }
+      // The process was disposed while its output was still open
+      catch (IOException) { }
+      catch (ObjectDisposedException) { }
     }
 
     /// <summary>The PNG is there and whole: it ends with its IEND chunk, which the browser writes last.</summary>
@@ -177,8 +244,13 @@ namespace MB.FramePacing.Charts
       }
     }
 
-    /// <summary>What the browser wrote to its error output, or nothing when it has not finished writing it in time.</summary>
-    private static string Text(Task<string> errors) => errors.Wait(2000) ? errors.Result : string.Empty;
+    /// <summary>What the browser has written to its error output: all of it when the output closes in time, else what has arrived.</summary>
+    private static string Text(Task reading, StringBuilder errors)
+    {
+      reading.Wait(2000);
+      lock (errors)
+        return errors.ToString();
+    }
 
     /// <summary>The browser's last error lines, for the exception: they say why it failed.</summary>
     private static string Tail(string errors)
