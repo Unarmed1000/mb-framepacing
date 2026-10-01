@@ -31,7 +31,7 @@ namespace MB.FramePacing.Charts
       var s = run.Statistics;
       var c = run.Counts;
       var pacing = run.Pacing;
-      double thresholdMs = chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+      double thresholdMs = chart.ErrorThreshold.TotalMilliseconds;
       int measured = s.AbsoluteAnimationErrorMs.Count;
       // The largest error either way: shown too soon (positive) or too late (negative)
       double worst = Math.Max(s.AnimationErrorMs.Max, -s.AnimationErrorMs.Min);
@@ -172,7 +172,7 @@ namespace MB.FramePacing.Charts
     {
       var chart = section.Run;
       var pacing = chart.Run.Pacing;
-      double refreshMs = pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
+      double refreshMs = pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
       var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
       bool mismatch = pacing?.MatchesExpectedRefresh == false;
       string kind =
@@ -185,13 +185,11 @@ namespace MB.FramePacing.Charts
       // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate,
       // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
       var refreshes = frames
-        .Where(f => f.DisplayDelta.HasValue && (Known(f.MarkerTargetFrameTime.Ticks) || f.TargetFrameTime.HasValue))
+        .Where(f => f.DisplayDelta.HasValue && (Known(f.MarkerTargetFrameTime) || f.TargetFrameTime.HasValue))
         .Select(f =>
           (int)
             Math.Round(
-              (Known(f.MarkerTargetFrameTime.Ticks) ? f.MarkerTargetFrameTime.Ticks : f.TargetFrameTime!.Value.Ticks)
-                / (double)TimeSpan.TicksPerMillisecond
-                / refreshMs
+              (Known(f.MarkerTargetFrameTime) ? f.MarkerTargetFrameTime.ToTimeSpan() : f.TargetFrameTime!.Value).TotalMilliseconds / refreshMs
             )
         )
         .Distinct()
@@ -211,12 +209,12 @@ namespace MB.FramePacing.Charts
     private static string Wants(IReadOnlyList<PresentedFrame> frames)
     {
       var preferredFps = frames
-        .Where(f => Known(f.MarkerPreferredFrameTime.Ticks))
+        .Where(f => Known(f.MarkerPreferredFrameTime))
         .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTime.Ticks, 1))
         .Distinct()
         .Order()
         .ToArray();
-      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTime.Ticks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks);
+      bool onDemand = frames.Any(f => f.MarkerPreferredFrameTime == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime);
       var wants = new List<string>();
       if (preferredFps.Length > 0)
       {
@@ -230,7 +228,9 @@ namespace MB.FramePacing.Charts
       return string.Join(", ", wants);
     }
 
-    private static bool Known(uint ticks) => ticks > 0 && ticks != MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks;
+    /// <summary>The marker says a frame time: neither unknown (0) nor on demand.</summary>
+    private static bool Known(TimeSpan32 frameTime) =>
+      frameTime != TimeSpan32.Zero && frameTime != MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
 

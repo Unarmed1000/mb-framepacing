@@ -90,7 +90,7 @@ namespace MB.FramePacing.Charts
       var chart = section.Run;
       var run = chart.Run;
       var pacing = run.Pacing;
-      double refreshMs = pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
+      double refreshMs = pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
       double from = section.FromSeconds;
       double to = section.ToSeconds;
       var (viewFrom, viewTo) = visible ?? (from, to);
@@ -112,8 +112,8 @@ namespace MB.FramePacing.Charts
         )
           + $", {frameCount.ToString("N0", CultureInfo.InvariantCulture)} presented frames on a {Hz(pacing)} display"
           + (pacing != null ? $", measured against a {Ms1(pacing.TargetFrameMs)} ms target." : "."),
-        $"Resolution {Ms1(chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond)} ms (one capture period); error threshold "
-          + $"{Ms(chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond)} ms.",
+        $"Resolution {Ms1(chart.CapturePeriod.TotalMilliseconds)} ms (one capture period); error threshold "
+          + $"{Ms(chart.ErrorThreshold.TotalMilliseconds)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
@@ -512,7 +512,7 @@ namespace MB.FramePacing.Charts
         var (start, end) = stretches[k];
         var last = data.Frames[end - 1];
         double x0 = Math.Max(PlotX0 - 1, view.XOfFrame(Math.Max(start, section.Start)));
-        double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + (last.OnScreen.Ticks / (double)TimeSpan.TicksPerSecond)));
+        double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + last.OnScreen.TotalSeconds));
         if (x1 <= x0)
           continue;
         if (bands.Count > 0 && x0 - bands[^1].X1 < 1)
@@ -552,7 +552,7 @@ namespace MB.FramePacing.Charts
 
       parts.Add(new TextShape(20, errorY - 16, "ANIMATION ERROR PER FRAME: + SHOWN TOO SOON, − SHOWN TOO LATE", "label", "start"));
       var panelKey = new List<(string[] Classes, string Text, bool Line)> { (new[] { "band" }, "within the error threshold", false) };
-      double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+      double threshold = section.Run.ErrorThreshold.TotalMilliseconds;
       parts.Add(new RectShape("band", N(PlotX0, 1), N(YOf(threshold), 1), N(view.PlotX1 - PlotX0, 1), N(YOf(-threshold) - YOf(threshold), 1)));
       foreach (double position in ChartScale.ErrorTicks(limit).Where(t => t != 0))
       {
@@ -589,7 +589,7 @@ namespace MB.FramePacing.Charts
         double barW = Math.Max(1.0, (section.FrameCount > 0 ? view.PixelsPerFrame : view.PlotX1 - PlotX0) - 0.6);
         foreach (int i in errors.FramesIn(section.Start, section.End))
         {
-          double value = TicksMs(data.Frames[i].AnimationError!.Value.Ticks);
+          double value = data.Frames[i].AnimationError!.Value.TotalMilliseconds;
           if (Math.Abs(value) < 1e-9)
             continue;
           double x = view.XOfFrame(i);
@@ -749,7 +749,7 @@ namespace MB.FramePacing.Charts
         foreach (int i in holds.FramesIn(section.Start, holdEnd))
         {
           var next = data.Frames[i + 1];
-          double level = TicksMs(next.DisplayDelta!.Value.Ticks);
+          double level = next.DisplayDelta!.Value.TotalMilliseconds;
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
           double y = YOf(level);
@@ -843,9 +843,9 @@ namespace MB.FramePacing.Charts
       var preferred = new StringBuilder();
       double? targetEnd = null;
       double? preferredEnd = null;
-      void Add(StringBuilder path, ref double? end, double x0, double x1, long ticks)
+      void Add(StringBuilder path, ref double? end, double x0, double x1, TimeSpan frameTime)
       {
-        double ms = TicksMs(ticks);
+        double ms = frameTime.TotalMilliseconds;
         double y = yOf(ms);
         // Joined to the stretch before when it ends where this one starts
         path.Append(
@@ -863,12 +863,12 @@ namespace MB.FramePacing.Charts
         double x1 = Math.Min(view.EndX, view.XOfFrame(Math.Min(stretch.End, holdEnd)));
         if (x1 <= x0)
           continue;
-        if (stretch.TargetTicks is { } targetTicks)
-          Add(target, ref targetEnd, x0, x1, targetTicks);
+        if (stretch.TargetFrameTime is { } targetTime)
+          Add(target, ref targetEnd, x0, x1, targetTime);
         else
           targetEnd = null;
-        if (stretch.PreferredTicks is { } preferredTicks && preferredTicks != stretch.TargetTicks)
-          Add(preferred, ref preferredEnd, x0, x1, preferredTicks);
+        if (stretch.PreferredFrameTime is { } preferredTime && preferredTime != stretch.TargetFrameTime)
+          Add(preferred, ref preferredEnd, x0, x1, preferredTime);
         else
           preferredEnd = null;
       }
@@ -909,7 +909,7 @@ namespace MB.FramePacing.Charts
         {
           double x0 = view.XOfFrame(i);
           double x1 = x1Of(i);
-          double y = yOf(TicksMs(view.Data.Frames[i + 1].AnimationDelta!.Value.Ticks));
+          double y = yOf(view.Data.Frames[i + 1].AnimationDelta!.Value.TotalMilliseconds);
           // Joined to the hold before when it ends where this one starts (a gap in the segment starts a new line)
           line.Append(
             previousX1 is { } before && Math.Abs(before - x0) < 1e-6
@@ -1005,7 +1005,7 @@ namespace MB.FramePacing.Charts
           view.EndX,
           i + 1 < section.End && frames[i + 1].Segment == frames[i].Segment
             ? view.XOfFrame(i + 1)
-            : view.XOf(data.Seconds(i) + (frames[i].OnScreen.Ticks / (double)TimeSpan.TicksPerSecond))
+            : view.XOf(data.Seconds(i) + frames[i].OnScreen.TotalSeconds)
         );
       plots.Add(new CardPlot(ReportItem.FrameTime, PlotX0, frameTimeY, view.PlotX1, frameTimeY + FrameTimeH, view.ViewFrom, view.ViewTo, 0, top));
       foreach (double position in ChartScale.StepTicks(refreshMs, top).Where(t => t > 0))
@@ -1040,8 +1040,8 @@ namespace MB.FramePacing.Charts
         {
           if (!data.Spans[i])
             continue;
-          double frameTime = frames[i].FrameTime?.Ticks is { } ticks ? TicksMs(ticks) : 0;
-          double cpuBusyMs = TicksMs(frames[i].CpuBusy.Ticks);
+          double frameTime = frames[i].FrameTime?.TotalMilliseconds ?? 0;
+          double cpuBusyMs = frames[i].CpuBusy.ToTimeSpan().TotalMilliseconds;
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
           if (cpuBusyMs > 0)
@@ -1250,8 +1250,8 @@ namespace MB.FramePacing.Charts
       plots.Add(new CardPlot(ReportItem.RefreshStrip, PlotX0, stripY, view.PlotX1, stripY + StripH, from, to, 0, 1));
       int legend = parts.Count;
       parts.Add(new TextShape(view.PlotX1, stripY - 16, string.Empty, "vsync-n", "end"));
-      long refreshTicks = (long)Math.Round(refreshMs * TimeSpan.TicksPerMillisecond);
-      int Cells(long ticks) => refreshTicks > 0 ? (int)Math.Max(0, (ticks + (refreshTicks / 2)) / refreshTicks) : 1;
+      var refresh = new TimeSpan((long)Math.Round(refreshMs * TimeSpan.TicksPerMillisecond));
+      int Cells(TimeSpan span) => refresh > TimeSpan.Zero ? (int)Math.Max(0, (span.Ticks + (refresh.Ticks / 2)) / refresh.Ticks) : 1;
       bool anyUnknown = false;
       bool anyStatic = false;
       bool anyLate = false;
@@ -1260,12 +1260,14 @@ namespace MB.FramePacing.Charts
       for (int i = section.Start; i < section.End; ++i)
       {
         var frame = frames[i];
-        long onScreen = frame.OnScreen.Ticks > 0 ? frame.OnScreen.Ticks : chart.CapturePeriodTicks;
+        var onScreen = frame.OnScreen > TimeSpan.Zero ? frame.OnScreen : chart.CapturePeriod;
         int cells = Math.Max(1, Cells(onScreen));
         int seen = cells;
         if (!chart.Camera && i + 1 < section.End && frames[i + 1].Segment == frame.Segment)
         {
-          long shown = Math.Min(frame.LastSeenTime.Ticks + chart.CapturePeriodTicks, frames[i + 1].FirstSeenTime.Ticks) - frame.FirstSeenTime.Ticks;
+          var lastShown = frame.LastSeenTime + chart.CapturePeriod;
+          var nextSeen = frames[i + 1].FirstSeenTime;
+          var shown = (lastShown < nextSeen ? lastShown : nextSeen) - frame.FirstSeenTime;
           seen = Math.Clamp(Cells(shown), 1, cells);
         }
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
@@ -1283,7 +1285,7 @@ namespace MB.FramePacing.Charts
         int repeats = 0;
         if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment && view.Data.DroppedBeforeFrame[i + 1] is > 0 and var dropped)
         {
-          long target = frames[i + 1].TargetFrameTime?.Ticks is > 0 and var t ? t : refreshTicks;
+          var target = frames[i + 1].TargetFrameTime is { } t && t > TimeSpan.Zero ? t : refresh;
           repeats = (int)Math.Min(seen - 1, dropped * Math.Max(1, Cells(target)));
         }
         for (int c = 0; c < cells; ++c)
@@ -1293,8 +1295,8 @@ namespace MB.FramePacing.Charts
             break;
           // A refresh that showed an older frame out of order (also between two sightings of this frame); after the frame's last
           // sighting, else one the capture did not tell; the refreshes where dropped frames were due repeat this frame
-          long at = frame.FirstSeenTime.Ticks + (c * refreshTicks);
-          bool older = frame.OlderFrames is { } shown && shown.Any(o => Math.Abs(o.CaptureTime.Ticks - at) * 2 < refreshTicks);
+          var at = frame.FirstSeenTime + new TimeSpan(c * refresh.Ticks);
+          bool older = frame.OlderFrames is { } shown && shown.Any(o => (o.CaptureTime - at).Duration().Ticks * 2 < refresh.Ticks);
           string cell =
             older ? "strip-older"
             : c >= seen ? "neutral"
@@ -1341,17 +1343,17 @@ namespace MB.FramePacing.Charts
     };
 
     /// <summary>The section's time on the capture's clock, for its events: from its start to its end, and the last frame's refresh.</summary>
-    private static (long From, long To) EventTicks(RunSection section) =>
+    private static (TickCount64 From, TickCount64 To) EventTimes(RunSection section) =>
       (
-        section.Data.OriginTicks + (long)Math.Round(section.FromSeconds * TimeSpan.TicksPerSecond),
-        section.Data.OriginTicks + (long)Math.Round(section.ToSeconds * TimeSpan.TicksPerSecond) + section.Data.Run.CapturePeriodTicks
+        section.Data.Origin + new TimeSpan((long)Math.Round(section.FromSeconds * TimeSpan.TicksPerSecond)),
+        section.Data.Origin + new TimeSpan((long)Math.Round(section.ToSeconds * TimeSpan.TicksPerSecond)) + section.Data.Run.CapturePeriod
       );
 
     /// <summary>What the capture missed in the section, by kind ("2 not decoded, 1 missed"); empty when nothing, or the rows are not known.</summary>
     private static string CaptureGaps(RunSection section)
     {
       var events = section.Data.Events;
-      var (from, to) = EventTicks(section);
+      var (from, to) = EventTimes(section);
       return string.Join(
         ", ",
         RunEvents
@@ -1369,16 +1371,16 @@ namespace MB.FramePacing.Charts
     private static void EventsPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, ChartRun chart, double eventsY)
     {
       var events = view.Data.Events;
-      long origin = view.Data.OriginTicks;
-      long period = Math.Max(1, chart.CapturePeriodTicks);
-      var (from, to) = EventTicks(view.Section);
+      var origin = view.Data.Origin;
+      var period = new TimeSpan(Math.Max(1, chart.CapturePeriod.Ticks));
+      var (from, to) = EventTimes(view.Section);
       parts.Add(new TextShape(20, eventsY - 16, "EVENTS: WHAT THE FRAMES DID, WHAT THE CAPTURE MISSED", "label", "start"));
       plots.Add(new CardPlot(ReportItem.Events, PlotX0, eventsY, view.PlotX1, eventsY + EventsH, view.ViewFrom, view.ViewTo, 0, 1));
 
       // The time axis is linear: a pixel column's time on the capture's clock
       double x0 = view.XOf(0);
       double pixelsPerSecond = view.XOf(1) - x0;
-      long TicksAt(double x) => origin + (long)Math.Round((x - x0) / pixelsPerSecond * TimeSpan.TicksPerSecond);
+      TickCount64 TimeAt(double x) => origin + new TimeSpan((long)Math.Round((x - x0) / pixelsPerSecond * TimeSpan.TicksPerSecond));
       int firstColumn = (int)Math.Floor(Math.Max(view.XOf(view.From), 0));
       int lastColumn = (int)Math.Ceiling(view.EndX);
 
@@ -1403,8 +1405,10 @@ namespace MB.FramePacing.Charts
         for (int column = firstColumn; column < lastColumn; ++column)
         {
           // An event covers its refresh: it shows in every column that refresh reaches
-          long start = Math.Max(from, TicksAt(column) - period + 1);
-          long end = Math.Min(to, TicksAt(column + 1));
+          var columnStart = TimeAt(column) - period + new TimeSpan(1);
+          var columnEnd = TimeAt(column + 1);
+          var start = columnStart > from ? columnStart : from;
+          var end = columnEnd < to ? columnEnd : to;
           string? cls = null;
           foreach (var kind in kinds)
           {

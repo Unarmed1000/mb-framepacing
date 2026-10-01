@@ -63,9 +63,9 @@ namespace MB.FramePacing.Charts
       // Display order (a run's frames are in it); a run that is not keeps a sorted copy here
       bool sorted = true;
       for (int i = 1; i < frames.Count && sorted; ++i)
-        sorted = frames[i].FirstSeenTime.Ticks >= frames[i - 1].FirstSeenTime.Ticks;
+        sorted = frames[i].FirstSeenTime >= frames[i - 1].FirstSeenTime;
       Frames = sorted ? frames : frames.OrderBy(f => f.FirstSeenTime.Ticks).ToArray();
-      OriginTicks = run.Run.Frames.Count > 0 ? run.Run.Frames[0].FirstSeenTime.Ticks : 0;
+      Origin = run.Run.Frames.Count > 0 ? run.Run.Frames[0].FirstSeenTime : default;
       int count = Frames.Count;
 
       Lazy<T> Once<T>(Func<T> create) => new Lazy<T>(create, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -186,12 +186,14 @@ namespace MB.FramePacing.Charts
 
       // What each hold was aimed at: the target and preferred frame time of the frame that ends it. The display time step panel draws them
       // in whole refreshes, as the analysis compares; the frametime panel as written. Without pacing (no refresh rate) there are none
-      long refresh = run.Run.Pacing is { } pacing ? (long)Math.Round(pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond) : 0;
-      long? Rounded(long? ticks) => ticks is { } t ? FrameTimeRounding.WholeRefreshes(new TimeSpan(t), new TimeSpan(refresh)).Ticks : null;
-      ReferenceStretch[] Stretches(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred)
+      var refresh = run.Run.Pacing is { } pacing
+        ? new TimeSpan((long)Math.Round(pacing.RefreshPeriodMs * TimeSpan.TicksPerMillisecond))
+        : TimeSpan.Zero;
+      TimeSpan? Rounded(TimeSpan? frameTime) => frameTime is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
+      ReferenceStretch[] Stretches(Func<PresentedFrame, TimeSpan?> target, Func<PresentedFrame, TimeSpan?> preferred)
       {
         var stretches = new List<ReferenceStretch>();
-        for (int i = 0; refresh > 0 && i < count; ++i)
+        for (int i = 0; refresh > TimeSpan.Zero && i < count; ++i)
         {
           if (!HasNext(i))
             continue;
@@ -199,7 +201,7 @@ namespace MB.FramePacing.Charts
           var (t, p) = (target(next), preferred(next));
           if (t == null && p == null)
             continue;
-          if (stretches.Count > 0 && stretches[^1] is var last && last.End == i && last.TargetTicks == t && last.PreferredTicks == p)
+          if (stretches.Count > 0 && stretches[^1] is var last && last.End == i && last.TargetFrameTime == t && last.PreferredFrameTime == p)
             stretches[^1] = last with { End = i + 1 };
           else
             stretches.Add(new ReferenceStretch(i, i + 1, t, p));
@@ -208,15 +210,15 @@ namespace MB.FramePacing.Charts
       }
       // The scales take the lines of the holds that animate: neither the frame holding nor the frame ending the hold, whose aim the line is,
       // is static (an idle screen's aim, 1 s at 1 fps, would squash them, as its hold would). Unless static values count too
-      FrameSequence References(Func<PresentedFrame, long?> target, Func<PresentedFrame, long?> preferred, bool withStatic) =>
+      FrameSequence References(Func<PresentedFrame, TimeSpan?> target, Func<PresentedFrame, TimeSpan?> preferred, bool withStatic) =>
         new FrameSequence(
           count,
           i =>
-            refresh > 0 && HasNext(i) && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
+            refresh > TimeSpan.Zero && HasNext(i) && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
               ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
               {
                 (null, null) => null,
-                var (t, p) => Math.Max(t ?? 0, p ?? 0),
+                var (t, p) => Math.Max(t?.Ticks ?? 0, p?.Ticks ?? 0),
               }
               : null
         );
@@ -241,7 +243,7 @@ namespace MB.FramePacing.Charts
     public IReadOnlyList<PresentedFrame> Frames { get; }
 
     /// <summary>The time at 0 s: the run's first frame.</summary>
-    public long OriginTicks { get; }
+    public TickCount64 Origin { get; }
 
     public FrameSequence Errors => m_errors.Value;
 
@@ -342,7 +344,7 @@ namespace MB.FramePacing.Charts
     public IReadOnlyList<int> SegmentEnds => m_segmentEnds.Value;
 
     /// <summary>Frame <paramref name="index"/>'s display time in seconds since the run's first frame.</summary>
-    public double Seconds(int index) => (Frames[index].FirstSeenTime.Ticks - OriginTicks) / (double)TimeSpan.TicksPerSecond;
+    public double Seconds(int index) => (Frames[index].FirstSeenTime - Origin).TotalSeconds;
 
     /// <summary>The frames first seen from <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> (both included), as a range.</summary>
     public (int Start, int End) Range(double fromSeconds, double toSeconds) =>

@@ -20,8 +20,8 @@ namespace MB.FramePacing.Gui.ViewModels
     public RunViewModel(ChartRun chart)
     {
       var run = chart.Run;
-      double capturePeriodMs = chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond;
-      double errorThresholdMs = chart.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+      double capturePeriodMs = chart.CapturePeriod.TotalMilliseconds;
+      double errorThresholdMs = chart.ErrorThreshold.TotalMilliseconds;
       Chart = chart;
       Run = run;
       CapturePeriodMs = capturePeriodMs;

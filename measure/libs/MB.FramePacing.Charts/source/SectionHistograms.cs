@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* A section's histograms from the run's prepared data: the same bins and counts Histogram.FromTicks gives for the section's frames (0.1 ms
+//* A section's histograms from the run's prepared data: the same bins and counts Histogram.From gives for the section's frames (0.1 ms
 //* bins, wider when the range needs more than the maximum bin count), counted with the wavelet matrix, two queries per bin, so the cost does
 //* not grow with the section's length.
 //*
@@ -25,16 +25,16 @@ namespace MB.FramePacing.Charts
     private static Histogram Of(FrameSequence sequence, RunSection section)
     {
       var (start, end) = sequence.Of(section.Start, section.End);
-      return end > start ? FromMatrix(sequence.Values, start, end, Histogram.DefaultBinWidth.Ticks) : Histogram.Empty;
+      return end > start ? FromMatrix(sequence.Values, start, end, Histogram.DefaultBinWidth) : Histogram.Empty;
     }
 
-    /// <summary>Histogram.FromTicks of positions <paramref name="start"/> to <paramref name="end"/> of <paramref name="values"/>: bin k covers [(k - 0.5) * width, (k + 0.5) * width).</summary>
-    public static Histogram FromMatrix(WaveletMatrix values, int start, int end, long binWidthTicks, int maxBins = Histogram.DefaultMaxBins)
+    /// <summary>Histogram.From of positions <paramref name="start"/> to <paramref name="end"/> of <paramref name="values"/>: bin k covers [(k - 0.5) * width, (k + 0.5) * width).</summary>
+    public static Histogram FromMatrix(WaveletMatrix values, int start, int end, TimeSpan binWidth, int maxBins = Histogram.DefaultMaxBins)
     {
       ArgumentOutOfRangeException.ThrowIfLessThan(maxBins, 1);
       if (end <= start)
         return Histogram.Empty;
-      long width = binWidthTicks > 0 ? binWidthTicks : TimeSpan.TicksPerMillisecond;
+      long width = binWidth > TimeSpan.Zero ? binWidth.Ticks : TimeSpan.TicksPerMillisecond;
       long min = values.KthSmallest(start, end, 0);
       long max = values.KthSmallest(start, end, end - start - 1);
       long first = BinOf(min, width);

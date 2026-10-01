@@ -81,10 +81,10 @@ namespace MB.FramePacing.Charts
       var frames = run.Run.Frames;
       if (frames.Count == 0)
         yield break;
-      long origin = frames[0].FirstSeenTime.Ticks;
-      double Seconds(PresentedFrame f) => (f.FirstSeenTime.Ticks - origin) / (double)TimeSpan.TicksPerSecond;
-      var worstError = frames.Where(f => f.AnimationError.HasValue).MaxBy(f => Math.Abs(f.AnimationError!.Value.Ticks));
-      if (worstError != null && worstError.AnimationError?.Ticks != 0)
+      var origin = frames[0].FirstSeenTime;
+      double Seconds(PresentedFrame f) => (f.FirstSeenTime - origin).TotalSeconds;
+      var worstError = frames.Where(f => f.AnimationError.HasValue).MaxBy(f => f.AnimationError!.Value.Duration());
+      if (worstError != null && worstError.AnimationError != TimeSpan.Zero)
       {
         double t = Seconds(worstError);
         yield return ("worst-error", RunSection.Create(run, t - DetailSeconds, t + DetailSeconds));
@@ -96,7 +96,7 @@ namespace MB.FramePacing.Charts
         int worst = 0;
         for (int i = 0; i < frames.Count; ++i)
         {
-          if (frames[i].FirstSeenTime.Ticks - origin >= LateShare.Window.Ticks && shares[i] > shares[worst])
+          if (frames[i].FirstSeenTime - origin >= LateShare.Window && shares[i] > shares[worst])
             worst = i;
         }
         double t = Seconds(frames[worst]);

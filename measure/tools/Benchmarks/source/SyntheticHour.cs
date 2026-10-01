@@ -89,7 +89,7 @@ namespace MB.FramePacing.Benchmarks
         Array.Empty<string>(),
         Pacing: pacing
       );
-      return new ChartRun(analysis, Refresh, TimeSpan.TicksPerMillisecond, false);
+      return new ChartRun(analysis, new TimeSpan(Refresh), TimeSpan.FromMilliseconds(1), false);
     }
   }
 }

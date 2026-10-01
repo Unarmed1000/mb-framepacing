@@ -65,7 +65,7 @@ namespace MB.FramePacing.Charts.UnitTest
     private static ChartRun Chart(List<CaptureRow> rows, bool withCaptures = true)
     {
       var result = TimelineAnalyzer.Analyze(rows);
-      return new ChartRun(result.Runs.Single(), result.CapturePeriod.Ticks, result.ErrorThreshold.Ticks, Camera: false)
+      return new ChartRun(result.Runs.Single(), result.CapturePeriod, result.ErrorThreshold, Camera: false)
       {
         Captures = withCaptures ? rows.Select(r => r.ToCsvRow()).ToList() : null,
       };
@@ -89,12 +89,12 @@ namespace MB.FramePacing.Charts.UnitTest
       };
       foreach (var (kind, count) in expected)
       {
-        Assert.That(events.Count(kind, long.MinValue, long.MaxValue), Is.EqualTo(count), $"{kind}: how many");
-        var single = events.In(kind, long.MinValue, long.MaxValue).ToArray().Single();
-        Assert.That(single.Ticks, Is.EqualTo(at[kind]), $"{kind}: when");
+        Assert.That(events.Count(kind), Is.EqualTo(count), $"{kind}: how many");
+        var single = events.All(kind).ToArray().Single();
+        Assert.That(single.Time.Ticks, Is.EqualTo(at[kind]), $"{kind}: when");
       }
-      Assert.That(events.In(RunEventKind.OutOfOrder, long.MinValue, long.MaxValue)[0].FrameIndex, Is.EqualTo(8), "the older frame");
-      var torn = events.In(RunEventKind.Torn, long.MinValue, long.MaxValue)[0];
+      Assert.That(events.All(RunEventKind.OutOfOrder)[0].FrameIndex, Is.EqualTo(8), "the older frame");
+      var torn = events.All(RunEventKind.Torn)[0];
       Assert.That((torn.FrameIndex, torn.OtherFrameIndex), Is.EqualTo(((ulong?)5, (ulong?)4)), "the torn capture's two frames");
       Assert.That(events.CapturesKnown);
     }
@@ -144,7 +144,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var drawing = ReportCard.Build(section, ReportOptions.ShowOnly(new[] { ReportItem.Events }));
       var plot = drawing.Plots.Single(p => p.Id == ReportItem.Events);
       var hover = new CardHover(section);
-      double Seconds(long ticks) => (ticks - section.Data.OriginTicks) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(long ticks) => (ticks - section.Data.Origin.Ticks) / (double)TimeSpan.TicksPerSecond;
 
       Assert.That(hover.Describe(plot, Seconds(at[RunEventKind.Torn]), 0.5), Does.Contain("torn: frames 5 and 4"));
       Assert.That(hover.Describe(plot, Seconds(at[RunEventKind.OutOfOrder]), 0.5), Does.Contain("an older frame, 8, shown again"));
@@ -160,8 +160,8 @@ namespace MB.FramePacing.Charts.UnitTest
       var chart = Chart(rows, withCaptures: false);
       var events = RunChartData.Of(chart).Events;
       Assert.That(events.CapturesKnown, Is.False);
-      Assert.That(RunEvents.CaptureKinds.Sum(k => events.Count(k, long.MinValue, long.MaxValue)), Is.Zero);
-      Assert.That(events.Count(RunEventKind.FramesDropped, long.MinValue, long.MaxValue), Is.EqualTo(1));
+      Assert.That(RunEvents.CaptureKinds.Sum(k => events.Count(k)), Is.Zero);
+      Assert.That(events.Count(RunEventKind.FramesDropped), Is.EqualTo(1));
     }
   }
 }

@@ -76,7 +76,7 @@ namespace MB.FramePacing.Charts
     private static CardDrawing BuildErrorHistogram(RunSection section, double width)
     {
       var histogram = SectionHistograms.AnimationErrorMs(section);
-      double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+      double threshold = section.Run.ErrorThreshold.TotalMilliseconds;
       var card = Card.Start(
         section,
         width,
@@ -135,7 +135,7 @@ namespace MB.FramePacing.Charts
     {
       int count = ErrorCount(section);
       double Percentile(double fraction) => AbsoluteErrorPercentileMs(section, fraction);
-      double threshold = section.Run.ErrorThresholdTicks / (double)TimeSpan.TicksPerMillisecond;
+      double threshold = section.Run.ErrorThreshold.TotalMilliseconds;
       var card = Card.Start(
         section,
         width,
@@ -217,7 +217,7 @@ namespace MB.FramePacing.Charts
       if ((card.PlotX1 - PlotX0) / frameCount >= 1)
       {
         for (int i = section.Start; i < section.End; ++i)
-          Point(XOfFrame(i), TicksMs(data.Frames[i].Drift.Ticks));
+          Point(XOfFrame(i), data.Frames[i].Drift.TotalMilliseconds);
       }
       else
       {
@@ -269,8 +269,7 @@ namespace MB.FramePacing.Charts
       return step * 10;
     }
 
-    private static double RefreshMs(ChartRun chart) =>
-      chart.Run.Pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
+    private static double RefreshMs(ChartRun chart) => chart.Run.Pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
 
     /// <summary>A card being built: the header, one plot area under its label, the axes, and the card's height under the plot.</summary>
     private sealed class Card

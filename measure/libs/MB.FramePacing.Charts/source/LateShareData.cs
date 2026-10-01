@@ -90,7 +90,7 @@ namespace MB.FramePacing.Charts
       for (int i = 0; i < frames.Count; ++i)
       {
         Add(i, 1);
-        while (frames[i].FirstSeenTime.Ticks - frames[start].FirstSeenTime.Ticks >= Analysis.LateShare.Window.Ticks)
+        while (frames[i].FirstSeenTime - frames[start].FirstSeenTime >= Analysis.LateShare.Window)
           Add(start++, -1);
         percent[i] = (counted > 0 ? (late + heldCount) / (double)counted : 0) * 100;
         anyLate[i] = late > 0;

@@ -7,6 +7,7 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
@@ -15,10 +16,10 @@ using MB.FramePacing.Data;
 namespace MB.FramePacing.Charts
 {
   /// <param name="Run">The analysed run.</param>
-  /// <param name="CapturePeriodTicks">The capture period (<see cref="TimelineResult.CapturePeriodTicks"/>).</param>
-  /// <param name="ErrorThresholdTicks">The |animation error| above which a frame counts as off (<see cref="TimelineResult.ErrorThresholdTicks"/>).</param>
+  /// <param name="CapturePeriod">The capture period (<see cref="TimelineResult.CapturePeriod"/>).</param>
+  /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (<see cref="TimelineResult.ErrorThreshold"/>).</param>
   /// <param name="Camera">An EXPERIMENTAL camera capture: the refresh strip draws every frame until the next one.</param>
-  public sealed record ChartRun(RunAnalysis Run, long CapturePeriodTicks, long ErrorThresholdTicks, bool Camera)
+  public sealed record ChartRun(RunAnalysis Run, TimeSpan CapturePeriod, TimeSpan ErrorThreshold, bool Camera)
   {
     /// <summary>
     /// The capture's rows (captures.csv), for what the capture missed (RunEvents): every run of the capture shares them. Null when not known.
@@ -27,7 +28,7 @@ namespace MB.FramePacing.Charts
 
     /// <param name="captures">The report's capture rows as <see cref="Captures"/> (<see cref="CapturesOf"/>, once for every run), or null to map them.</param>
     public static ChartRun From(AnalysisReport report, RunAnalysis run, IReadOnlyList<CaptureCsvRow>? captures = null) =>
-      new ChartRun(run, report.Timeline.CapturePeriod.Ticks, report.Timeline.ErrorThreshold.Ticks, report.Session?.Camera != null)
+      new ChartRun(run, report.Timeline.CapturePeriod, report.Timeline.ErrorThreshold, report.Session?.Camera != null)
       {
         Captures = captures ?? CapturesOf(report),
       };

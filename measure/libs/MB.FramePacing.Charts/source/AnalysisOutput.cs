@@ -33,8 +33,8 @@ namespace MB.FramePacing.Charts
     {
       string directory = Directory(folder);
       var summary = AnalysisSummary.Read(Path.Combine(directory, AnalysisFiles.SummaryFileName));
-      long capturePeriod = Milliseconds.FromMilliseconds(summary.CapturePeriodMs).Ticks;
-      long threshold = Milliseconds.FromMilliseconds(summary.ErrorThresholdMs).Ticks;
+      var capturePeriod = Milliseconds.FromMilliseconds(summary.CapturePeriodMs);
+      var threshold = Milliseconds.FromMilliseconds(summary.ErrorThresholdMs);
       bool camera = summary.Scanout == nameof(ScanoutModel.Camera);
       // What the capture missed, for every run's events (an analysis without the file draws its capture lane as not known)
       string capturesPath = Path.Combine(directory, AnalysisFiles.CapturesFileName);
@@ -54,7 +54,7 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>The presented frames of a run-&lt;id&gt;-frames.csv, by column name.</summary>
-    public static IReadOnlyList<PresentedFrame> ReadFrames(string path, long capturePeriodTicks) =>
-      FramesCsv.Read(path).Select(row => row.ToFrame(new TimeSpan(capturePeriodTicks))).ToList();
+    public static IReadOnlyList<PresentedFrame> ReadFrames(string path, TimeSpan capturePeriod) =>
+      FramesCsv.Read(path).Select(row => row.ToFrame(capturePeriod)).ToList();
   }
 }

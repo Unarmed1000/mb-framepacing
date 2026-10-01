@@ -69,7 +69,7 @@ namespace MB.FramePacing.Charts.UnitTest
       for (int i = 0; i < 3; ++i)
         Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)), 1);
       var result = TimelineAnalyzer.Analyze(rows);
-      return new ChartRun(result.Runs.Single(), result.CapturePeriod.Ticks, result.ErrorThreshold.Ticks, Camera: false);
+      return new ChartRun(result.Runs.Single(), result.CapturePeriod, result.ErrorThreshold, Camera: false);
     }
 
     private static (double Step, double FrameTime) Tops(CardDrawing card) =>

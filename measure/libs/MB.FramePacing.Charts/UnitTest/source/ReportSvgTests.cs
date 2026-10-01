@@ -361,7 +361,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Array.Empty<string>(),
         Pacing: pacing
       );
-      return new ChartRun(analysis, Refresh, TimeSpan.TicksPerMillisecond, false);
+      return new ChartRun(analysis, new TimeSpan(Refresh), TimeSpan.FromMilliseconds(1), false);
     }
 
     private static int Count(string text, string part) => Regex.Matches(text, Regex.Escape(part)).Count;

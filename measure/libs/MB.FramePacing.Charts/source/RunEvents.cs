@@ -36,7 +36,7 @@ namespace MB.FramePacing.Charts
 
     private RunEvents(List<RunEvent>[] events, bool capturesKnown)
     {
-      m_events = events.Select(list => list.OrderBy(e => e.Ticks).ToArray()).ToArray();
+      m_events = events.Select(list => list.OrderBy(e => e.Time.Ticks).ToArray()).ToArray();
       m_totals = m_events
         .Select(list =>
         {
@@ -52,32 +52,38 @@ namespace MB.FramePacing.Charts
     /// <summary>The capture rows were given: the capture lane says what the capture missed (else it is unknown).</summary>
     public bool CapturesKnown { get; }
 
-    /// <summary>The events of <paramref name="kind"/> from <paramref name="fromTicks"/> up to (not including) <paramref name="toTicks"/>.</summary>
-    public ReadOnlySpan<RunEvent> In(RunEventKind kind, long fromTicks, long toTicks)
+    /// <summary>Every event of <paramref name="kind"/>, in time order.</summary>
+    public ReadOnlySpan<RunEvent> All(RunEventKind kind) => m_events[(int)kind];
+
+    /// <summary>How many frames or refreshes all events of <paramref name="kind"/> stand for.</summary>
+    public long Count(RunEventKind kind) => m_totals[(int)kind][^1];
+
+    /// <summary>The events of <paramref name="kind"/> from <paramref name="from"/> up to (not including) <paramref name="to"/>.</summary>
+    public ReadOnlySpan<RunEvent> In(RunEventKind kind, TickCount64 from, TickCount64 to)
     {
-      var (start, end) = Range(kind, fromTicks, toTicks);
+      var (start, end) = Range(kind, from, to);
       return m_events[(int)kind].AsSpan(start, end - start);
     }
 
-    /// <summary>Whether <paramref name="kind"/> has an event from <paramref name="fromTicks"/> up to <paramref name="toTicks"/>.</summary>
-    public bool Any(RunEventKind kind, long fromTicks, long toTicks)
+    /// <summary>Whether <paramref name="kind"/> has an event from <paramref name="from"/> up to <paramref name="to"/>.</summary>
+    public bool Any(RunEventKind kind, TickCount64 from, TickCount64 to)
     {
-      var (start, end) = Range(kind, fromTicks, toTicks);
+      var (start, end) = Range(kind, from, to);
       return end > start;
     }
 
     /// <summary>How many frames or refreshes the events of <paramref name="kind"/> in the range stand for.</summary>
-    public long Count(RunEventKind kind, long fromTicks, long toTicks)
+    public long Count(RunEventKind kind, TickCount64 from, TickCount64 to)
     {
-      var (start, end) = Range(kind, fromTicks, toTicks);
+      var (start, end) = Range(kind, from, to);
       return m_totals[(int)kind][end] - m_totals[(int)kind][start];
     }
 
-    private (int Start, int End) Range(RunEventKind kind, long fromTicks, long toTicks)
+    private (int Start, int End) Range(RunEventKind kind, TickCount64 from, TickCount64 to)
     {
       var list = m_events[(int)kind];
-      int start = RunChartData.FirstWhere(0, list.Length, i => list[i].Ticks >= fromTicks);
-      int end = RunChartData.FirstWhere(start, list.Length, i => list[i].Ticks >= toTicks);
+      int start = RunChartData.FirstWhere(0, list.Length, i => list[i].Time >= from);
+      int end = RunChartData.FirstWhere(start, list.Length, i => list[i].Time >= to);
       return (start, end);
     }
 
@@ -85,7 +91,7 @@ namespace MB.FramePacing.Charts
     {
       var chart = data.Run;
       var frames = data.Frames;
-      long period = chart.CapturePeriodTicks;
+      var period = chart.CapturePeriod;
       var events = Enum.GetValues<RunEventKind>().Select(_ => new List<RunEvent>()).ToArray();
       void Add(RunEventKind kind, RunEvent e) => events[(int)kind].Add(e);
 
@@ -94,15 +100,15 @@ namespace MB.FramePacing.Charts
         var frame = frames[i];
         // Where the dropped frames were due: the refresh before the frame after them
         if (data.DroppedBeforeFrame[i] is > 0 and var dropped)
-          Add(RunEventKind.FramesDropped, new RunEvent(frame.FirstSeenTime.Ticks - period, dropped, frame.FrameIndex));
+          Add(RunEventKind.FramesDropped, new RunEvent(frame.FirstSeenTime - period, dropped, frame.FrameIndex));
         if (frame.OlderFrames is { } older)
         {
           foreach (var capture in older)
-            Add(RunEventKind.OutOfOrder, new RunEvent(capture.CaptureTime.Ticks, 1, capture.FrameIndex));
+            Add(RunEventKind.OutOfOrder, new RunEvent(capture.CaptureTime, 1, capture.FrameIndex));
         }
         // A camera's tears are found per frame; a capture card's are its torn captures (below)
         if (chart.Camera && (frame.Flags & PresentedFrameFlags.Torn) != 0)
-          Add(RunEventKind.Torn, new RunEvent(frame.FirstSeenTime.Ticks, 1, frame.FrameIndex));
+          Add(RunEventKind.Torn, new RunEvent(frame.FirstSeenTime, 1, frame.FrameIndex));
       }
 
       if (chart.Captures is { } rows && frames.Count > 0)
@@ -114,44 +120,44 @@ namespace MB.FramePacing.Charts
     private static void AddCaptures(
       IReadOnlyList<CaptureCsvRow> rows,
       IReadOnlyList<PresentedFrame> frames,
-      long period,
+      TimeSpan period,
       bool camera,
       Action<RunEventKind, RunEvent> add
     )
     {
       long firstIndex = frames.Min(f => f.FirstCaptureIndex);
-      long lastTicks = frames.Max(f => f.LastSeenTime.Ticks);
+      var lastSeen = new TickCount64(frames.Max(f => f.LastSeenTime.Ticks));
       int start = RunChartData.FirstWhere(0, rows.Count, i => rows[i].CaptureIndex >= firstIndex);
       // A capture the recorder dropped has no time: it is placed a period per capture index after the last one recorded
-      long knownTicks = start < rows.Count ? rows[start].CaptureTime?.Ticks ?? frames[0].FirstSeenTime.Ticks : 0;
+      var knownTime = start < rows.Count ? rows[start].CaptureTime ?? frames[0].FirstSeenTime : default;
       long knownIndex = start < rows.Count ? rows[start].CaptureIndex : 0;
       for (int i = start; i < rows.Count; ++i)
       {
         var row = rows[i];
-        long ticks = row.CaptureTime?.Ticks ?? knownTicks + ((row.CaptureIndex - knownIndex) * period);
-        if (ticks > lastTicks)
+        var time = row.CaptureTime ?? knownTime + new TimeSpan((row.CaptureIndex - knownIndex) * period.Ticks);
+        if (time > lastSeen)
           break;
-        if (row.CaptureTime?.Ticks is { } recorded)
+        if (row.CaptureTime is { } recorded)
         {
-          knownTicks = recorded;
+          knownTime = recorded;
           knownIndex = row.CaptureIndex;
         }
         // Reported or found before this capture: in the refresh before it
         if (row.SourceDropsBefore > 0)
-          add(RunEventKind.SourceDropped, new RunEvent(ticks - period, row.SourceDropsBefore));
+          add(RunEventKind.SourceDropped, new RunEvent(time - period, row.SourceDropsBefore));
         if (row.MissedBefore > 0)
-          add(RunEventKind.Missed, new RunEvent(ticks - period, row.MissedBefore));
+          add(RunEventKind.Missed, new RunEvent(time - period, row.MissedBefore));
         switch (row.Status)
         {
           case "NotRecorded":
-            add(RunEventKind.NotRecorded, new RunEvent(ticks, 1));
+            add(RunEventKind.NotRecorded, new RunEvent(time, 1));
             break;
           // A camera's zones legitimately show different frames or none while the scanout passes: not events of the capture
           case "Undecodable" when !camera:
-            add(RunEventKind.NotDecoded, new RunEvent(ticks, 1));
+            add(RunEventKind.NotDecoded, new RunEvent(time, 1));
             break;
           case "Torn" when !camera:
-            add(RunEventKind.Torn, new RunEvent(ticks, 1, row.FrameIndex, row.SyncFrameIndex));
+            add(RunEventKind.Torn, new RunEvent(time, 1, row.FrameIndex, row.SyncFrameIndex));
             break;
         }
       }

@@ -60,13 +60,13 @@ namespace MB.FramePacing.Charts
     public ChartRun Section => m_section.Value;
 
     /// <summary>The time at 0 s: the run's first frame.</summary>
-    public long OriginTicks => Run.Run.Frames.Count > 0 ? Run.Run.Frames[0].FirstSeenTime.Ticks : 0;
+    public TickCount64 Origin => Run.Run.Frames.Count > 0 ? Run.Run.Frames[0].FirstSeenTime : default;
 
     /// <summary>The whole run: from its first frame to one capture period after its last.</summary>
     public static RunSection Whole(ChartRun run)
     {
       var frames = run.Run.Frames;
-      double end = frames.Count > 0 ? Seconds(frames[^1].LastSeenTime.Ticks - frames[0].FirstSeenTime.Ticks + run.CapturePeriodTicks) : 1;
+      double end = frames.Count > 0 ? (frames[^1].LastSeenTime - frames[0].FirstSeenTime + run.CapturePeriod).TotalSeconds : 1;
       return new RunSection(run, 0, Math.Max(end, 0.001), 0, frames.Count, wholeRun: true);
     }
 
@@ -93,7 +93,7 @@ namespace MB.FramePacing.Charts
       var analysis = Run.Run with
       {
         Frames = frames,
-        Statistics = RunStatistics.From(frames, new TimeSpan(Run.ErrorThresholdTicks), new TimeSpan(Run.CapturePeriodTicks)),
+        Statistics = RunStatistics.From(frames, Run.ErrorThreshold, Run.CapturePeriod),
         // The section's own counts of what reached the display: presented, skipped and dropped frames, captures out of order
         Counts = Run.Run.Counts with
         {
@@ -119,7 +119,5 @@ namespace MB.FramePacing.Charts
         WorstLateShare = LateShare.Worst(frames, LateShare.Window),
       };
     }
-
-    private static double Seconds(long ticks) => ticks / (double)TimeSpan.TicksPerSecond;
   }
 }

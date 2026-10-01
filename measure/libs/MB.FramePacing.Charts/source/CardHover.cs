@@ -47,7 +47,7 @@ namespace MB.FramePacing.Charts
           return $"p{Invariant(p, "0.0")}: |animation error| {Invariant(DistributionCard.AbsoluteErrorPercentileMs(m_section, p / 100), "0.00")} ms";
         }
         case DistributionCard.Drift:
-          return FrameAt(x) is { } frame ? $"{Heading(frame)}\ndrift {Ms(frame.Drift.Ticks, sign: true)} ms" : null;
+          return FrameAt(x) is { } frame ? $"{Heading(frame)}\ndrift {Ms(frame.Drift, sign: true)} ms" : null;
         case ReportItem.Events:
           return Events(plot, x);
         default:
@@ -63,9 +63,9 @@ namespace MB.FramePacing.Charts
     {
       var data = m_section.Data;
       double column = Math.Floor(plot.PixelX(seconds));
-      long Ticks(double s) => data.OriginTicks + (long)Math.Round(s * TimeSpan.TicksPerSecond);
-      long from = Ticks(plot.ValueX(column)) - Math.Max(1, data.Run.CapturePeriodTicks) + 1;
-      long to = Ticks(plot.ValueX(column + 1));
+      TickCount64 TimeAt(double s) => data.Origin + new TimeSpan((long)Math.Round(s * TimeSpan.TicksPerSecond));
+      var from = TimeAt(plot.ValueX(column)) - new TimeSpan(Math.Max(1, data.Run.CapturePeriod.Ticks) - 1);
+      var to = TimeAt(plot.ValueX(column + 1));
       var lines = new List<string>();
       foreach (var kind in RunEvents.FrameKinds.Concat(RunEvents.CaptureKinds))
       {
@@ -96,32 +96,32 @@ namespace MB.FramePacing.Charts
       if (m_section.FrameCount == 0)
         return null;
       var frames = m_section.Data.Frames;
-      long ticks = m_section.OriginTicks + (long)Math.Round(seconds * TimeSpan.TicksPerSecond);
-      int after = RunChartData.FirstWhere(m_section.Start, m_section.End, i => frames[i].FirstSeenTime.Ticks > ticks);
+      var time = m_section.Origin + new TimeSpan((long)Math.Round(seconds * TimeSpan.TicksPerSecond));
+      int after = RunChartData.FirstWhere(m_section.Start, m_section.End, i => frames[i].FirstSeenTime > time);
       return frames[Math.Max(m_section.Start, after - 1)];
     }
 
     private string Describe(PresentedFrame frame)
     {
       var lines = new List<string> { Heading(frame) };
-      if (frame.DisplayDelta?.Ticks is { } display)
+      if (frame.DisplayDelta is { } display)
         lines.Add($"display time step {Ms(display)} ms");
-      if (frame.AnimationError?.Ticks is { } error)
+      if (frame.AnimationError is { } error)
         lines.Add($"animation error {Ms(error, sign: true)} ms");
-      if (frame.Lateness?.Ticks is { } lateness)
+      if (frame.Lateness is { } lateness)
         lines.Add($"lateness {Ms(lateness, sign: true)} ms");
-      if (frame.FrameTime?.Ticks is { } frameTime)
+      if (frame.FrameTime is { } frameTime)
         lines.Add($"frametime {Ms(frameTime)} ms");
-      if (frame.CpuBusy.Ticks > 0)
-        lines.Add($"CPU busy {Ms(frame.CpuBusy.Ticks)} ms");
+      if (frame.CpuBusy != TimeSpan32.Zero)
+        lines.Add($"CPU busy {Ms(frame.CpuBusy.ToTimeSpan())} ms");
       // What the step to this frame was aimed at, as the reference lines draw it (the preferred frame time below, as the marker says it)
       if (FrameReference.Target(frame) is { } target)
-        lines.Add($"target {Ms(target)} ms ({Invariant(TimeSpan.TicksPerSecond / (double)target, "0.#")} fps)");
-      if (frame.MarkerPreferredFrameTime.Ticks == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime.Ticks)
+        lines.Add($"target {Ms(target)} ms ({Invariant(TimeSpan.TicksPerSecond / (double)target.Ticks, "0.#")} fps)");
+      if (frame.MarkerPreferredFrameTime == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime)
         lines.Add("preferred: on demand");
-      else if (frame.MarkerPreferredFrameTime.Ticks > 0)
+      else if (frame.MarkerPreferredFrameTime != TimeSpan32.Zero)
         lines.Add(
-          $"preferred {Ms(frame.MarkerPreferredFrameTime.Ticks)} ms ({Invariant(TimeSpan.TicksPerSecond / (double)frame.MarkerPreferredFrameTime.Ticks, "0.#")} fps)"
+          $"preferred {Ms(frame.MarkerPreferredFrameTime.ToTimeSpan())} ms ({Invariant(TimeSpan.TicksPerSecond / (double)frame.MarkerPreferredFrameTime.Ticks, "0.#")} fps)"
         );
       return string.Join('\n', lines);
     }
@@ -129,7 +129,7 @@ namespace MB.FramePacing.Charts
     /// <summary>"Frame 1234 at 12.345 s", and what happened to it: late, torn, frame indices skipped before it.</summary>
     private string Heading(PresentedFrame frame)
     {
-      double seconds = (frame.FirstSeenTime.Ticks - m_section.OriginTicks) / (double)TimeSpan.TicksPerSecond;
+      double seconds = (frame.FirstSeenTime - m_section.Origin).TotalSeconds;
       var notes = new List<string>();
       if ((frame.Flags & PresentedFrameFlags.Late) != 0)
         notes.Add("late");
@@ -155,9 +155,9 @@ namespace MB.FramePacing.Charts
       return $"{what} {center} ms (bin of {Invariant(histogram.BinWidthMs, "0.0#")} ms): {frames}";
     }
 
-    private static string Ms(long ticks, bool sign = false)
+    private static string Ms(TimeSpan span, bool sign = false)
     {
-      double ms = ticks / (double)TimeSpan.TicksPerMillisecond;
+      double ms = span.TotalMilliseconds;
       return (sign && ms > 0 ? "+" : string.Empty) + Invariant(ms, "0.00");
     }
 

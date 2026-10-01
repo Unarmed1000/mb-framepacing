@@ -74,7 +74,7 @@ namespace MB.FramePacing.Charts.UnitTest
       double limit = ChartScale.ErrorLimit(judged.Select(Error).ToList());
       Assert.That((error.YFrom, error.YTo), Is.EqualTo((-limit, limit)), $"{clip}: symmetric scale");
       // A refresh line at every whole refresh an error reaches (within a tenth of one), inside the scale
-      double refreshMs = chart.Run.Pacing?.RefreshPeriodMs ?? (chart.CapturePeriodTicks / (double)TimeSpan.TicksPerMillisecond);
+      double refreshMs = chart.Run.Pacing?.RefreshPeriodMs ?? chart.CapturePeriod.TotalMilliseconds;
       var expectedLines = new List<double>();
       foreach (int sign in new[] { 1, -1 })
       {
@@ -326,10 +326,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var read = AnalysisOutput.Read(report.CaptureDirectory).Single();
       Assert.That(read.FilePrefix, Is.EqualTo("run-1"));
       var back = read.Chart;
-      Assert.That(
-        (back.CapturePeriodTicks, back.ErrorThresholdTicks, back.Camera),
-        Is.EqualTo((chart.CapturePeriodTicks, chart.ErrorThresholdTicks, chart.Camera))
-      );
+      Assert.That((back.CapturePeriod, back.ErrorThreshold, back.Camera), Is.EqualTo((chart.CapturePeriod, chart.ErrorThreshold, chart.Camera)));
       // Every frame to the tick; the older frames shown out of order after it compared by their content (a list compares by reference)
       static PresentedFrame WithoutLists(PresentedFrame f) => f with { OlderFrames = null };
       Assert.That(back.Run.Frames.Select(WithoutLists), Is.EqualTo(chart.Run.Frames.Select(WithoutLists)), $"{clip}: every frame to the tick");
@@ -436,7 +433,7 @@ namespace MB.FramePacing.Charts.UnitTest
         if (frames[i].CpuStartTime.Ticks == 0)
           continue;
         // Within a tick: the manifest and the capture round 1/60 s to ticks independently
-        Assert.That(frames[i].CpuStartTime.Ticks + offset!.Value, Is.EqualTo(frames[i - 1].FirstSeenTime.Ticks).Within(1), $"{clip}: frame {i}");
+        Assert.That((frames[i].CpuStartTime + offset!.Value).Ticks, Is.EqualTo(frames[i - 1].FirstSeenTime.Ticks).Within(1), $"{clip}: frame {i}");
         ++checkedFrames;
       }
       Assert.That(checkedFrames, Is.GreaterThan(frames.Count - 3), $"{clip}: nearly every frame has a CPU start");
@@ -473,7 +470,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(firstRefreshes, Is.EqualTo(frames.Count), "a first refresh per frame");
       Assert.That(
         Of("err-pill").Count(),
-        Is.EqualTo(frames.Count(f => f.AnimationError?.Ticks is { } e && Math.Abs(e) > chart.ErrorThresholdTicks)),
+        Is.EqualTo(frames.Count(f => f.AnimationError is { } e && e.Duration() > chart.ErrorThreshold)),
         "an error pill per frame off by more than the threshold"
       );
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
@@ -537,7 +534,7 @@ namespace MB.FramePacing.Charts.UnitTest
       foreach (var stretch in data.StepReferences)
       {
         for (int i = stretch.Start; i < stretch.End; ++i)
-          byHold[i] = (stretch.TargetTicks, stretch.PreferredTicks);
+          byHold[i] = (stretch.TargetFrameTime?.Ticks, stretch.PreferredFrameTime?.Ticks);
       }
       int differing = 0;
       for (int i = 0; i + 1 < manifest.FrameCount; ++i)
@@ -663,9 +660,9 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       // The events lanes count the same, and the clips are captured whole: nothing in the capture lane
       var events = RunChartData.Of(chart).Events;
-      Assert.That(events.Count(RunEventKind.FramesDropped, long.MinValue, long.MaxValue), Is.EqualTo(dropped), $"{clip}: dropped events");
-      Assert.That(events.Count(RunEventKind.OutOfOrder, long.MinValue, long.MaxValue), Is.EqualTo(older), $"{clip}: out-of-order events");
-      Assert.That(RunEvents.CaptureKinds.Sum(k => events.Count(k, long.MinValue, long.MaxValue)), Is.Zero, $"{clip}: capture events");
+      Assert.That(events.Count(RunEventKind.FramesDropped), Is.EqualTo(dropped), $"{clip}: dropped events");
+      Assert.That(events.Count(RunEventKind.OutOfOrder), Is.EqualTo(older), $"{clip}: out-of-order events");
+      Assert.That(RunEvents.CaptureKinds.Sum(k => events.Count(k)), Is.Zero, $"{clip}: capture events");
       Assert.That(events.CapturesKnown, $"{clip}: the capture rows are there");
     }
 
