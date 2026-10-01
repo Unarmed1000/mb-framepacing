@@ -43,7 +43,7 @@ now_ticks = time.monotonic_ns() // 100
 ```
 
 An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `seconds_to_ticks` (Python) or
-`std::llround(seconds * MB::FramePacing::TimeSpan::TicksPerSecond)` (C++).
+`MB::FramePacing::TimeSpan::FromSeconds(seconds)` (C++).
 
 ## The fields
 
@@ -206,8 +206,7 @@ An animation clock in seconds converts with `FrameMarker.SecondsToTicks` (C#), `
 - **Means:** the small second marker (kind `3`) carries only the run id and the frame index, and belongs to the main marker with the
   same two values.
 - **Value:** the main marker's run id and frame index, every frame: `payload.WithKind(MarkerKind.Sync)` (C#),
-  `payload.with_kind(MarkerKind.SYNC)` (Python), or a `Payload` with the same `FrameIndex` and `RunId` and `Kind = MarkerKind::Sync`
-  (C++).
+  `payload.with_kind(MarkerKind.SYNC)` (Python), `payload.WithKind(FM::MarkerKind::Sync)` (C++).
 - **What the analysis does:** on a capture card, a capture whose two markers disagree is **torn**: a capture gap, so the steps
   around it are not judged. A camera times every frame by it.
 - **Goes wrong when:** it carries a run id of `0` (the default) while the main marker has another: every capture reads as torn, and

@@ -11,6 +11,9 @@
 //                 [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>
 #include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -207,20 +210,21 @@ namespace
     uint64_t state = 0x6D622D6672616D6Au;
     for (int32_t row = 0; row < RowCount; ++row)
     {
-      FM::Payload payload;
       // Drawn in this order, not the wire format's: the digest's values depend on it
-      payload.Kind = static_cast<FM::MarkerKind>(row % 4);
-      payload.FrameIndex = NextRandom(state);
-      payload.AnimationTicks = static_cast<int64_t>(NextRandom(state));
-      payload.RunId = static_cast<uint32_t>(NextRandom(state));
-      payload.IntendedDisplayTicks = static_cast<int64_t>(NextRandom(state));
-      payload.TargetFrameTicks = static_cast<uint32_t>(NextRandom(state));
-      payload.CpuStartTicks = static_cast<int64_t>(NextRandom(state));
-      payload.CpuBusyTicks = static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu);
-      payload.PreferredFrameTicks = static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu);
-      payload.Flags = static_cast<FM::MarkerFlags>(NextRandom(state) & 0xFFu);
+      const auto kind = static_cast<FM::MarkerKind>(row % 4);
+      const uint64_t frameIndex = NextRandom(state);
+      const FP::TimeSpan animationTime(static_cast<int64_t>(NextRandom(state)));
+      const auto runId = static_cast<uint32_t>(NextRandom(state));
+      const FP::TickCount64 intendedDisplayTime(static_cast<int64_t>(NextRandom(state)));
+      const FP::TimeSpan32 targetFrameTime(static_cast<uint32_t>(NextRandom(state)));
+      const FP::TickCount64 cpuStartTime(static_cast<int64_t>(NextRandom(state)));
+      const FP::TimeSpan32 cpuBusy(static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu));
+      const FP::TimeSpan32 preferredFrameTime(static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu));
+      const auto flags = static_cast<FM::MarkerFlags>(NextRandom(state) & 0xFFu);
+      const FM::Payload payload(kind, runId, frameIndex, flags, animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime,
+                                cpuBusy);
       FM::StartMetadata start;
-      if (payload.Kind == FM::MarkerKind::SequenceStart)
+      if (payload.Kind() == FM::MarkerKind::SequenceStart)
       {
         start.UtcTicks = static_cast<int64_t>(NextRandom(state) >> 1u);
         // Cycle through random bytes, a text tag of every length 1..16, no id (all zero) and all 0xFF
@@ -256,10 +260,11 @@ namespace
       }
       // The matrix is stored packed exactly as the digest writes it
       const std::vector<uint8_t> bits(matrix.Bits().begin(), matrix.Bits().end());
-      digest << static_cast<uint32_t>(payload.Kind) << ',' << payload.RunId << ',' << payload.FrameIndex << ','
-             << static_cast<uint32_t>(payload.Flags) << ',' << payload.AnimationTicks << ',' << payload.PreferredFrameTicks << ','
-             << payload.TargetFrameTicks << ',' << payload.IntendedDisplayTicks << ',' << payload.CpuStartTicks << ',' << payload.CpuBusyTicks << ','
-             << start.UtcTicks << ',' << SequenceIdHex(payload.Kind, start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
+      digest << static_cast<uint32_t>(payload.Kind()) << ',' << payload.RunId() << ',' << payload.FrameIndex() << ','
+             << static_cast<uint32_t>(payload.Flags()) << ',' << payload.AnimationTime().Ticks() << ',' << payload.PreferredFrameTime().Ticks() << ','
+             << payload.TargetFrameTime().Ticks() << ',' << payload.IntendedDisplayTime().Ticks() << ',' << payload.CpuStartTime().Ticks() << ','
+             << payload.CpuBusy().Ticks() << ',' << start.UtcTicks << ',' << SequenceIdHex(payload.Kind(), start.Id) << ',' << matrix.Size() << ','
+             << ToHex(bits) << '\n';
     }
   }
 
@@ -278,26 +283,33 @@ namespace
     constexpr FM::SequenceId GoldenBytesId{
       {0x6Fu, 0x9Du, 0x2Cu, 0x41u, 0x8Bu, 0x3Eu, 0x4Au, 0x7Fu, 0x95u, 0xD0u, 0x1Cu, 0x00u, 0xE2u, 0xFFu, 0x80u, 0x7Au}};
     constexpr std::array<GoldenCase, 11> Cases{{
-      {{FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::None, 0}, {}},
-      {{FM::MarkerKind::Frame, 1u, 1u, FM::MarkerFlags::None, 166'667}, {}},
-      {{FM::MarkerKind::Frame, 1u, 123'456'789u, FM::MarkerFlags::None, 36'000'000'000, 166'667u, 333'333u, 987'654'321'000, 987'653'987'666,
-        123'456u},
+      {{FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::None, FP::TimeSpan{0}}, {}},
+      {{FM::MarkerKind::Frame, 1u, 1u, FM::MarkerFlags::None, FP::TimeSpan{166'667}}, {}},
+      {{FM::MarkerKind::Frame, 1u, 123'456'789u, FM::MarkerFlags::None, FP::TimeSpan{36'000'000'000}, FP::TimeSpan32{166'667u},
+        FP::TimeSpan32{333'333u}, FP::TickCount64{987'654'321'000}, FP::TickCount64{987'653'987'666}, FP::TimeSpan32{123'456u}},
        {}},
-      {{FM::MarkerKind::Frame, 2u, 42u, FM::MarkerFlags::None, -1}, {}},
-      {{FM::MarkerKind::Frame, 3u, 7u, FM::MarkerFlags::None, std::numeric_limits<int64_t>::min()}, {}},
+      {{FM::MarkerKind::Frame, 2u, 42u, FM::MarkerFlags::None, FP::TimeSpan{-1}}, {}},
+      {{FM::MarkerKind::Frame, 3u, 7u, FM::MarkerFlags::None, FP::TimeSpan{std::numeric_limits<int64_t>::min()}}, {}},
       {{FM::MarkerKind::Frame, std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint64_t>::max(), static_cast<FM::MarkerFlags>(0xFFu),
-        std::numeric_limits<int64_t>::max(), FM::Payload::OnDemandFrameTicks, std::numeric_limits<uint32_t>::max(),
-        std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max(), std::numeric_limits<uint32_t>::max()},
+        FP::TimeSpan{std::numeric_limits<int64_t>::max()}, FM::Payload::OnDemandFrameTime, FP::TimeSpan32{std::numeric_limits<uint32_t>::max()},
+        FP::TickCount64{std::numeric_limits<int64_t>::min()}, FP::TickCount64{std::numeric_limits<int64_t>::max()},
+        FP::TimeSpan32{std::numeric_limits<uint32_t>::max()}},
        {}},
-      {{FM::MarkerKind::Frame, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::StaticAfter, 0x1112131415161718, 0x71727374u, 0x41424344u,
-        0x3132333435363738, 0x5152535455565758, 0x61626364u},
+      {{FM::MarkerKind::Frame, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{0x1112131415161718},
+        FP::TimeSpan32{0x71727374u}, FP::TimeSpan32{0x41424344u}, FP::TickCount64{0x3132333435363738}, FP::TickCount64{0x5152535455565758},
+        FP::TimeSpan32{0x61626364u}},
        {}},
       // Start and end markers carry the frame's values too
-      {{FM::MarkerKind::SequenceStart, 5u, 600u, FM::MarkerFlags::StaticAfter, 100'000'000, 10'000'000u, 0u, 0, 0, 80'000u},
+      {{FM::MarkerKind::SequenceStart, 5u, 600u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{100'000'000}, FP::TimeSpan32{10'000'000u},
+        FP::TimeSpan32{0u}, FP::TickCount64{0}, FP::TickCount64{0}, FP::TimeSpan32{80'000u}},
        {0, TextSequenceId("golden-run")}},
-      {{FM::MarkerKind::SequenceStart, 6u, 601u, FM::MarkerFlags::None, 100'166'667, 0, 0u, 0, 0, 120'000u}, {GoldenStartUtcTicks, GoldenBytesId}},
-      {{FM::MarkerKind::SequenceEnd, 5u, 900u, FM::MarkerFlags::None, 150'000'000, 0, 0u, 0, 0, 80'000u}, {}},
-      {{FM::MarkerKind::Sync, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::None, 0}, {}},
+      {{FM::MarkerKind::SequenceStart, 6u, 601u, FM::MarkerFlags::None, FP::TimeSpan{100'166'667}, FP::TimeSpan32{0}, FP::TimeSpan32{0u},
+        FP::TickCount64{0}, FP::TickCount64{0}, FP::TimeSpan32{120'000u}},
+       {GoldenStartUtcTicks, GoldenBytesId}},
+      {{FM::MarkerKind::SequenceEnd, 5u, 900u, FM::MarkerFlags::None, FP::TimeSpan{150'000'000}, FP::TimeSpan32{0}, FP::TimeSpan32{0u},
+        FP::TickCount64{0}, FP::TickCount64{0}, FP::TimeSpan32{80'000u}},
+       {}},
+      {{FM::MarkerKind::Sync, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::None, FP::TimeSpan{0}}, {}},
     }};
     constexpr std::array<int32_t, 4> ModuleSizes{2, 3, 4, 6};
 
@@ -331,11 +343,12 @@ namespace
         fileName += std::to_string(moduleSize);
         fileName += ".pgm";
         WritePgm(directory / fileName, image);
-        manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind) << ',' << request.Payload.RunId << ','
-                 << request.Payload.FrameIndex << ',' << static_cast<uint32_t>(request.Payload.Flags) << ',' << request.Payload.AnimationTicks << ','
-                 << request.Payload.PreferredFrameTicks << ',' << request.Payload.TargetFrameTicks << ',' << request.Payload.IntendedDisplayTicks
-                 << ',' << request.Payload.CpuStartTicks << ',' << request.Payload.CpuBusyTicks << ',' << request.Start.UtcTicks << ','
-                 << SequenceIdHex(request.Payload.Kind, request.Start.Id) << ',' << request.Options.ModuleSizePx() << ','
+        manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind()) << ',' << request.Payload.RunId() << ','
+                 << request.Payload.FrameIndex() << ',' << static_cast<uint32_t>(request.Payload.Flags()) << ','
+                 << request.Payload.AnimationTime().Ticks() << ',' << request.Payload.PreferredFrameTime().Ticks() << ','
+                 << request.Payload.TargetFrameTime().Ticks() << ',' << request.Payload.IntendedDisplayTime().Ticks() << ','
+                 << request.Payload.CpuStartTime().Ticks() << ',' << request.Payload.CpuBusy().Ticks() << ',' << request.Start.UtcTicks << ','
+                 << SequenceIdHex(request.Payload.Kind(), request.Start.Id) << ',' << request.Options.ModuleSizePx() << ','
                  << request.Options.QuietZoneModules() << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
                  << image.Height << '\n';
       }
@@ -366,6 +379,16 @@ int main(int argc, char* argv[])
     std::string goldenDirectory;
     int32_t moduleSize = FM::Options::DefaultModuleSizePx;
     int32_t quietZone = FM::Options::RecommendedQuietZoneModules;
+    FM::MarkerKind kind = FM::MarkerKind::Frame;
+    uint32_t runId = 0;
+    uint64_t frameIndex = 0;
+    FM::MarkerFlags flags = FM::MarkerFlags::None;
+    FP::TimeSpan animationTime;
+    FP::TimeSpan32 preferredFrameTime;
+    FP::TimeSpan32 targetFrameTime;
+    FP::TickCount64 intendedDisplayTime;
+    FP::TickCount64 cpuStartTime;
+    FP::TimeSpan32 cpuBusy;
 
     const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
     for (std::size_t i = 1; i < arguments.size(); ++i)
@@ -387,35 +410,35 @@ int main(int argc, char* argv[])
       }
       if (arg == "--frame")
       {
-        request.Payload.FrameIndex = ParseNumber<uint64_t>(next(), arg);
+        frameIndex = ParseNumber<uint64_t>(next(), arg);
       }
       else if (arg == "--ticks")
       {
-        request.Payload.AnimationTicks = ParseNumber<int64_t>(next(), arg);
+        animationTime = FP::TimeSpan(ParseNumber<int64_t>(next(), arg));
       }
       else if (arg == "--intended-ticks")
       {
-        request.Payload.IntendedDisplayTicks = ParseNumber<int64_t>(next(), arg);
+        intendedDisplayTime = FP::TickCount64(ParseNumber<int64_t>(next(), arg));
       }
       else if (arg == "--target-ticks")
       {
-        request.Payload.TargetFrameTicks = ParseNumber<uint32_t>(next(), arg);
+        targetFrameTime = FP::TimeSpan32(ParseNumber<uint32_t>(next(), arg));
       }
       else if (arg == "--cpu-start-ticks")
       {
-        request.Payload.CpuStartTicks = ParseNumber<int64_t>(next(), arg);
+        cpuStartTime = FP::TickCount64(ParseNumber<int64_t>(next(), arg));
       }
       else if (arg == "--cpu-busy-ticks")
       {
-        request.Payload.CpuBusyTicks = ParseNumber<uint32_t>(next(), arg);
+        cpuBusy = FP::TimeSpan32(ParseNumber<uint32_t>(next(), arg));
       }
       else if (arg == "--preferred-ticks")
       {
-        request.Payload.PreferredFrameTicks = ParseNumber<uint32_t>(next(), arg);
+        preferredFrameTime = FP::TimeSpan32(ParseNumber<uint32_t>(next(), arg));
       }
       else if (arg == "--flags")
       {
-        request.Payload.Flags = static_cast<FM::MarkerFlags>(ParseNumber<uint8_t>(next(), arg));
+        flags = static_cast<FM::MarkerFlags>(ParseNumber<uint8_t>(next(), arg));
       }
       else if (arg == "--sequence-id")
       {
@@ -435,26 +458,26 @@ int main(int argc, char* argv[])
       }
       else if (arg == "--run")
       {
-        request.Payload.RunId = ParseNumber<uint32_t>(next(), arg);
+        runId = ParseNumber<uint32_t>(next(), arg);
       }
       else if (arg == "--kind")
       {
-        const std::string_view kind = next();
-        if (kind == "frame")
+        const std::string_view kindName = next();
+        if (kindName == "frame")
         {
-          request.Payload.Kind = FM::MarkerKind::Frame;
+          kind = FM::MarkerKind::Frame;
         }
-        else if (kind == "start")
+        else if (kindName == "start")
         {
-          request.Payload.Kind = FM::MarkerKind::SequenceStart;
+          kind = FM::MarkerKind::SequenceStart;
         }
-        else if (kind == "end")
+        else if (kindName == "end")
         {
-          request.Payload.Kind = FM::MarkerKind::SequenceEnd;
+          kind = FM::MarkerKind::SequenceEnd;
         }
-        else if (kind == "sync")
+        else if (kindName == "sync")
         {
-          request.Payload.Kind = FM::MarkerKind::Sync;
+          kind = FM::MarkerKind::Sync;
         }
         else
         {
@@ -510,6 +533,8 @@ int main(int argc, char* argv[])
     {
       throw std::invalid_argument("Invalid module size or quiet zone");
     }
+    request.Payload =
+      FM::Payload(kind, runId, frameIndex, flags, animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime, cpuBusy);
     request.Options = FM::Options(moduleSize, quietZone);
     WritePgm(outputPath, Render(request));
     return 0;

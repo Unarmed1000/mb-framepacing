@@ -118,8 +118,8 @@ namespace
       if (record.TryDecodeMain(payload))
       {
         ++decodedPayloads;
-        frameIndexSum += static_cast<int64_t>(payload.FrameIndex);
-        animationTicksSum += payload.AnimationTicks;
+        frameIndexSum += static_cast<int64_t>(payload.FrameIndex());
+        animationTicksSum += payload.AnimationTime().Ticks();
       }
     }
     return {

@@ -69,8 +69,9 @@ A sync marker belongs to the main marker with the same run id and frame index.
 Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, or an unknown kind.
 
 `AnimationTicks` must come from the same clock the application's animation uses (its "game time"), not from a separate
-wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `std::llround(t * 10'000'000.0)` in C++, or
-`std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(d).count()`.
+wall clock. Examples: `TimeSpan.FromSeconds(t).Ticks` in C#, `MB::FramePacing::TimeSpan::FromSeconds(t)` in C++, or
+`MB::FramePacing::ToTimeSpan(d)` from `core/time/ChronoConversion.hpp` for a `std::chrono` duration (a finer one than
+ticks, such as nanoseconds, through `std::chrono::floor<MB::FramePacing::TickDuration>(d)` first).
 
 ### Frame pacing: intended display time, target frame time and preferred frame time
 
@@ -333,8 +334,10 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 // marker is drawn last, just before Present). 0 = unknown. MarkerFlags::StaticAfter when nothing animates while this frame is
 // on screen, MarkerFlags::StaticBefore when the application only now knows nothing animated while the previous frame was
 // The fields in the order of the wire format
-const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::None, animationTicks, preferredFrameTicks, targetFrameTicks,
-                          intendedDisplayTicks, cpuStartTicks, cpuBusyTicks);
+// The animation time is an FP::TimeSpan, the frame times and CPU busy FP::TimeSpan32, the intended display and CPU start time
+// FP::TickCount64 (all in 100 ns ticks)
+const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::None, animationTime, preferredFrameTime, targetFrameTime,
+                          intendedDisplayTime, cpuStartTime, cpuBusy);
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
 // MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
 // FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.

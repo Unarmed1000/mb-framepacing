@@ -8,12 +8,12 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace MB::FramePacing::Data::Detail
+namespace MB::FramePacing::Data::CaptureDataFormat
 {
-  inline constexpr uint32_t CaptureDataMagic = 0x4443424Du;    // "MBCD" little endian
-  inline constexpr uint16_t CaptureDataFormatVersion = 1;
-  inline constexpr std::size_t CaptureDataHeaderSize = 256;
-  inline constexpr std::size_t CaptureDataRecordSize = 192;
+  inline constexpr uint32_t Magic = 0x4443424Du;    // "MBCD" little endian
+  inline constexpr uint16_t Version = 1;
+  inline constexpr std::size_t HeaderSize = 256;
+  inline constexpr std::size_t RecordSize = 192;
   inline constexpr std::size_t MaxMarkerLocations = 4;
   //! Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes).
   inline constexpr std::size_t MainMarkerCapacity = 80;

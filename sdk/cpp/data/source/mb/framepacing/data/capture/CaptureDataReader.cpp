@@ -11,8 +11,6 @@
 
 namespace MB::FramePacing::Data
 {
-  using namespace Detail;
-
   CaptureDataReader::CaptureDataReader(const std::filesystem::path& path)
     : m_file(path, std::ios::binary)
   {
@@ -20,7 +18,7 @@ namespace MB::FramePacing::Data
     {
       throw std::runtime_error("Cannot open '" + path.string() + "'");
     }
-    std::array<uint8_t, CaptureDataHeaderSize> bytes{};
+    std::array<uint8_t, CaptureDataFormat::HeaderSize> bytes{};
     m_file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     if (m_file.gcount() != static_cast<std::streamsize>(bytes.size()))
     {
@@ -29,7 +27,7 @@ namespace MB::FramePacing::Data
     m_header = CaptureDataHeader::Parse(bytes);
     // A capture that was killed mid-write may end with a partial record; it is ignored
     const auto size = static_cast<int64_t>(std::filesystem::file_size(path));
-    m_recordCount = (size - static_cast<int64_t>(CaptureDataHeaderSize)) / static_cast<int64_t>(CaptureDataRecordSize);
+    m_recordCount = (size - static_cast<int64_t>(CaptureDataFormat::HeaderSize)) / static_cast<int64_t>(CaptureDataFormat::RecordSize);
   }
 
   CaptureDataRecord CaptureDataReader::ReadRecord(const int64_t index)
@@ -38,10 +36,10 @@ namespace MB::FramePacing::Data
     {
       throw std::out_of_range("Record " + std::to_string(index) + " of " + std::to_string(m_recordCount));
     }
-    std::array<uint8_t, CaptureDataRecordSize> bytes{};
+    std::array<uint8_t, CaptureDataFormat::RecordSize> bytes{};
     m_file.clear();
-    m_file.seekg(static_cast<std::streamoff>(CaptureDataHeaderSize) +
-                 (static_cast<std::streamoff>(index) * static_cast<std::streamoff>(CaptureDataRecordSize)));
+    m_file.seekg(static_cast<std::streamoff>(CaptureDataFormat::HeaderSize) +
+                 (static_cast<std::streamoff>(index) * static_cast<std::streamoff>(CaptureDataFormat::RecordSize)));
     m_file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     if (m_file.gcount() != static_cast<std::streamsize>(bytes.size()))
     {

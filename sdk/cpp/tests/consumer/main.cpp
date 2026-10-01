@@ -5,7 +5,9 @@
 // list (marker), parse a CSV time (data), and print what came out with the library version (core).
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/data/analysis/Milliseconds.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
@@ -32,12 +34,14 @@ int main()
   const FM::Options options{};
   const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080);
   FM::ModuleMatrix matrix;
-  const FM::Payload payload{FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::None, animationTicks, frameTicks, frameTicks};
+  const FM::Payload payload{
+    FM::MarkerKind::Frame,     1u, frameIndex, FM::MarkerFlags::None, FP::TimeSpan{animationTicks}, FP::TimeSpan32{frameTicks},
+    FP::TimeSpan32{frameTicks}};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
   const int64_t ticks = FP::Data::ParseTicks("16.6667");
   const std::string_view version = FP::GetLibraryVersion().Text;
   std::printf("mb_framepacing %.*s: %zu vertices, %lld ticks, a %u tick frame\n", static_cast<int>(version.size()), version.data(), count,
-              static_cast<long long>(ticks), static_cast<unsigned>(payload.TargetFrameTicks));
-  return count > 0 && ticks == 166'667 && payload.TargetFrameTicks == 166'667u ? 0 : 1;
+              static_cast<long long>(ticks), static_cast<unsigned>(payload.TargetFrameTime().Ticks()));
+  return count > 0 && ticks == 166'667 && payload.TargetFrameTime().Ticks() == 166'667u ? 0 : 1;
 }

@@ -3,8 +3,12 @@
 //
 // FrameMarker.hpp's functions: the payload's wire format (doc/marker-format.md: C# must match it byte for byte), the QR symbol and
 // every way of drawing it.
+#include <mb/framepacing/core/ByteSpanUtil.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
+#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -21,58 +25,37 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cassert>
 #include "detail/WireFormat.hpp"
 #include "qrcodegen.h"
 
 namespace MB::FramePacing::Marker
 {
-  using namespace Detail;
-
   namespace
   {
 
-    template <std::size_t TByteCount>
-    void WriteLE(const std::span<uint8_t> dst, const std::size_t offset, const uint64_t value) noexcept
-    {
-      for (std::size_t i = 0; i < TByteCount; ++i)
-      {
-        dst[offset + i] = static_cast<uint8_t>((value >> (8u * i)) & 0xFFu);
-      }
-    }
-
-    template <std::size_t TByteCount>
-    uint64_t ReadLE(const std::span<const uint8_t> src, const std::size_t offset) noexcept
-    {
-      uint64_t value = 0;
-      for (std::size_t i = 0; i < TByteCount; ++i)
-      {
-        value |= static_cast<uint64_t>(src[offset + i]) << (8u * i);
-      }
-      return value;
-    }
-
     //! The 53 byte header every kind starts with (a sync marker is its first 16 bytes: which run and frame).
-    std::array<uint8_t, PayloadByteCount> EncodeHeader(const Payload& payload) noexcept
+    std::array<uint8_t, WireFormat::PayloadByteCount> EncodeHeader(const Payload& payload) noexcept
     {
-      std::array<uint8_t, PayloadByteCount> bytes{};
-      bytes[OffsetMagic0] = PayloadMagic0;
-      bytes[OffsetMagic1] = PayloadMagic1;
-      bytes[OffsetVersion] = PayloadFormatVersion;
-      bytes[OffsetKind] = static_cast<uint8_t>(payload.Kind);
-      WriteLE<4>(bytes, OffsetRunId, payload.RunId);
-      WriteLE<8>(bytes, OffsetFrameIndex, payload.FrameIndex);
-      bytes[OffsetFlags] = static_cast<uint8_t>(payload.Flags);
+      std::array<uint8_t, WireFormat::PayloadByteCount> bytes{};
+      bytes[WireFormat::OffsetMagic0] = WireFormat::PayloadMagic0;
+      bytes[WireFormat::OffsetMagic1] = WireFormat::PayloadMagic1;
+      bytes[WireFormat::OffsetVersion] = WireFormat::PayloadFormatVersion;
+      bytes[WireFormat::OffsetKind] = static_cast<uint8_t>(payload.Kind());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetRunId, payload.RunId());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetFrameIndex, payload.FrameIndex());
+      bytes[WireFormat::OffsetFlags] = static_cast<uint8_t>(payload.Flags());
       // Two's complement, identical to C# BinaryPrimitives.WriteInt64LittleEndian
-      WriteLE<8>(bytes, OffsetAnimationTicks, static_cast<uint64_t>(payload.AnimationTicks));
-      WriteLE<4>(bytes, OffsetPreferredFrameTicks, payload.PreferredFrameTicks);
-      WriteLE<4>(bytes, OffsetTargetFrameTicks, payload.TargetFrameTicks);
-      WriteLE<8>(bytes, OffsetIntendedDisplayTicks, static_cast<uint64_t>(payload.IntendedDisplayTicks));
-      WriteLE<8>(bytes, OffsetCpuStartTicks, static_cast<uint64_t>(payload.CpuStartTicks));
-      WriteLE<4>(bytes, OffsetCpuBusyTicks, payload.CpuBusyTicks);
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetAnimationTicks, payload.AnimationTime().Ticks());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetPreferredFrameTicks, payload.PreferredFrameTime().Ticks());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetTargetFrameTicks, payload.TargetFrameTime().Ticks());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetIntendedDisplayTicks, payload.IntendedDisplayTime().UnsignedTicks());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuStartTicks, payload.CpuStartTime().UnsignedTicks());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuBusyTicks, payload.CpuBusy().Ticks());
       return bytes;
     }
 
-    constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(QrVersion);
+    constexpr std::size_t QrBufferLength = qrcodegen_BUFFER_LEN_FOR_VERSION(WireFormat::QrVersion);
 
     static_assert(Payload::MaxEncodedByteCount <= QrBufferLength);
     static_assert(ModuleMatrix::MainSize == 41);
@@ -273,76 +256,80 @@ namespace MB::FramePacing::Marker
 
   std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, const std::span<uint8_t> dst) noexcept
   {
-    const bool isStart = payload.Kind == MarkerKind::SequenceStart;
-    const std::size_t byteCount = isStart ? StartPayloadByteCount : payload.Kind == MarkerKind::Sync ? SyncPayloadByteCount : PayloadByteCount;
-    if (dst.size() < byteCount)
+    const bool isStart = payload.Kind() == MarkerKind::SequenceStart;
+    const std::size_t byteCount = isStart                              ? WireFormat::StartPayloadByteCount
+                                  : payload.Kind() == MarkerKind::Sync ? WireFormat::SyncPayloadByteCount
+                                                                       : WireFormat::PayloadByteCount;
+    if (static_cast<uint8_t>(payload.Kind()) > WireFormat::MaxMarkerKindValue || dst.size() < byteCount)
     {
       return 0;
     }
 
     // A sync marker is the start of the header: magic, format version, kind, run id and frame index
-    const std::array<uint8_t, PayloadByteCount> header = EncodeHeader(payload);
-    std::copy_n(header.begin(), std::min(byteCount, PayloadByteCount), dst.begin());
+    const std::array<uint8_t, WireFormat::PayloadByteCount> header = EncodeHeader(payload);
+    std::copy_n(header.begin(), std::min(byteCount, WireFormat::PayloadByteCount), dst.begin());
     if (isStart)
     {
-      WriteLE<8>(dst, OffsetStartUtcTicks, static_cast<uint64_t>(metadata.UtcTicks));
-      std::copy_n(metadata.Id.Bytes.begin(), SequenceId::ByteCount, dst.subspan(OffsetSequenceId).begin());
+      ByteSpanUtil::WriteLE(dst, WireFormat::OffsetStartUtcTicks, metadata.UtcTicks);
+      std::copy_n(metadata.Id.Bytes.begin(), SequenceId::ByteCount, dst.subspan(WireFormat::OffsetSequenceId).begin());
     }
     return byteCount;
   }
 
   bool TryDecodePayload(const std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* const pMetadata) noexcept
   {
-    if (bytes.size() < SyncPayloadByteCount || bytes[OffsetMagic0] != PayloadMagic0 || bytes[OffsetMagic1] != PayloadMagic1 ||
-        bytes[OffsetVersion] != PayloadFormatVersion || bytes[OffsetKind] > MaxMarkerKindValue)
+    if (bytes.size() < WireFormat::SyncPayloadByteCount || bytes[WireFormat::OffsetMagic0] != WireFormat::PayloadMagic0 ||
+        bytes[WireFormat::OffsetMagic1] != WireFormat::PayloadMagic1 || bytes[WireFormat::OffsetVersion] != WireFormat::PayloadFormatVersion ||
+        bytes[WireFormat::OffsetKind] > WireFormat::MaxMarkerKindValue)
     {
       return false;
     }
 
-    const auto kind = static_cast<MarkerKind>(bytes[OffsetKind]);
+    const auto kind = static_cast<MarkerKind>(bytes[WireFormat::OffsetKind]);
     if (kind == MarkerKind::Sync)
     {
-      if (bytes.size() != SyncPayloadByteCount)
+      if (bytes.size() != WireFormat::SyncPayloadByteCount)
       {
         return false;
       }
-      rPayload = Payload{kind, static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId)), ReadLE<8>(bytes, OffsetFrameIndex), MarkerFlags::None, 0};
+      rPayload = Payload{kind, ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRunId),
+                         ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex), MarkerFlags::None, TimeSpan()};
       if (pMetadata != nullptr)
       {
         *pMetadata = StartMetadata{};
       }
       return true;
     }
-    if (bytes.size() < PayloadByteCount)
+    if (bytes.size() < WireFormat::PayloadByteCount)
     {
       return false;
     }
     StartMetadata metadata;
     if (kind == MarkerKind::SequenceStart)
     {
-      if (bytes.size() != StartPayloadByteCount)
+      if (bytes.size() != WireFormat::StartPayloadByteCount)
       {
         return false;
       }
-      metadata.UtcTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetStartUtcTicks));
-      std::copy_n(bytes.subspan(OffsetSequenceId).begin(), SequenceId::ByteCount, metadata.Id.Bytes.begin());
+      metadata.UtcTicks = ByteSpanUtil::ReadLE<int64_t>(bytes, WireFormat::OffsetStartUtcTicks);
+      std::copy_n(bytes.subspan(WireFormat::OffsetSequenceId).begin(), SequenceId::ByteCount, metadata.Id.Bytes.begin());
     }
-    else if (bytes.size() != PayloadByteCount)
+    else if (bytes.size() != WireFormat::PayloadByteCount)
     {
       return false;
     }
 
-    rPayload.Kind = kind;
-    rPayload.RunId = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetRunId));
-    rPayload.FrameIndex = ReadLE<8>(bytes, OffsetFrameIndex);
-    // Every value is accepted: bits without a name are reserved and kept
-    rPayload.Flags = static_cast<MarkerFlags>(bytes[OffsetFlags]);
-    rPayload.AnimationTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetAnimationTicks));
-    rPayload.PreferredFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetPreferredFrameTicks));
-    rPayload.TargetFrameTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetTargetFrameTicks));
-    rPayload.IntendedDisplayTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetIntendedDisplayTicks));
-    rPayload.CpuStartTicks = static_cast<int64_t>(ReadLE<8>(bytes, OffsetCpuStartTicks));
-    rPayload.CpuBusyTicks = static_cast<uint32_t>(ReadLE<4>(bytes, OffsetCpuBusyTicks));
+    // Every flags value is accepted: bits without a name are reserved and kept
+    rPayload = Payload{kind,
+                       ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRunId),
+                       ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex),
+                       static_cast<MarkerFlags>(bytes[WireFormat::OffsetFlags]),
+                       TimeSpan(ByteSpanUtil::ReadLE<int64_t>(bytes, WireFormat::OffsetAnimationTicks)),
+                       TimeSpan32(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetPreferredFrameTicks)),
+                       TimeSpan32(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetTargetFrameTicks)),
+                       TickCount64::FromUnsignedTicks(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetIntendedDisplayTicks)),
+                       TickCount64::FromUnsignedTicks(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetCpuStartTicks)),
+                       TimeSpan32(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetCpuBusyTicks))};
     if (pMetadata != nullptr)
     {
       *pMetadata = metadata;
@@ -361,11 +348,11 @@ namespace MB::FramePacing::Marker
     }
 
     // Every kind is pinned to one version, so the symbol never changes size between frames.
-    const int32_t version = payload.Kind == MarkerKind::Sync ? SyncQrVersion : QrVersion;
-    if (!qrcodegen_encodeBinary(dataAndTemp.data(), byteCount, qrCode.data(), qrcodegen_Ecc_MEDIUM, version, version, qrcodegen_Mask_AUTO, false))
-    {
-      return false;
-    }
+    const int32_t version = payload.Kind() == MarkerKind::Sync ? WireFormat::SyncQrVersion : WireFormat::QrVersion;
+    // Cannot fail: every kind's bytes fit its version (WireFormat::QrCapacityBytes, WireFormat::SyncQrCapacityBytes)
+    [[maybe_unused]] const bool encoded =
+      qrcodegen_encodeBinary(dataAndTemp.data(), byteCount, qrCode.data(), qrcodegen_Ecc_MEDIUM, version, version, qrcodegen_Mask_AUTO, false);
+    assert(encoded);
 
     // Pack the symbol: row-major, most significant bit first, continuous across rows
     const int32_t size = qrcodegen_getSize(qrCode.data());

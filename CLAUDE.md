@@ -13,7 +13,9 @@ The repository has two parts, and the license follows them (see Conventions):
   - **pacer** (C++ `MB::FramePacing::Pacer`, C# `MB.FramePacing.Pacer`): plans every frame on the display's refreshes with the adaptive swap interval rule
     (Swappy's, and mb-framepacing-explained's fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
-    `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; 100 % test coverage, measured with llvm-cov, C# assembly `MB.FramePacing`, Python
+    `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
+    byte count from the type) for every module's file and wire formats; the core and the marker module have 100 % test coverage
+    (regions, functions, lines, branches), measured with llvm-cov without asserts (`NDEBUG`), C# assembly `MB.FramePacing`, Python
     `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
     helper). The core's types hide same-named types that a `using` brings into `MB.FramePacing.*` code: the GUI writes `Avalonia.Point`.
 - **`measure/`** holds the .NET tools that **measure**: they record a capture card through ffmpeg and analyse the markers.
@@ -93,7 +95,8 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`
     (no umbrella headers: callers include each type's header; functions live in a header of their own, e.g. `marker/FrameMarker.hpp`, as
     C#'s static classes), sources mirroring them (`source/mb/framepacing/<module>/<Name>.cpp`, one per header; private helpers in
-    `source/.../detail/`), namespaces
+    `source/.../detail/`, in a namespace named for what they are, such as `Marker::WireFormat` and `Data::CaptureDataFormat`, and named in
+    full at every use: no `using namespace`), namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
 COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
     Each module's tests are their own executable (the marker's allocation test replaces the global `operator new`).
@@ -290,7 +293,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     into the static frame is judged. Independent flags, not an enum; bits 2 to 7 are reserved (write 0, decoders keep them).
   - **Field order:** every payload type (C++ and C# `Payload`, Python `Payload`, the tools' `MarkerPayload`) lists its fields in the
     order of the wire format: kind, run id, frame index, flags, animation time (required by every constructor; C++ also has a default
-    constructor and stays trivially copyable and standard layout), then the optional
+    constructor and stays trivially copyable and standard layout: private fields read through getters, `WithKind` for another kind; the
+    constructor asserts the kind and `EncodePayload` refuses an unknown one, the flags are kept as given), then the optional
     preferred frame time, target frame time, intended display time, CPU start time and CPU busy. The golden CSVs' columns
     (`sdk/test-data/markers`) and the docs' field lists follow it; keep new fields in their wire position.
   - **Frame rates describe the frames that animate:** a static frame's time on screen (the next frame's display time step, flag

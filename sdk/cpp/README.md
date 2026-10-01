@@ -81,7 +81,7 @@ FM::ModuleMatrix matrix;
 std::array<uint32_t, FM::MaxIndexCount()> indices;
 
 // Every frame, last (after post effects and UI), without blending:
-const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::None, animationTicks);
+const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::None, animationTime);   // an FP::TimeSpan
 FM::GenerateModules(payload, matrix);                                      // encode once
 const std::size_t count = FM::ModulesToGridIndices(matrix, indices);       // only the indices change
 DrawIndexed(indices.data(), count);      // triangles over the static vertices
@@ -95,12 +95,12 @@ faster still.
 - **Flags (optional):** `MarkerFlags::StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags::StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame).
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`MB::FramePacing::TimeSpan::TicksPerSecond`).
-- **Frame pacing (optional):** `PreferredFrameTicks` (the interval the application wants to run at; it differs from the target only
-  while the pacer runs slower than wanted), `TargetFrameTicks` (the interval the pacer aims for: `166'667` for 60 fps) and
-  `IntendedDisplayTicks` (when the pacer intends the frame to be shown, 100 ns ticks on its steady clock, any epoch; the SDK never
-  reads a clock: `TickCount64::FromNanoseconds`, `TickCount64::FromCounter` or `core/time/ChronoConversion.hpp` convert yours). `0` = unknown, `OnDemandFrameTicks` = frames only when something changes.
-- **CPU start time and CPU busy (optional):** `CpuStartTicks` (when the CPU started working on the frame, on the same clock,
-  PresentMon's `CPUStartTime`) and `CpuBusyTicks` (how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
+- **Frame pacing (optional):** `PreferredFrameTime` (a `TimeSpan32`: the interval the application wants to run at; it differs from the target only
+  while the pacer runs slower than wanted), `TargetFrameTime` (a `TimeSpan32`: the interval the pacer aims for, `166'667` ticks for 60 fps) and
+  `IntendedDisplayTime` (a `TickCount64`: when the pacer intends the frame to be shown on its steady clock, any epoch; the SDK never
+  reads a clock: `TickCount64::FromNanoseconds`, `TickCount64::FromCounter` or `core/time/ChronoConversion.hpp` convert yours). `0` = unknown, `Payload::OnDemandFrameTime` = frames only when something changes.
+- **CPU start time and CPU busy (optional):** `CpuStartTime` (a `TickCount64`: when the CPU started working on the frame, on the same clock,
+  PresentMon's `CPUStartTime`) and `CpuBusy` (a `TimeSpan32`: how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
   (`GenerateModules(payload, matrix, {utcTicks, sequenceId})`), and a payload of kind `MarkerKind::SequenceEnd`, each shown for a few
   frames. The sequence id is 16 opaque bytes unique to the run: a UUID's bytes, or a text tag of up to 16 printable ASCII characters
@@ -156,7 +156,7 @@ for (const FD::CaptureDataRecord& record : reader.ReadAll())
   MB::FramePacing::Marker::Payload payload;
   if (record.TryDecodeMain(payload))
   {
-    // payload.FrameIndex, payload.AnimationTicks, ...
+    // payload.FrameIndex(), payload.AnimationTime(), ...
   }
 }
 ```

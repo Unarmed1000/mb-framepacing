@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# The core module: the types every module shares (the library version, the tick units, the time types, Point and Rectangle).
+# The core module: the types every module shares (the library version, the time types, Point, Rectangle and ByteSpanUtil).
 
 add_library(mb_framepacing_core STATIC)
 add_library(mb_framepacing::core ALIAS mb_framepacing_core)
@@ -13,6 +13,7 @@ target_sources(mb_framepacing_core
     FILE_SET HEADERS
     BASE_DIRS include ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}
     FILES
+      include/mb/framepacing/core/ByteSpanUtil.hpp
       include/mb/framepacing/core/GetLibraryVersion.hpp
       include/mb/framepacing/core/LibraryVersion.hpp
       include/mb/framepacing/core/Point.hpp
@@ -33,6 +34,7 @@ install(TARGETS mb_framepacing_core EXPORT mb_framepacingTargets
 if(MB_FRAMEPACING_BUILD_TESTS)
   add_executable(mb_framepacing_core_tests
     tests/AllocationTests.cpp
+    tests/ByteSpanUtilTests.cpp
     tests/CoreTests.cpp
     tests/time/ChronoConversionTests.cpp
     tests/time/TickCount32Tests.cpp

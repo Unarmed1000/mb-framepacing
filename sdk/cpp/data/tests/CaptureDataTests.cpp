@@ -29,13 +29,13 @@ namespace
     }
   }
 
-  std::vector<uint8_t> HeaderBytes(const uint16_t version = FD::Detail::CaptureDataFormatVersion, const uint32_t markers = 1)
+  std::vector<uint8_t> HeaderBytes(const uint16_t version = FD::CaptureDataFormat::Version, const uint32_t markers = 1)
   {
-    std::vector<uint8_t> bytes(FD::Detail::CaptureDataHeaderSize);
-    Put(bytes, 0, FD::Detail::CaptureDataMagic, 4);
+    std::vector<uint8_t> bytes(FD::CaptureDataFormat::HeaderSize);
+    Put(bytes, 0, FD::CaptureDataFormat::Magic, 4);
     Put(bytes, 4, version, 2);
-    Put(bytes, 6, FD::Detail::CaptureDataHeaderSize, 2);
-    Put(bytes, 8, FD::Detail::CaptureDataRecordSize, 4);
+    Put(bytes, 6, FD::CaptureDataFormat::HeaderSize, 2);
+    Put(bytes, 8, FD::CaptureDataFormat::RecordSize, 4);
     Put(bytes, 12, 3, 4);
     Put(bytes, 16, 960, 4);
     Put(bytes, 20, 540, 4);
@@ -63,7 +63,7 @@ namespace
   std::vector<uint8_t> RecordBytes(const int64_t index, const int64_t device, const uint8_t status, const std::vector<uint8_t>& main,
                                    const std::vector<uint8_t>& second)
   {
-    std::vector<uint8_t> bytes(FD::Detail::CaptureDataRecordSize);
+    std::vector<uint8_t> bytes(FD::CaptureDataFormat::RecordSize);
     Put(bytes, 0, static_cast<uint64_t>(index), 8);
     Put(bytes, 8, static_cast<uint64_t>(index * 100), 8);
     Put(bytes, 16, static_cast<uint64_t>(device), 8);
@@ -79,7 +79,7 @@ namespace
 
 TEST(CaptureData, TheHeaderFieldsAreWhereTheFormatSays)
 {
-  const auto header = FD::CaptureDataHeader::Parse(HeaderBytes(FD::Detail::CaptureDataFormatVersion, 2));
+  const auto header = FD::CaptureDataHeader::Parse(HeaderBytes(FD::CaptureDataFormat::Version, 2));
   EXPECT_EQ(header.Width, 960);
   EXPECT_EQ(header.Height, 540);
   EXPECT_EQ(header.FrameRateNumerator, 60000u);
@@ -98,31 +98,31 @@ TEST(CaptureData, NewerAndForeignFilesAreRefused)
 {
   try
   {
-    (void)FD::CaptureDataHeader::Parse(HeaderBytes(FD::Detail::CaptureDataFormatVersion + 1));
+    (void)FD::CaptureDataHeader::Parse(HeaderBytes(FD::CaptureDataFormat::Version + 1));
     FAIL() << "a newer format was read";
   }
   catch (const FD::DataFormatError& error)
   {
     EXPECT_NE(std::string(error.what()).find("update"), std::string::npos);
   }
-  EXPECT_THROW((void)FD::CaptureDataHeader::Parse(std::vector<uint8_t>(FD::Detail::CaptureDataHeaderSize)), FD::DataFormatError);
-  EXPECT_THROW((void)FD::CaptureDataHeader::Parse(HeaderBytes(FD::Detail::CaptureDataFormatVersion, 5)), FD::DataFormatError);
+  EXPECT_THROW((void)FD::CaptureDataHeader::Parse(std::vector<uint8_t>(FD::CaptureDataFormat::HeaderSize)), FD::DataFormatError);
+  EXPECT_THROW((void)FD::CaptureDataHeader::Parse(HeaderBytes(FD::CaptureDataFormat::Version, 5)), FD::DataFormatError);
 }
 
 TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
 {
-  std::vector<uint8_t> main(FD::Detail::MainMarkerCapacity);
+  std::vector<uint8_t> main(FD::CaptureDataFormat::MainMarkerCapacity);
   for (std::size_t i = 0; i < main.size(); ++i)
   {
     main[i] = static_cast<uint8_t>(i);
   }
-  const std::vector<uint8_t> second(FD::Detail::SecondMarkerCapacity, 0x5Au);
+  const std::vector<uint8_t> second(FD::CaptureDataFormat::SecondMarkerCapacity, 0x5Au);
   auto file = HeaderBytes();
   for (const auto& record : {RecordBytes(0, 200, 1, main, second), RecordBytes(2, FD::CaptureDataRecord::UnknownTicks, 0, {}, {})})
   {
     file.insert(file.end(), record.begin(), record.end());
   }
-  file.resize(file.size() + (FD::Detail::CaptureDataRecordSize / 2));
+  file.resize(file.size() + (FD::CaptureDataFormat::RecordSize / 2));
 
   const auto path = std::filesystem::temp_directory_path() / "mb_framepacing_data_test.mbcd";
   {

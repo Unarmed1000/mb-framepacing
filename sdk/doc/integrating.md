@@ -125,8 +125,8 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
-  const int64_t ticks = std::llround(animationSeconds * MB::FramePacing::TimeSpan::TicksPerSecond); // the time your animation used
-  FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, ticks}, matrix);
+  const FP::TimeSpan animationTime = FP::TimeSpan::FromSeconds(animationSeconds); // the time your animation used
+  FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, animationTime}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 }
@@ -182,7 +182,7 @@ the static frame, so an animation clock that pauses while idle does not look lik
 the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock ticks, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
 does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
-presents only when something changes writes `FM::OnDemandFrameTicks` for both frame times. Without a pacer of your own, the SDK's
+presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. Without a pacer of your own, the SDK's
 [frame pacer](pacer.md) (`mb_framepacing::pacer`) plans every frame and hands you these values, and an animation time in whole
 refreshes.
 
@@ -193,8 +193,10 @@ in the order of the wire format: the kind, run id, frame index, flags and animat
 
 ```cpp
 // Kind, run id, frame index, flags, animation time; then preferred and target frame time, intended display time, CPU start and busy
+// The animation time is an FP::TimeSpan, the frame times and CPU busy FP::TimeSpan32, the intended display and CPU start time
+// FP::TickCount64 (all in 100 ns ticks)
 const FM::Payload payload(FM::MarkerKind::Frame, runId, frameIndex, nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None,
-                          ticks, preferredFrameTicks, targetFrameTicks, intendedDisplayTicks, cpuStartTicks, cpuBusyTicks);
+                          animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime, cpuBusy);
 ```
 
 What to write in each field, for typical frame pacers, is in [Filling the marker fields](marker-fields.md).
@@ -205,7 +207,7 @@ and frame index. The analysis flags tearing when the two disagree, and a camera 
 ```cpp
 const FP::Point syncOrigin = options.RecommendedOrigin(FM::MarkerKind::Sync, 1080, 2);
 FM::ModuleMatrix sync;
-FM::GenerateModules({FM::MarkerKind::Sync, runId, frameIndex, FM::MarkerFlags::None, 0}, sync);
+FM::GenerateModules(payload.WithKind(FM::MarkerKind::Sync), sync);   // the main marker's run id and frame index
 const std::size_t syncCount = FM::ModulesToTriangles(sync, options, syncOrigin, vertices);
 ```
 
@@ -239,7 +241,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, std::llround(animationSeconds * MB::FramePacing::TimeSpan::TicksPerSecond));
+  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, FP::TimeSpan::FromSeconds(animationSeconds));
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }

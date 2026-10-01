@@ -74,12 +74,9 @@ namespace MB::FramePacing::Marker
       ModuleMatrix matrix;
       matrix.m_size = size;
       std::copy_n(bits.begin(), byteCount, matrix.m_bits.begin());
-      // Zero the padding, so equal symbols compare equal
-      const auto usedBits = static_cast<uint32_t>((static_cast<std::size_t>(size) * static_cast<std::size_t>(size)) % 8u);
-      if (usedBits != 0u)
-      {
-        matrix.m_bits[byteCount - 1u] = static_cast<uint8_t>(matrix.m_bits[byteCount - 1u] & static_cast<uint8_t>(0xFFu << (8u - usedBits)));
-      }
+      // Zero the padding, so equal symbols compare equal. A QR size is odd and an odd square is 1 more than a multiple of 8, so the last
+      // byte always holds 1 module and 7 bits of padding.
+      matrix.m_bits[byteCount - 1u] = static_cast<uint8_t>(matrix.m_bits[byteCount - 1u] & 0x80u);
       rMatrix = matrix;
       return true;
     }

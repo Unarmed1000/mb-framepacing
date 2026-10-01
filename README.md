@@ -121,12 +121,12 @@ namespace FM = MB::FramePacing::Marker;
 
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 FM::ModuleMatrix matrix;
-FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, animationTicks}, matrix);   // encode once
+FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, animationTime}, matrix);    // encode once
 const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);        // draw it
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
 
-`frameIndex` counts rendered frames, `animationTicks` is the time the frame was animated for (100 ns ticks).
+`frameIndex` counts rendered frames, `animationTime` is the time the frame was animated for (an `MB::FramePacing::TimeSpan`).
 
 - **C++:** see **[Integrating the marker](sdk/doc/integrating.md)** for adding the library with CMake (a release archive, git,
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.

@@ -13,7 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace MB::FramePacing::Marker::Detail
+namespace MB::FramePacing::Marker::WireFormat
 {
   //! Every main marker (frame, start and end) is QR version 6 (41x41 modules), ECC level M, byte mode, so it never changes size; the
   //! sync marker is QR version 2 (25x25 modules), ECC level M.
@@ -27,6 +27,8 @@ namespace MB::FramePacing::Marker::Detail
   //! QR version 6-M in byte mode holds 106 bytes: a frame or end marker uses PayloadByteCount of them, a start marker
   //! StartPayloadByteCount; the rest is room for future fields.
   inline constexpr std::size_t QrCapacityBytes = 106;
+  //! QR version 2-M in byte mode holds 26 bytes: a sync marker uses SyncPayloadByteCount of them.
+  inline constexpr std::size_t SyncQrCapacityBytes = 26;
 
   inline constexpr uint8_t PayloadMagic0 = 'M';
   inline constexpr uint8_t PayloadMagic1 = 'F';
@@ -69,6 +71,7 @@ namespace MB::FramePacing::Marker::Detail
   static_assert(StartPayloadByteCount == 77u);
   static_assert(StartPayloadByteCount == Payload::MaxEncodedByteCount);
   static_assert(Payload::MaxEncodedByteCount <= QrCapacityBytes);
+  static_assert(SyncPayloadByteCount <= SyncQrCapacityBytes);
 }
 
 #endif

@@ -31,7 +31,6 @@ target_sources(mb_framepacing_data
     source/mb/framepacing/data/analysis/detail/CsvTable.cpp
     source/mb/framepacing/data/analysis/detail/CsvTable.hpp
     source/mb/framepacing/data/capture/detail/CaptureDataFormat.hpp
-    source/mb/framepacing/data/capture/detail/LittleEndian.hpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include

@@ -62,7 +62,8 @@ namespace MB::FramePacing::Marker
 
   //! Serialize a complete payload into dst (Payload::MaxEncodedByteCount bytes is always enough). Start markers append the metadata, other
   //! kinds ignore it. A frame or end marker is 53 bytes, a start marker 77, a sync marker 16
-  //! (doc/marker-format.md). Returns the number of bytes written, or 0 if dst is too small.
+  //! (doc/marker-format.md). Returns the number of bytes written, or 0 if dst is too small or the payload's kind is not a
+  //! MarkerKind.
   std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, std::span<uint8_t> dst) noexcept;
 
   //! Parse the wire format. Returns false on a wrong length, magic, format version or an unknown kind.
