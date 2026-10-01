@@ -104,6 +104,14 @@ dotnet test sdk/csharp/marker/UnitTest
 NUnit, including the golden images, the cross-language module digest and zero-allocation tests. The golden data is found by walking
 up from the test directory to `test-data/markers`.
 
+The benchmarks (`Benchmarks`, BenchmarkDotNet) time every per-frame step, as the C++ module's do: encoding (`EncodePayload`,
+`TryGenerateModules` for a frame, start and sync marker), every way to draw a matrix, bitmaps in every pixel format, and a whole
+frame (encode and draw the main and the sync marker):
+
+```sh
+dotnet run -c Release --project sdk/csharp/marker/Benchmarks/MB.FramePacing.Marker.Benchmarks.csproj -- --filter "*"
+```
+
 ## License
 
 BSD 3-Clause ([LICENSE](../../LICENSE)). The QR encoder (`source/QrEncoder.cs`) is a port of the QR Code generator library by Project

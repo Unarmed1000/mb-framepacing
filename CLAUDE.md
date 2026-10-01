@@ -112,7 +112,9 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     measurement (`--update-doc size-*.json` takes them). Refresh the table in the change that alters a module's size.
   - **Benchmarks:** `sdk/cpp/marker/benchmarks` (Google Benchmark 1.9.5 through FetchContent, `MB_FRAMEPACING_BUILD_BENCHMARKS`, off
     by default, on in the `windows` and `linux-sanitize` presets): encoding, every drawing output, a whole frame. CI builds them
-    (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally.
+    (`cpp-analysis`) but never runs them: timings on shared runners are noise. Run a Release build locally. The C# marker has the
+    same groups with BenchmarkDotNet (`sdk/csharp/marker/Benchmarks`, built with the solution; `Benchmarks` folders, like `UnitTest`,
+    are kept out of their library's compile by the root `Directory.Build.props`).
   - Clang's `-Wconversion` includes `-Wsign-conversion` (GCC's and MSVC's do not), so macOS CI can fail where Windows and Linux
     pass: shift and combine small unsigned types after casting them to `uint32_t`.
   - The `linux-sanitize` preset (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, compile database) is what CI runs the tests

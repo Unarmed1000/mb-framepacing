@@ -20,6 +20,7 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="measure/tools/Benchmarks/Benchmarks.csproj" />
+    <Project Path="sdk/csharp/marker/Benchmarks/MB.FramePacing.Marker.Benchmarks.csproj" />
     <Project Path="measure/tools/DocImages/DocImages.csproj" />
   </Folder>
   <Folder Name="/tests/">
