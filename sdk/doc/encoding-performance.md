@@ -1,8 +1,9 @@
 # Encoding performance: how the marker's QR encoder was made faster
 
-An application encodes two QR symbols every frame: the main marker (QR version 6, 41×41 modules) and the sync marker (version 2,
-25×25). Measured with the benchmarks, that encoding took far longer than everything else the marker does: about 0.33 ms for a main
-marker and 0.11 ms for a sync marker, while drawing either takes a few microseconds.
+An application encodes up to two QR symbols every frame: the main marker (QR version 6, 41×41 modules) and, when it draws one, the
+sync marker (version 2, 25×25: required for a camera, optional for a capture card). Measured with the benchmarks, that encoding took
+far longer than everything else the marker does: about 0.33 ms for a main marker and 0.11 ms for a sync marker, while drawing either
+takes a few microseconds.
 
 The C++ and C# marker modules now have a QR encoder made for the marker. It produces **exactly the same symbols** as the encoders it
 replaces (in C++ the [QR Code generator library](https://www.nayuki.io/page/qr-code-generator-library) by Project Nayuki, qrcodegen;
