@@ -91,17 +91,17 @@ class GeometryTests(unittest.TestCase):
     def test_recommended_origins(self) -> None:
         options = Options()
         # The main marker top-left, the sync marker bottom-left
-        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1920, 1080), Point(32, 32))
-        self.assertEqual(options.recommended_origin(MarkerKind.SEQUENCE_START, 1920, 1080), Point(32, 32))
-        self.assertEqual(options.recommended_origin(MarkerKind.SEQUENCE_END, 1920, 1080), Point(32, 32))
-        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 1920, 1080), Point(32, 1080 - 32 - 198))
+        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1080), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.SEQUENCE_START, 1080), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.SEQUENCE_END, 1080), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 1080), Point(32, 1080 - 32 - 198))
         # Aligned to a 3:1 downscale ratio
-        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1920, 1080, 3), Point(33, 33))
-        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 1920, 1080, 3), Point(33, 849))
-        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1920, 1080, 4), Point(32, 32))
+        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1080, 3), Point(33, 33))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 1080, 3), Point(33, 849))
+        self.assertEqual(options.recommended_origin(MarkerKind.FRAME, 1080, 4), Point(32, 32))
         # A frame lower than the marker: C# and C++ truncate toward zero, Python's // would floor
-        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 100, 100), Point(32, -130))
-        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 100, 100, 3), Point(33, -129))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 100), Point(32, -130))
+        self.assertEqual(options.recommended_origin(MarkerKind.SYNC, 100, 3), Point(33, -129))
 
     def test_every_main_marker_kind_is_version_6(self) -> None:
         for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):

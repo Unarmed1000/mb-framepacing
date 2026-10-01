@@ -57,11 +57,10 @@ class Options:
         marker is smaller."""
         return (qr_module_count_for(kind) + (2 * self.quiet_zone_modules)) * self.module_size_px
 
-    def recommended_origin(self, kind: MarkerKind, source_width: int, source_height: int, align_px: int = 1) -> Point:
-        """Recommended origin of a marker in a `source_width` x `source_height` output: the main marker (frame, start and end) top-left,
-        the sync marker bottom-left, RECOMMENDED_INSET_PX from the edges. `align_px` should be the capture's integer downscale ratio (1 if
+    def recommended_origin(self, kind: MarkerKind, source_height: int, align_px: int = 1) -> Point:
+        """Recommended origin of a marker in an output `source_height` pixels high: the main marker (frame, start and end) top-left, the
+        sync marker bottom-left, RECOMMENDED_INSET_PX from the edges. `align_px` should be the capture's integer downscale ratio (1 if
         none) so module edges land on stored pixel edges."""
-        del source_width  # the markers sit at the left edge; the width is part of the API as in the C# and C++ libraries
         inset = _align_up(RECOMMENDED_INSET_PX, align_px)
         if kind == MarkerKind.SYNC:
             return Point(inset, _align_down(source_height - inset - self.marker_size_px(kind), align_px))

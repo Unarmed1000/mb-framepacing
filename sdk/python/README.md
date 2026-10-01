@@ -29,7 +29,7 @@ from mb_framepacing.marker import (
 )
 
 options = Options(module_size_px=3)
-origin = options.recommended_origin(MarkerKind.FRAME, width, height)
+origin = options.recommended_origin(MarkerKind.FRAME, height)
 
 # Every frame, last (after post effects and UI), without blending:
 matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))  # encode once
@@ -62,7 +62,7 @@ intended_display_ticks=...)` carries the interval the application wants to run a
   25×25 modules: `options.marker_size_px(MarkerKind.SYNC)` is `33 × module_size_px` (198 px for 6 px modules).
 
 ```python
-sync_origin = options.recommended_origin(MarkerKind.SYNC, width, height)  # bottom-left
+sync_origin = options.recommended_origin(MarkerKind.SYNC, height)  # bottom-left
 sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NONE, 0))  # the main marker's run id and frame index
 modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFormat.R8G8B8)
 ```
