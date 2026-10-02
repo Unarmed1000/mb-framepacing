@@ -4,18 +4,20 @@
 // The timing diagrams of mb-framepacing-explained (tools/timing_diagrams/generate_diagrams.py, doc/frame-pacing-strategies.md) as tests:
 // their frames, swap intervals and clock readings, and the display refreshes and animation times they show. A diagram's frame model: 60 Hz,
 // the first frame starts 0.2 refresh into the refresh before it is shown, every other frame when the previous one is shown; a frame is
-// shown at the first refresh after it is done, and no sooner than its swap interval after the previous one. The vsync timer animates it
-// for the previous frame's display plus its swap interval.
+// shown at the first refresh after it is done, and no sooner than its swap interval after the previous one. The vsync timer (the
+// animation clock) animates it for the previous frame's display plus its swap interval.
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
 #include <mb/framepacing/pacer/animation/AnimationTime.hpp>
+#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
@@ -25,7 +27,9 @@ namespace PC = MB::FramePacing::Pacer;
 
 namespace
 {
-  constexpr PC::RefreshPeriod Hz60 = PC::RefreshPeriod::FromRate(60);
+  const PC::RefreshPeriod g_hz60 = PC::RefreshPeriod::FromRate(60);
+  //! A hundredth of a 60 Hz refresh, the diagrams' unit, as a period of its own
+  const PC::RefreshPeriod g_unit = PC::RefreshPeriod::FromRate(6'000);
   //! The diagrams' unit: 100 is one refresh
   constexpr int64_t Period = 100;
   constexpr int64_t FirstStart = 20;
@@ -52,8 +56,7 @@ namespace
   //! A time in units as ticks on the steady clock
   int64_t Ticks(const int64_t units) noexcept
   {
-    const int64_t scaled = units * Hz60.TicksQ32() / Period;
-    return Origin + ((scaled + (PC::RefreshPeriod::OneTickQ32 / 2)) >> 32);
+    return units >= 0 ? Origin + g_unit.TimeFor(units).Ticks() : Origin - g_unit.TimeFor(-units).Ticks();
   }
 
   //! a / b rounded up (b > 0)
@@ -90,16 +93,16 @@ namespace
     return frames;
   }
 
-  //! The vsync timer without a pacer: every frame's measured wake-up (its start, or its clock reading) and swap interval
+  //! The vsync timer without a pacer: every frame's measured start (when it starts, or its clock reading) and swap interval
   std::vector<int64_t> MeasuredAnimation(const std::vector<DiagramFrame>& frames, const std::vector<FrameTimes>& times)
   {
-    PC::AnimationClock clock(Hz60);
+    PC::PacerAnimationClock clock(g_hz60, FP::TimeSpan(2 * FP::TimeSpan::TicksPerSecond));
     std::vector<int64_t> animation;
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
-      const int64_t wakeUp = Ticks(times[index].Start) + frames[index].TimerErrorTicks;
-      const PC::AnimationTime time = clock.AdvanceMeasured(wakeUp, frames[index].SwapInterval);
-      animation.push_back(Hz60.NearestRefreshes(time.AnimationTicks));
+      const int64_t start = Ticks(times[index].Start) + frames[index].TimerErrorTicks;
+      const PC::AnimationTime time = clock.Advance(FP::TickCount64(start), static_cast<uint32_t>(frames[index].SwapInterval));
+      animation.push_back(g_hz60.NearestRefreshes(time.Time));
     }
     return animation;
   }
@@ -194,30 +197,32 @@ TEST(Diagrams, RecoveringAtHalfRateAndWithPerFrameTargets)
 
 TEST(Diagrams, ThePacerPlansTheDiagramsFramesAtAFixedSwapInterval)
 {
-  // slow-frames and half-rate-even paced by the pacer (its interval fixed): it aims every frame where the diagram's frame is aimed, infers
-  // the late frames from their Present, and the animation clock steps by its plan
+  // slow-frames and half-rate-even paced by the pacer (its interval fixed): it aims every frame where the diagram's frame is aimed,
+  // measures the late frames from the frame starts, and animates each for its predicted display time
   for (const auto& [frames, interval] : {std::pair{Frames("ABCDEF", {75, 125, 75, 75, 125, 75}, {1, 1, 1, 1, 1, 1}), int64_t{1}},
                                          std::pair{Frames("ABCD", {150, 150, 150, 150}, {2, 2, 2, 2}), int64_t{2}}})
   {
-    PC::PacerSettings settings(Hz60);
+    PC::PacerSettings settings(g_hz60);
     settings.SetPreferredSwapInterval(static_cast<uint32_t>(interval));
     settings.SetAutoSwapInterval(false);
     PC::FramePacer pacer(settings);
-    PC::AnimationClock clock(Hz60);
     const auto times = Simulate(frames);
-    // The first frame is told the vsync its predecessor was shown at: it starts in that refresh. The pacer's grid starts there, on a whole
-    // tick, so its slots are that vsync plus whole refreshes rounded to the tick
-    const int64_t firstVsync = Ticks(-interval * Period);
+    uint32_t lateFrames = 0;
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
       const int64_t start = Ticks(times[index].Start);
-      const int64_t vsync = index == 0 ? firstVsync : 0;
-      const PC::FrameSchedule schedule = pacer.BeginFrame({start, vsync});
+      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::TickCount64(start));
       const int64_t work = Ticks(frames[index].Render) - Origin;
-      (void)pacer.EndFrame({start + work, work});
-      const PC::AnimationTime animation = clock.Advance(schedule);
-      EXPECT_EQ(schedule.IntendedDisplayTicks, firstVsync + Hz60.TicksFor(times[index].Animation + interval)) << frames[index].Name;
-      EXPECT_EQ(Hz60.NearestRefreshes(animation.AnimationTicks), times[index].Animation - times[0].Animation) << frames[index].Name;
+      static_cast<void>(pacer.EndFrame(FP::TickCount64(start + work), FP::TimeSpan(work)));
+      // Every frame but the first starts when the previous one is shown, so it is aimed at the refresh the diagram aims it at, to the tick
+      // the two roundings allow. The first starts 0.2 refresh into its refresh: without a vsync time the pacer cannot know that
+      if (index > 0)
+      {
+        EXPECT_LE(std::abs(schedule.IntendedDisplayTime.Ticks() - Ticks(times[index].Animation * Period)), 1) << frames[index].Name;
+        lateFrames += times[index - 1].Shown > times[index - 1].Animation ? 1u : 0u;
+      }
+      EXPECT_EQ(g_hz60.NearestRefreshes(schedule.AnimationTime), times[index].Animation - times[0].Animation) << frames[index].Name;
+      EXPECT_EQ(pacer.FrameWindow().LateFrames, lateFrames) << frames[index].Name;
     }
   }
 }

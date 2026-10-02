@@ -1,14 +1,11 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include "PacerSimulation.hpp"
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
-#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
-#include <mb/framepacing/pacer/frame/FrameEnd.hpp>
-#include <mb/framepacing/pacer/frame/FrameInput.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <algorithm>
 #include <cstddef>
@@ -57,8 +54,8 @@ namespace MB::FramePacing::Pacer::Simulation
     //! The first refresh at or after ticks (from refresh 0 at 0)
     int64_t FirstRefreshAtOrAfter(const RefreshPeriod period, const int64_t ticks) noexcept
     {
-      const int64_t refresh = period.FloorRefreshes(ticks);
-      return period.TicksFor(refresh) < ticks ? refresh + 1 : refresh;
+      const int64_t refresh = period.FloorRefreshes(TimeSpan(ticks));
+      return period.TimeFor(refresh).Ticks() < ticks ? refresh + 1 : refresh;
     }
 
     std::string_view ChangeName(const SwapIntervalChange change) noexcept
@@ -201,7 +198,6 @@ namespace MB::FramePacing::Pacer::Simulation
     settings.SetSlowDown(rule);
     settings.SetAutoSwapInterval(scenario.AutoSwapInterval);
     FramePacer pacer(settings);
-    AnimationClock clock(period);
     SplitMix64 random(scenario.Seed);
 
     const std::size_t passFrames = scenario.Frames.size();
@@ -238,19 +234,19 @@ namespace MB::FramePacing::Pacer::Simulation
         source.WorkTicks = Draw(random, stage != scenario.Stages.end() ? *stage : scenario.Calm);
       }
 
-      const FrameSchedule schedule = pacer.BeginFrame({now});
-      const WindowState window = pacer.Window();
-      const int64_t target = period.NearestRefreshes(schedule.IntendedDisplayTicks - StartTicks);
+      const FrameSchedule schedule = pacer.BeginFrame(TickCount64(now));
+      const FrameWindowState window = pacer.FrameWindow();
+      const int64_t intendedDisplayTicks = schedule.IntendedDisplayTime.Ticks();
+      const int64_t target = period.NearestRefreshes(TimeSpan(intendedDisplayTicks - StartTicks));
       const int64_t done = now + source.WorkTicks;
       const int64_t shown = std::max(target, FirstRefreshAtOrAfter(period, done - StartTicks));
-      pacer.EndFrame({done, source.WorkTicks});
-      const AnimationTime animation = clock.Advance(schedule);
+      static_cast<void>(pacer.EndFrame(TickCount64(done), TimeSpan(source.WorkTicks)));
 
       out << frame << ',' << source.WorkTicks << ',' << target << ',' << shown << ',' << (shown > target ? 1 : 0) << ',' << schedule.SwapInterval
-          << ',' << ChangeName(schedule.Change) << ',' << schedule.IntendedDisplayTicks << ',' << animation.AnimationTicks << ',' << window.Frames
-          << ',' << window.LateFrames << ',' << source.ReferenceSwapInterval << ',' << source.ReferenceShownRefresh << '\n';
+          << ',' << ChangeName(schedule.Change) << ',' << intendedDisplayTicks << ',' << schedule.AnimationTime.Ticks() << ',' << window.Frames << ','
+          << window.LateFrames << ',' << source.ReferenceSwapInterval << ',' << source.ReferenceShownRefresh << '\n';
       // The next frame starts when this one is shown
-      now = StartTicks + period.TicksFor(shown);
+      now = StartTicks + period.TimeFor(shown).Ticks();
     }
     return out.str();
   }

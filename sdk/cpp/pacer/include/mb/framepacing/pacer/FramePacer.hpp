@@ -3,60 +3,62 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/frame/FrameEnd.hpp>
-#include <mb/framepacing/pacer/frame/FrameInput.hpp>
+#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
-#include <mb/framepacing/pacer/rule/WindowState.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
 {
-  //! Paces frames on a grid of refreshes (sdk/doc/pacer.md). Every frame: BeginFrame with what the platform knows, apply the schedule
-  //! (a swap interval, a present time, or sleep until EarliestPresentTicks), draw, EndFrame when presenting. The pacer aims every frame at
-  //! the refresh one swap interval after the previous frame's, and the swap interval rule adapts the interval to how long frames take.
-  //! Values in, values out: the pacer calls no platform API. Made once (it allocates the rule's window); nothing after that allocates.
+  //! EXPERIMENTAL: checked against its own simulation only, never against a real swap chain (sdk/doc/pacer.md).
+  //!
+  //! Paces a frame loop with nothing but a steady clock and a Present that waits for vsync: the baseline that works on any platform.
+  //! Every frame: BeginFrame with the time the frame starts, hold the frame for the schedule's swap interval and render it for the
+  //! schedule's animation time, EndFrame when presenting. The pacer measures on the CPU's clock when frames start, counts in whole
+  //! refreshes on the display's (PacerAnimationClock), and adapts the swap interval to how the frames do (SwapIntervalRule), from the frame
+  //! rate the application prefers down.
+  //!
+  //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); nothing
+  //! after that allocates.
   class FramePacer
   {
     SwapIntervalRule m_rule;
-    RefreshPeriod m_period;
-    // The refresh grid: refresh m_originSlot is at m_originTicks + m_originFraction / 2^32 ticks
-    int64_t m_originTicks{0};
-    uint32_t m_originFraction{0};
-    int64_t m_originSlot{0};
-    bool m_started{false};
-    uint64_t m_nextFrameIndex{0};
+    PacerAnimationClock m_clock;
     // The frame between BeginFrame and the next BeginFrame
+    TickCount64 m_cpuStartTime;
+    TimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
-    int64_t m_targetSlot{0};
-    int64_t m_cpuStartTicks{0};
-    int64_t m_presentTicks{0};
-    int64_t m_workTicks{0};
 
   public:
     explicit FramePacer(const PacerSettings& settings);
 
-    //! Start a frame: the previous frame's display is resolved (from PreviousDisplayTicks, or inferred from its Present), the rule
-    //! decides, and this frame is planned.
-    FrameSchedule BeginFrame(const FrameInput& input) noexcept;
+    //! Start a frame, at cpuStartTime on the application's steady clock: the previous frame is measured (how many refreshes after the
+    //! frame before it it was shown, so whether it was late), the rule decides, and this frame is planned.
+    FrameSchedule BeginFrame(TickCount64 cpuStartTime) noexcept;
 
-    //! The frame is presented now. Returns the CPU busy time (PresentTicks - the frame's CpuStartTicks) for the marker.
-    uint32_t EndFrame(const FrameEnd& end) noexcept;
+    //! The frame is presented now, at presentTime on the same clock. work: how long the frame needed, as the rule should count it (the
+    //! CPU's and the GPU's time, or whatever the application measures); zero takes the CPU busy time. Returns the CPU busy time
+    //! (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
+    TimeSpan32 EndFrame(TickCount64 presentTime, TimeSpan work = {}) noexcept;
 
-    //! The display's refresh period changed (a mode change, another monitor): the pacer starts again on a new grid with an empty window
-    //! at the preferred swap interval. The frame count goes on. The period the pacer has already changes nothing. A platform that
-    //! reports the period with every frame passes it in FrameInput::RefreshPeriodNanoseconds instead.
+    //! The display's refresh period changed (a mode change, another monitor): the pacer starts again on it, with an empty window, at the
+    //! swap interval the application prefers there. The animation time goes on. The period the pacer has already changes nothing.
     void SetRefreshPeriod(RefreshPeriod period) noexcept;
 
-    //! Start again (after a pause): the next frame is planned as the first, the window is empty, the swap interval the preferred one.
+    //! Start again (after a pause the application knows of): the next frame is planned as the first, the window is empty, the swap
+    //! interval the preferred one. The animation time goes on.
     void Reset() noexcept;
 
-    [[nodiscard]] WindowState Window() const noexcept
+    [[nodiscard]] FrameWindowState FrameWindow() const noexcept
     {
-      return m_rule.Window();
+      return m_rule.FrameWindow();
     }
 
     //! The swap interval the next frame is paced at.
@@ -68,7 +70,7 @@ namespace MB::FramePacing::Pacer
     //! The refresh period the pacer paces at now (PacerSettings::Refresh until the period changes).
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
-      return m_period;
+      return m_rule.Refresh();
     }
 
     //! The settings the pacer was made with.
@@ -76,15 +78,6 @@ namespace MB::FramePacing::Pacer
     {
       return m_rule.Settings();
     }
-
-  private:
-    [[nodiscard]] int64_t SlotTicks(int64_t slot) const noexcept;
-    [[nodiscard]] int64_t SlotAtOrBefore(int64_t ticks) const noexcept;
-    [[nodiscard]] int64_t SlotAtOrAfter(int64_t ticks) const noexcept;
-    [[nodiscard]] int64_t NearestSlot(int64_t ticks) const noexcept;
-    [[nodiscard]] bool IsNearGrid(int64_t ticks) const noexcept;
-    void Anchor(int64_t ticks, int64_t slot) noexcept;
-    void MoveOrigin(int64_t slot) noexcept;
   };
 }
 

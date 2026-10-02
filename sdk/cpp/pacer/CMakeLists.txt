@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# The pacer module: paces frames on a grid of refreshes with an adaptive swap interval, and aligns the animation timer to the refreshes.
+# The pacer module (EXPERIMENTAL): paces a frame loop with a steady clock and a Present that waits for vsync: an animation timer in
+# whole refreshes, an adaptive swap interval, a target frame rate.
 # No dependencies besides the core, no allocations per frame.
 
 add_library(mb_framepacing_pacer STATIC)
@@ -8,25 +9,28 @@ add_library(mb_framepacing::pacer ALIAS mb_framepacing_pacer)
 set_target_properties(mb_framepacing_pacer PROPERTIES EXPORT_NAME pacer POSITION_INDEPENDENT_CODE ON)
 target_sources(mb_framepacing_pacer
   PRIVATE
-    source/mb/framepacing/pacer/animation/AnimationClock.cpp
+    source/mb/framepacing/pacer/animation/PacerAnimationClock.cpp
     source/mb/framepacing/pacer/FramePacer.cpp
+    source/mb/framepacing/pacer/PacerSettings.cpp
+    source/mb/framepacing/pacer/RefreshPeriod.cpp
+    source/mb/framepacing/pacer/RefreshTime.cpp
     source/mb/framepacing/pacer/rule/SwapIntervalRule.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/pacer/animation/AnimationClock.hpp
+      include/mb/framepacing/pacer/animation/PacerAnimationClock.hpp
       include/mb/framepacing/pacer/animation/AnimationTime.hpp
-      include/mb/framepacing/pacer/frame/FrameEnd.hpp
-      include/mb/framepacing/pacer/frame/FrameInput.hpp
+      include/mb/framepacing/pacer/animation/FrameMeasurement.hpp
       include/mb/framepacing/pacer/FramePacer.hpp
       include/mb/framepacing/pacer/frame/FrameSchedule.hpp
       include/mb/framepacing/pacer/PacerSettings.hpp
       include/mb/framepacing/pacer/RefreshPeriod.hpp
+      include/mb/framepacing/pacer/RefreshTime.hpp
       include/mb/framepacing/pacer/rule/SlowDownRule.hpp
       include/mb/framepacing/pacer/rule/SwapIntervalChange.hpp
       include/mb/framepacing/pacer/rule/SwapIntervalRule.hpp
-      include/mb/framepacing/pacer/rule/WindowState.hpp)
+      include/mb/framepacing/pacer/rule/FrameWindowState.hpp)
 target_compile_features(mb_framepacing_pacer PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_pacer PUBLIC mb_framepacing::core)
 target_compile_options(mb_framepacing_pacer PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})

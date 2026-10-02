@@ -7,7 +7,7 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! What the swap interval rule decided on a frame.
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What the swap interval rule decided on a frame.
   enum class SwapIntervalChange : uint8_t
   {
     None = 0,

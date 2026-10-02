@@ -1,0 +1,90 @@
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// EXPERIMENTAL. The pacer's animation clock of sdk/doc/pacer.md: frame starts measured on the CPU's clock, counted in whole refreshes on
+// the display's.
+#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
+#include <algorithm>
+
+namespace MB::FramePacing::Pacer
+{
+  PacerAnimationClock::PacerAnimationClock(const RefreshPeriod period, const TimeSpan longestGap, const TimeSpan start) noexcept
+    : m_period(period)
+    , m_longestGap(longestGap)
+    , m_animationTime(start)
+    , m_current{start, TimeSpan(), 0}
+  {
+  }
+
+  AnimationTime PacerAnimationClock::Advance(const TickCount64 frameStartTime, const uint32_t swapInterval) noexcept
+  {
+    static_cast<void>(Measure(frameStartTime));
+    return Step(swapInterval);
+  }
+
+  FrameMeasurement PacerAnimationClock::Measure(const TickCount64 frameStartTime) noexcept
+  {
+    m_measurement = FrameMeasurement{};
+    if (m_hasLast)
+    {
+      // The frame starts when the previous one is shown, so the time between two starts is the refreshes between two displays: the
+      // previous frame was aimed its swap interval after the frame before it, and can not have been shown sooner
+      const TimeSpan gap = frameStartTime - m_lastStartTime;
+      const TimeSpan reach = std::max(m_longestGap, m_period.TimeFor(int64_t{2} * m_lastSwapInterval));
+      if (gap >= TimeSpan() && gap <= reach)
+      {
+        const auto refreshes = static_cast<uint32_t>(std::max(m_period.NearestRefreshes(gap), int64_t{m_lastSwapInterval}));
+        m_displayTime.Add(refreshes, m_period);
+        m_measurement.Restarted = false;
+        m_measurement.Refreshes = refreshes;
+        m_measurement.Late = refreshes > m_lastSwapInterval;
+      }
+    }
+    m_measurement.DisplayTime = m_displayTime.ToTimeSpan();
+    m_lastStartTime = frameStartTime;
+    m_hasLast = true;
+    return m_measurement;
+  }
+
+  AnimationTime PacerAnimationClock::Step(const uint32_t swapInterval) noexcept
+  {
+    const uint32_t interval = std::max(swapInterval, 1u);
+    // The previous frame's display plus this frame's swap interval. The previous frame animated for the display before it plus its own
+    // swap interval, so the step is the refreshes measured, minus its swap interval, plus this frame's
+    uint32_t refreshes = interval;
+    if (!m_stepped)
+    {
+      refreshes = 0;
+    }
+    else if (!m_measurement.Restarted)
+    {
+      refreshes = m_measurement.Refreshes - m_lastSwapInterval + interval;
+    }
+    m_stepped = true;
+    m_lastSwapInterval = interval;
+    m_measurement = FrameMeasurement{};
+
+    const TimeSpan before = m_animationTime.ToTimeSpan();
+    m_animationTime.Add(refreshes, m_period);
+    const TimeSpan after = m_animationTime.ToTimeSpan();
+    m_current = AnimationTime{after, TimeSpan(after.Ticks() - before.Ticks()), refreshes};
+    return m_current;
+  }
+
+  void PacerAnimationClock::SetRefreshPeriod(const RefreshPeriod period) noexcept
+  {
+    m_period = period;
+    Restart();
+  }
+
+  void PacerAnimationClock::Restart() noexcept
+  {
+    m_hasLast = false;
+    m_measurement = FrameMeasurement{};
+  }
+
+  TimeSpan PacerAnimationClock::DisplayTimeAfter(const uint32_t refreshes) const noexcept
+  {
+    return m_displayTime.After(refreshes, m_period).ToTimeSpan();
+  }
+}

@@ -6,167 +6,133 @@
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
-#include <algorithm>
-#include <cassert>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
 {
-  //! How a FramePacer paces. The display's refresh period is required; every other value has a default, the rule's being those of
-  //! the adaptive swap interval rule the mb-framepacing-explained repository describes and simulates: they are
-  //! settings, not properties of frame pacing in general. Always valid: every setter asserts that its value is within its range; without
-  //! asserts it clamps a value outside into it. The ranges keep the rule's arithmetic within 64 bits.
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). How a FramePacer paces. The display's refresh period is required; every other value
+  //! has a default, the rule's being those of the adaptive swap interval rule the mb-framepacing-explained repository describes and
+  //! simulates: they are settings, not properties of frame pacing in general. Always valid: every setter asserts that its value is within
+  //! its range; without asserts it clamps a value outside into it.
   class PacerSettings
   {
     RefreshPeriod m_refresh;
+    TimeSpan m_preferredFrameTime;
     uint32_t m_preferredSwapInterval{1};
     bool m_autoSwapInterval{true};
     SlowDownRule m_slowDown{SlowDownRule::LateCount};
-    int64_t m_windowTicks{2 * TimeSpan::TicksPerSecond};
+    TimeSpan m_frameWindowLength{2 * TimeSpan::TicksPerSecond};
     uint32_t m_slowDownLatePercent{10};
-    int64_t m_frameMarginTicks{TimeSpan::TicksPerMillisecond};
-    int64_t m_slowestFrameTicks{50 * TimeSpan::TicksPerMillisecond};
-    int64_t m_presentLatencyTicks{0};
-    uint32_t m_windowCapacity{0};
+    TimeSpan m_frameMargin{TimeSpan::TicksPerMillisecond};
+    TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
-    static constexpr int64_t MaxWindowTicks = 60 * TimeSpan::TicksPerSecond;
+    static constexpr TimeSpan MaxPreferredFrameTime{10 * TimeSpan::TicksPerSecond};
+    static constexpr TimeSpan MinFrameWindowLength{1};
+    static constexpr TimeSpan MaxFrameWindowLength{60 * TimeSpan::TicksPerSecond};
     static constexpr uint32_t MaxSlowDownLatePercent = 100;
-    static constexpr int64_t MaxFrameMarginTicks = TimeSpan::TicksPerSecond;
-    static constexpr int64_t MaxSlowestFrameTicks = 10 * TimeSpan::TicksPerSecond;
-    static constexpr int64_t MaxPresentLatencyTicks = TimeSpan::TicksPerSecond;
-    static constexpr uint32_t MinWindowCapacity = 2;
-    static constexpr uint32_t MaxWindowCapacity = 1u << 20u;
+    static constexpr TimeSpan MaxFrameMargin{TimeSpan::TicksPerSecond};
+    static constexpr TimeSpan MaxSlowestFrameTime{10 * TimeSpan::TicksPerSecond};
 
     //! The display's refresh period, from its display mode (a DXGI output mode, Display.getRefreshRate, wl_output's mode).
-    constexpr explicit PacerSettings(const RefreshPeriod refresh) noexcept
+    explicit PacerSettings(const RefreshPeriod refresh) noexcept
       : m_refresh(refresh)
     {
     }
 
     //! The display's refresh period.
-    [[nodiscard]] constexpr RefreshPeriod Refresh() const noexcept
+    [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
       return m_refresh;
     }
 
-    constexpr void SetRefresh(const RefreshPeriod refresh) noexcept
+    void SetRefresh(const RefreshPeriod refresh) noexcept
     {
       m_refresh = refresh;
     }
 
-    //! The swap interval the application wants, in refreshes: 1 = every refresh (1 to MaxSwapInterval). The pacer never goes faster;
-    //! PreferredSwapInterval refreshes are the marker's preferred frame time.
-    [[nodiscard]] constexpr uint32_t PreferredSwapInterval() const noexcept
+    //! The frame time the application wants: its target frame rate, as the time of one frame (0 to MaxPreferredFrameTime). 0, the
+    //! default: none, the display's rate. The pacer holds every frame for the whole refreshes that frame time needs on the display it
+    //! runs on (PreferredSwapIntervalAt) and never runs faster.
+    [[nodiscard]] TimeSpan PreferredFrameTime() const noexcept
+    {
+      return m_preferredFrameTime;
+    }
+
+    void SetPreferredFrameTime(TimeSpan frameTime) noexcept;
+
+    //! The target frame rate as numerator / denominator frames a second: 30, or 30000 / 1001. From 0.1 fps; a numerator or denominator
+    //! of 0 is outside (SetPreferredFrameTime({}) for none).
+    void SetPreferredFrameRate(uint32_t numerator, uint32_t denominator = 1) noexcept;
+
+    //! The swap interval the application wants, in refreshes: 1 = every refresh (1 to MaxSwapInterval): half rate on any display is 2.
+    //! With a preferred frame time as well, the slower of the two counts.
+    [[nodiscard]] uint32_t PreferredSwapInterval() const noexcept
     {
       return m_preferredSwapInterval;
     }
 
-    constexpr void SetPreferredSwapInterval(const uint32_t swapInterval) noexcept
-    {
-      assert(swapInterval >= 1u && swapInterval <= MaxSwapInterval);
-      m_preferredSwapInterval = std::clamp(swapInterval, 1u, MaxSwapInterval);
-    }
+    void SetPreferredSwapInterval(uint32_t swapInterval) noexcept;
 
-    //! Adapt the swap interval to the frames (the rule). false: always PreferredSwapInterval.
-    [[nodiscard]] constexpr bool AutoSwapInterval() const noexcept
+    //! The swap interval the application wants on a display with this refresh period: the pacer's fastest, and the marker's preferred
+    //! frame time. The preferred frame time in whole refreshes, rounded up, with a twentieth of a refresh of slack (so 60 fps on a
+    //! 59.94 Hz display is every refresh, and 60 fps on 144 Hz every third: never faster than asked), and at least the preferred swap
+    //! interval; at most MaxSwapInterval. The rounding is the one the tools judge a target frame rate by.
+    [[nodiscard]] uint32_t PreferredSwapIntervalAt(RefreshPeriod refresh) const noexcept;
+
+    //! Adapt the swap interval to the frames (the rule). false: always the preferred one, a fixed frame rate.
+    [[nodiscard]] bool AutoSwapInterval() const noexcept
     {
       return m_autoSwapInterval;
     }
 
-    constexpr void SetAutoSwapInterval(const bool autoSwapInterval) noexcept
+    void SetAutoSwapInterval(const bool autoSwapInterval) noexcept
     {
       m_autoSwapInterval = autoSwapInterval;
     }
 
     //! When the rule slows down (SlowDownRule).
-    [[nodiscard]] constexpr SlowDownRule SlowDown() const noexcept
+    [[nodiscard]] SlowDownRule SlowDown() const noexcept
     {
       return m_slowDown;
     }
 
-    constexpr void SetSlowDown(const SlowDownRule rule) noexcept
+    void SetSlowDown(SlowDownRule rule) noexcept;
+
+    //! How long a stretch of frames the rule looks at: its frame window (MinFrameWindowLength to MaxFrameWindowLength). A frame that
+    //! begins longer than this after the previous one starts again with an empty frame window.
+    [[nodiscard]] TimeSpan FrameWindowLength() const noexcept
     {
-      const bool known = rule == SlowDownRule::LateCount || rule == SlowDownRule::FullWindow;
-      assert(known);
-      m_slowDown = known ? rule : SlowDownRule::LateCount;
+      return m_frameWindowLength;
     }
 
-    //! How long a stretch of frames the rule looks at (1 tick to MaxWindowTicks).
-    [[nodiscard]] constexpr int64_t WindowTicks() const noexcept
-    {
-      return m_windowTicks;
-    }
+    void SetFrameWindowLength(TimeSpan length) noexcept;
 
-    constexpr void SetWindowTicks(const int64_t ticks) noexcept
-    {
-      assert(ticks >= 1 && ticks <= MaxWindowTicks);
-      m_windowTicks = std::clamp(ticks, int64_t{1}, MaxWindowTicks);
-    }
-
-    //! The rule slows down when more than this share of the window's frames was late (percent, 0 to 100).
-    [[nodiscard]] constexpr uint32_t SlowDownLatePercent() const noexcept
+    //! The rule slows down when more than this share of the frame window's frames was late (percent, 0 to 100).
+    [[nodiscard]] uint32_t SlowDownLatePercent() const noexcept
     {
       return m_slowDownLatePercent;
     }
 
-    constexpr void SetSlowDownLatePercent(const uint32_t percent) noexcept
-    {
-      assert(percent <= MaxSlowDownLatePercent);
-      m_slowDownLatePercent = std::min(percent, MaxSlowDownLatePercent);
-    }
+    void SetSlowDownLatePercent(uint32_t percent) noexcept;
 
     //! Added to the frames' average work time before it is compared with swap intervals, and asked for as room to spare to speed up (0
-    //! to MaxFrameMarginTicks).
-    [[nodiscard]] constexpr int64_t FrameMarginTicks() const noexcept
+    //! to MaxFrameMargin).
+    [[nodiscard]] TimeSpan FrameMargin() const noexcept
     {
-      return m_frameMarginTicks;
+      return m_frameMargin;
     }
 
-    constexpr void SetFrameMarginTicks(const int64_t ticks) noexcept
+    void SetFrameMargin(TimeSpan margin) noexcept;
+
+    //! The rule slows down no further once the current swap interval is longer than this plus the margin (0 to MaxSlowestFrameTime).
+    [[nodiscard]] TimeSpan SlowestFrameTime() const noexcept
     {
-      assert(ticks >= 0 && ticks <= MaxFrameMarginTicks);
-      m_frameMarginTicks = std::clamp(ticks, int64_t{0}, MaxFrameMarginTicks);
+      return m_slowestFrameTime;
     }
 
-    //! The rule slows down no further once the current swap interval is longer than this plus the margin (0 to MaxSlowestFrameTicks).
-    [[nodiscard]] constexpr int64_t SlowestFrameTicks() const noexcept
-    {
-      return m_slowestFrameTicks;
-    }
-
-    constexpr void SetSlowestFrameTicks(const int64_t ticks) noexcept
-    {
-      assert(ticks >= 0 && ticks <= MaxSlowestFrameTicks);
-      m_slowestFrameTicks = std::clamp(ticks, int64_t{0}, MaxSlowestFrameTicks);
-    }
-
-    //! Without display-time feedback: how long after Present a frame can be shown at the earliest (0 to MaxPresentLatencyTicks). 0: at the
-    //! next refresh.
-    [[nodiscard]] constexpr int64_t PresentLatencyTicks() const noexcept
-    {
-      return m_presentLatencyTicks;
-    }
-
-    constexpr void SetPresentLatencyTicks(const int64_t ticks) noexcept
-    {
-      assert(ticks >= 0 && ticks <= MaxPresentLatencyTicks);
-      m_presentLatencyTicks = std::clamp(ticks, int64_t{0}, MaxPresentLatencyTicks);
-    }
-
-    //! Frames the rule's window can hold (MinWindowCapacity to MaxWindowCapacity); 0: enough for WindowTicks at the preferred swap
-    //! interval, twice over (room for a faster display mode). Allocated once, when the pacer is made.
-    [[nodiscard]] constexpr uint32_t WindowCapacity() const noexcept
-    {
-      return m_windowCapacity;
-    }
-
-    constexpr void SetWindowCapacity(const uint32_t frames) noexcept
-    {
-      assert(frames == 0u || (frames >= MinWindowCapacity && frames <= MaxWindowCapacity));
-      m_windowCapacity = frames == 0u ? 0u : std::clamp(frames, MinWindowCapacity, MaxWindowCapacity);
-    }
+    void SetSlowestFrameTime(TimeSpan frameTime) noexcept;
 
     constexpr bool operator==(const PacerSettings&) const noexcept = default;
   };

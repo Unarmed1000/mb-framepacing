@@ -3,19 +3,21 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
 {
-  //! The time a frame animates for (AnimationClock).
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). The time a frame animates for (PacerAnimationClock).
   struct AnimationTime
   {
-    //! The animation time in ticks: the marker's animation time.
-    int64_t AnimationTicks{0};
+    //! The animation time: the frame's predicted display time on the display's clock. Render the frame for it; it is the marker's
+    //! animation time.
+    TimeSpan Time;
     //! The step from the previous frame's animation time.
-    int64_t StepTicks{0};
+    TimeSpan Step;
     //! The step in whole refreshes.
-    int64_t StepRefreshes{0};
+    uint32_t StepRefreshes{0};
   };
 }
 

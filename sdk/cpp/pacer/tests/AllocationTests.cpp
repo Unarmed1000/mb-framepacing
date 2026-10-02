@@ -3,12 +3,12 @@
 //
 // The pacer runs every frame, so it must never allocate after it is made. This test binary links the counting global operator new/delete
 // (mb_framepacing_test_support) and checks that every per-frame call stays at zero allocations.
+#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/animation/AnimationClock.hpp>
-#include <mb/framepacing/pacer/frame/FrameInput.hpp>
+#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <mb/framepacing/testing/AllocationCounter.hpp>
@@ -42,8 +42,7 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       copy.SetSlowDown(PC::SlowDownRule::FullWindow);
       return copy;
     }());
-  PC::AnimationClock clock(settings.Refresh(), 0, 30);
-  PC::AnimationClock measuredClock(settings.Refresh());
+  PC::PacerAnimationClock clock(settings.Refresh(), settings.FrameWindowLength());
 
   int64_t written = 0;
   {
@@ -54,31 +53,23 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       // Calm frames, then a busy stretch (every third frame over a refresh), the rule slowing down and speeding up again
       const bool busy = (frame / 600) % 2 == 1;
       const int64_t work = busy && frame % 3 == 0 ? 220'000 : 90'000;
-      PC::FrameInput input{now};
-      if (frame % 97 == 0)
-      {
-        input.VsyncTicks = now;
-      }
-      const PC::FrameSchedule schedule = pacer.BeginFrame(input);
-      written += static_cast<int64_t>(pacer.EndFrame({now + work, work}));
-      const PC::FrameSchedule other = fullWindowPacer.BeginFrame({now, 0, frame % 5 == 0 ? schedule.EarliestPresentTicks : 0, 0});
-      written += static_cast<int64_t>(fullWindowPacer.EndFrame({now + work}));
-      written += clock.Advance(schedule).StepTicks + measuredClock.AdvanceMeasured(now, 1).StepTicks;
-      written += static_cast<int64_t>(pacer.Window().Frames) + other.IntendedDisplayTicks % 7;
+      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::TickCount64(now));
+      written += static_cast<int64_t>(pacer.EndFrame(FP::TickCount64(now + work), FP::TimeSpan(work)).Ticks());
+      const PC::FrameSchedule other = fullWindowPacer.BeginFrame(FP::TickCount64(now));
+      written += static_cast<int64_t>(fullWindowPacer.EndFrame(FP::TickCount64(now + work)).Ticks());
+      written += clock.Advance(FP::TickCount64(now), schedule.SwapInterval).Step.Ticks() + (clock.DisplayTimeAfter(1).Ticks() % 3);
+      written += static_cast<int64_t>(pacer.FrameWindow().Frames) + (other.IntendedDisplayTime.Ticks() % 7);
       if (frame % 2'500 == 1'250)
       {
-        clock.Pause();
+        clock.Restart();
         pacer.Reset();
-      }
-      if (frame % 2'500 == 1'260)
-      {
-        clock.Resume();
       }
       if (frame == 5'000)
       {
         pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(60'000, 1'001));
+        clock.SetRefreshPeriod(PC::RefreshPeriod::FromRate(60'000, 1'001));
       }
-      now = std::max(schedule.IntendedDisplayTicks, now + work);
+      now = std::max(schedule.IntendedDisplayTime.Ticks(), now + work);
     }
     EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }
