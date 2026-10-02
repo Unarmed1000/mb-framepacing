@@ -1,8 +1,8 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Outlines the calibrated marker zones on a camera frame for the camera wizard (VERY EXPERIMENTAL camera support): the timing zone (scanned
-//* first) in green, the second zone in orange.
+//* Outlines the calibrated marker zones on a camera frame for the camera wizard (VERY EXPERIMENTAL camera support): the main marker's zone
+//* (scanned first) in green, the sync marker's in orange.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -20,16 +20,17 @@ namespace MB.FramePacing.Gui
     private static readonly int[] g_zoneColors = { unchecked((int)0xFF34C759), unchecked((int)0xFFFF9F0A) };
 
     /// <summary>
-    /// Outline each zone's frame marker, around its quiet zone so the modules stay visible, into BGRA <paramref name="pixels"/> (as made by
+    /// Outline each zone's marker (the main marker, the smaller sync marker), around its quiet zone so the modules stay visible, into BGRA
+    /// <paramref name="pixels"/> (as made by
     /// <see cref="GrayBitmap.ToBgra"/>). The frame is shown scaled down, so the lines are a few pixels wide.
     /// </summary>
     public static void Draw(int[] pixels, int width, int height, IReadOnlyList<CameraZone> zones)
     {
       int thickness = Math.Max(2, Math.Min(width, height) / 120);
       double near = -MarkerRenderer.RecommendedQuietZoneModules;
-      double far = MarkerRenderer.QrModuleCount + MarkerRenderer.RecommendedQuietZoneModules;
       for (int i = 0; i < zones.Count; ++i)
       {
+        double far = zones[i].ModuleCount + MarkerRenderer.RecommendedQuietZoneModules;
         var map = zones[i].ModuleToCamera;
         var corners = new[]
         {

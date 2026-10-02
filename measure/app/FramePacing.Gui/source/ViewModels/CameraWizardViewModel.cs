@@ -409,7 +409,7 @@ namespace MB.FramePacing.Gui.ViewModels
           : rig.Checks.Any(c => c.Level == CameraCheckLevel.Warn) ? "Calibrated. Fix the warnings for reliable results, or continue."
           : "Calibrated: every check passed.",
         rig => rig?.Zones,
-        "The last camera frame with the markers as calibrated: green is the timing zone, orange the second zone."
+        "The last camera frame with the markers as calibrated: green is the main marker, orange the sync marker."
       );
     }
 
@@ -428,7 +428,7 @@ namespace MB.FramePacing.Gui.ViewModels
             ? "The camera or display moved: go back and set up the camera as new (calibrate again)."
             : "The camera has not moved.",
         _ => rig.Zones,
-        "The last camera frame with the markers where the saved calibration expects them (green: timing zone, orange: second zone)."
+        "The last camera frame with the markers where the saved calibration expects them (green: the main marker, orange: the sync marker)."
       );
     }
 
