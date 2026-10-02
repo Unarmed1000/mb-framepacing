@@ -216,7 +216,7 @@ not use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/fram
 
 | Type                                                         | What it is                                                                                                                                 |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `FramePacer`                                                 | Paces every frame (`BeginFrame`, `EndFrame`, `SetRefreshPeriod`, `Reset`, `FrameWindow`)                                                   |
+| `FramePacer`                                                 | Paces every frame (`BeginFrame`, `EndFrame`, `SetRefreshPeriod`, `SetSettings`, `Reset`, `FrameWindow`)                                    |
 | `PacerSettings`, `SlowDownRule`                              | The refresh period (required), the target frame rate and the rule's settings; always valid                                                 |
 | `RefreshPeriod`, `RefreshTime`                               | The refresh period, exact (`FromRate`, `FromNanoseconds`, `FromTimeSpan`; always valid, no default), and a time counted in whole refreshes |
 | `FrameSchedule`                                              | What a frame gets: its swap interval, its animation time and the marker's pacing values                                                    |

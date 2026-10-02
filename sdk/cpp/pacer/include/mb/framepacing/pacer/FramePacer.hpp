@@ -24,8 +24,8 @@ namespace MB::FramePacing::Pacer
   //! refreshes on the display's (PacerRefreshClock), and adapts the swap interval to how the frames do (SwapIntervalRule), from the frame
   //! rate the application prefers down.
   //!
-  //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); nothing
-  //! after that allocates.
+  //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); pacing
+  //! frames never allocates, and only SetSettings with settings that need a larger window does.
   class FramePacer
   {
     SwapIntervalRule m_rule;
@@ -54,6 +54,12 @@ namespace MB::FramePacing::Pacer
     //! swap interval the application prefers there. The animation time goes on. The period the pacer has already changes nothing.
     void SetRefreshPeriod(RefreshPeriod period) noexcept;
 
+    //! Other settings on a live pacer (another target frame rate, the rule switched off, another display): the pacer starts again with
+    //! them, with an empty window, at the swap interval the application prefers. The animation time goes on, and a frame that is open
+    //! is ended as usual. The same settings change nothing, so this may be called every frame with the application's current ones.
+    //! Allocates when the frame window needs more room than it has (a longer window, a faster display or frame rate), and only then.
+    void SetSettings(const PacerSettings& settings);
+
     //! Start again (after a pause the application knows of): the next frame is planned as the first, the window is empty, the swap
     //! interval the preferred one. The animation time goes on.
     void Reset() noexcept;
@@ -69,13 +75,13 @@ namespace MB::FramePacing::Pacer
       return m_rule.SwapInterval();
     }
 
-    //! The refresh period the pacer paces at now (PacerSettings::Refresh until the period changes).
+    //! The refresh period the pacer paces at now: its settings'.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
       return m_rule.Refresh();
     }
 
-    //! The settings the pacer was made with.
+    //! The settings the pacer paces with: the ones it was made with, or was given since, with the refresh period it is on.
     [[nodiscard]] const PacerSettings& Settings() const noexcept
     {
       return m_rule.Settings();

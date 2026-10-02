@@ -219,7 +219,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     Keep it that way until it has been measured on real swap chains, and keep the Status table current with every pacer change.
   - **Values in, values out:** `BeginFrame(cpuStartTime)` → `FrameSchedule` (swap interval, animation time and step, the marker's
     pacing values), `EndFrame(presentTime, work)` → CPU busy. No platform API, no callbacks, no clock reads; made once (the rule's
-    frame window), no allocation after that.
+    frame window), no allocation per frame after that (only `SetSettings` with a larger frame window allocates).
   - **The design (two clocks):** the time between two frame starts on the CPU's clock, rounded to whole refreshes and at least the
     previous frame's swap interval, is how long that frame stayed (more = late). The display's clock counts those refreshes exactly
     (`RefreshTime`, the fraction carried); the animation time is the previous frame's display plus this frame's swap interval, the
@@ -234,7 +234,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Typed, no raw ticks:** points in time `TickCount64`, spans `TimeSpan`, the marker's values `TimeSpan32`. `RefreshPeriod`'s 2⁻³²
     ticks are private (`TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`). **Always valid:** `RefreshPeriod` (100 µs
     to 1 s, no default: the application gives its display's period) and `PacerSettings` (constructed from the period; setters
-    assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer.
+    assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer, and so does `SetSettings` with other settings
+    (the same ones change nothing; it allocates only when the frame window needs more room); both keep the animation time, and
+    `Settings()` always has the refresh period the pacer is on.
   - **Names:** the rule's stretch of frames is the **frame window** (`FrameWindowLength`, `FrameWindowState`), never "window" alone (in
     graphics that is the window system's). `PacerRefreshClock` (`pacer/clock/`) counts the display's
     refreshes: never call it an animation clock, which in this repository is the application's game time (`sdk/doc/marker-fields.md`).

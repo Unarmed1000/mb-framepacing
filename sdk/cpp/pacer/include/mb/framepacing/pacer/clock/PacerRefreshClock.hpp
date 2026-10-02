@@ -66,6 +66,18 @@ namespace MB::FramePacing::Pacer
     //! Start again with the next frame (after a pause the application knows of): nothing is measured across it.
     void Restart() noexcept;
 
+    //! The longest gap between two frame starts that is measured (see the constructor).
+    [[nodiscard]] TimeSpan LongestGap() const noexcept
+    {
+      return m_longestGap;
+    }
+
+    //! Another longest gap, from the next frame on. The clock goes on as it is.
+    void SetLongestGap(const TimeSpan longestGap) noexcept
+    {
+      m_longestGap = longestGap;
+    }
+
     //! The display's clock that many refreshes after the previous frame's display (FrameMeasurement::DisplayTime is the time at 0):
     //! exact, rounded to the nearest tick.
     [[nodiscard]] TimeSpan DisplayTimeAfter(uint32_t refreshes) const noexcept;

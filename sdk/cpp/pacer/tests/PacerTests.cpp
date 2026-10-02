@@ -1119,3 +1119,172 @@ TEST(FramePacer, ThePeriodItHasChangesNothing)
   }
   EXPECT_EQ(told.FrameWindow().Frames, 19u);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Other settings on a live pacer
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FramePacer, OtherSettingsStartAgainAndTheAnimationTimeGoesOn)
+{
+  PC::FramePacer pacer(Settings());
+  int64_t lastStart = 0;
+  const std::vector<PC::FrameSchedule> before = RunFrames(pacer, Second, 100, 4 * Ms, lastStart);
+  EXPECT_EQ(pacer.SwapInterval(), 1u);
+  EXPECT_EQ(pacer.FrameWindow().Frames, 99u);
+
+  // The application now wants 30 fps: every second refresh from the next frame on, with an empty window
+  PC::PacerSettings settings = pacer.Settings();
+  settings.SetPreferredFrameRate(30);
+  pacer.SetSettings(settings);
+  EXPECT_EQ(pacer.Settings(), settings);
+  EXPECT_EQ(pacer.SwapInterval(), 2u);
+  EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
+  const int64_t next = lastStart + 166'667;
+  const PC::FrameSchedule schedule = pacer.BeginFrame(At(next));
+  EXPECT_EQ(schedule.SwapInterval, 2u);
+  EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(333'333u));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::TimeSpan32(333'333u));
+  EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::None);
+  // The animation time goes on from where it was, by the new swap interval; the frame before the change is not in the new window
+  EXPECT_EQ(schedule.AnimationTime, Span(before.back().AnimationTime.Ticks() + schedule.AnimationStep.Ticks()));
+  EXPECT_EQ(schedule.AnimationStep, g_hz60.TimeFor(2));
+  EXPECT_EQ(schedule.IntendedDisplayTime, At(next + 333'333));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
+  static_cast<void>(pacer.EndFrame(At(next + (4 * Ms))));
+  static_cast<void>(pacer.BeginFrame(At(next + 333'333)));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 1u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+}
+
+TEST(FramePacer, TheSameSettingsChangeNothing)
+{
+  // One pacer is given its own settings every frame: it plans as the other one, also while it is slowed down
+  PC::FramePacer given(Settings());
+  PC::FramePacer plain(Settings());
+  int64_t now = Second;
+  for (int frame = 0; frame < 60; ++frame)
+  {
+    given.SetSettings(given.Settings());
+    const PC::FrameSchedule schedule = given.BeginFrame(At(now));
+    const PC::FrameSchedule other = plain.BeginFrame(At(now));
+    EXPECT_EQ(schedule.IntendedDisplayTime, other.IntendedDisplayTime) << frame;
+    EXPECT_EQ(schedule.AnimationTime, other.AnimationTime) << frame;
+    EXPECT_EQ(schedule.SwapInterval, other.SwapInterval) << frame;
+    static_cast<void>(given.EndFrame(At(now + (20 * Ms))));
+    static_cast<void>(plain.EndFrame(At(now + (20 * Ms))));
+    now += g_hz60.TimeFor(2).Ticks();
+  }
+  EXPECT_EQ(given.SwapInterval(), 2u);
+  EXPECT_EQ(given.FrameWindow().Frames, plain.FrameWindow().Frames);
+  EXPECT_GT(given.FrameWindow().Frames, 0u);
+}
+
+TEST(FramePacer, SettingsWithAnotherRefreshPeriodAreAsSetRefreshPeriod)
+{
+  PC::PacerSettings settings = Settings();
+  settings.SetPreferredFrameRate(30);
+  PC::FramePacer bySettings(settings);
+  PC::FramePacer byPeriod(settings);
+  static_cast<void>(RunFrames(bySettings, Second, 10, 4 * Ms));
+  static_cast<void>(RunFrames(byPeriod, Second, 10, 4 * Ms));
+
+  PC::PacerSettings moved = settings;
+  moved.SetRefresh(g_hz120);
+  bySettings.SetSettings(moved);
+  byPeriod.SetRefreshPeriod(g_hz120);
+  // The settings follow a new refresh period, so a pacer made from them is on the display the first one is on
+  EXPECT_EQ(byPeriod.Settings(), moved);
+  EXPECT_EQ(byPeriod.Settings().Refresh(), g_hz120);
+  EXPECT_EQ(bySettings.Settings(), moved);
+  EXPECT_EQ(bySettings.Refresh(), g_hz120);
+  EXPECT_EQ(bySettings.SwapInterval(), 4u);
+  const int64_t next = 20 * Second;
+  const PC::FrameSchedule schedule = bySettings.BeginFrame(At(next));
+  const PC::FrameSchedule other = byPeriod.BeginFrame(At(next));
+  EXPECT_EQ(schedule.SwapInterval, other.SwapInterval);
+  EXPECT_EQ(schedule.AnimationTime, other.AnimationTime);
+  EXPECT_EQ(schedule.IntendedDisplayTime, other.IntendedDisplayTime);
+  EXPECT_EQ(schedule.TargetFrameTime, other.TargetFrameTime);
+}
+
+TEST(FramePacer, AFrameOpenWhenTheSettingsChangeIsEndedAsUsual)
+{
+  PC::FramePacer pacer(Settings());
+  const int64_t start = Second;
+  static_cast<void>(pacer.BeginFrame(At(start)));
+  PC::PacerSettings settings = pacer.Settings();
+  settings.SetAutoSwapInterval(false);
+  pacer.SetSettings(settings);
+  EXPECT_EQ(pacer.EndFrame(At(start + (4 * Ms))), FP::TimeSpan32(40'000u));
+  // It was paced by the old settings: it is not in the new window
+  static_cast<void>(pacer.BeginFrame(At(start + 166'667)));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
+}
+
+TEST(FramePacer, ALongerFrameWindowIsAlsoALongerGapThatIsMeasured)
+{
+  // A frame that starts 3 s after the previous one: with the 2 s window a pause, with a 5 s window a late frame
+  PC::FramePacer pacer(Settings());
+  int64_t lastStart = 0;
+  static_cast<void>(RunFrames(pacer, Second, 10, 4 * Ms, lastStart));
+  static_cast<void>(pacer.BeginFrame(At(lastStart + (3 * Second))));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
+
+  PC::PacerSettings settings = pacer.Settings();
+  settings.SetFrameWindowLength(Span(5 * Second));
+  pacer.SetSettings(settings);
+  const int64_t start = 100 * Second;
+  static_cast<void>(RunFrames(pacer, start, 10, 4 * Ms, lastStart));
+  static_cast<void>(pacer.BeginFrame(At(lastStart + (3 * Second))));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 10u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+}
+
+TEST(SwapIntervalRule, OtherSettingsStartAgainWithRoomForTheirWindow)
+{
+  // Made for a 30 Hz display: room for twice the 62 frames of its window. Given settings for a 240 Hz display it has room for the
+  // 480 frames of the window there: the window is full when its oldest frame is 2 s old, not when it holds all it could before
+  PC::SwapIntervalRule rule(Settings(PC::RefreshPeriod::FromRate(30), PC::SlowDownRule::FullWindow));
+  int64_t refresh = 0;
+  static_cast<void>(Feed(rule, refresh, 20, 4 * Ms, false));
+  EXPECT_EQ(rule.FrameWindow().Frames, 20u);
+
+  const PC::RefreshPeriod fast = PC::RefreshPeriod::FromRate(240);
+  const PC::PacerSettings settings = Settings(fast, PC::SlowDownRule::FullWindow);
+  rule.SetSettings(settings);
+  EXPECT_EQ(rule.Settings(), settings);
+  EXPECT_EQ(rule.Refresh(), fast);
+  EXPECT_EQ(rule.SwapInterval(), 1u);
+  EXPECT_EQ(rule.FrameWindow().Frames, 0u);
+  refresh = 0;
+  static_cast<void>(Feed(rule, refresh, 400, Ms, false));
+  EXPECT_EQ(rule.FrameWindow().Frames, 400u);
+  EXPECT_FALSE(rule.FrameWindow().Full);
+  static_cast<void>(Feed(rule, refresh, 200, Ms, false));
+  EXPECT_TRUE(rule.FrameWindow().Full);
+  EXPECT_EQ(rule.FrameWindow().Frames, 482u);
+
+  // The same settings change nothing; settings that need less room keep the room there is
+  rule.SetSettings(settings);
+  EXPECT_EQ(rule.FrameWindow().Frames, 482u);
+  PC::PacerSettings slower = settings;
+  slower.SetPreferredSwapInterval(4);
+  rule.SetSettings(slower);
+  EXPECT_EQ(rule.SwapInterval(), 4u);
+  EXPECT_EQ(rule.PreferredSwapInterval(), 4u);
+  EXPECT_EQ(rule.FrameWindow().Frames, 0u);
+}
+
+TEST(PacerRefreshClock, TheLongestGapCanChange)
+{
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
+  EXPECT_EQ(clock.LongestGap(), Span(2 * Second));
+  static_cast<void>(clock.Advance(At(Second), 1));
+  clock.SetLongestGap(Span(5 * Second));
+  EXPECT_EQ(clock.LongestGap(), Span(5 * Second));
+  // 3 s later: measured, not a restart
+  const PC::FrameMeasurement measured = clock.Measure(At(4 * Second));
+  EXPECT_FALSE(measured.Restarted);
+  EXPECT_EQ(measured.Refreshes, 180u);
+  EXPECT_TRUE(measured.Late);
+}

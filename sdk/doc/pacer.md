@@ -10,7 +10,8 @@ it for, and what to write into the frame marker. It holds a **target frame rate*
 do.
 
 It is **values in, values out**: the application passes the time a frame starts and gets back a plan. The pacer calls no graphics or
-platform API, has no callbacks and never reads a clock. Made once (it allocates its frame window then), it never allocates again.
+platform API, has no callbacks and never reads a clock. Made once (it allocates its frame window then), it never allocates again while
+it paces; only other settings that need a larger frame window do.
 
 | Language | Module                                                                                  |
 | -------- | --------------------------------------------------------------------------------------- |
@@ -131,10 +132,12 @@ stays the guess the table calls it.
   pacing (and the marker's static flag says that nothing moves).
 - **A display mode change.** `SetRefreshPeriod` starts again on the new period, with an empty frame window, at the swap interval the
   application prefers there. The animation time goes on. The period the pacer already has changes nothing.
-- **Other settings.** A `FramePacer` takes its settings when it is made, and only the refresh period changes on a live one. For
-  another target frame rate or another setting of the rule, make a new `FramePacer` from the changed `pacer.Settings()`: its frame
-  window is empty and its animation time starts at zero, so keep an animation time of your own and add every frame's
-  `AnimationStep` to it.
+- **Other settings.** `SetSettings` changes them on a live pacer (another target frame rate, the rule switched off, another
+  margin): take `pacer.Settings()`, change it, and give it back. The pacer starts again with them, with an empty frame window, at
+  the swap interval the application prefers; the animation time goes on, and a frame that is open is ended as usual. The same
+  settings change nothing, so it can be called every frame with the application's current ones. It allocates only when the frame
+  window needs more room than it has (a longer window, a faster display or frame rate). `pacer.Settings()` always has the refresh
+  period the pacer is on.
 
 ## A target frame rate
 

@@ -69,9 +69,42 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
         pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(60'000, 1'001));
         clock.SetRefreshPeriod(PC::RefreshPeriod::FromRate(60'000, 1'001));
       }
+      // The same settings every frame, and now and then other ones that need no more room than the window has: a target frame rate
+      // and back
+      PC::PacerSettings current = pacer.Settings();
+      if (frame % 1'000 == 500)
+      {
+        current.SetPreferredFrameRate(30);
+      }
+      else if (frame % 1'000 == 750)
+      {
+        current.SetPreferredFrameTime({});
+      }
+      pacer.SetSettings(current);
       now = std::max(schedule.IntendedDisplayTime.Ticks(), now + work);
     }
     EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }
   EXPECT_GT(written, 0) << "the calls must actually have produced output";
+}
+
+TEST(Allocations, SettingsThatNeedMoreRoomAllocateOnce)
+{
+  const PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));
+  PC::FramePacer pacer(settings);
+  PC::PacerSettings longer = settings;
+  longer.SetFrameWindowLength(FP::TimeSpan(10 * FP::TimeSpan::TicksPerSecond));
+  {
+    const FT::AllocationCounter counter;
+    pacer.SetSettings(longer);
+    EXPECT_GE(FT::AllocationCounter::Count(), 1u);
+  }
+  {
+    // The room stays: the shorter window again, and the longer one again, allocate nothing
+    const FT::AllocationCounter counter;
+    pacer.SetSettings(settings);
+    pacer.SetSettings(longer);
+    pacer.SetSettings(longer);
+    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
+  }
 }

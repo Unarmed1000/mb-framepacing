@@ -27,7 +27,6 @@ namespace MB::FramePacing::Pacer
     };
 
     PacerSettings m_settings;
-    RefreshPeriod m_period;
     std::vector<Entry> m_entries;
     std::size_t m_first{0};
     std::size_t m_count{0};
@@ -56,14 +55,21 @@ namespace MB::FramePacing::Pacer
       return m_preferredSwapInterval;
     }
 
-    //! The refresh period the rule decides at (PacerSettings::Refresh until SetRefreshPeriod).
+    //! The refresh period the rule decides at: its settings'.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
-      return m_period;
+      return m_settings.Refresh();
     }
 
-    //! The display's refresh period changed: the rule starts again at the preferred swap interval on it, with an empty window.
+    //! The display's refresh period changed: the rule starts again at the preferred swap interval on it, with an empty window. Its
+    //! settings have the new period. Never allocates: a window that has no room for all the frames of a faster display counts as
+    //! full when it holds all it can.
     void SetRefreshPeriod(RefreshPeriod period) noexcept;
+
+    //! Other settings: the rule starts again with them at the preferred swap interval, with an empty window. The same settings change
+    //! nothing. Allocates when the window needs more room than it has (a longer window, a faster display, a faster frame rate), and
+    //! only then: not a call for every frame unless the settings are the same.
+    void SetSettings(const PacerSettings& settings);
 
     //! Start again at swapInterval (at least the preferred one) with an empty window.
     void Reset(uint32_t swapInterval) noexcept;
@@ -73,7 +79,7 @@ namespace MB::FramePacing::Pacer
 
     [[nodiscard]] FrameWindowState FrameWindow() const noexcept;
 
-    //! The settings the rule was made with.
+    //! The settings the rule decides with: the ones it was made with, or was given since, with the refresh period it is on.
     [[nodiscard]] const PacerSettings& Settings() const noexcept
     {
       return m_settings;

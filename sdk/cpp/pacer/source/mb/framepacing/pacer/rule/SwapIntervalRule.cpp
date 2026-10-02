@@ -55,7 +55,6 @@ namespace MB::FramePacing::Pacer
 
   SwapIntervalRule::SwapIntervalRule(const PacerSettings& settings)
     : m_settings(settings)
-    , m_period(settings.Refresh())
     , m_entries(Capacity(settings))
     , m_preferredSwapInterval(settings.PreferredSwapIntervalAt(settings.Refresh()))
     , m_swapInterval(m_preferredSwapInterval)
@@ -87,28 +86,28 @@ namespace MB::FramePacing::Pacer
     }
     const auto frames = static_cast<uint32_t>(m_count);
     const bool full = IsFull();
-    const TimeSpan margin = m_settings.FrameMarginAt(m_period);
+    const RefreshPeriod period = m_settings.Refresh();
+    const TimeSpan margin = m_settings.FrameMargin();
     // What a frame needs: the frames' average work, and the margin
     const TimeSpan frameTime(m_workSum.Ticks() / frames + margin.Ticks());
 
     const bool mayGoSlower =
-      m_swapInterval < PacerSettings::MaxSwapInterval && m_period.TimeFor(m_swapInterval) <= Sum(m_settings.SlowestFrameTime(), margin);
+      m_swapInterval < PacerSettings::MaxSwapInterval && period.TimeFor(m_swapInterval) <= Sum(m_settings.SlowestFrameTime(), margin);
     const bool slowerByShare = full && LatePercent(m_lateCount, frames) > m_settings.SlowDownLatePercent();
     // The fix: as many late frames as would make a full window's share late, without waiting for the window to fill again
-    const bool slowerByCount =
-      m_settings.SlowDown() == SlowDownRule::LateCount &&
-      int64_t{100} * m_lateCount > m_settings.SlowDownLatePercent() * FullWindowFrames(windowLength, m_swapInterval, m_period);
+    const bool slowerByCount = m_settings.SlowDown() == SlowDownRule::LateCount &&
+                               int64_t{100} * m_lateCount > m_settings.SlowDownLatePercent() * FullWindowFrames(windowLength, m_swapInterval, period);
 
     SwapIntervalChange change = SwapIntervalChange::None;
     uint32_t swapInterval = m_swapInterval;
     if (mayGoSlower && (slowerByShare || slowerByCount))
     {
-      swapInterval = std::max(m_swapInterval + 1u, NeededSwapInterval(frameTime, m_period));
+      swapInterval = std::max(m_swapInterval + 1u, NeededSwapInterval(frameTime, period));
       change = SwapIntervalChange::Slower;
     }
-    else if (full && m_lateCount == 0 && m_swapInterval > m_preferredSwapInterval && Sum(frameTime, margin) < m_period.TimeFor(m_swapInterval - 1u))
+    else if (full && m_lateCount == 0 && m_swapInterval > m_preferredSwapInterval && Sum(frameTime, margin) < period.TimeFor(m_swapInterval - 1u))
     {
-      swapInterval = std::max(m_preferredSwapInterval, NeededSwapInterval(frameTime, m_period));
+      swapInterval = std::max(m_preferredSwapInterval, NeededSwapInterval(frameTime, period));
       change = SwapIntervalChange::Faster;
     }
     if (change != SwapIntervalChange::None)
@@ -121,8 +120,26 @@ namespace MB::FramePacing::Pacer
 
   void SwapIntervalRule::SetRefreshPeriod(const RefreshPeriod period) noexcept
   {
-    m_period = period;
+    m_settings.SetRefresh(period);
     m_preferredSwapInterval = m_settings.PreferredSwapIntervalAt(period);
+    m_swapInterval = m_preferredSwapInterval;
+    Clear();
+  }
+
+  void SwapIntervalRule::SetSettings(const PacerSettings& settings)
+  {
+    if (settings == m_settings)
+    {
+      return;
+    }
+    // More room first: when there is no memory for it the rule is as it was
+    const std::size_t capacity = Capacity(settings);
+    if (capacity > m_entries.size())
+    {
+      m_entries.resize(capacity);
+    }
+    m_settings = settings;
+    m_preferredSwapInterval = settings.PreferredSwapIntervalAt(settings.Refresh());
     m_swapInterval = m_preferredSwapInterval;
     Clear();
   }

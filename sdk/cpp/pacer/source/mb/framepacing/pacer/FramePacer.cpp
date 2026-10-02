@@ -89,6 +89,17 @@ namespace MB::FramePacing::Pacer
     }
   }
 
+  void FramePacer::SetSettings(const PacerSettings& settings)
+  {
+    if (settings != m_rule.Settings())
+    {
+      m_rule.SetSettings(settings);
+      // Nothing is measured across the change: the frame before it was paced by the old settings
+      m_clock.SetLongestGap(settings.FrameWindowLength());
+      m_clock.SetRefreshPeriod(settings.Refresh());
+    }
+  }
+
   void FramePacer::Reset() noexcept
   {
     m_rule.Reset(m_rule.PreferredSwapInterval());
