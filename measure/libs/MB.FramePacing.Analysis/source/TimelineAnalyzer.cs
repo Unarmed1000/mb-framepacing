@@ -384,9 +384,9 @@ namespace MB.FramePacing.Analysis
     }
 
     /// <summary>
-    /// EXPERIMENTAL camera captures. The scanout reaches the second (lower) zone a roughly constant time after the timing zone. A frame that
+    /// EXPERIMENTAL camera captures. The scanout reaches the second (lower) zone a roughly constant time after the first zone. A frame that
     /// reaches the second zone clearly earlier than that was presented while the scanout was between the zones (vsync off): the camera saw a
-    /// tear. Frame indices only the second zone shows were replaced before the next scanout reached the timing zone. Frames normally follow a
+    /// tear. Frame indices only the second zone shows were replaced before the next scanout reached the first zone. Frames normally follow a
     /// few undecodable captures (the scanout crossing the marker, the panel switching), so a start only counts as uncertain when the gap is
     /// clearly longer than usual.
     /// </summary>

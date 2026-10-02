@@ -102,8 +102,8 @@ The steps:
 3. **Source**: the live camera (with its mode), a clip filmed with it (with its recorded fps), or the **Synthetic camera** to
    try everything without hardware.
 4. **Calibrate** (new camera): the checks below. Fix every warning and calibrate again. While it runs, the wizard shows what the
-   camera sees a few times per second. Afterwards the last frame stays, with the calibrated markers outlined (green: the timing
-   zone, orange: the second zone).
+   camera sees a few times per second. Afterwards the last frame stays, with the calibrated markers outlined (green: the main
+   marker, orange: the sync marker).
 
    ![Step 4 of a new camera: the last camera frame with the calibrated markers outlined, and the checks](images/gui-camera-wizard.png)
 

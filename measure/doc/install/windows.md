@@ -55,8 +55,9 @@ dotnet run --project measure/app/FramePacing -- selftest          # the command 
 
 ### Prebuilt
 
-When a release is published, unzip its `win-x64` archive and run `mb-framepacing-gui.exe` (or `mb-framepacing.exe` in a
-terminal). Nothing else is required: the executables are self-contained.
+A `tools-v*` tag builds the self-contained executables as an artifact of its CI run (`mb-framepacing-Windows`, kept 30 days).
+Download it and run `win-x64/gui/mb-framepacing-gui.exe` (or `win-x64/cli/mb-framepacing.exe` in a terminal). Nothing else is
+required. `python measure/build_standalone.py` builds the same from source.
 
 ## 3. Check it works without hardware
 
@@ -65,8 +66,9 @@ mb-framepacing selftest
 ```
 
 It captures a synthetic game at 500 fps through the real recorder, analyses it and prints `PASS` when every frame matches the
-known answer. If it reports dropped frames, the disk is too slow for that rate: use a faster SSD or a smaller `--size`.
-Then start `mb-framepacing-gui`: the first time, a short setup dialog finds ffmpeg and asks where captures go.
+known answer. If it reports dropped frames, this machine cannot decode that rate: try a lower `--fps` or a smaller `--size` (the disk only matters
+with `--keep-frames`).
+Then start `mb-framepacing-gui`: if ffmpeg is not found, a short setup dialog helps you get it and asks where captures go.
 
 ## 4. Capture cards
 
@@ -98,7 +100,7 @@ and reading the results, in the GUI and on the command line.
 
 ## 6. Build the C++ marker library (for your application)
 
-Install Visual Studio 2026 (or 2022) with the "Desktop development with C++" workload and CMake 4.0 or newer
+Install Visual Studio 2026 with the "Desktop development with C++" workload and CMake 4.0 or newer
 (`winget install Kitware.CMake`), then:
 
 ```powershell

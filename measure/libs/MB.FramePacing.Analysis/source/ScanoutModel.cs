@@ -16,7 +16,7 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>
     /// EXPERIMENTAL: a camera filming the screen. The scanout rolls down the screen while the camera exposes, so the lower zone showing an older
-    /// frame than the timing zone is normal; a frame that reaches the lower zone first was presented mid-scanout (a tear).
+    /// frame than the first zone is normal; a frame that reaches the lower zone first was presented mid-scanout (a tear).
     /// </summary>
     Camera,
   }

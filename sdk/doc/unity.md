@@ -135,6 +135,7 @@ give the matrix to `FrameMarkerMesh`. It keeps a `Mesh` with the current marker 
 again only when the size, options, origin or output height change, and per frame only the indices of the dark modules:
 
 ```csharp
+using MB.FramePacing;
 using MB.FramePacing.Marker;
 using MB.FramePacing.Marker.Unity;
 
@@ -193,7 +194,7 @@ matrix can feed several.
   C++ marker module module for module and pixel for pixel.
 - **Before a release (local, needs a Unity license):** `python sdk/unity/check_in_unity.py` runs a real Unity editor in batch mode
   (no window) on a throw-away project. It checks that:
-  - the package compiles, without warnings;
+  - the package compiles;
   - the marker module reproduces all 512 C++ module matrices on Unity's scripting runtime;
   - every drawing method renders pixel exact into a render texture, including the y flip: `FrameMarkerGL` (the Geometry mode),
     `FrameMarkerMesh` (the static grid with per-frame indices, through a command buffer), `FrameMarkerTexture` (the Bitmap mode) and

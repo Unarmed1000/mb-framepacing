@@ -163,7 +163,7 @@ sequenceDiagram
 
 1. Connect the application's display output through a capture card (it passes the signal on to your monitor). The recording
    can run on the same PC or a second one.
-2. Start the recording: **Start capture** in the GUI, or `mb-framepacing capture --wait-for-start --stop-at-end --analyze`.
+2. Start the recording: **Start capture** in the GUI, or `mb-framepacing capture -d "<device>" --wait-for-start --stop-at-end --analyze`.
 3. Run the test in your application. It shows the **start** marker, then the normal frame markers, then the **end** marker.
 4. The recording stops by itself at the end marker and the analysis opens. Record with other equipment instead (a lossless video,
    a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. **The way we suggest
@@ -205,7 +205,8 @@ building the C++ library. The short version is below. What is planned next (HDR 
 
 ### The GUI
 
-Run `mb-framepacing-gui`. The first time, a short setup dialog helps you get ffmpeg and choose where captures go.
+Run `mb-framepacing-gui`. If ffmpeg is not found, a short setup dialog helps you get it and choose where captures go
+(**Settings → Set up...** opens it at any time).
 
 | Capture                                                                  | Setup                                                           |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------- |
@@ -368,7 +369,8 @@ mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline 
 
 `mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
 `captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
-the charts as `run-<id>-*.png` and the report as `run-<id>-report.svg`.
+the report and the distribution cards as SVG (`run-<id>-report.svg`, `run-<id>-error-histogram.svg`, ...). `render --png` writes
+PNGs.
 
 ### What you need
 
@@ -483,6 +485,7 @@ flowchart TB
         M["MB.FramePacing.MarkerDecoding<br/>QR decoding"]
         CAP["MB.FramePacing.Capture<br/>recorder, ffmpeg, video/image/stream sources"]
         AN["MB.FramePacing.Analysis<br/>timeline, animation error, reports"]
+        CH["MB.FramePacing.Charts<br/>report and distribution cards"]
         CLI["mb-framepacing<br/>command line"]
         GUI["mb-framepacing-gui<br/>Avalonia"]
     end
@@ -490,8 +493,8 @@ flowchart TB
     L -.->|same pixels| CS
     CS --> U
     CS -- "draws markers for the synthetic game" --> M
-    M --> CAP --> AN --> CLI
-    AN --> GUI
+    M --> CAP --> AN --> CH --> CLI
+    CH --> GUI
 ```
 
 | Path                        | Contents                                                                                                                                                 |
@@ -508,6 +511,7 @@ flowchart TB
 | `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                                                      |
 | `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                                            |
 | `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                                                      |
+| `measure/tools/Benchmarks`  | BenchmarkDotNet benchmarks of the tools' libraries                                                                                                       |
 | `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                                                |
 | `measure/doc/`              | Platform, usage and camera guides, images                                                                                                                |
 | `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                                                          |

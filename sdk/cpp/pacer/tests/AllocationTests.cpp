@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// The pacer runs every frame, so it must never allocate after it is made. This test binary links the counting global operator new/delete
-// (mb_framepacing_test_support) and checks that every per-frame call stays at zero allocations.
+// The pacer runs every frame, so pacing must never allocate after the pacer is made. This test binary links the counting global
+// operator new/delete (mb_framepacing_test_support) and checks that every per-frame call stays at zero allocations; only SetSettings
+// with settings that need a larger frame window may allocate.
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>

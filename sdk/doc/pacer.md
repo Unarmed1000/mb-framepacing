@@ -19,14 +19,14 @@ it paces; only other settings that need a larger frame window do.
 
 ## Status
 
-| Checked                                                                                                                               | Not checked                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Its simulation of a frame loop, against golden results (`sdk/test-data/pacer`)                                                        | Any real swap chain, on any platform or graphics API     |
-| The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                             | A real display's clock against a real CPU clock          |
-| That repository's timing diagrams (the vsync timer, half rate, switching rates)                                                       | A compositor, a frame queue longer than one, a GPU limit |
-| A simulated display 0.1 % off its nominal rate with 2 ms of jitter on every frame start, for an hour                                  | Variable refresh, vsync off                              |
-| The refresh rates monitors have, 50 to 540 Hz: frames on time, a display off its rate, target frame rates, a load that comes and goes |                                                          |
-| Every line and branch of the module by its tests; no allocation per frame                                                             |                                                          |
+| Checked                                                                                                                                                                  | Not checked                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Its simulation of a frame loop, against golden results (`sdk/test-data/pacer`)                                                                                           | Any real swap chain, on any platform or graphics API            |
+| The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                                                                | A real display's clock against a real CPU clock                 |
+| That repository's timing diagrams (the vsync timer, half rate, switching rates)                                                                                          | A compositor, a frame queue longer than one, a real GPU's limit |
+| A simulated display 0.1 % off its nominal rate with 2 ms of jitter on every frame start, for an hour                                                                     | Variable refresh, vsync off                                     |
+| The refresh rates monitors have, 50 to 540 Hz: frames on time, a display off its rate, target frame rates, a load that comes and goes, a loop the GPU limits (simulated) |                                                                 |
+| Every line and branch of the module by its tests; no allocation per frame                                                                                                |                                                                 |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
 
@@ -216,8 +216,9 @@ settings, not properties of frame pacing in general.
 period.
 
 **`FrameMargin` follows the display by default.** The rule speeds up only when the frames' average work plus twice the margin fits
-one refresh less. A margin of 1 ms is a small share of a 60 Hz refresh and half of a 500 Hz one: twice that would not fit a refresh
-from 480 Hz on, and a pacer that had slowed down to every second refresh would stay there however light the frames became. So the
+one refresh less. A margin of 1 ms is a small share of a 60 Hz refresh and half of a 500 Hz one: twice that is a whole refresh at
+500 Hz and leaves 0.08 ms for the work at 480 Hz, so a pacer that had slowed down to every second refresh would stay there, and
+with work of a tenth of a refresh it already would above 450 Hz. So the
 default is 1 ms and at most an eighth of the refresh period (less than 1 ms above 125 Hz: 0.87 ms at 144 Hz, 0.52 ms at 240 Hz,
 0.25 ms at 500 Hz), and it follows a change of the refresh period. A margin you set with `SetFrameMargin` is that margin on every
 display (`FrameMarginAt(refresh)` says what it is on one).

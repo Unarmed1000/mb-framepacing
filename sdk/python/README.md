@@ -95,12 +95,12 @@ The same API as the C# marker module (`MB.FramePacing.Marker`), in Python's nami
 
 | Python                                                                                                                          | What it does                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                          | What a marker carries                                                                   |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`, `MarkerFlags`                                                           | What a marker carries                                                                   |
 | `Options` (`recommended`, `minimum`, `marker_size_px`, `quiet_zone_px`, `recommended_origin`), `Point`                          | Size and place: always valid (a value outside its range is clamped)                     |
 | `generate_modules`, `ModuleMatrix` (`size`, `is_dark`, `bits`)                                                                  | Encode the marker: its QR symbol, 1 bit per module (211 bytes)                          |
 | `grid_vertices`, `grid_vertex_count`, `modules_to_grid_indices`                                                                 | A static grid uploaded once, and per frame only the indices                             |
 | `modules_to_bitmap`, `PixelFormat`                                                                                              | Draw it into a pixel buffer (R8, R8G8B8 or R8G8B8A8, any stride)                        |
-| `modules_to_indexed`, `modules_to_triangles`                                                                                    | Draw it as indexed triangles or a triangle list, for a GPU                              |
+| `modules_to_indexed`, `modules_to_triangles` (`Vertex`)                                                                         | Draw it as indexed triangles or a triangle list, for a GPU                              |
 | `modules_to_quads`, `MarkerQuad` (`rect`, a `Rectangle`: `x`, `y`, `width`, `height`, `left`, `right`, `top`, `bottom`; `dark`) | Draw it as rectangles: the light background, then one dark rectangle per run of modules |
 | `qr_module_count_for`                                                                                                           | Modules per side of a kind's symbol                                                     |
 | `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks`                                                | The wire format and its time units                                                      |
@@ -133,15 +133,15 @@ with CaptureDataReader(capture_folder / "captures.mbcd") as reader:
 
 ### API
 
-| Python                                                                          | What it is                                                                |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                   | `captures.mbcd`: the header, the records (`records()`, `read_all()`, ...) |
-| `CaptureDataStatus`, `Rectangle`, `MarkerLocation`, `UNKNOWN_TICKS`             | A record's status, where the markers are, a missing device time           |
-| `read_summary`, `parse_summary`, `AnalysisSummary` and the `Summary…` classes   | `summary.json`                                                            |
-| `read_frames`, `FrameRow`                                                       | A run's frames CSV                                                        |
-| `read_captures`, `CaptureCsvRow`                                                | `captures.csv`                                                            |
-| `find_analysis`, `frames_file_name`, `run_file_prefix`, `TICKS_PER_MILLISECOND` | The analysis folder, the file names, the ticks in a millisecond           |
-| `DataFormatError`                                                               | Raised for another kind of file or a newer format version ("update ...")  |
+| Python                                                                                           | What it is                                                                |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                                    | `captures.mbcd`: the header, the records (`records()`, `read_all()`, ...) |
+| `CaptureDataStatus`, `Rectangle`, `MarkerLocation`, `UNKNOWN_TICKS`                              | A record's status, where the markers are, a missing device time           |
+| `read_summary`, `parse_summary`, `AnalysisSummary`, the `Summary…` classes and `ValueStatistics` | `summary.json`                                                            |
+| `read_frames`, `FrameRow`                                                                        | A run's frames CSV                                                        |
+| `read_captures`, `CaptureCsvRow`                                                                 | `captures.csv`                                                            |
+| `find_analysis`, `frames_file_name`, `run_file_prefix`, `TICKS_PER_MILLISECOND`                  | The analysis folder, the file names, the ticks in a millisecond           |
+| `DataFormatError`                                                                                | Raised for another kind of file or a newer format version ("update ...")  |
 
 ## Tests
 

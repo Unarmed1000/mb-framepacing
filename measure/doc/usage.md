@@ -91,7 +91,7 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 
-In the GUI: choose **Video file** as the source, pick the recording, enter the **Display refresh rate**, and press **Start capture**.
+In the GUI: choose **Video file...** as the source, pick the recording, enter the **Display refresh rate**, and press **Start capture**.
 
 Before you trust the numbers, check that the recording is what the display showed:
 
@@ -99,7 +99,8 @@ Before you trust the numbers, check that the recording is what the display showe
   With `--display-hz`, the report also says "Display refresh 60 Hz (the capture rate), expected 60 Hz: matches."
 - An application that ran every refresh shows no frame indices never seen. Many of them, evenly spread, point to a lower rate in
   OBS than the display's.
-- "No marker seen" or many undecodable captures point to scaling or compression: see [Troubleshooting](#troubleshooting).
+- The warning "No frame markers were found in the capture" (the GUI's preview: "No marker seen yet") or many undecodable captures
+  point to scaling or compression: see [Troubleshooting](#troubleshooting).
 
 mb-framepacing can also record the card itself, without OBS: the next section.
 
@@ -132,7 +133,8 @@ Settings that matter:
 
 **GUI**
 
-1. **Source:** pick the card, then its **mode** (highest frame rate). Under **Advanced**, set **Scale** (for example 960x540).
+1. **Source:** pick the card. Under **Advanced**, pick its **Device mode** (highest frame rate) and set the **Stored size** (for
+   example 960x540).
 2. **Start at the start marker** and **Stop at the end marker** are ticked by default, and **Stop after** is empty: the capture
    records the run between its markers. A **Stop after** time (30s, 2m) is only a limit, counted from the start marker; untick
    the marker boxes for an application without start and end markers. If the application aims for a frame rate below the
@@ -190,12 +192,12 @@ Import the recording. Nothing is dropped, and any frame
 rate works. A camera filming the screen needs a calibrated camera rig and `--camera`; that is **very experimental**, see
 [camera capture](camera.md).
 
-| Source                                   | GUI source     | Command line                                                     |
-| ---------------------------------------- | -------------- | ---------------------------------------------------------------- |
-| Video file (its own timestamps are used) | Video file     | `mb-framepacing import recording.mkv --analyze`                  |
-| Folder of images at a known frame rate   | Image folder   | `mb-framepacing import frames/ --fps 1000 --analyze`             |
-| Folder of images with a time per image   | Image folder   | `mb-framepacing import frames/ --timestamps times.csv --analyze` |
-| Network stream (RTSP, SRT, HTTP, ...)    | Network stream | `mb-framepacing import rtsp://camera/stream -t 30s --analyze`    |
+| Source                                   | GUI source              | Command line                                                     |
+| ---------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
+| Video file (its own timestamps are used) | Video file...           | `mb-framepacing import recording.mkv --analyze`                  |
+| Folder of images at a known frame rate   | Image folder...         | `mb-framepacing import frames/ --fps 1000 --analyze`             |
+| Folder of images with a time per image   | Image folder...         | `mb-framepacing import frames/ --timestamps times.csv --analyze` |
+| Network stream (RTSP, SRT, HTTP, ...)    | Network stream (URL)... | `mb-framepacing import rtsp://camera/stream -t 30s --analyze`    |
 
 - Record **at the display's refresh rate**: like a capture card, a recording is analysed as one refresh per recorded frame. A
   60 fps screen recording of a 144 Hz display misses most of the frames the viewer saw. Only a camera filming the screen
@@ -350,7 +352,8 @@ for comparisons with their numbers.
 
 Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
 early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it
-the target frame time and the refresh rate used, compared with the expected display rate when one was given. What "late" is
+what "late" is measured against, with the typical target frame time. The refresh rate used, compared with the expected display
+rate when one was given, is the Display card's tooltip. What "late" is
 measured against, in order: the intended display times the application's frame pacer writes into the marker (then **Detailed
 statistics** also shows the pacing and prediction error), its target frame time in the marker, its preferred frame time in the marker
 (a game that wants 30 fps on a 60 Hz display is measured against two refreshes), the **target frame rate** given at

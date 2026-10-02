@@ -16,7 +16,7 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL: checked against its own simulation only, never against a real swap chain (sdk/doc/pacer.md).
+  //! EXPERIMENTAL: checked against its own simulation only; no capture of it on a real swap chain has been analysed (sdk/doc/pacer.md).
   //!
   //! Paces a frame loop with nothing but a steady clock and a Present that waits for vsync: the baseline that works on any platform.
   //! Every frame: BeginFrame with the time the frame starts, hold the frame for the schedule's swap interval and render it for the

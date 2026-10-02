@@ -187,8 +187,7 @@ namespace MB.FramePacing.Capture.Camera
     private sealed record Timing(double? DelayMs, double? RefreshHz, double[] DecodeRate, double[] WhiteVariation, int DelaySamples);
 
     /// <summary>
-    /// Full detector search (slow, so only on a spread of frames). Start markers are larger versions; calibration skips them because it fits
-    /// the frame marker's geometry.
+    /// Full detector search (slow, so only on a spread of frames). Start markers are left out unless includeStartMarkers asks for them.
     /// </summary>
     private static List<Hit> FindMarkers(CameraFrameSet frames, int maxFrames, CancellationToken cancellationToken, bool includeStartMarkers = false)
     {

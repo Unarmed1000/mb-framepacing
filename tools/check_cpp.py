@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Check the C++ library (sdk/cpp: the core, marker and data modules) with clang-format and clang-tidy (config: sdk/cpp/.clang-format and
+"""Check the C++ library (sdk/cpp: the core, marker, data and pacer modules) with clang-format and clang-tidy (config: sdk/cpp/.clang-format and
 .clang-tidy). The consumer project (sdk/cpp/tests/consumer), the size probes (sdk/cpp/tests/size) and the Conan recipe's test package
 (sdk/cpp/conan) are only formatted.
 

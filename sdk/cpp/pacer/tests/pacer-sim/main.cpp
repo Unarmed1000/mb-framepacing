@@ -4,7 +4,7 @@
 // pacer-sim: paces a scenario with the pacer module in the frame model of mb-framepacing-explained's simulations (PacerSimulation.hpp) and
 // writes one row per frame: the refresh it targets and is shown on, the swap interval, the rule's decisions, the animation time.
 //
-//   pacer-sim --golden <dir>                                     every golden scenario with both rules into <dir> (sdk/test-data/pacer)
+//   pacer-sim --golden <dir>                                     every golden scenario with its rules into <dir> (sdk/test-data/pacer)
 //   pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]   one scenario to stdout (rate: Hz, numerator / denominator)
 #include <exception>
 #include <filesystem>

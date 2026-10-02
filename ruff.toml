@@ -7,7 +7,7 @@
 # Ruff's default excludes (.git, build, dist, node_modules, .venv, ...) stay in place; these are the repository's own output folders
 extend-exclude = [
     "sdk/cpp/build",
-    "sdk/cpp/marker/third_party",
+    "sdk/cpp/marker/reference/third_party",
     "measure/publish",
 ]
 

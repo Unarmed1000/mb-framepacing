@@ -134,7 +134,7 @@ encoder) produce the same modules. The new encoder is covered completely by the 
 
 ## What it costs
 
-The tables are data in the library: about 8 KiB. An executable that uses the marker module grows by 20.5 KiB in a Release build
+The tables are data in the library: about 8 KiB. An executable that uses the marker module grows by 20.4 KiB in a Release build
 (28.9 KiB with qrcodegen, whose code was larger) and by 18.1 KiB in a build optimized for size (12.8 KiB before: the tables do not
 shrink). See "What it adds to your executable" in `sdk/cpp/README.md`. The C# assembly `MB.FramePacing.Marker` grows from 25.5 to 27.0 KiB;
 its tables are made when the first encoder is created.

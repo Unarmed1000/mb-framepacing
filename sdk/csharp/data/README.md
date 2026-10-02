@@ -43,7 +43,7 @@ foreach (var record in reader.ReadAll())
 | `CaptureDataReader`, `CaptureDataWriter`                        | Read and write `captures.mbcd`                                                                                                                                 |
 | `MarkerLocation` (its bounds a core `Rectangle`)                | Where the markers are                                                                                                                                          |
 | `AnalysisSummary` and the `Summary…` records, `ValueStatistics` | `summary.json`: `Read`, `Parse`, `Write`, `ToJson`                                                                                                             |
-| `FramesCsv`, `FrameRow`                                         | A run's frames CSV                                                                                                                                             |
+| `FramesCsv`, `FrameRow`, `OlderFrame`                           | A run's frames CSV                                                                                                                                             |
 | `CapturesCsv`, `CaptureCsvRow`                                  | `captures.csv`                                                                                                                                                 |
 | `AnalysisFiles`                                                 | The file names, and finding the analysis folder of a capture                                                                                                   |
 

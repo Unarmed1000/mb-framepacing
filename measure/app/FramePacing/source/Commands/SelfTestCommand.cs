@@ -224,7 +224,7 @@ namespace MB.FramePacing.App.Commands
         failures.Add("no run was found");
       else
       {
-        // Frames only seen below a tear never reach the timing zone; every other frame must be found
+        // Frames only seen below a tear never reach the first zone; every other frame must be found
         var found = run.Frames.Select(f => f.FrameIndex).ToHashSet();
         var expected = truth.Where(f => !tears.Contains(f.Payload.FrameIndex) || found.Contains(f.Payload.FrameIndex)).ToList();
         if (!run.Frames.Select(f => f.FrameIndex).SequenceEqual(expected.Select(f => f.Payload.FrameIndex)))

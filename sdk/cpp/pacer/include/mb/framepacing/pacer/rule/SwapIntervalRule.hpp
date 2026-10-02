@@ -16,7 +16,8 @@ namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). The adaptive swap interval rule: it keeps the frames of the last FrameWindowLength
   //! since its last change and decides after every frame whether to run slower or faster. FramePacer uses it; an application with its own
-  //! frame loop can use it alone. The window is allocated once, when the rule is made; AddFrame and the rest never allocate.
+  //! frame loop can use it alone. The window is allocated when the rule is made; AddFrame and the rest never allocate, except SetSettings
+  //! with settings that need a larger window.
   class SwapIntervalRule
   {
     struct Entry

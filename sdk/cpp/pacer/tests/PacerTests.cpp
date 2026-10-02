@@ -138,7 +138,7 @@ namespace
 TEST(RefreshPeriod, ARationalRateIsExactOverAnHour)
 {
   EXPECT_EQ(g_hz60.ToTimeSpan(), Span(166'667));
-  // 60 Hz for an hour is 216 000 refreshes of exactly 1/60 s: no drift, where whole ticks would be 72 ms off
+  // 60 Hz for an hour is 216 000 refreshes of exactly 1/60 s: no drift, where whole ticks would be 7.2 ms off
   EXPECT_EQ(g_hz60.TimeFor(216'000), Span(3'600 * Second));
   EXPECT_EQ(g_hz60.TimeFor(3), Span(500'000));
   EXPECT_EQ(g_hz60.TimeFor(1), Span(166'667));

@@ -4,8 +4,8 @@
 > Camera capture is **VERY EXPERIMENTAL**. How to use it: [camera.md](camera.md). This page records what exists, how each part
 > was checked, what is known to be missing, and what to do next. Keep it current with every camera change.
 
-Status on 2026-09-26: merged into `master` as very experimental (PR #2). CI passes on Windows, Ubuntu and macOS. Validation
-with real hardware is still pending (next steps 1–3).
+Status on 2026-10-02: on `master`, very experimental (first merged on 2026-09-26, PR #2, before `master` was restarted). CI passes on
+Windows, Ubuntu and macOS. Validation with real hardware is still pending (next steps 1–3).
 
 ## Summary
 
@@ -37,7 +37,7 @@ Results on the synthetic camera (`selftest --camera --fps 1000 --refresh 60`):
 
 - Every presented frame is found.
 - Display deltas are within two camera periods of the truth, with a mean error of about 0.62 ms (timed by the sync marker).
-- The scanout delay matches the simulation (10.0 ms).
+- The scanout delay matches the simulation (8.0 ms at 60 Hz).
 - With vsync off (`--tear-every`), every tear between the zones is found. A tear at the very start or end of a run is not
   counted.
 - Precision by camera rate: the table in [camera.md](camera.md#what-you-need), regenerated with
@@ -82,10 +82,10 @@ of C# rectification, well above 1000 fps on one core.
   **Known limit:** at exactly twice the refresh rate with about half of the sightings late, every time is on one of two camera
   frames half a refresh apart, the times are on no grid the camera can see, and nothing can calculate the rate: the analysis then
   warns that the calculated rate is unreliable (`selftest --camera` at 150 fps on 75 Hz, 240 on 120 and 288 on 144). The
-  calibration's clip in the selftest is too short for the search (under 64 sightings), so its rate is the intervals' and can be off
-  at these camera rates. The period found is then measured with a least squares line through every
+  calibration's clip in the selftest is too short for the search to be sure (half a second: at most one stretch of 64 sightings), so
+  its rate is the intervals' and can be off at these camera rates. The period found is then measured with a least squares line through every
   reliable first-seen time against its refresh number (`RefreshEstimator.RefinePeriodTicks`; the average of the intervals only uses
-  the two ends of each unbroken stretch). On simulated sightings its error is 10 to 20 times smaller, from 100 to 2000 fps on a
+  the two ends of each unbroken stretch). On simulated sightings its error is 10 to 20 times smaller, from 130 to 2000 fps on a
   60 Hz display; `selftest --camera` finds 59.99 to 60.00 Hz at every rate of the table (59.90 to 60.11 Hz before). The line is
   not taken when its own numbering does not hold up against it (a camera below about twice the refresh rate) or when it leaves
   the estimate by more than 1 %. The user can give the **expected display rate** (`--display-hz`, GUI "Display refresh
@@ -124,17 +124,17 @@ In priority order:
 
 ## Where things are
 
-| What                                          | Where                                                                                                                |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Calibration, verification, rig file, library  | `measure/libs/MB.FramePacing.Capture/source/Camera/`                                                                 |
-| ffmpeg rectification filter, `--recorded-fps` | `Capture/source/Ffmpeg/FfmpegCommandBuilder.cs` (`BuildCameraFilter`), `FfmpegCaptureSource.cs`                      |
-| Homography, refinement, grid sampler          | `measure/libs/MB.FramePacing.MarkerDecoding/source/` (`Homography*.cs`, `ModuleGridSampler.cs`, `MarkerGeometry.cs`) |
-| Camera analysis                               | `Analysis/source/CaptureDecoder.cs` (`CameraLayout`), `TimelineAnalyzer.cs` (`AnalyzeCamera`)                        |
-| Synthetic camera (ground truth)               | `Capture/source/Synthetic/SyntheticCamera*.cs`                                                                       |
-| CLI                                           | `measure/app/FramePacing/source/Commands/CameraRigCommand.cs`, `SelfTestCommand.cs` (`--camera`)                     |
-| GUI                                           | `measure/app/FramePacing.Gui/source/ViewModels/Camera*.cs`, `Views/CameraWizardWindow.axaml`                         |
-| Tests                                         | `*Camera*Tests.cs`, `HomographyTests.cs`, `ModuleGridSamplerTests.cs`; `FfmpegCameraTests` needs ffmpeg              |
-| Benchmarks                                    | `measure/tools/Benchmarks` (`dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj`)            |
+| What                                          | Where                                                                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Calibration, verification, rig file, library  | `measure/libs/MB.FramePacing.Capture/source/Camera/`                                                                                 |
+| ffmpeg rectification filter, `--recorded-fps` | `Capture/source/Ffmpeg/FfmpegCommandBuilder.cs` (`BuildCameraFilter`), `FfmpegCaptureSource.cs`                                      |
+| Homography, refinement, grid sampler          | `measure/libs/MB.FramePacing.MarkerDecoding/source/` (`Homography*.cs`, `ModuleGridSampler.cs`, `MarkerGeometry.cs`)                 |
+| Camera analysis                               | `Capture/source/FrameMarkerDecoder.cs` (`CameraLayout`), `Analysis/source/TimelineAnalyzer.cs` (`AnalyzeCamera`, `TimeBySyncMarker`) |
+| Synthetic camera (ground truth)               | `Capture/source/Synthetic/SyntheticCamera*.cs`                                                                                       |
+| CLI                                           | `measure/app/FramePacing/source/Commands/CameraRigCommand.cs`, `SelfTestCommand.cs` (`--camera`)                                     |
+| GUI                                           | `measure/app/FramePacing.Gui/source/ViewModels/Camera*.cs`, `Views/CameraWizardWindow.axaml`                                         |
+| Tests                                         | `*Camera*Tests.cs`, `Refresh*Tests.cs`, `HomographyTests.cs`, `ModuleGridSamplerTests.cs`; `FfmpegCameraTests` needs ffmpeg          |
+| Benchmarks                                    | `measure/tools/Benchmarks` (`dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj`)                            |
 
 Quick checks after a change:
 

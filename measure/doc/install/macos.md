@@ -45,8 +45,9 @@ dotnet run --project measure/app/FramePacing -- selftest          # the command 
 
 ### Prebuilt
 
-When a release is published, unpack its `osx-arm64` (Apple Silicon) or `osx-x64` (Intel) archive. The executables are not
-notarized, so remove the download quarantine once:
+A `tools-v*` tag builds the self-contained executables as an artifact of its CI run (`mb-framepacing-macOS`, osx-arm64 for Apple
+Silicon, kept 30 days); for an Intel Mac, build from source with `python3 measure/build_standalone.py --rid osx-x64`. The
+executables are not notarized, so remove the download quarantine once:
 
 ```sh
 xattr -dr com.apple.quarantine mb-framepacing mb-framepacing-gui
@@ -59,9 +60,9 @@ xattr -dr com.apple.quarantine mb-framepacing mb-framepacing-gui
 mb-framepacing selftest
 ```
 
-Prints `PASS` when a synthetic 500 fps capture comes back frame-exact. If it reports dropped frames, the disk is too slow for that
-rate: use a smaller `--size`. Then start `mb-framepacing-gui`: the first time, a short setup dialog finds ffmpeg and asks where
-captures go.
+Prints `PASS` when a synthetic 500 fps capture comes back frame-exact. If it reports dropped frames, this machine cannot decode that rate: try a lower `--fps` or a smaller `--size` (the disk only matters
+with `--keep-frames`).
+Then start `mb-framepacing-gui`: if ffmpeg is not found, a short setup dialog helps you get it and asks where captures go.
 
 ## 4. Capture cards
 

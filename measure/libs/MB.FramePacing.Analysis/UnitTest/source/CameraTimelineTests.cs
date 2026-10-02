@@ -26,8 +26,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     /// <summary>
     /// Rows of a camera capture: frame k is first decoded at capture k * 17 after 4 undecodable captures; the second zone shows each frame 10
-    /// captures after the timing zone. <paramref name="longGapFrame"/> gets a 12 capture gap, <paramref name="tornFrame"/> reaches the second
-    /// zone 6 captures before the timing zone, <paramref name="secondZoneOnly"/> is never seen by the timing zone. The run id is 1; the second
+    /// captures after the first zone. <paramref name="longGapFrame"/> gets a 12 capture gap, <paramref name="tornFrame"/> reaches the second
+    /// zone 6 captures before the first zone, <paramref name="secondZoneOnly"/> is never seen by the first zone. The run id is 1; the second
     /// zone shows <paramref name="otherRunFrame"/> with run id 2, as another run's frame of the same index.
     /// </summary>
     private static List<CaptureRow> Rows(int frames, int longGapFrame, int tornFrame, int secondZoneOnly, int otherRunFrame = -1)

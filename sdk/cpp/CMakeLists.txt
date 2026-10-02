@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 4.0)
 #   core    mb_framepacing::core    shared types: the library version, the time types, Point, Rectangle
 #   marker  mb_framepacing::marker  the frame marker: encode it and draw it (links core)
 #   data    mb_framepacing::data    reads the tools' capture data and analysis output (links marker; nlohmann/json inside)
-#   pacer   mb_framepacing::pacer   paces frames with an adaptive swap interval, aligns the animation timer to refreshes (links core)
+#   pacer   mb_framepacing::pacer   paces frames with an adaptive swap interval, an animation time in whole refreshes (links core)
 # Every module has its folder (include/, source/, tests/); the headers install into one tree, <mb/framepacing/...>.
 
 # Inside the repository the version and LICENSE live in sdk/ (shared with the C#, Python and Unity libraries), the reference shaders in

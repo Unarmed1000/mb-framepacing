@@ -118,17 +118,17 @@ faster still.
 
 In `MB::FramePacing::Marker`: the functions in `<mb/framepacing/marker/FrameMarker.hpp>`, each type in its own header (`<mb/framepacing/marker/…>`):
 
-| Function or type                                                                                                             | What it does                                                                                                                        |
-| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                       | What a marker carries                                                                                                               |
-| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                                     | Size and place: always valid (a value outside its range asserts, else is clamped)                                                   |
-| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`, `TryFromBits`)                                                  | Encode the marker: its QR symbol, 1 bit per module (211 bytes of bits), a plain value; `TryFromBits` makes one from a marker's bits |
-| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                              | A static grid uploaded once, and per frame only the indices                                                                         |
-| `ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil::BytesPerPixel`                                                           | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride)                                                |
-| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark)              | Draw it as indexed triangles, a triangle list or rectangles, into your buffers                                                      |
-| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix::MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                                                                             |
-| `ModuleMatrix::SizeFor`, `MainSize`, `SyncSize`                                                                              | Modules per side of a kind's symbol                                                                                                 |
-| `EncodePayload`, `TryDecodePayload`                                                                                          | The wire format                                                                                                                     |
+| Function or type                                                                                                                                              | What it does                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`, `MarkerFlags` (`HasFlag`)                                                                             | What a marker carries                                                                                                               |
+| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                                                                      | Size and place: always valid (a value outside its range asserts, else is clamped)                                                   |
+| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`, `TryFromBits`)                                                                                   | Encode the marker: its QR symbol, 1 bit per module (211 bytes of bits), a plain value; `TryFromBits` makes one from a marker's bits |
+| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                                                               | A static grid uploaded once, and per frame only the indices                                                                         |
+| `ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil::BytesPerPixel`                                                                                            | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride)                                                |
+| `ModulesToIndexed` (`IndexedCount`), `ModulesToTriangles` (`Vertex`: `X`, `Y`, `Luma`), `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark) | Draw it as indexed triangles, a triangle list or rectangles, into your buffers                                                      |
+| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix::MaxPackedModuleByteCount`                                  | Buffer sizes that fit every marker kind                                                                                             |
+| `ModuleMatrix::SizeFor`, `MainSize`, `SyncSize`                                                                                                               | Modules per side of a kind's symbol                                                                                                 |
+| `EncodePayload`, `TryDecodePayload`                                                                                                                           | The wire format                                                                                                                     |
 
 Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the matrix is empty or a buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
 
@@ -182,14 +182,15 @@ each group of functions in its own header (`<mb/framepacing/data/…>`: `Analysi
 `ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names). The files hold every time as whole 100 ns
 ticks, in the integer type it has, so a value is read exactly as it was written:
 
-| Function or type                                                               | What it does                                                            |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                  | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...)      |
-| `CaptureDataStatus`, `MarkerLocation`                                          | A record's status, where the markers are                                |
-| `ReadSummary`, `ParseSummary`, `AnalysisSummary` and the `Summary…` structs    | `summary.json` (capture.json inside it as JSON text)                    |
-| `ReadFrames`, `FrameRow`                                                       | A run's frames CSV, by column name                                      |
-| `ReadCaptures`, `CaptureCsvRow`                                                | `captures.csv`, by column name                                          |
-| `FindAnalysis`, `FramesFileName`, `ParseMilliseconds`, the file name constants | The analysis folder, the file names, the CSV time format (a `TimeSpan`) |
+| Function or type                                                                                                                            | What it does                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                                                                               | `captures.mbcd`: the header and the records (`TryDecodeMain`, ...)                                                 |
+| `CaptureDataStatus`, `MarkerLocation`                                                                                                       | A record's status, where the markers are                                                                           |
+| `ReadSummary`, `ParseSummary`, `AnalysisSummary`, the `Summary…` structs and `ValueStatistics`                                              | `summary.json` (capture.json inside it as JSON text)                                                               |
+| `ReadFrames`, `FrameRow`, `OlderFrame`                                                                                                      | A run's frames CSV, by column name                                                                                 |
+| `ReadCaptures`, `CaptureCsvRow`                                                                                                             | `captures.csv`, by column name                                                                                     |
+| `FindAnalysis`, `RunFilePrefix`, `FramesFileName`, the file name constants (`AnalysisDirectoryName`, `SummaryFileName`, `CapturesFileName`) | The analysis folder and the file names                                                                             |
+| `DataFormatError`                                                                                                                           | Thrown for content that is not the format: another kind of file, a newer format version, a value outside its field |
 
 ## The pacer (experimental)
 

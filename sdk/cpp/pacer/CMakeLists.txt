@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# The pacer module (EXPERIMENTAL): paces a frame loop with a steady clock and a Present that waits for vsync: an animation timer in
+# The pacer module (EXPERIMENTAL): paces a frame loop with a steady clock and a Present that waits for vsync: an animation time in
 # whole refreshes, an adaptive swap interval, a target frame rate.
 # No dependencies besides the core, no allocations per frame.
 

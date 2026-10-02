@@ -74,7 +74,8 @@ The workflow `.github/workflows/release-sdk.yml` then:
 5. **Publishes the Unity package** on the `upm` branch, tagged `upm/v<version>`.
 6. **Builds the Conan recipe** from the published archive on Windows, Ubuntu and macOS (see [Conan](#conan)).
 
-Nothing is published if any step fails. To try the packaging locally:
+Nothing is published if the tag check or the tests fail. The GitHub Release also needs the packaging to pass; the Unity package is
+published independently of the packaging, and the Conan check runs after the release is out. To try the packaging locally:
 
 ```sh
 python sdk/cpp/package_release.py --output dist --verify
@@ -93,7 +94,8 @@ python tools/add_conan_version.py 0.2.0     # reads the release's SHA256SUMS
 git commit -am "Conan: mb-framepacing 0.2.0"
 ```
 
-`python tools/check_conan.py` builds the recipe from this checkout's sources, with every module and without the data module (CI runs it
+`python tools/check_conan.py` builds the recipe from this checkout's sources: with the default modules, with the pacer too, and with the core and marker modules
+only (CI runs it
 on every push); `--released` uses the recipe's own versions and archives. Both run in a temporary Conan home, never the user's cache.
 
 **ConanCenter, later:** fork conan-center-index, copy `sdk/cpp/conan/recipes/mb-framepacing` to its `recipes/mb-framepacing`, and open

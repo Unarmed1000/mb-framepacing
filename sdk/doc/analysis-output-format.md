@@ -92,7 +92,7 @@ missed: see `missedBefore` below), `presentedFrames`, `skippedFrameIndices` (fra
 deviation), `p50`, `p95`, `p99`, `p999`, `max`. Percentiles interpolate linearly between the closest ranks. `count` 0 means no value,
 and every other field is then 0. All are required but `p999` (0 in a file without it).
 
-**`statistics`:** the six statistics objects in the first three rows, `framesWithAnimationError`, `errorPerFrameMs`, `percentError`,
+**`statistics`:** the six statistics objects in the first four rows, `framesWithAnimationError`, `errorPerFrameMs`, `percentError`,
 `excludedStaticFrames` and `uncertainSteps` are required.
 
 | Field                                       | Meaning                                                                                                                |

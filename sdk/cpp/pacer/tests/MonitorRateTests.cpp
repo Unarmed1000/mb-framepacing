@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The pacer on the refresh rates monitors have, from 50 to 540 Hz (59.94 and 119.88 Hz as the display modes state them): a frame loop
-// paced by vsync, with frames on time, a display a little off its nominal rate, target frame rates, and a load that comes and goes.
+// paced by vsync, with frames on time, a display a little off its nominal rate, target frame rates, a load that comes and goes (with
+// the default frame margin, which follows the refresh period, and with one set to 1 ms), and a loop the GPU limits.
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
@@ -227,7 +228,8 @@ TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBack)
 
       // The load goes: after a frame window without a late frame the pacer is back on every refresh, when the frames' work and twice
       // the margin fit a refresh. The default margin is at most an eighth of a refresh, so it does on every display. A margin set
-      // to 1 ms stays 1 ms: from 480 Hz on a refresh is too short for twice that, and the pacer stays at half rate
+      // to 1 ms stays 1 ms: twice that and this work of a tenth of a refresh fit a refresh up to 450 Hz, so from 480 Hz on the
+      // pacer stays at half rate
       const FP::TimeSpan light = Share(period, 100);
       for (int64_t frame = 0; frame < 3 * framesPerWindow; ++frame)
       {

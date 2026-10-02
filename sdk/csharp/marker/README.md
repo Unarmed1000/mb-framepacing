@@ -81,16 +81,16 @@ Every option draws exactly the same pixels, from one encode per frame (the 211 b
 
 Buffers are spans: `ReadOnlySpan<T>` in, `Span<T>` out; an array or a `stackalloc` passes straight in. Nothing allocates per frame.
 
-| Type or member                                                                                                                          | What it does                                                                          |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `Payload` (`WithKind`, `MaxEncodedByteCount`, `OnDemandFrameTime`), `StartMetadata`, `SequenceId`, `MarkerKind`, `MarkerFlags`          | What a marker carries; a kind that is not a `MarkerKind` throws                       |
-| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`, its limits and defaults); `Point` (the core's) | Size and place: always valid (a value outside its range is clamped)                   |
-| `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`, `MainSize`, `SyncSize`, `SizeFor`)                      | Encode the marker into your bytes: its QR symbol, 1 bit per module                    |
-| `FrameMarker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                             | A static grid uploaded once, and per frame only the indices                           |
-| `FrameMarker.ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil.BytesPerPixel`                                                           | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride)  |
-| `FrameMarker.ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: `Rect`, a `Rectangle`, and `Dark`)                | Draw it as indexed triangles, a triangle list or rectangles                           |
-| `FrameMarker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix.MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                               |
-| `FrameMarker.EncodePayload`, `TryDecodePayload`                                                                                         | The wire format (its layout is internal: `sdk/doc/marker-format.md` is the reference) |
+| Type or member                                                                                                                                       | What it does                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Payload` (`WithKind`, `MaxEncodedByteCount`, `OnDemandFrameTime`), `StartMetadata`, `SequenceId`, `MarkerKind`, `MarkerFlags`                       | What a marker carries; a kind that is not a `MarkerKind` throws                       |
+| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`, its limits and defaults); `Point` (the core's)              | Size and place: always valid (a value outside its range is clamped)                   |
+| `MarkerGenerator.TryGenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`, `MainSize`, `SyncSize`, `SizeFor`)                                   | Encode the marker into your bytes: its QR symbol, 1 bit per module                    |
+| `FrameMarker.GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                                          | A static grid uploaded once, and per frame only the indices                           |
+| `FrameMarker.ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil.BytesPerPixel`                                                                        | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride)  |
+| `FrameMarker.ModulesToIndexed` (`IndexedCount`), `ModulesToTriangles` (`Vertex`), `ModulesToQuads` (`MarkerQuad`: `Rect`, a `Rectangle`, and `Dark`) | Draw it as indexed triangles, a triangle list or rectangles                           |
+| `FrameMarker.MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix.MaxPackedModuleByteCount`              | Buffer sizes that fit every marker kind                                               |
+| `FrameMarker.EncodePayload`, `TryDecodePayload`                                                                                                      | The wire format (its layout is internal: `sdk/doc/marker-format.md` is the reference) |
 
 `ModuleMatrix` is a `ref struct` view over the bytes you give `TryGenerateModules`: keep the bytes, not the view, in a field. One encode
 can feed several outputs. The drawing methods return 0 (an empty `IndexedCount`, false) when the matrix is empty or a buffer is too small.

@@ -63,7 +63,7 @@ namespace MB.FramePacing.Capture.Camera
     /// <summary>Time the scanout takes from the main marker to the sync marker.</summary>
     public double? ScanoutDelayMs { get; init; }
 
-    /// <summary>The refresh rate estimated from the calibration (median time between consecutive frames).</summary>
+    /// <summary>The refresh rate calculated at the calibration, from when the frames were first seen (RefreshEstimator).</summary>
     public double? RefreshHz { get; init; }
 
     public IReadOnlyList<CameraCheck> Checks { get; init; } = Array.Empty<CameraCheck>();

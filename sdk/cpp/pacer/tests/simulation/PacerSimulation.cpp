@@ -131,7 +131,7 @@ namespace MB::FramePacing::Pacer::Simulation
 
   std::vector<Scenario> GoldenScenarios(const std::filesystem::path& testDataPacer)
   {
-    // The busy stretch of mb-framepacing-explained's 60-busy clip, frame by frame, played twice as its simulation does (so the clip
+    // The busy stretch of mb-framepacing-explained's 60-busy-adaptive clip, frame by frame, played twice as its simulation does (so the clip
     // starts in the state it ends in); its swap intervals and refreshes are the reference
     Scenario busy;
     busy.Name = "60-busy";

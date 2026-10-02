@@ -50,8 +50,9 @@ sudo apt install libice6 libsm6 libfontconfig1
 
 ### Prebuilt
 
-When a release is published, unpack its `linux-x64` (or `linux-arm64`) archive and run `./mb-framepacing-gui` or
-`./mb-framepacing`; the executables are self-contained.
+A `tools-v*` tag builds the self-contained executables as an artifact of its CI run (`mb-framepacing-Linux`, linux-x64, kept 30
+days). Download it and run `linux-x64/gui/mb-framepacing-gui` or `linux-x64/cli/mb-framepacing`. For linux-arm64, build from
+source: `python3 measure/build_standalone.py --rid linux-arm64`.
 
 ## 3. Check it works without hardware
 
@@ -59,9 +60,9 @@ When a release is published, unpack its `linux-x64` (or `linux-arm64`) archive a
 mb-framepacing selftest
 ```
 
-Prints `PASS` when a synthetic 500 fps capture comes back frame-exact. If it reports dropped frames, the disk is too slow for that
-rate: use a faster SSD or a smaller `--size`. Then start `mb-framepacing-gui`: the first time, a short setup dialog finds ffmpeg
-and asks where captures go.
+Prints `PASS` when a synthetic 500 fps capture comes back frame-exact. If it reports dropped frames, this machine cannot decode that rate: try a lower `--fps` or a smaller `--size` (the disk only matters
+with `--keep-frames`).
+Then start `mb-framepacing-gui`: if ffmpeg is not found, a short setup dialog helps you get it and asks where captures go.
 
 ## 4. Capture cards
 

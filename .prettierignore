@@ -5,7 +5,7 @@ node_modules/
 **/build/
 **/publish/
 **/TestResults/
-sdk/cpp/marker/third_party/
+sdk/cpp/marker/reference/third_party/
 test-data/
 licenses/*.txt
 package-lock.json
