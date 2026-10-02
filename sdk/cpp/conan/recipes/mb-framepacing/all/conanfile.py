@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Conan recipe for mb_framepacing, the C++20 library of the mb-framepacing SDK: it builds the C++ release archive of the sdk-v<version>
 tag (conandata.yml has its URL and SHA-256). Every module is a component (mb_framepacing::core, ::marker, ::data, ::pacer); with_marker,
-with_data leaves a module out; with_pacer (off by default: the pacer is off until it is reworked) adds one. Laid out as conan-center-index recipes are, so the same folder can go there."""
+with_data leaves a module out; with_pacer (off by default: the pacer is experimental, sdk/doc/pacer.md) adds one. Laid out as conan-center-index
+recipes are, so the same folder can go there."""
 
 import os
 
@@ -20,7 +21,7 @@ class MbFramePacingConan(ConanFile):
     name = "mb-framepacing"
     description = (
         "The mb-framepacing SDK: draws a QR frame marker into every frame, so a capture card or camera can measure frame pacing and animation "
-        "error, reads the tools' capture data and analysis output, and paces frames with an adaptive swap interval"
+        "error, reads the tools' capture data and analysis output, and has an experimental frame pacer (with_pacer, off by default)"
     )
     license = "BSD-3-Clause"
     url = "https://github.com/Unarmed1000/mb-framepacing"

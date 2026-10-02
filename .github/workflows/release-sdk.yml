@@ -139,7 +139,7 @@ jobs:
           ## C++ (CMake 4.0+, C++20)
 
           One library of modules: \`mb_framepacing::core\`, \`mb_framepacing::marker\` and \`mb_framepacing::data\`
-          (\`mb_framepacing::pacer\` is off until it is reworked).
+          (\`mb_framepacing::pacer\` is experimental and off by default: \`-DMB_FRAMEPACING_BUILD_PACER=ON\`).
           Link the ones you use; \`-DMB_FRAMEPACING_BUILD_DATA=OFF\` leaves the data module (and nlohmann/json) out.
 
           \`\`\`cmake

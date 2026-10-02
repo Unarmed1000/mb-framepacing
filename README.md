@@ -443,7 +443,7 @@ AppleClang 15+), Python 3, and Node.js for formatting the docs.
 mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 
-# C++ library: the core, marker and data modules (the pacer is off until it is reworked); the tests fetch GoogleTest.
+# C++ library: the core, marker and data modules (the experimental pacer: -DMB_FRAMEPACING_BUILD_PACER=ON); the tests fetch GoogleTest.
 # Presets: windows, linux, linux-clang, linux-sanitize, macos
 cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
 python sdk/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
@@ -493,26 +493,26 @@ flowchart TB
     AN --> GUI
 ```
 
-| Path                        | Contents                                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                                        |
-| `sdk/VERSION`               | The SDK's version: every module, every language                                                                                                   |
-| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, and `pacer/`, off until it is reworked), its Conan recipe |
-| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10)                     |
-| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                                           |
-| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                                      |
-| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                                                |
-| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats, the pacer, encoding performance                       |
-| `sdk/test-data/`            | Golden marker images (checked by every marker module), the data modules' golden data and the pacer's                                              |
-| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                                               |
-| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                                     |
-| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                                               |
-| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                                         |
-| `measure/doc/`              | Platform, usage and camera guides, images                                                                                                         |
-| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                                                   |
-| `doc/`                      | Release guide and roadmap                                                                                                                         |
-| `tools/`                    | Repository scripts: checks, golden data                                                                                                           |
-| `licenses/`                 | Licenses of every third-party component                                                                                                           |
+| Path                        | Contents                                                                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                                               |
+| `sdk/VERSION`               | The SDK's version: every module, every language                                                                                                          |
+| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, and `pacer/`, experimental and off by default), its Conan recipe |
+| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10)                            |
+| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                                                  |
+| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                                             |
+| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                                                       |
+| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats, the pacer, encoding performance                              |
+| `sdk/test-data/`            | Golden marker images (checked by every marker module), the data modules' golden data and the pacer's                                                     |
+| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                                                      |
+| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                                            |
+| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                                                      |
+| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                                                |
+| `measure/doc/`              | Platform, usage and camera guides, images                                                                                                                |
+| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                                                          |
+| `doc/`                      | Release guide and roadmap                                                                                                                                |
+| `tools/`                    | Repository scripts: checks, golden data                                                                                                                  |
+| `licenses/`                 | Licenses of every third-party component                                                                                                                  |
 
 ## License
 

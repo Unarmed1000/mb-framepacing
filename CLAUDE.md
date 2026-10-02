@@ -10,8 +10,10 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
-  - **pacer** (C++ `MB::FramePacing::Pacer`; off, and its C# port out of the tree, until it is reworked): plans every frame on the display's refreshes with the adaptive swap interval rule
-    (the full-window rule of mb-framepacing-explained's simulation, and its fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
+  - **pacer** (C++ `MB::FramePacing::Pacer` only; **experimental**, off by default): paces a frame loop with nothing but a steady clock
+    and vsync: frame starts measured on the CPU's clock and counted in whole refreshes on the display's (`PacerAnimationClock`), a
+    target frame rate, and the adaptive swap interval rule (the full-window rule of mb-framepacing-explained's simulation, and its fix
+    as the default);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
     language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
@@ -204,17 +206,35 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `TimeSpan.TotalMilliseconds` (on .NET 10 the same bits as ticks / 10000.0, so the output does not change).
     The charts read the typed values; what they keep in ticks is integer arithmetic (whole refreshes, strip cells) and the prepared
     sequences (`FrameSequence`, `WaveletMatrix`), which rank plain integers. The GUI's `Stopwatch` timestamps stay raw.
-- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`):** the C++ module is off (`MB_FRAMEPACING_BUILD_PACER` and Conan's
-  `with_pacer` default to off) until it is reworked; build it with `-DMB_FRAMEPACING_BUILD_PACER=ON` to work on it.
-  - Values in, values out: `FrameInput` (the platform's values) → `FrameSchedule` (what to apply, the marker's pacing values), `FrameEnd`
-    → CPU busy. No platform API, no callbacks, no clock reads; made once (the rule's window), no allocation after that.
-  - `FrameInput`'s optional platform values (vsync, previous display, predicted display, `RefreshPeriodNanoseconds`) use **0 =
-    unknown**, as the marker fields do (agreed with the user over `std::optional`: one convention, plain blittable structs).
-  - **Always valid:** `RefreshPeriod` (1 tick to 1 s, no default: the application gives its display's period) and `PacerSettings`
-    (constructed from the period; setters assert, then clamp). The ranges keep the rule's Q32 arithmetic within 64 bits; nothing
-    downstream sanitizes. A reported period of another nanosecond, or `SetRefreshPeriod` with another period, restarts the pacer.
-  - Integer arithmetic only (periods and grids in 2⁻³² ticks): a port must give the golden data's bytes too. The C#
-    port (`MB.FramePacing.Pacer`, last in commit e7ff58b's tree) was removed until the rework: port it again from the reworked C++.
+- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`): EXPERIMENTAL.** A first version designed from scratch as the baseline that
+  works on any platform: it needs a steady clock (passed in), a `Present` that waits for vsync and the display's refresh period, nothing
+  else. It has only run against its own simulation, never a real swap chain. Off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's
+  `with_pacer`); build it with `-DMB_FRAMEPACING_BUILD_PACER=ON`.
+  - **Every place users meet it says "experimental":** the guide's notice and its Status table (checked / not checked), the READMEs,
+    `integrating.md`, the CMake and Conan option descriptions, the release notes, and the first line of every public type's comment.
+    Keep it that way until it has been measured on real swap chains, and keep the Status table current with every pacer change.
+  - **Values in, values out:** `BeginFrame(cpuStartTime)` → `FrameSchedule` (swap interval, animation time and step, the marker's
+    pacing values), `EndFrame(presentTime, work)` → CPU busy. No platform API, no callbacks, no clock reads; made once (the rule's
+    frame window), no allocation after that.
+  - **The design (two clocks):** the time between two frame starts on the CPU's clock, rounded to whole refreshes and at least the
+    previous frame's swap interval, is how long that frame stayed (more = late). The display's clock counts those refreshes exactly
+    (`RefreshTime`, the fraction carried); the animation time is the previous frame's display plus this frame's swap interval, the
+    intended display time the frame's start plus that step. A gap longer than the frame window (or two frames), or a frame before
+    the previous one, starts again. The pacer keeps **no grid of refreshes of its own**: one that runs on the CPU's clock slides
+    against the display and double-steps (why the earlier design went).
+  - **Nothing a platform may not have:** vsync times, predicted display times, presentation feedback, scheduled presents, a
+    measured refresh period, VRR are the guide's "Not used yet" and `doc/roadmap.md`. Agree with the user before adding one.
+  - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
+    with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
+    `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.
+  - **Typed, no raw ticks:** points in time `TickCount64`, spans `TimeSpan`, the marker's values `TimeSpan32`. `RefreshPeriod`'s 2⁻³²
+    ticks are private (`TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`). **Always valid:** `RefreshPeriod` (100 µs
+    to 1 s, no default: the application gives its display's period) and `PacerSettings` (constructed from the period; setters
+    assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer.
+  - **Names:** the rule's stretch of frames is the **frame window** (`FrameWindowLength`, `FrameWindowState`), never "window" alone (in
+    graphics that is the window system's). `PacerAnimationClock` is the pacer's, not a general animation timer.
+  - Integer arithmetic only: the golden data must come out byte for byte. 100 % test coverage as the core and the marker
+    (llvm-cov, `NDEBUG`). There is no C# port (the roadmap lists one as a possible upgrade).
   - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the
     tests only: never part of the library.
   - Golden data: `python tools/update_pacer_test_data.py` writes the scenarios' frames from the test clips and runs `pacer-sim --golden`;
