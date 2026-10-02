@@ -15,8 +15,10 @@ namespace MB::FramePacing
   //! adding and subtracting wrap around with defined behaviour; Ticks() is its signed view.
   //!
   //! Wrap-around safe, as TickCount32: two counts compare and subtract correctly while they are less than 2^63 ticks apart, across the
-  //! wrap too (a < b when b is ahead of a, the serial number rule, RFC 1982). So the comparisons are not a total order. The From...
-  //! factories throw std::overflow_error for a value outside the range; nothing else throws or allocates.
+  //! wrap too (a < b when b is ahead of a, the serial number rule, RFC 1982). So the comparisons are not a total order: counts exactly
+  //! 2^63 apart are each "less" than the other, and they order a set of counts (std::sort, std::map) only while all of them lie within
+  //! 2^63 ticks of each other. The From... factories throw std::overflow_error for a value outside the range, FromCounter
+  //! std::out_of_range for a frequency outside its range; nothing else throws or allocates.
   class TickCount64
   {
     uint64_t m_ticks{0};

@@ -61,6 +61,16 @@ def build_and_run(work: Path, name: str, definitions: dict[str, str]) -> None:
     run([str(executables[0])])
 
 
+def check_installs_nothing(work: Path, name: str) -> None:
+    """An application that builds the library inside its own project (add_subdirectory, FetchContent) installs its own files, not the
+    library's: MB_FRAMEPACING_INSTALL is off unless mb_framepacing is the top level project."""
+    prefix = work / (name + "-prefix")
+    run(["cmake", "--install", str(work / name), "--config", "Release", "--prefix", str(prefix)])
+    installed = sorted(str(path.relative_to(prefix)) for path in prefix.rglob("*") if path.is_file()) if prefix.exists() else []
+    if installed:
+        sys.exit(f"{name}: the consumer's install holds the library's files ({len(installed)}: {', '.join(installed[:5])}, ...)")
+
+
 def main() -> int:
     args = parse_args()
     source = Path(args.source).resolve()
@@ -73,7 +83,9 @@ def main() -> int:
             "fetchcontent",
             {"MB_CONSUMER_MODE": "fetchcontent", "FETCHCONTENT_SOURCE_DIR_MB_FRAMEPACING": source.as_posix(), "MB_CONSUMER_VERSION": major_minor},
         )
+        check_installs_nothing(work, "fetchcontent")
         build_and_run(work, "subdirectory", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix()})
+        check_installs_nothing(work, "subdirectory")
 
         print("\n== install", flush=True)
         library = work / "library"

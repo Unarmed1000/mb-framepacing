@@ -39,13 +39,15 @@ target_compile_features(mb_framepacing_marker PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_marker PUBLIC mb_framepacing::core)
 target_compile_options(mb_framepacing_marker PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MB_FRAMEPACING_CXX_WARNINGS}> ${MB_FRAMEPACING_SECTION_FLAGS})
 
-install(TARGETS mb_framepacing_marker EXPORT mb_framepacingTargets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-# The third-party component the module's QR encoder is ported from (qrcodegen), and the reference shaders that draw the marker as one quad
-# (sdk/shaders; shaders/ in a release archive)
-install(FILES ${MB_FRAMEPACING_LEGAL_DIR}/licenses/qrcodegen-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing/licenses)
-install(DIRECTORY ${MB_FRAMEPACING_META_DIR}/shaders/ DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing/shaders)
+if(MB_FRAMEPACING_INSTALL)
+  install(TARGETS mb_framepacing_marker EXPORT mb_framepacingTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  # The third-party component the module's QR encoder is ported from (qrcodegen), and the reference shaders that draw the marker as one
+  # quad (sdk/shaders; shaders/ in a release archive)
+  install(FILES ${MB_FRAMEPACING_LEGAL_DIR}/licenses/qrcodegen-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing/licenses)
+  install(DIRECTORY ${MB_FRAMEPACING_META_DIR}/shaders/ DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing/shaders)
+endif()
 
 if(MB_FRAMEPACING_BUILD_TOOLS)
   add_executable(marker-render tools/marker-render/main.cpp)

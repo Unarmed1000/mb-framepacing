@@ -61,11 +61,13 @@ target_compile_features(mb_framepacing_data PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_data PUBLIC mb_framepacing::marker PRIVATE $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>)
 target_compile_options(mb_framepacing_data PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
-install(TARGETS mb_framepacing_data EXPORT mb_framepacingTargets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-# The one third-party component compiled into the module (nlohmann/json)
-install(FILES ${MB_FRAMEPACING_LEGAL_DIR}/licenses/nlohmann-json-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing/licenses)
+if(MB_FRAMEPACING_INSTALL)
+  install(TARGETS mb_framepacing_data EXPORT mb_framepacingTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  # The one third-party component compiled into the module (nlohmann/json)
+  install(FILES ${MB_FRAMEPACING_LEGAL_DIR}/licenses/nlohmann-json-MIT.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing/licenses)
+endif()
 
 if(MB_FRAMEPACING_BUILD_TESTS)
   add_executable(mb_framepacing_data_tests tests/AnalysisOutputTests.cpp tests/CaptureDataTests.cpp tests/GoldenDataTests.cpp)

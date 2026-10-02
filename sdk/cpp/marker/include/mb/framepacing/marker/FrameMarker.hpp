@@ -71,7 +71,8 @@ namespace MB::FramePacing::Marker
   bool TryDecodePayload(std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* pMetadata = nullptr) noexcept;
 
   //! Encode a marker: the payload's QR symbol as a module matrix, the one step every drawing output starts from (metadata is only used by
-  //! start markers). Draw it with ModulesToQuads, ModulesToTriangles, ModulesToIndexed or ModulesToBitmap; one matrix can feed several.
+  //! start markers). Draw it with ModulesToQuads, ModulesToTriangles, ModulesToIndexed, ModulesToGridIndices or ModulesToBitmap; one
+  //! matrix can feed several.
   //! Does not allocate. Returns false (rMatrix unchanged) if the payload cannot be encoded.
   bool GenerateModules(const Payload& payload, ModuleMatrix& rMatrix, const StartMetadata& metadata = {}) noexcept;
 

@@ -46,6 +46,8 @@ option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; n
 option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer); off until it is reworked" OFF)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
+# An application that builds the library inside its own project installs its own files, not the library's
+option(MB_FRAMEPACING_INSTALL "Add the install rules and the CMake package (find_package(mb_framepacing CONFIG))" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_BENCHMARKS "Build the benchmarks (the marker module's; fetches Google Benchmark unless one is installed)" OFF)
 option(MB_FRAMEPACING_BUILD_FUZZERS "Build the libFuzzer targets (needs Clang): the marker's QR encoder against its reference" OFF)
 option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})
@@ -122,20 +124,23 @@ if(MB_FRAMEPACING_BUILD_PACER)
   list(APPEND MB_FRAMEPACING_COMPONENTS pacer)
 endif()
 
-# Install + export so projects can use find_package(mb_framepacing CONFIG) as an alternative to add_subdirectory/FetchContent.
-install(FILES ${MB_FRAMEPACING_META_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing)
-install(EXPORT mb_framepacingTargets NAMESPACE mb_framepacing:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacing)
-configure_package_config_file(cmake/mb_framepacingConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfig.cmake
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacing)
-# Semantic versioning: in 0.x a minor release may break the API, from 1.0 only a major release may.
-if(PROJECT_VERSION_MAJOR EQUAL 0)
-  set(MB_FRAMEPACING_COMPATIBILITY SameMinorVersion)
-else()
-  set(MB_FRAMEPACING_COMPATIBILITY SameMajorVersion)
+# Install + export so projects can use find_package(mb_framepacing CONFIG) as an alternative to add_subdirectory/FetchContent. The
+# modules add their targets to the export set under the same option.
+if(MB_FRAMEPACING_INSTALL)
+  install(FILES ${MB_FRAMEPACING_META_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/mb_framepacing)
+  install(EXPORT mb_framepacingTargets NAMESPACE mb_framepacing:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacing)
+  configure_package_config_file(cmake/mb_framepacingConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacing)
+  # Semantic versioning: in 0.x a minor release may break the API, from 1.0 only a major release may.
+  if(PROJECT_VERSION_MAJOR EQUAL 0)
+    set(MB_FRAMEPACING_COMPATIBILITY SameMinorVersion)
+  else()
+    set(MB_FRAMEPACING_COMPATIBILITY SameMajorVersion)
+  endif()
+  write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfigVersion.cmake COMPATIBILITY ${MB_FRAMEPACING_COMPATIBILITY})
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacing)
 endif()
-write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfigVersion.cmake COMPATIBILITY ${MB_FRAMEPACING_COMPATIBILITY})
-install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/mb_framepacingConfigVersion.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mb_framepacing)

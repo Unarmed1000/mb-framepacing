@@ -31,9 +31,11 @@ target_compile_features(mb_framepacing_pacer PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_pacer PUBLIC mb_framepacing::core)
 target_compile_options(mb_framepacing_pacer PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
-install(TARGETS mb_framepacing_pacer EXPORT mb_framepacingTargets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+if(MB_FRAMEPACING_INSTALL)
+  install(TARGETS mb_framepacing_pacer EXPORT mb_framepacingTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 if(MB_FRAMEPACING_BUILD_TESTS)
   # Test code, not part of the library: the simulation of the sister repository's frame model (a frame starts when the previous one is

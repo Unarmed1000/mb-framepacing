@@ -21,6 +21,9 @@ namespace MB::FramePacing::Data
     constexpr std::size_t OffsetSecond = OffsetMain + CaptureDataFormat::MainMarkerCapacity;
 
     static_assert(OffsetSecond + CaptureDataFormat::SecondMarkerCapacity == CaptureDataFormat::RecordSize);
+    // Either slot holds any marker the marker module encodes
+    static_assert(CaptureDataFormat::MainMarkerCapacity >= MB::FramePacing::Marker::Payload::MaxEncodedByteCount);
+    static_assert(CaptureDataFormat::SecondMarkerCapacity >= MB::FramePacing::Marker::Payload::MaxEncodedByteCount);
 
     bool TryDecode(const std::vector<uint8_t>& bytes, MB::FramePacing::Marker::Payload& rPayload,
                    MB::FramePacing::Marker::StartMetadata* pMetadata) noexcept

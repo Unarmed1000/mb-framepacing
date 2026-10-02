@@ -14,6 +14,7 @@
 #include <mb/framepacing/marker/geometry/MarkerQuad.hpp>
 #include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
 #include <mb/framepacing/marker/geometry/PixelFormat.hpp>
+#include <mb/framepacing/marker/geometry/PixelFormatUtil.hpp>
 #include <mb/framepacing/marker/geometry/Vertex.hpp>
 #include <mb/framepacing/marker/payload/MarkerFlags.hpp>
 #include <mb/framepacing/marker/payload/Payload.hpp>
@@ -47,6 +48,7 @@ namespace
   std::array<uint8_t, std::size_t{294} * 294u * 4u> g_pixels{};
   FM::ModuleMatrix g_matrix{};
   FM::ModuleMatrix g_startMatrix{};
+  FM::ModuleMatrix g_syncMatrix{};
 }
 
 TEST(Allocations, CountingWorks)
@@ -96,6 +98,25 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       written += FM::GridVertices(FM::MarkerKind::Frame, options, origin, g_grid);
       written += FM::ModulesToGridIndices(g_matrix, g_indices, 32u);
       written += FM::GenerateModules(endPayload, g_matrix) ? 1u : 0u;
+
+      // The sync marker, the values around a payload and the sizing: every call an application makes per frame
+      const FM::Payload syncPayload = framePayload.WithKind(FM::MarkerKind::Sync);
+      written += FM::GenerateModules(syncPayload, g_syncMatrix) ? 1u : 0u;
+      written += FM::ModulesToQuads(g_syncMatrix, options, options.RecommendedOrigin(FM::MarkerKind::Sync, 1080, 2), g_quads);
+      written += FM::GridVertices(FM::MarkerKind::Sync, options, origin, g_grid);
+      written += FM::ModulesToGridIndices(g_syncMatrix, g_indices, 16u);
+      written += FM::ModulesToBitmap(g_syncMatrix, FM::Options(2, 1), {3, 5}, g_pixels, 64, 64, FM::PixelFormat::R8G8B8, 200u) ? 1u : 0u;
+      FM::ModuleMatrix copy;
+      written += FM::ModuleMatrix::TryFromBits(g_syncMatrix.Size(), g_syncMatrix.Bits(), copy) && copy == g_syncMatrix ? 1u : 0u;
+      written += copy.IsDark(0, 0) ? 1u : 0u;
+      written += static_cast<std::size_t>(FM::ModuleMatrix::SizeFor(syncPayload.Kind()));
+      const FM::Options recommended = FM::Options::Recommended(1080, 540);
+      const FM::Options minimum = FM::Options::Minimum(1080, 540);
+      written += static_cast<std::size_t>(recommended.MarkerSizePx() + minimum.MarkerSizePx(FM::MarkerKind::Sync) + recommended.QuietZonePx());
+      written += static_cast<std::size_t>(FM::PixelFormatUtil::BytesPerPixel(FM::PixelFormat::R8G8B8A8));
+      const FM::MarkerFlags flags = (framePayload.Flags() | FM::MarkerFlags::StaticBefore) & FM::MarkerFlags::StaticAfter;
+      written += FM::HasFlag(flags, FM::MarkerFlags::StaticAfter) ? 1u : 0u;
+      written += metadata.Id.IsEmpty() ? 0u : 1u;
       written += FM::EncodePayload(framePayload, metadata, g_payloadBytes);
       written += MB::FramePacing::GetLibraryVersion().Text.size();
 

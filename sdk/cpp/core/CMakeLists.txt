@@ -27,9 +27,11 @@ target_sources(mb_framepacing_core
 target_compile_features(mb_framepacing_core PUBLIC cxx_std_20)
 target_compile_options(mb_framepacing_core PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
-install(TARGETS mb_framepacing_core EXPORT mb_framepacingTargets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+if(MB_FRAMEPACING_INSTALL)
+  install(TARGETS mb_framepacing_core EXPORT mb_framepacingTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 if(MB_FRAMEPACING_BUILD_TESTS)
   add_executable(mb_framepacing_core_tests

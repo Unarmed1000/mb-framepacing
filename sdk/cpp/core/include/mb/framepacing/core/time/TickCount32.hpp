@@ -17,8 +17,8 @@ namespace MB::FramePacing
   //!
   //! Two counts compare and subtract correctly while they are less than 2^31 ticks (214.7483648 s) apart, across the wrap too: a < b
   //! when b is ahead of a, the serial number rule (RFC 1982). So the comparisons are not a total order, and counts exactly 2^31 apart
-  //! are each "less" than the other. The From... factories throw std::overflow_error for a value outside the range; nothing else throws
-  //! or allocates.
+  //! are each "less" than the other. They order a set of counts (std::sort, std::map) only while all of them lie within 2^31 ticks of
+  //! each other. The From... factories throw std::overflow_error for a value outside the range; nothing else throws or allocates.
   class TickCount32
   {
     uint32_t m_ticks{0};

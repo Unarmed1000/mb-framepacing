@@ -37,6 +37,8 @@ namespace MB::FramePacing::Data
       return m_recordCount;
     }
 
+    //! The record at index (0 to RecordCount() - 1). Throws std::out_of_range for another index, DataFormatError for bytes that are not
+    //! a record.
     CaptureDataRecord ReadRecord(int64_t index);
 
     //! Every record, in file order.

@@ -112,6 +112,21 @@ TEST(TickCount64, ASlowCounterPastTheRangeWrapsAsTheCountDoes)
             FP::TimeSpan::FromMilliseconds(-1));
 }
 
+TEST(TickCount64, CountsExactlyHalfTheRangeApartAreEachLessThanTheOther)
+{
+  // The comparisons look at the distance across the wrap: at exactly 2^63 ticks apart it is the same either way
+  const FP::TickCount64 a(0);
+  const FP::TickCount64 b(MinTicks);
+  EXPECT_TRUE(a < b);
+  EXPECT_TRUE(b < a);
+  EXPECT_FALSE(a > b);
+  EXPECT_FALSE(b > a);
+  EXPECT_FALSE(a == b);
+  // One tick less and the order is plain again
+  EXPECT_TRUE(a < FP::TickCount64(MaxTicks));
+  EXPECT_FALSE(FP::TickCount64(MaxTicks) < a);
+}
+
 TEST(TickCount64, ACounterFrequencyOutsideItsRangeThrows)
 {
   EXPECT_THROW(static_cast<void>(FP::TickCount64::FromCounter(123, 0)), std::out_of_range);

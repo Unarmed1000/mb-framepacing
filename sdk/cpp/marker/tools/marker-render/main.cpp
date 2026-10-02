@@ -64,7 +64,7 @@ namespace
 
   Image Render(const RenderRequest& request)
   {
-    const int32_t markerSize = request.Options.MarkerSizePx();
+    const int32_t markerSize = request.Options.MarkerSizePx(request.Payload.Kind());
     Image image;
     image.Width = request.CanvasWidth > 0 ? request.CanvasWidth : request.Origin.X + markerSize + FM::Options::RecommendedInsetPx;
     image.Height = request.CanvasHeight > 0 ? request.CanvasHeight : request.Origin.Y + markerSize + FM::Options::RecommendedInsetPx;
@@ -191,9 +191,10 @@ namespace
   //! modules.csv: the QR module matrix of many pseudo random payloads (frame, start, end and sync markers; the start markers carry random,
   //! text, empty and all 0xFF sequence ids; both symbol versions use every mask). Other implementations of the marker (C#, Python) must
   //! reproduce every row exactly.
-  //! Columns: kind, run id, frame index, animation ticks, intended display ticks, target frame ticks, CPU start ticks, CPU busy ticks,
-  //! preferred frame ticks, flags (the byte, reserved bits included), start UTC ticks, sequence id (32 hex digits, start markers only), symbol size,
-  //! modules (hex): row major, one bit per module (1 = dark), most significant bit first, the last byte zero padded.
+  //! Columns, the payload's in the order of the wire format: kind, run id, frame index, flags (the byte, reserved bits included),
+  //! animation ticks, preferred frame ticks, target frame ticks, intended display ticks, CPU start ticks, CPU busy ticks; then start UTC
+  //! ticks, sequence id (32 hex digits, start markers only), symbol size, modules (hex): row major, one bit per module (1 = dark), most
+  //! significant bit first, the last byte zero padded.
   void WriteModuleDigest(const std::filesystem::path& directory)
   {
     constexpr int32_t RowCount = 512;
@@ -502,7 +503,7 @@ int main(int argc, char* argv[])
       }
       else if (arg == "--background")
       {
-        request.Background = static_cast<uint8_t>(ParseNumber<uint32_t>(next(), arg));
+        request.Background = ParseNumber<uint8_t>(next(), arg);
       }
       else if (arg == "-o" || arg == "--output")
       {
