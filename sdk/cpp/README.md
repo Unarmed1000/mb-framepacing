@@ -193,8 +193,9 @@ ticks, in the integer type it has, so a value is read exactly as it was written:
 
 ## The pacer (experimental)
 
-> **Experimental.** The pacer has only run against its own simulation, never against a real swap chain. It is off by default
-> (`-DMB_FRAMEPACING_BUILD_PACER=ON` builds it, Conan's `with_pacer=True`), and its API may change in any release.
+> **Experimental.** The pacer is checked against its own simulation only: no capture of it on a real swap chain has been analysed
+> yet. It is off by default (`-DMB_FRAMEPACING_BUILD_PACER=ON` builds it, Conan's `with_pacer=True`), and its API may change in any
+> release.
 
 ```cpp
 #include <mb/framepacing/pacer/FramePacer.hpp>

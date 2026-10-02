@@ -1,8 +1,8 @@
 # The frame pacer (experimental)
 
-> **Experimental.** The pacer has only run against its own simulation, never against a real swap chain. It is off by default
-> (`MB_FRAMEPACING_BUILD_PACER`, Conan's `with_pacer`), its API may change in any release, and it is not what the marker and the tools
-> need: they measure any pacer. See [Status](#status).
+> **Experimental.** The pacer is checked against its own simulation only: no capture of it on a real swap chain has been analysed
+> yet. It is off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's `with_pacer`), its API may change in any release, and it is not
+> what the marker and the tools need: they measure any pacer. See [Status](#status).
 
 The pacer module paces a frame loop with nothing but a steady clock and a `Present` that waits for vsync: a baseline that works on any
 platform, with the oldest graphics APIs too. It gives every frame the **swap interval** to hold it for, the **animation time** to render
@@ -29,6 +29,14 @@ it paces; only other settings that need a larger frame window do.
 | Every line and branch of the module by its tests; no allocation per frame                                                             |                                                          |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
+
+**A first integration.** This project's author's own, **unofficial** [gtec-demo-framework](https://github.com/Unarmed1000/gtec-demo-framework) has the pacer in its three
+FramePacing samples, for [Vulkan](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/Vulkan/FramePacing), [OpenGL ES 3](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES3/FramePacing) and [OpenGL ES 2](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES2/FramePacing)
+([its description](https://github.com/Unarmed1000/gtec-demo-framework/blob/master/Doc/FramePacing.md)): a frame loop with a target frame rate, the adaptive rule, a CPU and a GPU load to try them with, and
+the marker filled from the schedule. There the pacer has paced Vulkan swap chains on Windows, where it held its targets by its own
+count of late frames; the OpenGL ES samples have only run on an emulator whose swap is not locked to vsync. No capture of it has
+been analysed with the tools, so the "not checked" column above stands. What that integration found is in this guide
+([Applying the schedule](#applying-the-schedule), `EndFrame`'s work).
 
 ## What it needs
 

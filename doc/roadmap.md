@@ -32,7 +32,9 @@ The work:
 ## The frame pacer
 
 The SDK's [frame pacer](../sdk/doc/pacer.md) is a first version and experimental: a baseline that needs only a steady clock and a
-`Present` that waits for vsync, so it works on any platform, and it is off by default. It has only run against its own simulation.
+`Present` that waits for vsync, so it works on any platform, and it is off by default. It is checked against its own simulation
+only; a first integration (the author's unofficial gtec-demo-framework, see the guide's Status) runs it on real swap chains, not
+yet measured with the tools.
 
 **Out of experimental:** measure it on real swap chains, with the marker and the tools, on each platform and for each way of applying
 a schedule (the platform's swap interval, presenting a frame again, sleeping until the frame is due). Until then it stays off by

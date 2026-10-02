@@ -17,15 +17,16 @@ Everything here is under the BSD 3-Clause License. The measuring tools themselve
 
 ## Where to start
 
-| You want to                                  | Start with                                                                                                                                                    |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Put the marker into a C++, C# or Python app  | [Integrating the marker](doc/integrating.md), then the library's README below                                                                                 |
-| Put the marker into a Unity game             | [Unity](doc/unity.md)                                                                                                                                         |
-| Pace your frames and fill the marker from it | [The frame pacer](doc/pacer.md) (experimental, off by default)                                                                                                |
-| Know what to write in each marker field      | [Filling the marker fields](doc/marker-fields.md)                                                                                                             |
-| Read the tools' results in your own code     | [The data module](#the-data-module), [the analysis output format](doc/analysis-output-format.md)                                                              |
-| Implement the marker or a reader yourself    | [The marker format](doc/marker-format.md), [the capture data format](doc/capture-data-format.md), [the analysis output format](doc/analysis-output-format.md) |
-| Know what the marker costs per frame         | [Encoding performance](doc/encoding-performance.md), and the benchmarks in the [C++ README](cpp/README.md)                                                    |
+| You want to                                  | Start with                                                                                                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Put the marker into a C++, C# or Python app  | [Integrating the marker](doc/integrating.md), then the library's README below                                                                                               |
+| See it built into a real application         | [A complete integration to look at](doc/integrating.md#a-complete-integration-to-look-at): every OpenGL ES and Vulkan sample of the author's unofficial gtec-demo-framework |
+| Put the marker into a Unity game             | [Unity](doc/unity.md)                                                                                                                                                       |
+| Pace your frames and fill the marker from it | [The frame pacer](doc/pacer.md) (experimental, off by default)                                                                                                              |
+| Know what to write in each marker field      | [Filling the marker fields](doc/marker-fields.md)                                                                                                                           |
+| Read the tools' results in your own code     | [The data module](#the-data-module), [the analysis output format](doc/analysis-output-format.md)                                                                            |
+| Implement the marker or a reader yourself    | [The marker format](doc/marker-format.md), [the capture data format](doc/capture-data-format.md), [the analysis output format](doc/analysis-output-format.md)               |
+| Know what the marker costs per frame         | [Encoding performance](doc/encoding-performance.md), and the benchmarks in the [C++ README](cpp/README.md)                                                                  |
 
 ## Pick a library
 

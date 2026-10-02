@@ -132,7 +132,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
   const FP::TimeSpan animationTime = FP::TimeSpan::FromSeconds(animationSeconds); // the time your animation used
-  FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, animationTime}, matrix);
+  FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 }
@@ -201,7 +201,7 @@ in the order of the wire format: the kind, run id, frame index, flags and animat
 // Kind, run id, frame index, flags, animation time; then preferred and target frame time, intended display time, CPU start and busy
 // The animation time is an FP::TimeSpan, the frame times and CPU busy FP::TimeSpan32, the intended display and CPU start time
 // FP::TickCount64 (all in 100 ns ticks)
-const FM::Payload payload(FM::MarkerKind::Frame, runId, frameIndex, nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::None,
+const FM::Payload payload(FM::MarkerKind::Frame, runId, frameIndex, nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::NoFlags,
                           animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime, cpuBusy);
 ```
 
@@ -247,7 +247,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::None, FP::TimeSpan::FromSeconds(animationSeconds));
+  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::NoFlags, FP::TimeSpan::FromSeconds(animationSeconds));
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }
@@ -264,6 +264,27 @@ mb-framepacing capture -d "<your capture card>" --scale 960x540 --wait-for-start
 or record with any other tool (a lossless video, a high speed camera's image sequence) and use `mb-framepacing import`. To film
 the screen with a high speed camera, draw the sync marker as well and see the very experimental
 [camera capture](../../measure/doc/camera.md).
+
+## A complete integration to look at
+
+This project's author keeps an **unofficial** version of the gtec-demo-framework,
+[Unarmed1000/gtec-demo-framework](https://github.com/Unarmed1000/gtec-demo-framework), with the marker built into the framework. Its
+[Doc/FramePacing.md](https://github.com/Unarmed1000/gtec-demo-framework/blob/master/Doc/FramePacing.md) describes it; in short:
+
+- **Every OpenGL ES 2, OpenGL ES 3 and Vulkan sample can show the marker**, without a change to the sample: the framework draws it
+  as the last thing of the frame. It is off by default. `--FramePacing` switches it on, `--FramePacing.SyncMarker` adds the sync
+  marker, `--FramePacing.Run <name>` with `--FramePacing.Duration <seconds>` brackets a measured run with the start and end markers,
+  and `--FramePacing.CaptureHeight <px>` sizes the modules for the height the capture is stored at.
+- **Three samples also pace their frames** with the SDK's experimental [frame pacer](pacer.md): FramePacing for
+  [Vulkan](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/Vulkan/FramePacing), [OpenGL ES 3](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES3/FramePacing) and [OpenGL ES 2](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES2/FramePacing). The pacer is in those three samples only, not in the
+  framework.
+
+Its example, any sample measured for 30 seconds:
+
+```sh
+GLES3.Stats --FramePacing.Run "Stats 30s" --FramePacing.Duration 30 --FramePacing.CaptureHeight 540
+mb-framepacing capture -d "<capture card>" --scale 960x540 --wait-for-start --stop-at-end --analyze
+```
 
 ## Checking your integration
 

@@ -209,7 +209,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     sequences (`FrameSequence`, `WaveletMatrix`), which rank plain integers. The GUI's `Stopwatch` timestamps stay raw.
 - **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`): EXPERIMENTAL.** A first version designed from scratch as the baseline that
   works on any platform: it needs a steady clock (passed in), a `Present` that waits for vsync and the display's refresh period, nothing
-  else. It has only run against its own simulation, never a real swap chain. Off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's
+  else. It is checked against its own simulation only: the first integration (the user's unofficial gtec-demo-framework, three
+  FramePacing samples, linked from the guide's Status and from `integrating.md`) runs it on real swap chains, but no capture of it
+  has been analysed with the tools. Off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's
   `with_pacer`); build it with `-DMB_FRAMEPACING_BUILD_PACER=ON`.
   - **Off for users, on where we check:** the `windows` and `linux-sanitize` presets, CI's and the release workflow's C++ build and
     tests (Windows, Ubuntu, macOS) build it. `check_consumers.py` and `check_conan.py` each run once more with it (the consumer and
