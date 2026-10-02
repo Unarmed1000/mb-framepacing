@@ -31,7 +31,8 @@ namespace MB.FramePacing.App.Commands
       var fpsOption = new Option<double?>("--fps") { Description = "Image sequences: the frame rate the images were captured at." };
       var timestampsOption = new Option<string?>("--timestamps")
       {
-        Description = "Image sequences: a CSV with 'fileName,timeMs' per image (overrides --fps; the images are used in this order).",
+        Description =
+          "Image sequences: a CSV with the header line 'fileName,timeTicks' and a line per image, its time in 100 ns ticks (overrides --fps; the images are used in this order).",
       };
       var scaleOption = new Option<string?>("--scale") { Description = "Stored frame size WIDTHxHEIGHT (area downscale). Prefer integer ratios." };
       var roiOption = new Option<string?>("--roi")

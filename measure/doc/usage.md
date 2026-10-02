@@ -201,8 +201,19 @@ rate works. A camera filming the screen needs a calibrated camera rig and `--cam
   60 fps screen recording of a 144 Hz display misses most of the frames the viewer saw. Only a camera filming the screen
   (`--camera`) films faster; its refresh rate is calculated from the frames.
 - Record **lossless or at a high bit rate** (FFV1, lossless H.264/HEVC, PNG images): heavy compression blurs the marker.
-- Images are sorted by name with numbers compared as numbers (`frame2` before `frame10`). A timestamp file is CSV with one line per
-  image, `fileName,timeMs`, in the order the frames were taken; `#` comments and a header line are allowed.
+- Images are sorted by name with numbers compared as numbers (`frame2` before `frame10`).
+- A timestamp file is CSV: a header line that names the columns, `fileName,timeTicks`, then one line per image in the order the
+  frames were taken. A time is a whole number of 100 ns ticks, as every time in the tools' files (a millisecond is 10 000 ticks):
+
+  ```text
+  fileName,timeTicks
+  frame0001.png,0
+  frame0002.png,166667
+  ```
+
+  The columns are found by their names, so their order does not matter and other columns are ignored; `#` comments and empty lines
+  are skipped. A file without the header, or with a time that is not a whole number, is refused with the line it is on.
+
 - `--scale`, `--roi x,y,width,height` and `--roi auto` work on imports too.
 
 ## 5. Results

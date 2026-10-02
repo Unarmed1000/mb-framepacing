@@ -355,7 +355,7 @@ mb-framepacing locate -d "Cam Link 4K" --mode 1920x1080@240  # where the marker 
 mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
 mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-end --analyze  # an OBS recording of the capture card
 mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images at a known frame rate
-mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeMs)
+mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeTicks)
 mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
 mb-framepacing analyze <capture folder>                   # (re)analyse
 mb-framepacing analyze <capture folder> --target-fps 30   # ... measuring late frames against a 30 fps target

@@ -42,12 +42,57 @@ namespace MB.FramePacing.Capture.UnitTest
       using var temp = new TempDirectory();
       Touch(temp, "a.png", "b.png", "c.png");
       var csv = temp.File("times.csv");
-      File.WriteAllText(csv, "file,timeMs\n# comment\nc.png,100\na.png,104.5\nb.png,110\n");
+      File.WriteAllText(csv, "fileName,timeTicks\n# comment\nc.png,1000000\na.png,1045000\n\nb.png,1100000\n");
 
       var frames = ImageSequence.Collect(temp.Path, null, csv);
 
       Assert.That(frames.Select(f => Path.GetFileName(f.Path)), Is.EqualTo(new[] { "c.png", "a.png", "b.png" }));
       Assert.That(frames.Select(f => f.Time.Ticks), Is.EqualTo(new long[] { 1_000_000, 1_045_000, 1_100_000 }));
+    }
+
+    [Test]
+    public void Collect_TimestampFile_FindsItsColumnsByName_AndReadsTheTicksAsTheyAre()
+    {
+      using var temp = new TempDirectory();
+      Touch(temp, "a.png", "b.png", "c.png");
+      var csv = temp.File("times.csv");
+      // A comment and an empty line before the header, the columns in the other order with one more between them, spaces around the
+      // cells (the file is written by hand), a negative first time, and a time a double does not hold exactly (2^53 + 1)
+      File.WriteAllText(
+        csv,
+        "# exported by the camera\r\n\r\ntimeTicks,exposureUs,fileName\r\n-5 , 100 , a.png\r\n9007199254740993,100,b.png\r\n9223372036854775807,100,c.png\r\n"
+      );
+
+      var frames = ImageSequence.Collect(temp.Path, null, csv);
+
+      Assert.That(frames.Select(f => Path.GetFileName(f.Path)), Is.EqualTo(new[] { "a.png", "b.png", "c.png" }));
+      Assert.That(frames.Select(f => f.Time.Ticks), Is.EqualTo(new long[] { -5, 9_007_199_254_740_993, long.MaxValue }));
+    }
+
+    [TestCase("c.png,100\n", 1, "timeTicks", TestName = "{m}(no header: the old file's first line)")]
+    [TestCase("file,timeMs\nc.png,100\n", 1, "10 000", TestName = "{m}(the old header)")]
+    [TestCase("fileName,timeMs\nc.png,100\n", 1, "10 000", TestName = "{m}(the old unit)")]
+    [TestCase("fileName\nc.png\n", 1, "timeTicks", TestName = "{m}(no time column)")]
+    [TestCase("timeTicks\n100\n", 1, "fileName", TestName = "{m}(no file name column)")]
+    [TestCase("fileName,timeTicks\nc.png,104.5\n", 2, "104.5", TestName = "{m}(a fraction)")]
+    [TestCase("fileName,timeTicks\nc.png,0\na.png,1e3\n", 3, "1e3", TestName = "{m}(an exponent)")]
+    [TestCase("fileName,timeTicks\nc.png,+5\n", 2, "+5", TestName = "{m}(a plus sign)")]
+    [TestCase("fileName,timeTicks\nc.png,1_000\n", 2, "1_000", TestName = "{m}(a digit separator)")]
+    [TestCase("fileName,timeTicks\nc.png,\n", 2, "whole number", TestName = "{m}(an empty time)")]
+    [TestCase("fileName,timeTicks\n# two images\n\nc.png\n", 4, "whole number", TestName = "{m}(a line with one cell)")]
+    [TestCase("fileName,timeTicks\nc.png,9223372036854775808\n", 2, "9223372036854775808", TestName = "{m}(more than 64 bits hold)")]
+    [TestCase("fileName,timeTicks\n,5\n", 2, "file name", TestName = "{m}(no file name)")]
+    public void Collect_TimestampFile_ThatIsNotOne_IsRefused(string content, int line, string says)
+    {
+      using var temp = new TempDirectory();
+      Touch(temp, "a.png", "c.png");
+      var csv = temp.File("times.csv");
+      File.WriteAllText(csv, content);
+
+      Assert.That(
+        () => ImageSequence.Collect(temp.Path, null, csv),
+        Throws.InstanceOf<InvalidDataException>().With.Message.Contains($"times.csv:{line}: ").And.Message.Contains(says)
+      );
     }
 
     [Test]
@@ -59,8 +104,15 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.Throws<FileNotFoundException>(() => ImageSequence.Collect(temp.Path, 60, null), "no images");
 
       var csv = temp.File("times.csv");
-      File.WriteAllText(csv, "missing.png,0\n");
+      File.WriteAllText(csv, "fileName,timeTicks\nmissing.png,0\n");
       Assert.Throws<FileNotFoundException>(() => ImageSequence.Collect(temp.Path, null, csv));
+      File.WriteAllText(csv, "fileName,timeTicks\n# no images\n");
+      Assert.That(
+        () => ImageSequence.Collect(temp.Path, null, csv),
+        Throws.InstanceOf<InvalidDataException>().With.Message.Contains("lists no images")
+      );
+      File.WriteAllText(csv, string.Empty);
+      Assert.That(() => ImageSequence.Collect(temp.Path, null, csv), Throws.InstanceOf<InvalidDataException>().With.Message.Contains("timeTicks"));
     }
 
     [Test]

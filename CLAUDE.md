@@ -191,6 +191,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     Nothing between a marker and a file goes through a floating point number: never add a milliseconds column or field for a time.
     Only `summary.json`'s statistics and histograms are milliseconds (`…Ms`): a mean or an interpolated percentile is no whole tick.
     A whole number is digits with a `-` in front when negative, in every language's reader (no `+`, spaces, fraction or exponent).
+    The rule covers the files the tools read too: an image sequence's timestamp file (`import --timestamps`) is `fileName,timeTicks`.
   - **Readers are strict, and alike:** what every file has is required (`sdk/doc/analysis-output-format.md` marks it), a value must be
     of its field's type and in its range, and content that is not is one error type per module (C++ `DataFormatError`, C#
     `InvalidDataException`, Python `DataFormatError`), with the file and line for a CSV. A file that cannot be opened is the
@@ -270,7 +271,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file / Image folder / Network stream") go through
     `MediaInput` -> ffmpeg.
   - Image sequences get their exact times from `--fps` or the timestamp CSV (`FrameTimestamps`), not from ffmpeg: its concat
-    timestamps are 40 ms coarse.
+    timestamps are 40 ms coarse. The CSV (`ImageSequence.ReadTimestamps`) needs its header line, `fileName,timeTicks` found by name,
+    and holds whole ticks: a headerless file, or one with `timeMs`, is refused, since whole milliseconds would read as ticks.
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
 - **Fast capture** (`--roi auto`, `locate`, the GUI's "Locate marker"):
   - `FfmpegMarkerLocator` runs ffmpeg uncropped into `MarkerProbe` (nothing is recorded). `MarkerCrop` then picks the region and

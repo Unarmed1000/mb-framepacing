@@ -193,7 +193,7 @@ namespace MB.FramePacing.Gui.ViewModels
         SourceKind.VideoFile =>
           "Any video ffmpeg can read (mp4, mkv, mov, ...), e.g. a lossless recording or a high speed camera clip. Its own timestamps are used.",
         SourceKind.ImageFolder =>
-          "A folder of frames (png, jpg, bmp, ...), in name order at the given frame rate, or with exact times from a CSV (fileName,timeMs).",
+          "A folder of frames (png, jpg, bmp, ...), in name order at the given frame rate, or with exact times from a CSV (a header line fileName,timeTicks, then a line per image; 100 ns ticks).",
         SourceKind.Stream => "A live stream ffmpeg can open: rtsp://, srt://, udp://, http(s)://. Stop it with Stop or a duration.",
         SourceKind.SyntheticCamera =>
           "VERY EXPERIMENTAL: the synthetic game (60 Hz) filmed by a simulated 1000 fps camera at an angle. Set it up with Set up camera... in the Camera card, then capture.",
@@ -214,7 +214,7 @@ namespace MB.FramePacing.Gui.ViewModels
     [RelayCommand]
     private async Task BrowseTimestampsAsync()
     {
-      var path = await m_dialogs.PickFileAsync("Select a timestamp file (CSV: fileName,timeMs)");
+      var path = await m_dialogs.PickFileAsync("Select a timestamp file (CSV: fileName,timeTicks)");
       if (path != null)
         TimestampFile = path;
     }

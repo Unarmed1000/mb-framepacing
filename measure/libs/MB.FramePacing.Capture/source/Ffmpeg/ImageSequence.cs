@@ -85,9 +85,18 @@ namespace MB.FramePacing.Capture.Ffmpeg
       return TimeSpan.TicksPerSecond / (double)intervals[intervals.Count / 2];
     }
 
+    /// <summary>
+    /// The timestamp file: a header line that names the columns (fileName and timeTicks, found by name; others are ignored), then a line
+    /// per image in the order the frames were taken. A time is a whole number of 100 ns ticks, as every file's times are, so the unit is
+    /// in the file and nothing goes through a floating point number. Comments (#) and empty lines are skipped.
+    /// </summary>
     private static List<ImageSequenceFrame> ReadTimestamps(string folder, string timestampFile)
     {
+      const string FileNameColumn = "fileName";
+      const string TimeColumn = "timeTicks";
       var frames = new List<ImageSequenceFrame>();
+      int fileNameIndex = -1;
+      int timeIndex = -1;
       int lineNumber = 0;
       foreach (var raw in File.ReadLines(timestampFile))
       {
@@ -95,18 +104,35 @@ namespace MB.FramePacing.Capture.Ffmpeg
         var line = raw.Trim();
         if (line.Length == 0 || line.StartsWith('#'))
           continue;
-        var parts = line.Split(',', StringSplitOptions.TrimEntries);
-        if (parts.Length < 2 || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double ms))
+        // Spaces around a cell are taken: the file is written by hand
+        var cells = line.Split(',', StringSplitOptions.TrimEntries);
+        if (timeIndex < 0)
         {
-          if (frames.Count == 0 && lineNumber == 1)
-            continue; // header line
-          throw new InvalidDataException($"{timestampFile}:{lineNumber}: expected 'fileName,timeMs'");
+          fileNameIndex = Array.IndexOf(cells, FileNameColumn);
+          timeIndex = Array.IndexOf(cells, TimeColumn);
+          if (fileNameIndex < 0 || timeIndex < 0)
+            throw new InvalidDataException(
+              $"{timestampFile}:{lineNumber}: expected a header line with the columns {FileNameColumn} and {TimeColumn} (100 ns ticks). "
+                + "A file with timeMs is the old format: multiply its times by 10 000."
+            );
+          continue;
         }
-        var path = Path.IsPathRooted(parts[0]) ? parts[0] : Path.Combine(folder, parts[0]);
+        string name = fileNameIndex < cells.Length ? cells[fileNameIndex] : string.Empty;
+        string time = timeIndex < cells.Length ? cells[timeIndex] : string.Empty;
+        if (name.Length == 0)
+          throw new InvalidDataException($"{timestampFile}:{lineNumber}: the line has no file name");
+        // Digits, with a '-' in front when negative, as the analysis output's numbers (AllowLeadingSign takes a '+' too)
+        if (time.Length == 0 || time[0] == '+' || !long.TryParse(time, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long ticks))
+          throw new InvalidDataException($"{timestampFile}:{lineNumber}: '{time}' is not a whole number of ticks ({TimeColumn})");
+        var path = Path.IsPathRooted(name) ? name : Path.Combine(folder, name);
         if (!File.Exists(path))
           throw new FileNotFoundException($"{timestampFile}:{lineNumber}: '{path}' does not exist");
-        frames.Add(new ImageSequenceFrame(path, new TickCount64((long)Math.Round(ms * TimeSpan.TicksPerMillisecond))));
+        frames.Add(new ImageSequenceFrame(path, new TickCount64(ticks)));
       }
+      if (timeIndex < 0)
+        throw new InvalidDataException(
+          $"{timestampFile}:{lineNumber}: expected a header line with the columns {FileNameColumn} and {TimeColumn} (100 ns ticks)"
+        );
       if (frames.Count == 0)
         throw new InvalidDataException($"The timestamp file '{timestampFile}' lists no images");
       return frames;
