@@ -21,13 +21,13 @@ shows the **animation error**: how far what the game animated is from what was a
 
 All draw exactly the same pixels; per frame, for the 41×41 main marker:
 
-| #   | Way                                                       | Per frame                                           | Needs                                        |
-| --- | --------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------- |
-| 1   | Overlay **Render Mode: Shader Packed Bits** (the default) | The 211 packed bytes (a 211×1 texture) and one quad | Shader model 3.5 (it falls back to Geometry) |
-| 2   | Overlay **Render Mode: Shader**                           | A 1,681 byte module texture and one quad            | Shader model 3.5 (it falls back to Geometry) |
-| 3   | `FrameMarkerMesh` in your command buffer                  | About 2,600 indices; the grid's vertices stay       | Your own render pipeline code                |
-| 4   | Overlay **Render Mode: Bitmap** (`FrameMarkerTexture`)    | A 41×41 RGBA texture drawn scaled up                | Nothing                                      |
-| 5   | Overlay **Render Mode: Geometry**                         | About 440 rectangles in GL immediate mode           | Nothing: works on every graphics API         |
+| #   | Way                                                       | Per frame                                                         | Needs                                        |
+| --- | --------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- |
+| 1   | Overlay **Render Mode: Shader Packed Bits** (the default) | The 211 packed bytes (a 211×1 texture) and one quad               | Shader model 3.5 (it falls back to Geometry) |
+| 2   | Overlay **Render Mode: Shader**                           | A 1,681 byte module texture and one quad                          | Shader model 3.5 (it falls back to Geometry) |
+| 3   | `FrameMarkerMesh` in your command buffer                  | About 2,600 indices; the grid's vertices stay                     | Your own render pipeline code                |
+| 4   | Overlay **Render Mode: Bitmap** (`FrameMarkerTexture`)    | A module texture with its quiet zone (49×49 RGBA) drawn scaled up | Nothing                                      |
+| 5   | Overlay **Render Mode: Geometry**                         | About 440 rectangles in GL immediate mode                         | Nothing: works on every graphics API         |
 
 The shaders' module lookup is the reference shaders' (`FrameMarker.hlsl`, from `sdk/shaders/hlsl` in the repository).
 

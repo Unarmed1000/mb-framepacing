@@ -12,7 +12,8 @@ The repository has two parts, and the license follows them (see Conventions):
     `mb_framepacing.data`);
   - **pacer** (C++ `MB::FramePacing::Pacer`; off, and its C# port out of the tree, until it is reworked): plans every frame on the display's refreshes with the adaptive swap interval rule
     (the full-window rule of mb-framepacing-explained's simulation, and its fix as the default) and aligns the animation time to refreshes (`AnimationClock`);
-  - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0) in every language (C++
+  - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
+    language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
     byte count from the type) for every module's file and wire formats; the core and the marker module have 100 % test coverage
     (regions, functions, lines, branches), measured with llvm-cov without asserts (`NDEBUG`); the C# core has the same `TickCount64`, `TickCount32` and `TimeSpan32`
@@ -95,13 +96,16 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     include paths); `--preset` takes another one. With a compile database (`linux-sanitize`, CI) clang-tidy checks the sources that build
     compiles: a module that is switched off (the pacer) is skipped, and the script says so. To apply formatting: `clang-format -i` on the files the script lists.
   - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,source,tests}`),
-    each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`
+    each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`,
+    grouped in subfolders where a module has many (`core/time/`, `marker/geometry/`, `marker/payload/`, `data/analysis/`, `data/capture/`)
     (no umbrella headers: callers include each type's header; functions live in a header of their own, e.g. `marker/FrameMarker.hpp`, as
     C#'s static classes), sources mirroring them (`source/mb/framepacing/<module>/<Name>.cpp`, one per header; private helpers in
     `source/.../detail/`, in a namespace named for what they are, such as `Marker::WireFormat` and `Data::CaptureDataFormat`, and named in
     full at every use: no `using namespace`), namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
 COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
+    `MB_FRAMEPACING_INSTALL` (on only when top-level) is around every install rule and the CMake package: an application that builds the
+    library inside its own project installs its own files only (`tests/consumer/check_consumers.py` checks it).
     Each module's tests are their own executable. What they share is in `sdk/cpp/testing` (`mb_framepacing_test_support`, an OBJECT
     library built with the tests only, never installed): `Testing::AllocationCounter` and the counting global `operator new`/`delete`
     the allocation tests link.
@@ -153,10 +157,12 @@ script>` runs inside it, and CI runs `uv sync --locked`. `tools/check_cpp.py` an
   - It isn't stored as one folder: `sdk/unity/build_upm.py` assembles it from `sdk/csharp/core/source` (`Runtime/Core`, asmdef
     `MB.FramePacing`), `sdk/csharp/marker/source` (`Runtime/Marker`, `MB.FramePacing.Marker`) plus `sdk/unity/Runtime/Unity` (helpers,
     all wrapped in `#if UNITY_2021_3_OR_NEWER`), and generates `.meta` files with stable GUIDs.
-  - CI runs it with `--check`.
+  - CI runs it with `--check`: every file the package takes from the repository equals its source, and each default reference names a
+    file and a field of the package.
   - `sdk/unity/check_in_unity.py` verifies it in a real Unity editor in batch mode (every drawing method pixel exact; `--graphics
 glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Unity Hub installed, or `--unity`. Run it after changing
-    the core, the marker module or the helpers.
+    the core, the marker module or the helpers. It also checks that `FrameMarkerTexture` keeps a quiet zone in its range and that
+    `FrameMarkerOverlay` keeps drawing after a frame's draw threw (it reports the first failure and tries the next frame).
   - The core and the marker module must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
     APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
 - **Standalone release archive:** `sdk/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE`, `licenses/` and `shaders/` next to itself in a
@@ -223,6 +229,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - The analysis starts from `captures.mbcd` (`CaptureDecoder.FromData`). A capture with only `frames.mbfc` is decoded with the same
     steps (`CaptureDecoder.DecodeFrames`) and gets `captures.mbcd`; `analyze --redecode` redoes that. `VideoClipTests` checks that
     live and afterwards give identical records, so keep the two paths on the shared decoder.
+- **The suggested way to measure today** is OBS recording a capture card and `import` of the recording (`measure/doc/usage.md` section 2):
+  the display's refresh rate must be the capture source's FPS and OBS's video FPS (the rate the file is saved at), with no scaling and
+  little or no compression. Its OBS settings are proposed, not yet verified with a recording: say so until they are.
 - **Media sources**
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file / Image folder / Network stream") go through
     `MediaInput` -> ffmpeg.
@@ -467,6 +476,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
 tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs it); `--render` (`uv run --with moderngl tools/check_shaders.py --render`, needs a
   GPU; `VULKAN_SDK` for DXC and SPIRV-Cross) draws every one and compares every pixel with `modules_to_bitmap`. Run it after touching
   a shader, and `check_in_unity.py` (also `--graphics glcore|gles|vulkan`) after touching the Unity ones.
+- **A matrix is a marker's:** `ModuleMatrix::TryFromBits` (C#, and Python's `ModuleMatrix(size, bits)`) takes the two marker sizes only (41 and
+  25), the ones the drawing functions and the grid know. **Seconds to ticks truncate** in every language (`TimeSpan::FromSeconds`,
+  `TimeSpanUtil.FromSeconds`, Python's `seconds_to_ticks`: 1/60 s is 166 666 ticks).
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
   `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). A drawn rectangle is a
@@ -498,8 +510,9 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
     comment in XAML/MSBuild/solution files). Every code file (not MSBuild, solutions or workflows) has
     `SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS` on the line right before it, in the same comment style: the SPDX
     short form (as the Linux kernel and REUSE use it), never the license text in the file. `python tools/check_license_headers.py`
-    checks both (CI `lint`), `--fix` adds missing ones (the copyright with the current year). Third-party code (`third_party/`) keeps its own notices; each language's marker module keeps it in a `third_party/`
-    folder of its own (`sdk/cpp/marker/third_party/`, `sdk/python/mb_framepacing/marker/third_party/`), with its license text next to it.
+    checks both (CI `lint`), `--fix` adds missing ones (the copyright with the current year). It also reports a source file that holds a NUL
+    byte (git treats such a file as binary: no diffs, skipped by text searches): write `'\0'`. Third-party code (`third_party/`) keeps its own notices; each language's marker module keeps it in a `third_party/`
+    folder of its own (`sdk/cpp/marker/reference/third_party/`, `sdk/python/mb_framepacing/marker/third_party/`), with its license text next to it.
   - A new file belongs to the license of its path. Moving code across that line (for example from `measure/` into `sdk/`)
     changes its license: only Mana Battery can decide that.
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a

@@ -48,7 +48,7 @@ jobs:
           esac
           ffmpeg -version | head -1
 
-      - name: C++ library (every module)
+      - name: C++ library (core, marker, data)
         shell: bash
         run: |
           cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release

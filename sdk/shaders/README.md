@@ -77,8 +77,8 @@ words hold 4 bytes each, the first in their lowest 8 bits (little endian, as on 
 - **Vulkan**: `vulkan/*.vert` and `*.frag` with `glslangValidator -V` or `glslc`: the constants at set 0, binding 0 (a uniform
   buffer; 256 bytes is more than the push constant space Vulkan guarantees), the module image at set 0, binding 1 (a combined image
   sampler). Or the HLSL through `dxc -spirv`, the vertex shader with `-fvk-invert-y`.
-- **OpenGL 3.3+ and WebGL 2** (`gl/`): link `frame_marker.vert` with one fragment shader. **OpenGL ES 3.0**: replace each file's first
-  line with `#version 300 es` followed by `precision highp float; precision highp int;`.
+- **OpenGL 3.3+** (`gl/`): link `frame_marker.vert` with one fragment shader. **OpenGL ES 3.0 and WebGL 2** (which takes GLSL ES
+  only): replace each file's first line with `#version 300 es` followed by `precision highp float; precision highp int;`.
 - **OpenGL ES 2.0 and WebGL 1** (`gles2/`): GLSL ES 1.00 has no integer operations, so the packed variant gets each bit with float
   arithmetic and reads the 211 bytes from a 211 × 1 `GL_LUMINANCE` texture. Both variants **need `highp` in the fragment shader**:
   with 32 bit floats every value is exact, with the `mediump` OpenGL ES 2.0 guarantees (some GPUs, such as Mali-400, have no more) a

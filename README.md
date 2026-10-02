@@ -166,7 +166,9 @@ sequenceDiagram
 2. Start the recording: **Start capture** in the GUI, or `mb-framepacing capture --wait-for-start --stop-at-end --analyze`.
 3. Run the test in your application. It shows the **start** marker, then the normal frame markers, then the **end** marker.
 4. The recording stops by itself at the end marker and the analysis opens. Record with other equipment instead (a lossless video,
-   a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. Filming the screen
+   a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. **The way we suggest
+   for now** is to record the capture card with OBS Studio at the display's refresh rate and import the recording:
+   [Measure with OBS and a capture card](measure/doc/usage.md#2-measure-with-obs-and-a-capture-card). Filming the screen
    with a calibrated high speed camera is **very experimental**: see [measure/doc/camera.md](measure/doc/camera.md).
 
 The start and end markers bracket exactly the part you want measured. The start marker also carries a sequence id (a UUID, or a
@@ -196,7 +198,7 @@ The exact format, sizing rules and placement are in [`sdk/doc/marker-format.md`]
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1. Install and build, per platform | **[Windows](measure/doc/install/windows.md)** · **[Ubuntu](measure/doc/install/ubuntu.md)** · **[macOS (Homebrew)](measure/doc/install/macos.md)**               |
 | 2. Put the marker into your app    | **[Integrating the marker](sdk/doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](sdk/doc/marker-fields.md)** |
-| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (test game, capture card, video/image import, results, troubleshooting)                                         |
+| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (test game, OBS and a capture card, direct capture, video/image import, results, troubleshooting)               |
 
 The platform guides cover ffmpeg, building the tools and putting them on your PATH, capture card devices and permissions, and
 building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).
@@ -351,6 +353,7 @@ mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --scale 960x540 --w
 mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end  # fast capture
 mb-framepacing locate -d "Cam Link 4K" --mode 1920x1080@240  # where the marker is, and the region a fast capture stores
 mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
+mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-end --analyze  # an OBS recording of the capture card
 mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images at a known frame rate
 mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeMs)
 mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
@@ -432,7 +435,7 @@ then the usual install folders (winget, Chocolatey, Scoop, Homebrew, apt, snap).
 ## Building from source
 
 Step-by-step instructions per platform, including putting the tools on your PATH, are in the [platform guides](#getting-started).
-This is the developer summary. Requirements: the .NET 10 SDK, CMake 4.0+ with a C++20 compiler (MSVC 19.4x / Visual Studio 2026, GCC 12+, Clang 16+ or
+This is the developer summary. Requirements: the .NET 10 SDK, CMake 4.0+ with a C++20 compiler (MSVC 19.5x / Visual Studio 2026, GCC 12+, Clang 16+ or
 AppleClang 15+), Python 3, and Node.js for formatting the docs.
 
 ```sh
@@ -440,7 +443,8 @@ AppleClang 15+), Python 3, and Node.js for formatting the docs.
 mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 
-# C++ library, every module (presets: windows, linux, linux-clang, macos); the tests fetch GoogleTest
+# C++ library: the core, marker and data modules (the pacer is off until it is reworked); the tests fetch GoogleTest.
+# Presets: windows, linux, linux-clang, linux-sanitize, macos
 cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
 python sdk/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
 
@@ -489,26 +493,26 @@ flowchart TB
     AN --> GUI
 ```
 
-| Path                        | Contents                                                                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                    |
-| `sdk/VERSION`               | The SDK's version: every module, every language                                                                               |
-| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, `pacer/`), its Conan recipe           |
-| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10) |
-| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                       |
-| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                  |
-| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                            |
-| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats                                    |
-| `sdk/test-data/`            | Golden marker images (checked by every marker module) and the data modules' golden data                                       |
-| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                           |
-| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                 |
-| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                           |
-| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                     |
-| `measure/doc/`              | Platform, usage and camera guides, images                                                                                     |
-| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                               |
-| `doc/`                      | Release guide and roadmap                                                                                                     |
-| `tools/`                    | Repository scripts: checks, golden data                                                                                       |
-| `licenses/`                 | Licenses of every third-party component                                                                                       |
+| Path                        | Contents                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                                        |
+| `sdk/VERSION`               | The SDK's version: every module, every language                                                                                                   |
+| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, and `pacer/`, off until it is reworked), its Conan recipe |
+| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10)                     |
+| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                                           |
+| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                                      |
+| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                                                |
+| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats, the pacer, encoding performance                       |
+| `sdk/test-data/`            | Golden marker images (checked by every marker module), the data modules' golden data and the pacer's                                              |
+| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                                               |
+| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                                     |
+| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                                               |
+| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                                         |
+| `measure/doc/`              | Platform, usage and camera guides, images                                                                                                         |
+| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                                                   |
+| `doc/`                      | Release guide and roadmap                                                                                                                         |
+| `tools/`                    | Repository scripts: checks, golden data                                                                                                           |
+| `licenses/`                 | Licenses of every third-party component                                                                                                           |
 
 ## License
 

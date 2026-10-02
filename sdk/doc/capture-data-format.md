@@ -15,22 +15,22 @@ write through it.
 
 ## Header (256 bytes)
 
-| Offset | Size | Field                                                                                                     |
-| ------ | ---- | --------------------------------------------------------------------------------------------------------- |
-| 0      | 4    | Magic `MBCD` (`0x4443424D`)                                                                               |
-| 4      | 2    | Format version: 1. Readers refuse a newer version ("update the tools")                                    |
-| 6      | 2    | Header size: 256                                                                                          |
-| 8      | 4    | Record size: 192                                                                                          |
-| 12     | 4    | Flags: bit 0 = the frames were stored too (`frames.mbfc`), bit 1 = camera capture (very experimental)     |
-| 16     | 8    | Stored frame width, height (`i32` each): the frames the markers were read from                            |
-| 24     | 8    | Nominal frame rate: numerator, denominator (`u32` each; 0/0 = unknown)                                    |
-| 32     | 8    | Source width, height (`i32` each), before scaling and cropping                                            |
-| 40     | 16   | Region of the source that was stored: x, y, width, height (`i32` each; all 0 = the whole frame)           |
-| 56     | 8    | Reserved (0)                                                                                              |
-| 64     | 4    | Marker lock count (`u32`, at most 4; 0 = no marker was found)                                             |
-| 68     | 4    | Reserved (0)                                                                                              |
-| 72     | 96   | Up to 4 locks of 24 bytes: bounds x, y, width, height (`i32` each, stored pixels) and module size (`f64`) |
-| 168    | 88   | Reserved (0)                                                                                              |
+| Offset | Size | Field                                                                                                                              |
+| ------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | 4    | Magic `MBCD` (`0x4443424D`)                                                                                                        |
+| 4      | 2    | Format version: 1. Readers refuse a newer version ("update the tools")                                                             |
+| 6      | 2    | Header size: 256                                                                                                                   |
+| 8      | 4    | Record size: 192                                                                                                                   |
+| 12     | 4    | Flags: bit 0 = the frames were stored too (`frames.mbfc`), bit 1 = camera capture (very experimental)                              |
+| 16     | 8    | Stored frame width, height (`i32` each): the frames the markers were read from                                                     |
+| 24     | 8    | Nominal frame rate: numerator, denominator (`u32` each; 0/0 = unknown)                                                             |
+| 32     | 8    | Source width, height (`i32` each), before scaling and cropping; 0 = the stored width, height                                       |
+| 40     | 16   | Region of the source that was stored: x, y, width, height (`i32` each; all 0 = the whole frame)                                    |
+| 56     | 8    | Reserved (0)                                                                                                                       |
+| 64     | 4    | Marker lock count (`u32`, at most 4; 0 = no marker was found)                                                                      |
+| 68     | 4    | Reserved (0)                                                                                                                       |
+| 72     | 96   | Up to 4 locks of 24 bytes: bounds x, y, width, height (`i32` each, stored pixels, the quiet zone included) and module size (`f64`) |
+| 168    | 88   | Reserved (0)                                                                                                                       |
 
 The first lock is the main marker (frame, start and end markers); a second one is the sync marker (the tearing check) or, for a
 camera capture, the second zone. The locks are where the capture's decoder found the markers; the header is completed when the

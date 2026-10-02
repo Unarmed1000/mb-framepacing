@@ -11,7 +11,7 @@ Special **start** and **end** markers bracket a test run so the analyzer can cut
 The marker module of the C++20 library in [`sdk/cpp/marker/`](../cpp/marker) generates the marker geometry, and so do the C# module
 `MB.FramePacing.Marker` ([`sdk/csharp/marker/`](../csharp/marker)) and the Python module `mb_framepacing.marker` ([`sdk/python/`](../python)).
 The tools' C# library `MB.FramePacing.MarkerDecoding` decodes it.
-Both implement this document; if they disagree, this document is the reference. [Integrating the marker](integrating.md) builds it
+All of them implement this document; if they disagree, this document is the reference. [Integrating the marker](integrating.md) builds it
 into an application, and [Filling the marker fields](marker-fields.md) says where each field's value comes from, when it changes and
 what the analysis does with it, with examples for typical frame pacers.
 
@@ -352,6 +352,7 @@ const std::size_t vertexCount = FM::ModulesToTriangles(matrix, options, origin, 
 
 ## Requirements
 
-- C++: CMake 4.0 or newer and a C++20 compiler (MSVC 19.4x / Visual Studio 2026, GCC 12+, Clang 16+, AppleClang 15+).
-  The library has no external dependencies; the unit tests fetch GoogleTest unless an installed one is found.
+- C++: CMake 4.0 or newer and a C++20 compiler (MSVC 19.5x / Visual Studio 2026, GCC 12+, Clang 16+, AppleClang 15+).
+  The core and the marker module have no external dependencies (the data module fetches nlohmann/json unless one is installed); the
+  unit tests fetch GoogleTest unless an installed one is found.
 - C#: .NET 10 SDK.

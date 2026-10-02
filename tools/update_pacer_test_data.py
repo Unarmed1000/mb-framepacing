@@ -5,7 +5,7 @@
 
 1. <scenario>-frames.csv: a busy test clip of measure/test-data/videos (made by mb-framepacing-explained's simulations) frame by frame:
    each frame's render time (the manifest's cpuBusyTicks) and, as the reference, the swap interval it was paced at (60 fps: 1, 30 fps:
-   2) and the refresh it was shown on. 60-busy is the busy stretch of the 60-busy clip (the full-window rule), 60-busy-full-rate the clip of that name (every
+   2) and the refresh it was shown on. 60-busy is the busy stretch of the 60-busy-adaptive clip (the full-window rule), 60-busy-full-rate the clip of that name (every
    refresh, no adapting).
 2. <scenario>-<rule>.csv: pacer-sim --golden, every golden scenario paced with its rules (both, or -Fixed at a fixed swap interval; the
    C++ tool; a port's tests must produce the same bytes).

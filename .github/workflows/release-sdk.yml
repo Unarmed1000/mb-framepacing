@@ -71,7 +71,7 @@ jobs:
           dotnet-version: 10.0.x
       - name: CMake 4
         uses: lukka/get-cmake@v4.4.2
-      - name: C++ library (every module)
+      - name: C++ library (core, marker, data)
         shell: bash
         run: |
           cmake -S sdk/cpp -B sdk/cpp/build/release -DCMAKE_BUILD_TYPE=Release
@@ -138,9 +138,9 @@ jobs:
           cat > notes.md <<EOF
           ## C++ (CMake 4.0+, C++20)
 
-          One library of modules: \`mb_framepacing::core\`, \`mb_framepacing::marker\`, \`mb_framepacing::data\` and \`mb_framepacing::pacer\`.
-          Link the ones you use; \`-DMB_FRAMEPACING_BUILD_DATA=OFF\` leaves the data module (and nlohmann/json) out,
-          \`-DMB_FRAMEPACING_BUILD_PACER=OFF\` the pacer.
+          One library of modules: \`mb_framepacing::core\`, \`mb_framepacing::marker\` and \`mb_framepacing::data\`
+          (\`mb_framepacing::pacer\` is off until it is reworked).
+          Link the ones you use; \`-DMB_FRAMEPACING_BUILD_DATA=OFF\` leaves the data module (and nlohmann/json) out.
 
           \`\`\`cmake
           include(FetchContent)

@@ -18,7 +18,8 @@ copy of `source/`. **Unity:** the [Unity package](../../unity/README.md) contain
 
 The time types (`source/Time/`) are the C++ core's, member for member; a signed interval is .NET's `System.TimeSpan`, whose ticks
 are the SDK's unit. Out of range throws (`OverflowException` from the `From...` factories, `ArgumentOutOfRangeException` from
-`TimeSpan32.FromTimeSpan` and `FromCounter`); nothing else throws or allocates. The SDK never reads a clock: the application gives
+`TimeSpan32.FromTimeSpan` and `FromCounter`, `ArgumentException` from `TimeSpanUtil.FromSeconds` for NaN); nothing else throws or
+allocates. The SDK never reads a clock: the application gives
 its own clock's times, for example `TickCount64.FromCounter(Stopwatch.GetTimestamp(), Stopwatch.Frequency)`.
 
 The C++ core (`MB::FramePacing` in [`sdk/cpp/core`](../../cpp/README.md#the-core)) has the same types; the Python package's root

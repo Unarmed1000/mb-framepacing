@@ -25,7 +25,85 @@ below use `mb-framepacing` / `mb-framepacing-gui`; when running from source, use
 - **Command line:** `mb-framepacing selftest` does the same and checks the result against the known answer. It prints `PASS`,
   or explains what went wrong (usually a machine too slow for the rate: try a lower `--fps`, or `--size 480x270`).
 
-## 2. Measure with a capture card
+## 2. Measure with OBS and a capture card
+
+**This is the way we suggest for now:** [OBS Studio](https://obsproject.com) records what a capture card sees, and mb-framepacing
+analyses the recording afterwards. You keep the recording, so a measurement can be analysed again.
+
+```mermaid
+flowchart LR
+    PC["Application PC<br/>(marker in every frame)"] -->|HDMI / DP| CARD["Capture card<br/>in → passthrough out"]
+    CARD -->|HDMI / DP| MON[Monitor]
+    CARD -->|USB / PCIe| REC["Recording PC<br/>OBS Studio"]
+    REC -->|recording.mkv| TOOL["mb-framepacing<br/>import --analyze"]
+```
+
+### One rate, in three places
+
+The analysis takes every recorded frame as one refresh of the display. That only holds when the same rate is set in all three places:
+
+1. **The display mode** the application's PC outputs: a fixed refresh rate (60 Hz, say), with G-Sync/FreeSync off and HDR off
+   ([Before you start](#before-you-start)).
+2. **The rate OBS takes frames from the card at**: the capture card source's FPS.
+3. **The rate OBS records and saves the file at**: OBS's video FPS.
+
+What goes wrong otherwise:
+
+- A lower rate in 2 or 3 than the display's never records some of the frames that were shown. They are reported as frame indices
+  never seen.
+- A rate in 3 that differs from 2 makes OBS repeat or leave out frames to fit. In the recording a repeated frame is a frame that
+  stayed on screen for two refreshes, and a left out one is a frame that was never shown: the analysis cannot tell them from what the
+  application did.
+- 59.94 Hz and 60 Hz are different rates. Use the display's exact one.
+
+Give the analysis the rate you expect (`--display-hz`, the GUI's **Display refresh rate**): it warns when the recording runs at
+another one.
+
+### OBS settings
+
+The settings below follow from the rule above and from the [recording rules](#4-measure-from-a-recording): the display's rate, no
+scaling, little or no compression. **We have not yet verified each of them with a recording**; where your OBS or card differs, keep
+to the rule.
+
+| Where in OBS                                                           | Set                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sources → Video Capture Device** (the card) → Properties             | **Resolution/FPS Type:** Custom. **Resolution:** the signal's (1920x1080). **FPS:** the display's refresh rate. **Video Format:** an uncompressed one when the card offers it (NV12, YUY2), not MJPEG     |
+| The source in the preview                                              | At its own size in the top-left corner (**Transform → Reset Transform**), and nothing else in the scene: the marker must reach the recording pixel for pixel                                              |
+| **Settings → Video**                                                   | **Base (Canvas) Resolution** and **Output (Scaled) Resolution:** both the signal's resolution, so nothing is scaled                                                                                       |
+| **Settings → Video → FPS**                                             | The display's refresh rate: **Common FPS Values**, or **Integer FPS Value** for a rate that is not in the list (144, 240), or **Fractional FPS Value** 60000 / 1001 for 59.94 Hz                          |
+| **Settings → Output → Output Mode:** Advanced → **Recording**          | **Recording Format:** Matroska Video (.mkv): a recording that is cut short stays readable. **Rescale Output:** off                                                                                        |
+| **Settings → Output → Recording → Video Encoder** and its rate control | Lossless or close to it: x264 with **Rate Control** CRF and a CRF of 0 (lossless) to about 10, or your GPU encoder's lossless or constant quality (CQP) setting with a low value. Not a streaming bitrate |
+
+Then:
+
+1. Check the preview: the marker is sharp, and the source's FPS and OBS's FPS are the display's rate.
+2. **Start Recording** before the application shows its start marker, run the test, and **Stop Recording** after the end marker. What
+   is recorded before and after the run does not matter: the markers cut it.
+
+### Analyse the recording
+
+```sh
+mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-end --analyze
+```
+
+- `--display-hz 60`: the display's refresh rate. A recording that runs at another rate (by more than 1 %) gets a warning: "The capture
+  runs at 30 fps, but a 60 Hz display was expected".
+- `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
+- `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
+
+In the GUI: choose **Video file** as the source, pick the recording, enter the **Display refresh rate**, and press **Start capture**.
+
+Before you trust the numbers, check that the recording is what the display showed:
+
+- The report's first line gives the recording's period ("period 16.667 ms" at 60 Hz): it must be the display's refresh period.
+  With `--display-hz`, the report also says "Display refresh 60 Hz (the capture rate), expected 60 Hz: matches."
+- An application that ran every refresh shows no frame indices never seen. Many of them, evenly spread, point to a lower rate in
+  OBS than the display's.
+- "No marker seen" or many undecodable captures point to scaling or compression: see [Troubleshooting](#troubleshooting).
+
+mb-framepacing can also record the card itself, without OBS: the next section.
+
+## 3. Capture with mb-framepacing itself
 
 Connect the capture card between the application's PC and its monitor. The card passes the picture on unchanged and sends a copy
 to the recording PC (the same PC works too, if it has the spare CPU).
@@ -105,9 +183,10 @@ stored size now.
 - `--roi auto` chooses the stored size itself; leave out `--scale`. `locate` prints the region as `--roi … --scale …` to reuse it
   without searching again.
 
-## 3. Measure from a recording
+## 4. Measure from a recording
 
-Recorded with other equipment, such as a high speed camera or a recorder? Import the recording. Nothing is dropped, and any frame
+Recorded with OBS ([above](#2-measure-with-obs-and-a-capture-card)) or other equipment, such as a high speed camera or a recorder?
+Import the recording. Nothing is dropped, and any frame
 rate works. A camera filming the screen needs a calibrated camera rig and `--camera`; that is **very experimental**, see
 [camera capture](camera.md).
 
@@ -126,7 +205,7 @@ rate works. A camera filming the screen needs a calibrated camera rig and `--cam
   image, `fileName,timeMs`, in the order the frames were taken; `#` comments and a header line are allowed.
 - `--scale`, `--roi x,y,width,height` and `--roi auto` work on imports too.
 
-## 4. Results
+## 5. Results
 
 Each recording gets its own folder under the capture folder (set in the GUI's setup, `config --set-capture-dir`, or `-o`):
 

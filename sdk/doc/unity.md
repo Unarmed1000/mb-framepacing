@@ -2,8 +2,8 @@
 
 The Unity package **MB Frame Pacing** (`com.manabattery.framepacing`) draws the marker into every frame of a Unity game. It contains:
 
-- **the SDK's general C# marker module** `MB.FramePacing.Marker`: the same code as [`sdk/csharp/marker`](../csharp/marker), with no
-  Unity dependency;
+- **the SDK's general C# modules** `MB.FramePacing` (the core: `Point`, `Rectangle`, the time types) and `MB.FramePacing.Marker`: the
+  same code as [`sdk/csharp/core`](../csharp/core) and [`sdk/csharp/marker`](../csharp/marker), with no Unity dependency;
 - **Unity helpers** `MB.FramePacing.Marker.Unity`: an overlay component that does everything, and building blocks for your own render
   pipeline code.
 
@@ -115,7 +115,7 @@ comes from Unity.
 
 `FrameMarkerOverlay` waits for the end of the frame (`WaitForEndOfFrame`), after cameras, post processing, upscaling and UI, and draws
 the marker with GL immediate mode straight into the output in pixel coordinates: by default one quad with the dedicated shader, the
-fastest way (see [the ways to draw it](../marker/unity/README.md#ways-to-draw-it-most-efficient-first)). The rules from [Integrating the marker](integrating.md)
+fastest way (see [the ways to draw it](../unity/README.md#ways-to-draw-it-most-efficient-first)). The rules from [Integrating the marker](integrating.md)
 apply:
 
 - **Last in the frame:** nothing may be drawn over or blended with the marker.
@@ -167,8 +167,8 @@ number with point filtering, on whole pixels, so every module covers exactly the
 
 ## Using the general library directly
 
-The core library works without the helpers (and outside Unity). Create one `MarkerGenerator` and reuse it: it encodes the marker into
-bytes you own (the `ModuleMatrix`), and `Marker` draws it straight into your arrays:
+The marker module works without the helpers (and outside Unity). Create one `MarkerGenerator` and reuse it: it encodes the marker into
+bytes you own (the `ModuleMatrix`), and `FrameMarker` draws it straight into your arrays:
 
 ```csharp
 var generator = new MarkerGenerator();
@@ -187,23 +187,27 @@ matrix can feed several.
 ## What is verified
 
 - **Every push (CI):** the package is assembled and validated with `python sdk/unity/build_upm.py --output <folder> --check`:
-  every asset has a `.meta` file with a unique, stable GUID, the version matches `sdk/VERSION` and the core sources equal
-  `sdk/csharp/marker/source`. The core module itself is tested on .NET, where it matches the C++ marker module module for module and
-  pixel for pixel.
+  every asset has a `.meta` file with a unique, stable GUID, the version matches `sdk/VERSION`, every file the package takes from
+  the repository equals its source (`sdk/csharp/core/source`, `sdk/csharp/marker/source`, the Unity helpers, `FrameMarker.hlsl`), and
+  each default reference names a file and a field of the package. The marker module itself is tested on .NET, where it matches the
+  C++ marker module module for module and pixel for pixel.
 - **Before a release (local, needs a Unity license):** `python sdk/unity/check_in_unity.py` runs a real Unity editor in batch mode
   (no window) on a throw-away project. It checks that:
   - the package compiles, without warnings;
-  - the core library reproduces all 512 C++ module matrices on Unity's scripting runtime;
+  - the marker module reproduces all 512 C++ module matrices on Unity's scripting runtime;
   - every drawing method renders pixel exact into a render texture, including the y flip: `FrameMarkerGL` (the Geometry mode),
     `FrameMarkerMesh` (the static grid with per-frame indices, through a command buffer), `FrameMarkerTexture` (the Bitmap mode) and
-    `FrameMarkerQuad` (the Shader mode, with GL and through a command buffer), for frame, start, end and sync markers at several module
-    sizes and origins;
-  - `FrameMarkerTexture` holds the module bitmap. `--graphics d3d11|d3d12|glcore|vulkan|metal` forces a graphics API.
+    `FrameMarkerQuad` (the Shader and Shader Packed Bits modes, each with GL and through a command buffer), for frame, start, end and
+    sync markers at several module sizes and origins;
+  - `FrameMarkerTexture` holds the module bitmap, and keeps a quiet zone outside its range within it;
+  - `FrameMarkerOverlay` keeps drawing after a frame's draw threw (a provider of the game's that throws).
+
+  `--graphics d3d11|d3d12|glcore|gles|vulkan|metal` forces a graphics API.
 
   Passed with Unity 6000.3.24f1 and 6000.6.2f1 on Windows (Direct3D 11), and 6000.6.3f1 on Windows with Direct3D 11, OpenGL Core and
   Vulkan.
 
 - **Not verified yet:**
   - the overlay's end-of-frame drawing in a running game and in player builds, with URP and HDRP;
-  - other graphics APIs (Vulkan, Metal, OpenGL);
+  - other graphics APIs (Direct3D 12, OpenGL ES, Metal);
   - Unity versions before 6 (the package declares 2021.3).

@@ -15,7 +15,7 @@ whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precis
 
 ## 1. Add the C++ library
 
-CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`, `::pacer`); the marker
+CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`; `::pacer` is off until it is reworked); the marker
 module needs only the core and has no dependencies ([what each module adds to your executable](../cpp/README.md#what-it-adds-to-your-executable)).
 Pick one of five ways:
 
@@ -80,16 +80,21 @@ What your project gets:
 - A static library target per module in every way above: **`mb_framepacing::marker`** for the marker (it links
   `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. Each type has its own header (`<mb/framepacing/marker/payload/Payload.hpp>`,
   `<mb/framepacing/core/time/TimeSpan.hpp>`, ...) and the marker's functions are in `<mb/framepacing/marker/FrameMarker.hpp>`.
-- When the library is not the top-level project, its tests, tools and warnings-as-errors are off, so GoogleTest is never downloaded.
+- When the library is not the top-level project, its tests, tools, install rules and warnings-as-errors are off, so GoogleTest is
+  never downloaded and your project's `cmake --install` installs your files only.
   The options, if you want to change them:
 
-  | Option                              | Default                                                |
-  | ----------------------------------- | ------------------------------------------------------ |
-  | `MB_FRAMEPACING_BUILD_MARKER`       | on                                                     |
-  | `MB_FRAMEPACING_BUILD_DATA`         | on (off: no data module and no nlohmann/json download) |
-  | `MB_FRAMEPACING_BUILD_TESTS`        | on only when top-level                                 |
-  | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)               |
-  | `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                 |
+  | Option                              | Default                                                                         |
+  | ----------------------------------- | ------------------------------------------------------------------------------- |
+  | `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                              |
+  | `MB_FRAMEPACING_BUILD_DATA`         | on (off: no data module and no nlohmann/json download)                          |
+  | `MB_FRAMEPACING_BUILD_PACER`        | off (the pacer is off until it is reworked)                                     |
+  | `MB_FRAMEPACING_BUILD_TESTS`        | on only when top-level                                                          |
+  | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                        |
+  | `MB_FRAMEPACING_BUILD_BENCHMARKS`   | off (the marker's benchmarks; fetches Google Benchmark unless one is installed) |
+  | `MB_FRAMEPACING_BUILD_FUZZERS`      | off (the libFuzzer target of the marker's QR encoder; needs Clang)              |
+  | `MB_FRAMEPACING_INSTALL`            | on only when top-level (the install rules and the CMake package)                |
+  | `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                          |
 
 - Versions follow semantic versioning. While the version is 0.x, a new minor version may change the API, so `find_package` only
   accepts the same minor version; from 1.0 it accepts any newer version with the same major version.
@@ -183,9 +188,9 @@ the static frame, so an animation clock that pauses while idle does not look lik
 the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock ticks, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
 does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
-presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. Without a pacer of your own, the SDK's
-[frame pacer](pacer.md) (`mb_framepacing::pacer`) plans every frame and hands you these values, and an animation time in whole
-refreshes.
+presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. The SDK's own
+[frame pacer](pacer.md) (`mb_framepacing::pacer`), which plans every frame and hands you these values and an animation time in whole
+refreshes, is off until it is reworked.
 
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the

@@ -73,15 +73,15 @@ encoded and decode as `0`.
 
 ### Ways to draw it, most efficient first
 
-| #   | Option                                                                              | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                         |
-| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| 1   | **Shader, packed bits**: one quad; the shader reads each module's bit from `Bits()` | 211 bytes (the packed bits as constants), 4 vertices         | A shader of ours: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 or Vulkan |
-| 2   | **Shader, a texel per module**: one quad and a 41×41 texture                        | 1,681 bytes (the texture), 4 vertices                        | The same, and a single channel texture                                        |
-| 3   | **Static grid**: `grid_vertices` once, then `modules_to_grid_indices`               | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                     |
-| 4   | **Module texture scaled up**: `modules_to_bitmap` at 1 px per module                | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact    |
-| 5   | **Triangles**: `modules_to_indexed` or `modules_to_triangles`                       | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                        |
-| 6   | **Rectangles**: `modules_to_quads`                                                  | About 440 filled rectangles (`MarkerQuad`)                   | A 2D fill-rectangle API                                                       |
-| 7   | **Full-size bitmap**: `modules_to_bitmap`                                           | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images                  |
+| #   | Option                                                                            | Per frame (41×41 main marker, about 440 dark runs)           | Needs                                                                         |
+| --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| 1   | **Shader, packed bits**: one quad; the shader reads each module's bit from `bits` | 211 bytes (the packed bits as constants), 4 vertices         | A shader of ours: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 or Vulkan |
+| 2   | **Shader, a texel per module**: one quad and a 41×41 texture                      | 1,681 bytes (the texture), 4 vertices                        | The same, and a single channel texture                                        |
+| 3   | **Static grid**: `grid_vertices` once, then `modules_to_grid_indices`             | About 2,600 indices (10 KB as 32 bit, 5 KB as 16 bit)        | Index buffers and vertex colours; the 1,768 vertices stay                     |
+| 4   | **Module texture scaled up**: `modules_to_bitmap` at 1 px per module              | 1,681 pixels                                                 | A texture drawn scaled by a whole number with point filtering, pixel exact    |
+| 5   | **Triangles**: `modules_to_indexed` or `modules_to_triangles`                     | About 1,750 vertices and 2,600 indices, or 2,600 vertices    | Only vertex colours: the simplest to add to a renderer                        |
+| 6   | **Rectangles**: `modules_to_quads`                                                | About 440 filled rectangles (`MarkerQuad`)                   | A 2D fill-rectangle API                                                       |
+| 7   | **Full-size bitmap**: `modules_to_bitmap`                                         | The marker's pixels (294×294 at 6 px per module: 86 KB grey) | A CPU pixel buffer: software rendering, video frames, images                  |
 
 Every option draws exactly the same pixels, from one encode per frame (the 211 byte module matrix). The shaders for 1 and 2 (HLSL for
 Direct3D, GLSL for OpenGL 3.3 and OpenGL ES 3.0, OpenGL ES 2.0 and Vulkan) and how to draw them are in

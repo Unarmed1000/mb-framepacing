@@ -105,7 +105,7 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 - **Goes wrong when:**
   - A bit is set while something still moves (a spinner, a blinking cursor, a video): its errors are hidden and its time is missing
     from the frame rates.
-  - Both are missing while the animation clock pauses: every step of the pause shows an animation error of a whole display step. When
+  - Both are missing while the animation clock pauses: every step of the pause shows an animation error of a whole display time step. When
     no frames are presented while idle, the first frame after it shows an error as long as the pause.
   - The animation clock pauses one frame early: the frame that reaches the rest pose gets the paused time, and the step into it (which
     is judged) shows an error. Pause the clock after the last frame that animates.

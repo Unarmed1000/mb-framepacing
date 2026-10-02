@@ -11,7 +11,7 @@ own static library target, like Boost's and Poco's.
 | `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/pacer/…>`  | Off until it is reworked (`MB_FRAMEPACING_BUILD_PACER`): plans frames on the refreshes      |
 
 No header includes a whole module: include the header of each type you use (one type per header) and the header of the functions
-(`marker/FrameMarker.hpp`, `data/FramesCsv.hpp`, ...).
+(`marker/FrameMarker.hpp`, `data/analysis/FramesCsv.hpp`, ...).
 
 The **marker** draws a small QR code into every frame that carries the frame index and the animation time. A capture of the display
 output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the application animated is from
@@ -47,16 +47,17 @@ Or git (`GIT_TAG sdk-v0.1.0`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of th
 `find_package(mb_framepacing 0.1 CONFIG REQUIRED COMPONENTS marker data)`, or Conan 2 (`mb-framepacing/0.1.0` from the recipe in
 [`conan/`](conan), see the guide). Every way gives the same targets: link the modules you use.
 
-| Option                              | Default                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------- |
-| `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                              |
-| `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched          |
-| `MB_FRAMEPACING_BUILD_PACER`        | off (the pacer is off until it is reworked)                                     |
-| `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                               |
-| `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                        |
-| `MB_FRAMEPACING_BUILD_BENCHMARKS`   | off (the marker's benchmarks; fetches Google Benchmark unless one is installed) |
-| `MB_FRAMEPACING_BUILD_FUZZERS`      | off (the libFuzzer target of the marker's QR encoder; needs Clang)              |
-| `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                          |
+| Option                              | Default                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                                                                        |
+| `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched                                                    |
+| `MB_FRAMEPACING_BUILD_PACER`        | off (the pacer is off until it is reworked)                                                                               |
+| `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                                                                         |
+| `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                                                                  |
+| `MB_FRAMEPACING_INSTALL`            | on only when top-level: the install rules and the CMake package. Off, your own `cmake --install` installs your files only |
+| `MB_FRAMEPACING_BUILD_BENCHMARKS`   | off (the marker's benchmarks; fetches Google Benchmark unless one is installed)                                           |
+| `MB_FRAMEPACING_BUILD_FUZZERS`      | off (the libFuzzer target of the marker's QR encoder; needs Clang)                                                        |
+| `MB_FRAMEPACING_WARNINGS_AS_ERRORS` | on only when top-level                                                                                                    |
 
 nlohmann/json is found with `find_package(nlohmann_json 3.12)` when installed, and downloaded (a pinned release) otherwise; GoogleTest
 likewise, only for the tests.
@@ -114,17 +115,17 @@ faster still.
 
 In `MB::FramePacing::Marker`: the functions in `<mb/framepacing/marker/FrameMarker.hpp>`, each type in its own header (`<mb/framepacing/marker/…>`):
 
-| Function or type                                                                                                             | What it does                                                                         |
-| ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                       | What a marker carries                                                                |
-| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                                     | Size and place: always valid (a value outside its range asserts, else is clamped)    |
-| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`)                                                                 | Encode the marker: its QR symbol, 1 bit per module (211 bytes), a plain value        |
-| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                              | A static grid uploaded once, and per frame only the indices                          |
-| `ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil::BytesPerPixel`                                                           | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride) |
-| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark)              | Draw it as indexed triangles, a triangle list or rectangles, into your buffers       |
-| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix::MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                              |
-| `ModuleMatrix::SizeFor`, `MainSize`, `SyncSize`                                                                              | Modules per side of a kind's symbol                                                  |
-| `EncodePayload`, `TryDecodePayload`                                                                                          | The wire format                                                                      |
+| Function or type                                                                                                             | What it does                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `Payload`, `StartMetadata`, `SequenceId`, `MarkerKind`                                                                       | What a marker carries                                                                                                               |
+| `Options` (`Recommended`, `Minimum`, `MarkerSizePx`, `QuietZonePx`, `RecommendedOrigin`)                                     | Size and place: always valid (a value outside its range asserts, else is clamped)                                                   |
+| `GenerateModules`, `ModuleMatrix` (`Size`, `IsDark`, `Bits`, `TryFromBits`)                                                  | Encode the marker: its QR symbol, 1 bit per module (211 bytes of bits), a plain value; `TryFromBits` makes one from a marker's bits |
+| `GridVertices`, `GridVertexCount`, `MaxGridVertexCount`, `ModulesToGridIndices`                                              | A static grid uploaded once, and per frame only the indices                                                                         |
+| `ModulesToBitmap`, `PixelFormat`, `PixelFormatUtil::BytesPerPixel`                                                           | Draw it into a pixel buffer (`[L]`, `[R, G, B]` or `[R, G, B, A]` bytes; any stride)                                                |
+| `ModulesToIndexed`, `ModulesToTriangles`, `ModulesToQuads` (`MarkerQuad`: a `Rectangle` and whether it is dark)              | Draw it as indexed triangles, a triangle list or rectangles, into your buffers                                                      |
+| `MaxTriangleVertexCount`, `MaxIndexedVertexCount`, `MaxIndexCount`, `MaxQuadCount`, `ModuleMatrix::MaxPackedModuleByteCount` | Buffer sizes that fit every marker kind                                                                                             |
+| `ModuleMatrix::SizeFor`, `MainSize`, `SyncSize`                                                                              | Modules per side of a kind's symbol                                                                                                 |
+| `EncodePayload`, `TryDecodePayload`                                                                                          | The wire format                                                                                                                     |
 
 Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false) when the matrix is empty or a buffer is too small. One encode can feed several outputs (a mesh for the game, a bitmap for a UI).
 
@@ -139,6 +140,10 @@ Every function is `noexcept` and never allocates; it returns 0 (`{0, 0}`, false)
 namespace FD = MB::FramePacing::Data;
 
 const auto analysis = FD::FindAnalysis(captureFolder);   // the capture folder's analysis folder (or the folder itself)
+if (!analysis)
+{
+  return;   // neither holds a summary.json: analyse the capture first
+}
 const FD::AnalysisSummary summary = FD::ReadSummary(*analysis / FD::SummaryFileName);
 for (const FD::SummaryRun& run : summary.Runs)
 {
@@ -250,8 +255,8 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 | Toolchain               | Compiler                   | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      20.5 KiB |            222.0 KiB |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.1 KiB |            195.2 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      20.4 KiB |            220.5 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.1 KiB |            192.6 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.3 KiB |            214.0 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.0 KiB |            141.5 KiB |
 | Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      19.8 KiB |            186.4 KiB |
@@ -261,8 +266,8 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 <!-- /sdk-size-table -->
 
-`python tools/measure_sdk_size.py --toolchain <msvc-x64 | gcc-x64 | clang-x64 | appleclang-arm64> --update-doc` measures with the
-compiler CMake finds and rewrites that toolchain's rows. CI measures all four and fails when a number is off by more than 10 % (and at
+`python tools/measure_sdk_size.py --toolchain <msvc-x64 | gcc-x64 | clang-x64 | appleclang-arm64> --update-doc` (run in the
+repository's root: the script is in its `tools/`, not in a release archive) measures with the compiler CMake finds and rewrites that toolchain's rows. CI measures all four and fails when a number is off by more than 10 % (and at
 least 4 KiB), so a change in size comes with this table updated (`--update-doc` also takes CI's measurement files).
 
 ## Build and test
@@ -276,7 +281,7 @@ allocation counter of the zero-allocation tests, is in `testing` (test code, nev
 (`marker/tools/marker-render`) writes marker images (PGM) for any payload, to compare your renderer's output pixel by pixel;
 `marker-render --golden <dir>` writes the golden set the other libraries are tested against. The pacer's tests hold a simulation of a
 frame loop (`pacer/tests/simulation`, test code, not part of the library) and `pacer-sim` (`pacer/tests/pacer-sim`, built with the
-tests), which paces a scenario with it; `pacer-sim --golden <dir>` writes the pacer's golden results. `tests/consumer` is a project that uses
+tests when the pacer is built: `-DMB_FRAMEPACING_BUILD_PACER=ON`), which paces a scenario with it; `pacer-sim --golden <dir>` writes the pacer's golden results. `tests/consumer` is a project that uses
 the library every documented way (`tests/consumer/check_consumers.py`).
 
 The marker's benchmarks (`marker/benchmarks`, Google Benchmark; `-DMB_FRAMEPACING_BUILD_BENCHMARKS=ON`, on in the `windows` and
@@ -294,5 +299,6 @@ build/windows/marker/Release/mb_framepacing_marker_benchmarks   # --benchmark_fi
 
 BSD 3-Clause (`LICENSE`). The QR encoder is a port of the QR Code generator library by Project Nayuki, MIT (vendored in
 `marker/reference/third_party/qrcodegen`, which only the tests and benchmarks build, to compare it with);
-the data module parses JSON with nlohmann/json, MIT; the tests use GoogleTest (BSD 3-Clause), which is not part of the library. Their
+the data module parses JSON with nlohmann/json, MIT; the tests use GoogleTest (BSD 3-Clause) and the benchmarks Google Benchmark
+(Apache 2.0), which are not part of the library. Their
 license texts are in a release archive's `licenses/` folder (the repository's root `licenses/`).

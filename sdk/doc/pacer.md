@@ -162,7 +162,7 @@ the vsync timer of mb-framepacing-explained (`doc/frame-pacing-strategies.md`): 
 
 `sdk/test-data/pacer` holds the pacer's golden results, which the tests must reproduce to the byte. `python tools/update_pacer_test_data.py` regenerates them with `pacer-sim --golden`:
 
-- `60-busy`: the busy stretch of mb-framepacing-explained's 60-busy clip. The full-window rule reproduces that simulation's swap
+- `60-busy`: the busy stretch of mb-framepacing-explained's `60-busy-adaptive` clip. The full-window rule reproduces that simulation's swap
   intervals and display refreshes frame by frame.
 - `60-busy-full-rate`: the `60-busy-full-rate` clip at a fixed swap interval: every frame is shown on the clip's refresh.
 - `100-stages` and `60-relapse`: seeded staged loads. The fix is never late more often than the full-window rule and never slows down later;

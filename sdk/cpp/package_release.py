@@ -48,6 +48,9 @@ EXTRA_FILES = {
     "doc/analysis-output-format.md": SDK_DIR / "doc" / "analysis-output-format.md",
     "doc/pacer.md": SDK_DIR / "doc" / "pacer.md",
     "doc/encoding-performance.md": SDK_DIR / "doc" / "encoding-performance.md",
+    # What the documents above link to
+    "doc/vocabulary.md": SDK_DIR / "doc" / "vocabulary.md",
+    "doc/unity.md": SDK_DIR / "doc" / "unity.md",
 }
 EXTRA_DIRECTORIES = {
     # The reference shaders (HLSL, GLSL for OpenGL, OpenGL ES 2.0 and Vulkan) that draw the marker as one quad

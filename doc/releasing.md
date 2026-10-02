@@ -32,8 +32,8 @@ tag of its stream, pre-releases included.
 ## SDK
 
 `sdk/VERSION` is the version of the **next** release. Raise it in the change that alters the API, not only when you release: CI
-(`tools/check_semver.py`, the `semver` job) compares the public API of every C# module (`MB.FramePacing.Marker`,
-`MB.FramePacing.Data`) with the last `sdk-v*` release and fails when the version does not cover the change. The C++ marker API mirrors
+(`tools/check_semver.py`, the `semver` job) compares the public API of every C# module (`MB.FramePacing`,
+`MB.FramePacing.Marker`, `MB.FramePacing.Data`) with the last `sdk-v*` release and fails when the version does not cover the change. The C++ marker API mirrors
 the C# one, so this guards both. A change to the data formats themselves is a format version (see
 [the analysis output format](../sdk/doc/analysis-output-format.md)), not only an SDK version.
 
@@ -85,7 +85,7 @@ python sdk/unity/build_upm.py --output dist/upm --check
 
 The Conan 2 recipe (`sdk/cpp/conan/recipes/mb-framepacing`) is laid out as conan-center-index is, so a checkout works as a
 `local-recipes-index` remote. Every module is a component (`mb_framepacing::core`, `::marker`, `::data`), and the options `with_marker`
-and `with_data` leave modules out. Each version builds its release archive, so a version is added **after** its release: the release
+and `with_data` leave modules out (`with_pacer` adds `::pacer`, off until the pacer is reworked). Each version builds its release archive, so a version is added **after** its release: the release
 workflow tests it through the recipe without committing it; to publish it, add it and commit:
 
 ```sh
