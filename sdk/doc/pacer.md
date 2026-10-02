@@ -35,7 +35,9 @@ It is here to be tried and measured (the marker and the tools exist for exactly 
   `TickCount64::FromCounter(counter, frequency)`, or a `std::chrono` clock through `core/time/ChronoConversion.hpp`).
 - **A loop paced by vsync**: vsync on, a fixed refresh rate, and a `Present` (or the wait for a free buffer) that waits for the
   display, so every frame starts when the previous one is shown.
-- **The display's refresh period**: from the display mode, or a hard-coded value to start with.
+- **The display's refresh period**: from the display mode, or a hard-coded value to start with (not every window system reports
+  it). Give it with its fraction: `RefreshPeriod::FromRate(24002, 100)` for 240.02 Hz, or `FromNanoseconds`; whole ticks
+  (`FromTimeSpan`) lose it.
 
 Nothing else: no vsync timestamps, no presentation feedback, no scheduled presents. [Not used yet](#not-used-yet) lists what a newer
 platform could add.
@@ -84,19 +86,35 @@ Present(schedule.SwapInterval);                                 // hold the fram
 | `PreferredFrameTime`  | The swap interval the application prefers, as a time (the marker's)                                                     |
 | `Change`              | What the rule decided from the previous frame (`None`, `Slower`, `Faster`): this frame is the first at the new interval |
 
-`EndFrame(presentTime, work)` takes the time the frame is presented and returns its CPU busy time for the marker. `work` is how long the
-frame needed as the rule should count it (the CPU's and the GPU's time, if you measure it); leave it out and the CPU busy time counts. A
-frame without `EndFrame` counts as presented when the next one begins.
+`EndFrame(presentTime, work)` takes the time the frame's work is done and returns its CPU busy time for the marker. Call it as you
+draw the marker: before the present, and before any wait for the frame's time (the sleep below). A wait inside it would count as
+work, and the rule would slow down. A frame without `EndFrame` counts as presented when the next one begins.
+
+`work` is how long the frame needed as the rule should count it; leave it out and the CPU busy time counts. **An application that
+the GPU limits must put the GPU's time into it** (a timer query; the time of the last frame that was measured will do). The late
+frames slow the pacer down without it too, but the work the rule sees then fits a refresh, so after a frame window without a late
+frame it speeds up again, is late again, and goes on like that.
 
 ### Applying the schedule
 
 Use the first way your platform has:
 
-| Way                     | What to do                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Swap interval**       | Present with `SwapInterval`: DXGI's `SyncInterval`, `eglSwapInterval`, `wglSwapIntervalEXT`, `glXSwapIntervalEXT`, Unity's `QualitySettings.vSyncCount` |
-| **Present it again**    | Where vsync holds a frame for one refresh only (core Vulkan's FIFO, core Wayland): present the finished frame `SwapInterval` times                      |
-| **Sleep, then present** | Sleep until one refresh before `IntendedDisplayTime`, then present. A guess: the thread wakes a little late, differently every time                     |
+| Way                     | What to do                                                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Swap interval**       | Present with `SwapInterval`: DXGI's `SyncInterval`, `eglSwapInterval`, `wglSwapIntervalEXT`, `glXSwapIntervalEXT`, Unity's `QualitySettings.vSyncCount`                                                                                          |
+| **Present it again**    | Where vsync holds a frame for one refresh only (core Vulkan's FIFO, core Wayland): present the finished frame `SwapInterval` times. In Vulkan an image that was presented can not be presented again: draw or copy the frame into the next image |
+| **Sleep, then present** | Sleep until one refresh before `IntendedDisplayTime`, then present. A guess: the thread wakes a little late, differently every time                                                                                                              |
+
+**A platform's swap interval has a largest value.** DXGI's `SyncInterval` takes at most 4, and `eglSwapInterval` fails above the
+config's `EGL_MAX_SWAP_INTERVAL`. A target of 30 fps on a 240 Hz display is a swap interval of 8: set the largest the platform takes
+and wait for the rest, as below.
+
+**When you sleep, hold the next frame's start too.** A present that was delayed by a sleep is not paced by the display any more: where
+the swap chain has an image to spare, the present returns at once, the next frame starts early, and the loop runs faster than the
+swap interval says (a 30 fps target ran at 33 fps). The pacer can not see that: it counts a frame start that comes early as the
+previous frame's swap interval, never less. So begin the next frame no earlier than the previous frame's `IntendedDisplayTime`. The
+frame starts then follow your steady clock, not the display's, so now and then a frame is held a refresh more or less: this way
+stays the guess the table calls it.
 
 ### How a frame is paced
 
@@ -109,9 +127,14 @@ Use the first way your platform has:
 - **A pause.** A frame that starts longer after the previous one than the frame window is long (or than two frames, when that is
   longer), or before it, starts again: the frame from before the pause is not counted, the frame window is empty, the swap interval
   stays, and the animation goes on one swap interval instead of jumping. `Reset()` does the same on purpose, and goes back to the
-  preferred swap interval.
+  preferred swap interval. An application that pauses its animation and keeps presenting frames needs neither: the pacer goes on
+  pacing (and the marker's static flag says that nothing moves).
 - **A display mode change.** `SetRefreshPeriod` starts again on the new period, with an empty frame window, at the swap interval the
   application prefers there. The animation time goes on. The period the pacer already has changes nothing.
+- **Other settings.** A `FramePacer` takes its settings when it is made, and only the refresh period changes on a live one. For
+  another target frame rate or another setting of the rule, make a new `FramePacer` from the changed `pacer.Settings()`: its frame
+  window is empty and its animation time starts at zero, so keep an animation time of your own and add every frame's
+  `AnimationStep` to it.
 
 ## A target frame rate
 

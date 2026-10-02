@@ -239,7 +239,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     graphics that is the window system's). `PacerRefreshClock` (`pacer/clock/`) counts the display's
     refreshes: never call it an animation clock, which in this repository is the application's game time (`sdk/doc/marker-fields.md`).
   - **Monitor refresh rates** (`pacer/tests/MonitorRateTests.cpp`): 23 rates from 50 to 540 Hz (59.94 and 119.88 as rationals) run a
-    vsync loop with frames on time, a display 0.1 % off its rate, target frame rates and a load that comes and goes. The default
+    vsync loop with frames on time, a display 0.1 % off its rate, target frame rates, a load that comes and goes and a GPU-bound
+    loop (the GPU's time must be in `EndFrame`'s `work`, or the rule goes up and down; `EndFrame` comes before the present and
+    before any wait, which would count as work). The default
     `FrameMargin` is the smaller of 1 ms and an eighth of the refresh period (`PacerSettings::FrameMarginAt`, agreed with the user):
     1 ms alone leaves no room to speed up again from 480 Hz on, and a margin that was set stays as set. 60 and 100 Hz, and so the
     golden data, keep 1 ms.

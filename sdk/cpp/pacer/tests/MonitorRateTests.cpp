@@ -71,6 +71,19 @@ namespace
       m_shownOnRefresh = std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, m_display.RefreshesToFit(FP::TimeSpan(start + work.Ticks())));
       return schedule;
     }
+
+    //! A frame the GPU finishes after the CPU is done with it: EndFrame comes when the CPU is done, with the GPU's time in the work
+    //! the rule counts or without it
+    PC::FrameSchedule GpuFrame(const FP::TimeSpan cpu, const FP::TimeSpan gpu, const bool gpuInWork)
+    {
+      const int64_t start = m_display.TimeFor(m_shownOnRefresh).Ticks();
+      const PC::FrameSchedule schedule = m_pacer.BeginFrame(FP::TickCount64(StartTicks + start));
+      const FP::TimeSpan work = gpuInWork ? FP::TimeSpan(cpu.Ticks() + gpu.Ticks()) : FP::TimeSpan();
+      static_cast<void>(m_pacer.EndFrame(FP::TickCount64(StartTicks + start + cpu.Ticks()), work));
+      const int64_t done = start + cpu.Ticks() + gpu.Ticks();
+      m_shownOnRefresh = std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, m_display.RefreshesToFit(FP::TimeSpan(done)));
+      return schedule;
+    }
   };
 
   //! A share of a refresh period, in thousandths
@@ -253,4 +266,42 @@ TEST(MonitorRates, TheDefaultFrameMarginFollowsAChangeOfTheRefreshPeriod)
     static_cast<void>(loop.Frame(Share(fast, 100)));
   }
   EXPECT_EQ(pacer.SwapInterval(), 1u);
+}
+
+TEST(MonitorRates, AGpuBoundLoopNeedsTheGpusTimeInItsWork)
+{
+  for (const MonitorRate rate : MonitorRates)
+  {
+    for (const bool gpuInWork : {true, false})
+    {
+      SCOPED_TRACE(rate.Name() + (gpuInWork ? ", the GPU's time in the work" : ", the CPU's time only"));
+      const PC::RefreshPeriod period = rate.Period();
+      PC::FramePacer pacer{PC::PacerSettings(period)};
+      VsyncLoop loop(pacer, period);
+      const int64_t framesPerWindow = period.RefreshesToFit(pacer.Settings().FrameWindowLength());
+      // A tenth of a refresh on the CPU and one and three tenths on the GPU: every frame at full rate is late
+      int64_t slower = 0;
+      int64_t faster = 0;
+      for (int64_t frame = 0; frame < 6 * framesPerWindow; ++frame)
+      {
+        const PC::FrameSchedule schedule = loop.GpuFrame(Share(period, 100), Share(period, 1'300), gpuInWork);
+        slower += schedule.Change == PC::SwapIntervalChange::Slower ? 1 : 0;
+        faster += schedule.Change == PC::SwapIntervalChange::Faster ? 1 : 0;
+      }
+      if (gpuInWork)
+      {
+        // The rule knows what a frame needs: it slows down once and stays
+        EXPECT_EQ(slower, 1);
+        EXPECT_EQ(faster, 0);
+        EXPECT_EQ(pacer.SwapInterval(), 2u);
+      }
+      else
+      {
+        // The late frames still slow it down, but the work it sees fits a refresh: after a frame window without a late frame it speeds
+        // up again, is late again, and so on
+        EXPECT_GE(slower, 2);
+        EXPECT_GE(faster, 1);
+      }
+    }
+  }
 }

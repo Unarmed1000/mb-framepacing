@@ -43,9 +43,11 @@ namespace MB::FramePacing::Pacer
     //! frame before it it was shown, so whether it was late), the rule decides, and this frame is planned.
     FrameSchedule BeginFrame(TickCount64 cpuStartTime) noexcept;
 
-    //! The frame is presented now, at presentTime on the same clock. work: how long the frame needed, as the rule should count it (the
-    //! CPU's and the GPU's time, or whatever the application measures); zero takes the CPU busy time. Returns the CPU busy time
-    //! (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
+    //! The frame's work is done and it is about to be presented, at presentTime on the same clock: call it as the marker is drawn,
+    //! before the present and before any wait for the frame's time (a wait inside it would count as work). work: how long the frame
+    //! needed, as the rule should count it; zero takes the CPU busy time. An application the GPU limits must put the GPU's time in
+    //! (the last frame's that was measured will do): without it the rule speeds up again after every frame window without a late
+    //! frame. Returns the CPU busy time (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
     TimeSpan32 EndFrame(TickCount64 presentTime, TimeSpan work = {}) noexcept;
 
     //! The display's refresh period changed (a mode change, another monitor): the pacer starts again on it, with an empty window, at the
