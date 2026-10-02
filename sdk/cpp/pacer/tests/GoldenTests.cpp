@@ -13,6 +13,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 #include "PacerSimulation.hpp"
 
@@ -80,9 +81,10 @@ namespace
     return rows;
   }
 
-  const Sim::Scenario& Named(const std::vector<Sim::Scenario>& scenarios, const std::string& name)
+  // The name by value: GCC takes a reference returned from a call with a temporary argument for one into that temporary
+  const Sim::Scenario& Named(const std::vector<Sim::Scenario>& scenarios, const std::string_view name)
   {
-    return *std::find_if(scenarios.begin(), scenarios.end(), [&name](const Sim::Scenario& scenario) { return scenario.Name == name; });
+    return *std::find_if(scenarios.begin(), scenarios.end(), [name](const Sim::Scenario& scenario) { return scenario.Name == name; });
   }
 
   int64_t LateFrames(const std::vector<ResultRow>& rows)
