@@ -294,8 +294,8 @@ The **events** panel under it shows what went wrong where, at every zoom (the st
 in two lanes that are never mixed up: **frames**, what the application and the display did (frames the target dropped orange, an
 older frame shown out of order pink, a torn refresh cyan), and **capture**, what the capture missed (a capture not recorded, frames the
 capture source reported dropping, refreshes its timestamps say it missed: grey; a capture whose marker could not be decoded: dark
-grey). Each pixel column shows one mark per lane, the kind that outweighs the others there; hovering it in the GUI lists everything in
-it, with the frames it names. The key counts each kind in the section. The capture lane needs `captures.csv` next to the frames.
+grey). Each pixel column shows one mark per lane, the kind that outweighs the others there. The key counts each kind in the section.
+The panel is in the report card (`--charts`, `render`, the GUI's **Save charts**), not in the GUI's Timeline. The capture lane needs `captures.csv` next to the frames.
 
 **Capture gaps** (captures not decoded, not recorded, or dropped by the capture source) leave the display time of the next frame
 uncertain: the steps into and out of it are not judged (no animation error, no late verdict, not in the frame rates), drawn dashed grey

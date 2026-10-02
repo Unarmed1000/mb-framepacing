@@ -291,7 +291,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     from the refresh; `selftest --fps N` simulates an N Hz display.
   - **Charts** live in `MB.FramePacing.Charts` (no GUI): the report cards as shapes (below). The GUI draws them itself with `CardView`
     (`FramePacing.Gui`, the style from `CardStyle`, which parses the SVG's style sheet; hover texts from `CardHover`); the Timeline card
-    zooms (wheel), pans (drag) and resets (double-click), the distribution tabs follow its section, and **Save view** writes the card
+    shows five panels only (`AnalysisViewModel`'s `g_timelineItems`: animation error, display time step, frametime, late share,
+    refresh strip; not the events panel or the reference lines, which the report card has), zooms (wheel), pans (drag) and resets
+    (double-click), the distribution tabs follow its section, and **Save view** writes the card
     on screen as SVG or PNG (`CardImage`). DocImages checks the width, zoom, the sliding window (sideways scroll, scrollbar and drag
     move the same card; near its edge the next one is built), reset and hover with headless input.
     - **The sliding window:** zoomed, the GUI's Timeline is built for the view plus a screen either side (`TimelineWindow`;
@@ -360,7 +362,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       events sorted with running totals; the capture's come from `ChartRun.Captures` (the capture rows as captures.csv has them: live from
       the report, `ChartRun.CapturesOf` once per capture; from files, `AnalysisOutput` reads captures.csv), so the report from the files
       is the live one (`ChartVideoClipTests`). The key counts each kind in the section, the description names the capture gaps by kind,
-      and `CardHover` lists a column's events with the frames they name. The strip has no marks.
+      and `CardHover` lists a column's events with the frames they name (on a card that has the panel: the GUI's Timeline has not).
+      The strip has no marks.
     - **Static stretches:** a violet band (`static-band`) behind every time panel from the first static frame's display time to the next
       frame's (`RunChartData.StaticStretches`), violet strip cells (`strip-static-a`/`-b`). With `ReportOptions.ClampStatic` (the
       default; `render --no-static-clamp`, the GUI's "Clamp static" check box, `GuiSettings.ClampStatic`) the display time step and

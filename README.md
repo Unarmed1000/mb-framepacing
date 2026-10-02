@@ -241,7 +241,9 @@ of the two causes of animation error dominates: frames with an error where the d
 early or dropped frames); frames with an error while the display time step stays even are **delta time jitter** (uneven animation
 steps).
 
-The GUI draws the report's cards itself, as wide as the window. The **Timeline** tab shows the report's panels on one time axis: the
+The GUI draws the report's cards itself, as wide as the window. The **Timeline** tab shows the report's animation error, display
+time step, frametime, late share and refresh strip panels on one time axis (the events panel and the target and preferred frame
+time lines are in the report card only, as **Save charts** writes it): the
 mouse wheel zooms around the pointer, a sideways wheel or swipe (or Shift with the wheel), dragging and the scrollbar scroll left and
 right, and **Reset zoom** (or a double-click) shows the whole run again; the scales stay the whole run's, so the axes do not jump while
 you look around. Hovering shows the frame under the pointer (its display time step, animation error, lateness, frametime and CPU
