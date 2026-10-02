@@ -7,7 +7,7 @@ Assembles the package (build_upm.py), creates a throw-away Unity project that re
 the package must compile, reproduce the C++ module matrices on Unity's scripting runtime and render pixel exact. Needs a Unity editor
 with an active license (Unity Hub sign-in); CI has none, so run it locally before an SDK release.
 
-  python sdk/unity/check_in_unity.py [--unity <path to the Unity executable>] [--keep]
+  python sdk/unity/check_in_unity.py [--unity <path to the Unity executable>] [--graphics d3d11|d3d12|glcore|gles|vulkan|metal] [--keep]
 """
 
 import argparse

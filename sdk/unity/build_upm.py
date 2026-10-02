@@ -130,7 +130,8 @@ def assemble(output: Path, version: str) -> None:
 
     manifest = read_manifest(SCRIPT_DIR / "package.template.json")
     manifest["version"] = version
-    _ = (output / "package.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Line feeds on every platform (as the .meta files below): the package's bytes do not depend on where it was assembled
+    _ = (output / "package.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
     _ = shutil.copy2(SCRIPT_DIR / "README.md", output / "README.md")
     _ = shutil.copy2(SDK_DIR / "LICENSE", output / "LICENSE.md")
@@ -148,7 +149,7 @@ def assemble(output: Path, version: str) -> None:
             "",
         ]
     )
-    _ = (output / "Third Party Notices.md").write_text(notices, encoding="utf-8")
+    _ = (output / "Third Party Notices.md").write_text(notices, encoding="utf-8", newline="\n")
 
     for folder, (sources, asmdef) in MODULES.items():
         copy_module_sources(sources, output / "Runtime" / folder)
@@ -193,12 +194,27 @@ def check(output: Path, version: str) -> list[str]:
     if name != PACKAGE_NAME or manifest_version != version:
         problems.append(f"package.json: name/version {name}/{manifest_version}, expected {PACKAGE_NAME}/{version}")
 
+    # Every file the package takes from the repository is the repository's file
+    copies: list[tuple[str, Path]] = []
     for folder, (sources, _asmdef) in MODULES.items():
-        for source in sorted(sources.rglob("*.cs")):
-            relative = source.relative_to(sources).as_posix()
-            copy = output / "Runtime" / folder / relative
-            if not copy.exists() or copy.read_bytes() != source.read_bytes():
-                problems.append(f"Runtime/{folder}/{relative}: differs from {source.parent.relative_to(REPOSITORY_ROOT).as_posix()}")
+        copies += [(f"Runtime/{folder}/{source.relative_to(sources).as_posix()}", source) for source in sorted(sources.rglob("*.cs"))]
+    copies += [(f"Runtime/Unity/{source.name}", source) for source in sorted((SCRIPT_DIR / "Runtime" / "Unity").glob("*")) if source.is_file()]
+    copies.append(("Runtime/Unity/FrameMarker.hlsl", SDK_DIR / "shaders" / "hlsl" / "FrameMarker.hlsl"))
+    for relative, source in copies:
+        copy = output / relative
+        if not copy.exists() or copy.read_bytes() != source.read_bytes():
+            problems.append(f"{relative}: differs from {source.relative_to(REPOSITORY_ROOT).as_posix()}")
+
+    # A default reference names files of the package: guid_for gives any name a GUID, so a renamed shader would leave the overlay with
+    # a reference to nothing, and its shader out of player builds
+    for script, references in DEFAULT_REFERENCES.items():
+        if not (output / script).is_file():
+            problems.append(f"{script}: has default references but is not in the package")
+        for field, target in references.items():
+            if not (output / target).is_file():
+                problems.append(f"{script}: the default reference {field} names {target}, which is not in the package")
+            elif (output / script).is_file() and field not in (output / script).read_text(encoding="utf-8"):
+                problems.append(f"{script}: has no field {field} for its default reference")
     return problems
 
 

@@ -91,6 +91,8 @@ namespace MB.FramePacing.Marker.Unity
     private StartMetadata m_start;
     private double m_phaseStartTime;
     private bool m_warned;
+    private bool m_materialWarned;
+    private bool m_drawFailed;
 
     /// <summary>How the marker is drawn (the same pixels every way).</summary>
     public FrameMarkerRenderMode RenderMode
@@ -234,7 +236,24 @@ namespace MB.FramePacing.Marker.Unity
       while (true)
       {
         yield return m_endOfFrame;
-        Draw();
+        // An exception here would end the coroutine, and with it every later marker and the run's phases: a frame that cannot be drawn
+        // (a provider of the game's that throws, an animation time that is no number) is reported once and the next frame is tried again
+        try
+        {
+          Draw();
+        }
+        catch (Exception exception)
+        {
+          if (!m_drawFailed)
+          {
+            m_drawFailed = true;
+            Debug.LogException(exception, this);
+            Debug.LogError(
+              "FrameMarkerOverlay: a frame's marker could not be drawn (the exception above). Only the first failure is reported.",
+              this
+            );
+          }
+        }
       }
     }
 
@@ -410,13 +429,14 @@ namespace MB.FramePacing.Marker.Unity
       if (m_ownedMaterial != null)
         return m_ownedMaterial;
       m_ownedMaterial = FrameMarkerGL.CreateMaterial();
-      if (m_ownedMaterial == null && !m_warned)
+      // Its own flag: WarnOnce has set m_warned by the time the first marker is drawn
+      if (m_ownedMaterial == null && !m_materialWarned)
       {
         Debug.LogError(
           "FrameMarkerOverlay: shader Hidden/Internal-Colored not found. Assign a material or add the shader to 'Always Included Shaders'.",
           this
         );
-        m_warned = true;
+        m_materialWarned = true;
       }
       return m_ownedMaterial;
     }

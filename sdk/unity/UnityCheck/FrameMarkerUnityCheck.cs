@@ -3,12 +3,14 @@
 //* ----------------
 //* Runs inside a real Unity editor (batch mode) on a throw-away project created by sdk/unity/check_in_unity.py:
 //*   - the package compiles in Unity (the C# version and API level Unity uses),
-//*   - the core library produces the C++ module matrices (test-data/markers/modules.csv) on Unity's scripting runtime,
+//*   - the marker module produces the C++ module matrices (test-data/markers/modules.csv) on Unity's scripting runtime,
 //*   - every drawing method renders pixel exact: FrameMarkerGL (the overlay's geometry), FrameMarkerMesh (the static grid with per-frame
 //*     indices, through a command buffer), FrameMarkerTexture (the module bitmap scaled up) and FrameMarkerQuad (the dedicated shader, with
 //*     GL and through a command buffer). The pixels read back from a render texture must equal the marker's quads, including the y flip,
 //*     for frame, start, end and sync markers at several module sizes and odd origins;
-//*   - FrameMarkerTexture holds the module-resolution bitmap, bottom row first as Unity textures are.
+//*   - FrameMarkerTexture holds the module-resolution bitmap, bottom row first as Unity textures are, and keeps a quiet zone outside its
+//*     range within it;
+//*   - FrameMarkerOverlay keeps drawing after a frame's draw threw (a provider of the game's that throws).
 //* Exits the editor with 0 when everything passed.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -16,8 +18,10 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using MB.FramePacing;
 using MB.FramePacing.Marker;
@@ -51,6 +55,8 @@ public static class FrameMarkerUnityCheck
       )
         failures += CheckRendering(method);
       failures += CheckTexture();
+      failures += CheckTextureQuietZone();
+      failures += CheckOverlaySurvivesAnException();
     }
     catch (Exception ex)
     {
@@ -310,6 +316,100 @@ public static class FrameMarkerUnityCheck
     }
     Debug.Log($"FrameMarkerUnityCheck: FrameMarkerTexture {(differences == 0 ? "exact" : $"{differences} texels differ")}");
     return differences == 0 ? 0 : 1;
+  }
+
+  /// <summary>A quiet zone outside its range is kept within it, as Options does: never a texture of another size than the marker's.</summary>
+  private static int CheckTextureQuietZone()
+  {
+    var bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
+    var texture = new FrameMarkerTexture();
+    int failures = 0;
+    try
+    {
+      if (!new MarkerGenerator().TryGenerateModules(new Payload(MarkerKind.Sync, 5, 99, MarkerFlags.None, new TimeSpan(1234)), bits, out var matrix))
+        throw new InvalidOperationException("TryGenerateModules failed");
+      foreach (var (quietZone, expected) in new[] { (-30, 0), (-1, 0), (0, 0), (Options.MaxQuietZoneModules, 16), (20, 16), (1000, 16) })
+      {
+        int size = matrix.Size + (2 * expected);
+        if (!texture.Update(matrix, quietZone) || texture.Texture.width != size || texture.Texture.height != size)
+        {
+          Debug.LogError(
+            $"FrameMarkerUnityCheck: FrameMarkerTexture with a quiet zone of {quietZone} is {texture.Texture?.width}x{texture.Texture?.height}, expected {size}x{size}"
+          );
+          ++failures;
+          continue;
+        }
+        // The symbol's first module is the quiet zone in from the top-left corner (texture rows start at the bottom)
+        var pixels = texture.Texture.GetPixels32();
+        var corner = pixels[((size - 1 - expected) * size) + expected];
+        if (corner.r != (matrix.IsDark(0, 0) ? 0 : 255))
+        {
+          Debug.LogError(
+            $"FrameMarkerUnityCheck: FrameMarkerTexture with a quiet zone of {quietZone}: the symbol is not at ({expected}, {expected})"
+          );
+          ++failures;
+        }
+      }
+    }
+    finally
+    {
+      texture.Dispose();
+    }
+    Debug.Log($"FrameMarkerUnityCheck: FrameMarkerTexture quiet zone {(failures == 0 ? "within its range" : $"{failures} sizes wrong")}");
+    return failures == 0 ? 0 : 1;
+  }
+
+  /// <summary>
+  /// A frame whose draw throws (here: the game's animation clock) must not be the overlay's last: the next frames are drawn, and the run's
+  /// phases go on. The overlay's end-of-frame loop is stepped by hand, since the editor's batch mode runs no coroutines.
+  /// </summary>
+  private static int CheckOverlaySurvivesAnException()
+  {
+    var gameObject = new GameObject("MB Frame Marker Overlay Check") { hideFlags = HideFlags.HideAndDontSave };
+    try
+    {
+      var overlay = gameObject.AddComponent<FrameMarkerOverlay>();
+      var loop = typeof(FrameMarkerOverlay).GetMethod("DrawAtEndOfFrame", BindingFlags.Instance | BindingFlags.NonPublic);
+      if (loop == null)
+      {
+        Debug.LogError("FrameMarkerUnityCheck: FrameMarkerOverlay has no DrawAtEndOfFrame to step (the check follows the overlay's loop)");
+        return 1;
+      }
+      int calls = 0;
+      overlay.AnimationTimeProvider = () =>
+      {
+        ++calls;
+        throw new InvalidOperationException("FrameMarkerUnityCheck: the animation clock throws (expected: the overlay reports it once)");
+      };
+      overlay.BeginRun();
+      var frames = (IEnumerator)loop.Invoke(overlay, null);
+      const int Frames = 4;
+      // The first step waits for the end of a frame; each further one draws a frame
+      for (int frame = 0; frame <= Frames; ++frame)
+      {
+        if (!frames.MoveNext())
+        {
+          Debug.LogError($"FrameMarkerUnityCheck: FrameMarkerOverlay's loop ended after {frame} frames");
+          return 1;
+        }
+      }
+      if (calls != Frames)
+      {
+        Debug.LogError($"FrameMarkerUnityCheck: FrameMarkerOverlay drew {calls} of {Frames} frames after its draw threw");
+        return 1;
+      }
+      Debug.Log("FrameMarkerUnityCheck: FrameMarkerOverlay keeps drawing after an exception");
+      return 0;
+    }
+    catch (Exception ex)
+    {
+      Debug.LogError($"FrameMarkerUnityCheck: FrameMarkerOverlay stopped at an exception in its draw: {(ex.InnerException ?? ex).GetType().Name}");
+      return 1;
+    }
+    finally
+    {
+      UnityEngine.Object.DestroyImmediate(gameObject);
+    }
   }
 
   private static string Hex(ReadOnlySpan<byte> bytes)

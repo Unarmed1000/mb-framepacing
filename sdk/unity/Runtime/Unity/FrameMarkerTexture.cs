@@ -25,15 +25,17 @@ namespace MB.FramePacing.Marker.Unity
     public Texture2D Texture { get; private set; }
 
     /// <summary>
-    /// Fill the texture with the encoded marker and its quiet zone: (matrix.Size + 2 x quietZoneModules) texels per side. Returns false (and
-    /// leaves the texture unchanged) if the quiet zone is invalid or the matrix is empty.
+    /// Fill the texture with the encoded marker and its quiet zone: (matrix.Size + 2 x quiet zone) texels per side. A quiet zone outside
+    /// 0 to <see cref="Options.MaxQuietZoneModules"/> is kept within it, as <see cref="Options"/> does. Returns false (and leaves the
+    /// texture unchanged) if the matrix is empty.
     /// </summary>
     public bool Update(ModuleMatrix matrix, int quietZoneModules = Options.RecommendedQuietZoneModules)
     {
       var options = new Options(1, quietZoneModules);
       if (matrix.IsEmpty)
         return false;
-      int size = matrix.Size + (2 * quietZoneModules);
+      // The quiet zone Options kept: the texture is exactly the marker it draws
+      int size = matrix.Size + (2 * options.QuietZoneModules);
       int rowBytes = size * 4;
       if (Texture == null || Texture.width != size)
       {
