@@ -20,7 +20,7 @@ SEQUENCE_ID_BYTE_COUNT = 16
 
 class MarkerKind(IntEnum):
     """What a marker marks: a frame of a run, or the start or end of a run (a test sequence). SYNC is the small second marker for
-    tearing checks and camera timing: it only carries the frame index."""
+    tearing checks and camera timing: it only carries the run id and the frame index."""
 
     FRAME = 0
     SEQUENCE_START = 1
@@ -140,6 +140,10 @@ class Vertex:
     luma: int
 
 
+# Modules per side of a main marker and of the sync marker (constants.QR_MODULE_COUNT and SYNC_QR_MODULE_COUNT, which import this module)
+_MARKER_SIZES = (41, 25)
+
+
 def packed_module_byte_count(size: int) -> int:
     """The bytes of a packed module matrix of size x size modules: 211 for the main marker (41), 79 for the sync marker (25)."""
     return 0 if size <= 0 else ((size * size) + 7) // 8
@@ -151,16 +155,17 @@ class ModuleMatrix:
     rows, the last byte zero padded (exactly test-data/markers/modules.csv's modulesHex). generate_modules makes it once per marker; every
     drawing output (modules_to_quads, modules_to_triangles, modules_to_indexed, modules_to_bitmap) is made from it.
 
-    `size` modules per side (41 for the main marker, 25 for the sync marker). Building one from bits checks the size (21 to 41, in steps
-    of 4) and the length (at least packed_module_byte_count(size) bytes), and ignores bits past the last module."""
+    `size` modules per side (41 for the main marker, 25 for the sync marker). Building one from bits checks the size (one of those two:
+    the sizes the drawing functions and the grid know) and the length (at least packed_module_byte_count(size) bytes), and ignores bits
+    past the last module."""
 
     size: int
     bits: bytes = field(repr=False)
 
     def __post_init__(self) -> None:
         count = packed_module_byte_count(self.size)
-        if self.size < 21 or self.size > 41 or (self.size - 17) % 4 != 0 or len(self.bits) < count:
-            raise ValueError(f"not a packed QR symbol: size {self.size}, {len(self.bits)} bytes")
+        if self.size not in _MARKER_SIZES or len(self.bits) < count:
+            raise ValueError(f"not a marker's packed modules: size {self.size}, {len(self.bits)} bytes")
         bits = bytearray(self.bits[:count])
         used = (self.size * self.size) % 8
         if used:

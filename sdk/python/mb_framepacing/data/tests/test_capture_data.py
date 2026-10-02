@@ -8,10 +8,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ...marker import MarkerFlags, MarkerKind, Payload, SequenceId, StartMetadata, encode_payload
 from .. import (
     UNKNOWN_TICKS,
     CaptureDataHeader,
     CaptureDataReader,
+    CaptureDataRecord,
     CaptureDataStatus,
     DataFormatError,
     Rectangle,
@@ -71,6 +73,105 @@ class CaptureDataTests(unittest.TestCase):
         self.assertEqual(dropped.source_drops, 3)
         self.assertFalse(dropped.has_device_ticks)
         self.assertIsNone(dropped.main_bytes)
+
+    def test_a_header_that_is_not_the_format_is_refused(self) -> None:
+        def with_field(offset: int, fmt: str, value: int) -> bytes:
+            data = header_bytes()
+            struct.pack_into(fmt, data, offset, value)
+            return bytes(data)
+
+        self.assertEqual(CaptureDataHeader.parse(bytes(header_bytes())).width, 960, "the bytes these cases change one field of")
+        cases = {
+            "a byte short": bytes(header_bytes())[:-1],
+            "nothing": b"",
+            "another magic": with_field(0, "<I", MAGIC + 1),
+            "version 0": with_field(4, "<H", 0),
+            "another header size": with_field(6, "<H", HEADER_SIZE - 1),
+            "another record size": with_field(8, "<I", RECORD_SIZE - 1),
+            "five markers": with_field(64, "<I", 5),
+        }
+        for what, data in cases.items():
+            with self.subTest(what), self.assertRaises(DataFormatError):
+                _ = CaptureDataHeader.parse(data)
+        header = CaptureDataHeader.parse(with_field(12, "<I", 0) + b"more bytes than a header")
+        self.assertEqual((header.frames_stored, header.camera), (False, False))
+        self.assertEqual(CaptureDataHeader.parse(with_field(64, "<I", 0)).markers, ())
+
+    def test_a_record_that_is_not_one_is_refused(self) -> None:
+        good = record_bytes(7, 200, 2, b"main", b"second")
+        record = CaptureDataRecord.parse(good)
+        self.assertEqual((record.capture_index, record.status, record.main_bytes, record.second_bytes), (7, CaptureDataStatus.TORN, b"main", b"second"))
+        self.assertEqual(CaptureDataRecord.parse(memoryview(good + b"more")), record, "a view, and more bytes than a record")
+        cases = {
+            "a byte short": good[:-1],
+            "an unknown status": record_bytes(7, 200, 3, b"", b""),
+            "a main marker longer than its slot": record_bytes(7, 200, 1, bytes(81), b"")[:RECORD_SIZE],
+            "a second marker longer than its slot": record_bytes(7, 200, 1, b"", bytes(81))[:RECORD_SIZE],
+        }
+        for what, data in cases.items():
+            with self.subTest(what), self.assertRaises(DataFormatError):
+                _ = CaptureDataRecord.parse(data)
+        self.assertEqual(len(CaptureDataRecord.parse(record_bytes(7, 200, 1, bytes(80), bytes(80))).second_bytes or b""), 80)
+
+    def test_a_records_markers_decode(self) -> None:
+        main = encode_payload(Payload(MarkerKind.SEQUENCE_START, 7, 12, MarkerFlags.STATIC_AFTER, 34), StartMetadata(5, SequenceId.from_text("run 7")))
+        sync = encode_payload(Payload(MarkerKind.SYNC, 7, 11, MarkerFlags.NONE, 0))
+        self.assertEqual((len(main), len(sync)), (77, 16), "the longest and the shortest marker")
+        record = CaptureDataRecord.parse(record_bytes(5, 200, 2, main, sync))
+        decoded = record.try_decode_main()
+        assert decoded is not None
+        payload, metadata = decoded
+        self.assertEqual((payload.kind, payload.run_id, payload.frame_index, payload.animation_ticks), (MarkerKind.SEQUENCE_START, 7, 12, 34))
+        assert metadata is not None
+        self.assertEqual((metadata.utc_ticks, str(metadata.sequence_id)), (5, "run 7"))
+        second = record.try_decode_second()
+        assert second is not None
+        self.assertEqual((second.kind, second.run_id, second.frame_index), (MarkerKind.SYNC, 7, 11))
+
+        # A record without markers, and bytes that are no marker
+        none = CaptureDataRecord.parse(record_bytes(5, 200, 0, b"", b""))
+        self.assertEqual((none.try_decode_main(), none.try_decode_second()), (None, None))
+        garbage = CaptureDataRecord.parse(record_bytes(5, 200, 1, bytes(53), b"\x01\x02\x03"))
+        self.assertEqual((garbage.try_decode_main(), garbage.try_decode_second()), (None, None))
+
+    def test_records_are_read_in_order_whatever_is_read_between_them(self) -> None:
+        count = 5000  # more than one batch of records()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "captures.mbcd"
+            _ = path.write_bytes(bytes(header_bytes()) + b"".join(record_bytes(i, i * 3, 1, b"", b"") for i in range(count)))
+            with CaptureDataReader(path) as reader:
+                self.assertEqual(reader.record_count, count)
+                indices: list[int] = []
+                for record in reader.records():
+                    indices.append(record.capture_index)
+                    # Reading one record by its index must not move where records() reads its next batch
+                    if record.capture_index in (0, 4095, 4096):
+                        self.assertEqual(reader.read_record(count - 1).capture_index, count - 1)
+                self.assertEqual(indices, list(range(count)))
+                # Two walks at once each see every record
+                pairs = list(zip(reader.records(), reader.records(), strict=True))
+                self.assertEqual([(a.capture_index, b.capture_index) for a, b in pairs], [(i, i) for i in range(count)])
+                self.assertEqual([r.capture_index for r in reader.read_all()], list(range(count)))
+                for index in (-1, count):
+                    with self.subTest(index), self.assertRaises(IndexError):
+                        _ = reader.read_record(index)
+
+    def test_what_is_no_capture_data_file_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "captures.mbcd"
+            for what, content in (("empty", b""), ("ends in its header", bytes(header_bytes())[:-1]), ("another file", bytes(HEADER_SIZE))):
+                _ = path.write_bytes(content)
+                with self.subTest(what), self.assertRaises(DataFormatError):
+                    _ = CaptureDataReader(path)
+                # A refused file is closed again: it can be replaced
+                path.unlink()
+            with self.assertRaises(FileNotFoundError):
+                _ = CaptureDataReader(path)
+            _ = path.write_bytes(bytes(header_bytes()))
+            reader = CaptureDataReader(str(path))
+            self.assertEqual((reader.record_count, reader.read_all()), (0, []))
+            reader.close()
+            path.unlink()
 
 
 if __name__ == "__main__":

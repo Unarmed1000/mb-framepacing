@@ -7,6 +7,7 @@ sequence id."""
 import unittest
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from .. import (
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
@@ -368,8 +369,30 @@ class PayloadTests(unittest.TestCase):
         time = datetime(2026, 1, 1, tzinfo=UTC)
         self.assertEqual(to_date_time_ticks(time), 639_028_224_000_000_000)
         self.assertEqual(to_date_time_ticks(time + timedelta(microseconds=1)), 639_028_224_000_000_010)
+        self.assertEqual(to_date_time_ticks(datetime(2026, 1, 1)), to_date_time_ticks(datetime(2026, 1, 1).astimezone()), "a naive time is local")
+
+    def test_seconds_are_truncated_to_a_tick_as_in_cpp_and_csharp(self) -> None:
         self.assertEqual(seconds_to_ticks(1.5), 15_000_000)
-        self.assertEqual(seconds_to_ticks(1.0 / 60), 166_667)
+        self.assertEqual(seconds_to_ticks(1.0 / 60), 166_666, "TimeSpan::FromSeconds and TimeSpanUtil.FromSeconds give this tick")
+        self.assertEqual(seconds_to_ticks(-1.0 / 60), -166_666, "toward zero")
+        self.assertEqual(seconds_to_ticks(0.999_999_99e-7), 0)
+        self.assertEqual(seconds_to_ticks(2), 20_000_000)
+        with self.assertRaises(ValueError):
+            _ = seconds_to_ticks(float("nan"))
+        with self.assertRaises(OverflowError):
+            _ = seconds_to_ticks(float("inf"))
+
+    def test_a_kind_that_is_not_a_marker_kind_is_not_encoded(self) -> None:
+        def with_kind(kind: int) -> Payload:
+            # A number where the type says MarkerKind: what a caller without a type checker can pass
+            return Payload(cast(MarkerKind, cast(object, kind)), 1, 2, MarkerFlags.NONE, 3)
+
+        for kind in (4, 7, 255, -1):
+            with self.subTest(kind), self.assertRaises(ValueError):
+                _ = encode_payload(with_kind(kind))
+        # The plain number of a kind is that kind
+        self.assertEqual(encode_payload(with_kind(0)), encode_payload(Payload(MarkerKind.FRAME, 1, 2, MarkerFlags.NONE, 3)))
+        self.assertEqual(len(encode_payload(with_kind(3))), 16)
 
 
 class SequenceIdTests(unittest.TestCase):

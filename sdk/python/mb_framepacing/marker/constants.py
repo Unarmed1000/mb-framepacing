@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Constants of the frame marker format and geometry, as in the C++ library's Constants.hpp. See doc/marker-format.md for the full
-specification."""
+"""Constants of the frame marker format and geometry. See doc/marker-format.md for the full specification."""
 
 from .structures import SEQUENCE_ID_BYTE_COUNT, MarkerKind, packed_module_byte_count
 

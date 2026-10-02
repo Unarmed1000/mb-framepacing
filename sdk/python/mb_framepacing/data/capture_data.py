@@ -136,6 +136,8 @@ class CaptureDataRecord:
 
     @staticmethod
     def parse(data: bytes | memoryview) -> "CaptureDataRecord":
+        """Parse a record. Raises DataFormatError for bytes that are not one: fewer than 192, an unknown status, or a marker longer than
+        its slot."""
         if len(data) < RECORD_SIZE:
             raise DataFormatError("A capture data record is 192 bytes")
         capture_index, host, device, source_drops, status, main_length, second_length = cast(
@@ -171,17 +173,19 @@ class CaptureDataReader:
             raise
 
     def read_record(self, index: int) -> CaptureDataRecord:
+        """The record at index (0 to record_count - 1; another index raises IndexError)."""
         if index < 0 or index >= self.record_count:
             raise IndexError(f"record {index} of {self.record_count}")
         _ = self._file.seek(HEADER_SIZE + (index * RECORD_SIZE))
         return CaptureDataRecord.parse(self._file.read(RECORD_SIZE))
 
     def records(self) -> Iterator[CaptureDataRecord]:
-        """Every record, in file order."""
-        _ = self._file.seek(HEADER_SIZE)
+        """Every record, in file order. read_record, or another walk, may be used while this one is under way."""
         batch = 4096
         for first in range(0, self.record_count, batch):
             count = min(batch, self.record_count - first)
+            # Each batch from its own place: the file's position is shared with read_record and other walks
+            _ = self._file.seek(HEADER_SIZE + (first * RECORD_SIZE))
             view = memoryview(self._file.read(count * RECORD_SIZE))
             for i in range(count):
                 yield CaptureDataRecord.parse(view[i * RECORD_SIZE : (i + 1) * RECORD_SIZE])

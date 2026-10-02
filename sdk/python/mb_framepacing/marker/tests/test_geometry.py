@@ -203,14 +203,24 @@ class ModuleMatrixTests(unittest.TestCase):
                     self.assertEqual(matrix.is_dark(x, y), (matrix.bits[index // 8] >> (7 - (index % 8))) & 1 == 1)
         self.assertEqual((packed_module_byte_count(41), packed_module_byte_count(25)), (211, 79))
 
-    def test_takes_qr_sizes_and_ignores_the_padding(self) -> None:
+    def test_takes_the_marker_sizes_and_ignores_the_padding(self) -> None:
         matrix = generate_modules(Payload(MarkerKind.SYNC, 3, 1, MarkerFlags.NONE, 2))
         padded = bytearray(matrix.bits)
         padded[-1] |= 0x7F  # 625 modules: the last byte uses 1 bit
         self.assertEqual(ModuleMatrix(25, bytes(padded) + b"extra"), matrix)
-        for size, bits in ((24, padded), (45, padded), (25, padded[:78])):
+        for size, bits in ((24, padded), (45, padded), (25, padded[:78]), (0, padded), (-25, padded)):
             with self.subTest(size), self.assertRaises(ValueError):
                 _ = ModuleMatrix(size, bytes(bits))
+        # The two sizes are the constants' (a matrix of each is made from enough zero bytes)
+        self.assertEqual([ModuleMatrix(size, bytes(211)).size for size in (QR_MODULE_COUNT, SYNC_QR_MODULE_COUNT)], [41, 25])
+        # The other QR sizes are not markers: nothing draws their grid
+        for size in (21, 29, 33, 37):
+            with self.subTest(size), self.assertRaises(ValueError):
+                _ = ModuleMatrix(size, bytes(211))
+        main = generate_modules(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2))
+        self.assertEqual((ModuleMatrix(41, main.bits), ModuleMatrix(41, main.bits).size, len(main.bits)), (main, 41, 211))
+        with self.assertRaises(ValueError):
+            _ = ModuleMatrix(41, main.bits[:210])
 
 
 class BitmapTests(unittest.TestCase):
@@ -272,6 +282,11 @@ class BitmapTests(unittest.TestCase):
             modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), pixels, 64, 64, PixelFormat.R8G8B8, (64 * 3) - 1)
         with self.assertRaises(ValueError):
             modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), memoryview(pixels)[:-1], 64, 64, PixelFormat.R8G8B8A8)
+        for width, height in ((-1, 64), (64, -1)):
+            with self.subTest(width=width, height=height), self.assertRaises(ValueError):
+                modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), pixels, width, height)
+        with self.assertRaises(ValueError):
+            modules_to_bitmap(matrix, Options(1, 4), Point(0, 0), pixels, 64, 64, PixelFormat.R8, 0)
         self.assertTrue(all(value == 128 for value in pixels))
         modules_to_bitmap(matrix, Options(1, 4), Point(500, 500), pixels, 64, 64)
         self.assertTrue(all(value == 128 for value in pixels), "outside the buffer: nothing to draw")

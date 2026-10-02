@@ -3,8 +3,8 @@
 
 """mb_framepacing.marker: the frame marker of mb-framepacing, in Python.
 
-Draw a QR marker with the frame index, the animation time, the run id and (optionally) the frame pacer's intended display time and
-target frame time, the CPU start time and CPU busy into every frame of an application, so mb-framepacing can measure the animation
+Draw a QR marker with the frame index, the animation time, the run id and (optionally) the frame pacer's preferred and target frame
+time and intended display time, the CPU start time and CPU busy into every frame of an application, so mb-framepacing can measure the animation
 error on the real display output. It draws exactly the same pixels as the C++ and C# libraries: the tests check
 it against the golden images the C++ library writes (test-data/markers). The format is specified in doc/marker-format.md.
 
@@ -15,9 +15,9 @@ it against the golden images the C++ library writes (test-data/markers). The for
     matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))   # encode once
     modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)       # draw it
 
-    # Optional (required for camera capture): the small sync marker, bottom-left, with the same frame index
+    # Optional (required for camera capture): the small sync marker, bottom-left, with the same run id and frame index
     sync_origin = options.recommended_origin(MarkerKind.SYNC, height)
-    sync = generate_modules(Payload(MarkerKind.SYNC, 0, frame_index, MarkerFlags.NONE, 0))
+    sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NONE, 0))
     modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFormat.R8G8B8)
 
 Standard library only, Python 3.12 or later.

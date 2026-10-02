@@ -46,6 +46,7 @@ _HEADER = struct.Struct("<2sBBIQBqIIqqI")
 _SYNC = struct.Struct("<2sBBIQ")
 _START_FIELDS = struct.Struct(f"<q{SEQUENCE_ID_BYTE_COUNT}s")
 _DATE_TIME_EPOCH = datetime(1, 1, 1, tzinfo=UTC)
+_KINDS = frozenset(int(kind) for kind in MarkerKind)
 
 
 def to_date_time_ticks(time: datetime) -> int:
@@ -54,15 +55,18 @@ def to_date_time_ticks(time: datetime) -> int:
 
 
 def seconds_to_ticks(seconds: float) -> int:
-    """Convert seconds (for example an animation clock) to TimeSpan ticks, rounded to the nearest tick (half to even, like the C#
-    library's Math.Round)."""
-    return round(seconds * TICKS_PER_SECOND)
+    """Convert seconds (for example an animation clock) to TimeSpan ticks, truncated toward zero to a tick: 1.0 / 60 is 166_666 ticks,
+    the tick the C++ library's TimeSpan::FromSeconds and the C# library's TimeSpanUtil.FromSeconds give. Raises ValueError for NaN and
+    OverflowError for an infinite value."""
+    return int(seconds * TICKS_PER_SECOND)
 
 
 def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> bytes:
     """Serialize the payload. Start markers append the metadata, other kinds ignore it; a sync marker is SYNC_PAYLOAD_BYTE_COUNT bytes
     (the start of the header: the run id and the frame index) and ignores the other fields. Raises ValueError when an encoded field is out of its
-    range."""
+    range, or the kind is not a MarkerKind (try_decode_payload would refuse the bytes)."""
+    if payload.kind not in _KINDS:
+        raise ValueError(f"not a marker kind: {payload.kind!r}")
     if payload.kind == MarkerKind.SYNC:
         try:
             return _SYNC.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.run_id, payload.frame_index)
