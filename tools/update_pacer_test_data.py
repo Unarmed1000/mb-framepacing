@@ -75,7 +75,10 @@ def main() -> int:
         print(write_frames(scenario, clip))
     pacer_sim = Path(args.pacer_sim) if args.pacer_sim else find_pacer_sim()
     if pacer_sim is None or not pacer_sim.is_file():
-        sys.exit("pacer-sim not found: build sdk/cpp with its tests (cmake --preset <preset> && cmake --build --preset <preset>) or pass --pacer-sim")
+        sys.exit(
+            "pacer-sim not found: build sdk/cpp with the pacer and its tests (-DMB_FRAMEPACING_BUILD_PACER=ON; the windows and "
+            + "linux-sanitize presets have it on) or pass --pacer-sim"
+        )
     _ = subprocess.run([str(pacer_sim), "--golden", str(TARGET)], check=True)
     return 0
 

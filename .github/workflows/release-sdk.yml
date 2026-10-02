@@ -71,10 +71,11 @@ jobs:
           dotnet-version: 10.0.x
       - name: CMake 4
         uses: lukka/get-cmake@v4.4.2
-      - name: C++ library (core, marker, data)
+      # The pacer is experimental and off by default; it is built and tested here all the same
+      - name: C++ library (core, marker, data and the experimental pacer)
         shell: bash
         run: |
-          cmake -S sdk/cpp -B sdk/cpp/build/release -DCMAKE_BUILD_TYPE=Release
+          cmake -S sdk/cpp -B sdk/cpp/build/release -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON
           cmake --build sdk/cpp/build/release --config Release --parallel
           ctest --test-dir sdk/cpp/build/release -C Release --output-on-failure
       - name: C# modules

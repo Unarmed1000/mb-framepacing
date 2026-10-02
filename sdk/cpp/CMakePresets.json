@@ -18,7 +18,8 @@
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "cacheVariables": {
-        "MB_FRAMEPACING_BUILD_BENCHMARKS": "ON"
+        "MB_FRAMEPACING_BUILD_BENCHMARKS": "ON",
+        "MB_FRAMEPACING_BUILD_PACER": "ON"
       },
       "condition": {
         "type": "equals",
@@ -49,6 +50,7 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "MB_FRAMEPACING_BUILD_BENCHMARKS": "ON",
         "MB_FRAMEPACING_BUILD_FUZZERS": "ON",
+        "MB_FRAMEPACING_BUILD_PACER": "ON",
         "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"

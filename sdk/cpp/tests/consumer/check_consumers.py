@@ -8,6 +8,9 @@ subdirectory   add_subdirectory(<source tree>)
 package        cmake --install to a temporary prefix, then find_package(mb_framepacing <version> CONFIG REQUIRED COMPONENTS ...)
 archive        FetchContent of a release archive (a local path as URL, with its SHA256) (only with --archive)
 
+The pacer module is experimental and off by default: the runs above must not get it. Two more runs ask for it and pace a frame
+(MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer against an install built with -DMB_FRAMEPACING_BUILD_PACER=ON.
+
 python sdk/cpp/tests/consumer/check_consumers.py [--source <mb_framepacing source tree>] [--archive <mb-framepacing-cpp-x.y.z.tar.gz>]
 """
 
@@ -71,6 +74,25 @@ def check_installs_nothing(work: Path, name: str) -> None:
         sys.exit(f"{name}: the consumer's install holds the library's files ({len(installed)}: {', '.join(installed[:5])}, ...)")
 
 
+def install_library(work: Path, source: Path, name: str, options: list[str]) -> Path:
+    """Build the library as its own project and install it: the prefix a consumer finds it in."""
+    print(f"\n== install ({name})", flush=True)
+    library = work / name
+    prefix = work / (name + "-prefix")
+    tests_and_tools_off = ["-DMB_FRAMEPACING_BUILD_TESTS=OFF", "-DMB_FRAMEPACING_BUILD_TOOLS=OFF"]
+    run(["cmake", "-S", str(source), "-B", str(library), "-DCMAKE_BUILD_TYPE=Release", *tests_and_tools_off, *options])
+    run(["cmake", "--build", str(library), "--config", "Release", "--parallel"])
+    run(["cmake", "--install", str(library), "--config", "Release", "--prefix", str(prefix)])
+    return prefix
+
+
+def check_has_no_pacer(prefix: Path) -> None:
+    """The pacer is experimental: an install with the default options has none of it."""
+    found = sorted(str(path.relative_to(prefix)) for path in prefix.rglob("*") if "pacer" in path.name.lower())
+    if found:
+        sys.exit(f"The default install holds the pacer module, which is off by default ({', '.join(found[:5])})")
+
+
 def main() -> int:
     args = parse_args()
     source = Path(args.source).resolve()
@@ -87,24 +109,16 @@ def main() -> int:
         build_and_run(work, "subdirectory", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix()})
         check_installs_nothing(work, "subdirectory")
 
-        print("\n== install", flush=True)
-        library = work / "library"
-        prefix = work / "prefix"
-        run(
-            [
-                "cmake",
-                "-S",
-                str(source),
-                "-B",
-                str(library),
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DMB_FRAMEPACING_BUILD_TESTS=OFF",
-                "-DMB_FRAMEPACING_BUILD_TOOLS=OFF",
-            ]
-        )
-        run(["cmake", "--build", str(library), "--config", "Release", "--parallel"])
-        run(["cmake", "--install", str(library), "--config", "Release", "--prefix", str(prefix)])
+        prefix = install_library(work, source, "library", [])
+        check_has_no_pacer(prefix)
         build_and_run(work, "package", {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor})
+
+        # The experimental pacer, for an application that asks for it
+        pacer = {"MB_CONSUMER_PACER": "ON"}
+        build_and_run(work, "subdirectory-pacer", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix(), **pacer})
+        prefix = install_library(work, source, "library-pacer", ["-DMB_FRAMEPACING_BUILD_PACER=ON"])
+        package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
+        build_and_run(work, "package-pacer", {**package, **pacer})
 
         if args.archive:
             archive = Path(args.archive).resolve()
@@ -124,7 +138,8 @@ def main() -> int:
         return 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    print("\nConsumer check: OK (" + ", ".join(["fetchcontent", "subdirectory", "package"] + (["archive"] if args.archive else [])) + ")")
+    names = ["fetchcontent", "subdirectory", "package", "subdirectory-pacer", "package-pacer"] + (["archive"] if args.archive else [])
+    print("\nConsumer check: OK (" + ", ".join(names) + ")")
     return 0
 
 

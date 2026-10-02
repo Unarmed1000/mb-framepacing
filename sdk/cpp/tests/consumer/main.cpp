@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The smallest program using mb_framepacing's modules: encode the frame marker of one frame at 60 fps and draw it as a triangle
-// list (marker), read a summary's capture period (data), and print what came out with the library version (core).
+// list (marker), read a summary's capture period (data), and print what came out with the library version (core). With
+// MB_CONSUMER_PACER it also paces a frame with the experimental pacer module and fills the frame's marker from it.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
@@ -16,6 +17,12 @@
 #include <mb/framepacing/marker/geometry/Vertex.hpp>
 #include <mb/framepacing/marker/payload/MarkerFlags.hpp>
 #include <mb/framepacing/marker/payload/Payload.hpp>
+#ifdef MB_CONSUMER_PACER
+#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#endif
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -23,6 +30,39 @@
 
 namespace FP = MB::FramePacing;
 namespace FM = MB::FramePacing::Marker;
+
+#ifdef MB_CONSUMER_PACER
+namespace
+{
+  // The experimental pacer: the first frame of a 30 fps target on a 60 Hz display, and its marker filled from the schedule (the
+  // frame index is the application's own)
+  bool PaceOneFrame(const uint64_t frameIndex)
+  {
+    namespace PC = MB::FramePacing::Pacer;
+    PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));
+    settings.SetPreferredFrameRate(30);
+    PC::FramePacer pacer(settings);
+    const FP::TickCount64 cpuStartTime = FP::TickCount64::FromSeconds(10);
+    const PC::FrameSchedule schedule = pacer.BeginFrame(cpuStartTime);
+    const FP::TimeSpan32 cpuBusy = pacer.EndFrame(cpuStartTime + FP::TimeSpan::FromMilliseconds(4));
+    const FM::Payload payload{FM::MarkerKind::Frame,
+                              1u,
+                              frameIndex,
+                              FM::MarkerFlags::None,
+                              schedule.AnimationTime,
+                              schedule.PreferredFrameTime,
+                              schedule.TargetFrameTime,
+                              schedule.IntendedDisplayTime,
+                              cpuStartTime,
+                              cpuBusy};
+    FM::ModuleMatrix matrix;
+    const bool encoded = FM::GenerateModules(payload, matrix);
+    std::printf("the pacer (experimental): swap interval %u, a %u tick frame, %u ticks busy\n", static_cast<unsigned>(schedule.SwapInterval),
+                static_cast<unsigned>(payload.TargetFrameTime().Ticks()), static_cast<unsigned>(cpuBusy.Ticks()));
+    return encoded && schedule.SwapInterval == 2u && payload.TargetFrameTime().Ticks() == 333'333u && cpuBusy.Ticks() == 40'000u;
+  }
+}
+#endif
 
 int main()
 {
@@ -43,5 +83,10 @@ int main()
   const std::string_view version = FP::GetLibraryVersion().Text;
   std::printf("mb_framepacing %.*s: %zu vertices, %lld ticks, a %u tick frame\n", static_cast<int>(version.size()), version.data(), count,
               static_cast<long long>(ticks), static_cast<unsigned>(payload.TargetFrameTime().Ticks()));
-  return count > 0 && ticks == 166'667 && payload.TargetFrameTime().Ticks() == 166'667u ? 0 : 1;
+#ifdef MB_CONSUMER_PACER
+  const bool paced = PaceOneFrame(frameIndex);
+#else
+  const bool paced = true;
+#endif
+  return count > 0 && ticks == 166'667 && payload.TargetFrameTime().Ticks() == 166'667u && paced ? 0 : 1;
 }

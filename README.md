@@ -443,7 +443,8 @@ AppleClang 15+), Python 3, and Node.js for formatting the docs.
 mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 
-# C++ library: the core, marker and data modules (the experimental pacer: -DMB_FRAMEPACING_BUILD_PACER=ON); the tests fetch GoogleTest.
+# C++ library: every module; the tests fetch GoogleTest. The pacer is experimental and off by default
+# (-DMB_FRAMEPACING_BUILD_PACER=ON): only the windows and linux-sanitize presets build it.
 # Presets: windows, linux, linux-clang, linux-sanitize, macos
 cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
 python sdk/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations

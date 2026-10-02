@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 """Check the Conan recipe (sdk/cpp/conan, the conan-center-index layout) the way users get the package: sdk/cpp/conan as a
 local-recipes-index remote, then `conan test` of the recipe's test_package, which builds the package from source and runs a program against
-it. The package is built with its default modules (the pacer is off by default), and once more with only the core and the marker module
+it. The package is built and tested with its default modules (the experimental pacer is off by default), built and tested again with the
+pacer (with_pacer=True: the test package then paces a frame), and built once more with only the core and the marker module
 (with_data=False: no nlohmann/json; with_pacer=False).
 
 By default the recipe builds this checkout: sdk/cpp/package_release.py writes the release archive of the current sdk/VERSION, and a copy of
@@ -32,8 +33,9 @@ RECIPE = "mb-framepacing"
 VERSION_FILE = ROOT / "sdk" / "VERSION"
 PACKAGE_RELEASE = ROOT / "sdk" / "cpp" / "package_release.py"
 ARCHIVE_PREFIX = "mb-framepacing-cpp"
-# The package is built and tested with its default modules, then built with the core and marker modules only (conan install --build=missing);
-# the test package needs the data module too, so that second package is not run against
+# The package is built and tested with its default modules and with the experimental pacer, then built with the core and marker modules
+# only (conan install --build=missing); the test package needs the data module too, so that last package is not run against
+WITH_PACER = ("-o", f"{RECIPE}/*:with_pacer=True")
 CORE_AND_MARKER = ("-o", f"{RECIPE}/*:with_data=False", "-o", f"{RECIPE}/*:with_pacer=False")
 
 
@@ -98,10 +100,11 @@ def main() -> int:
         reference = f"{RECIPE}/{version}"
         test_package = index / "recipes" / RECIPE / "all" / "test_package"
         run([conan, "test", str(test_package), reference, "--build=missing", "-s", "compiler.cppstd=20"], env)
+        run([conan, "test", str(test_package), reference, "--build=missing", "-s", "compiler.cppstd=20", *WITH_PACER], env)
         # --output-folder: conan install writes its generated files there, never into the current folder
         core_and_marker = ["--output-folder", str(work / "core-and-marker"), *CORE_AND_MARKER]
         run([conan, "install", f"--requires={reference}", "--build=missing", "-s", "compiler.cppstd=20", *core_and_marker], env)
-    print(f"Conan recipe: OK ({RECIPE}/{version}: tested with the default modules, built with the core and marker modules only)")
+    print(f"Conan recipe: OK ({RECIPE}/{version}: tested with the default modules and with the pacer, built with the core and marker modules only)")
     return 0
 
 

@@ -69,7 +69,7 @@ mb-quality -r --all .                            # the standard check: dotnet fo
 mb-quality -r --repair .                         # apply formatting, then build and test
 dotnet build mb-framepacing.slnx                 # warnings are errors (Directory.Build.props)
 dotnet test  mb-framepacing.slnx
-cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # every module; linux / linux-clang / macos too
+cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # every module, the pacer too (on in windows and linux-sanitize); linux / linux-clang / macos
 dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --fps 500  # end to end without hardware
 uv sync                                          # the Python dev tools in .venv, on the Python of .python-version (3.12)
 uv run python -m unittest discover -s sdk/python -t sdk/python    # the Python package against sdk/test-data
@@ -96,7 +96,7 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     (`--module core|marker|data|pacer` for one), with the versions CI pins in `uv.lock` (`uv run tools/check_cpp.py`). clang-tidy needs a
     configured build: `sdk/cpp/build/<preset>`, default `windows` (the VS generator writes no compile database, so the script passes the
     include paths); `--preset` takes another one. With a compile database (`linux-sanitize`, CI) clang-tidy checks the sources that build
-    compiles: a module that is switched off (the pacer) is skipped, and the script says so. To apply formatting: `clang-format -i` on the files the script lists.
+    compiles: a module that build leaves out is skipped, and the script says so. To apply formatting: `clang-format -i` on the files the script lists.
   - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,source,tests}`),
     each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`,
     grouped in subfolders where a module has many (`core/time/`, `marker/geometry/`, `marker/payload/`, `data/analysis/`, `data/capture/`)
@@ -210,6 +210,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   works on any platform: it needs a steady clock (passed in), a `Present` that waits for vsync and the display's refresh period, nothing
   else. It has only run against its own simulation, never a real swap chain. Off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's
   `with_pacer`); build it with `-DMB_FRAMEPACING_BUILD_PACER=ON`.
+  - **Off for users, on where we check:** the `windows` and `linux-sanitize` presets, CI's and the release workflow's C++ build and
+    tests (Windows, Ubuntu, macOS) build it. `check_consumers.py` and `check_conan.py` each run once more with it (the consumer and
+    the Conan test package pace one frame and fill a `Payload` from the schedule), and the consumer check fails when a default
+    install holds anything of the pacer.
   - **Every place users meet it says "experimental":** the guide's notice and its Status table (checked / not checked), the READMEs,
     `integrating.md`, the CMake and Conan option descriptions, the release notes, and the first line of every public type's comment.
     Keep it that way until it has been measured on real swap chains, and keep the Status table current with every pacer change.
@@ -447,8 +451,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - A version is added after its release: `python tools/add_conan_version.py <version>` (reads the release's `SHA256SUMS`), then
     commit. The release workflow tests the new archive through the recipe (`check_conan.py --released`).
   - `tools/check_conan.py` (CI `conan` job, Windows/Ubuntu/macOS) builds the recipe from this checkout's archive, using a copy of
-    `sdk/cpp/conan` as a local-recipes-index remote: `conan test` of the test package with `compiler.cppstd=20`, and a build with the
-    core and marker modules only.
+    `sdk/cpp/conan` as a local-recipes-index remote: `conan test` of the test package with `compiler.cppstd=20`, the same with
+    `with_pacer=True` (the test package then paces a frame), and a build with the core and marker modules only.
   - **Every Conan run uses a temporary `CONAN_HOME`**: never touch the user's cache (their global Conan may be another version;
     running a newer one migrates the cache). Conan is pinned in `pyproject.toml`'s dev group.
   - basedpyright excludes `sdk/cpp/conan` (Conan's API is untyped); ruff still checks the recipe. The test package's C++ is formatted

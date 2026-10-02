@@ -275,6 +275,8 @@ least 4 KiB), so a change in size comes with this table updated (`--update-doc` 
 cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # or linux, linux-clang, linux-sanitize, macos
 ```
 
+The `windows` and `linux-sanitize` presets also build and test the experimental pacer (`MB_FRAMEPACING_BUILD_PACER`, off by default).
+
 Every module has its tests (`<module>/tests`); they fetch GoogleTest (an installed or Conan GTest wins). What they share, such as the
 allocation counter of the zero-allocation tests, is in `testing` (test code, never installed). `marker-render`
 (`marker/tools/marker-render`) writes marker images (PGM) for any payload, to compare your renderer's output pixel by pixel;

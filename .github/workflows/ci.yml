@@ -48,10 +48,11 @@ jobs:
           esac
           ffmpeg -version | head -1
 
-      - name: C++ library (core, marker, data)
+      # The pacer is experimental and off by default; it is built and tested here all the same
+      - name: C++ library (core, marker, data and the experimental pacer)
         shell: bash
         run: |
-          cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release
+          cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON
           cmake --build sdk/cpp/build/ci --config Release --parallel
           ctest --test-dir sdk/cpp/build/ci -C Release --output-on-failure
 
