@@ -166,25 +166,27 @@ swap interval it decides.
 (without asserts it clamps a value outside into the range). The rule's defaults are those of the simulation it reproduces; they are
 settings, not properties of frame pacing in general.
 
-| Setting                 | Default   | Range                     | What it is                                                                                  |
-| ----------------------- | --------- | ------------------------- | ------------------------------------------------------------------------------------------- |
-| `Refresh`               | required  | 100 µs to 1 s             | The display's refresh period (`RefreshPeriod::FromRate`, `FromNanoseconds`, `FromTimeSpan`) |
-| `PreferredFrameTime`    | none      | 0 (none) to 10 s          | The target frame rate as a frame time (`SetPreferredFrameRate` takes a rate)                |
-| `PreferredSwapInterval` | 1         | 1 to 100                  | The swap interval the application wants; the pacer never goes faster                        |
-| `AutoSwapInterval`      | on        |                           | Adapt the swap interval with the rule                                                       |
-| `SlowDown`              | LateCount | `LateCount`, `FullWindow` | When the rule slows down                                                                    |
-| `FrameWindowLength`     | 2 s       | 1 tick to 60 s            | How long a stretch of frames the rule looks at; a longer gap between frames is a pause      |
-| `SlowDownLatePercent`   | 10        | 0 to 100                  | The share of late frames the rule slows down beyond                                         |
-| `FrameMargin`           | 1 ms      | 0 to 1 s                  | Added to the frames' average work before it is compared with swap intervals                 |
-| `SlowestFrameTime`      | 50 ms     | 0 to 10 s                 | The rule slows down no further once the swap interval is longer than this plus the margin   |
+| Setting                 | Default                              | Range                     | What it is                                                                                  |
+| ----------------------- | ------------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------- |
+| `Refresh`               | required                             | 100 µs to 1 s             | The display's refresh period (`RefreshPeriod::FromRate`, `FromNanoseconds`, `FromTimeSpan`) |
+| `PreferredFrameTime`    | none                                 | 0 (none) to 10 s          | The target frame rate as a frame time (`SetPreferredFrameRate` takes a rate)                |
+| `PreferredSwapInterval` | 1                                    | 1 to 100                  | The swap interval the application wants; the pacer never goes faster                        |
+| `AutoSwapInterval`      | on                                   |                           | Adapt the swap interval with the rule                                                       |
+| `SlowDown`              | LateCount                            | `LateCount`, `FullWindow` | When the rule slows down                                                                    |
+| `FrameWindowLength`     | 2 s                                  | 1 tick to 60 s            | How long a stretch of frames the rule looks at; a longer gap between frames is a pause      |
+| `SlowDownLatePercent`   | 10                                   | 0 to 100                  | The share of late frames the rule slows down beyond                                         |
+| `FrameMargin`           | 1 ms, at most an eighth of a refresh | 0 to 1 s                  | Added to the frames' average work before it is compared with swap intervals                 |
+| `SlowestFrameTime`      | 50 ms                                | 0 to 10 s                 | The rule slows down no further once the swap interval is longer than this plus the margin   |
 
 `RefreshPeriod` is always valid too: from 100 µs (10 kHz) to 1 s (1 Hz), with no default. The application gives the pacer its display's
 period.
 
-**`FrameMargin` on fast displays.** The rule speeds up only when the frames' average work plus twice the margin fits one refresh
-less. The default margin of 1 ms is a small share of a 60 Hz refresh and half of a 500 Hz one: on a display of 480 Hz or more,
-twice the margin no longer fits a refresh, so a pacer that has slowed down to every second refresh stays there however light the
-frames become. Set a margin that suits the display (an eighth of its refresh period comes back at every rate from 50 to 540 Hz).
+**`FrameMargin` follows the display by default.** The rule speeds up only when the frames' average work plus twice the margin fits
+one refresh less. A margin of 1 ms is a small share of a 60 Hz refresh and half of a 500 Hz one: twice that would not fit a refresh
+from 480 Hz on, and a pacer that had slowed down to every second refresh would stay there however light the frames became. So the
+default is 1 ms and at most an eighth of the refresh period (less than 1 ms above 125 Hz: 0.87 ms at 144 Hz, 0.52 ms at 240 Hz,
+0.25 ms at 500 Hz), and it follows a change of the refresh period. A margin you set with `SetFrameMargin` is that margin on every
+display (`FrameMarginAt(refresh)` says what it is on one).
 
 ## Filling the marker
 

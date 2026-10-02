@@ -24,6 +24,7 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_frameWindowLength{2 * TimeSpan::TicksPerSecond};
     uint32_t m_slowDownLatePercent{10};
     TimeSpan m_frameMargin{TimeSpan::TicksPerMillisecond};
+    bool m_frameMarginSet{false};
     TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
 
   public:
@@ -33,6 +34,9 @@ namespace MB::FramePacing::Pacer
     static constexpr TimeSpan MaxFrameWindowLength{60 * TimeSpan::TicksPerSecond};
     static constexpr uint32_t MaxSlowDownLatePercent = 100;
     static constexpr TimeSpan MaxFrameMargin{TimeSpan::TicksPerSecond};
+    //! The default frame margin is this, and on a fast display less: the refresh period divided by DefaultFrameMarginDivisor
+    static constexpr TimeSpan DefaultFrameMargin{TimeSpan::TicksPerMillisecond};
+    static constexpr int64_t DefaultFrameMarginDivisor = 8;
     static constexpr TimeSpan MaxSlowestFrameTime{10 * TimeSpan::TicksPerSecond};
 
     //! The display's refresh period, from its display mode (a DXGI output mode, Display.getRefreshRate, wl_output's mode).
@@ -118,12 +122,18 @@ namespace MB::FramePacing::Pacer
     void SetSlowDownLatePercent(uint32_t percent) noexcept;
 
     //! Added to the frames' average work time before it is compared with swap intervals, and asked for as room to spare to speed up (0
-    //! to MaxFrameMargin).
+    //! to MaxFrameMargin): on the settings' own display (FrameMarginAt(Refresh())).
     [[nodiscard]] TimeSpan FrameMargin() const noexcept
     {
-      return m_frameMargin;
+      return FrameMarginAt(m_refresh);
     }
 
+    //! The frame margin on a display with this refresh period: the one that was set, on any display. By default the smaller of
+    //! DefaultFrameMargin (1 ms) and an eighth of the refresh period (above 125 Hz): the rule speeds up only when the frames' work
+    //! and twice the margin fit a refresh, and 1 ms is half a refresh at 500 Hz.
+    [[nodiscard]] TimeSpan FrameMarginAt(RefreshPeriod refresh) const noexcept;
+
+    //! Set the frame margin: it then is this on every display.
     void SetFrameMargin(TimeSpan margin) noexcept;
 
     //! The rule slows down no further once the current swap interval is longer than this plus the margin (0 to MaxSlowestFrameTime).

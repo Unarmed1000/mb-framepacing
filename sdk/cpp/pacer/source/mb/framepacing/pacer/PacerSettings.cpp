@@ -67,10 +67,16 @@ namespace MB::FramePacing::Pacer
     m_slowDownLatePercent = std::min(percent, MaxSlowDownLatePercent);
   }
 
+  TimeSpan PacerSettings::FrameMarginAt(const RefreshPeriod refresh) const noexcept
+  {
+    return m_frameMarginSet ? m_frameMargin : std::min(DefaultFrameMargin, TimeSpan(refresh.ToTimeSpan().Ticks() / DefaultFrameMarginDivisor));
+  }
+
   void PacerSettings::SetFrameMargin(const TimeSpan margin) noexcept
   {
     assert(margin >= TimeSpan() && margin <= MaxFrameMargin);
     m_frameMargin = std::clamp(margin, TimeSpan(), MaxFrameMargin);
+    m_frameMarginSet = true;
   }
 
   void PacerSettings::SetSlowestFrameTime(const TimeSpan frameTime) noexcept

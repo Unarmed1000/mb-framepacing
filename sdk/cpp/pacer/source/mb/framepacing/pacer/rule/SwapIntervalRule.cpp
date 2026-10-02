@@ -87,7 +87,7 @@ namespace MB::FramePacing::Pacer
     }
     const auto frames = static_cast<uint32_t>(m_count);
     const bool full = IsFull();
-    const TimeSpan margin = m_settings.FrameMargin();
+    const TimeSpan margin = m_settings.FrameMarginAt(m_period);
     // What a frame needs: the frames' average work, and the margin
     const TimeSpan frameTime(m_workSum.Ticks() / frames + margin.Ticks());
 

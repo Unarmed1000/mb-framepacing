@@ -285,6 +285,33 @@ TEST(PacerSettings, TheRefreshIsRequiredAndTheRestHaveDefaults)
   EXPECT_NE(other, defaults);
 }
 
+TEST(PacerSettings, TheDefaultFrameMarginIsAMillisecondAndAtMostAnEighthOfARefresh)
+{
+  // Up to 125 Hz the margin is 1 ms; above, an eighth of the refresh period, so that twice the margin always leaves room to speed up
+  const PC::PacerSettings defaults(g_hz60);
+  EXPECT_EQ(defaults.FrameMargin(), Span(Ms));
+  EXPECT_EQ(defaults.FrameMarginAt(g_hz120), Span(Ms));
+  EXPECT_EQ(defaults.FrameMarginAt(PC::RefreshPeriod::FromRate(125)), Span(Ms));
+  EXPECT_EQ(defaults.FrameMarginAt(PC::RefreshPeriod::FromRate(144)), Span(69'444 / 8));
+  EXPECT_EQ(defaults.FrameMarginAt(PC::RefreshPeriod::FromRate(500)), Span(2'500));
+  EXPECT_EQ(defaults.FrameMarginAt(g_khz10), Span(125));
+  // The settings' own margin is the one on their display
+  EXPECT_EQ(PC::PacerSettings(PC::RefreshPeriod::FromRate(500)).FrameMargin(), Span(2'500));
+  PC::PacerSettings moved(g_hz60);
+  moved.SetRefresh(PC::RefreshPeriod::FromRate(240));
+  EXPECT_EQ(moved.FrameMargin(), Span(41'667 / 8));
+
+  // A margin that was set is that margin on every display, also when it is the default's value
+  PC::PacerSettings set(g_hz60);
+  set.SetFrameMargin(Span(Ms));
+  EXPECT_EQ(set.FrameMargin(), Span(Ms));
+  EXPECT_EQ(set.FrameMarginAt(PC::RefreshPeriod::FromRate(500)), Span(Ms));
+  EXPECT_NE(set, defaults);
+  set.SetFrameMargin(Span(3 * Ms));
+  EXPECT_EQ(set.FrameMarginAt(g_hz60), Span(3 * Ms));
+  EXPECT_EQ(set.FrameMarginAt(g_khz10), Span(3 * Ms));
+}
+
 TEST(PacerSettings, EveryValueIsKeptInItsRange)
 {
   PC::PacerSettings settings(g_hz60);

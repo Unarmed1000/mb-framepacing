@@ -186,18 +186,18 @@ TEST(MonitorRates, ATargetFrameRateIsTheSmallestSwapIntervalThatReachesIt)
   }
 }
 
-TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBackWhereTheMarginLeavesRoom)
+TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBack)
 {
   for (const MonitorRate rate : MonitorRates)
   {
-    for (const bool marginOfTheRefresh : {false, true})
+    for (const bool marginOfAMillisecond : {false, true})
     {
-      SCOPED_TRACE(rate.Name() + (marginOfTheRefresh ? ", a frame margin of an eighth of a refresh" : ", the default frame margin"));
+      SCOPED_TRACE(rate.Name() + (marginOfAMillisecond ? ", a frame margin set to 1 ms" : ", the default frame margin"));
       const PC::RefreshPeriod period = rate.Period();
       PC::PacerSettings settings(period);
-      if (marginOfTheRefresh)
+      if (marginOfAMillisecond)
       {
-        settings.SetFrameMargin(Share(period, 125));
+        settings.SetFrameMargin(PC::PacerSettings::DefaultFrameMargin);
       }
       PC::FramePacer pacer(settings);
       VsyncLoop loop(pacer, period);
@@ -213,7 +213,8 @@ TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBackWhereTheMarginLeavesR
       EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 
       // The load goes: after a frame window without a late frame the pacer is back on every refresh, when the frames' work and twice
-      // the margin fit a refresh. The default margin is 1 ms: from 480 Hz on a refresh is too short for twice that
+      // the margin fit a refresh. The default margin is at most an eighth of a refresh, so it does on every display. A margin set
+      // to 1 ms stays 1 ms: from 480 Hz on a refresh is too short for twice that, and the pacer stays at half rate
       const FP::TimeSpan light = Share(period, 100);
       for (int64_t frame = 0; frame < 3 * framesPerWindow; ++frame)
       {
@@ -221,14 +222,35 @@ TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBackWhereTheMarginLeavesR
       }
       const bool room = light.Ticks() + (2 * settings.FrameMargin().Ticks()) < period.ToTimeSpan().Ticks();
       EXPECT_EQ(pacer.SwapInterval(), room ? 1u : 2u);
-      if (marginOfTheRefresh)
+      if (marginOfAMillisecond)
       {
-        EXPECT_TRUE(room);
+        EXPECT_EQ(room, period.ToTimeSpan() > FP::TimeSpan(22'200)) << "a margin of 1 ms: displays up to 450 Hz";
       }
       else
       {
-        EXPECT_EQ(room, period.ToTimeSpan() > FP::TimeSpan(22'200)) << "with the default margin: displays up to 450 Hz";
+        EXPECT_TRUE(room);
       }
     }
   }
+}
+
+TEST(MonitorRates, TheDefaultFrameMarginFollowsAChangeOfTheRefreshPeriod)
+{
+  // A pacer made for a 60 Hz display that moves to a 500 Hz one: the default margin is the new display's (0.25 ms), not the 1 ms of
+  // the display it was made for, so it comes back to every refresh there too
+  const PC::RefreshPeriod fast = PC::RefreshPeriod::FromRate(500);
+  PC::FramePacer pacer{PC::PacerSettings(PC::RefreshPeriod::FromRate(60))};
+  pacer.SetRefreshPeriod(fast);
+  VsyncLoop loop(pacer, fast);
+  const int64_t framesPerWindow = fast.RefreshesToFit(pacer.Settings().FrameWindowLength());
+  for (int64_t frame = 0; frame < 2 * framesPerWindow; ++frame)
+  {
+    static_cast<void>(loop.Frame(Share(fast, 1'400)));
+  }
+  EXPECT_EQ(pacer.SwapInterval(), 2u);
+  for (int64_t frame = 0; frame < 3 * framesPerWindow; ++frame)
+  {
+    static_cast<void>(loop.Frame(Share(fast, 100)));
+  }
+  EXPECT_EQ(pacer.SwapInterval(), 1u);
 }
