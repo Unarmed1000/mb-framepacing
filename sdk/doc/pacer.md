@@ -18,13 +18,14 @@ platform API, has no callbacks and never reads a clock. Made once (it allocates 
 
 ## Status
 
-| Checked                                                                                              | Not checked                                              |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Its simulation of a frame loop, against golden results (`sdk/test-data/pacer`)                       | Any real swap chain, on any platform or graphics API     |
-| The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame            | A real display's clock against a real CPU clock          |
-| That repository's timing diagrams (the vsync timer, half rate, switching rates)                      | A compositor, a frame queue longer than one, a GPU limit |
-| A simulated display 0.1 % off its nominal rate with 2 ms of jitter on every frame start, for an hour | Variable refresh, vsync off                              |
-| Every line and branch of the module by its tests; no allocation per frame                            |                                                          |
+| Checked                                                                                                                               | Not checked                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Its simulation of a frame loop, against golden results (`sdk/test-data/pacer`)                                                        | Any real swap chain, on any platform or graphics API     |
+| The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                             | A real display's clock against a real CPU clock          |
+| That repository's timing diagrams (the vsync timer, half rate, switching rates)                                                       | A compositor, a frame queue longer than one, a GPU limit |
+| A simulated display 0.1 % off its nominal rate with 2 ms of jitter on every frame start, for an hour                                  | Variable refresh, vsync off                              |
+| The refresh rates monitors have, 50 to 540 Hz: frames on time, a display off its rate, target frame rates, a load that comes and goes |                                                          |
+| Every line and branch of the module by its tests; no allocation per frame                                                             |                                                          |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
 
@@ -179,6 +180,11 @@ settings, not properties of frame pacing in general.
 
 `RefreshPeriod` is always valid too: from 100 µs (10 kHz) to 1 s (1 Hz), with no default. The application gives the pacer its display's
 period.
+
+**`FrameMargin` on fast displays.** The rule speeds up only when the frames' average work plus twice the margin fits one refresh
+less. The default margin of 1 ms is a small share of a 60 Hz refresh and half of a 500 Hz one: on a display of 480 Hz or more,
+twice the margin no longer fits a refresh, so a pacer that has slowed down to every second refresh stays there however light the
+frames become. Set a margin that suits the display (an eighth of its refresh period comes back at every rate from 50 to 540 Hz).
 
 ## Filling the marker
 

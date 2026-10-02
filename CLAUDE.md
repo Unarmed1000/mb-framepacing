@@ -238,6 +238,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Names:** the rule's stretch of frames is the **frame window** (`FrameWindowLength`, `FrameWindowState`), never "window" alone (in
     graphics that is the window system's). `PacerRefreshClock` (`pacer/clock/`) counts the display's
     refreshes: never call it an animation clock, which in this repository is the application's game time (`sdk/doc/marker-fields.md`).
+  - **Monitor refresh rates** (`pacer/tests/MonitorRateTests.cpp`): 23 rates from 50 to 540 Hz (59.94 and 119.88 as rationals) run a
+    vsync loop with frames on time, a display 0.1 % off its rate, target frame rates and a load that comes and goes. The default
+    `FrameMargin` (1 ms) leaves no room to speed up again from 480 Hz on; the guide says so. Keep both current with the rule.
   - Integer arithmetic only: the golden data must come out byte for byte. 100 % test coverage as the core and the marker
     (llvm-cov, `NDEBUG`). There is no C# port (the roadmap lists one as a possible upgrade).
   - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the
