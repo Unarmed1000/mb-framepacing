@@ -291,7 +291,7 @@ namespace MB::FramePacing::Marker
         return false;
       }
       rPayload = Payload{kind, ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRunId),
-                         ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex), MarkerFlags::None, TimeSpan()};
+                         ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex), MarkerFlags::NoFlags, TimeSpan()};
       if (pMetadata != nullptr)
       {
         *pMetadata = StartMetadata{};

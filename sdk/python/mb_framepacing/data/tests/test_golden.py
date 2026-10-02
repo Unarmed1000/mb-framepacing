@@ -25,7 +25,7 @@ class GoldenDataTests(unittest.TestCase):
         assert CLIP is not None
         with CaptureDataReader(CLIP / CAPTURE_DATA_FILE_NAME) as reader:
             records = reader.read_all()
-        decoded = [r for r in records if r.status == CaptureDataStatus.DECODED]
+        decoded = [r for r in records if r.capture_status == CaptureDataStatus.DECODED]
         self.assertTrue(decoded)
         self.assertTrue(all(r.try_decode_main() is not None for r in decoded))
         self.assertTrue(all(r.try_decode_main() is None for r in records if r.main_bytes is None))

@@ -105,7 +105,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     [TestCase(42UL, -1L, 3u, MarkerKind.SequenceEnd)]
     public void RoundTrip(ulong frameIndex, long ticks, uint runId, MarkerKind kind)
     {
-      var payload = new MarkerPayload(kind, runId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(ticks));
+      var payload = new MarkerPayload(kind, runId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(ticks));
       Assert.That(MarkerPayload.TryDecode(payload.Encode(), out var decoded, out var start), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
       Assert.That(start, kind == MarkerKind.SequenceStart ? Is.EqualTo(StartMetadata.Empty) : Is.Null);
@@ -120,7 +120,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         MarkerKind.SequenceStart,
         30,
         10,
-        MB.FramePacing.Marker.MarkerFlags.None,
+        MB.FramePacing.Marker.MarkerFlags.NoFlags,
         new TimeSpan(20),
         TargetFrameTime: new TimeSpan32(50),
         IntendedDisplayTime: new TickCount64(40),
@@ -147,7 +147,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     [Test]
     public void FrameMarker_IgnoresMetadata()
     {
-      var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2)).Encode(
+      var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode(
         StartMetadata.FromTag(5, "ignored")
       );
       Assert.That(bytes, Has.Length.EqualTo(53), "a frame marker's payload");
@@ -156,7 +156,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     [Test]
     public void TryDecode_RejectsBadInput()
     {
-      var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2)).Encode();
+      var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode();
       Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 52), out _), Is.False);
 
       bytes[0] = (byte)'X';
@@ -178,7 +178,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     [Test]
     public void TryDecode_RejectsWrongStartLength()
     {
-      var bytes = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2)).Encode(
+      var bytes = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode(
         StartMetadata.FromTag(0, "ab")
       );
       Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.True);

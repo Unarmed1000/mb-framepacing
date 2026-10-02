@@ -93,7 +93,7 @@ namespace MB.FramePacing.Marker
           kind,
           BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetRunId)),
           BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetFrameIndex)),
-          MarkerFlags.None,
+          MarkerFlags.NoFlags,
           TimeSpan.Zero
         );
         return true;

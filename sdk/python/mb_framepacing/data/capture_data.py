@@ -117,7 +117,7 @@ class CaptureDataRecord:
     host_ticks: int
     device_ticks: int
     source_drops: int
-    status: CaptureDataStatus
+    capture_status: CaptureDataStatus
     main_bytes: bytes | None
     second_bytes: bytes | None
 
@@ -152,7 +152,7 @@ class CaptureDataRecord:
             host_ticks=host,
             device_ticks=device,
             source_drops=source_drops,
-            status=CaptureDataStatus(status),
+            capture_status=CaptureDataStatus(status),
             main_bytes=bytes(data[main_offset : main_offset + main_length]) if main_length > 0 else None,
             second_bytes=bytes(data[second_offset : second_offset + second_length]) if second_length > 0 else None,
         )

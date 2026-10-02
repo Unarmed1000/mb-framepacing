@@ -21,7 +21,7 @@ namespace MB::FramePacing::Data
     int64_t CaptureIndex{0};
     std::optional<TickCount64> CaptureTime;
     //! Decoded, Undecodable, Torn or NotRecorded.
-    std::string Status;
+    std::string CaptureStatus;
     std::optional<std::string> Kind;
     std::optional<uint32_t> RunId;
     std::optional<uint64_t> FrameIndex;

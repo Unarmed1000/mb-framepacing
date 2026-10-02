@@ -32,7 +32,7 @@ var modules = new byte[ModuleMatrix.MaxPackedModuleByteCount];   // the encoded 
 var indices = new int[FrameMarker.MaxIndexCount];
 
 // Every frame, last (after post effects and UI), without blending:
-var payload = new Payload(MarkerKind.Frame, 1, frameIndex, MarkerFlags.None, TimeSpanUtil.FromSeconds(animationSeconds));
+var payload = new Payload(MarkerKind.Frame, 1, frameIndex, MarkerFlags.NoFlags, TimeSpanUtil.FromSeconds(animationSeconds));
 generator.TryGenerateModules(payload, modules, out var matrix);   // encode once
 int count = FrameMarker.ModulesToGridIndices(matrix, indices);         // only the indices change
 DrawIndexed(indices.AsSpan(0, count));                            // triangles over the static vertices
@@ -41,7 +41,7 @@ DrawIndexed(indices.AsSpan(0, count));                            // triangles o
 This is the most efficient way without a dedicated shader; the shaders (1 and 2 in [the options](#ways-to-draw-it-most-efficient-first)) are faster still.
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
-- **Flags:** `MarkerFlags.None`, or `MarkerFlags.StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags.StaticBefore`
+- **Flags:** `MarkerFlags.NoFlags`, or `MarkerFlags.StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags.StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame).
 - **Animation time:** the moment the frame shows, as the application animated it: a `TimeSpan` (`TimeSpanUtil.FromSeconds` converts
   seconds to the tick on every runtime; Unity's `TimeSpan.FromSeconds` rounds to a millisecond).

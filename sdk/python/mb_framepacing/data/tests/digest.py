@@ -97,7 +97,7 @@ def _capture_data(path: Path) -> dict[str, JsonValue]:
         "deviceTicksCount": sum(1 for r in records if r.has_device_ticks),
         "deviceTicksSum": sum(r.device_ticks for r in records if r.has_device_ticks),
         "sourceDropsSum": sum(r.source_drops for r in records),
-        "statusCounts": _counts(r.status.name.title() for r in records),
+        "statusCounts": _counts(r.capture_status.name.title() for r in records),
         "mainByteCount": sum(len(r.main_bytes or b"") for r in records),
         "secondByteCount": sum(len(r.second_bytes or b"") for r in records),
         "decodedMainPayloads": len(decoded),
@@ -166,7 +166,7 @@ def _captures(path: Path) -> dict[str, JsonValue]:
     rows = read_captures(path)
     return {
         "rowCount": len(rows),
-        "statusCounts": _counts(r.status for r in rows),
+        "statusCounts": _counts(r.capture_status for r in rows),
         "kindCounts": _counts(r.kind for r in rows if r.kind is not None),
         "captureTicksSum": sum(r.capture_ticks or 0 for r in rows),
         "frameIndexSum": sum(r.frame_index or 0 for r in rows),

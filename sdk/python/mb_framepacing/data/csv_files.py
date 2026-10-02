@@ -67,7 +67,7 @@ class CaptureCsvRow:
 
     capture_index: int
     capture_ticks: int | None
-    status: str
+    capture_status: str
     kind: str | None
     run_id: int | None
     frame_index: int | None
@@ -223,7 +223,7 @@ def _capture(table: _Table, row: list[str]) -> CaptureCsvRow:
     return CaptureCsvRow(
         capture_index=table.whole(row, "captureIndex", _INT64),
         capture_ticks=table.optional_ticks(row, "captureTicks"),
-        status=table.cell(row, "status"),
+        capture_status=table.cell(row, "status"),
         kind=table.cell(row, "kind") or None,
         run_id=table.optional_whole(row, "runId", _UINT32),
         frame_index=table.optional_whole(row, "frameIndex", _UINT64),

@@ -531,7 +531,7 @@ TEST(AnalysisOutput, CapturesCarrySourceDropsMissedRefreshesAndTheSyncMarker)
   ASSERT_EQ(rows.size(), 2u);
   EXPECT_EQ(rows[0].CaptureIndex, 4);
   EXPECT_EQ(rows[0].CaptureTime, FP::TickCount64(666'667));
-  EXPECT_EQ(rows[0].Status, "Torn");
+  EXPECT_EQ(rows[0].CaptureStatus, "Torn");
   EXPECT_EQ(rows[0].Kind, "Frame");
   EXPECT_EQ(rows[0].RunId, 7u);
   EXPECT_EQ(rows[0].FrameIndex, 12u);

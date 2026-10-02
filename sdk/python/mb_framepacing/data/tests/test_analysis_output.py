@@ -383,7 +383,7 @@ class CapturesCsvTests(unittest.TestCase):
             CaptureCsvRow(
                 capture_index=4,
                 capture_ticks=666_667,
-                status="Torn",
+                capture_status="Torn",
                 kind="Frame",
                 run_id=7,
                 frame_index=12,

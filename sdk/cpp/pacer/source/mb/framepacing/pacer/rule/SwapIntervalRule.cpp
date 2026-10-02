@@ -82,7 +82,7 @@ namespace MB::FramePacing::Pacer
 
     if (!m_settings.AutoSwapInterval())
     {
-      return SwapIntervalChange::None;
+      return SwapIntervalChange::Unchanged;
     }
     const auto frames = static_cast<uint32_t>(m_count);
     const bool full = IsFull();
@@ -98,7 +98,7 @@ namespace MB::FramePacing::Pacer
     const bool slowerByCount = m_settings.SlowDown() == SlowDownRule::LateCount &&
                                int64_t{100} * m_lateCount > m_settings.SlowDownLatePercent() * FullWindowFrames(windowLength, m_swapInterval, period);
 
-    SwapIntervalChange change = SwapIntervalChange::None;
+    SwapIntervalChange change = SwapIntervalChange::Unchanged;
     uint32_t swapInterval = m_swapInterval;
     if (mayGoSlower && (slowerByShare || slowerByCount))
     {
@@ -110,7 +110,7 @@ namespace MB::FramePacing::Pacer
       swapInterval = std::max(m_preferredSwapInterval, NeededSwapInterval(frameTime, period));
       change = SwapIntervalChange::Faster;
     }
-    if (change != SwapIntervalChange::None)
+    if (change != SwapIntervalChange::Unchanged)
     {
       m_swapInterval = swapInterval;
       Clear();

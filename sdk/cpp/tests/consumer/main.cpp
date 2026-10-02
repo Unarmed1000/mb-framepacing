@@ -48,7 +48,7 @@ namespace
     const FM::Payload payload{FM::MarkerKind::Frame,
                               1u,
                               frameIndex,
-                              FM::MarkerFlags::None,
+                              FM::MarkerFlags::NoFlags,
                               schedule.AnimationTime,
                               schedule.PreferredFrameTime,
                               schedule.TargetFrameTime,
@@ -75,7 +75,7 @@ int main()
   const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080);
   FM::ModuleMatrix matrix;
   const FM::Payload payload{
-    FM::MarkerKind::Frame,     1u, frameIndex, FM::MarkerFlags::None, FP::TimeSpan{animationTicks}, FP::TimeSpan32{frameTicks},
+    FM::MarkerKind::Frame,     1u, frameIndex, FM::MarkerFlags::NoFlags, FP::TimeSpan{animationTicks}, FP::TimeSpan32{frameTicks},
     FP::TimeSpan32{frameTicks}};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;

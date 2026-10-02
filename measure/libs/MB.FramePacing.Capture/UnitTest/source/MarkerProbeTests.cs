@@ -83,7 +83,7 @@ namespace MB.FramePacing.Capture.UnitTest
           if (position(i) is { } origin)
             MarkerRenderer.Render(
               image,
-              new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(i * 41_667L)),
+              new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(i * 41_667L)),
               origin.X,
               origin.Y,
               ModulePx

@@ -108,7 +108,7 @@ def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | No
     if magic != PAYLOAD_MAGIC or version != PAYLOAD_FORMAT_VERSION or kind > max(MarkerKind):
         return None
     if kind == MarkerKind.SYNC:
-        return (Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NONE, 0), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
+        return (Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
     if len(data) < PAYLOAD_BYTE_COUNT:
         return None
     fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))

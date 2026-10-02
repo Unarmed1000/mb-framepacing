@@ -12,12 +12,12 @@ it against the golden images the C++ library writes (test-data/markers). The for
 
     options = Options(module_size_px=3)
     origin = options.recommended_origin(MarkerKind.FRAME, height)
-    matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))   # encode once
+    matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NO_FLAGS, seconds_to_ticks(animation_seconds)))   # encode once
     modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)       # draw it
 
     # Optional (required for camera capture): the small sync marker, bottom-left, with the same run id and frame index
     sync_origin = options.recommended_origin(MarkerKind.SYNC, height)
-    sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NONE, 0))
+    sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NO_FLAGS, 0))
     modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFormat.R8G8B8)
 
 Standard library only, Python 3.12 or later.

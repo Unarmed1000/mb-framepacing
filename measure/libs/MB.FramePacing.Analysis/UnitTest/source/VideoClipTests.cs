@@ -284,8 +284,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         var (a, b) = (liveRecords[i], records[i]);
         string where = $"{clip}: record {i}";
         Assert.That(
-          (a.CaptureIndex, a.HostTime, a.DeviceTime, a.SourceDrops, a.Status),
-          Is.EqualTo((b.CaptureIndex, b.HostTime, b.DeviceTime, b.SourceDrops, b.Status)),
+          (a.CaptureIndex, a.HostTime, a.DeviceTime, a.SourceDrops, a.CaptureStatus),
+          Is.EqualTo((b.CaptureIndex, b.HostTime, b.DeviceTime, b.SourceDrops, b.CaptureStatus)),
           where
         );
         Assert.That(a.MainBytes, Is.EqualTo(b.MainBytes), where + ": main marker bytes");

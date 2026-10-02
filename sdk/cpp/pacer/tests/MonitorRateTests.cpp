@@ -114,7 +114,7 @@ TEST(MonitorRates, FramesOnTimeAreOneRefreshEachAndTheAnimationDoesNotDrift)
     {
       schedule = loop.Frame(Share(period, 300), WakeUp(period, frame));
       const int64_t aimedAfter = schedule.IntendedDisplayTime.Ticks() - (StartTicks + period.TimeFor(frame).Ticks() + WakeUp(period, frame).Ticks());
-      const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::None &&
+      const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::Unchanged &&
                          schedule.AnimationTime == period.TimeFor(frame) && std::abs(aimedAfter - period.ToTimeSpan().Ticks()) <= 1 &&
                          schedule.TargetFrameTime == FP::TimeSpan32::FromTimeSpan(period.ToTimeSpan());
       wrongFrames += right ? 0 : 1;
@@ -145,7 +145,7 @@ TEST(MonitorRates, ADisplayATenthOfAPercentOffItsRateNeverHitches)
       {
         const PC::FrameSchedule schedule = loop.Frame(Share(period, 300), WakeUp(period, frame));
         // Every step is one refresh of the rate the pacer was told: the display's drift never adds up to a double step
-        const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::None &&
+        const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::Unchanged &&
                            (frame == 0 || std::abs((schedule.AnimationTime.Ticks() - previous.Ticks()) - period.ToTimeSpan().Ticks()) <= 1);
         wrongFrames += right ? 0 : 1;
         previous = schedule.AnimationTime;

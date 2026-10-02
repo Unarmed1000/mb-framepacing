@@ -95,7 +95,7 @@ namespace MB.FramePacing.Capture.UnitTest
         var record = records[i];
         Assert.That(record.CaptureIndex, Is.EqualTo(i));
         Assert.That(record.DeviceTime, Is.EqualTo(scenario.CaptureTime(i)), "the display timer");
-        Assert.That(record.Status, Is.EqualTo(CaptureDataStatus.Decoded), $"record {i}");
+        Assert.That(record.CaptureStatus, Is.EqualTo(CaptureDataStatus.Decoded), $"record {i}");
         var expected = scenario.PresentedFrames[scenario.PresentedIndexAt(i)].Payload;
         var expectedStart = expected.Kind == MarkerKind.SequenceStart ? scenario.StartMetadata : null;
         Assert.That(record.MainBytes, Is.EqualTo(expected.Encode(expectedStart)), $"record {i}: the encoded QR bytes as read");

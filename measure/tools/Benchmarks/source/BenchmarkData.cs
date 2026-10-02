@@ -28,7 +28,7 @@ namespace MB.FramePacing.Benchmarks
       CardFrame = new GrayImage(960, 540, 96);
       MarkerRenderer.Render(
         CardFrame,
-        new MarkerPayload(MarkerKind.Frame, 1, 12345, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(67890)),
+        new MarkerPayload(MarkerKind.Frame, 1, 12345, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(67890)),
         32,
         32,
         CardModulePx

@@ -445,7 +445,7 @@ namespace MB.FramePacing.Data.UnitTest
 
       Assert.That(rows, Has.Count.EqualTo(2));
       var torn = rows[0];
-      Assert.That((torn.Status, torn.FrameIndex, torn.SyncRunId, torn.SyncFrameIndex), Is.EqualTo(("Torn", (ulong?)12, (uint?)7, (ulong?)11)));
+      Assert.That((torn.CaptureStatus, torn.FrameIndex, torn.SyncRunId, torn.SyncFrameIndex), Is.EqualTo(("Torn", (ulong?)12, (uint?)7, (ulong?)11)));
       Assert.That(
         (torn.CaptureTime, torn.AnimationTime, torn.HostTime, torn.DeviceTime),
         Is.EqualTo(

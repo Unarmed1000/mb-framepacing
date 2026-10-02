@@ -90,7 +90,7 @@ namespace MB.FramePacing.Data.UnitTest
     {
       using var reader = new CaptureDataReader(Path.Combine(TestData.ClipDirectory, CaptureDataHeader.FileName));
       var records = reader.ReadAll();
-      var decoded = records.Where(r => r.Status == CaptureDataStatus.Decoded).ToList();
+      var decoded = records.Where(r => r.CaptureStatus == CaptureDataStatus.Decoded).ToList();
       Assert.That(decoded, Is.Not.Empty);
       Assert.That(decoded.All(r => r.TryDecodeMain(out _, out _)), "every decoded record carries a valid main payload");
       Assert.That(records.Where(r => r.MainBytes == null).All(r => !r.TryDecodeMain(out _, out _)));

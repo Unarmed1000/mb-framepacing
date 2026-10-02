@@ -275,8 +275,8 @@ namespace MB.FramePacing.Marker.Unity
         Kind(),
         Phase == MarkerPhase.Idle ? 0u : RunId,
         (ulong)Time.frameCount,
-        (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.None)
-          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.None),
+        (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.NoFlags)
+          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.NoFlags),
         TimeSpanUtil.FromSeconds(AnimationTime()),
         preferredFrameTime: PreferredFrameTimeProvider != null ? PreferredFrameTimeProvider() : DefaultTargetFrameTime(),
         targetFrameTime: TargetFrameTimeProvider != null ? TargetFrameTimeProvider() : DefaultTargetFrameTime(),

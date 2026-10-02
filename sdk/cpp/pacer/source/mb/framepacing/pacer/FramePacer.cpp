@@ -38,7 +38,7 @@ namespace MB::FramePacing::Pacer
     // empty, and the swap interval stays
     const FrameMeasurement previous = m_clock.Measure(cpuStartTime);
     const RefreshPeriod period = m_rule.Refresh();
-    SwapIntervalChange change = SwapIntervalChange::None;
+    SwapIntervalChange change = SwapIntervalChange::Unchanged;
     if (previous.Restarted)
     {
       m_rule.Clear();

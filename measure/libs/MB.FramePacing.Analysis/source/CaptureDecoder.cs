@@ -139,7 +139,7 @@ namespace MB.FramePacing.Analysis
       // The sync marker: a camera's second zone measures the scanout with it; a capture card's tearing check is already in the status
       MarkerPayload? sync = record.SecondBytes != null && MarkerPayload.TryDecode(record.SecondBytes, out var second) ? second : null;
 
-      var status = record.Status switch
+      var status = record.CaptureStatus switch
       {
         CaptureDataStatus.Decoded => CaptureStatus.Decoded,
         CaptureDataStatus.Torn => CaptureStatus.Torn,

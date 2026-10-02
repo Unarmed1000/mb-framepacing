@@ -68,7 +68,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         time += Period;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)), StartMetadata.Empty);
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)), StartMetadata.Empty);
       for (ulong frame = 1; frame <= 6; ++frame)
       {
         if ((int)frame == gapBefore)
@@ -78,7 +78,7 @@ namespace MB.FramePacing.Analysis.UnitTest
             MarkerKind.Frame,
             1,
             frame,
-            MB.FramePacing.Marker.MarkerFlags.None,
+            MB.FramePacing.Marker.MarkerFlags.NoFlags,
             new TimeSpan((long)frame * Period),
             PreferredFrameTime: new TimeSpan32((uint)Period),
             TargetFrameTime: new TimeSpan32((uint)Period)
@@ -86,7 +86,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         );
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(7 * Period)));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(7 * Period)));
       return records;
     }
 

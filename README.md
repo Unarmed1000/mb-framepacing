@@ -121,7 +121,7 @@ namespace FM = MB::FramePacing::Marker;
 
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 FM::ModuleMatrix matrix;
-FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::None, animationTime}, matrix);    // encode once
+FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime}, matrix);    // encode once
 const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);        // draw it
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```

@@ -162,7 +162,7 @@ namespace MB.FramePacing.Data.UnitTest
         return bytes;
       }
       Assert.That(
-        CaptureDataRecord.Read(With(CaptureDataRecord.StatusOffset, (byte)CaptureDataStatus.Torn)).Status,
+        CaptureDataRecord.Read(With(CaptureDataRecord.StatusOffset, (byte)CaptureDataStatus.Torn)).CaptureStatus,
         Is.EqualTo(CaptureDataStatus.Torn)
       );
       Assert.That(
@@ -202,7 +202,7 @@ namespace MB.FramePacing.Data.UnitTest
         main
       );
       var sync = new byte[Payload.MaxEncodedByteCount];
-      int syncLength = FrameMarker.EncodePayload(new Payload(MarkerKind.Sync, 7, 11, MarkerFlags.None, TimeSpan.Zero), default, sync);
+      int syncLength = FrameMarker.EncodePayload(new Payload(MarkerKind.Sync, 7, 11, MarkerFlags.NoFlags, TimeSpan.Zero), default, sync);
       Assert.That((mainLength, syncLength), Is.EqualTo((77, 16)), "the longest and the shortest marker");
       Assert.That(mainLength, Is.LessThanOrEqualTo(CaptureDataRecord.MainCapacity), "any marker fits a slot");
 
@@ -221,7 +221,7 @@ namespace MB.FramePacing.Data.UnitTest
       CaptureDataRecord.WriteCapture(reversed, 5, new TickCount64(100), new TickCount64(-200), 3);
       Assert.That(reversed, Is.EqualTo(whole), "the capture part written last");
       Assert.That(
-        (record.CaptureIndex, record.HostTime, record.DeviceTime, record.SourceDrops, record.Status),
+        (record.CaptureIndex, record.HostTime, record.DeviceTime, record.SourceDrops, record.CaptureStatus),
         Is.EqualTo((5L, new TickCount64(100), (TickCount64?)new TickCount64(-200), 3u, CaptureDataStatus.Torn))
       );
 

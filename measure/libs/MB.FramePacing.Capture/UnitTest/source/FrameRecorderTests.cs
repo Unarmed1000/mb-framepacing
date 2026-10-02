@@ -181,7 +181,7 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(records.Select(r => r.HostTime.Ticks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
       Assert.That(records.Select(r => r.DeviceTime?.Ticks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long?)(i * 3L))));
       Assert.That(records.Select(r => r.SourceDrops), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i == 5 ? 3u : 0u)));
-      Assert.That(records.All(r => r.Status == CaptureDataStatus.Undecodable && r.MainBytes == null), "no marker in these frames");
+      Assert.That(records.All(r => r.CaptureStatus == CaptureDataStatus.Undecodable && r.MainBytes == null), "no marker in these frames");
       Assert.That(System.IO.File.Exists(temp.File("frames.mbfc")), Is.False);
     }
 

@@ -17,7 +17,7 @@ namespace MB.FramePacing.Marker.UnitTest
   {
     private static byte[] SyncBits()
     {
-      ModuleMatrix matrix = TestMarkers.Encode(new Payload(MarkerKind.Sync, 3, 1, MarkerFlags.None, TimeSpan.Zero));
+      ModuleMatrix matrix = TestMarkers.Encode(new Payload(MarkerKind.Sync, 3, 1, MarkerFlags.NoFlags, TimeSpan.Zero));
       return matrix.Bits.ToArray();
     }
 

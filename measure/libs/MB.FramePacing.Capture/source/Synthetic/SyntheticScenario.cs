@@ -146,7 +146,7 @@ namespace MB.FramePacing.Capture.Synthetic
             kind,
             idle ? 0u : o.RunId,
             frameIndex,
-            MB.FramePacing.Marker.MarkerFlags.None,
+            MB.FramePacing.Marker.MarkerFlags.NoFlags,
             animationTime,
             PreferredFrameTime: TimeSpan32.FromTimeSpan(refresh),
             TargetFrameTime: TimeSpan32.FromTimeSpan(refresh),
@@ -154,7 +154,7 @@ namespace MB.FramePacing.Capture.Synthetic
             CpuStartTime: cpuStartTime,
             CpuBusy: TimeSpan32.FromTimeSpan(cpuBusy)
           )
-          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.None, animationTime);
+          : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, animationTime);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTime));
       }
     }

@@ -65,7 +65,7 @@ namespace MB::FramePacing::Data
       record.DeviceTime = TickCount64(deviceTicks);
     }
     record.SourceDrops = ByteSpanUtil::ReadLE<uint32_t>(bytes, 24);
-    record.Status = static_cast<CaptureDataStatus>(status);
+    record.CaptureStatus = static_cast<CaptureDataStatus>(status);
     const auto main = bytes.subspan(OffsetMain, mainLength);
     const auto second = bytes.subspan(OffsetSecond, secondLength);
     record.MainBytes.assign(main.begin(), main.end());

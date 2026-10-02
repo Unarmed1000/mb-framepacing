@@ -100,12 +100,12 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(data[61:77], bytes(range(0xA0, 0xB0)))
 
     def test_negative_ticks_are_stored_as_twos_complement(self) -> None:
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, -1))[17:25], b"\xff" * 8)
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, intended_display_ticks=-2))[33:41], b"\xfe" + (b"\xff" * 7))
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, cpu_start_ticks=-3))[41:49], b"\xfd" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, -1))[17:25], b"\xff" * 8)
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ticks=-2))[33:41], b"\xfe" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ticks=-3))[41:49], b"\xfd" + (b"\xff" * 7))
 
     def test_the_optional_fields_default_to_unknown(self) -> None:
-        payload = Payload(MarkerKind.SEQUENCE_END, 3, 1, MarkerFlags.NONE, 2)
+        payload = Payload(MarkerKind.SEQUENCE_END, 3, 1, MarkerFlags.NO_FLAGS, 2)
         self.assertEqual(
             (
                 payload.intended_display_ticks,
@@ -115,20 +115,20 @@ class PayloadTests(unittest.TestCase):
                 payload.preferred_frame_ticks,
                 payload.flags,
             ),
-            (0, 0, 0, 0, 0, MarkerFlags.NONE),
+            (0, 0, 0, 0, 0, MarkerFlags.NO_FLAGS),
         )
         self.assertEqual(encode_payload(payload)[24:], bytes(29))
         self.assertEqual(StartMetadata(), StartMetadata(0, SequenceId(bytes(16))))
 
     def test_round_trips(self) -> None:
         for payload in (
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0),
-            Payload(MarkerKind.FRAME, 7, 1, MarkerFlags.NONE, 166_667),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0),
+            Payload(MarkerKind.FRAME, 7, 1, MarkerFlags.NO_FLAGS, 166_667),
             Payload(
                 MarkerKind.FRAME,
                 U32_MAX,
                 U64_MAX,
-                MarkerFlags.NONE,
+                MarkerFlags.NO_FLAGS,
                 I64_MAX,
                 target_frame_ticks=U32_MAX,
                 intended_display_ticks=I64_MAX,
@@ -139,7 +139,7 @@ class PayloadTests(unittest.TestCase):
                 MarkerKind.SEQUENCE_START,
                 1,
                 7,
-                MarkerFlags.NONE,
+                MarkerFlags.NO_FLAGS,
                 I64_MIN,
                 target_frame_ticks=0,
                 intended_display_ticks=I64_MIN,
@@ -150,18 +150,18 @@ class PayloadTests(unittest.TestCase):
                 MarkerKind.SEQUENCE_END,
                 3,
                 42,
-                MarkerFlags.NONE,
+                MarkerFlags.NO_FLAGS,
                 -1,
                 target_frame_ticks=333_333,
                 intended_display_ticks=-1,
                 cpu_start_ticks=-1,
                 cpu_busy_ticks=1,
             ),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6, target_frame_ticks=166_667),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6, cpu_start_ticks=123_456_789_012),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6, cpu_busy_ticks=81_234),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6, cpu_busy_ticks=U32_MAX),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NONE, 6, cpu_start_ticks=123_456_789_012, cpu_busy_ticks=500_000),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, target_frame_ticks=166_667),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_start_ticks=123_456_789_012),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_busy_ticks=81_234),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_busy_ticks=U32_MAX),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_start_ticks=123_456_789_012, cpu_busy_ticks=500_000),
         ):
             with self.subTest(payload):
                 decoded = try_decode_payload(encode_payload(payload))
@@ -171,18 +171,26 @@ class PayloadTests(unittest.TestCase):
 
     def test_sync_marker_carries_only_the_run_id_and_the_frame_index(self) -> None:
         payload = Payload(
-            MarkerKind.SYNC, 4, 0x0102030405060708, MarkerFlags.NONE, 123, target_frame_ticks=6, intended_display_ticks=5, cpu_start_ticks=7, cpu_busy_ticks=8
+            MarkerKind.SYNC,
+            4,
+            0x0102030405060708,
+            MarkerFlags.NO_FLAGS,
+            123,
+            target_frame_ticks=6,
+            intended_display_ticks=5,
+            cpu_start_ticks=7,
+            cpu_busy_ticks=8,
         )
         data = encode_payload(payload, StartMetadata(7, SequenceId.from_text("ignored")))
         self.assertEqual(data, b"MF\x01\x03" + bytes([4, 0, 0, 0]) + bytes([8, 7, 6, 5, 4, 3, 2, 1]))
         self.assertEqual(len(data), SYNC_PAYLOAD_BYTE_COUNT)
-        self.assertEqual(try_decode_payload(data), (Payload(MarkerKind.SYNC, payload.run_id, payload.frame_index, MarkerFlags.NONE, 0), None))
+        self.assertEqual(try_decode_payload(data), (Payload(MarkerKind.SYNC, payload.run_id, payload.frame_index, MarkerFlags.NO_FLAGS, 0), None))
 
         # Exactly 16 bytes: longer (for example a full header with kind 3) or shorter is rejected
         self.assertIsNone(try_decode_payload(data + b"\x00"))
         self.assertIsNone(try_decode_payload(data[:-1]))
         self.assertIsNone(
-            try_decode_payload(encode_payload(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2))[:3] + b"\x03" + bytes(PAYLOAD_BYTE_COUNT - 4))
+            try_decode_payload(encode_payload(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NO_FLAGS, 2))[:3] + b"\x03" + bytes(PAYLOAD_BYTE_COUNT - 4))
         )
         # A 16 byte payload of another kind is too short
         self.assertIsNone(try_decode_payload(b"MF\x01\x00" + bytes(12)))
@@ -190,7 +198,7 @@ class PayloadTests(unittest.TestCase):
     def test_sync_round_trips_and_range(self) -> None:
         for frame_index, run_id in ((0, 0), (1, 7), (42, U32_MAX), (U64_MAX, 1)):
             with self.subTest(frame_index=frame_index, run_id=run_id):
-                payload = Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NONE, 0)
+                payload = Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0)
                 self.assertEqual(try_decode_payload(encode_payload(payload)), (payload, None))
         # Only the run id and the frame index are range checked: the other fields are not encoded
         self.assertEqual(
@@ -200,7 +208,7 @@ class PayloadTests(unittest.TestCase):
                         MarkerKind.SYNC,
                         0,
                         0,
-                        MarkerFlags.NONE,
+                        MarkerFlags.NO_FLAGS,
                         I64_MAX + 1,
                         target_frame_ticks=-1,
                         intended_display_ticks=I64_MIN - 1,
@@ -213,11 +221,11 @@ class PayloadTests(unittest.TestCase):
         )
         for frame_index, run_id in ((-1, 0), (U64_MAX + 1, 0), (0, -1), (0, U32_MAX + 1)):
             with self.subTest(frame_index=frame_index, run_id=run_id), self.assertRaises(ValueError):
-                _ = encode_payload(Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NONE, 0))
+                _ = encode_payload(Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0))
 
     def test_start_metadata_round_trips(self) -> None:
         payload = Payload(
-            MarkerKind.SEQUENCE_START, 30, 10, MarkerFlags.NONE, 20, target_frame_ticks=50, intended_display_ticks=40, cpu_start_ticks=60, cpu_busy_ticks=70
+            MarkerKind.SEQUENCE_START, 30, 10, MarkerFlags.NO_FLAGS, 20, target_frame_ticks=50, intended_display_ticks=40, cpu_start_ticks=60, cpu_busy_ticks=70
         )
         for metadata in (
             StartMetadata(638_000_000_000_000_000, SequenceId.from_text("benchmark-run-01")),
@@ -233,38 +241,38 @@ class PayloadTests(unittest.TestCase):
         # A start marker without metadata carries an unknown time and an empty sequence id; frame payloads ignore the metadata
         self.assertEqual(try_decode_payload(encode_payload(payload)), (payload, StartMetadata()))
         self.assertEqual(
-            len(encode_payload(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NONE, 2), StartMetadata(5, SequenceId.from_text("x")))), PAYLOAD_BYTE_COUNT
+            len(encode_payload(Payload(MarkerKind.FRAME, 3, 1, MarkerFlags.NO_FLAGS, 2), StartMetadata(5, SequenceId.from_text("x")))), PAYLOAD_BYTE_COUNT
         )
 
     def test_encode_rejects_out_of_range_fields(self) -> None:
-        start = Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NONE, 2)
+        start = Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NO_FLAGS, 2)
         for metadata in (StartMetadata(I64_MAX + 1), StartMetadata(I64_MIN - 1)):
             with self.subTest(metadata), self.assertRaises(ValueError):
                 _ = encode_payload(start, metadata)
         for payload in (
-            Payload(MarkerKind.FRAME, 0, -1, MarkerFlags.NONE, 0),
-            Payload(MarkerKind.FRAME, 0, U64_MAX + 1, MarkerFlags.NONE, 0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, I64_MAX + 1),
-            Payload(MarkerKind.FRAME, U32_MAX + 1, 0, MarkerFlags.NONE, 0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, intended_display_ticks=I64_MAX + 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, intended_display_ticks=I64_MIN - 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, target_frame_ticks=-1, intended_display_ticks=0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, target_frame_ticks=U32_MAX + 1, intended_display_ticks=0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, target_frame_ticks=0, intended_display_ticks=0, cpu_start_ticks=I64_MAX + 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, target_frame_ticks=0, intended_display_ticks=0, cpu_start_ticks=I64_MIN - 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, cpu_busy_ticks=-1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, cpu_busy_ticks=U32_MAX + 1),
-            Payload(MarkerKind.SEQUENCE_START, 0, 0, MarkerFlags.NONE, 0, cpu_busy_ticks=U32_MAX + 1),
-            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NONE, 0, cpu_busy_ticks=-1),
-            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NONE, 0, cpu_start_ticks=I64_MAX + 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NONE, 0, preferred_frame_ticks=U32_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, -1, MarkerFlags.NO_FLAGS, 0),
+            Payload(MarkerKind.FRAME, 0, U64_MAX + 1, MarkerFlags.NO_FLAGS, 0),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, I64_MAX + 1),
+            Payload(MarkerKind.FRAME, U32_MAX + 1, 0, MarkerFlags.NO_FLAGS, 0),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ticks=I64_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ticks=I64_MIN - 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=-1, intended_display_ticks=0),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=U32_MAX + 1, intended_display_ticks=0),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=0, intended_display_ticks=0, cpu_start_ticks=I64_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=0, intended_display_ticks=0, cpu_start_ticks=I64_MIN - 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=-1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=U32_MAX + 1),
+            Payload(MarkerKind.SEQUENCE_START, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=U32_MAX + 1),
+            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=-1),
+            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ticks=I64_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, preferred_frame_ticks=U32_MAX + 1),
             Payload(MarkerKind.FRAME, 0, 0, MarkerFlags(0x100), 0),
         ):
             with self.subTest(payload), self.assertRaises(ValueError):
                 _ = encode_payload(payload)
 
     def test_try_decode_rejects_bad_input(self) -> None:
-        data = bytearray(encode_payload(Payload(MarkerKind.FRAME, 0, 1, MarkerFlags.NONE, 2)))
+        data = bytearray(encode_payload(Payload(MarkerKind.FRAME, 0, 1, MarkerFlags.NO_FLAGS, 2)))
         self.assertIsNone(try_decode_payload(bytes(data[:-1])), "short: 52 bytes")
         self.assertIsNone(try_decode_payload(bytes(data[:44])), "an older 44 byte header")
         self.assertIsNone(try_decode_payload(bytes(data[:48])), "an older 48 byte header")
@@ -283,7 +291,7 @@ class PayloadTests(unittest.TestCase):
         self.assertIsNotNone(try_decode_payload(bytes(data)))
 
         # A start marker must be exactly 77 bytes: without its metadata, truncated or longer is rejected
-        start = encode_payload(Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NONE, 2), StartMetadata(5, SequenceId.from_text("run")))
+        start = encode_payload(Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NO_FLAGS, 2), StartMetadata(5, SequenceId.from_text("run")))
         self.assertEqual(len(start), 77)
         self.assertIsNotNone(try_decode_payload(start))
         for length in (PAYLOAD_BYTE_COUNT, PAYLOAD_BYTE_COUNT + 9, START_PAYLOAD_BYTE_COUNT - 1):
@@ -299,7 +307,7 @@ class PayloadTests(unittest.TestCase):
                 MarkerKind.FRAME,
                 3,
                 1,
-                MarkerFlags.NONE,
+                MarkerFlags.NO_FLAGS,
                 2,
                 preferred_frame_ticks=166_667,
                 target_frame_ticks=333_333,
@@ -385,13 +393,13 @@ class PayloadTests(unittest.TestCase):
     def test_a_kind_that_is_not_a_marker_kind_is_not_encoded(self) -> None:
         def with_kind(kind: int) -> Payload:
             # A number where the type says MarkerKind: what a caller without a type checker can pass
-            return Payload(cast(MarkerKind, cast(object, kind)), 1, 2, MarkerFlags.NONE, 3)
+            return Payload(cast(MarkerKind, cast(object, kind)), 1, 2, MarkerFlags.NO_FLAGS, 3)
 
         for kind in (4, 7, 255, -1):
             with self.subTest(kind), self.assertRaises(ValueError):
                 _ = encode_payload(with_kind(kind))
         # The plain number of a kind is that kind
-        self.assertEqual(encode_payload(with_kind(0)), encode_payload(Payload(MarkerKind.FRAME, 1, 2, MarkerFlags.NONE, 3)))
+        self.assertEqual(encode_payload(with_kind(0)), encode_payload(Payload(MarkerKind.FRAME, 1, 2, MarkerFlags.NO_FLAGS, 3)))
         self.assertEqual(len(encode_payload(with_kind(3))), 16)
 
 

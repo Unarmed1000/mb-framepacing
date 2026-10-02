@@ -68,7 +68,7 @@ class CaptureDataTests(unittest.TestCase):
                 self.assertEqual(reader.record_count, 2)
                 first, dropped = reader.read_all()
                 self.assertEqual(reader.read_record(1), dropped)
-        self.assertEqual((first.capture_index, first.host_ticks, first.device_ticks, first.status), (0, 0, 200, CaptureDataStatus.DECODED))
+        self.assertEqual((first.capture_index, first.host_ticks, first.device_ticks, first.capture_status), (0, 0, 200, CaptureDataStatus.DECODED))
         self.assertEqual((first.main_bytes, first.second_bytes), (main, second))
         self.assertEqual(dropped.source_drops, 3)
         self.assertFalse(dropped.has_device_ticks)
@@ -100,7 +100,7 @@ class CaptureDataTests(unittest.TestCase):
     def test_a_record_that_is_not_one_is_refused(self) -> None:
         good = record_bytes(7, 200, 2, b"main", b"second")
         record = CaptureDataRecord.parse(good)
-        self.assertEqual((record.capture_index, record.status, record.main_bytes, record.second_bytes), (7, CaptureDataStatus.TORN, b"main", b"second"))
+        self.assertEqual((record.capture_index, record.capture_status, record.main_bytes, record.second_bytes), (7, CaptureDataStatus.TORN, b"main", b"second"))
         self.assertEqual(CaptureDataRecord.parse(memoryview(good + b"more")), record, "a view, and more bytes than a record")
         cases = {
             "a byte short": good[:-1],
@@ -115,7 +115,7 @@ class CaptureDataTests(unittest.TestCase):
 
     def test_a_records_markers_decode(self) -> None:
         main = encode_payload(Payload(MarkerKind.SEQUENCE_START, 7, 12, MarkerFlags.STATIC_AFTER, 34), StartMetadata(5, SequenceId.from_text("run 7")))
-        sync = encode_payload(Payload(MarkerKind.SYNC, 7, 11, MarkerFlags.NONE, 0))
+        sync = encode_payload(Payload(MarkerKind.SYNC, 7, 11, MarkerFlags.NO_FLAGS, 0))
         self.assertEqual((len(main), len(sync)), (77, 16), "the longest and the shortest marker")
         record = CaptureDataRecord.parse(record_bytes(5, 200, 2, main, sync))
         decoded = record.try_decode_main()

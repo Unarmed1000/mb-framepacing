@@ -43,7 +43,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       for (int i = 0; i < 3; ++i)
         Add(
-          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)),
+          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)),
           StartMetadata.FromTag(0, "pacing")
         );
       ulong index = 100;
@@ -57,7 +57,7 @@ namespace MB.FramePacing.Analysis.UnitTest
               MarkerKind.Frame,
               1,
               index,
-              MB.FramePacing.Marker.MarkerFlags.None,
+              MB.FramePacing.Marker.MarkerFlags.NoFlags,
               new TimeSpan(animationMs * Ms),
               PreferredFrameTime: new TimeSpan32(preferredTicks),
               TargetFrameTime: new TimeSpan32(target),
@@ -67,7 +67,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         ++index;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)));
       return rows;
     }
 

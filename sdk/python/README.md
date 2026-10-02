@@ -32,12 +32,12 @@ options = Options(module_size_px=3)
 origin = options.recommended_origin(MarkerKind.FRAME, height)
 
 # Every frame, last (after post effects and UI), without blending:
-matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NONE, seconds_to_ticks(animation_seconds)))  # encode once
+matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NO_FLAGS, seconds_to_ticks(animation_seconds)))  # encode once
 modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)  # draw it
 ```
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
-- **Flags:** `MarkerFlags.NONE`, or `MarkerFlags.STATIC_AFTER` on a frame when nothing animates while it is on screen, or
+- **Flags:** `MarkerFlags.NO_FLAGS`, or `MarkerFlags.STATIC_AFTER` on a frame when nothing animates while it is on screen, or
   `MarkerFlags.STATIC_BEFORE` on the next frame when that is only known then (the analysis does not judge the step out of the static
   frame).
 - **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`seconds_to_ticks`).
@@ -63,7 +63,7 @@ intended_display_ticks=...)` carries the interval the application wants to run a
 
 ```python
 sync_origin = options.recommended_origin(MarkerKind.SYNC, height)  # bottom-left
-sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NONE, 0))  # the main marker's run id and frame index
+sync = generate_modules(Payload(MarkerKind.SYNC, 1, frame_index, MarkerFlags.NO_FLAGS, 0))  # the main marker's run id and frame index
 modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFormat.R8G8B8)
 ```
 

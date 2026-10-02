@@ -147,7 +147,7 @@ namespace MB.FramePacing.Charts
           add(RunEventKind.SourceDropped, new RunEvent(time - period, row.SourceDropsBefore));
         if (row.MissedBefore > 0)
           add(RunEventKind.Missed, new RunEvent(time - period, row.MissedBefore));
-        switch (row.Status)
+        switch (row.CaptureStatus)
         {
           case "NotRecorded":
             add(RunEventKind.NotRecorded, new RunEvent(time, 1));

@@ -57,7 +57,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Records_RoundTrip_WithTheLargestMarkers()
     {
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(2)).Encode(
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode(
         new StartMetadata(123, new MB.FramePacing.Marker.SequenceId(ulong.MaxValue, ulong.MaxValue))
       );
       Assert.That(start, Has.Length.EqualTo(MarkerPayload.MaxEncodedByteCount));
@@ -91,8 +91,8 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var (expected, actual) = (records[i], read[i]);
         Assert.That(
-          (actual.CaptureIndex, actual.HostTime, actual.DeviceTime, actual.SourceDrops, actual.Status),
-          Is.EqualTo((expected.CaptureIndex, expected.HostTime, expected.DeviceTime, expected.SourceDrops, expected.Status))
+          (actual.CaptureIndex, actual.HostTime, actual.DeviceTime, actual.SourceDrops, actual.CaptureStatus),
+          Is.EqualTo((expected.CaptureIndex, expected.HostTime, expected.DeviceTime, expected.SourceDrops, expected.CaptureStatus))
         );
         Assert.That(actual.MainBytes, Is.EqualTo(expected.MainBytes));
         Assert.That(actual.SecondBytes, Is.EqualTo(expected.SecondBytes));

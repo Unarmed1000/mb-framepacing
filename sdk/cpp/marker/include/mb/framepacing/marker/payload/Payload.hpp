@@ -128,7 +128,7 @@ namespace MB::FramePacing::Marker
     MarkerKind m_kind{MarkerKind::Frame};
     uint32_t m_runId{0};
     uint64_t m_frameIndex{0};
-    MarkerFlags m_flags{MarkerFlags::None};
+    MarkerFlags m_flags{MarkerFlags::NoFlags};
     TimeSpan m_animationTime;
     TimeSpan32 m_preferredFrameTime;
     TimeSpan32 m_targetFrameTime;

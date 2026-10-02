@@ -141,8 +141,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         kind,
         RunId,
         ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
-        (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.None)
-          | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.None),
+        (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.NoFlags)
+          | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.NoFlags),
         new TimeSpan(RenderedAnimationTicks[frame] + (loop * DurationTicks)),
         PreferredFrameTime: new TimeSpan32(FrameTicks(RenderedPreferredInterval[frame])),
         TargetFrameTime: new TimeSpan32(FrameTicks(RenderedSwapInterval[frame])),

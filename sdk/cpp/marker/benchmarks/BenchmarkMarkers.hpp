@@ -33,7 +33,7 @@ namespace MB::FramePacing::Marker::BenchmarkMarkers
     return {MarkerKind::Frame,
             0x12345678u,
             frameIndex,
-            MarkerFlags::None,
+            MarkerFlags::NoFlags,
             TimeSpan(offset),
             FrameTime,
             FrameTime,

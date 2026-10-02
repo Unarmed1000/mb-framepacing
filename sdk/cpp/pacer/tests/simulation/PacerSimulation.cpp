@@ -66,9 +66,10 @@ namespace MB::FramePacing::Pacer::Simulation
         return "Slower";
       case SwapIntervalChange::Faster:
         return "Faster";
-      case SwapIntervalChange::None:
+      case SwapIntervalChange::Unchanged:
         break;
       }
+      // The golden files' word for it
       return "None";
     }
 

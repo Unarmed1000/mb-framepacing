@@ -151,7 +151,7 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
 
   EXPECT_EQ(records[0].CaptureIndex, 0);
   EXPECT_EQ(records[0].DeviceTime, FP::TickCount64(200));
-  EXPECT_EQ(records[0].Status, FD::CaptureDataStatus::Decoded);
+  EXPECT_EQ(records[0].CaptureStatus, FD::CaptureDataStatus::Decoded);
   EXPECT_EQ(records[0].MainBytes, main);
   EXPECT_EQ(records[0].SecondBytes, second);
   EXPECT_EQ(records[1].SourceDrops, 3u);
@@ -193,7 +193,7 @@ TEST(CaptureData, ARecordThatIsNotOneIsRefused)
   const auto record = FD::CaptureDataRecord::Parse(good);
   EXPECT_EQ(record.CaptureIndex, 7);
   EXPECT_EQ(record.HostTime, FP::TickCount64(700));
-  EXPECT_EQ(record.Status, FD::CaptureDataStatus::Torn);
+  EXPECT_EQ(record.CaptureStatus, FD::CaptureDataStatus::Torn);
   EXPECT_EQ(record.MainBytes, main);
   EXPECT_EQ(record.SecondBytes, second);
 
@@ -221,7 +221,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
   const std::size_t mainSize =
     FM::EncodePayload({FM::MarkerKind::SequenceStart, 7u, 12u, FM::MarkerFlags::StaticAfter, FP::TimeSpan(34)}, start, buffer);
   const std::vector<uint8_t> main(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(mainSize));
-  const std::size_t syncSize = FM::EncodePayload({FM::MarkerKind::Sync, 7u, 11u, FM::MarkerFlags::None, FP::TimeSpan(0)}, {}, buffer);
+  const std::size_t syncSize = FM::EncodePayload({FM::MarkerKind::Sync, 7u, 11u, FM::MarkerFlags::NoFlags, FP::TimeSpan(0)}, {}, buffer);
   const std::vector<uint8_t> sync(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(syncSize));
   ASSERT_EQ(main.size(), 77u) << "the longest marker";
   ASSERT_EQ(sync.size(), 16u) << "the shortest";
@@ -246,7 +246,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
 
   // A record without markers, and bytes that are no marker
   const auto none = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 0, {}, {}));
-  FM::Payload untouched{FM::MarkerKind::Frame, 99u, 98u, FM::MarkerFlags::None, FP::TimeSpan(97)};
+  FM::Payload untouched{FM::MarkerKind::Frame, 99u, 98u, FM::MarkerFlags::NoFlags, FP::TimeSpan(97)};
   EXPECT_FALSE(none.TryDecodeMain(untouched));
   EXPECT_FALSE(none.TryDecodeSecond(untouched));
   const auto garbage = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 1, std::vector<uint8_t>(53), {1, 2, 3}));

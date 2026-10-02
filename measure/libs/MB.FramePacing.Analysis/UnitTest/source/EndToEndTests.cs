@@ -200,7 +200,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           Array.Fill(frame.Pixels, (byte)96);
           MarkerRenderer.Render(
             frame,
-            new MarkerPayload(kind, 1, top, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan((long)top * 166_667)),
+            new MarkerPayload(kind, 1, top, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan((long)top * 166_667)),
             12,
             12,
             3,
@@ -209,7 +209,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           if (kind == MarkerKind.Frame)
             MarkerRenderer.Render(
               frame,
-              new MarkerPayload(MarkerKind.Sync, bottomRun, bottom, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)),
+              new MarkerPayload(MarkerKind.Sync, bottomRun, bottom, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)),
               12,
               200,
               3
@@ -251,7 +251,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           if (i < Captures - lostCaptures)
             MarkerRenderer.Render(
               frame,
-              new MarkerPayload(MarkerKind.Frame, 1, (ulong)(i / 4), MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(i / 4 * 166_667L)),
+              new MarkerPayload(MarkerKind.Frame, 1, (ulong)(i / 4), MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(i / 4 * 166_667L)),
               8,
               8,
               3

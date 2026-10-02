@@ -13,7 +13,7 @@ using System;
 namespace MB.FramePacing.Data
 {
   /// <param name="CaptureTime">When the capture was taken (the analysis's clock); null for a capture the recorder dropped.</param>
-  /// <param name="Status">"Decoded", "Undecodable", "Torn" or "NotRecorded".</param>
+  /// <param name="CaptureStatus">"Decoded", "Undecodable", "Torn" or "NotRecorded".</param>
   /// <param name="Kind">The main marker's kind ("Frame", "SequenceStart", "SequenceEnd", "Sync"), when one was read.</param>
   /// <param name="Payload">The main marker's encoded bytes, when one was read.</param>
   /// <param name="SourceDropsBefore">How many frames the capture source reported dropping before this capture.</param>
@@ -25,7 +25,7 @@ namespace MB.FramePacing.Data
   public sealed record CaptureCsvRow(
     long CaptureIndex,
     TickCount64? CaptureTime,
-    string Status,
+    string CaptureStatus,
     string? Kind,
     uint? RunId,
     ulong? FrameIndex,

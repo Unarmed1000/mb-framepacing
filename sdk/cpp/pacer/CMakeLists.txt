@@ -59,5 +59,6 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests
   target_compile_definitions(mb_framepacing_pacer_tests PRIVATE MB_FRAMEPACING_PACER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  mb_framepacing_add_x11_macro_check(mb_framepacing_pacer_tests pacer)
   gtest_discover_tests(mb_framepacing_pacer_tests)
 endif()

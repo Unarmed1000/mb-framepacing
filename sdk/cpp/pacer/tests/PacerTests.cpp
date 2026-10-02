@@ -63,12 +63,12 @@ namespace
   PC::SwapIntervalChange Feed(PC::SwapIntervalRule& rule, int64_t& displayRefresh, const int64_t frames, const int64_t workTicks, const bool late,
                               const int64_t gapRefreshes = 1)
   {
-    PC::SwapIntervalChange last = PC::SwapIntervalChange::None;
+    PC::SwapIntervalChange last = PC::SwapIntervalChange::Unchanged;
     for (int64_t frame = 0; frame < frames; ++frame)
     {
       displayRefresh += gapRefreshes;
       const PC::SwapIntervalChange change = rule.AddFrame(rule.Refresh().TimeFor(displayRefresh), Span(workTicks), late);
-      if (change != PC::SwapIntervalChange::None)
+      if (change != PC::SwapIntervalChange::Unchanged)
       {
         last = change;
       }
@@ -450,7 +450,7 @@ TEST(SwapIntervalRule, TheFullWindowRuleWaitsForAFullWindow)
   PC::SwapIntervalRule rule(Settings(g_hz60, PC::SlowDownRule::FullWindow));
   int64_t refresh = 0;
   // Every frame late, but 2 s of frames are needed before the rule decides anything: 120 frames span 119 refreshes, not more than 2 s
-  EXPECT_EQ(Feed(rule, refresh, 121, 20 * Ms, true), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 121, 20 * Ms, true), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), 1u);
   EXPECT_FALSE(rule.FrameWindow().Full);
   // The 122nd frame makes the window span more than 2 s: all late, so slower, to the interval the average (20 + 1 ms) needs: 2
@@ -466,11 +466,11 @@ TEST(SwapIntervalRule, TheLateCountFixSlowsDownAtAFullWindowsShareOfLateFrames)
   PC::SwapIntervalRule rule(Settings());
   int64_t refresh = 0;
   // A full window at 60 fps holds 120 frames; more than 10 % of that is 13 late frames, however few frames the window holds
-  EXPECT_EQ(Feed(rule, refresh, 12, 20 * Ms, true), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 12, 20 * Ms, true), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(Feed(rule, refresh, 1, 20 * Ms, true), PC::SwapIntervalChange::Slower);
   EXPECT_EQ(rule.SwapInterval(), 2u);
   // After the change only the late frames at the new interval count: a full window at 30 fps holds 60 frames, so 7 late ones
-  EXPECT_EQ(Feed(rule, refresh, 6, 40 * Ms, true, 3), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 6, 40 * Ms, true, 3), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(Feed(rule, refresh, 1, 40 * Ms, true, 3), PC::SwapIntervalChange::Slower);
   EXPECT_EQ(rule.SwapInterval(), 3u);
 }
@@ -483,7 +483,7 @@ TEST(SwapIntervalRule, TheShareIsRoundedAsTheSimulationRoundsIt)
   const auto run = [&settings](const int64_t lateFrames)
   {
     PC::SwapIntervalRule rule(settings);
-    PC::SwapIntervalChange change = PC::SwapIntervalChange::None;
+    PC::SwapIntervalChange change = PC::SwapIntervalChange::Unchanged;
     for (int64_t frame = 0; frame < 200; ++frame)
     {
       change = rule.AddFrame(g_khz10.TimeFor(frame), Span(5 * Ms), frame < lateFrames);
@@ -491,12 +491,12 @@ TEST(SwapIntervalRule, TheShareIsRoundedAsTheSimulationRoundsIt)
     return change;
   };
   // 21 of 200 is 10.5 %: rounded half to even, 10 %, not more than 10 %
-  EXPECT_EQ(run(21), PC::SwapIntervalChange::None);
+  EXPECT_EQ(run(21), PC::SwapIntervalChange::Unchanged);
   // 22 of 200 is 11 %
   EXPECT_EQ(run(22), PC::SwapIntervalChange::Slower);
   // With 11 % as the share: 22 of 200 is not more, and 23 of 200 is 11.5 %, rounded half to even, 12 %
   settings.SetSlowDownLatePercent(11);
-  EXPECT_EQ(run(22), PC::SwapIntervalChange::None);
+  EXPECT_EQ(run(22), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(run(23), PC::SwapIntervalChange::Slower);
 }
 
@@ -506,11 +506,11 @@ TEST(SwapIntervalRule, ItSpeedsUpOnlyOnAFullWindowWithoutLateFramesAndRoomToSpar
   rule.Reset(2);
   int64_t refresh = 0;
   // 15 ms: with 1 ms margin and 1 ms to spare, 17 ms does not fit a 16.7 ms refresh
-  EXPECT_EQ(Feed(rule, refresh, 80, 15 * Ms, false, 2), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 80, 15 * Ms, false, 2), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), 2u);
   // 14 ms: 16 ms fits; the window is full after 2 s of frames at 30 fps (62 frames)
   rule.Clear();
-  EXPECT_EQ(Feed(rule, refresh, 61, 14 * Ms, false, 2), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 61, 14 * Ms, false, 2), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(Feed(rule, refresh, 1, 14 * Ms, false, 2), PC::SwapIntervalChange::Faster);
   EXPECT_EQ(rule.SwapInterval(), 1u);
 }
@@ -521,7 +521,7 @@ TEST(SwapIntervalRule, OneLateFrameInTheWindowKeepsItSlow)
   rule.Reset(2);
   int64_t refresh = 0;
   static_cast<void>(Feed(rule, refresh, 1, 14 * Ms, true, 2));
-  EXPECT_EQ(Feed(rule, refresh, 61, 14 * Ms, false, 2), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 61, 14 * Ms, false, 2), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), 2u);
   // Once the late frame leaves the window (it keeps 2 s), it speeds up
   EXPECT_EQ(Feed(rule, refresh, 2, 14 * Ms, false, 2), PC::SwapIntervalChange::Faster);
@@ -548,7 +548,7 @@ TEST(SwapIntervalRule, ItSlowsDownNoFurtherThanTheSlowestFrameTime)
   EXPECT_EQ(Feed(rule, refresh, 7, 70 * Ms, true, 4), PC::SwapIntervalChange::Slower);
   EXPECT_EQ(rule.SwapInterval(), 5u);
   // 83 ms is beyond it: however late, no slower
-  EXPECT_EQ(Feed(rule, refresh, 200, 120 * Ms, true, 8), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 200, 120 * Ms, true, 8), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), 5u);
 }
 
@@ -561,7 +561,7 @@ TEST(SwapIntervalRule, ItSlowsDownNoFurtherThanTheLongestSwapInterval)
   // 30 ms of work needs 310 refreshes: it goes to the longest
   EXPECT_EQ(Feed(rule, refresh, 300, 30 * Ms, true, 400), PC::SwapIntervalChange::Slower);
   EXPECT_EQ(rule.SwapInterval(), PC::PacerSettings::MaxSwapInterval);
-  EXPECT_EQ(Feed(rule, refresh, 300, 30 * Ms, true, 400), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 300, 30 * Ms, true, 400), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), PC::PacerSettings::MaxSwapInterval);
 }
 
@@ -589,7 +589,7 @@ TEST(SwapIntervalRule, ThePreferredIntervalIsTheFastest)
   EXPECT_EQ(rule.SwapInterval(), 2u);
   EXPECT_EQ(rule.PreferredSwapInterval(), 2u);
   int64_t refresh = 0;
-  EXPECT_EQ(Feed(rule, refresh, 200, 2 * Ms, false, 2), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 200, 2 * Ms, false, 2), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), 2u);
   rule.Reset(1);
   EXPECT_EQ(rule.SwapInterval(), 2u);
@@ -622,7 +622,7 @@ TEST(SwapIntervalRule, WithoutAutoSwapIntervalNothingChanges)
   settings.SetAutoSwapInterval(false);
   PC::SwapIntervalRule rule(settings);
   int64_t refresh = 0;
-  EXPECT_EQ(Feed(rule, refresh, 300, 40 * Ms, true), PC::SwapIntervalChange::None);
+  EXPECT_EQ(Feed(rule, refresh, 300, 40 * Ms, true), PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(rule.SwapInterval(), 1u);
   // The window keeps 2 s of frames and the one before them: 122 at 60 fps
   EXPECT_EQ(rule.FrameWindow().LateFrames, 122u);
@@ -655,13 +655,13 @@ TEST(SwapIntervalRule, AWindowThatHoldsAllTheFramesItCanCountsAsFull)
   PC::SwapIntervalRule rule(Settings(PC::RefreshPeriod::FromRate(30), PC::SlowDownRule::FullWindow));
   const PC::RefreshPeriod fast = PC::RefreshPeriod::FromRate(240);
   rule.SetRefreshPeriod(fast);
-  PC::SwapIntervalChange change = PC::SwapIntervalChange::None;
+  PC::SwapIntervalChange change = PC::SwapIntervalChange::Unchanged;
   int64_t frames = 0;
-  while (change == PC::SwapIntervalChange::None && frames < 1'000)
+  while (change == PC::SwapIntervalChange::Unchanged && frames < 1'000)
   {
     ++frames;
     change = rule.AddFrame(fast.TimeFor(frames), Span(6 * Ms), true);
-    if (change == PC::SwapIntervalChange::None)
+    if (change == PC::SwapIntervalChange::Unchanged)
     {
       EXPECT_EQ(rule.FrameWindow().Full, frames == 124) << frames;
     }
@@ -900,7 +900,7 @@ TEST(FramePacer, TheFirstFrameIsAimedOneSwapIntervalAfterItStarts)
   EXPECT_EQ(schedule.IntendedDisplayTime, At((10 * Second) + 166'667));
   EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(166'667u));
   EXPECT_EQ(schedule.PreferredFrameTime, FP::TimeSpan32(166'667u));
-  EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::None);
+  EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(pacer.EndFrame(At((10 * Second) + 90'000)), FP::TimeSpan32(90'000u));
 }
 
@@ -980,7 +980,7 @@ TEST(FramePacer, TheScheduleCarriesTheRulesChangeAndTheNewInterval)
   std::vector<std::size_t> changedAt;
   for (std::size_t frame = 0; frame < schedules.size(); ++frame)
   {
-    if (schedules[frame].Change != PC::SwapIntervalChange::None)
+    if (schedules[frame].Change != PC::SwapIntervalChange::Unchanged)
     {
       changedAt.push_back(frame);
       EXPECT_EQ(schedules[frame].Change, PC::SwapIntervalChange::Slower);
@@ -1043,7 +1043,7 @@ TEST(FramePacer, APauseLongerThanTheWindowStartsAgainAndKeepsTheSwapInterval)
   EXPECT_EQ(resumed.SwapInterval, 2u);
   EXPECT_EQ(resumed.AnimationStep, Span(g_hz60.TimeFor(2).Ticks()));
   EXPECT_LE(std::abs(resumed.IntendedDisplayTime.Ticks() - (lastStart + (2 * Second) + 1 + 333'333)), 1);
-  EXPECT_EQ(resumed.Change, PC::SwapIntervalChange::None);
+  EXPECT_EQ(resumed.Change, PC::SwapIntervalChange::Unchanged);
 }
 
 TEST(FramePacer, AWindowShorterThanAFrameStillPaces)
@@ -1144,7 +1144,7 @@ TEST(FramePacer, OtherSettingsStartAgainAndTheAnimationTimeGoesOn)
   EXPECT_EQ(schedule.SwapInterval, 2u);
   EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(333'333u));
   EXPECT_EQ(schedule.PreferredFrameTime, FP::TimeSpan32(333'333u));
-  EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::None);
+  EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
   // The animation time goes on from where it was, by the new swap interval; the frame before the change is not in the new window
   EXPECT_EQ(schedule.AnimationTime, Span(before.back().AnimationTime.Ticks() + schedule.AnimationStep.Ticks()));
   EXPECT_EQ(schedule.AnimationStep, g_hz60.TimeFor(2));

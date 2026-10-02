@@ -67,7 +67,7 @@ namespace MB.FramePacing.Capture.UnitTest
       var older = camera.Scenario.PresentedFrames[shown - 1].Payload;
       Assert.That(
         results[1].Payload,
-        Is.EqualTo(new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FramePacing.Marker.MarkerFlags.None, new TimeSpan(0)))
+        Is.EqualTo(new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)))
       );
     }
 

@@ -284,13 +284,13 @@ namespace
     constexpr FM::SequenceId GoldenBytesId{
       {0x6Fu, 0x9Du, 0x2Cu, 0x41u, 0x8Bu, 0x3Eu, 0x4Au, 0x7Fu, 0x95u, 0xD0u, 0x1Cu, 0x00u, 0xE2u, 0xFFu, 0x80u, 0x7Au}};
     constexpr std::array<GoldenCase, 11> Cases{{
-      {{FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::None, FP::TimeSpan{0}}, {}},
-      {{FM::MarkerKind::Frame, 1u, 1u, FM::MarkerFlags::None, FP::TimeSpan{166'667}}, {}},
-      {{FM::MarkerKind::Frame, 1u, 123'456'789u, FM::MarkerFlags::None, FP::TimeSpan{36'000'000'000}, FP::TimeSpan32{166'667u},
+      {{FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, {}},
+      {{FM::MarkerKind::Frame, 1u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{166'667}}, {}},
+      {{FM::MarkerKind::Frame, 1u, 123'456'789u, FM::MarkerFlags::NoFlags, FP::TimeSpan{36'000'000'000}, FP::TimeSpan32{166'667u},
         FP::TimeSpan32{333'333u}, FP::TickCount64{987'654'321'000}, FP::TickCount64{987'653'987'666}, FP::TimeSpan32{123'456u}},
        {}},
-      {{FM::MarkerKind::Frame, 2u, 42u, FM::MarkerFlags::None, FP::TimeSpan{-1}}, {}},
-      {{FM::MarkerKind::Frame, 3u, 7u, FM::MarkerFlags::None, FP::TimeSpan{std::numeric_limits<int64_t>::min()}}, {}},
+      {{FM::MarkerKind::Frame, 2u, 42u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-1}}, {}},
+      {{FM::MarkerKind::Frame, 3u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{std::numeric_limits<int64_t>::min()}}, {}},
       {{FM::MarkerKind::Frame, std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint64_t>::max(), static_cast<FM::MarkerFlags>(0xFFu),
         FP::TimeSpan{std::numeric_limits<int64_t>::max()}, FM::Payload::OnDemandFrameTime, FP::TimeSpan32{std::numeric_limits<uint32_t>::max()},
         FP::TickCount64{std::numeric_limits<int64_t>::min()}, FP::TickCount64{std::numeric_limits<int64_t>::max()},
@@ -304,13 +304,13 @@ namespace
       {{FM::MarkerKind::SequenceStart, 5u, 600u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{100'000'000}, FP::TimeSpan32{10'000'000u},
         FP::TimeSpan32{0u}, FP::TickCount64{0}, FP::TickCount64{0}, FP::TimeSpan32{80'000u}},
        {0, TextSequenceId("golden-run")}},
-      {{FM::MarkerKind::SequenceStart, 6u, 601u, FM::MarkerFlags::None, FP::TimeSpan{100'166'667}, FP::TimeSpan32{0}, FP::TimeSpan32{0u},
+      {{FM::MarkerKind::SequenceStart, 6u, 601u, FM::MarkerFlags::NoFlags, FP::TimeSpan{100'166'667}, FP::TimeSpan32{0}, FP::TimeSpan32{0u},
         FP::TickCount64{0}, FP::TickCount64{0}, FP::TimeSpan32{120'000u}},
        {GoldenStartUtcTicks, GoldenBytesId}},
-      {{FM::MarkerKind::SequenceEnd, 5u, 900u, FM::MarkerFlags::None, FP::TimeSpan{150'000'000}, FP::TimeSpan32{0}, FP::TimeSpan32{0u},
+      {{FM::MarkerKind::SequenceEnd, 5u, 900u, FM::MarkerFlags::NoFlags, FP::TimeSpan{150'000'000}, FP::TimeSpan32{0}, FP::TimeSpan32{0u},
         FP::TickCount64{0}, FP::TickCount64{0}, FP::TimeSpan32{80'000u}},
        {}},
-      {{FM::MarkerKind::Sync, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::None, FP::TimeSpan{0}}, {}},
+      {{FM::MarkerKind::Sync, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, {}},
     }};
     constexpr std::array<int32_t, 4> ModuleSizes{2, 3, 4, 6};
 
@@ -383,7 +383,7 @@ int main(int argc, char* argv[])
     FM::MarkerKind kind = FM::MarkerKind::Frame;
     uint32_t runId = 0;
     uint64_t frameIndex = 0;
-    FM::MarkerFlags flags = FM::MarkerFlags::None;
+    FM::MarkerFlags flags = FM::MarkerFlags::NoFlags;
     FP::TimeSpan animationTime;
     FP::TimeSpan32 preferredFrameTime;
     FP::TimeSpan32 targetFrameTime;

@@ -41,7 +41,7 @@ namespace MB::FramePacing::Data
       CaptureCsvRow capture;
       capture.CaptureIndex = Csv::ParseInteger<int64_t>(table.Cell(row, "captureIndex"));
       capture.CaptureTime = Csv::OptionalTickCount64(table.Cell(row, "captureTicks"));
-      capture.Status = std::string(table.Cell(row, "status"));
+      capture.CaptureStatus = std::string(table.Cell(row, "status"));
       if (const std::string_view kind = table.Cell(row, "kind"); !kind.empty())
       {
         capture.Kind = std::string(kind);

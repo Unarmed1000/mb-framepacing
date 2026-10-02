@@ -19,7 +19,7 @@ namespace MB.FramePacing.Data
   /// <param name="HostTime">When the frame arrived, on the host's steady clock (since the capture started).</param>
   /// <param name="DeviceTime">The capture device's timestamp; null if it gave none.</param>
   /// <param name="SourceDrops">How many frames the capture source reported dropping since the previous record (0: none).</param>
-  /// <param name="Status">Decoded, undecodable or torn.</param>
+  /// <param name="CaptureStatus">Decoded, undecodable or torn.</param>
   /// <param name="MainBytes">The main marker's encoded bytes as read (frame, start or end marker), when it was read.</param>
   /// <param name="SecondBytes">The second marker's encoded bytes (sync marker, a camera's second zone), when it was read.</param>
   public readonly record struct CaptureDataRecord(
@@ -27,7 +27,7 @@ namespace MB.FramePacing.Data
     TickCount64 HostTime,
     TickCount64? DeviceTime,
     uint SourceDrops,
-    CaptureDataStatus Status,
+    CaptureDataStatus CaptureStatus,
     byte[]? MainBytes,
     byte[]? SecondBytes
   )
@@ -59,7 +59,7 @@ namespace MB.FramePacing.Data
         throw new ArgumentException("Record buffer too small", nameof(destination));
       destination.Slice(0, Size).Clear();
       WriteCapture(destination, CaptureIndex, HostTime, DeviceTime, SourceDrops);
-      WriteDecoded(destination, Status, MainBytes, SecondBytes);
+      WriteDecoded(destination, CaptureStatus, MainBytes, SecondBytes);
     }
 
     /// <summary>Write the decoded part (status and marker bytes) of a record; the capture part (bytes 0 to 27) is left as it is.</summary>

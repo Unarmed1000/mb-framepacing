@@ -104,7 +104,7 @@ namespace MB.FramePacing.Data.UnitTest
         ["deviceTicksCount"] = records.Count(r => r.DeviceTime.HasValue),
         ["deviceTicksSum"] = records.Sum(r => r.DeviceTime?.Ticks ?? 0),
         ["sourceDropsSum"] = records.Sum(r => (long)r.SourceDrops),
-        ["statusCounts"] = Counts(records.Select(r => r.Status.ToString())),
+        ["statusCounts"] = Counts(records.Select(r => r.CaptureStatus.ToString())),
         ["mainByteCount"] = records.Sum(r => r.MainBytes?.Length ?? 0),
         ["secondByteCount"] = records.Sum(r => r.SecondBytes?.Length ?? 0),
         ["decodedMainPayloads"] = decodedPayloads,
@@ -184,7 +184,7 @@ namespace MB.FramePacing.Data.UnitTest
       return new JsonObject
       {
         ["rowCount"] = rows.Count,
-        ["statusCounts"] = Counts(rows.Select(r => r.Status)),
+        ["statusCounts"] = Counts(rows.Select(r => r.CaptureStatus)),
         ["kindCounts"] = Counts(rows.Where(r => r.Kind != null).Select(r => r.Kind!)),
         ["captureTicksSum"] = rows.Sum(r => r.CaptureTime?.Ticks ?? 0),
         ["frameIndexSum"] = rows.Sum(r => (long)(r.FrameIndex ?? 0)),

@@ -13,6 +13,9 @@ own static library target, like Boost's and Poco's.
 No header includes a whole module: include the header of each type you use (one type per header) and the header of the functions
 (`marker/FrameMarker.hpp`, `data/analysis/FramesCsv.hpp`, ...).
 
+The headers compile after X11's (`Xlib.h` defines `None`, `Status`, `Bool` and more as macros, and Vulkan's and EGL's platform
+headers pull it in on Linux): no name in them is one of those words, which is why the flags' zero value is `MarkerFlags::NoFlags`.
+
 The **marker** draws a small QR code into every frame that carries the frame index and the animation time. A capture of the display
 output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the application animated is from
 what was actually shown on screen. The format is specified in
@@ -84,7 +87,7 @@ FM::ModuleMatrix matrix;
 std::array<uint32_t, FM::MaxIndexCount()> indices;
 
 // Every frame, last (after post effects and UI), without blending:
-const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::None, animationTime);   // an FP::TimeSpan
+const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime);   // an FP::TimeSpan
 FM::GenerateModules(payload, matrix);                                      // encode once
 const std::size_t count = FM::ModulesToGridIndices(matrix, indices);       // only the indices change
 DrawIndexed(indices.data(), count);      // triangles over the static vertices

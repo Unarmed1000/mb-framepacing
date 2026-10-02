@@ -232,7 +232,7 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
   const FM::Payload payload{FM::MarkerKind::SequenceStart,
                             3u,
                             1u,
-                            FM::MarkerFlags::None,
+                            FM::MarkerFlags::NoFlags,
                             FP::TimeSpan{2},
                             UnknownFrameTime,
                             FP::TimeSpan32{5u},
@@ -261,7 +261,7 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
 
 TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
 {
-  const auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::None, FP::TimeSpan{-1}});
+  const auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-1}});
   for (std::size_t i = 17; i < 25; ++i)
   {
     EXPECT_EQ(bytes[i], 0xFFu) << "byte " << i;
@@ -272,25 +272,26 @@ TEST(Payload, RoundTrips)
 {
   constexpr uint32_t U32Max = std::numeric_limits<uint32_t>::max();
   const std::array<FM::Payload, 18> payloads{{
-    {FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::None, FP::TimeSpan{0}},
-    {FM::MarkerKind::Frame, 7u, 1u, FM::MarkerFlags::None, FP::TimeSpan{166'667}},
-    {FM::MarkerKind::Frame, 7u, 2u, FM::MarkerFlags::None, FP::TimeSpan{333'334}, UnknownFrameTime, FrameTime60, FP::TickCount64{1'234'567'890'123}},
-    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::None, FP::TimeSpan{500'001}, UnknownFrameTime, FrameTime60, FP::TickCount64{1'234'568'056'790},
-     FP::TickCount64{1'234'567'723'456}},
-    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::None, FP::TimeSpan{500'001}, UnknownFrameTime, FrameTime60, FP::TickCount64{1'234'568'056'790},
-     FP::TickCount64{1'234'567'723'456}, FP::TimeSpan32{80'000u}},
-    {FM::MarkerKind::Frame, U32Max, std::numeric_limits<uint64_t>::max(), FM::MarkerFlags::None, MaxAnimation, UnknownFrameTime, MaxFrameTime,
+    {FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}},
+    {FM::MarkerKind::Frame, 7u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{166'667}},
+    {FM::MarkerKind::Frame, 7u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{333'334}, UnknownFrameTime, FrameTime60,
+     FP::TickCount64{1'234'567'890'123}},
+    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::NoFlags, FP::TimeSpan{500'001}, UnknownFrameTime, FrameTime60,
+     FP::TickCount64{1'234'568'056'790}, FP::TickCount64{1'234'567'723'456}},
+    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::NoFlags, FP::TimeSpan{500'001}, UnknownFrameTime, FrameTime60,
+     FP::TickCount64{1'234'568'056'790}, FP::TickCount64{1'234'567'723'456}, FP::TimeSpan32{80'000u}},
+    {FM::MarkerKind::Frame, U32Max, std::numeric_limits<uint64_t>::max(), FM::MarkerFlags::NoFlags, MaxAnimation, UnknownFrameTime, MaxFrameTime,
      MinClock, MaxClock, MaxFrameTime},
-    {FM::MarkerKind::Frame, 2u, 8u, FM::MarkerFlags::None, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
+    {FM::MarkerKind::Frame, 2u, 8u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
      FP::TickCount64{5}, MaxFrameTime},
-    {FM::MarkerKind::SequenceEnd, 2u, 4u, FM::MarkerFlags::None, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3}, MinClock,
-     MaxFrameTime},
-    {FM::MarkerKind::SequenceStart, 2u, 5u, FM::MarkerFlags::None, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
+    {FM::MarkerKind::SequenceEnd, 2u, 4u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
+     MinClock, MaxFrameTime},
+    {FM::MarkerKind::SequenceStart, 2u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
      FP::TickCount64{-5}, FP::TimeSpan32{80'000u}},
-    {FM::MarkerKind::SequenceStart, 1u, 7u, FM::MarkerFlags::None, MinAnimation},
-    {FM::MarkerKind::SequenceEnd, 3u, 42u, FM::MarkerFlags::None, FP::TimeSpan{-1}},
-    {FM::MarkerKind::SequenceStart, 0u, 0u, FM::MarkerFlags::None, FP::TimeSpan{0}},
-    {FM::MarkerKind::Frame, 2u, 9u, FM::MarkerFlags::None, FP::TimeSpan{1}, FrameTime60, FrameTime30, FP::TickCount64{3}, FP::TickCount64{5},
+    {FM::MarkerKind::SequenceStart, 1u, 7u, FM::MarkerFlags::NoFlags, MinAnimation},
+    {FM::MarkerKind::SequenceEnd, 3u, 42u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-1}},
+    {FM::MarkerKind::SequenceStart, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}},
+    {FM::MarkerKind::Frame, 2u, 9u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, FrameTime60, FrameTime30, FP::TickCount64{3}, FP::TickCount64{5},
      FP::TimeSpan32{6u}},
     {FM::MarkerKind::Frame, 2u, 10u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{1}, FM::Payload::OnDemandFrameTime, FM::Payload::OnDemandFrameTime,
      UnknownTime, UnknownTime, UnknownFrameTime},
@@ -321,7 +322,7 @@ TEST(Payload, ConstructorsKeepItPlainData)
   static_assert(std::is_trivially_copyable_v<FM::Payload>);
   static_assert(std::is_standard_layout_v<FM::Payload>);
   constexpr FM::Payload Empty;
-  static_assert(Empty.Kind() == FM::MarkerKind::Frame && Empty.FrameIndex() == 0u && Empty.Flags() == FM::MarkerFlags::None);
+  static_assert(Empty.Kind() == FM::MarkerKind::Frame && Empty.FrameIndex() == 0u && Empty.Flags() == FM::MarkerFlags::NoFlags);
   // The fields in the order of the wire format; the timing fields default to 0 (unknown)
   constexpr FM::Payload Required(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticBefore, FP::TimeSpan{3});
   static_assert(Required == FM::Payload(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticBefore, FP::TimeSpan{3}, UnknownFrameTime,
@@ -348,14 +349,14 @@ TEST(Payload, AnUnknownKindIsAsserted)
   constexpr auto Unknown = static_cast<FM::MarkerKind>(4u);
 #ifdef NDEBUG
   // Without asserts nothing encodes it
-  const FM::Payload payload(Unknown, 1u, 2u, FM::MarkerFlags::None, FP::TimeSpan{3});
+  const FM::Payload payload(Unknown, 1u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{3});
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
   EXPECT_EQ(FM::EncodePayload(payload, {}, buffer), 0u);
   FM::ModuleMatrix matrix;
   EXPECT_FALSE(FM::GenerateModules(payload, matrix));
   EXPECT_EQ(FM::EncodePayload(FM::Payload().WithKind(Unknown), {}, buffer), 0u);
 #elif GTEST_HAS_DEATH_TEST
-  EXPECT_DEATH(static_cast<void>(FM::Payload(Unknown, 1u, 2u, FM::MarkerFlags::None, FP::TimeSpan{3})), "");
+  EXPECT_DEATH(static_cast<void>(FM::Payload(Unknown, 1u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{3})), "");
   EXPECT_DEATH(static_cast<void>(FM::Payload().WithKind(Unknown)), "");
 #else
   GTEST_SKIP() << "asserts are on and death tests are not available";
@@ -367,7 +368,7 @@ TEST(Payload, MarkerFlagsCombine)
   constexpr auto Reserved = static_cast<FM::MarkerFlags>(0x80u);
   static_assert(FM::HasFlag(FM::MarkerFlags::StaticAfter | Reserved, FM::MarkerFlags::StaticAfter));
   static_assert(!FM::HasFlag(Reserved, FM::MarkerFlags::StaticAfter));
-  static_assert((FM::MarkerFlags::StaticAfter & Reserved) == FM::MarkerFlags::None);
+  static_assert((FM::MarkerFlags::StaticAfter & Reserved) == FM::MarkerFlags::NoFlags);
   static_assert(!FM::HasFlag(FM::MarkerFlags::StaticAfter, FM::MarkerFlags::StaticBefore));
   static_assert(FM::HasFlag(FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, FM::MarkerFlags::StaticBefore));
   EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticBefore), 0x02u);
@@ -382,7 +383,7 @@ TEST(Payload, MarkerFlagsCombine)
 
 TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 {
-  auto header = PayloadBytes({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  auto header = PayloadBytes({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
   header.resize(FM::WireFormat::PayloadByteCount);
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(header, decoded));
@@ -390,7 +391,7 @@ TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 
 TEST(Payload, TryDecodeRejectsBadInput)
 {
-  auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::PayloadByteCount - 1), decoded));
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::SyncPayloadByteCount - 1), decoded));
@@ -411,7 +412,7 @@ TEST(Payload, TryDecodeRejectsBadInput)
 
 TEST(Payload, DecodingASyncMarkerResetsTheMetadata)
 {
-  const std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{}});
+  const std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{}});
   FM::Payload decoded{};
   FM::StartMetadata metadata{9, FM::SequenceId{{1u, 2u, 3u}}};
   ASSERT_TRUE(FM::TryDecodePayload(bytes, decoded, &metadata));
@@ -425,7 +426,7 @@ TEST(Payload, TryDecodeRejectsWrongLengths)
   FM::Payload decoded{};
   for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::SequenceEnd})
   {
-    ASSERT_EQ(FM::EncodePayload({kind, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4},
+    ASSERT_EQ(FM::EncodePayload({kind, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4},
                                  FP::TickCount64{6}, FP::TimeSpan32{7u}},
                                 {}, buffer),
               53u);
@@ -433,7 +434,7 @@ TEST(Payload, TryDecodeRejectsWrongLengths)
     EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(52), decoded));
     EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(54), decoded));
   }
-  ASSERT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u},
+  ASSERT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u},
                                FP::TickCount64{4}, FP::TickCount64{6}, FP::TimeSpan32{7u}},
                               {9, {}}, buffer),
             77u);
@@ -460,7 +461,7 @@ TEST(Payload, StartMetadataRoundTrips)
   const FM::Payload payload{FM::MarkerKind::SequenceStart,
                             30u,
                             10u,
-                            FM::MarkerFlags::None,
+                            FM::MarkerFlags::NoFlags,
                             FP::TimeSpan{20},
                             UnknownFrameTime,
                             FP::TimeSpan32{50u},
@@ -488,9 +489,9 @@ TEST(Payload, StartMetadataRoundTrips)
 
   // Frame and end payloads ignore the metadata and stay PayloadByteCount bytes, and decoding them resets the metadata
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
-  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}, {5, textId}, buffer),
+  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, {5, textId}, buffer),
             FM::WireFormat::PayloadByteCount);
-  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}, {5, textId}, buffer),
+  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, {5, textId}, buffer),
             FM::WireFormat::PayloadByteCount);
   FM::Payload decoded{};
   FM::StartMetadata metadata{5, textId};
@@ -597,13 +598,13 @@ TEST(Symbol, SyncMarkersAreVersion2)
 {
   FM::ModuleMatrix matrix;
   ASSERT_TRUE(FM::GenerateModules(
-    {FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4}}, matrix));
+    {FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4}}, matrix));
   EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::SyncSize);
   EXPECT_EQ(matrix.Size(), 25);
 
   const FM::Options options{3, 4};
   std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
-  const std::size_t count = GenerateQuads({FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::None, FP::TimeSpan{0}}, options, {10, 20}, quads);
+  const std::size_t count = GenerateQuads({FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, options, {10, 20}, quads);
   ASSERT_GT(count, 0u);
   EXPECT_EQ(quads.front(), (FM::MarkerQuad{FP::Rectangle(10, 20, 99, 99), false}));
 }
@@ -612,7 +613,7 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 {
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
   const FM::Payload payload{FM::MarkerKind::Sync, 4u,
-                            0x0102030405060708u,  FM::MarkerFlags::None,
+                            0x0102030405060708u,  FM::MarkerFlags::NoFlags,
                             FP::TimeSpan{123},    UnknownFrameTime,
                             FP::TimeSpan32{6u},   FP::TickCount64{5},
                             FP::TickCount64{7},   FP::TimeSpan32{8u}};
@@ -624,7 +625,7 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 
   FM::Payload decoded{};
   ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
-  EXPECT_EQ(decoded, (FM::Payload{FM::MarkerKind::Sync, payload.RunId(), payload.FrameIndex(), FM::MarkerFlags::None, FP::TimeSpan{0}}));
+  EXPECT_EQ(decoded, (FM::Payload{FM::MarkerKind::Sync, payload.RunId(), payload.FrameIndex(), FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}));
   EXPECT_EQ(decoded.CpuStartTime().Ticks(), 0);
   EXPECT_EQ(decoded.CpuBusy().Ticks(), 0u);
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));
@@ -633,16 +634,16 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 TEST(Symbol, EveryMarkerIsVersion6)
 {
   FM::ModuleMatrix matrix;
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, matrix));
   EXPECT_EQ(matrix.Size(), 41);
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, matrix));
   EXPECT_EQ(matrix.Size(), 41);
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}, matrix, {}));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, matrix, {}));
   EXPECT_EQ(matrix.Size(), 41);
 
   FM::SequenceId id;
   ASSERT_TRUE(FM::SequenceId::TryFromText("0123456789abcdef", id));
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}, UnknownFrameTime,
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime,
                                    FP::TimeSpan32{5u}, FP::TickCount64{4}, FP::TickCount64{6}, FP::TimeSpan32{7u}},
                                   matrix, {123, id}));
   EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::MainSize);
@@ -660,7 +661,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
   const FP::Point origin{32, 32};
   std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
   const std::size_t count =
-    GenerateStartQuads({FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::None, FP::TimeSpan{6}}, {99, id}, options, origin, quads);
+    GenerateStartQuads({FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{6}}, {99, id}, options, origin, quads);
   ASSERT_GT(count, 0u);
   ASSERT_LE(count, FM::MaxQuadCount());
   const FM::MarkerQuad& background = quads.front();
@@ -676,7 +677,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
 
 TEST(Geometry, QuadsArePixelAlignedAndReproduceTheModuleMatrix)
 {
-  const FM::Payload payload{FM::MarkerKind::Frame, 0u, 123'456'789u, FM::MarkerFlags::None, FP::TimeSpan{36'000'000'000}};
+  const FM::Payload payload{FM::MarkerKind::Frame, 0u, 123'456'789u, FM::MarkerFlags::NoFlags, FP::TimeSpan{36'000'000'000}};
   for (const int32_t moduleSize : {1, 2, 3, 6})
   {
     for (const int32_t quiet : {0, 1, 4})
@@ -755,15 +756,15 @@ TEST(Symbol, DifferentPayloadsGiveDifferentSymbols)
 {
   FM::ModuleMatrix a;
   FM::ModuleMatrix b;
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::None, FP::TimeSpan{0}}, a));
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 2u, FM::MarkerFlags::None, FP::TimeSpan{0}}, b));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, a));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, b));
   EXPECT_NE(a, b);
 }
 
 TEST(Symbol, FinderPatternsArePresent)
 {
   FM::ModuleMatrix matrix;
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 99u, FM::MarkerFlags::None, FP::TimeSpan{99}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 99u, FM::MarkerFlags::NoFlags, FP::TimeSpan{99}}, matrix));
   // Top-left finder: 7x7 dark ring with a dark 3x3 centre.
   for (int32_t i = 0; i < 7; ++i)
   {
@@ -784,7 +785,7 @@ TEST(Symbol, FinderPatternsArePresent)
 
 TEST(Vertices, TheBackgroundQuadIsDrawnInTheDocumentedOrder)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
   const FM::Options options{2, 4};
   const int32_t size = options.MarkerSizePx();
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
@@ -825,19 +826,19 @@ namespace
       for (const int32_t quietZone : {0, 4})
       {
         const FM::Options options{moduleSize, quietZone};
-        cases.push_back({{FM::MarkerKind::Frame, 3u, 42u, FM::MarkerFlags::None, FP::TimeSpan{1'234'567}, UnknownFrameTime, FrameTime60,
+        cases.push_back({{FM::MarkerKind::Frame, 3u, 42u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1'234'567}, UnknownFrameTime, FrameTime60,
                           FP::TickCount64{987'654'321}, FP::TickCount64{987'487'654}},
                          {},
                          options,
                          {5, 7}});
-        cases.push_back({{FM::MarkerKind::SequenceEnd, 3u, 43u, FM::MarkerFlags::None, FP::TimeSpan{1'400'234}}, {}, options, {0, 0}});
+        cases.push_back({{FM::MarkerKind::SequenceEnd, 3u, 43u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1'400'234}}, {}, options, {0, 0}});
         FM::SequenceId textId;
         FM::SequenceId::TryFromText("triangle-case", textId);
         FM::SequenceId fullId;
         fullId.Bytes.fill(0xFFu);
         for (const FM::SequenceId& id : {FM::SequenceId{}, textId, fullId})
         {
-          cases.push_back({{FM::MarkerKind::SequenceStart, 3u, 41u, FM::MarkerFlags::None, FP::TimeSpan{1'067'890}}, id, options, {32, 64}});
+          cases.push_back({{FM::MarkerKind::SequenceStart, 3u, 41u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1'067'890}}, id, options, {32, 64}});
         }
       }
     }
@@ -988,7 +989,8 @@ TEST(Triangles, FrameMarkersFitTheBufferSizes)
   std::vector<uint32_t> indices(FM::MaxIndexCount());
   for (uint64_t frame = 0; frame < 500u; ++frame)
   {
-    const FM::Payload payload{FM::MarkerKind::Frame, 9u, frame * 7919u, FM::MarkerFlags::None, FP::TimeSpan{static_cast<int64_t>(frame) * 166'667}};
+    const FM::Payload payload{FM::MarkerKind::Frame, 9u, frame * 7919u, FM::MarkerFlags::NoFlags,
+                              FP::TimeSpan{static_cast<int64_t>(frame) * 166'667}};
     EXPECT_GT(GenerateTriangles(payload, {}, {0, 0}, vertices), 0u) << "frame " << frame;
     EXPECT_GT(GenerateIndexed(payload, {}, {0, 0}, indexedVertices, indices).IndexCount, 0u) << "frame " << frame;
   }
@@ -996,7 +998,7 @@ TEST(Triangles, FrameMarkersFitTheBufferSizes)
 
 TEST(Triangles, SmallBuffersGenerateNothing)
 {
-  const FM::Payload payload{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}};
+  const FM::Payload payload{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}};
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
   std::vector<FM::Vertex> tooFew(12);
   EXPECT_EQ(GenerateTriangles(payload, {}, {0, 0}, tooFew), 0u);
@@ -1068,7 +1070,7 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
 {
   for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::Sync})
   {
-    const FM::ModuleMatrix matrix = Encode({kind, 9u, 12345u, FM::MarkerFlags::None, FP::TimeSpan{678}});
+    const FM::ModuleMatrix matrix = Encode({kind, 9u, 12345u, FM::MarkerFlags::NoFlags, FP::TimeSpan{678}});
     const int32_t size = matrix.Size();
     const auto bits = matrix.Bits();
     ASSERT_EQ(bits.size(), FM::ModuleMatrix::PackedModuleByteCount(size));
@@ -1090,7 +1092,7 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
 
 TEST(ModuleMatrix, TryFromBitsTakesTheMarkerSizesAndIgnoresThePadding)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
   std::array<uint8_t, FM::ModuleMatrix::MaxPackedModuleByteCount> bits{};
   std::copy(matrix.Bits().begin(), matrix.Bits().end(), bits.begin());
   bits[FM::ModuleMatrix::PackedModuleByteCount(25) - 1u] |= 0x7Fu;    // 625 modules: the last byte uses 1 bit
@@ -1112,7 +1114,7 @@ TEST(ModuleMatrix, TryFromBitsTakesTheMarkerSizesAndIgnoresThePadding)
   EXPECT_EQ(copy, matrix) << "a refused call leaves the matrix unchanged";
   EXPECT_NE(copy, FM::ModuleMatrix{});
 
-  const FM::ModuleMatrix main = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  const FM::ModuleMatrix main = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
   ASSERT_TRUE(FM::ModuleMatrix::TryFromBits(FM::ModuleMatrix::MainSize, main.Bits(), copy));
   EXPECT_EQ(copy, main);
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(FM::ModuleMatrix::MainSize, main.Bits().first(210), copy));
@@ -1142,14 +1144,14 @@ namespace
   };
 
   const std::array<BitmapCase, 5> g_bitmapCases{{
-    {{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}, FM::Options(3, 4), {5, 7}},
-    {{FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::None, FP::TimeSpan{-5}}, FM::Options(1, 0), {0, 0}},
-    {{FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::None, FP::TimeSpan{0}}, FM::Options(2, 4), {3, 1}},
-    {{FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::None, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u},
+    {{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, FM::Options(3, 4), {5, 7}},
+    {{FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-5}}, FM::Options(1, 0), {0, 0}},
+    {{FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, FM::Options(2, 4), {3, 1}},
+    {{FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u},
       FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
      FM::Options(2, 1),
      {-9, -4}},
-    {{FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::None, FP::TimeSpan{6}}, FM::Options(4, 2), {100, 60}},
+    {{FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{6}}, FM::Options(4, 2), {100, 60}},
   }};
 }
 
@@ -1207,7 +1209,7 @@ TEST(Bitmap, EqualsTheRasterizedQuadsInEveryPixelFormat)
 
 TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 59u, 31u, FM::MarkerFlags::None, FP::TimeSpan{41}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 59u, 31u, FM::MarkerFlags::NoFlags, FP::TimeSpan{41}});
   constexpr int32_t ModuleSize = 3;
   const FM::Options small{1, 4};
   const FM::Options large{ModuleSize, 4};
@@ -1230,7 +1232,7 @@ TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
 
 TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
   std::vector<uint8_t> pixels(std::size_t{64} * 64u * 4u, 128u);
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, 64, 64, FM::PixelFormat::R8G8B8, 64u * 3u - 1u)) << "short stride";
   EXPECT_FALSE(
@@ -1279,12 +1281,12 @@ TEST(Grid, ResolvedIndicesEqualTheIndexedTrianglesTriangleByTriangle)
 {
   constexpr uint32_t BaseVertex = 100u;
   const std::array<FM::Payload, 5> payloads{{
-    {FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}},
-    {FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::None, FP::TimeSpan{-5}},
-    {FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::None, FP::TimeSpan{0}},
-    {FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::None, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
-     FP::TickCount64{5}, FP::TimeSpan32{6u}},
-    {FM::MarkerKind::SequenceStart, 7u, 5u, FM::MarkerFlags::None, FP::TimeSpan{6}},
+    {FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}},
+    {FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-5}},
+    {FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}},
+    {FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u},
+     FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
+    {FM::MarkerKind::SequenceStart, 7u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{6}},
   }};
   for (const FM::Payload& payload : payloads)
   {
@@ -1318,10 +1320,10 @@ TEST(Grid, SmallBuffersGiveNothing)
   EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {}, {}, std::span<FM::Vertex>(grid).first(1767)), 0u);
   EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Sync, {}, {}, std::span<FM::Vertex>(grid).first(680)), 680u);
   std::array<uint32_t, 12> indices{};
-  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}), indices), 0u);
+  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}), indices), 0u);
   EXPECT_EQ(FM::ModulesToGridIndices(FM::ModuleMatrix{}, indices), 0u);
-  EXPECT_EQ(
-    FM::ModulesToGridIndices(Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::None, FP::TimeSpan{2}}), std::span<uint32_t>(indices).first(5)),
-    0u)
+  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}),
+                                     std::span<uint32_t>(indices).first(5)),
+            0u)
     << "not even the background";
 }

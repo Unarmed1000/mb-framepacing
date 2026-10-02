@@ -70,6 +70,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   # The tests check the private wire format and the QR encoder too (source/mb/framepacing/marker/detail)
   target_include_directories(mb_framepacing_marker_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
   target_compile_options(mb_framepacing_marker_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+  mb_framepacing_add_x11_macro_check(mb_framepacing_marker_tests marker)
   gtest_discover_tests(mb_framepacing_marker_tests)
 
   # The QR encoder against its reference with far more input than the unit tests (tests/stress): a short run with the tests, the long

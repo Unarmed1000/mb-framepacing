@@ -77,15 +77,15 @@ Present(schedule.SwapInterval);                                 // hold the fram
 
 `BeginFrame` returns a `FrameSchedule`:
 
-| `FrameSchedule`       | What it is                                                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `SwapInterval`        | Refreshes from the previous frame's display to this one's: hold the frame for it                                        |
-| `AnimationTime`       | The frame's predicted display time on the display's clock: render the frame for it (the marker's)                       |
-| `AnimationStep`       | The step from the previous frame's animation time: the frame's delta time                                               |
-| `IntendedDisplayTime` | When the pacer aims for the frame to be shown, on your steady clock (the marker's)                                      |
-| `TargetFrameTime`     | `SwapInterval` refreshes, as a time (the marker's)                                                                      |
-| `PreferredFrameTime`  | The swap interval the application prefers, as a time (the marker's)                                                     |
-| `Change`              | What the rule decided from the previous frame (`None`, `Slower`, `Faster`): this frame is the first at the new interval |
+| `FrameSchedule`       | What it is                                                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `SwapInterval`        | Refreshes from the previous frame's display to this one's: hold the frame for it                                             |
+| `AnimationTime`       | The frame's predicted display time on the display's clock: render the frame for it (the marker's)                            |
+| `AnimationStep`       | The step from the previous frame's animation time: the frame's delta time                                                    |
+| `IntendedDisplayTime` | When the pacer aims for the frame to be shown, on your steady clock (the marker's)                                           |
+| `TargetFrameTime`     | `SwapInterval` refreshes, as a time (the marker's)                                                                           |
+| `PreferredFrameTime`  | The swap interval the application prefers, as a time (the marker's)                                                          |
+| `Change`              | What the rule decided from the previous frame (`Unchanged`, `Slower`, `Faster`): this frame is the first at the new interval |
 
 `EndFrame(presentTime, work)` takes the time the frame's work is done and returns its CPU busy time for the marker. Call it as you
 draw the marker: before the present, and before any wait for the frame's time (the sleep below). A wait inside it would count as

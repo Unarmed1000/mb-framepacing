@@ -25,7 +25,7 @@ namespace
 int main(int argc, char* argv[])
 {
   const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
-  const FM::Payload payload(FM::MarkerKind::Frame, 1u, static_cast<uint64_t>(argc), FM::MarkerFlags::None, FP::TimeSpan::FromSeconds(argc / 60.0));
+  const FM::Payload payload(FM::MarkerKind::Frame, 1u, static_cast<uint64_t>(argc), FM::MarkerFlags::NoFlags, FP::TimeSpan::FromSeconds(argc / 60.0));
   FM::ModuleMatrix matrix;
   std::size_t count = 0;
   if (FM::GenerateModules(payload, matrix))

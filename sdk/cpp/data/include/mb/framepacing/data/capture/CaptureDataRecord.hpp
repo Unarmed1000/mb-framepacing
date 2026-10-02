@@ -25,7 +25,7 @@ namespace MB::FramePacing::Data
     std::optional<TickCount64> DeviceTime;
     //! How many frames the capture source reported dropping since the previous record (0: none).
     uint32_t SourceDrops{0};
-    CaptureDataStatus Status{CaptureDataStatus::Undecodable};
+    CaptureDataStatus CaptureStatus{CaptureDataStatus::Undecodable};
     std::vector<uint8_t> MainBytes;
     std::vector<uint8_t> SecondBytes;
 

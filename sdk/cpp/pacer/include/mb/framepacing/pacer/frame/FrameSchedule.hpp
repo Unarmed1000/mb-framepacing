@@ -30,7 +30,7 @@ namespace MB::FramePacing::Pacer
     //! The marker's preferred frame time: the preferred swap interval's refreshes (PacerSettings::PreferredSwapIntervalAt).
     TimeSpan32 PreferredFrameTime;
     //! What the swap interval rule decided from the previous frame; this frame is the first at the new interval.
-    SwapIntervalChange Change{SwapIntervalChange::None};
+    SwapIntervalChange Change{SwapIntervalChange::Unchanged};
   };
 }
 

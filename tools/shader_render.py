@@ -45,7 +45,7 @@ def cases() -> Iterator[tuple[int, MarkerKind, ModuleMatrix, Options, Point]]:
             kind,
             rng.randrange(1, 1000),
             rng.randrange(1 << 40),
-            MarkerFlags.NONE,
+            MarkerFlags.NO_FLAGS,
             rng.randrange(1 << 50),
             target_frame_ticks=166_667,
             intended_display_ticks=rng.randrange(1 << 50),

@@ -112,19 +112,24 @@ public static class FrameMarkerUnityCheck
     var cases = new[]
     {
       (
-        Payload: new Payload(MarkerKind.Frame, 7, 4242, MarkerFlags.None, new TimeSpan(9_876_543)),
+        Payload: new Payload(MarkerKind.Frame, 7, 4242, MarkerFlags.NoFlags, new TimeSpan(9_876_543)),
         Start: default(StartMetadata),
         Options: new Options(3, 4),
         Origin: new Point(17, 23)
       ),
       (
-        new Payload(MarkerKind.SequenceStart, 7, 77, MarkerFlags.None, new TimeSpan(1_234)),
+        new Payload(MarkerKind.SequenceStart, 7, 77, MarkerFlags.NoFlags, new TimeSpan(1_234)),
         new StartMetadata(638_000_000_000_000_000, new SequenceId(1, 2)),
         new Options(1, 0),
         new Point(33, 7)
       ),
-      (new Payload(MarkerKind.SequenceEnd, 7, 99, MarkerFlags.None, new TimeSpan(5)), default(StartMetadata), new Options(2, 2), new Point(151, 41)),
-      (new Payload(MarkerKind.Sync, 0, 4242, MarkerFlags.None, new TimeSpan(0)), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
+      (
+        new Payload(MarkerKind.SequenceEnd, 7, 99, MarkerFlags.NoFlags, new TimeSpan(5)),
+        default(StartMetadata),
+        new Options(2, 2),
+        new Point(151, 41)
+      ),
+      (new Payload(MarkerKind.Sync, 0, 4242, MarkerFlags.NoFlags, new TimeSpan(0)), default(StartMetadata), new Options(4, 4), new Point(5, 101)),
     };
     int failures = 0;
     var generator = new MarkerGenerator();
@@ -290,7 +295,7 @@ public static class FrameMarkerUnityCheck
       foreach (var kind in new[] { MarkerKind.Frame, MarkerKind.Sync })
       {
         if (
-          !new MarkerGenerator().TryGenerateModules(new Payload(kind, 5, 99, MarkerFlags.None, new TimeSpan(1234)), bits, out var matrix)
+          !new MarkerGenerator().TryGenerateModules(new Payload(kind, 5, 99, MarkerFlags.NoFlags, new TimeSpan(1234)), bits, out var matrix)
           || !texture.Update(matrix, 4)
         )
           throw new InvalidOperationException("FrameMarkerTexture.Update failed");
@@ -326,7 +331,9 @@ public static class FrameMarkerUnityCheck
     int failures = 0;
     try
     {
-      if (!new MarkerGenerator().TryGenerateModules(new Payload(MarkerKind.Sync, 5, 99, MarkerFlags.None, new TimeSpan(1234)), bits, out var matrix))
+      if (
+        !new MarkerGenerator().TryGenerateModules(new Payload(MarkerKind.Sync, 5, 99, MarkerFlags.NoFlags, new TimeSpan(1234)), bits, out var matrix)
+      )
         throw new InvalidOperationException("TryGenerateModules failed");
       foreach (var (quietZone, expected) in new[] { (-30, 0), (-1, 0), (0, 0), (Options.MaxQuietZoneModules, 16), (20, 16), (1000, 16) })
       {

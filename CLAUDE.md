@@ -509,6 +509,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   has one header per type and no umbrella headers (a header that includes a whole module is a god file:
   `tools/check_one_type_per_file.py` rejects one); the functions have headers of their own. CI runs `tools/check_one_type_per_file.py`.
 - **Hot path:** the marker APIs run every frame, so they must not allocate. Add zero-allocation tests for new API.
+- **No X11 macro names in public C++ headers:** `Xlib.h` and `X.h` define plain words as macros (`None`, `Status`, `Bool`, `True`,
+  `False`, `Success`, `Always`, `Above`, `Below`, `Complex`, ...), and Vulkan's and EGL's platform headers pull them in on Linux, so
+  an enumerator `None` or a member `Status` does not compile in an application that includes them first. Every module's tests compile
+  all its public headers after those macros (`mb_framepacing_add_x11_macro_check`, `sdk/cpp/testing/X11Macros.cpp.in`). The names are
+  the same in every language (agreed with the user, although .NET names a flags enum's zero `None`): `MarkerFlags::NoFlags`
+  (Python `NO_FLAGS`), `SwapIntervalChange::Unchanged`, the data rows' `CaptureStatus` (Python `capture_status`). Files keep their
+  words: the CSV column is `status`, the pacer's golden files say `None`.
 - **Reference shaders (`sdk/shaders/`, BSD):** one quad whose fragment shader finds each pixel's module, from the packed bits
   (`Bits()` as constants; the fastest way to draw the marker) or a texel per module. One folder per API: `hlsl/` (`FrameMarker.hlsl` is
   the lookup, also included by the Unity shaders; `build_upm.py` copies it into the package), `gl/`, `gles2/` (GLSL ES 1.00: no

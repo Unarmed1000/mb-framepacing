@@ -146,7 +146,7 @@ var material = FrameMarkerGL.CreateMaterial();            // once, or your own u
 // every frame, as the last thing drawn into the output
 var options = Options.Recommended(Screen.height, 540);
 var origin = options.RecommendedOrigin(MarkerKind.Frame, Screen.height);
-var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.None, TimeSpanUtil.FromSeconds(Time.timeAsDouble));
+var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.NoFlags, TimeSpanUtil.FromSeconds(Time.timeAsDouble));
 if (generator.TryGenerateModules(payload, modules, out var matrix))
   markerMesh.Update(matrix, options, origin, Screen.height);
 commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Screen.width, Screen.height));

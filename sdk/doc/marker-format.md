@@ -340,7 +340,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 // The fields in the order of the wire format
 // The animation time is an FP::TimeSpan, the frame times and CPU busy FP::TimeSpan32, the intended display and CPU start time
 // FP::TickCount64 (all in 100 ns ticks)
-const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::None, animationTime, preferredFrameTime, targetFrameTime,
+const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime, preferredFrameTime, targetFrameTime,
                           intendedDisplayTime, cpuStartTime, cpuBusy);
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
 // MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:

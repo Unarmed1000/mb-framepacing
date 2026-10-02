@@ -32,7 +32,7 @@ class MarkerFlags(IntFlag):
     """The payload's flags byte (doc/marker-format.md "Flags"). Bits 2 to 7 are reserved: write 0; a decoded payload keeps whatever it
     carried."""
 
-    NONE = 0
+    NO_FLAGS = 0
     STATIC_AFTER = 1
     """Nothing animates while this frame is on screen, until the next frame (the application has no pending work after it). Says nothing
     about whether this frame itself animated. The analysis does not judge the step from it to the next frame."""

@@ -37,7 +37,7 @@ namespace MB.FramePacing.Data
             ',',
             row.CaptureIndex.ToString(CultureInfo.InvariantCulture),
             row.CaptureTime?.Ticks.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.Status,
+            row.CaptureStatus,
             row.Kind ?? string.Empty,
             row.RunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.FrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,

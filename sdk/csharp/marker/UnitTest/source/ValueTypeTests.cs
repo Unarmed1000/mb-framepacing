@@ -33,9 +33,9 @@ namespace MB.FramePacing.Marker.UnitTest
     public void Payload_AKindThatIsNotAMarkerKindThrows()
     {
       const MarkerKind Unknown = (MarkerKind)4;
-      Assert.That(() => new Payload(Unknown, 1, 2, MarkerFlags.None, new TimeSpan(3)), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => new Payload(Unknown, 1, 2, MarkerFlags.NoFlags, new TimeSpan(3)), Throws.TypeOf<ArgumentOutOfRangeException>());
       Assert.That(() => g_payload.WithKind(Unknown), Throws.TypeOf<ArgumentOutOfRangeException>());
-      Assert.That(() => new Payload((MarkerKind)255, 1, 2, MarkerFlags.None, TimeSpan.Zero), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => new Payload((MarkerKind)255, 1, 2, MarkerFlags.NoFlags, TimeSpan.Zero), Throws.TypeOf<ArgumentOutOfRangeException>());
       // Every MarkerKind is taken, and a default payload is a frame marker
       foreach (MarkerKind kind in Enum.GetValues(typeof(MarkerKind)))
         Assert.That(g_payload.WithKind(kind).Kind, Is.EqualTo(kind));
@@ -123,7 +123,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.Kind,
           p.RunId,
           p.FrameIndex,
-          MarkerFlags.None,
+          MarkerFlags.NoFlags,
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,

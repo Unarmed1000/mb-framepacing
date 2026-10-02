@@ -15,7 +15,8 @@ namespace MB.FramePacing.Marker
   [Flags]
   public enum MarkerFlags : byte
   {
-    None = 0,
+    /// <summary>No flag. Named as in the C++ library, where X11's headers define "None" as a macro.</summary>
+    NoFlags = 0,
 
     /// <summary>
     /// Nothing animates while this frame is on screen, until the next frame (the application has no pending work after it). Says nothing

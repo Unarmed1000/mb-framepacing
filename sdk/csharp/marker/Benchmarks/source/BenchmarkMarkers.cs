@@ -35,7 +35,7 @@ namespace MB.FramePacing.Marker.Benchmarks
         MarkerKind.Frame,
         0x12345678,
         frameIndex,
-        MarkerFlags.None,
+        MarkerFlags.NoFlags,
         new TimeSpan(offset),
         g_frameTime,
         g_frameTime,

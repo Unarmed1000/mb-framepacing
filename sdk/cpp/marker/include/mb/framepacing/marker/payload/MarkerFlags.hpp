@@ -11,7 +11,8 @@ namespace MB::FramePacing::Marker
   //! carried, so values without a name here survive a round trip.
   enum class MarkerFlags : uint8_t
   {
-    None = 0,
+    //! No flag (not "None": X11's headers define that name as a macro)
+    NoFlags = 0,
     //! Nothing animates while this frame is on screen, until the next frame (the application has no pending work after it). Says nothing
     //! about whether this frame itself animated. The analysis does not judge the step from it to the next frame.
     StaticAfter = 1u << 0u,

@@ -82,8 +82,8 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
                                      FP::TickCount64{ticks + 50'000},
                                      FP::TickCount64{ticks - 10'000},
                                      FP::TimeSpan32{80'000u}};
-      const FM::Payload endPayload{FM::MarkerKind::SequenceEnd, 7u, frame, FM::MarkerFlags::None, FP::TimeSpan{ticks}};
-      const FM::Payload startPayload{FM::MarkerKind::SequenceStart, 7u, frame, FM::MarkerFlags::None, FP::TimeSpan{ticks}};
+      const FM::Payload endPayload{FM::MarkerKind::SequenceEnd, 7u, frame, FM::MarkerFlags::NoFlags, FP::TimeSpan{ticks}};
+      const FM::Payload startPayload{FM::MarkerKind::SequenceStart, 7u, frame, FM::MarkerFlags::NoFlags, FP::TimeSpan{ticks}};
       written += FM::SequenceId::TryFromText("allocation-test", metadata.Id) ? 1u : 0u;
 
       written += FM::GenerateModules(framePayload, g_matrix) ? 1u : 0u;

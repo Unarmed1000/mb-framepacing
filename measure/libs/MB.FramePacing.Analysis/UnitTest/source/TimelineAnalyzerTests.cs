@@ -37,7 +37,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         StartMetadata? start = null,
         uint targetFrameTicks = 0,
         uint preferredFrameTicks = 0,
-        MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.None
+        MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.NoFlags
       )
       {
         var payload = new MarkerPayload(
@@ -189,10 +189,10 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// rest), the step out of it is not, whether the animation clock paused while nothing animated (64 ms) or kept running (1064 ms), and the
     /// drift does not jump. The frame rate numbers leave out frame 4's time on screen, and count it.
     /// </summary>
-    [TestCase(64L, MB.FramePacing.Marker.MarkerFlags.StaticAfter, MB.FramePacing.Marker.MarkerFlags.None)]
-    [TestCase(1064L, MB.FramePacing.Marker.MarkerFlags.StaticAfter, MB.FramePacing.Marker.MarkerFlags.None)]
-    [TestCase(64L, MB.FramePacing.Marker.MarkerFlags.None, MB.FramePacing.Marker.MarkerFlags.StaticBefore)]
-    [TestCase(1064L, MB.FramePacing.Marker.MarkerFlags.None, MB.FramePacing.Marker.MarkerFlags.StaticBefore)]
+    [TestCase(64L, MB.FramePacing.Marker.MarkerFlags.StaticAfter, MB.FramePacing.Marker.MarkerFlags.NoFlags)]
+    [TestCase(1064L, MB.FramePacing.Marker.MarkerFlags.StaticAfter, MB.FramePacing.Marker.MarkerFlags.NoFlags)]
+    [TestCase(64L, MB.FramePacing.Marker.MarkerFlags.NoFlags, MB.FramePacing.Marker.MarkerFlags.StaticBefore)]
+    [TestCase(1064L, MB.FramePacing.Marker.MarkerFlags.NoFlags, MB.FramePacing.Marker.MarkerFlags.StaticBefore)]
     [TestCase(64L, MB.FramePacing.Marker.MarkerFlags.StaticAfter, MB.FramePacing.Marker.MarkerFlags.StaticBefore)]
     public void StaticStep_SaidByEitherFrame_IsNotJudged(
       long animationAfterIdleMs,

@@ -111,7 +111,7 @@ namespace
         deviceTicksSum += record.DeviceTime->Ticks();
       }
       sourceDropsSum += record.SourceDrops;
-      statuses.push_back(StatusName(record.Status));
+      statuses.push_back(StatusName(record.CaptureStatus));
       mainByteCount += static_cast<int64_t>(record.MainBytes.size());
       secondByteCount += static_cast<int64_t>(record.SecondBytes.size());
       MB::FramePacing::Marker::Payload payload;
@@ -292,7 +292,7 @@ namespace
     int64_t payloadByteCount = 0;
     for (const auto& row : rows)
     {
-      statuses.push_back(row.Status);
+      statuses.push_back(row.CaptureStatus);
       if (row.Kind)
       {
         kinds.push_back(*row.Kind);
