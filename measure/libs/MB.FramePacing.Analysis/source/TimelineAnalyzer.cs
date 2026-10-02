@@ -488,17 +488,28 @@ namespace MB.FramePacing.Analysis
         // The user's expected rate settles an ambiguous estimate (a steady game below the refresh rate) before the rig's calibration
         double? hintHz = expected ?? (options.CalibratedRefreshHz is > 0 ? options.CalibratedRefreshHz : null);
         double? hint = hintHz is { } hz ? TimeSpan.TicksPerSecond / hz : null;
-        if (RefreshEstimator.EstimatePeriodTicks(CameraIntervals(frames), period.Ticks, hint) is not { } estimate)
+        var intervals = CameraIntervals(frames).ToList();
+        if (RefreshEstimator.EstimatePeriodTicks(intervals, period.Ticks, hint) is not { } estimate)
         {
           warnings.Add(
             "Camera capture: the display's refresh rate could not be calculated from the frames (too few, or the camera is too slow), so late frames are not marked."
           );
           return null;
         }
-        // Which period the intervals say; how long it is, the line through every reliable first-seen time
-        estimate = RefreshEstimator.RefinePeriodTicks(CameraFirstSeenTimes(frames), estimate);
+        // Which period the intervals say; which grid of refreshes the reliable first-seen times are on (the intervals mislead when the
+        // camera sees a refresh in two or three frames); how long that period is, the line through those times
+        var firstSeen = CameraFirstSeenTimes(frames).ToList();
+        double? onGrid = RefreshEstimator.GridPeriodTicks(firstSeen, estimate, intervals, period.Ticks, hint);
+        estimate = RefreshEstimator.RefinePeriodTicks(firstSeen, onGrid ?? estimate);
         refresh = new TimeSpan((long)Math.Round(estimate));
         double calculatedHz = TimeSpan.TicksPerSecond / estimate;
+        if (onGrid == null && firstSeen.Count >= RefreshEstimator.MinGridTimes)
+          warnings.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"Camera capture: the frames' first-seen times are on no grid of refreshes the camera can see (it films about twice the refresh rate or less, or vsync is off), so the calculated display rate of {calculatedHz:0.##} Hz is unreliable. Film faster."
+            )
+          );
         if (expected is { } expectedHz && !WithinTolerance(calculatedHz, expectedHz))
           warnings.Add(
             string.Create(

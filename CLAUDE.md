@@ -357,9 +357,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `TimelineOptions.ErrorThreshold`), and a display time step is off its target from half a refresh on. A source's precision (a
     camera's period) goes into warnings, never into the binning or the thresholds.
   - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`:
-    `EstimatePeriodTicks` finds which period from the intervals, `RefinePeriodTicks` measures it with a line through every
+    `EstimatePeriodTicks` finds which period from the intervals, `GridPeriodTicks` asks the first-seen times which grid of refreshes
+    they are on (a search of the periods with `GridFit`, the periodogram of the times; the intervals mislead a camera that sees a
+    refresh in two or three frames, and the times are on no grid at exactly twice the refresh rate with half of the sightings late:
+    the analysis then warns that the rate is unreliable), `RefinePeriodTicks` measures it with a line through every
     first-seen time, the maximum likelihood estimate once the refresh numbers are known; also used
-    by the calibration). The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
+    by the calibration). After a change to it run `RefreshGridTests` and `selftest --camera --fps <2 x refresh> --refresh <rate>`
+    for a few monitor rates. The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
     (`TimelineAnalyzer.RefreshTolerance`) is a warning.
   - **Capture gaps** (a capture card's captures not decoded, not recorded, dropped by the source (`CaptureRow.SourceDrops`, a count), or

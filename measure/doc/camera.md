@@ -181,7 +181,11 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
 - **The display's refresh rate** (`runs[].pacing.refreshPeriodTicks`, `refreshCalculated: true`): a capture card captures at the
   refresh rate, a camera films faster, so the refresh is calculated from the frames. The first-seen intervals are whole refreshes
   quantised to camera periods; the refresh is the largest period that makes them whole multiples. A steady game below the refresh
-  rate is ambiguous alone: the rig's calibrated refresh settles it, and the analysis warns when the two disagree. That period is
+  rate is ambiguous alone: the rig's calibrated refresh settles it, and the analysis warns when the two disagree. The intervals
+  mislead when the camera sees a refresh in two or three frames and some sightings come a camera frame late, so the first-seen
+  times are then asked directly which grid of refreshes they are on, and that period is taken (a run of a second or more). At
+  exactly twice the refresh rate, with about half of the sightings late, the times are on no grid the camera can see: the analysis
+  warns that the calculated rate is unreliable. Film faster than twice the refresh rate to stay clear of it. The period is
   then measured with every reliable first sighting at once: a line through the first-seen times against the refresh each fell on
   (on the simulated camera the rate comes out within 0.01 Hz for a run of a few seconds; a camera slower than about twice the
   refresh rate can not number the refreshes, and the average of the intervals stands). Late frames and the pacing verdict are
