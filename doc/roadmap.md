@@ -29,6 +29,27 @@ The work:
 5. **Validate with real hardware:** an HDR game captured by an HDR capture card, and by one that converts to SDR. Until then the HDR
    path is documented as untested.
 
+## The frame pacer
+
+The SDK's [frame pacer](../sdk/doc/pacer.md) is a first version and experimental: a baseline that needs only a steady clock and a
+`Present` that waits for vsync, so it works on any platform, and it is off by default. It has only run against its own simulation.
+
+**Out of experimental:** measure it on real swap chains, with the marker and the tools, on each platform and for each way of applying
+a schedule (the platform's swap interval, presenting a frame again, sleeping until the frame is due). Until then it stays off by
+default and its API may change.
+
+**Possible upgrades.** Each is for platforms that offer it, never a requirement of the baseline; the guide's
+[Not used yet](../sdk/doc/pacer.md#not-used-yet) says where each exists:
+
+- **Vsync times the platform reports:** the intended display time without the jitter of the frame starts.
+- **Predicted display times:** the animation time the platform itself aims for.
+- **Presentation feedback:** frames that were late although they were presented in time.
+- **Scheduled presents and per-frame targets:** back at full rate a frame sooner after one slow frame, and no sleep that guesses.
+- **The refresh period measured from the frames:** a change of rate followed without being told, 59.94 Hz taken for 60.
+- **Slewing against drift:** animation that stays in step with audio or a server over hours.
+- **Variable refresh and vsync off:** pacing where there is no grid of refreshes to round to.
+- **A C# port** (`MB.FramePacing.Pacer`): the same pacer for .NET, giving the golden data's results byte for byte.
+
 ## Later
 
 - **Synced playback (GUI):** click a spike in a chart to open the captured frame it came from.

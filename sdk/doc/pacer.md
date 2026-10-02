@@ -210,8 +210,8 @@ general animation timer: it has no speed and no pause, only the refreshes the di
 
 ## Not used yet
 
-The baseline takes nothing a platform may not have. What newer platforms offer, and what the pacer does not use yet
-([roadmap](../../doc/roadmap.md)):
+The baseline takes nothing a platform may not have. What newer platforms offer and the pacer does not use yet; each is a possible
+upgrade on the [roadmap](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/roadmap.md), as is a C# port:
 
 | Not used yet                                | Where it exists                                                                                                                | What it would improve                                                        |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
