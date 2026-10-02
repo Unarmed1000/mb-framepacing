@@ -1,5 +1,5 @@
-#ifndef MB_FRAMEPACING_PACER_ANIMATION_PACERANIMATIONCLOCK_HPP
-#define MB_FRAMEPACING_PACER_ANIMATION_PACERANIMATIONCLOCK_HPP
+#ifndef MB_FRAMEPACING_PACER_CLOCK_PACERREFRESHCLOCK_HPP
+#define MB_FRAMEPACING_PACER_CLOCK_PACERREFRESHCLOCK_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -7,16 +7,16 @@
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
-#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
-#include <mb/framepacing/pacer/animation/FrameMeasurement.hpp>
+#include <mb/framepacing/pacer/clock/AnimationTime.hpp>
+#include <mb/framepacing/pacer/clock/FrameMeasurement.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). The pacer's animation clock: the animation time of a loop paced by vsync,
-  //! counted in the display's refreshes (the technique mb-framepacing-explained calls the vsync timer). It is not a general animation
-  //! timer: it has no speed, no pause and no time of its own, only the refreshes the display has shown. It needs nothing from the
-  //! platform but a steady clock.
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). The pacer's refresh clock: the display's refreshes, counted from the frame
+  //! starts of a loop paced by vsync, and the animation time that follows from them (the technique mb-framepacing-explained calls the
+  //! vsync timer). It is not the application's animation clock: it has no speed, no pause and no time of its own, only the refreshes
+  //! the display has shown. It needs nothing from the platform but a steady clock.
   //!
   //! On a display with a fixed refresh rate and vsync on, every frame is shown a whole number of refreshes after the previous one, and
   //! the loop waits in Present, so every frame starts when the previous one is shown. The time from one frame start to the next, on the
@@ -28,7 +28,7 @@ namespace MB::FramePacing::Pacer
   //! Rounding removes the frame starts' jitter while it stays under half a refresh. Every step is measured on its own, so a display
   //! that runs a little off its nominal rate never adds up to a jump; the steps add up exactly (RefreshTime), so the animation time is
   //! the refreshes counted. No allocation.
-  class PacerAnimationClock
+  class PacerRefreshClock
   {
     RefreshPeriod m_period;
     TimeSpan m_longestGap;
@@ -46,7 +46,7 @@ namespace MB::FramePacing::Pacer
     //! longestGap: a frame that starts longer than this after the previous one (or two of its frames, when that is longer), or before
     //! it, starts the clock again instead of stepping by the gap: after a pause, a suspended process, a stop in a debugger. start: the
     //! animation time of the first frame.
-    explicit PacerAnimationClock(RefreshPeriod period, TimeSpan longestGap, TimeSpan start = {}) noexcept;
+    explicit PacerRefreshClock(RefreshPeriod period, TimeSpan longestGap, TimeSpan start = {}) noexcept;
 
     //! A frame starts at frameStartTime (the application's steady clock) and is held for swapInterval refreshes (at least 1): Measure,
     //! then Step.

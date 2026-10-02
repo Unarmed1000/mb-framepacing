@@ -8,7 +8,7 @@
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
+#include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
@@ -21,7 +21,7 @@ namespace MB::FramePacing::Pacer
   //! Paces a frame loop with nothing but a steady clock and a Present that waits for vsync: the baseline that works on any platform.
   //! Every frame: BeginFrame with the time the frame starts, hold the frame for the schedule's swap interval and render it for the
   //! schedule's animation time, EndFrame when presenting. The pacer measures on the CPU's clock when frames start, counts in whole
-  //! refreshes on the display's (PacerAnimationClock), and adapts the swap interval to how the frames do (SwapIntervalRule), from the frame
+  //! refreshes on the display's (PacerRefreshClock), and adapts the swap interval to how the frames do (SwapIntervalRule), from the frame
   //! rate the application prefers down.
   //!
   //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); nothing
@@ -29,7 +29,7 @@ namespace MB::FramePacing::Pacer
   class FramePacer
   {
     SwapIntervalRule m_rule;
-    PacerAnimationClock m_clock;
+    PacerRefreshClock m_clock;
     // The frame between BeginFrame and the next BeginFrame
     TickCount64 m_cpuStartTime;
     TimeSpan m_work;

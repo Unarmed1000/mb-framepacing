@@ -8,7 +8,7 @@
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
+#include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <mb/framepacing/testing/AllocationCounter.hpp>
@@ -42,7 +42,7 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       copy.SetSlowDown(PC::SlowDownRule::FullWindow);
       return copy;
     }());
-  PC::PacerAnimationClock clock(settings.Refresh(), settings.FrameWindowLength());
+  PC::PacerRefreshClock clock(settings.Refresh(), settings.FrameWindowLength());
 
   int64_t written = 0;
   {

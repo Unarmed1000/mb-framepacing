@@ -9,7 +9,7 @@ add_library(mb_framepacing::pacer ALIAS mb_framepacing_pacer)
 set_target_properties(mb_framepacing_pacer PROPERTIES EXPORT_NAME pacer POSITION_INDEPENDENT_CODE ON)
 target_sources(mb_framepacing_pacer
   PRIVATE
-    source/mb/framepacing/pacer/animation/PacerAnimationClock.cpp
+    source/mb/framepacing/pacer/clock/PacerRefreshClock.cpp
     source/mb/framepacing/pacer/FramePacer.cpp
     source/mb/framepacing/pacer/PacerSettings.cpp
     source/mb/framepacing/pacer/RefreshPeriod.cpp
@@ -19,9 +19,9 @@ target_sources(mb_framepacing_pacer
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/pacer/animation/PacerAnimationClock.hpp
-      include/mb/framepacing/pacer/animation/AnimationTime.hpp
-      include/mb/framepacing/pacer/animation/FrameMeasurement.hpp
+      include/mb/framepacing/pacer/clock/PacerRefreshClock.hpp
+      include/mb/framepacing/pacer/clock/AnimationTime.hpp
+      include/mb/framepacing/pacer/clock/FrameMeasurement.hpp
       include/mb/framepacing/pacer/FramePacer.hpp
       include/mb/framepacing/pacer/frame/FrameSchedule.hpp
       include/mb/framepacing/pacer/PacerSettings.hpp

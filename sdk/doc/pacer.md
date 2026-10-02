@@ -197,10 +197,11 @@ period.
 The intended display time is the frame's start plus its swap interval. A frame starts a little after the previous one is shown, by the
 time the thread takes to wake up, so it carries that jitter: without a vsync time from the platform the pacer knows no better.
 
-## The pacer's animation clock alone
+## The pacer's refresh clock alone
 
-`PacerAnimationClock` is the part that measures and counts, for an application that decides its swap interval itself. It is not a
-general animation timer: it has no speed and no pause, only the refreshes the display has shown.
+`PacerRefreshClock` is the part that measures the frame starts and counts the display's refreshes, for an application that decides
+its swap interval itself. It is not the application's animation clock: it has no speed and no pause, only the refreshes the display
+has shown.
 
 - `Advance(frameStartTime, swapInterval)` gives the frame's `AnimationTime` (`Time`, `Step`, `StepRefreshes`).
 - `Measure(frameStartTime)` and then `Step(swapInterval)` do the same in two steps, for a loop that decides the swap interval from the
@@ -234,5 +235,5 @@ regenerates them with `pacer-sim --golden` (built with the tests when the pacer 
 - `100-stages` and `60-relapse`: seeded staged loads. The fix is never late more often than the full-window rule and never slows down
   later; on `100-stages` and `60-relapse` it is late less often.
 
-The simulation's display runs exactly at the nominal rate. `PacerAnimationClock`'s tests add what it leaves out: a display off its rate,
+The simulation's display runs exactly at the nominal rate. `PacerRefreshClock`'s tests add what it leaves out: a display off its rate,
 jitter on every frame start, the clock's wrap.

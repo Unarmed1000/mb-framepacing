@@ -221,7 +221,7 @@ not use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/fram
 | `RefreshPeriod`, `RefreshTime`                               | The refresh period, exact (`FromRate`, `FromNanoseconds`, `FromTimeSpan`; always valid, no default), and a time counted in whole refreshes |
 | `FrameSchedule`                                              | What a frame gets: its swap interval, its animation time and the marker's pacing values                                                    |
 | `SwapIntervalRule`, `SwapIntervalChange`, `FrameWindowState` | The adaptive swap interval rule on its own, for a frame loop of your own                                                                   |
-| `PacerAnimationClock`, `AnimationTime`, `FrameMeasurement`   | The part that measures the frame starts and counts refreshes, for an application that decides its swap interval itself                     |
+| `PacerRefreshClock`, `AnimationTime`, `FrameMeasurement`     | The part that measures the frame starts and counts refreshes, for an application that decides its swap interval itself                     |
 
 ## The core
 

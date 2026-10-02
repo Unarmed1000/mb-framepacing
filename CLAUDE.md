@@ -11,7 +11,7 @@ The repository has two parts, and the license follows them (see Conventions):
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
   - **pacer** (C++ `MB::FramePacing::Pacer` only; **experimental**, off by default): paces a frame loop with nothing but a steady clock
-    and vsync: frame starts measured on the CPU's clock and counted in whole refreshes on the display's (`PacerAnimationClock`), a
+    and vsync: frame starts measured on the CPU's clock and counted in whole refreshes on the display's (`PacerRefreshClock`), a
     target frame rate, and the adaptive swap interval rule (the full-window rule of mb-framepacing-explained's simulation, and its fix
     as the default);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
@@ -236,7 +236,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     to 1 s, no default: the application gives its display's period) and `PacerSettings` (constructed from the period; setters
     assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer.
   - **Names:** the rule's stretch of frames is the **frame window** (`FrameWindowLength`, `FrameWindowState`), never "window" alone (in
-    graphics that is the window system's). `PacerAnimationClock` is the pacer's, not a general animation timer.
+    graphics that is the window system's). `PacerRefreshClock` (`pacer/clock/`) counts the display's
+    refreshes: never call it an animation clock, which in this repository is the application's game time (`sdk/doc/marker-fields.md`).
   - Integer arithmetic only: the golden data must come out byte for byte. 100 % test coverage as the core and the marker
     (llvm-cov, `NDEBUG`). There is no C# port (the roadmap lists one as a possible upgrade).
   - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the

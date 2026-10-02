@@ -1,5 +1,5 @@
-#ifndef MB_FRAMEPACING_PACER_ANIMATION_FRAMEMEASUREMENT_HPP
-#define MB_FRAMEPACING_PACER_ANIMATION_FRAMEMEASUREMENT_HPP
+#ifndef MB_FRAMEPACING_PACER_CLOCK_FRAMEMEASUREMENT_HPP
+#define MB_FRAMEPACING_PACER_CLOCK_FRAMEMEASUREMENT_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -9,7 +9,7 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What a frame's start time says about the frame before it
-  //! (PacerAnimationClock::Measure): in a loop paced by vsync a frame starts when the previous one is shown.
+  //! (PacerRefreshClock::Measure): in a loop paced by vsync a frame starts when the previous one is shown.
   struct FrameMeasurement
   {
     //! The clock started again with this frame (the first frame, a gap longer than its longest, a new refresh period): nothing was

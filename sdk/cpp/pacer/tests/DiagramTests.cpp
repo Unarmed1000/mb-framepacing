@@ -5,14 +5,14 @@
 // their frames, swap intervals and clock readings, and the display refreshes and animation times they show. A diagram's frame model: 60 Hz,
 // the first frame starts 0.2 refresh into the refresh before it is shown, every other frame when the previous one is shown; a frame is
 // shown at the first refresh after it is done, and no sooner than its swap interval after the previous one. The vsync timer (the
-// animation clock) animates it for the previous frame's display plus its swap interval.
+// refresh clock) animates it for the previous frame's display plus its swap interval.
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
-#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
+#include <mb/framepacing/pacer/clock/AnimationTime.hpp>
+#include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -96,7 +96,7 @@ namespace
   //! The vsync timer without a pacer: every frame's measured start (when it starts, or its clock reading) and swap interval
   std::vector<int64_t> MeasuredAnimation(const std::vector<DiagramFrame>& frames, const std::vector<FrameTimes>& times)
   {
-    PC::PacerAnimationClock clock(g_hz60, FP::TimeSpan(2 * FP::TimeSpan::TicksPerSecond));
+    PC::PacerRefreshClock clock(g_hz60, FP::TimeSpan(2 * FP::TimeSpan::TicksPerSecond));
     std::vector<int64_t> animation;
     for (std::size_t index = 0; index < frames.size(); ++index)
     {

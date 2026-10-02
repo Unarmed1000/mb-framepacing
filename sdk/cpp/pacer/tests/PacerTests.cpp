@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The pacer module: the refresh period's exact arithmetic, the settings and the target frame rate, the swap interval rule's decisions at
-// their edges, the animation clock (measuring frame starts, catching up, pauses, no drift, a display off its nominal rate) and the pacer
+// their edges, the refresh clock (measuring frame starts, catching up, pauses, no drift, a display off its nominal rate) and the pacer
 // (planning, late frames, pauses, a change of refresh period).
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
@@ -11,9 +11,9 @@
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
-#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
-#include <mb/framepacing/pacer/animation/FrameMeasurement.hpp>
-#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
+#include <mb/framepacing/pacer/clock/AnimationTime.hpp>
+#include <mb/framepacing/pacer/clock/FrameMeasurement.hpp>
+#include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
@@ -656,12 +656,12 @@ TEST(SwapIntervalRule, AWindowThatHoldsAllTheFramesItCanCountsAsFull)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
-// PacerAnimationClock
+// PacerRefreshClock
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
-TEST(PacerAnimationClock, TheFirstFrameIsTheStartAndEveryStepIsWholeRefreshes)
+TEST(PacerRefreshClock, TheFirstFrameIsTheStartAndEveryStepIsWholeRefreshes)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second), Span(1'000));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second), Span(1'000));
   EXPECT_EQ(clock.Refresh(), g_hz60);
   EXPECT_EQ(clock.Current().Time, Span(1'000));
   int64_t start = Second;
@@ -679,9 +679,9 @@ TEST(PacerAnimationClock, TheFirstFrameIsTheStartAndEveryStepIsWholeRefreshes)
   EXPECT_EQ(clock.Current().Step, Span(g_hz60.TimeFor(6).Ticks() - g_hz60.TimeFor(5).Ticks()));
 }
 
-TEST(PacerAnimationClock, ALateFrameShowsInTheNextMeasurementAndTheAnimationCatchesUp)
+TEST(PacerRefreshClock, ALateFrameShowsInTheNextMeasurementAndTheAnimationCatchesUp)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   int64_t start = Second;
   static_cast<void>(clock.Advance(At(start), 1));
   start += 166'667;
@@ -703,9 +703,9 @@ TEST(PacerAnimationClock, ALateFrameShowsInTheNextMeasurementAndTheAnimationCatc
   EXPECT_EQ(clock.Current().Time, g_hz60.TimeFor(4));
 }
 
-TEST(PacerAnimationClock, AChangeOfSwapIntervalStepsByTheNewOneAtOnce)
+TEST(PacerRefreshClock, AChangeOfSwapIntervalStepsByTheNewOneAtOnce)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   int64_t start = Second;
   static_cast<void>(clock.Advance(At(start), 1));
   // The next frame is held for two refreshes: it animates for the previous frame's display plus two
@@ -726,9 +726,9 @@ TEST(PacerAnimationClock, AChangeOfSwapIntervalStepsByTheNewOneAtOnce)
   EXPECT_EQ(clock.Step(0).StepRefreshes, 1u);
 }
 
-TEST(PacerAnimationClock, AGapLongerThanTheLongestStartsAgainWithoutAJump)
+TEST(PacerRefreshClock, AGapLongerThanTheLongestStartsAgainWithoutAJump)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   const int64_t start = Second;
   static_cast<void>(clock.Advance(At(start), 1));
   static_cast<void>(clock.Advance(At(start + 166'667), 1));
@@ -751,10 +751,10 @@ TEST(PacerAnimationClock, AGapLongerThanTheLongestStartsAgainWithoutAJump)
   EXPECT_EQ(clock.Current().Time, g_hz60.TimeFor(124));
 }
 
-TEST(PacerAnimationClock, TheLongestGapIsAtLeastTwoFrames)
+TEST(PacerRefreshClock, TheLongestGapIsAtLeastTwoFrames)
 {
   // A longest gap of a tick would make every frame a pause: two frames of the swap interval are always measured
-  PC::PacerAnimationClock clock(g_hz60, Span(1));
+  PC::PacerRefreshClock clock(g_hz60, Span(1));
   int64_t start = Second;
   static_cast<void>(clock.Advance(At(start), 2));
   start += g_hz60.TimeFor(4).Ticks();
@@ -765,9 +765,9 @@ TEST(PacerAnimationClock, TheLongestGapIsAtLeastTwoFrames)
   EXPECT_TRUE(clock.Measure(At(start + g_hz60.TimeFor(4).Ticks() + 1)).Restarted);
 }
 
-TEST(PacerAnimationClock, RestartAndANewRefreshPeriodMeasureNothingAcrossThem)
+TEST(PacerRefreshClock, RestartAndANewRefreshPeriodMeasureNothingAcrossThem)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   int64_t start = Second;
   static_cast<void>(clock.Advance(At(start), 1));
   start += 166'667;
@@ -791,9 +791,9 @@ TEST(PacerAnimationClock, RestartAndANewRefreshPeriodMeasureNothingAcrossThem)
   EXPECT_EQ(clock.Advance(At(start), 1).StepRefreshes, 1u);
 }
 
-TEST(PacerAnimationClock, TheDisplaysClockCountsRefreshesExactly)
+TEST(PacerRefreshClock, TheDisplaysClockCountsRefreshesExactly)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   EXPECT_EQ(clock.DisplayTimeAfter(0), Span(0));
   EXPECT_EQ(clock.DisplayTimeAfter(3), Span(500'000));
   int64_t start = Second;
@@ -809,9 +809,9 @@ TEST(PacerAnimationClock, TheDisplaysClockCountsRefreshesExactly)
   }
 }
 
-TEST(PacerAnimationClock, AnHourOfStepsDoesNotDrift)
+TEST(PacerRefreshClock, AnHourOfStepsDoesNotDrift)
 {
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   int64_t now = Second;
   // Every frame at swap interval 2, on time
   static_cast<void>(clock.Advance(At(now), 2));
@@ -824,12 +824,12 @@ TEST(PacerAnimationClock, AnHourOfStepsDoesNotDrift)
   EXPECT_EQ(clock.Current().Time, Span(3'600 * Second));
 }
 
-TEST(PacerAnimationClock, ADisplayOffItsNominalRateNeverHitches)
+TEST(PacerRefreshClock, ADisplayOffItsNominalRateNeverHitches)
 {
   // The display really runs 0.1 % slower than the 60 Hz the clock was given (59.94 Hz taken for 60), and every frame start is up to
   // 2 ms early or late. A timer that kept a grid of its own would slide a whole refresh against the display every 17 s and have to jump;
   // measured frame by frame, every step is one refresh, for an hour
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   Random random(20'261'002);
   static_cast<void>(clock.Advance(At(Second), 1));
   int64_t wrongSteps = 0;
@@ -842,10 +842,10 @@ TEST(PacerAnimationClock, ADisplayOffItsNominalRateNeverHitches)
   EXPECT_EQ(clock.Current().Time, Span(3'600 * Second));
 }
 
-TEST(PacerAnimationClock, TheClocksWrapIsNotAGap)
+TEST(PacerRefreshClock, TheClocksWrapIsNotAGap)
 {
   // The steady clock's ticks wrap at 2^64: frames across it are a refresh apart as anywhere
-  PC::PacerAnimationClock clock(g_hz60, Span(2 * Second));
+  PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
   const uint64_t first = std::numeric_limits<uint64_t>::max() - 400'000u;
   static_cast<void>(clock.Advance(FP::TickCount64::FromUnsignedTicks(first), 1));
   for (uint64_t frame = 1; frame <= 6; ++frame)

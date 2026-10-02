@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The pacer's animation clock of sdk/doc/pacer.md: frame starts measured on the CPU's clock, counted in whole refreshes on
+// EXPERIMENTAL. The pacer's refresh clock of sdk/doc/pacer.md: frame starts measured on the CPU's clock, counted in whole refreshes on
 // the display's.
-#include <mb/framepacing/pacer/animation/PacerAnimationClock.hpp>
+#include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <algorithm>
 
 namespace MB::FramePacing::Pacer
 {
-  PacerAnimationClock::PacerAnimationClock(const RefreshPeriod period, const TimeSpan longestGap, const TimeSpan start) noexcept
+  PacerRefreshClock::PacerRefreshClock(const RefreshPeriod period, const TimeSpan longestGap, const TimeSpan start) noexcept
     : m_period(period)
     , m_longestGap(longestGap)
     , m_animationTime(start)
@@ -16,13 +16,13 @@ namespace MB::FramePacing::Pacer
   {
   }
 
-  AnimationTime PacerAnimationClock::Advance(const TickCount64 frameStartTime, const uint32_t swapInterval) noexcept
+  AnimationTime PacerRefreshClock::Advance(const TickCount64 frameStartTime, const uint32_t swapInterval) noexcept
   {
     static_cast<void>(Measure(frameStartTime));
     return Step(swapInterval);
   }
 
-  FrameMeasurement PacerAnimationClock::Measure(const TickCount64 frameStartTime) noexcept
+  FrameMeasurement PacerRefreshClock::Measure(const TickCount64 frameStartTime) noexcept
   {
     m_measurement = FrameMeasurement{};
     if (m_hasLast)
@@ -46,7 +46,7 @@ namespace MB::FramePacing::Pacer
     return m_measurement;
   }
 
-  AnimationTime PacerAnimationClock::Step(const uint32_t swapInterval) noexcept
+  AnimationTime PacerRefreshClock::Step(const uint32_t swapInterval) noexcept
   {
     const uint32_t interval = std::max(swapInterval, 1u);
     // The previous frame's display plus this frame's swap interval. The previous frame animated for the display before it plus its own
@@ -71,19 +71,19 @@ namespace MB::FramePacing::Pacer
     return m_current;
   }
 
-  void PacerAnimationClock::SetRefreshPeriod(const RefreshPeriod period) noexcept
+  void PacerRefreshClock::SetRefreshPeriod(const RefreshPeriod period) noexcept
   {
     m_period = period;
     Restart();
   }
 
-  void PacerAnimationClock::Restart() noexcept
+  void PacerRefreshClock::Restart() noexcept
   {
     m_hasLast = false;
     m_measurement = FrameMeasurement{};
   }
 
-  TimeSpan PacerAnimationClock::DisplayTimeAfter(const uint32_t refreshes) const noexcept
+  TimeSpan PacerRefreshClock::DisplayTimeAfter(const uint32_t refreshes) const noexcept
   {
     return m_displayTime.After(refreshes, m_period).ToTimeSpan();
   }

@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The frame pacer of sdk/doc/pacer.md: the animation clock measures, the swap interval rule decides, and the frame is planned
+// EXPERIMENTAL. The frame pacer of sdk/doc/pacer.md: the refresh clock measures, the swap interval rule decides, and the frame is planned
 // from the two.
 #include <mb/framepacing/pacer/FramePacer.hpp>
-#include <mb/framepacing/pacer/animation/AnimationTime.hpp>
-#include <mb/framepacing/pacer/animation/FrameMeasurement.hpp>
+#include <mb/framepacing/pacer/clock/AnimationTime.hpp>
+#include <mb/framepacing/pacer/clock/FrameMeasurement.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <limits>
 
