@@ -158,9 +158,10 @@ namespace MB::FramePacing::Pacer
 
   bool SwapIntervalRule::IsFull() const noexcept
   {
-    // More than FrameWindowLength from its oldest frame to its newest. A window that holds all the frames it can is full too: after a change
-    // to a much faster display it is too small for FrameWindowLength of frames, and would otherwise never decide
-    return m_count > 0 && (m_count == m_entries.size() || At(m_count - 1u).DisplayTime > Sum(At(0).DisplayTime, m_settings.FrameWindowLength()));
+    // Called with a frame in the window. More than FrameWindowLength from its oldest frame to its newest; a window that holds all the
+    // frames it can is full too: after a change to a much faster display it is too small for FrameWindowLength of frames, and would
+    // otherwise never decide
+    return m_count == m_entries.size() || At(m_count - 1u).DisplayTime > Sum(At(0).DisplayTime, m_settings.FrameWindowLength());
   }
 
   void SwapIntervalRule::PopFront() noexcept
