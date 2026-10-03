@@ -47,7 +47,7 @@ class Result:
 
 def run(fps: float, refresh: float) -> Result:
     command = ["dotnet", "run", "-c", "Release", "--no-build", "--project", str(PROJECT), "--"]
-    command += ["selftest", "--camera", "--fps", f"{fps:g}", "--refresh", f"{refresh:g}"]
+    command += ["selftest", "--experimental", "--camera", "--fps", f"{fps:g}", "--refresh", f"{refresh:g}"]
     output = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
     match = ERROR_LINE.search(output)
     passed = "PASS (camera" in re.sub(r"\s+", " ", output)

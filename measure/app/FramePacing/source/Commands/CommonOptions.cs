@@ -8,7 +8,9 @@
 //****************************************************************************************************************************************************
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using MB.FramePacing.Capture;
+using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
 {
@@ -22,6 +24,57 @@ namespace MB.FramePacing.App.Commands
     };
 
     public static FramePacingConfig LoadConfig(ParseResult parseResult) => FramePacingConfig.Load(parseResult.GetValue(Config));
+
+    /// <summary>
+    /// Global (recursive) option: show and allow the experimental parts, live capture (capture, locate, devices, a stream URL for import)
+    /// and camera capture (camera-rig, --camera, --recorded-fps, selftest --camera). Without it they are left out of --help and refused,
+    /// as the GUI hides them unless its experimental features are on.
+    /// </summary>
+    public static readonly Option<bool> Experimental = new Option<bool>("--experimental")
+    {
+      Description =
+        "Show and allow the experimental parts: live capture (capture, locate, devices, a stream URL for import) and camera capture "
+        + "(camera-rig, --camera, --recorded-fps, selftest --camera).",
+      Recursive = true,
+    };
+
+    /// <summary>Whether the command line has --experimental: read before the commands are made, so that --help shows what it allows.</summary>
+    public static bool ExperimentalRequested { get; set; }
+
+    /// <summary>What a live capture prints first.</summary>
+    public const string LiveCaptureNotice =
+      "Live capture is EXPERIMENTAL. The suggested way to measure is a recording of the capture card (OBS) imported with 'import' "
+      + "(measure/doc/usage.md). On some platforms, macOS among them, live capture is probably too slow to be usable "
+      + "(measure/doc/live-capture.md).";
+
+    public static void PrintLiveCaptureWarning() => AnsiConsole.MarkupLineInterpolated($"[yellow]WARNING:[/] {LiveCaptureNotice}");
+
+    /// <summary>An experimental command and its subcommands: hidden from --help, and refused, without --experimental.</summary>
+    public static Command ExperimentalCommand(Command command, string what)
+    {
+      command.Hidden = !ExperimentalRequested;
+      command.Validators.Add(result =>
+      {
+        if (!result.GetValue(Experimental))
+          result.AddError($"{what} is experimental: add --experimental.");
+      });
+      foreach (var subcommand in command.Subcommands)
+        ExperimentalCommand(subcommand, what);
+      return command;
+    }
+
+    /// <summary>An experimental option: hidden from --help, and refused when it is given without --experimental.</summary>
+    public static T ExperimentalOption<T>(T option, string what)
+      where T : Option
+    {
+      option.Hidden = !ExperimentalRequested;
+      option.Validators.Add(result =>
+      {
+        if (!result.Implicit && !result.GetValue(Experimental))
+          result.AddError($"{what} is experimental: add --experimental.");
+      });
+      return option;
+    }
 
     public static Option<string?> Ffmpeg() =>
       new Option<string?>("--ffmpeg")

@@ -20,7 +20,7 @@ namespace MB.FramePacing.App.Commands
     {
       var ffmpegOption = CommonOptions.Ffmpeg();
       var modesOption = new Option<bool>("--modes", "-m") { Description = "Also list each device's modes (DirectShow and v4l2)." };
-      var command = new Command("devices", "List the capture devices ffmpeg can see.") { ffmpegOption, modesOption };
+      var command = new Command("devices", "(EXPERIMENTAL, live capture) List the capture devices ffmpeg can see.") { ffmpegOption, modesOption };
       command.SetAction(parseResult =>
       {
         try

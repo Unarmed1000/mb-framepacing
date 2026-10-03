@@ -44,21 +44,27 @@ namespace MB.FramePacing.App.Commands
 
     /// <summary>--camera for 'capture' and 'import'.</summary>
     public static Option<string?> CameraOption() =>
-      new Option<string?>("--camera")
-      {
-        Description =
-          $"({Experimental}) A saved camera name or a rig file ('camera-rig calibrate'): verify the camera did not move, then store only the "
-          + "rectified marker zones.",
-      };
+      CommonOptions.ExperimentalOption(
+        new Option<string?>("--camera")
+        {
+          Description =
+            $"({Experimental}) A saved camera name or a rig file ('camera-rig calibrate'): verify the camera did not move, then store only the "
+            + "rectified marker zones.",
+        },
+        "Camera capture"
+      );
 
     /// <summary>--recorded-fps for video files.</summary>
     public static Option<double?> RecordedFpsOption() =>
-      new Option<double?>("--recorded-fps")
-      {
-        Description =
-          "Video files: the rate the clip was really recorded at (high speed camera clips are often stored at a slower playback rate). "
-          + "Frame n is timed at n / rate; the file's timestamps are ignored.",
-      };
+      CommonOptions.ExperimentalOption(
+        new Option<double?>("--recorded-fps")
+        {
+          Description =
+            "Video files: the rate the clip was really recorded at (high speed camera clips are often stored at a slower playback rate). "
+            + "Frame n is timed at n / rate; the file's timestamps are ignored.",
+        },
+        "Camera capture (--recorded-fps)"
+      );
 
     public static void PrintExperimentalWarning() => AnsiConsole.MarkupLineInterpolated($"[yellow]WARNING:[/] {CameraRig.ExperimentalNotice}");
 

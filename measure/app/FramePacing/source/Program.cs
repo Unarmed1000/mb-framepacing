@@ -36,15 +36,16 @@ namespace MB.FramePacing.App
       // -v .. -vvvv selects the log level; it is handled here and stripped before parsing
       int verbosity = args.Where(IsVerbosityToken).Select(a => a.Length - 1).DefaultIfEmpty(0).Max();
       ConfigureLogging(verbosity);
+      CommonOptions.ExperimentalRequested = args.Contains(CommonOptions.Experimental.Name);
 
       var root = new RootCommand(
         $"mb-framepacing {VersionString} - capture a game's display output and measure animation error from in-frame markers"
       )
       {
-        DevicesCommand.Create(),
-        CaptureCommand.Create(),
-        LocateCommand.Create(),
-        CameraRigCommand.Create(),
+        CommonOptions.ExperimentalCommand(DevicesCommand.Create(), "Live capture ('devices')"),
+        CommonOptions.ExperimentalCommand(CaptureCommand.Create(), "Live capture ('capture')"),
+        CommonOptions.ExperimentalCommand(LocateCommand.Create(), "Live capture ('locate')"),
+        CommonOptions.ExperimentalCommand(CameraRigCommand.Create(), "Camera capture ('camera-rig')"),
         ImportCommand.Create(),
         AnalyzeCommand.Create(),
         RenderCommand.Create(),
@@ -54,6 +55,7 @@ namespace MB.FramePacing.App
         NameCommand.Create(),
       };
       root.Options.Add(CommonOptions.Config);
+      root.Options.Add(CommonOptions.Experimental);
       root.Options.Add(new Option<bool>("-v") { Description = "Verbose logging, repeat for more detail (-vv, -vvv, -vvvv)." });
 
       try

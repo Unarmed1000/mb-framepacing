@@ -38,7 +38,10 @@ namespace MB.FramePacing.App.Commands
       };
       var ffmpegOption = CommonOptions.Ffmpeg();
 
-      var command = new Command("locate", "Find the marker and print the region a fast capture stores ('capture --roi auto' does this itself).")
+      var command = new Command(
+        "locate",
+        "(EXPERIMENTAL, live capture) Find the marker and print the region a fast capture stores ('capture --roi auto' does this itself)."
+      )
       {
         deviceOption,
         modeOption,
@@ -51,6 +54,7 @@ namespace MB.FramePacing.App.Commands
         {
           try
           {
+            CommonOptions.PrintLiveCaptureWarning();
             var config = CommonOptions.LoadConfig(parseResult);
             var modeText = parseResult.GetValue(modeOption);
             var options = new FfmpegCaptureOptions

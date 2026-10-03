@@ -72,7 +72,8 @@ namespace MB.FramePacing.App.Commands
 
       var command = new Command(
         "capture",
-        "Record a capture device: every frame's decoded markers and timestamps (and the frames with --keep-frames)."
+        "(EXPERIMENTAL) Record a capture device live: every frame's decoded markers and timestamps (and the frames with --keep-frames). "
+          + "The suggested way is a recording of the card, imported with 'import'."
       )
       {
         keepFramesOption,
@@ -101,6 +102,7 @@ namespace MB.FramePacing.App.Commands
         {
           try
           {
+            CommonOptions.PrintLiveCaptureWarning();
             var config = CommonOptions.LoadConfig(parseResult);
             var ffmpeg = FfmpegLocator.Find(parseResult.GetValue(ffmpegOption), config);
             var scaleText = parseResult.GetValue(scaleOption);

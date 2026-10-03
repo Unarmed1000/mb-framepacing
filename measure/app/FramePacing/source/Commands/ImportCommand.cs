@@ -56,7 +56,10 @@ namespace MB.FramePacing.App.Commands
       var cameraOption = CameraRigCommand.CameraOption();
       var recordedFpsOption = CameraRigCommand.RecordedFpsOption();
 
-      var command = new Command("import", "Read a video file, an image sequence or a stream instead of a capture card.")
+      var command = new Command(
+        "import",
+        "Read a recording: a video file (such as an OBS recording of a capture card) or an image sequence; a stream URL with --experimental."
+      )
       {
         keepFramesOption,
         cameraOption,
@@ -86,6 +89,13 @@ namespace MB.FramePacing.App.Commands
             var config = CommonOptions.LoadConfig(parseResult);
             var ffmpeg = FfmpegLocator.Find(parseResult.GetValue(ffmpegOption), config);
             var input = parseResult.GetValue(inputArgument)!;
+            // Not a file or a folder: a stream URL, which is live capture
+            if (!File.Exists(input) && !Directory.Exists(input) && input.Contains("://", StringComparison.Ordinal))
+            {
+              if (!parseResult.GetValue(CommonOptions.Experimental))
+                throw new ArgumentException("A stream URL is live capture, which is experimental: add --experimental.");
+              CommonOptions.PrintLiveCaptureWarning();
+            }
             var output = Path.GetFullPath(parseResult.GetValue(outputOption) ?? DefaultOutputDirectory(config));
             var scaleText = parseResult.GetValue(scaleOption);
             var roiText = parseResult.GetValue(roiOption);

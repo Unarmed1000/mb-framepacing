@@ -37,10 +37,13 @@ namespace MB.FramePacing.App.Commands
         Description = "Capture rate. A capture card captures at the display's refresh rate, so this is also the simulated display's rate.",
         DefaultValueFactory = _ => 500,
       };
-      var refreshOption = new Option<double?>("--refresh")
-      {
-        Description = $"--camera: the simulated display's refresh rate (Hz, default {CameraRefreshHz:0}); the camera films faster than it.",
-      };
+      var refreshOption = CommonOptions.ExperimentalOption(
+        new Option<double?>("--refresh")
+        {
+          Description = $"--camera: the simulated display's refresh rate (Hz, default {CameraRefreshHz:0}); the camera films faster than it.",
+        },
+        "Camera capture (selftest --refresh)"
+      );
       var secondsOption = new Option<double>("--seconds") { Description = "Length of the measured run.", DefaultValueFactory = _ => 5 };
       var sizeOption = new Option<string>("--size") { Description = "Stored frame size.", DefaultValueFactory = _ => "960x540" };
       var stallOption = new Option<int>("--stall-every")
@@ -58,17 +61,20 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "Keep the capture in this directory (default: a temporary directory that is deleted).",
       };
-      var cameraOption = new Option<bool>("--camera")
-      {
-        Description =
-          $"({CameraRigCommand.Experimental}) Film the synthetic game with a simulated high speed camera (perspective, rolling scanout, panel "
-          + "response, blur, noise) and run the camera pipeline: rig calibration, rectified zones, camera analysis. Try --fps 1000 --refresh 60.",
-      };
+      var cameraOption = CommonOptions.ExperimentalOption(
+        new Option<bool>("--camera")
+        {
+          Description =
+            $"({CameraRigCommand.Experimental}) Film the synthetic game with a simulated high speed camera (perspective, rolling scanout, panel "
+            + "response, blur, noise) and run the camera pipeline: rig calibration, rectified zones, camera analysis. Try --fps 1000 --refresh 60.",
+        },
+        "Camera capture (selftest --camera)"
+      );
       var keepFramesOption = CommonOptions.KeepFrames();
-      var tearOption = new Option<int>("--tear-every")
-      {
-        Description = "--camera: every n-th frame is presented mid-scanout (vsync off; 0 = never).",
-      };
+      var tearOption = CommonOptions.ExperimentalOption(
+        new Option<int>("--tear-every") { Description = "--camera: every n-th frame is presented mid-scanout (vsync off; 0 = never)." },
+        "Camera capture (selftest --tear-every)"
+      );
 
       var command = new Command("selftest", "Capture and analyse a synthetic game to verify the whole pipeline on this machine.")
       {
