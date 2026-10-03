@@ -26,6 +26,7 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_frameMargin{TimeSpan::TicksPerMillisecond};
     bool m_frameMarginSet{false};
     TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
+    bool m_usePresentFeedback{false};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
@@ -143,6 +144,19 @@ namespace MB::FramePacing::Pacer
     }
 
     void SetSlowestFrameTime(TimeSpan frameTime) noexcept;
+
+    //! Measure the frames by the display times the application reports (FramePacer::AddPresentFeedback), not by their starts: for a
+    //! platform with present feedback, on a display with a fixed refresh rate. false, the default: by their starts, which needs
+    //! nothing from the platform. While it is on and no feedback comes, no frame counts as late.
+    [[nodiscard]] bool UsePresentFeedback() const noexcept
+    {
+      return m_usePresentFeedback;
+    }
+
+    void SetUsePresentFeedback(const bool usePresentFeedback) noexcept
+    {
+      m_usePresentFeedback = usePresentFeedback;
+    }
 
     constexpr bool operator==(const PacerSettings&) const noexcept = default;
   };

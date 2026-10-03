@@ -13,7 +13,7 @@ The repository has two parts, and the license follows them (see Conventions):
   - **pacer** (C++ `MB::FramePacing::Pacer` only; **experimental**, off by default): paces a frame loop with nothing but a steady clock
     and vsync: frame starts measured on the CPU's clock and counted in whole refreshes on the display's (`PacerRefreshClock`), a
     target frame rate, and the adaptive swap interval rule (the full-window rule of mb-framepacing-explained's simulation, and its fix
-    as the default);
+    as the default); optionally the frames are measured by the display times the platform reports (present feedback) instead;
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
     language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
@@ -51,7 +51,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, the data formats, the pacer guide, encoding performance |
 | `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                       |
 | `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
-| `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames from test clips and every scenario's result (`pacer-sim --golden`)       |
+| `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames, every scenario's result (`pacer-sim --golden`), a real present log      |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
@@ -242,8 +242,24 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     intended display time the frame's start plus that step. A gap longer than the frame window (or two frames), or a frame before
     the previous one, starts again. The pacer keeps **no grid of refreshes of its own**: one that runs on the CPU's clock slides
     against the display and double-steps (why the earlier design went).
-  - **Nothing a platform may not have:** vsync times, predicted display times, presentation feedback, scheduled presents, a
+  - **Nothing a platform may not have:** vsync times, predicted display times, scheduled presents, a
     measured refresh period, VRR are the guide's "Not used yet" and `doc/roadmap.md`. Agree with the user before adding one.
+  - **Present feedback is the one optional input** (agreed with the user; `PacerSettings::UsePresentFeedback`, off by default, and
+    without it the pacer and its golden data are unchanged): the application gives each frame's measured display time back by its
+    `FrameSchedule::FrameId` (`AddPresentFeedback(PresentFeedback)`, a few frames later), and the frames are measured by those
+    (`FramesInFlight`, `pacer/frame/`: a ring of 64 frames, no allocation) and not by their starts. Why: a swap chain that queues
+    presents starts frames up to 3 ms off the display's refreshes (the first integration's Vulkan logs at 240 Hz), which the
+    refresh clock's rounding reads as late frames.
+    - Late = more whole refreshes between two display times than the swap intervals between them; a late frame is caught up when
+      its feedback comes (`PacerRefreshClock::MeasureLate`); a frame without feedback counts as on time, also when it leaves the
+      ring. Refused (`FeedbackState()` counts it): before the frame's present, not a whole number of refreshes (within an eighth)
+      after the display time used before it, a frame not kept. Two refused in a row that agree start the count again.
+    - `IntendedDisplayTime` is then the newest display time plus the swap intervals since (0 = unknown while there is none);
+      `NextFrameStartTime` (the frame's start plus its swap interval, the old value) is what a loop that sleeps holds to.
+    - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works): with G-SYNC on the display
+      times are on no grid and are refused. Those logs come from a G-SYNC display: ask for its state before reading a new one.
+    - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off; not written by `pacer-sim`):
+      the tests pace it both ways and pin the counts (214 frames late by their starts, 2 by their display times).
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
     `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.

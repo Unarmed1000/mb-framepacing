@@ -15,6 +15,9 @@ namespace MB::FramePacing::Pacer
   //! hold it for, the time to render it for, and the marker's pacing fields.
   struct FrameSchedule
   {
+    //! The frame's id: the pacer's own count of the frames it began, from 1. The application gives it back with the frame's present
+    //! feedback (PresentFeedback), where its platform has any.
+    uint64_t FrameId{0};
     //! Refreshes from the previous frame's display to this one's: DXGI's SyncInterval, eglSwapInterval, QualitySettings.vSyncCount.
     uint32_t SwapInterval{1};
     //! The animation time: the frame's predicted display time on the display's clock. Render the frame for it; it is the marker's
@@ -22,9 +25,16 @@ namespace MB::FramePacing::Pacer
     TimeSpan AnimationTime;
     //! The step from the previous frame's animation time: the frame's delta time.
     TimeSpan AnimationStep;
-    //! When the pacer aims for this frame to be shown, on the application's steady clock: the frame's start plus its swap interval, as
-    //! the frame starts when the previous one is shown. The marker's intended display time.
+    //! When the pacer aims for this frame to be shown, on the application's steady clock: the marker's intended display time. Measured
+    //! by the frame starts it is the frame's start plus its swap interval (NextFrameStartTime), as the frame starts when the previous
+    //! one is shown. With present feedback it is the newest display time the platform reported plus the swap intervals of the frames
+    //! since, this one included: the refresh the frame reaches when none of them is late, however many presents are queued. Unknown
+    //! (TickCount64(), the marker's 0) while there is no display time to count from.
     TickCount64 IntendedDisplayTime;
+    //! The frame's start plus its swap interval, on the application's steady clock: what a loop that paces by sleeping holds to
+    //! (present no earlier than one refresh before it, start the next frame no earlier than it). Not a display time: with presents
+    //! queued the frame is shown later.
+    TickCount64 NextFrameStartTime;
     //! The marker's target frame time: SwapInterval refreshes, rounded to a tick.
     TimeSpan32 TargetFrameTime;
     //! The marker's preferred frame time: the preferred swap interval's refreshes (PacerSettings::PreferredSwapIntervalAt).

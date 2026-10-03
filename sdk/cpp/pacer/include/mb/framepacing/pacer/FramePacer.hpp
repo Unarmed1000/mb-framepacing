@@ -10,7 +10,11 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/frame/FramesInFlight.hpp>
+#include <mb/framepacing/pacer/frame/PresentFeedback.hpp>
+#include <mb/framepacing/pacer/frame/PresentFeedbackState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
+#include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
 #include <cstdint>
 
@@ -24,12 +28,20 @@ namespace MB::FramePacing::Pacer
   //! refreshes on the display's (PacerRefreshClock), and adapts the swap interval to how the frames do (SwapIntervalRule), from the frame
   //! rate the application prefers down.
   //!
+  //! Optional, where the platform has present feedback and the display a fixed refresh rate (PacerSettings::UsePresentFeedback): the
+  //! application gives each frame's measured display time back (AddPresentFeedback), a few frames after the frame, and the frames are
+  //! measured by those and not by their starts (FramesInFlight). A swap chain that queues presents starts a frame before the previous
+  //! one is shown, so there the frame starts say little about the display.
+  //!
   //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); pacing
   //! frames never allocates, and only SetSettings with settings that need a larger window does.
   class FramePacer
   {
     SwapIntervalRule m_rule;
     PacerRefreshClock m_clock;
+    FramesInFlight m_inFlight;
+    // With present feedback: the first frame the rule counts, the one its last change was for
+    uint64_t m_firstRuleFrameId{0};
     // The frame between BeginFrame and the next BeginFrame
     TickCount64 m_cpuStartTime;
     TimeSpan m_work;
@@ -50,6 +62,12 @@ namespace MB::FramePacing::Pacer
     //! frame. Returns the CPU busy time (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
     TimeSpan32 EndFrame(TickCount64 presentTime, TimeSpan work = {}) noexcept;
 
+    //! What the platform measured for an earlier frame (its FrameSchedule::FrameId): any number of calls between two BeginFrames,
+    //! oldest frame first; the next BeginFrame plans with it. Nothing while PacerSettings::UsePresentFeedback is off. A late frame is
+    //! caught up when its feedback comes, a few frames after it; feedback that can not be a refresh of the display is refused
+    //! (FeedbackState counts it), and a frame without any counts as on time. Never allocates.
+    void AddPresentFeedback(const PresentFeedback& feedback) noexcept;
+
     //! The display's refresh period changed (a mode change, another monitor): the pacer starts again on it, with an empty window, at the
     //! swap interval the application prefers there. The animation time goes on. The period the pacer has already changes nothing.
     void SetRefreshPeriod(RefreshPeriod period) noexcept;
@@ -69,6 +87,12 @@ namespace MB::FramePacing::Pacer
       return m_rule.FrameWindow();
     }
 
+    //! What became of the present feedback given so far.
+    [[nodiscard]] PresentFeedbackState FeedbackState() const noexcept
+    {
+      return m_inFlight.State();
+    }
+
     //! The swap interval the next frame is paced at.
     [[nodiscard]] uint32_t SwapInterval() const noexcept
     {
@@ -86,6 +110,9 @@ namespace MB::FramePacing::Pacer
     {
       return m_rule.Settings();
     }
+
+  private:
+    SwapIntervalChange AddMeasuredFrames() noexcept;
   };
 }
 

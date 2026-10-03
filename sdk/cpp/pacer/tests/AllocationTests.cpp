@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The pacer runs every frame, so pacing must never allocate after the pacer is made. This test binary links the counting global
-// operator new/delete (mb_framepacing_test_support) and checks that every per-frame call stays at zero allocations; only SetSettings
-// with settings that need a larger frame window may allocate.
+// operator new/delete (mb_framepacing_test_support) and checks that every per-frame call stays at zero allocations, with present
+// feedback too; only SetSettings with settings that need a larger frame window may allocate.
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
@@ -11,6 +11,7 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/frame/PresentFeedback.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <mb/framepacing/testing/AllocationCounter.hpp>
 #include <gtest/gtest.h>
@@ -43,6 +44,13 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       copy.SetSlowDown(PC::SlowDownRule::FullWindow);
       return copy;
     }());
+  PC::FramePacer feedbackPacer(
+    [&settings]
+    {
+      PC::PacerSettings copy = settings;
+      copy.SetUsePresentFeedback(true);
+      return copy;
+    }());
   PC::PacerRefreshClock clock(settings.Refresh(), settings.FrameWindowLength());
 
   int64_t written = 0;
@@ -60,6 +68,16 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       written += static_cast<int64_t>(fullWindowPacer.EndFrame(FP::TickCount64(now + work)).Ticks());
       written += clock.Advance(FP::TickCount64(now), schedule.SwapInterval).Step.Ticks() + (clock.DisplayTimeAfter(1).Ticks() % 3);
       written += static_cast<int64_t>(pacer.FrameWindow().Frames) + (other.IntendedDisplayTime.Ticks() % 7);
+      // Present feedback three frames after each frame: on time, late, off the grid, not shown, and none at all
+      const PC::FrameSchedule measured = feedbackPacer.BeginFrame(FP::TickCount64(now));
+      written += static_cast<int64_t>(feedbackPacer.EndFrame(FP::TickCount64(now + work)).Ticks()) + (measured.IntendedDisplayTime.Ticks() % 5);
+      if (measured.FrameId > 3u && frame % 7 != 0)
+      {
+        const FP::TickCount64 shown(now + (frame % 11 == 0 ? 250'000 : 0) + (frame % 13 == 0 ? 70'000 : 0));
+        feedbackPacer.AddPresentFeedback(frame % 17 == 0 ? PC::PresentFeedback::NotShown(measured.FrameId - 3u)
+                                                         : PC::PresentFeedback::Shown(measured.FrameId - 3u, shown));
+      }
+      written += static_cast<int64_t>(feedbackPacer.FeedbackState().Used);
       if (frame % 2'500 == 1'250)
       {
         clock.Restart();

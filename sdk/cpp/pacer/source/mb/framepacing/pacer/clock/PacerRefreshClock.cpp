@@ -24,16 +24,28 @@ namespace MB::FramePacing::Pacer
 
   FrameMeasurement PacerRefreshClock::Measure(const TickCount64 frameStartTime) noexcept
   {
+    return Measure(frameStartTime, true, 0);
+  }
+
+  FrameMeasurement PacerRefreshClock::MeasureLate(const TickCount64 frameStartTime, const uint32_t lateRefreshes) noexcept
+  {
+    return Measure(frameStartTime, false, lateRefreshes);
+  }
+
+  FrameMeasurement PacerRefreshClock::Measure(const TickCount64 frameStartTime, const bool fromStarts, const uint32_t lateRefreshes) noexcept
+  {
     m_measurement = FrameMeasurement{};
     if (m_hasLast)
     {
       // The frame starts when the previous one is shown, so the time between two starts is the refreshes between two displays: the
-      // previous frame was aimed its swap interval after the frame before it, and can not have been shown sooner
+      // previous frame was aimed its swap interval after the frame before it, and can not have been shown sooner. Where the display
+      // was measured, the refreshes are the swap interval and what the frames measured were late by
       const TimeSpan gap = frameStartTime - m_lastStartTime;
       const TimeSpan reach = std::max(m_longestGap, m_period.TimeFor(int64_t{2} * m_lastSwapInterval));
       if (gap >= TimeSpan() && gap <= reach)
       {
-        const auto refreshes = static_cast<uint32_t>(std::max(m_period.NearestRefreshes(gap), int64_t{m_lastSwapInterval}));
+        const auto refreshes = fromStarts ? static_cast<uint32_t>(std::max(m_period.NearestRefreshes(gap), int64_t{m_lastSwapInterval}))
+                                          : m_lastSwapInterval + lateRefreshes;
         m_displayTime.Add(refreshes, m_period);
         m_measurement.Restarted = false;
         m_measurement.Refreshes = refreshes;
