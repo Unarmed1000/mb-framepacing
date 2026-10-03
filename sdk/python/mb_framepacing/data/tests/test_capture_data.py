@@ -29,6 +29,8 @@ def header_bytes(version: int = 1, markers: int = 1) -> bytearray:
     struct.pack_into("<I", data, 64, markers)
     for i in range(markers):
         struct.pack_into("<iiiid", data, 72 + (24 * i), 40, 32 + i, 147, 147, 3.0)
+    # The sync marker's region, after the marker locations
+    struct.pack_into("<iiii", data, 168, 14, 820, 240, 246)
     return data
 
 
@@ -45,6 +47,7 @@ class CaptureDataTests(unittest.TestCase):
         header = CaptureDataHeader.parse(bytes(header_bytes(markers=2)))
         self.assertEqual((header.width, header.height, header.frame_rate_numerator, header.frame_rate_denominator), (960, 540, 60000, 1001))
         self.assertEqual((header.source_width, header.source_height, header.region), (1920, 1080, Rectangle(8, 16, 960, 540)))
+        self.assertEqual(header.sync_region, Rectangle(14, 820, 240, 246))
         self.assertEqual([m.bounds.y for m in header.markers], [32, 33])
         self.assertTrue(header.frames_stored and header.camera)
 

@@ -13,10 +13,13 @@ namespace MB::FramePacing::Data
   {
     constexpr std::size_t OffsetMarkers = 72;
     constexpr std::size_t MarkerSize = 24;
+    constexpr std::size_t OffsetSyncRegion = 168;
     constexpr uint32_t FramesStoredFlag = 1u;
     constexpr uint32_t CameraFlag = 2u;
 
     static_assert(OffsetMarkers + (CaptureDataFormat::MaxMarkerLocations * MarkerSize) <= CaptureDataFormat::HeaderSize);
+    static_assert(OffsetMarkers + (CaptureDataFormat::MaxMarkerLocations * MarkerSize) <= OffsetSyncRegion);
+    static_assert(OffsetSyncRegion + 16 <= CaptureDataFormat::HeaderSize);
 
     Rectangle ReadRect(const std::span<const uint8_t> bytes, const std::size_t offset) noexcept
     {
@@ -68,6 +71,7 @@ namespace MB::FramePacing::Data
     }
     header.FramesStored = (flags & FramesStoredFlag) != 0u;
     header.Camera = (flags & CameraFlag) != 0u;
+    header.SyncRegion = ReadRect(bytes, OffsetSyncRegion);
     return header;
   }
 }

@@ -30,6 +30,20 @@ namespace MB.FramePacing.Capture.UnitTest
     }
 
     [Test]
+    public void Header_SizeText_NamesTheSourceWhenLessOfItWasStored()
+    {
+      var rate = FrameRate.FromFps(60);
+      // Only the markers' regions of a 1080p recording, a downscale, and frames stored as they are or of an unknown source
+      Assert.That(
+        new CaptureFileHeader(165, 282, rate, 1920, 1080, new PixelRect(14, 14, 330, 330)).SizeText,
+        Is.EqualTo("1920x1080 source, 165x282 stored")
+      );
+      Assert.That(new CaptureFileHeader(960, 540, rate, 1920, 1080).SizeText, Is.EqualTo("1920x1080 source, 960x540 stored"));
+      Assert.That(new CaptureFileHeader(1920, 1080, rate, 1920, 1080).SizeText, Is.EqualTo("1920x1080"));
+      Assert.That(new CaptureFileHeader(640, 360, rate).SizeText, Is.EqualTo("640x360"));
+    }
+
+    [Test]
     public void Header_RejectsForeignFiles()
     {
       Assert.Throws<InvalidDataException>(() => CaptureFileHeader.Read(new byte[CaptureFileHeader.HeaderSize]));

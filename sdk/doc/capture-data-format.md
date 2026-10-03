@@ -30,11 +30,17 @@ write through it.
 | 64     | 4    | Marker lock count (`u32`, at most 4; 0 = no marker was found)                                                                      |
 | 68     | 4    | Reserved (0)                                                                                                                       |
 | 72     | 96   | Up to 4 locks of 24 bytes: bounds x, y, width, height (`i32` each, stored pixels, the quiet zone included) and module size (`f64`) |
-| 168    | 88   | Reserved (0)                                                                                                                       |
+| 168    | 16   | Second region of the source, stored below the first: x, y, width, height (`i32` each; all 0 = none)                                |
+| 184    | 72   | Reserved (0)                                                                                                                       |
 
 The first lock is the main marker (frame, start and end markers); a second one is the sync marker (the tearing check) or, for a
 camera capture, the second zone. The locks are where the capture's decoder found the markers; the header is completed when the
 capture ends.
+
+A capture that stores only the markers (`import`'s default for a recording, `--roi auto`) crops the main marker's region and, when
+the source has a sync marker, the sync marker's too, and stores the two as one frame: the first region on top, the second below
+it, both downscaled alike, the narrower one padded with white on its right. The locks are in that stored frame. Without a sync
+marker, and with a region given as a rectangle, there is one region and the second is all 0.
 
 ## Records (192 bytes each)
 

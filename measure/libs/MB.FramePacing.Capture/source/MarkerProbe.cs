@@ -24,39 +24,54 @@ namespace MB.FramePacing.Capture
 
     /// <summary>
     /// Read frames from <paramref name="source"/> until the marker was found <see cref="RequiredHits"/> times at the same position, the
-    /// timeout passed or the source ended. Returns the frame marker lock in the source's frame coordinates.
+    /// timeout passed or the source ended. Returns the main marker's lock in the source's frame coordinates, and the sync marker's when the
+    /// frames with the main marker show one.
     /// </summary>
+    /// <param name="timeout">How long to look; null reads the source to its end (a recording: its marker may come late).</param>
     /// <param name="decodeInterval">Minimum host time between two decodes; the frames in between are only read. Zero decodes every frame
     /// (for sources that wait, like files).</param>
-    public static MarkerLock Locate(ICaptureSource source, TimeSpan timeout, TimeSpan decodeInterval, CancellationToken cancellationToken)
+    public static MarkerProbeResult Locate(ICaptureSource source, TimeSpan? timeout, TimeSpan decodeInterval, CancellationToken cancellationToken)
     {
       ArgumentNullException.ThrowIfNull(source);
       using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-      stop.CancelAfter(timeout);
+      if (timeout is { } limit)
+        stop.CancelAfter(limit);
       var sink = new Sink(source.Format.Width, source.Format.Height, decodeInterval, stop);
       source.Run(sink, new CaptureClock(), stop.Token);
       cancellationToken.ThrowIfCancellationRequested();
 
       if (sink.Moved is { } moved)
-        throw new InvalidOperationException(
+        throw new MarkerRegionException(
           $"The marker moved between frames ({sink.Hits[0].Bounds} and {moved.Bounds}). "
             + "Only storing the marker region needs the marker at a fixed position; capture the whole frame instead."
         );
       if (sink.Hits.Count == 0)
-        throw new TimeoutException(
-          $"No marker was found in {sink.FramesSeen} frames ({timeout.TotalSeconds:0.#} s). Check that the application is running and draws the "
-            + "marker (see sdk/doc/marker-format.md 'Sizing')."
+      {
+        if (timeout is { } waited)
+          throw new TimeoutException(
+            $"No marker was found in {sink.FramesSeen} frames ({waited.TotalSeconds:0.#} s). Check that the application is running and draws the "
+              + "marker (see sdk/doc/marker-format.md 'Sizing')."
+          );
+        throw new MarkerNotFoundException(
+          $"No marker was found in {sink.FramesSeen} frames: the recording does not show the marker. Check that it is a recording of the "
+            + "application with the marker drawn (see sdk/doc/marker-format.md 'Sizing')."
         );
-      return new MarkerLock(
-        new PixelRect(
-          Median(sink.Hits.Select(h => h.Bounds.X)),
-          Median(sink.Hits.Select(h => h.Bounds.Y)),
-          Median(sink.Hits.Select(h => h.Bounds.Width)),
-          Median(sink.Hits.Select(h => h.Bounds.Height))
-        ),
-        sink.Hits.Select(h => h.ModuleSizePx).OrderBy(m => m).ElementAt(sink.Hits.Count / 2)
-      );
+      }
+      // The sync marker counts when most of the frames with the main marker showed it, at one position
+      var syncHits = sink.SyncHits.Where(h => Agrees(sink.SyncHits[0], h)).ToList();
+      return new MarkerProbeResult(MedianLock(sink.Hits), syncHits.Count * 2 > sink.Hits.Count ? MedianLock(syncHits) : null);
     }
+
+    private static MarkerLock MedianLock(IReadOnlyList<MarkerLock> hits) =>
+      new MarkerLock(
+        new PixelRect(
+          Median(hits.Select(h => h.Bounds.X)),
+          Median(hits.Select(h => h.Bounds.Y)),
+          Median(hits.Select(h => h.Bounds.Width)),
+          Median(hits.Select(h => h.Bounds.Height))
+        ),
+        hits.Select(h => h.ModuleSizePx).OrderBy(m => m).ElementAt(hits.Count / 2)
+      );
 
     private static int Median(IEnumerable<int> values)
     {
@@ -90,6 +105,9 @@ namespace MB.FramePacing.Capture
 
       public List<MarkerLock> Hits { get; } = new List<MarkerLock>();
 
+      /// <summary>The sync marker, in the frames that are hits and show one.</summary>
+      public List<MarkerLock> SyncHits { get; } = new List<MarkerLock>();
+
       public MarkerLock? Moved { get; private set; }
 
       public long FramesSeen { get; private set; }
@@ -114,6 +132,15 @@ namespace MB.FramePacing.Capture
           return;
         }
         Hits.Add(hit);
+        // The same frame again for its other marker: a sync marker's region is stored too, so the tearing check stays
+        foreach (var other in m_decoder.DecodeAll(m_frame))
+        {
+          if (other.IsDecoded && other.ModuleSizePx > 0 && other.Payload.Kind == MarkerKind.Sync)
+          {
+            SyncHits.Add(SequenceMonitor.LockFor(other));
+            break;
+          }
+        }
         if (Hits.Count >= RequiredHits)
           m_stop.Cancel();
       }

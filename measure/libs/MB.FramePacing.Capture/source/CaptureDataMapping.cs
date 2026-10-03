@@ -17,8 +17,17 @@ namespace MB.FramePacing.Capture
 {
   public static class CaptureDataMapping
   {
-    /// <summary>The captures.mbcd header of frames with <paramref name="frames"/>'s header and markers at <paramref name="locks"/>.</summary>
-    public static CaptureDataHeader ToDataHeader(this CaptureFileHeader frames, IReadOnlyList<MarkerLock> locks, bool framesStored, bool camera) =>
+    /// <summary>
+    /// The captures.mbcd header of frames with <paramref name="frames"/>'s header and markers at <paramref name="locks"/>;
+    /// <paramref name="syncRoi"/> is the second region of the source stored below the first (empty: none).
+    /// </summary>
+    public static CaptureDataHeader ToDataHeader(
+      this CaptureFileHeader frames,
+      IReadOnlyList<MarkerLock> locks,
+      bool framesStored,
+      bool camera,
+      PixelRect syncRoi = default
+    ) =>
       new CaptureDataHeader(
         frames.Width,
         frames.Height,
@@ -30,7 +39,10 @@ namespace MB.FramePacing.Capture
         locks.ToLocations(),
         framesStored,
         camera
-      );
+      )
+      {
+        SyncRegion = new Rectangle(syncRoi.X, syncRoi.Y, syncRoi.Width, syncRoi.Height),
+      };
 
     /// <summary>The header of the frames the capture data was read from.</summary>
     public static CaptureFileHeader ToFileHeader(this CaptureDataHeader header) =>

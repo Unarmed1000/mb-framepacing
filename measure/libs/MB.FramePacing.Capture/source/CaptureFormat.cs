@@ -17,7 +17,16 @@ namespace MB.FramePacing.Capture
   /// <param name="SourceWidth">Device mode width before crop/scale, 0 if unknown.</param>
   /// <param name="SourceHeight">Device mode height before crop/scale, 0 if unknown.</param>
   /// <param name="Roi">Crop in source pixels applied before scaling, empty if none.</param>
-  public sealed record CaptureFormat(int Width, int Height, FrameRate FrameRate, int SourceWidth = 0, int SourceHeight = 0, PixelRect Roi = default)
+  /// <param name="SyncRoi">A second crop in source pixels, stored below <paramref name="Roi"/> (the sync marker's region); empty if none.</param>
+  public sealed record CaptureFormat(
+    int Width,
+    int Height,
+    FrameRate FrameRate,
+    int SourceWidth = 0,
+    int SourceHeight = 0,
+    PixelRect Roi = default,
+    PixelRect SyncRoi = default
+  )
   {
     public int PixelByteCount => checked(Width * Height);
 

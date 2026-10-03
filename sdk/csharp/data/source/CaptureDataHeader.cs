@@ -47,9 +47,16 @@ namespace MB.FramePacing.Data
     public const int MaxMarkers = 4;
 
     private const int MarkersOffset = 72;
+    private const int SyncRegionOffset = 168;
     private const int MarkerSize = 24;
     private const uint FramesStoredFlag = 1;
     private const uint CameraFlag = 2;
+
+    /// <summary>
+    /// The region of the source stored below <see cref="Region"/> for the sync marker, in source pixels: a capture that stores only the
+    /// markers keeps the two as one frame, the main marker's region on top (empty = none: one region, or the whole frame).
+    /// </summary>
+    public Rectangle SyncRegion { get; init; }
 
     public void Write(Span<byte> destination)
     {
@@ -77,6 +84,7 @@ namespace MB.FramePacing.Data
         WriteRect(slot, Markers[i].Bounds);
         BinaryPrimitives.WriteDoubleLittleEndian(slot.Slice(16), Markers[i].ModuleSizePx);
       }
+      WriteRect(destination.Slice(SyncRegionOffset), SyncRegion);
     }
 
     /// <summary>Parse a header. Throws <see cref="InvalidDataException"/> for another file, a newer format version or wrong sizes.</summary>
@@ -118,7 +126,10 @@ namespace MB.FramePacing.Data
         markers,
         (flags & FramesStoredFlag) != 0,
         (flags & CameraFlag) != 0
-      );
+      )
+      {
+        SyncRegion = ReadRect(source.Slice(SyncRegionOffset)),
+      };
     }
 
     private static void WriteRect(Span<byte> destination, Rectangle rect)

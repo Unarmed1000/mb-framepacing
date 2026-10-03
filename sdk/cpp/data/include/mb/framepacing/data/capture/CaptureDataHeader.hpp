@@ -28,6 +28,9 @@ namespace MB::FramePacing::Data
     std::vector<MarkerLocation> Markers;
     bool FramesStored{false};
     bool Camera{false};
+    //! The region of the source stored below Region for the sync marker, in source pixels: a capture that stores only the markers keeps
+    //! the two as one frame, the main marker's region on top. Empty = none (one region, or the whole frame).
+    Rectangle SyncRegion;
 
     //! Parse a header. Throws DataFormatError for another file, a newer format version or wrong sizes.
     static CaptureDataHeader Parse(std::span<const uint8_t> bytes);

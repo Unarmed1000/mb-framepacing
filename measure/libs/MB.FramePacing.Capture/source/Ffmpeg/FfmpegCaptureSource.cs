@@ -96,7 +96,8 @@ namespace MB.FramePacing.Capture.Ffmpeg
           FrameRate.FromFps(fps),
           input?.Width ?? 0,
           input?.Height ?? 0,
-          options.Roi ?? default
+          options.Roi ?? default,
+          options.SyncRoi ?? default
         );
         g_logger.Info(
           "ffmpeg capturing: source {0}x{1}@{2:0.###}, stored {3}x{4}",

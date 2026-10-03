@@ -26,21 +26,29 @@ namespace MB.FramePacing.Capture.Ffmpeg
 
     public static bool IsAutoRoi(string? text) => string.Equals(text?.Trim(), AutoRoi, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Find the marker in the source <paramref name="options"/> describe (their Roi and Scale are ignored) and compute the crop.</summary>
+    /// <summary>
+    /// Find the markers in the source <paramref name="options"/> describe (their Roi and Scale are ignored) and compute the crops: the main
+    /// marker's and, when the source shows a sync marker, that one's. A live source is given <paramref name="timeout"/>; a recording is
+    /// read until its first marker, to its end if need be (it may start before the application draws one), and then is a
+    /// <see cref="MarkerNotFoundException"/>.
+    /// </summary>
     public static MarkerLocateResult Locate(FfmpegCaptureOptions options, TimeSpan timeout, CancellationToken cancellationToken)
     {
       ArgumentNullException.ThrowIfNull(options);
-      MarkerLock sourceLock;
+      MarkerProbeResult found;
       int width;
       int height;
-      using (var source = FfmpegCaptureSource.Start(options with { Roi = null, Scale = null }, TimeSpan.FromSeconds(30)))
+      using (var source = FfmpegCaptureSource.Start(options with { Roi = null, SyncRoi = null, Scale = null }, TimeSpan.FromSeconds(30)))
       {
         width = source.Format.Width;
         height = source.Format.Height;
-        sourceLock = MarkerProbe.Locate(source, timeout, source.IsLive ? g_liveDecodeInterval : TimeSpan.Zero, cancellationToken);
+        found = MarkerProbe.Locate(source, source.IsLive ? timeout : null, source.IsLive ? g_liveDecodeInterval : TimeSpan.Zero, cancellationToken);
       }
       bool mjpeg = string.Equals(options.InputFormat, "mjpeg", StringComparison.OrdinalIgnoreCase);
-      return new MarkerLocateResult(sourceLock, MarkerCrop.For(sourceLock, width, height, mjpeg), width, height);
+      return new MarkerLocateResult(found.Main, MarkerCrop.For(found.Main, found.Sync, width, height, mjpeg), width, height)
+      {
+        SyncLock = found.Sync,
+      };
     }
   }
 }

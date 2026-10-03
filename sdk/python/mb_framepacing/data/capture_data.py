@@ -31,6 +31,8 @@ SECOND_CAPACITY = RECORD_SIZE - 32 - MAIN_CAPACITY
 _HEADER = struct.Struct("<IHHIIiiIIiiiiii8xI")
 _MARKER = struct.Struct("<iiiid")
 _MARKERS_OFFSET = 72
+_SYNC_REGION = struct.Struct("<iiii")
+_SYNC_REGION_OFFSET = 168
 _RECORD = struct.Struct("<qqqIBBB")
 _FRAMES_STORED = 1
 _CAMERA = 2
@@ -56,7 +58,8 @@ class MarkerLocation:
 class CaptureDataHeader:
     """The frames the markers were read from (stored size, nominal frame rate as a fraction, 0/0 = unknown, source size, the stored region
     of the source, empty = all of it), where the markers are (the main marker first), whether the frames were stored too (frames.mbfc) and
-    whether it is an EXPERIMENTAL camera capture."""
+    whether it is an EXPERIMENTAL camera capture. sync_region is the region of the source stored below region for the sync marker (a
+    capture that stores only the markers keeps the two as one frame, the main marker's region on top); empty = none."""
 
     width: int
     height: int
@@ -68,6 +71,7 @@ class CaptureDataHeader:
     markers: tuple[MarkerLocation, ...]
     frames_stored: bool
     camera: bool
+    sync_region: Rectangle = Rectangle(0, 0, 0, 0)
 
     @staticmethod
     def parse(data: bytes) -> "CaptureDataHeader":
@@ -104,6 +108,7 @@ class CaptureDataHeader:
             markers=tuple(markers),
             frames_stored=(flags & _FRAMES_STORED) != 0,
             camera=(flags & _CAMERA) != 0,
+            sync_region=Rectangle(*cast(tuple[int, int, int, int], _SYNC_REGION.unpack_from(data, _SYNC_REGION_OFFSET))),
         )
 
 

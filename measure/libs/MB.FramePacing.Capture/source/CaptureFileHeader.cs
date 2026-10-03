@@ -10,6 +10,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Globalization;
 using System.IO;
 using MB.FramePacing.MarkerDecoding;
 
@@ -34,6 +35,15 @@ namespace MB.FramePacing.Capture
     public int PixelByteCount => checked(Width * Height);
 
     public int RecordSize => ((RecordHeaderSize + PixelByteCount + RecordAlignment - 1) / RecordAlignment) * RecordAlignment;
+
+    /// <summary>
+    /// The frames' size, for people: the source's, and what was stored of it when that is another size (only the markers' regions, a
+    /// region or a downscale): "1920x1080 source, 165x282 stored". A capture that does not know its source's size has the stored one.
+    /// </summary>
+    public string SizeText =>
+      SourceWidth > 0 && SourceHeight > 0 && (SourceWidth != Width || SourceHeight != Height)
+        ? string.Create(CultureInfo.InvariantCulture, $"{SourceWidth}x{SourceHeight} source, {Width}x{Height} stored")
+        : string.Create(CultureInfo.InvariantCulture, $"{Width}x{Height}");
 
     public void Write(Span<byte> dst)
     {

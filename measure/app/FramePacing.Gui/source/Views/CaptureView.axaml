@@ -54,7 +54,7 @@
                 <TextBox Text="{Binding ScaleText}" PlaceholderText="e.g. 960x540 (empty = full size)" />
                 <TextBlock Classes="caption" Text="Only store a region (source pixels)" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                  <TextBox Text="{Binding RoiText}" PlaceholderText="x,y,width,height or auto (empty = whole frame)" />
+                  <TextBox Text="{Binding RoiText}" PlaceholderText="x,y,width,height, auto or full (empty = a recording's markers)" />
                   <Button
                     Grid.Column="1"
                     Content="Locate marker"

@@ -338,12 +338,30 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     timestamps are 40 ms coarse. The CSV (`ImageSequence.ReadTimestamps`) needs its header line, `fileName,timeTicks` found by name,
     and holds whole ticks: a headerless file, or one with `timeMs`, is refused, since whole milliseconds would read as ticks.
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
-- **Fast capture** (`--roi auto`, `locate`, the GUI's "Locate marker"; live capture, experimental, but `--roi` works on imports too):
-  - `FfmpegMarkerLocator` runs ffmpeg uncropped into `MarkerProbe` (nothing is recorded). `MarkerCrop` then picks the region and
-    the integer downscale, and the capture starts a new ffmpeg with `crop=...:exact=1,scale=...`.
-  - The crop starts a whole number of downscale steps before the marker origin; otherwise module edges fall between stored pixels
-    and dense start markers stop decoding.
-  - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures.
+- **Only the markers are read** (an import's default; `--roi auto`, `locate`, the GUI's "Locate marker" for live capture, which is
+  experimental; agreed with the user):
+  - **The rule is `RegionRule`** (Capture, shared by the CLI and the GUI): a recording (a video file or an image folder:
+    `InputPath` set) with no `--roi`, no `--scale` and no `--keep-frames` stores only its markers' regions; `--roi full` (the GUI's
+    region box: `full`) is the whole frame; `auto` asks for the regions anywhere; a rectangle is one rectangle. Live sources keep the
+    whole frame unless asked. It goes in `CaptureCommand.ApplyRegion` / `CaptureViewModel.ApplyRegion`, never in
+    `MediaInput.ToCaptureOptions` (the camera-rig tools and the ffmpeg tests call that for whole frames).
+  - `FfmpegMarkerLocator` runs ffmpeg uncropped into `MarkerProbe` (nothing is recorded), which returns the main marker's lock and
+    the sync marker's when the frames show one (`MarkerProbeResult`). A live source gets 10 s; a recording is read until its first
+    marker, to its end (it may start before the application): none at all is `MarkerNotFoundException` and the import stops. A marker
+    that moved while located or does not fit the frame is `MarkerRegionException`: the default falls back to the whole frame and
+    says so, an explicit `auto` fails.
+  - `MarkerCrop` picks a region per marker and one integer downscale; each crop starts a whole number of downscale steps before its
+    marker's origin (otherwise module edges fall between stored pixels and dense start markers stop decoding). Regions that would
+    overlap become one. Two regions are stored as one frame, the main marker's on top (`FfmpegCommandBuilder.BuildStackedFilter`:
+    split, crop, scale, pad the narrower with white, vstack; `FfmpegCaptureOptions.SyncRoi` / `RoiDownscale`), so the tearing check
+    stays. `capture.json` has `roi` and `syncRoi`, the `captures.mbcd` header the second region at offset 168 (`SyncRegion`, all
+    three languages); `frames.mbfc`'s header has room for the first only.
+  - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures, counted
+    from the first capture with a marker to the end, or to the end marker when that is the last marker seen (footage before and
+    after the run is not a marker that moved).
+  - The golden data stays a whole-frame capture: `update_test_data.py` imports with `--roi full`.
+  - Measured (60 fps H.264, both markers): 720p 2000 fps against 1400 for whole frames, 1080p 1600 against 700, 2160p 540 against
+    200, where it is as fast as ffmpeg decodes the file.
 - **Refresh rate and pacing:**
   - A capture card captures at the display's native refresh rate: that is a fundamental assumption, not a setting. The analysis
     takes the capture period as the refresh period; display time steps are whole refreshes. `SyntheticCaptureSource` refuses a capture rate that differs

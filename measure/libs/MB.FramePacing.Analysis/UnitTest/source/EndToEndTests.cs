@@ -269,5 +269,54 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable), Is.EqualTo(lostCaptures));
       Assert.That(report.Warnings.Any(w => w.Contains("may have moved", StringComparison.Ordinal)), Is.EqualTo(expectWarning));
     }
+
+    [TestCase(20, 0, false, false, Description = "a recording that starts before the application draws the marker")]
+    [TestCase(0, 20, true, false, Description = "a recording that goes on after the end marker")]
+    [TestCase(20, 20, true, false, Description = "both")]
+    [TestCase(0, 20, false, true, Description = "the marker gone without an end marker: it may have moved")]
+    public void Analyzer_RegionCapture_FootageBeforeAndAfterTheRun_IsNotAMarkerThatMoved(int before, int after, bool endMarker, bool expectWarning)
+    {
+      var header = new CaptureFileHeader(160, 160, FrameRate.FromFps(240), 1920, 1080, new PixelRect(16, 16, 320, 320));
+      Directory.CreateDirectory(m_directory);
+      var frame = new GrayImage(header.Width, header.Height, 96);
+      var record = new byte[header.RecordSize];
+      const int Frames = 40;
+      using (var writer = new CaptureFileWriter(Path.Combine(m_directory, CaptureSessionInfo.FramesFileName), header))
+      {
+        for (int i = 0; i < before + Frames + after; ++i)
+        {
+          int shown = i - before;
+          Array.Fill(frame.Pixels, (byte)96);
+          if (shown >= 0 && shown < Frames)
+          {
+            // The run's last captures show its end marker
+            bool end = endMarker && shown >= Frames - 4;
+            MarkerRenderer.Render(
+              frame,
+              new MarkerPayload(
+                end ? MarkerKind.SequenceEnd : MarkerKind.Frame,
+                1,
+                (ulong)(shown / 4),
+                MB.FramePacing.Marker.MarkerFlags.NoFlags,
+                new TimeSpan(shown / 4 * 166_667L)
+              ),
+              8,
+              8,
+              3
+            );
+          }
+          new CaptureRecordHeader(i, new TickCount64(i * 41_667L), new DeviceTimestamp(new TickCount64(i * 41_667L)), 0, header.PixelByteCount).Write(
+            record
+          );
+          frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
+          writer.WriteRecords(record);
+        }
+      }
+
+      var report = CaptureAnalyzer.Analyze(m_directory, new AnalysisOptions());
+
+      Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable), Is.EqualTo(before + after));
+      Assert.That(report.Warnings.Any(w => w.Contains("may have moved", StringComparison.Ordinal)), Is.EqualTo(expectWarning));
+    }
   }
 }

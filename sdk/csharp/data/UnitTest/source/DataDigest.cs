@@ -92,6 +92,7 @@ namespace MB.FramePacing.Data.UnitTest
           ["sourceWidth"] = header.SourceWidth,
           ["sourceHeight"] = header.SourceHeight,
           ["region"] = Rect(header.Region),
+          ["syncRegion"] = Rect(header.SyncRegion),
           ["markers"] = new JsonArray(
             header.Markers.Select(m => (JsonNode)new JsonObject { ["bounds"] = Rect(m.Bounds), ["moduleSizePx"] = m.ModuleSizePx }).ToArray()
           ),

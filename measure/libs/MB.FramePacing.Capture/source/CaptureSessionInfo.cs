@@ -39,6 +39,12 @@ namespace MB.FramePacing.Capture
     public int SourceWidth { get; init; }
     public int SourceHeight { get; init; }
     public string? Roi { get; init; }
+
+    /// <summary>
+    /// The second region of the source that was stored, below <see cref="Roi"/> (x,y,width,height in source pixels): the sync marker's,
+    /// when only the markers were stored and the source has one. Null when there is none.
+    /// </summary>
+    public string? SyncRoi { get; init; }
     public double NominalFps { get; init; }
     public bool WaitedForStart { get; init; }
     public bool StopAtEnd { get; init; }

@@ -414,8 +414,17 @@ page that plays the imported recording next to its report, with a playhead on th
 
 ### How fast can it record?
 
-There is no built-in frame rate limit. A recording (a video file or an image folder) is read as fast as the disk allows and nothing
-is dropped; the times come from the file (or from `--fps` / a timestamp file).
+There is no built-in frame rate limit. A recording (a video file or an image folder) is read as fast as ffmpeg decodes it and
+nothing is dropped; the times come from the file (or from `--fps` / a timestamp file). Only the markers' regions are read from each
+frame, which is what makes it fast. On the development PC, H.264 recordings at 60 fps were imported at these rates:
+
+| Recording | Only the markers (the default) | Whole frames (`--roi full`) |
+| --------- | ------------------------------ | --------------------------- |
+| 1280×720  | 2000 frames per second         | 1400                        |
+| 1920×1080 | 1600                           | 700                         |
+| 3840×2160 | 540                            | 200                         |
+
+So an hour recorded at 1080p60 takes a little over two minutes to import.
 
 **Precision:** a capture card captures at the display's refresh rate, and so does its recording, so display time steps are whole
 refreshes and exact.

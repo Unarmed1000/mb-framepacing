@@ -68,6 +68,11 @@ namespace
       Put(bytes, slot + 12, 147, 4);
       Put(bytes, slot + 16, std::bit_cast<uint64_t>(3.0), 8);
     }
+    // The sync marker's region, after the marker locations
+    Put(bytes, 168, 14, 4);
+    Put(bytes, 172, 820, 4);
+    Put(bytes, 176, 240, 4);
+    Put(bytes, 180, 246, 4);
     return bytes;
   }
 
@@ -98,6 +103,7 @@ TEST(CaptureData, TheHeaderFieldsAreWhereTheFormatSays)
   EXPECT_EQ(header.SourceWidth, 1920);
   EXPECT_EQ(header.SourceHeight, 1080);
   EXPECT_EQ(header.Region, (MB::FramePacing::Rectangle(8, 16, 960, 540)));
+  EXPECT_EQ(header.SyncRegion, (MB::FramePacing::Rectangle(14, 820, 240, 246)));
   ASSERT_EQ(header.Markers.size(), 2u);
   EXPECT_EQ(header.Markers[1].Bounds.Y(), 33);
   EXPECT_EQ(header.Markers[1].ModuleSizePx, 3.0);

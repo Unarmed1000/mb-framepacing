@@ -195,8 +195,8 @@ The capture pipeline only works if the marker reaches the display output unmodif
    points down). Do **not** add the old D3D9 half-pixel offset.
 4. Render at the swap chain's resolution. If the application renders at a lower resolution and upscales, draw the marker
    after the upscale.
-5. Keep the marker at a **fixed position** every frame. The analyzer locks onto the region after the first detection, and a fast
-   capture (`--roi auto`) stores only that region, so a marker that moves is lost.
+5. Keep the marker at a **fixed position** every frame. The analyzer locks onto the region after the first detection, and an
+   import (or a fast capture, `--roi auto`) reads only that region, so a marker that moves is lost.
 6. Update the payload every frame, including frames that repeat the same animation time.
 
 ## Test sequences
@@ -270,9 +270,10 @@ origin and the settings for each library.
 - A non-integer ratio (for example 1440p → 1080p) still works, but use at least the recommended size, not the minimum.
 - `--roi` crops first and `--scale` then scales the crop, so `s` is the `--scale` height divided by the `--roi` height (1 without
   `--scale`).
-- `--roi auto` (fast capture) crops the region around the marker's origin that holds the marker, starting a whole
-  number of downscale steps before the origin, and downscales it by the largest integer ratio that keeps the recommended stored
-  size (3 px per module, 4 with MJPEG). Only the top marker is stored, so tearing is not checked.
+- An import's default and `--roi auto` (fast capture) crop the region around the marker's origin that holds the marker,
+  starting a whole number of downscale steps before the origin, and downscale it by the largest integer ratio that keeps the
+  recommended stored size (3 px per module, 4 with MJPEG). A sync marker gets a region of its own, cropped and downscaled the same
+  way and stored below the main marker's, so tearing is still checked. A rectangle given with `--roi` stores only what is in it.
 
 ### Checks in the tools
 

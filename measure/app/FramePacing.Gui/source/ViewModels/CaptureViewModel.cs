@@ -655,22 +655,25 @@ namespace MB.FramePacing.Gui.ViewModels
       };
     }
 
-    /// <summary>The stored size and region; "auto" as the region finds the marker first and stores only its region (fast capture).</summary>
-    private FfmpegCaptureOptions ApplyRegion(FfmpegCaptureOptions options, CancellationToken cancellationToken)
-    {
-      if (FfmpegMarkerLocator.IsAutoRoi(RoiText))
-      {
-        if (!string.IsNullOrWhiteSpace(ScaleText))
-          throw new InvalidOperationException("The region 'auto' chooses the stored size itself; clear the stored size.");
-        Dispatcher.UIThread.Post(() => PhaseText = "Looking for the marker...");
-        return FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, cancellationToken).Apply(options);
-      }
-      return options with
-      {
-        Scale = string.IsNullOrWhiteSpace(ScaleText) ? null : RequestedMode.ParseSize(ScaleText.Trim(), "scale"),
-        Roi = string.IsNullOrWhiteSpace(RoiText) ? null : PixelRect.Parse(RoiText.Trim()),
-      };
-    }
+    /// <summary>
+    /// The stored size and region (<see cref="RegionRule"/>): "auto" finds the markers first and stores only their regions, which is also
+    /// what a recording gets with both boxes empty and its frames not stored; "full" is the whole frame.
+    /// </summary>
+    private FfmpegCaptureOptions ApplyRegion(FfmpegCaptureOptions options, CancellationToken cancellationToken) =>
+      RegionRule.Apply(
+        options,
+        RoiText,
+        string.IsNullOrWhiteSpace(ScaleText) ? null : RequestedMode.ParseSize(ScaleText.Trim(), "scale"),
+        KeepFrames,
+        () =>
+        {
+          Dispatcher.UIThread.Post(() => PhaseText = "Looking for the marker...");
+          var located = FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, cancellationToken);
+          g_logger.Info("{0}", located.Summary);
+          return located;
+        },
+        note => g_logger.Warn("{0}", note)
+      );
 
     /// <summary>Find the marker now and fill in the region and stored size, so the next captures store only the marker's region.</summary>
     [RelayCommand(CanExecute = nameof(CanStart))]

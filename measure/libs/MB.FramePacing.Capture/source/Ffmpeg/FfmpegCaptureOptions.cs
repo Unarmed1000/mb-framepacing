@@ -32,6 +32,16 @@ namespace MB.FramePacing.Capture.Ffmpeg
     /// <summary>Stored frame size after crop; null keeps the (cropped) source size.</summary>
     public (int Width, int Height)? Scale { get; init; }
 
+    /// <summary>
+    /// A second crop in source pixels, stored below <see cref="Roi"/> as one frame: the sync marker's region next to the main marker's, so
+    /// a capture that stores only the markers still checks tearing. Needs <see cref="Roi"/>; both are downscaled by
+    /// <see cref="RoiDownscale"/> (their sizes are multiples of it) and <see cref="Scale"/> is not used.
+    /// </summary>
+    public PixelRect? SyncRoi { get; init; }
+
+    /// <summary>The integer area downscale of <see cref="Roi"/> and <see cref="SyncRoi"/> when both are stored; 1 keeps the source's pixels.</summary>
+    public int RoiDownscale { get; init; } = 1;
+
     /// <summary>DirectShow real-time buffer (absorbs short hiccups before ffmpeg drops frames).</summary>
     public int RealTimeBufferMegabytes { get; init; } = 1024;
 

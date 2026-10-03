@@ -37,8 +37,10 @@ namespace MB.FramePacing.Capture.UnitTest
       );
       using var source = new SyntheticCaptureSource(scenario, paced: false);
 
-      var markerLock = MarkerProbe.Locate(source, g_timeout, TimeSpan.Zero, CancellationToken.None);
+      var found = MarkerProbe.Locate(source, g_timeout, TimeSpan.Zero, CancellationToken.None);
+      var markerLock = found.Main;
 
+      Assert.That(found.Sync, Is.Null, "the synthetic game draws no sync marker");
       Assert.That(markerLock.Bounds.X, Is.EqualTo(20).Within(1));
       Assert.That(markerLock.Bounds.Y, Is.EqualTo(16).Within(1));
       Assert.That(markerLock.ModuleSizePx, Is.EqualTo(4).Within(0.2));
@@ -57,12 +59,50 @@ namespace MB.FramePacing.Capture.UnitTest
     public void Locate_MovingMarker_Throws()
     {
       using var source = new ScriptedSource(frames: 20, frame => frame % 2 == 0 ? (12, 12) : (140, 12));
-      var ex = Assert.Throws<InvalidOperationException>(() => MarkerProbe.Locate(source, g_timeout, TimeSpan.Zero, CancellationToken.None));
+      var ex = Assert.Throws<MarkerRegionException>(() => MarkerProbe.Locate(source, g_timeout, TimeSpan.Zero, CancellationToken.None));
       Assert.That(ex!.Message, Does.Contain("moved"));
     }
 
-    /// <summary>Frame markers at a scripted position per frame (null: no marker).</summary>
-    private sealed class ScriptedSource(int frames, Func<int, (int X, int Y)?> position) : ICaptureSource
+    [Test]
+    public void Locate_ARecording_IsReadUntilItsFirstMarker_HoweverLate()
+    {
+      // No time limit (a recording): the first frames show no marker, as when the recording started before the application
+      using var source = new ScriptedSource(frames: 40, frame => frame >= 25 ? (12, 12) : null);
+      var found = MarkerProbe.Locate(source, null, TimeSpan.Zero, CancellationToken.None);
+      Assert.That((found.Main.Bounds.X, found.Main.Bounds.Y), Is.EqualTo((12, 12)));
+    }
+
+    [Test]
+    public void Locate_ARecordingWithoutAMarker_IsNotFound()
+    {
+      using var source = new ScriptedSource(frames: 20, _ => null);
+      var ex = Assert.Throws<MarkerNotFoundException>(() => MarkerProbe.Locate(source, null, TimeSpan.Zero, CancellationToken.None));
+      Assert.That(ex!.Message, Does.Contain("No marker was found in 20 frames"));
+    }
+
+    [Test]
+    public void Locate_FindsTheSyncMarkerToo_WhenTheFramesShowOne()
+    {
+      // The scripted frame is 320 x 180: the sync marker fits beside the main marker
+      using var source = new ScriptedSource(frames: 20, _ => (12, 12), _ => (170, 20));
+      var found = MarkerProbe.Locate(source, g_timeout, TimeSpan.Zero, CancellationToken.None);
+
+      Assert.That((found.Main.Bounds.X, found.Main.Bounds.Y), Is.EqualTo((12, 12)));
+      Assert.That(found.Sync, Is.Not.Null);
+      Assert.That((found.Sync!.Value.Bounds.X, found.Sync.Value.Bounds.Y), Is.EqualTo((170, 20)));
+      Assert.That(found.Sync.Value.ModuleCount, Is.EqualTo(MarkerRenderer.QrModuleCountFor(MarkerKind.Sync)), "a sync marker's lock");
+    }
+
+    [Test]
+    public void Locate_ASyncMarkerInOneFrameOnly_DoesNotCount()
+    {
+      using var source = new ScriptedSource(frames: 20, _ => (12, 12), frame => frame == 0 ? (170, 20) : null);
+      Assert.That(MarkerProbe.Locate(source, g_timeout, TimeSpan.Zero, CancellationToken.None).Sync, Is.Null);
+    }
+
+    /// <summary>Frame markers at a scripted position per frame (null: no marker), and sync markers at theirs when given.</summary>
+    private sealed class ScriptedSource(int frames, Func<int, (int X, int Y)?> position, Func<int, (int X, int Y)?>? syncPosition = null)
+      : ICaptureSource
     {
       private const int ModulePx = 3;
 
@@ -86,6 +126,14 @@ namespace MB.FramePacing.Capture.UnitTest
               new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(i * 41_667L)),
               origin.X,
               origin.Y,
+              ModulePx
+            );
+          if (syncPosition?.Invoke(i) is { } syncOrigin)
+            MarkerRenderer.Render(
+              image,
+              new MarkerPayload(MarkerKind.Sync, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)),
+              syncOrigin.X,
+              syncOrigin.Y,
               ModulePx
             );
           image.Pixels.CopyTo(sink.BeginFrame());

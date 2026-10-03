@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using MB.FramePacing.Capture.Camera;
+using MB.FramePacing.MarkerDecoding;
 
 namespace MB.FramePacing.Capture.Ffmpeg
 {
@@ -29,6 +30,8 @@ namespace MB.FramePacing.Capture.Ffmpeg
       args.AddRange(new[] { "-an", "-sn", "-copyts", "-fps_mode", "passthrough" });
       if (options.Camera != null)
         args.AddRange(new[] { "-filter_complex", BuildCameraFilter(options.Camera), "-map", "[out]" });
+      else if (options.SyncRoi is { IsEmpty: false })
+        args.AddRange(new[] { "-filter_complex", BuildStackedFilter(options), "-map", "[out]" });
       else
         args.AddRange(new[] { "-vf", BuildFilter(options) });
       args.AddRange(new[] { "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1" });
@@ -46,6 +49,36 @@ namespace MB.FramePacing.Capture.Ffmpeg
       filters.Add("format=gray");
       filters.Add("showinfo");
       return string.Join(",", filters);
+    }
+
+    /// <summary>
+    /// The two markers' regions as one frame: the main marker's crop (<see cref="FfmpegCaptureOptions.Roi"/>) on top and the sync marker's
+    /// (<see cref="FfmpegCaptureOptions.SyncRoi"/>) below it, each cropped at its exact pixel and downscaled by
+    /// <see cref="FfmpegCaptureOptions.RoiDownscale"/>, the narrower one padded with white on its right to the wider one's width.
+    /// </summary>
+    public static string BuildStackedFilter(FfmpegCaptureOptions options)
+    {
+      ArgumentNullException.ThrowIfNull(options);
+      if (options.Roi is not { IsEmpty: false } main || options.SyncRoi is not { IsEmpty: false } sync)
+        throw new ArgumentException("Two stacked regions need both Roi and SyncRoi", nameof(options));
+      if (options.Scale != null)
+        throw new ArgumentException("Two stacked regions are downscaled by RoiDownscale, not Scale", nameof(options));
+      int factor = options.RoiDownscale;
+      if (factor < 1 || new[] { main.Width, main.Height, sync.Width, sync.Height }.Any(size => size % factor != 0))
+        throw new ArgumentException("The regions' sizes must be multiples of RoiDownscale", nameof(options));
+
+      int width = Math.Max(main.Width, sync.Width) / factor;
+      string Branch(PixelRect roi, string input, string output)
+      {
+        var filters = new List<string> { Invariant($"crop={roi.Width}:{roi.Height}:{roi.X}:{roi.Y}:exact=1") };
+        if (factor > 1)
+          filters.Add(Invariant($"scale={roi.Width / factor}:{roi.Height / factor}:flags=area"));
+        filters.Add("format=gray");
+        if (roi.Width / factor < width)
+          filters.Add(Invariant($"pad={width}:{roi.Height / factor}:0:0:color=white"));
+        return Invariant($"[{input}]{string.Join(",", filters)}[{output}]");
+      }
+      return string.Join(";", "[0:v]split=2[a][b]", Branch(main, "a", "m"), Branch(sync, "b", "s"), "[m][s]vstack=inputs=2,showinfo[out]");
     }
 
     /// <summary>

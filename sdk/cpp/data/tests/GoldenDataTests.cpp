@@ -131,6 +131,7 @@ namespace
         {"sourceWidth", header.SourceWidth},
         {"sourceHeight", header.SourceHeight},
         {"region", Rect(header.Region)},
+        {"syncRegion", Rect(header.SyncRegion)},
         {"markers", markers},
         {"framesStored", header.FramesStored},
         {"camera", header.Camera}}},

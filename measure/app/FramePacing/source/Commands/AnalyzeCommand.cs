@@ -150,7 +150,7 @@ namespace MB.FramePacing.App.Commands
     {
       var layout = report.Capture.Layout;
       AnsiConsole.MarkupLineInterpolated(
-        $"Capture {report.Capture.Header.Width}x{report.Capture.Header.Height}, {report.Capture.Rows.Count} captures, period {report.CapturePeriodMs:0.###} ms ({report.Capture.TimeSource} clock), {layout.Locks.Count} marker(s) at {layout.ModuleSizePx:0.0} px/module"
+        $"Capture {report.Capture.Header.SizeText}, {report.Capture.Rows.Count} captures, period {report.CapturePeriodMs:0.###} ms ({report.Capture.TimeSource} clock), {layout.Locks.Count} marker(s) at {layout.ModuleSizePx:0.0} px/module"
       );
       foreach (var warning in report.Warnings)
         AnsiConsole.MarkupLineInterpolated($"[yellow]warning:[/] {warning}");

@@ -19,7 +19,15 @@ namespace MB.FramePacing.MarkerDecoding
     /// <param name="sourceWidth">Source frame width.</param>
     /// <param name="sourceHeight">Source frame height.</param>
     /// <param name="mjpeg">The capture card delivers MJPEG (needs 4 stored pixels per module instead of 3).</param>
-    public static MarkerCropResult For(MarkerLock sourceLock, int sourceWidth, int sourceHeight, bool mjpeg = false)
+    public static MarkerCropResult For(MarkerLock sourceLock, int sourceWidth, int sourceHeight, bool mjpeg = false) =>
+      For(sourceLock, null, sourceWidth, sourceHeight, mjpeg);
+
+    /// <summary>
+    /// The crop for the main marker at <paramref name="sourceLock"/> and, when the source shows a sync marker at
+    /// <paramref name="syncLock"/>, a second crop for it, with the same downscale and each starting a whole number of downscale steps
+    /// before its marker. Crops that would overlap become one that holds both markers.
+    /// </summary>
+    public static MarkerCropResult For(MarkerLock sourceLock, MarkerLock? syncLock, int sourceWidth, int sourceHeight, bool mjpeg = false)
     {
       if (sourceWidth <= 0 || sourceHeight <= 0)
         throw new ArgumentOutOfRangeException(nameof(sourceHeight), "The source size must be positive");
@@ -31,19 +39,40 @@ namespace MB.FramePacing.MarkerDecoding
       int target = MarkerRenderer.RecommendModuleSizePx(1, 1, mjpeg);
       int factor = Math.Max(1, module / target);
 
-      // One extra module around the search region absorbs small errors in the located origin
-      var region = sourceLock.SearchRegion.Inflate(module);
-      // The crop starts a whole number of factors before the marker origin, so the downscale keeps module edges on stored pixel edges
-      // (a half pixel offset blurs every module), and its size is a multiple of the factor, so the stored size is whole
-      var (left, width) = Span(region.X, region.Right, sourceLock.Bounds.X, sourceWidth, factor);
-      var (top, height) = Span(region.Y, region.Bottom, sourceLock.Bounds.Y, sourceHeight, factor);
-      var roi = new PixelRect(left, top, width, height);
+      var roi = RegionOf(sourceLock, sourceLock.SearchRegion.Inflate(module), sourceWidth, sourceHeight, factor);
+      double storedModule = sourceLock.ModuleSizePx / factor;
+      if (syncLock is not { } sync)
+        return new MarkerCropResult(roi, factor, storedModule);
+      var syncRoi = RegionOf(sync, sync.SearchRegion.Inflate(module), sourceWidth, sourceHeight, factor);
+      if (roi.Intersect(syncRoi).IsEmpty)
+        return new MarkerCropResult(roi, factor, storedModule, syncRoi);
 
-      if (roi.IsEmpty || roi.Intersect(sourceLock.Bounds) != sourceLock.Bounds)
-        throw new InvalidOperationException(
-          $"The marker at {sourceLock.Bounds} does not fit in the {sourceWidth}x{sourceHeight} source; it must be drawn fully inside the frame."
+      // The two regions overlap (a small frame): one crop that holds both markers, on the main marker's grid
+      var both = new PixelRect(
+        Math.Min(roi.X, syncRoi.X),
+        Math.Min(roi.Y, syncRoi.Y),
+        Math.Max(roi.Right, syncRoi.Right) - Math.Min(roi.X, syncRoi.X),
+        Math.Max(roi.Bottom, syncRoi.Bottom) - Math.Min(roi.Y, syncRoi.Y)
+      );
+      return new MarkerCropResult(RegionOf(sourceLock, both, sourceWidth, sourceHeight, factor), factor, storedModule);
+    }
+
+    /// <summary>
+    /// The crop that holds <paramref name="region"/> around the marker at <paramref name="markerLock"/>: one extra module around the
+    /// marker's search region absorbs small errors in the located origin. It starts a whole number of factors before the marker origin,
+    /// so the downscale keeps module edges on stored pixel edges (a half pixel offset blurs every module), and its size is a multiple of
+    /// the factor, so the stored size is whole.
+    /// </summary>
+    private static PixelRect RegionOf(MarkerLock markerLock, PixelRect region, int sourceWidth, int sourceHeight, int factor)
+    {
+      var (left, width) = Span(region.X, region.Right, markerLock.Bounds.X, sourceWidth, factor);
+      var (top, height) = Span(region.Y, region.Bottom, markerLock.Bounds.Y, sourceHeight, factor);
+      var roi = new PixelRect(left, top, width, height);
+      if (roi.IsEmpty || roi.Intersect(markerLock.Bounds) != markerLock.Bounds)
+        throw new MarkerRegionException(
+          $"The marker at {markerLock.Bounds} does not fit in the {sourceWidth}x{sourceHeight} source; it must be drawn fully inside the frame."
         );
-      return new MarkerCropResult(roi, factor, sourceLock.ModuleSizePx / factor);
+      return roi;
     }
 
     /// <summary>One axis: [start, end) clamped to [0, limit), starting a multiple of <paramref name="factor"/> before <paramref name="origin"/>.</summary>

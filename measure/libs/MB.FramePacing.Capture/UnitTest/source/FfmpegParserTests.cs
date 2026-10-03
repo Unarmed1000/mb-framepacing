@@ -154,6 +154,50 @@ namespace MB.FramePacing.Capture.UnitTest
     }
 
     [Test]
+    public void CaptureCommand_TwoRegions_AreCroppedDownscaledAndStacked()
+    {
+      var options = new FfmpegCaptureOptions
+      {
+        FfmpegPath = "ffmpeg",
+        Device = new CaptureDevice(FfmpegInputKind.Media, "recording.mkv", "recording.mkv"),
+        Roi = new PixelRect(14, 14, 330, 330),
+        SyncRoi = new PixelRect(14, 832, 234, 234),
+        RoiDownscale = 2,
+      };
+      var args = string.Join(" ", FfmpegCommandBuilder.BuildCapture(options));
+      Assert.That(
+        args,
+        Does.Contain(
+          "-copyts -fps_mode passthrough -filter_complex [0:v]split=2[a][b];"
+            + "[a]crop=330:330:14:14:exact=1,scale=165:165:flags=area,format=gray[m];"
+            + "[b]crop=234:234:14:832:exact=1,scale=117:117:flags=area,format=gray,pad=165:117:0:0:color=white[s];"
+            + "[m][s]vstack=inputs=2,showinfo[out] -map [out] -f rawvideo -pix_fmt gray pipe:1"
+        )
+      );
+
+      // At the source's own resolution nothing is scaled; the wider region is the one that is not padded, whichever it is
+      var unscaled = FfmpegCommandBuilder.BuildStackedFilter(
+        options with
+        {
+          Roi = new PixelRect(0, 0, 120, 120),
+          SyncRoi = new PixelRect(0, 300, 165, 165),
+          RoiDownscale = 1,
+        }
+      );
+      Assert.That(
+        unscaled,
+        Is.EqualTo(
+          "[0:v]split=2[a][b];[a]crop=120:120:0:0:exact=1,format=gray,pad=165:120:0:0:color=white[m];"
+            + "[b]crop=165:165:0:300:exact=1,format=gray[s];[m][s]vstack=inputs=2,showinfo[out]"
+        )
+      );
+
+      Assert.Throws<ArgumentException>(() => FfmpegCommandBuilder.BuildStackedFilter(options with { SyncRoi = null }), "one region");
+      Assert.Throws<ArgumentException>(() => FfmpegCommandBuilder.BuildStackedFilter(options with { Scale = (165, 282) }), "a stored size");
+      Assert.Throws<ArgumentException>(() => FfmpegCommandBuilder.BuildStackedFilter(options with { RoiDownscale = 4 }), "sizes not multiples");
+    }
+
+    [Test]
     public void CaptureCommand_Video4Linux2AndAVFoundation()
     {
       var v4l2 = new FfmpegCaptureOptions

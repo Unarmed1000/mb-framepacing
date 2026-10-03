@@ -39,8 +39,8 @@ namespace MB.FramePacing.App.Commands
       var roiOption = new Option<string?>("--roi")
       {
         Description =
-          "Only store this region of the source: x,y,width,height (source pixels, before --scale), or 'auto' to find the marker first and "
-          + "store only its region (fast capture; the marker must not move).",
+          "Only store this region of the source: x,y,width,height (source pixels, before --scale), or 'auto' to find the markers first and "
+          + "store only their regions (fast capture; the markers must not move).",
       };
       var durationOption = new Option<string?>("--duration", "-t")
       {
@@ -122,7 +122,7 @@ namespace MB.FramePacing.App.Commands
             options =
               cameraText != null
                 ? CameraRigCommand.ApplyCamera(options, cameraText, cancellationToken)
-                : ApplyRegion(options, roiText, scaleText, cancellationToken);
+                : ApplyRegion(options, roiText, scaleText, parseResult.GetValue(keepFramesOption), cancellationToken);
             var runOptions = new CaptureRunOptions
             {
               Camera = options.Camera,
@@ -178,26 +178,25 @@ namespace MB.FramePacing.App.Commands
       return Path.Combine(root, $"capture-{DateTime.Now:yyyyMMdd-HHmmss}");
     }
 
-    /// <summary>--roi and --scale; '--roi auto' locates the marker and chooses both.</summary>
+    /// <summary>
+    /// --roi and --scale (<see cref="RegionRule"/>): '--roi auto' locates the markers and chooses both; a recording stores only its markers'
+    /// regions unless --roi, --scale or --keep-frames says otherwise; '--roi full' is the whole frame.
+    /// </summary>
     internal static FfmpegCaptureOptions ApplyRegion(
       FfmpegCaptureOptions options,
       string? roiText,
       string? scaleText,
+      bool keepFrames,
       CancellationToken cancellationToken
-    )
-    {
-      if (FfmpegMarkerLocator.IsAutoRoi(roiText))
-      {
-        if (scaleText != null)
-          throw new ArgumentException("--roi auto chooses the stored size itself; leave out --scale.");
-        return LocateCommand.LocateAndApply(options, cancellationToken);
-      }
-      return options with
-      {
-        Scale = scaleText != null ? RequestedMode.ParseSize(scaleText, scaleText) : null,
-        Roi = roiText != null ? PixelRect.Parse(roiText) : null,
-      };
-    }
+    ) =>
+      RegionRule.Apply(
+        options,
+        roiText,
+        scaleText != null ? RequestedMode.ParseSize(scaleText, scaleText) : null,
+        keepFrames,
+        () => LocateCommand.Locate(options, cancellationToken),
+        note => AnsiConsole.MarkupLineInterpolated($"[yellow]{note}[/]")
+      );
 
     internal static CaptureResult RunWithStatus(ICaptureSource source, CaptureRunOptions options, CancellationToken cancellationToken)
     {

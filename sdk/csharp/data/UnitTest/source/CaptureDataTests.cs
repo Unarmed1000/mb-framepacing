@@ -9,6 +9,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using MB.FramePacing.Marker;
 using NUnit.Framework;
 
@@ -149,6 +150,24 @@ namespace MB.FramePacing.Data.UnitTest
       var read = CaptureDataHeader.Read(bytes);
       Assert.That((read.FramesStored, read.Camera, read.SourceWidth, read.SourceHeight, read.Markers.Count), Is.EqualTo((false, true, 0, 0, 0)));
       Assert.That((read.FrameRateNumerator, read.FrameRateDenominator, read.Region), Is.EqualTo((60000u, 1001u, new Rectangle(8, 16, 960, 540))));
+      Assert.That(read.SyncRegion, Is.EqualTo(default(Rectangle)), "one region: no second one");
+    }
+
+    [Test]
+    public void Header_TheSyncMarkersRegion_IsAfterTheMarkerLocations()
+    {
+      var bytes = new byte[CaptureDataHeader.HeaderSize];
+      var stacked = g_header with { SyncRegion = new Rectangle(14, 820, 240, 246) };
+      stacked.Write(bytes);
+
+      // x, y, width, height as 32-bit numbers at offset 168; everything before it as without one
+      Assert.That(new[] { 168, 172, 176, 180 }.Select(offset => BitConverter.ToInt32(bytes, offset)), Is.EqualTo(new[] { 14, 820, 240, 246 }));
+      Assert.That(bytes.AsSpan(184).ToArray(), Is.All.Zero, "the rest stays reserved");
+      var plain = new byte[CaptureDataHeader.HeaderSize];
+      g_header.Write(plain);
+      Assert.That(bytes.AsSpan(0, 168).ToArray(), Is.EqualTo(plain.AsSpan(0, 168).ToArray()));
+      var read = CaptureDataHeader.Read(bytes);
+      Assert.That((read.Region, read.SyncRegion), Is.EqualTo((g_header.Region, new Rectangle(14, 820, 240, 246))));
     }
 
     [Test]

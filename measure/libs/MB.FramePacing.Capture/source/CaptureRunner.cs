@@ -66,7 +66,7 @@ namespace MB.FramePacing.Capture
 
       var clock = new CaptureClock();
       var startedUtc = DateTime.UtcNow;
-      using var data = new CaptureDataWriter(dataPath, header.ToDataHeader(Array.Empty<MarkerLock>(), options.KeepFrames, camera));
+      using var data = new CaptureDataWriter(dataPath, header.ToDataHeader(Array.Empty<MarkerLock>(), options.KeepFrames, camera, format.SyncRoi));
       using var frames = options.KeepFrames ? new CaptureFileWriter(framesPath, header, expectedRecords) : null;
       using var recorder = new FrameRecorder(header, frames, data, recorderOptions, clock, source.DeviceTimestamps);
       using var stopSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -177,6 +177,7 @@ namespace MB.FramePacing.Capture
         SourceWidth = format.SourceWidth,
         SourceHeight = format.SourceHeight,
         Roi = format.Roi.IsEmpty ? null : format.Roi.ToString(),
+        SyncRoi = format.SyncRoi.IsEmpty ? null : format.SyncRoi.ToString(),
         NominalFps = format.FrameRate.FramesPerSecond,
         WaitedForStart = options.WaitForStart,
         StopAtEnd = options.StopAtEnd,

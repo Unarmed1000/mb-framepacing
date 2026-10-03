@@ -37,7 +37,10 @@ namespace MB.FramePacing.App.Commands
       var scaleOption = new Option<string?>("--scale") { Description = "Stored frame size WIDTHxHEIGHT (area downscale). Prefer integer ratios." };
       var roiOption = new Option<string?>("--roi")
       {
-        Description = "Only store this region: x,y,width,height (source pixels, before --scale), or 'auto' for the marker's region.",
+        Description =
+          "What to read of each frame: x,y,width,height (source pixels, before --scale), 'auto' for the markers' regions, or 'full' for "
+          + "the whole frame. Default for a video file or an image folder: the markers' regions, located first (several times faster; "
+          + "the markers must not move), unless --scale or --keep-frames is given.",
       };
       var durationOption = new Option<string?>("--duration", "-t") { Description = "Stop after this long (mostly for streams), e.g. 30s." };
       var waitOption = new Option<bool>("--wait-for-start") { Description = "Skip everything before the start marker (keeps a short pre-roll)." };
@@ -118,7 +121,13 @@ namespace MB.FramePacing.App.Commands
             var options =
               cameraText != null
                 ? CameraRigCommand.ApplyCamera(media.ToCaptureOptions(ffmpeg), cameraText, cancellationToken)
-                : CaptureCommand.ApplyRegion(media.ToCaptureOptions(ffmpeg), roiText, scaleText, cancellationToken);
+                : CaptureCommand.ApplyRegion(
+                  media.ToCaptureOptions(ffmpeg),
+                  roiText,
+                  scaleText,
+                  parseResult.GetValue(keepFramesOption),
+                  cancellationToken
+                );
             var runOptions = new CaptureRunOptions
             {
               Camera = options.Camera,

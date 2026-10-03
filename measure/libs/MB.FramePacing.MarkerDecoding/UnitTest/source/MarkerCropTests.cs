@@ -9,6 +9,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Linq;
 using NUnit.Framework;
 
 namespace MB.FramePacing.MarkerDecoding.UnitTest
@@ -69,7 +70,8 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     [Test]
     public void MarkerOutsideTheFrame_Throws()
     {
-      Assert.Throws<InvalidOperationException>(() => MarkerCrop.For(LockAt(100, 100, 6), 200, 200));
+      Assert.Throws<MarkerRegionException>(() => MarkerCrop.For(LockAt(100, 100, 6), 200, 200));
+      Assert.Throws<MarkerRegionException>(() => MarkerCrop.For(LockAt(32, 32, 3), SyncLockAt(32, 150, 3), 320, 200), "the sync marker");
       Assert.Throws<ArgumentOutOfRangeException>(() => MarkerCrop.For(new MarkerLock(new PixelRect(0, 0, 99, 99), 0), 200, 200));
     }
 
@@ -109,6 +111,78 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         Assert.That(decoded.Payload, Is.EqualTo(payload));
       }
     }
+
+    [TestCase(3)]
+    [TestCase(6)]
+    [TestCase(8)]
+    [TestCase(12)]
+    public void BothMarkers_GetACropEach_AndDecodeFromTheStackedFrame(int modulePx)
+    {
+      // A 2160p output: room between the two markers at every module size (12 px modules on 1080p would overlap)
+      const int Width = 3840;
+      const int Height = 2160;
+      var mainLock = LockAt(32, 32, modulePx);
+      int syncSize = MarkerRenderer.MarkerSizePx(modulePx, MarkerRenderer.RecommendedQuietZoneModules, MarkerKind.Sync);
+      var syncLock = SyncLockAt(32, Height - 32 - syncSize, modulePx);
+
+      var crop = MarkerCrop.For(mainLock, syncLock, Width, Height);
+
+      Assert.That(crop.HasSyncRoi, Is.True);
+      Assert.That(crop.Roi, Is.EqualTo(MarkerCrop.For(mainLock, Width, Height).Roi), "the main marker's crop is what it is alone");
+      // Each crop on its own marker's grid, each a whole number of stored pixels
+      foreach (
+        int value in new[]
+        {
+          syncLock.Bounds.X - crop.SyncRoi.X,
+          syncLock.Bounds.Y - crop.SyncRoi.Y,
+          crop.SyncRoi.Width,
+          crop.SyncRoi.Height,
+          crop.Roi.Width,
+          crop.Roi.Height,
+        }
+      )
+        Assert.That(value % crop.Factor, Is.Zero);
+      Assert.That(crop.SyncRoi.Intersect(syncLock.SearchRegion), Is.EqualTo(syncLock.SearchRegion));
+      Assert.That(crop.Roi.Intersect(crop.SyncRoi).IsEmpty, Is.True);
+      Assert.That(
+        (crop.StoredWidth, crop.StoredHeight),
+        Is.EqualTo((crop.Roi.Width / crop.Factor, (crop.Roi.Height + crop.SyncRoi.Height) / crop.Factor)),
+        "the sync marker's crop is the narrower one"
+      );
+
+      // The stored frame as ffmpeg makes it: each crop downscaled, the narrower one padded with white, one below the other
+      var main = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(5_678_000));
+      var sync = new MarkerPayload(MarkerKind.Sync, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0));
+      var source = new GrayImage(Width, Height, 96);
+      MarkerRenderer.Render(source, main, mainLock.Bounds.X, mainLock.Bounds.Y, modulePx);
+      MarkerRenderer.Render(source, sync, syncLock.Bounds.X, syncLock.Bounds.Y, modulePx);
+      var top = Crop(source, crop.Roi).DownscaleBox(crop.Factor);
+      var bottom = Crop(source, crop.SyncRoi).DownscaleBox(crop.Factor);
+      var stored = new GrayImage(crop.StoredWidth, crop.StoredHeight, 255);
+      for (int y = 0; y < top.Height; ++y)
+        top.Row(y).CopyTo(stored.Row(y));
+      for (int y = 0; y < bottom.Height; ++y)
+        bottom.Row(y).CopyTo(stored.Row(top.Height + y));
+
+      var found = new MarkerDecoder(tryHarder: true).DecodeAll(stored).Where(r => r.IsDecoded).Select(r => r.Payload).ToList();
+      Assert.That(found, Is.EquivalentTo(new[] { main, sync }), $"{modulePx} px per module");
+    }
+
+    [Test]
+    public void MarkersWhoseRegionsOverlap_GetOneCropThatHoldsBoth()
+    {
+      // A frame so small that the sync marker is right below the main marker
+      var mainLock = LockAt(16, 16, 3);
+      var syncLock = SyncLockAt(16, 16 + mainLock.Bounds.Height, 3);
+      var crop = MarkerCrop.For(mainLock, syncLock, 320, 300);
+
+      Assert.That(crop.HasSyncRoi, Is.False);
+      Assert.That(crop.Roi.Intersect(mainLock.Bounds), Is.EqualTo(mainLock.Bounds));
+      Assert.That(crop.Roi.Intersect(syncLock.Bounds), Is.EqualTo(syncLock.Bounds));
+      Assert.That((crop.StoredWidth, crop.StoredHeight), Is.EqualTo((crop.Roi.Width / crop.Factor, crop.Roi.Height / crop.Factor)));
+    }
+
+    private static MarkerLock SyncLockAt(int x, int y, int modulePx) => MarkerLock.At(x, y, modulePx, MarkerKind.Sync);
 
     private static GrayImage Crop(GrayImage image, PixelRect rect)
     {

@@ -742,7 +742,7 @@ namespace MB.FramePacing.Gui.ViewModels
 
         var layout = report.Capture.Layout;
         SummaryText =
-          $"{report.Capture.Header.Width}x{report.Capture.Header.Height}, {report.Capture.Rows.Count} captures, capture period "
+          $"{report.Capture.Header.SizeText}, {report.Capture.Rows.Count} captures, capture period "
           + $"{report.CapturePeriodMs.ToString("0.###", CultureInfo.InvariantCulture)} ms ({report.Capture.TimeSource} clock), "
           + $"{layout.Locks.Count} marker(s) at {layout.ModuleSizePx.ToString("0.0", CultureInfo.InvariantCulture)} px/module";
         foreach (var warning in report.Warnings)

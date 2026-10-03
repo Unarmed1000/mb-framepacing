@@ -135,7 +135,15 @@ rate works. A camera filming the screen needs a calibrated camera rig and `--cam
   The columns are found by their names, so their order does not matter and other columns are ignored; `#` comments and empty lines
   are skipped. A file without the header, or with a time that is not a whole number, is refused with the line it is on.
 
-- `--scale`, `--roi x,y,width,height` and `--roi auto` work on imports too.
+- **Only the markers are read.** An import first finds the markers in the recording (it reads on until the first one, so the
+  recording may start before the application does), then has ffmpeg deliver only their regions: the main marker's and, when the
+  recording has one, the sync marker's, stored as one small frame. That is about twice as fast as reading whole frames, and the
+  result is the same. It relies on the markers staying where they are, as the decoder always has.
+  - `--roi full` reads whole frames; so do `--scale` and `--keep-frames` (the frames are stored as they are) without `--roi`. In
+    the GUI these are the region box under **Advanced** (`full`), the stored size and **Store video frames**.
+  - `--roi x,y,width,height` reads that rectangle, and `--roi auto` is the default said out loud.
+  - A recording without any marker stops with "No marker was found". A marker that moved while it was located, or that is partly
+    outside the frame, makes the import read whole frames and say so.
 - A network stream is recorded live, which is experimental: see [Live capture](live-capture.md#network-streams).
 
 ## 4. Results

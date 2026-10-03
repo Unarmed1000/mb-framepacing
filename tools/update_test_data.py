@@ -43,7 +43,9 @@ def main() -> int:
     video = ROOT / "measure" / "test-data" / "videos" / CLIP / "video.mp4"
     with tempfile.TemporaryDirectory(prefix="mb-framepacing-test-data-") as temporary:
         capture = Path(temporary) / CLIP
-        command = ["dotnet", "run", "--project", str(PROJECT), "-c", "Release", "--", "import", str(video), "-o", str(capture), "--analyze"]
+        # The whole frame, not only the markers' regions (an import's default): the golden capture is every frame of the clip as it is
+        import_arguments = ["import", str(video), "-o", str(capture), "--analyze", "--roi", "full"]
+        command = ["dotnet", "run", "--project", str(PROJECT), "-c", "Release", "--", *import_arguments]
         print("> " + " ".join(command), flush=True)
         _ = subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
 

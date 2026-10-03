@@ -85,6 +85,34 @@ namespace MB.FramePacing.Analysis.UnitTest
         PgmFile.Write(Path.Combine(directory, $"frame{Count++}.pgm"), new GrayImage(width, height, width, m_pixels));
     }
 
+    /// <summary>
+    /// Draws a sync marker into every synthetic capture before it goes on: the run id and frame index of the frame the capture shows,
+    /// except at <paramref name="tornCapture"/>, where it names the next frame (as a tear between the two markers shows).
+    /// </summary>
+    private sealed class SyncMarkerSink(IFrameSink inner, SyntheticScenario scenario, int x, int y, long tornCapture) : IFrameSink
+    {
+      private readonly GrayImage m_frame = new GrayImage(scenario.Options.Width, scenario.Options.Height);
+      private long m_capture;
+
+      public Span<byte> BeginFrame() => m_frame.Pixels.AsSpan(0, m_frame.Width * m_frame.Height);
+
+      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
+      {
+        var shown = scenario.PresentedFrames[scenario.PresentedIndexAt(m_capture)].Payload;
+        ulong frameIndex = shown.FrameIndex + (m_capture == tornCapture ? 1UL : 0UL);
+        MarkerRenderer.Render(
+          m_frame,
+          new MarkerPayload(MarkerKind.Sync, shown.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, TimeSpan.Zero),
+          x,
+          y,
+          scenario.Options.ModuleSizePx
+        );
+        ++m_capture;
+        BeginFrame().CopyTo(inner.BeginFrame());
+        inner.EndFrame(hostTime, deviceTime, sourceDrops);
+      }
+    }
+
     private static List<(ulong FrameIndex, long AnimationTicks)> ExpectedFrames(SyntheticScenario scenario)
     {
       var expected = new List<(ulong, long)>();
@@ -107,14 +135,11 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>Render the scenario and encode it losslessly into a 240 fps video with ffmpeg itself.</summary>
-    private string EncodeVideo(SyntheticScenario scenario)
+    private string EncodeVideo(SyntheticScenario scenario, Func<IFrameSink, IFrameSink>? draw = null)
     {
       var images = Directory.CreateDirectory(Path.Combine(m_directory, "images")).FullName;
-      new SyntheticCaptureSource(scenario, paced: false).Run(
-        new PgmSink(images, scenario.Options.Width, scenario.Options.Height),
-        new CaptureClock(),
-        CancellationToken.None
-      );
+      IFrameSink sink = new PgmSink(images, scenario.Options.Width, scenario.Options.Height);
+      new SyntheticCaptureSource(scenario, paced: false).Run(draw?.Invoke(sink) ?? sink, new CaptureClock(), CancellationToken.None);
 
       var video = Path.Combine(m_directory, "markers.mkv");
       var encode = new ProcessStartInfo(m_ffmpeg)
@@ -221,6 +246,69 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
       Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(ExpectedFrames(scenario)));
+    }
+
+    /// <summary>
+    /// A recording with both markers: the two regions are located, stored as one frame (the main marker's on top) at 3 px per module, every
+    /// frame is recovered and the tearing check still works: the capture whose sync marker names another frame is torn.
+    /// </summary>
+    [Test]
+    public void VideoFile_BothMarkers_AreStoredAsOneStackedFrame_AndTearingIsChecked()
+    {
+      const int SyncX = 32;
+      const int SyncY = 410;
+      const long TornCapture = 90;
+      var scenario = new SyntheticScenario(
+        CreateScenario().Options with
+        {
+          Width = 960,
+          Height = 640,
+          ModuleSizePx = 6,
+          OriginX = 32,
+          OriginY = 32,
+          RunSeconds = 0.5,
+          StartMarkerSeconds = 0.1,
+          EndMarkerSeconds = 0.1,
+        }
+      );
+      var video = EncodeVideo(scenario, sink => new SyncMarkerSink(sink, scenario, SyncX, SyncY, TornCapture));
+      var output = Path.Combine(m_directory, "capture");
+      var options = MediaInput.Create(video, new MediaInputOptions(), output).ToCaptureOptions(m_ffmpeg);
+
+      var located = FfmpegMarkerLocator.Locate(options, TimeSpan.FromSeconds(30), CancellationToken.None);
+
+      Assert.That(located.SyncLock, Is.Not.Null, "the sync marker is found with the main marker");
+      Assert.That((located.SyncLock!.Value.Bounds.X, located.SyncLock.Value.Bounds.Y), Is.EqualTo((SyncX, SyncY)));
+      var crop = located.Crop;
+      Assert.That((crop.Factor, crop.HasSyncRoi), Is.EqualTo((2, true)));
+      var stacked = located.Apply(options);
+      Assert.That(
+        (stacked.Roi, stacked.SyncRoi, stacked.RoiDownscale, stacked.Scale),
+        Is.EqualTo((crop.Roi, (PixelRect?)crop.SyncRoi, 2, ((int, int)?)null))
+      );
+
+      using (var source = FfmpegCaptureSource.Start(stacked, TimeSpan.FromSeconds(30)))
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output }, null, CancellationToken.None);
+      var report = CaptureAnalyzer.Analyze(output, new AnalysisOptions());
+
+      // One stored frame holds both regions, and the capture says which regions they are
+      var header = report.Capture.Header;
+      Assert.That((header.Width, header.Height), Is.EqualTo((crop.StoredWidth, crop.StoredHeight)));
+      Assert.That(header.Roi, Is.EqualTo(crop.Roi));
+      Assert.That((report.Session!.Roi, report.Session.SyncRoi), Is.EqualTo((crop.Roi.ToString(), crop.SyncRoi.ToString())));
+      using (var data = new CaptureDataReader(Path.Combine(output, CaptureSessionInfo.DataFileName)))
+        Assert.That(data.Header.SyncRegion, Is.EqualTo(new Rectangle(crop.SyncRoi.X, crop.SyncRoi.Y, crop.SyncRoi.Width, crop.SyncRoi.Height)));
+      Assert.That(crop.StoredWidth * crop.StoredHeight * 10, Is.LessThan(960 * 640), "far less to read than whole frames");
+
+      // Both markers are decoded from it, and the one capture whose markers disagree is torn
+      Assert.That(report.Capture.Layout.Locks, Has.Count.EqualTo(2));
+      Assert.That(report.Capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable), Is.Zero);
+      Assert.That(report.Capture.Rows.Where(r => r.Status == CaptureStatus.Torn).Select(r => r.CaptureIndex), Is.EqualTo(new[] { TornCapture }));
+      Assert.That(report.Warnings, Has.None.Contains("moved"));
+      var expected = ExpectedFrames(scenario).Select(f => f.FrameIndex).ToList();
+      var found = report.Timeline.Runs.Single().Frames.Select(f => f.FrameIndex).ToList();
+      Assert.That(found, Is.SubsetOf(expected));
+      Assert.That(found, Has.Count.GreaterThanOrEqualTo(expected.Count - 1), "every frame, but perhaps the torn capture's");
     }
   }
 }

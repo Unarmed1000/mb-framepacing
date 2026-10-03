@@ -93,26 +93,29 @@ the development PC, 1000 fps ran with the recorder's ring nearly empty; with sto
 980 MiB/s) ran with no drops and every frame matched. A recording imported afterwards never drops a frame: it is read as fast as
 the disk allows.
 
-## Fast capture: read only the marker
+## Fast capture: read only the markers
 
 When ffmpeg or, with `--keep-frames`, the disk is the limit (high frame rates, long runs, a laptop), have ffmpeg deliver only the
-marker instead of whole frames:
+markers instead of whole frames (an imported recording does this by itself, see [usage](usage.md)):
 
 ```sh
 mb-framepacing locate --experimental -d "<device>" --mode 1920x1080@240   # optional: where the marker is and what would be stored
 mb-framepacing capture --experimental -d "<device>" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end --analyze
 ```
 
-`--roi auto` reads the source for a moment (nothing is recorded), finds the marker, then records only the region around it,
-downscaled to 3 stored pixels per module (4 with MJPEG). With 6 px modules in a 1080p source that is about 27 KB per captured frame
-instead of 2 MB. In the GUI, type `auto` as the region under **Advanced**, or press **Locate marker** to fill in the region and
-stored size now.
+`--roi auto` reads the source for a moment (nothing is recorded), finds the markers, then records only the regions around them,
+downscaled to 3 stored pixels per module (4 with MJPEG): the main marker's, and below it the sync marker's when the source shows
+one, as one frame. With 6 px modules in a 1080p source that is about 27 KB per captured frame instead of 2 MB (46 KB with a sync
+marker). In the GUI, type `auto` as the region under **Advanced**, or press **Locate marker** to fill in the main marker's region
+and stored size now.
 
-- The application must already draw the marker when the capture starts (idle frame markers are enough), and the marker must
-  **not move**: a marker that leaves the region shows as undecodable captures, and the analysis warns about it.
-- Only the top marker is kept, so tearing is not checked.
-- `--roi auto` chooses the stored size itself; leave out `--scale`. `locate` prints the region as `--roi … --scale …` to reuse it
-  without searching again.
+- The application must already draw the marker when the capture starts (idle frame markers are enough), and the markers must
+  **not move**: a marker that leaves its region shows as undecodable captures, and the analysis warns about it.
+- With a sync marker's region stored too, tearing is checked as in a whole frame. A region given as a rectangle
+  (`--roi x,y,width,height`, the **Locate marker** button) is one rectangle: the sync marker is not stored and tearing is not
+  checked.
+- `--roi auto` chooses the stored size itself; leave out `--scale`. `locate` prints the main marker's region as
+  `--roi … --scale …` to reuse it without searching again.
 
 ## Network streams
 

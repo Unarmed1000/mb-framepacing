@@ -87,6 +87,7 @@ def _capture_data(path: Path) -> dict[str, JsonValue]:
             "sourceWidth": header.source_width,
             "sourceHeight": header.source_height,
             "region": _rect(header.region),
+            "syncRegion": _rect(header.sync_region),
             "markers": [{"bounds": _rect(m.bounds), "moduleSizePx": m.module_size_px} for m in header.markers],
             "framesStored": header.frames_stored,
             "camera": header.camera,

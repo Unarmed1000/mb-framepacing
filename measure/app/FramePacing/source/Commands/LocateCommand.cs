@@ -34,7 +34,9 @@ namespace MB.FramePacing.App.Commands
       var inputFormatOption = new Option<string?>("--input-format") { Description = "Device pixel format or codec: mjpeg, yuyv422, nv12, ..." };
       var timeoutOption = new Option<string?>("--timeout")
       {
-        Description = $"Give up when no marker was found after this long (default {FfmpegMarkerLocator.DefaultTimeout.TotalSeconds:0}s).",
+        Description =
+          $"Give up when no marker was found after this long (default {FfmpegMarkerLocator.DefaultTimeout.TotalSeconds:0}s). A recording "
+          + "is read to its end.",
       };
       var ffmpegOption = CommonOptions.Ffmpeg();
 
@@ -78,9 +80,9 @@ namespace MB.FramePacing.App.Commands
       return command;
     }
 
-    /// <summary>--roi auto: find the marker, report the region and return the capture options that store only that region.</summary>
-    internal static FfmpegCaptureOptions LocateAndApply(FfmpegCaptureOptions options, CancellationToken cancellationToken) =>
-      Locate(options, FfmpegMarkerLocator.DefaultTimeout, cancellationToken).Apply(options);
+    /// <summary>Find the markers for a capture that stores only their regions, and report what it found.</summary>
+    internal static MarkerLocateResult Locate(FfmpegCaptureOptions options, CancellationToken cancellationToken) =>
+      Locate(options, FfmpegMarkerLocator.DefaultTimeout, cancellationToken);
 
     private static MarkerLocateResult Locate(FfmpegCaptureOptions options, TimeSpan timeout, CancellationToken cancellationToken)
     {
@@ -100,8 +102,10 @@ namespace MB.FramePacing.App.Commands
     {
       AnsiConsole.MarkupLineInterpolated($"{result.Summary}");
       AnsiConsole.MarkupLineInterpolated(
-        $"[grey]The marker must not move. To store the same region without locating it again: {result.Arguments}[/]"
+        $"[grey]The markers must not move. To store the main marker's region without locating it again: {result.Arguments}[/]"
       );
+      if (result.Crop.HasSyncRoi)
+        AnsiConsole.MarkupLine("[grey]A region given that way is one rectangle: the sync marker is not stored, so tearing is not checked.[/]");
     }
   }
 }

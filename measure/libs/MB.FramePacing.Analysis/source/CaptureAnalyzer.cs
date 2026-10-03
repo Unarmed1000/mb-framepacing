@@ -64,8 +64,9 @@ namespace MB.FramePacing.Analysis
       warnings.AddRange(timeline.Warnings);
       if (MarkerMayHaveMoved(capture))
         warnings.Add(
-          $"Many captures could not be decoded and only the region {capture.Header.Roi} was stored: the marker may have moved out of it. "
-            + "Keep the marker at a fixed position, or locate it again ('locate', --roi auto)."
+          $"Many captures could not be decoded and only the region {capture.Header.Roi} was stored: the marker may have moved out of it, or the "
+            + "recording goes on after the application stopped drawing it. Keep the marker at a fixed position, or store the whole frame "
+            + "(--roi full)."
         );
       if (scanout == ScanoutModel.Camera && UndecodableFraction(capture) is var fraction && fraction > CameraUndecodableFraction)
         warnings.Add(
@@ -148,10 +149,37 @@ namespace MB.FramePacing.Analysis
     {
       if (capture.Header.Roi.IsEmpty)
         return false;
-      int recorded = capture.Rows.Count(r => r.Status != CaptureStatus.NotRecorded);
-      int undecodable = capture.Rows.Count(r => r.Status == CaptureStatus.Undecodable);
+      // From the first capture with a marker on: what a recording shows before the application draws one has no marker to lose. And up
+      // to an end marker, when that is the last marker seen: what follows it is after the run. Captures without a marker at the end
+      // of anything else do count: that is what a marker that moved out of the region looks like
+      var rows = capture.Rows;
+      int first = 0;
+      while (first < rows.Count && !HasMarker(rows[first]))
+        ++first;
+      int last = rows.Count - 1;
+      int lastMarker = last;
+      while (lastMarker > first && !HasMarker(rows[lastMarker]))
+        --lastMarker;
+      if (
+        lastMarker >= first
+        && lastMarker < rows.Count
+        && rows[lastMarker].IsDecoded
+        && rows[lastMarker].Payload.Kind == MarkerDecoding.MarkerKind.SequenceEnd
+      )
+        last = lastMarker;
+      int recorded = 0;
+      int undecodable = 0;
+      for (int i = first; i <= last; ++i)
+      {
+        if (rows[i].Status != CaptureStatus.NotRecorded)
+          ++recorded;
+        if (rows[i].Status == CaptureStatus.Undecodable)
+          ++undecodable;
+      }
       return recorded > 0 && undecodable > recorded * MovedMarkerUndecodableFraction;
     }
+
+    private static bool HasMarker(CaptureRow row) => row.Status is CaptureStatus.Decoded or CaptureStatus.Torn;
 
     private static double UndecodableFraction(DecodedCapture capture)
     {
