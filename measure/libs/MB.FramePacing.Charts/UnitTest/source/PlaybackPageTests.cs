@@ -87,8 +87,9 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(result.Pages, Is.EqualTo(new[] { Path.Combine(report.OutputDirectory, "playback", "run-1", "index.html") }));
 
       string html = File.ReadAllText(result.Pages[0]);
-      // The report card, inline: the only image among the page's icons
-      Assert.That(Regex.Matches(html, "<svg [^>]*role=\"img\"").Count, Is.EqualTo(1), "the report card, inline");
+      // The report cards, inline: the whole report shown, the zoom steps (an 8 s clip: 2 s per screen) as text until they are shown
+      Assert.That(Regex.Matches(html, "<svg [^>]*role=\"img\"").Count, Is.EqualTo(2), "the report cards, inline");
+      Assert.That(html, Does.Contain("<script type=\"text/plain\" id=\"pb-card-source-1\"><svg "));
       Assert.That(html, Does.Not.Contain("<!--PB:").And.Not.Contain("__PB_"), "every placeholder filled");
       Assert.That(html, Does.Not.Contain("<script src").And.Not.Contain("<link "), "nothing loaded from elsewhere");
       using var data = PageData(html);
@@ -97,12 +98,24 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(root.GetProperty("video").GetProperty("playable").GetBoolean(), Is.True);
       Assert.That(root.GetProperty("originTicks").GetInt64(), Is.EqualTo(run.Frames[0].FirstSeenTime.Ticks));
 
-      // The plots are the card's, as the page draws it (its own header has the title and the tiles)
+      // The plots are the cards', as the page draws them (its own header has the title and the tiles)
+      var cards = root.GetProperty("cards").EnumerateArray().ToList();
+      Assert.That(
+        cards.Select(c =>
+          c.GetProperty("secondsPerScreen").ValueKind == JsonValueKind.Null ? (double?)null : c.GetProperty("secondsPerScreen").GetDouble()
+        ),
+        Is.EqualTo(new double?[] { null, 2 })
+      );
       var card = ReportCard.Build(RunSection.Whole(chart), ReportOptions.Default.Hide(new[] { ReportItem.Title, ReportItem.Tiles }));
-      var plots = root.GetProperty("plots").EnumerateArray().ToList();
+      var plots = cards[0].GetProperty("plots").EnumerateArray().ToList();
       Assert.That(plots.Select(p => p.GetProperty("id").GetString()), Is.EqualTo(card.Plots.Select(p => p.Id)));
       Assert.That(plots.Select(p => p.GetProperty("left").GetDouble()), Is.EqualTo(card.Plots.Select(p => p.Left)));
       Assert.That(plots.Select(p => p.GetProperty("xTo").GetDouble()), Is.EqualTo(card.Plots.Select(p => p.XTo)));
+      // The zoomed card's plots show its first screen: the run's first 2 s
+      Assert.That(
+        cards[1].GetProperty("plots").EnumerateArray().Select(p => p.GetProperty("xTo").GetDouble() - p.GetProperty("xFrom").GetDouble()),
+        Is.All.EqualTo(2).Within(1e-9)
+      );
 
       // Every frame of the run, as the analysis has it
       var frames = root.GetProperty("frames");

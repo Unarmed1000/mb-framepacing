@@ -2,7 +2,9 @@
 //* File Description
 //* ----------------
 //* Writes a card drawing as SVG: the element with its size, title and style sheet (SvgMarkup's, verbatim), an optional page colour behind
-//* the card, the card, then every shape in order, one element per line.
+//* the card, the card, then every shape in order, one element per line. A file shows exactly its range: the scrolling layers' shapes are
+//* written where they are. A page that scrolls the card itself (the playback page) asks for the layers as they are: each a group with the
+//* class "scroll-layer", clipped to its area, which the page moves sideways.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -17,9 +19,16 @@ namespace MB.FramePacing.Charts
 {
   public static class SvgCardWriter
   {
-    /// <summary>The SVG of <paramref name="drawing"/>; <paramref name="background"/> puts a page colour behind the card (for previews).</summary>
-    public static string Write(CardDrawing drawing, string? background = null)
+    /// <summary>The class of a scrolling layer's group when the layers are kept (<see cref="Write"/>'s scrollLayers).</summary>
+    public const string ScrollLayerClass = "scroll-layer";
+
+    /// <summary>
+    /// The SVG of <paramref name="drawing"/>; <paramref name="background"/> puts a page colour behind the card (for previews). With
+    /// <paramref name="scrollLayers"/> (a prefix for the clip paths' ids, unique in the page) the scrolling layers stay groups of their own.
+    /// </summary>
+    public static string Write(CardDrawing drawing, string? background = null, string? scrollLayers = null)
     {
+      var layers = scrollLayers != null ? new LayerIds(scrollLayers) : null;
       string width = Fixed(drawing.Width, 0);
       string height = Fixed(drawing.Height, 0);
       var parts = new List<string>
@@ -34,12 +43,12 @@ namespace MB.FramePacing.Charts
         $"<rect class=\"card\" x=\"0.5\" y=\"0.5\" width=\"{Fixed(drawing.Width - 1, 0)}\" height=\"{Fixed(drawing.Height - 1, 0)}\" rx=\"14\"/>"
       );
       foreach (var shape in drawing.Shapes)
-        Add(parts, shape);
+        Add(parts, shape, layers);
       parts.Add("</svg>");
       return string.Join("\n", parts) + "\n";
     }
 
-    private static void Add(List<string> parts, CardShape shape)
+    private static void Add(List<string> parts, CardShape shape, LayerIds? layers)
     {
       switch (shape)
       {
@@ -67,20 +76,45 @@ namespace MB.FramePacing.Charts
           parts.Add($"<text x=\"{Fixed(t.X, 1)}\" y=\"{Fixed(t.Y, 1)}\" text-anchor=\"{t.Anchor}\"{cls}>{body}</text>");
           break;
         }
+        case ScrollShape scroll when layers != null:
+        {
+          string id = $"{layers.Prefix}-clip-{layers.Count++}";
+          parts.Add(
+            $"<clipPath id=\"{id}\"><rect x=\"{Fixed(scroll.Left, 1)}\" y=\"{Fixed(scroll.Top, 1)}\" width=\"{Fixed(scroll.Right - scroll.Left, 1)}\" height=\"{Fixed(scroll.Bottom - scroll.Top, 1)}\"/></clipPath>"
+          );
+          parts.Add($"<g clip-path=\"url(#{id})\"><g class=\"{ScrollLayerClass}\">");
+          foreach (var child in scroll.Children)
+            Add(parts, child, layers);
+          parts.Add("</g></g>");
+          break;
+        }
         case ScrollShape scroll:
           // A file shows exactly its range: the scrolling shapes are written where they are
           foreach (var child in scroll.Children)
-            Add(parts, child);
+            Add(parts, child, layers);
           break;
         case GroupShape g:
           parts.Add($"<g transform=\"translate(0 {Fixed(g.TranslateY, 0)})\">");
           foreach (var child in g.Children)
-            Add(parts, child);
+            Add(parts, child, layers);
           parts.Add("</g>");
           break;
         default:
           throw new ArgumentException($"Unknown card shape {shape.GetType().Name}", nameof(shape));
       }
+    }
+
+    /// <summary>The clip paths' ids of one SVG with its scrolling layers kept: the prefix, and how many there are so far.</summary>
+    private sealed class LayerIds
+    {
+      public LayerIds(string prefix)
+      {
+        Prefix = prefix;
+      }
+
+      public string Prefix { get; }
+
+      public int Count { get; set; }
     }
   }
 }

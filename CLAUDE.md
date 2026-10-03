@@ -300,6 +300,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     section's frames as tick columns), a player bar, a playhead on every panel. Video time = the capture's time: an import keeps the
     file's own pts (`-copyts`), so only video-file imports with the Device time source qualify (`PlaybackCapture.Problem`: no camera,
     no `--recorded-fps`, not images). capture.json `inputPath` names the recording (`--video` for older imports).
+  - **Zoom steps** (`PlaybackZoom`: whole, 60, 10, 2 s per screen): a zoomed card is `ReportCard.Build(..., visible:)` with its
+    `ScrollShape` layers kept (`SvgCardWriter.Write(..., scrollLayers:)`, clipped groups the page translates, as the GUI's Timeline);
+    the steps that fit a 64 MB estimate (300 bytes per frame or pixel column drawn, measured), each kept as inert text until shown.
   - **A folder per report** (`analysis/playback/<prefix>[-<from>s-<to>s]/`: `index.html`, its own video, `playback.json`). An export
     touches only the folders it writes; saving the same report again replaces that folder only. Never share or delete another
     report's files.

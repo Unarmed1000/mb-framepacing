@@ -183,6 +183,11 @@ mb-framepacing render <capture folder> --playback --from 120 --to 125   # a page
 In the GUI: **Save playback page** on the Analyze page writes the selected run's report (the part in view when the Timeline is
 zoomed), and **Open playback page** opens it. A report is written only when you ask for it.
 
+- **Zoom the report** with the buttons above it (**Whole**, **60 s**, **10 s**, **2 s** per screen) or **+** and **−**: zoomed,
+  the panels keep their titles, keys and axes while the plots scroll with the playhead, and scrolling sideways over them moves
+  through the recording. A zoomed card holds the whole report at its zoom, so a page offers the steps that fit about 64 MB: two
+  minutes or ten get every step down to 2 s, half an hour 10 s, an hour 60 s (each zoom is read only when it is first shown). For
+  frame detail in a long run, write a report of a section of it (`--from`/`--to`, or the GUI's zoomed Timeline).
 - **Recordings imported as a video file only.** The page finds a capture in the video by its time, the video's own timestamps,
   so it needs a capture made by `import` of a video file. A capture card recorded live, a folder of images or a camera capture
   have no page. Imports made before capture.json named the recording need it named: `--video <file>` (the GUI asks for it).
@@ -201,8 +206,9 @@ zoomed), and **Open playback page** opens it. A report is written only when you 
 - Saving the same report again uses its video again while the recording is unchanged, without asking (`playback.json`).
 
 Keys: **Space** plays and pauses, **←** **→** step a video frame, **Shift**+**←** **→** an application frame, **Home** and
-**End** go to the start and the end, **1** to **4** set the speed (1×, ½×, ¼×, ⅛×). The address keeps the moment on screen
-(`run-1.html#t=12.345`, seconds since the run's first frame), so a link opens the page there.
+**End** go to the start and the end, **1** to **4** set the speed (1×, ½×, ¼×, ⅛×), **+** and **−** zoom the report. The address
+keeps the moment on screen and the zoom (`index.html#t=12.345&zoom=10`, seconds since the run's first frame), so a link opens the
+page there.
 
 The whole run's report and distribution cards are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or
 the GUI's **Save charts**; both write the same files, as SVG. `render` draws reports from an analysis (the capture itself is not needed):

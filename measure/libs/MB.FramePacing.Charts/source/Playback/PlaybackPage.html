@@ -647,7 +647,12 @@
         background: var(--pb-report-bg);
         overflow: hidden;
       }
-      .pb-report > svg {
+      .pb-report-tools {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .pb-report svg {
         display: block;
         width: 100%;
         height: auto;
@@ -958,7 +963,10 @@
         <section class="pb-card pb-report-card" aria-label="Report">
           <div class="pb-card-head">
             <span class="pb-label">Report</span>
-            <span class="pb-hint">Click or drag on a panel to go there</span>
+            <span class="pb-report-tools">
+              <span class="pb-hint" id="pb-hint">Click or drag on a panel to go there</span>
+              <span class="pb-segmented" id="pb-zooms" role="group" aria-label="Report zoom"></span>
+            </span>
           </div>
           <div class="pb-report" id="pb-report"><!--PB:REPORT--></div>
         </section>
@@ -980,6 +988,8 @@
         <dd>The start or the end</dd>
         <dt><kbd>1</kbd> – <kbd>4</kbd></dt>
         <dd>Speed 1×, ½×, ¼×, ⅛×</dd>
+        <dt><kbd>+</kbd> <kbd>−</kbd></dt>
+        <dd>Zoom the report in or out</dd>
         <dt><kbd>?</kbd></dt>
         <dd>Show or hide this list</dd>
       </dl>
@@ -1090,50 +1100,87 @@
           tiles.append(node);
         }
 
-        // ---- The report card: playhead, the frame's band, hover, click to seek --------------------------------------------------------
-        const svg = document.querySelector("#pb-report > svg");
-        const overlay = document.createElementNS(SVG_NS, "g");
-        overlay.setAttribute("pointer-events", "none");
-        const svgElement = (tag, className, attributes = {}) => {
-          const node = document.createElementNS(SVG_NS, tag);
-          node.setAttribute("class", className);
-          for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
-          overlay.append(node);
-          return node;
-        };
-        const plots = data.plots.map((plot) => ({
-          ...plot,
-          band: svgElement("rect", "pb-ov-band", { y: plot.top, height: plot.bottom - plot.top }),
-          line: svgElement("line", "pb-ov-line", { y1: plot.top, y2: plot.bottom }),
-        }));
-        const hoverLine = svgElement("line", "pb-ov-hover");
-        const topPlot = plots.reduce((top, plot) => (top === null || plot.top < top.top ? plot : top), null);
-        const tag = (className) => {
-          const group = document.createElementNS(SVG_NS, "g");
-          const rect = document.createElementNS(SVG_NS, "rect");
-          rect.setAttribute("class", className);
-          rect.setAttribute("rx", "4");
-          rect.setAttribute("height", "18");
-          const text = document.createElementNS(SVG_NS, "text");
-          text.setAttribute("class", "pb-ov-text");
-          text.setAttribute("text-anchor", "middle");
-          text.setAttribute("y", "13");
-          group.append(rect, text);
-          overlay.append(group);
-          return { group, rect, text };
-        };
-        const playTag = tag("pb-ov-tag");
-        const hoverTag = tag("pb-ov-tag pb-ov-tag-hover");
-        if (svg) svg.append(overlay);
+        // ---- The report cards: the whole report, and the zoom steps whose plots scroll with the playhead ----------------------------
         const xOf = (plot, secondsValue) =>
-          plot.left + ((plot.right - plot.left) * (secondsValue - plot.xFrom)) / (plot.xTo - plot.xFrom);
-        const secondsOf = (plot, x) => plot.xFrom + ((plot.xTo - plot.xFrom) * (x - plot.left)) / (plot.right - plot.left);
+          plot.left + ((plot.right - plot.left) * (secondsValue - plot.from)) / (plot.to - plot.from);
+        const secondsOf = (plot, x) => plot.from + ((plot.to - plot.from) * (x - plot.left)) / (plot.right - plot.left);
         const inside = (plot, x) => x >= plot.left - 0.5 && x <= plot.right + 0.5;
+        let dragging = false;
 
-        function placeTag(tagParts, x, y, label) {
+        function makeCard(card, index) {
+          const view = document.querySelector(`#pb-report > [data-card="${index}"]`);
+          const svg = view ? view.querySelector("svg") : null;
+          const overlay = document.createElementNS(SVG_NS, "g");
+          overlay.setAttribute("pointer-events", "none");
+          const svgElement = (tag, className, attributes = {}) => {
+            const node = document.createElementNS(SVG_NS, tag);
+            node.setAttribute("class", className);
+            for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+            overlay.append(node);
+            return node;
+          };
+          const plots = card.plots.map((plot) => ({
+            ...plot,
+            from: plot.xFrom,
+            to: plot.xTo,
+            band: svgElement("rect", "pb-ov-band", { y: plot.top, height: plot.bottom - plot.top }),
+            line: svgElement("line", "pb-ov-line", { y1: plot.top, y2: plot.bottom }),
+          }));
+          const hoverLine = svgElement("line", "pb-ov-hover", { visibility: "hidden" });
+          const tag = (className) => {
+            const group = document.createElementNS(SVG_NS, "g");
+            const rect = document.createElementNS(SVG_NS, "rect");
+            rect.setAttribute("class", className);
+            rect.setAttribute("rx", "4");
+            rect.setAttribute("height", "18");
+            const text = document.createElementNS(SVG_NS, "text");
+            text.setAttribute("class", "pb-ov-text");
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("y", "13");
+            group.append(rect, text);
+            overlay.append(group);
+            return { group, rect, text };
+          };
+          const topPlot = plots.reduce((top, plot) => (top === null || plot.top < top.top ? plot : top), null);
+          const result = {
+            ...card,
+            view,
+            svg,
+            plots,
+            topPlot,
+            hoverLine,
+            playTag: tag("pb-ov-tag"),
+            hoverTag: tag("pb-ov-tag pb-ov-tag-hover"),
+            // A zoomed card: its scrolling layers, its first screen's start, and its scale (card units per second)
+            layers: svg ? [...svg.querySelectorAll("g.scroll-layer")] : [],
+            start: topPlot ? topPlot.xFrom : 0,
+            pixelsPerSecond: card.secondsPerScreen && topPlot ? (topPlot.right - topPlot.left) / card.secondsPerScreen : 0,
+          };
+          result.hoverTag.group.setAttribute("visibility", "hidden");
+          if (svg) {
+            svg.append(overlay);
+            wireCard(result);
+          }
+          return result;
+        }
+
+        /** A zoomed card shows <from> on: its scrolling layers move, and its plots' time ranges with them. */
+        function scrollCard(card, from) {
+          const length = card.secondsPerScreen;
+          from = Math.min(Math.max(from, data.section.from), Math.max(data.section.from, data.section.to - length));
+          const shift = from - card.start;
+          for (const plot of card.plots) {
+            plot.from = plot.xFrom + shift;
+            plot.to = plot.xTo + shift;
+          }
+          const transform = `translate(${-shift * card.pixelsPerSecond} 0)`;
+          for (const layer of card.layers) layer.setAttribute("transform", transform);
+        }
+
+        function placeTag(card, tagParts, x, y, label) {
           tagParts.text.textContent = label;
           const width = label.length * 7.4 + 14;
-          const left = Math.min(Math.max(x - width / 2, topPlot.left - 6), topPlot.right + 6 - width);
+          const left = Math.min(Math.max(x - width / 2, card.topPlot.left - 6), card.topPlot.right + 6 - width);
           tagParts.rect.setAttribute("x", String(left));
           tagParts.rect.setAttribute("width", String(width));
           tagParts.text.setAttribute("x", String(left + width / 2));
@@ -1141,14 +1188,16 @@
         }
 
         function drawOverlay(ticks, frame) {
-          if (!svg) return;
+          const card = activeCard;
+          if (!card.svg) return;
           const now = ticks / TICKS_PER_SECOND;
+          // Zoomed, the plots follow the playhead (in the middle), except while a drag in them chooses the moment
+          if (card.secondsPerScreen && !dragging) scrollCard(card, now - card.secondsPerScreen / 2);
           const start = frame >= 0 ? frames.t[frame] / TICKS_PER_SECOND : now;
           const step = frame >= 0 ? (frames.step[frame] ?? data.periodTicks) / TICKS_PER_SECOND : 0;
-          for (const plot of plots) {
+          for (const plot of card.plots) {
             const x = xOf(plot, now);
-            const shown = inside(plot, x);
-            plot.line.setAttribute("visibility", shown ? "visible" : "hidden");
+            plot.line.setAttribute("visibility", inside(plot, x) ? "visible" : "hidden");
             plot.line.setAttribute("x1", String(x));
             plot.line.setAttribute("x2", String(x));
             const left = Math.max(plot.left, xOf(plot, start));
@@ -1157,29 +1206,31 @@
             plot.band.setAttribute("x", String(left));
             plot.band.setAttribute("width", String(Math.max(0, right - left)));
           }
-          if (topPlot) {
-            const x = xOf(topPlot, now);
-            playTag.group.setAttribute("visibility", inside(topPlot, x) ? "visible" : "hidden");
-            placeTag(playTag, x, topPlot.top + 2, number(now, 3) + " s");
+          if (card.topPlot) {
+            const x = xOf(card.topPlot, now);
+            card.playTag.group.setAttribute("visibility", inside(card.topPlot, x) ? "visible" : "hidden");
+            placeTag(card, card.playTag, x, card.topPlot.top + 2, number(now, 3) + " s");
           }
         }
 
-        function plotAt(event) {
-          if (!svg) return null;
-          const point = svg.createSVGPoint();
-          point.x = event.clientX;
-          point.y = event.clientY;
-          const matrix = svg.getScreenCTM();
-          if (!matrix) return null;
-          const local = point.matrixTransform(matrix.inverse());
-          const plot = plots.find(
-            (p) => local.x >= p.left && local.x <= p.right && local.y >= p.top - 6 && local.y <= p.bottom + 6,
-          );
-          return plot ? { plot, x: local.x, seconds: secondsOf(plot, local.x) } : null;
-        }
-
-        let dragging = false;
-        if (svg) {
+        function wireCard(card) {
+          const svg = card.svg;
+          const plotAt = (event) => {
+            const point = svg.createSVGPoint();
+            point.x = event.clientX;
+            point.y = event.clientY;
+            const matrix = svg.getScreenCTM();
+            if (!matrix) return null;
+            const local = point.matrixTransform(matrix.inverse());
+            const plot = card.plots.find(
+              (p) => local.x >= p.left && local.x <= p.right && local.y >= p.top - 6 && local.y <= p.bottom + 6,
+            );
+            return plot ? { plot, x: local.x, seconds: secondsOf(plot, local.x) } : null;
+          };
+          const hideHover = () => {
+            card.hoverLine.setAttribute("visibility", "hidden");
+            card.hoverTag.group.setAttribute("visibility", "hidden");
+          };
           svg.addEventListener("pointerdown", (event) => {
             const hit = plotAt(event);
             if (!hit || event.button !== 0) return;
@@ -1191,28 +1242,85 @@
             const hit = plotAt(event);
             if (dragging && hit) seekSeconds(hit.seconds);
             if (!hit) {
-              hoverLine.setAttribute("visibility", "hidden");
-              hoverTag.group.setAttribute("visibility", "hidden");
+              hideHover();
               return;
             }
-            hoverLine.setAttribute("visibility", "visible");
-            hoverLine.setAttribute("x1", String(hit.x));
-            hoverLine.setAttribute("x2", String(hit.x));
-            hoverLine.setAttribute("y1", String(hit.plot.top));
-            hoverLine.setAttribute("y2", String(hit.plot.bottom));
-            hoverTag.group.setAttribute("visibility", "visible");
-            placeTag(hoverTag, hit.x, hit.plot.bottom + 4, number(hit.seconds, 3) + " s");
+            card.hoverLine.setAttribute("visibility", "visible");
+            card.hoverLine.setAttribute("x1", String(hit.x));
+            card.hoverLine.setAttribute("x2", String(hit.x));
+            card.hoverLine.setAttribute("y1", String(hit.plot.top));
+            card.hoverLine.setAttribute("y2", String(hit.plot.bottom));
+            card.hoverTag.group.setAttribute("visibility", "visible");
+            placeTag(card, card.hoverTag, hit.x, hit.plot.bottom + 4, number(hit.seconds, 3) + " s");
           });
-          const stop = () => (dragging = false);
+          const stop = () => {
+            if (!dragging) return;
+            dragging = false;
+            // The plots follow the playhead again
+            show(current);
+          };
           svg.addEventListener("pointerup", stop);
           svg.addEventListener("pointercancel", stop);
-          svg.addEventListener("pointerleave", () => {
-            hoverLine.setAttribute("visibility", "hidden");
-            hoverTag.group.setAttribute("visibility", "hidden");
-          });
+          svg.addEventListener("pointerleave", hideHover);
+          // Zoomed: scrolling sideways (a sideways wheel, or Shift and the wheel) moves through the report, and the video with it
+          svg.addEventListener(
+            "wheel",
+            (event) => {
+              if (!card.secondsPerScreen) return;
+              const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.shiftKey ? event.deltaY : 0;
+              if (delta === 0) return;
+              event.preventDefault();
+              const scale = svg.getBoundingClientRect().width / card.width;
+              const pixels = event.deltaMode === 1 ? delta * 16 : delta;
+              seekSeconds(ticksOfCapture(current) / TICKS_PER_SECOND + pixels / scale / card.pixelsPerSecond);
+            },
+            { passive: false },
+          );
         }
-        hoverLine.setAttribute("visibility", "hidden");
-        hoverTag.group.setAttribute("visibility", "hidden");
+
+        // A zoomed card waits as text until it is first shown: then it is parsed, and gets its playhead
+        const cards = data.cards.map((card) => ({
+          ...card,
+          label: card.secondsPerScreen ? `${number(card.secondsPerScreen, 0)} s` : "Whole",
+          ready: false,
+        }));
+        function prepare(index) {
+          const card = cards[index];
+          if (card.ready) return card;
+          const view = document.querySelector(`#pb-report > [data-card="${index}"]`);
+          const source = $(`pb-card-source-${index}`);
+          if (view && source) {
+            view.innerHTML = source.textContent;
+            source.remove();
+          }
+          Object.assign(card, makeCard(card, index), { ready: true });
+          return card;
+        }
+        let activeCard = prepare(0);
+        const zooms = $("pb-zooms");
+        const zoomButtons = cards.map((card, index) => {
+          const button = element("button", "", card.label);
+          button.type = "button";
+          button.setAttribute("aria-label", card.secondsPerScreen ? `Zoom: ${card.label} per screen` : "Zoom: the whole report");
+          button.addEventListener("click", () => setZoom(index, true));
+          zooms.append(button);
+          return button;
+        });
+        zooms.hidden = cards.length < 2;
+
+        function setZoom(index, remember) {
+          index = Math.min(Math.max(index, 0), cards.length - 1);
+          activeCard = prepare(index);
+          document.querySelectorAll("#pb-report > .pb-card-view").forEach((view, i) => (view.hidden = i !== index));
+          zoomButtons.forEach((button, i) => button.setAttribute("aria-pressed", String(i === index)));
+          $("pb-hint").textContent = activeCard.secondsPerScreen
+            ? "Click or drag on a panel to go there · scroll sideways to move"
+            : "Click or drag on a panel to go there";
+          if (remember) {
+            show(current);
+            rememberPosition();
+          }
+        }
 
         // ---- The scrubber and its marks ------------------------------------------------------------------------------------------------
         const scrub = $("pb-scrub");
@@ -1419,6 +1527,8 @@
             if (!video.paused) return;
             const parameters = new URLSearchParams(location.hash.slice(1));
             parameters.set("t", (ticksOfCapture(current) / TICKS_PER_SECOND).toFixed(3));
+            if (activeCard.secondsPerScreen) parameters.set("zoom", String(activeCard.secondsPerScreen));
+            else parameters.delete("zoom");
             try {
               history.replaceState(null, "", "#" + parameters.toString());
             } catch {
@@ -1459,8 +1569,7 @@
             showBanner(
               `The video is ${number(video.duration, 1)} s long, but the capture runs to ${number(needed, 1)} s: is it the recording this capture was imported from?`,
             );
-          const start = hash.has("t") ? Math.floor(captureAt(Number(hash.get("t")) * TICKS_PER_SECOND) + 1e-3) : firstCapture;
-          seekTo(pendingCapture ?? (Number.isFinite(start) ? start : firstCapture));
+          seekTo(pendingCapture ?? firstCapture);
           pendingCapture = null;
         });
         $("pb-open").addEventListener("click", () => $("pb-file").click());
@@ -1553,6 +1662,13 @@
             case "4":
               setSpeed(SPEEDS[Number(event.key) - 1][0]);
               break;
+            case "+":
+            case "=":
+              setZoom(cards.indexOf(activeCard) + 1, true);
+              break;
+            case "-":
+              setZoom(cards.indexOf(activeCard) - 1, true);
+              break;
             case "?":
               toggleKeys();
               break;
@@ -1565,7 +1681,11 @@
           if (handled) event.preventDefault();
         });
 
-        show(firstCapture);
+        const askedZoom = cards.findIndex((card) => String(card.secondsPerScreen) === hash.get("zoom"));
+        setZoom(askedZoom >= 0 ? askedZoom : 0, false);
+        // The moment the address asks for, on the report at once: the video goes there once it has loaded (if it can)
+        const start = hash.has("t") ? Math.floor(captureAt(Number(hash.get("t")) * TICKS_PER_SECOND) + 1e-3) : firstCapture;
+        seekTo(Number.isFinite(start) ? start : firstCapture);
         drawMarks();
       })();
     </script>

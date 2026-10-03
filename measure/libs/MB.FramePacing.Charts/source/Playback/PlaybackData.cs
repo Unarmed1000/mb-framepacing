@@ -12,6 +12,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -26,12 +27,12 @@ namespace MB.FramePacing.Charts.Playback
     public const int FormatVersion = 1;
 
     /// <summary>
-    /// The data of <paramref name="section"/> drawn as <paramref name="card"/> (its <see cref="ReportCard"/>), playing <paramref name="video"/>
-    /// from a page in <paramref name="pageDirectory"/>.
+    /// The data of <paramref name="section"/> drawn as <paramref name="cards"/> (the whole report, then the zoom steps), playing
+    /// <paramref name="video"/> from a page in <paramref name="pageDirectory"/>.
     /// </summary>
     public static string Json(
       RunSection section,
-      CardDrawing card,
+      IReadOnlyList<PlaybackCard> cards,
       ReportOptions options,
       PlaybackVideo video,
       string pageDirectory,
@@ -88,22 +89,32 @@ namespace MB.FramePacing.Charts.Playback
         }
         json.WriteEndArray();
 
-        json.WriteStartObject("card");
-        json.WriteNumber("width", card.Width);
-        json.WriteNumber("height", card.Height);
-        json.WriteEndObject();
-        json.WriteStartArray("plots");
-        // Every panel of the report card has the time across: each with its own range (the refresh strip may show only its first seconds)
-        foreach (var plot in card.Plots)
+        json.WriteStartArray("cards");
+        foreach (var card in cards)
         {
           json.WriteStartObject();
-          json.WriteString("id", plot.Id);
-          json.WriteNumber("left", plot.Left);
-          json.WriteNumber("top", plot.Top);
-          json.WriteNumber("right", plot.Right);
-          json.WriteNumber("bottom", plot.Bottom);
-          json.WriteNumber("xFrom", plot.XFrom);
-          json.WriteNumber("xTo", plot.XTo);
+          if (card.SecondsPerScreen is { } seconds)
+            json.WriteNumber("secondsPerScreen", seconds);
+          else
+            json.WriteNull("secondsPerScreen");
+          json.WriteNumber("width", card.Drawing.Width);
+          json.WriteNumber("height", card.Drawing.Height);
+          json.WriteStartArray("plots");
+          // Every panel of the report card has the time across, each with its own range (the refresh strip may show only its first
+          // seconds); a zoomed card's plots show its first screen, and move with its scrolling layers
+          foreach (var plot in card.Drawing.Plots)
+          {
+            json.WriteStartObject();
+            json.WriteString("id", plot.Id);
+            json.WriteNumber("left", plot.Left);
+            json.WriteNumber("top", plot.Top);
+            json.WriteNumber("right", plot.Right);
+            json.WriteNumber("bottom", plot.Bottom);
+            json.WriteNumber("xFrom", plot.XFrom);
+            json.WriteNumber("xTo", plot.XTo);
+            json.WriteEndObject();
+          }
+          json.WriteEndArray();
           json.WriteEndObject();
         }
         json.WriteEndArray();
