@@ -51,6 +51,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [TestCase("AUTO", true, true, false, RegionChoice.Markers)]
     [TestCase("8,16,320,320", false, true, false, RegionChoice.Rectangle)]
     [TestCase("8,16,320,320", true, false, true, RegionChoice.Rectangle)]
+    [TestCase("8,16,320,320+8,700,240,240", true, false, false, RegionChoice.Rectangle, Description = "two rectangles are asked for as one is")]
     public void For_ChoosesWhatIsStored(string? roi, bool hasScale, bool recording, bool keepFrames, RegionChoice expected)
     {
       Assert.That(RegionRule.For(roi, hasScale, recording, keepFrames), Is.EqualTo(expected));
@@ -71,6 +72,73 @@ namespace MB.FramePacing.Capture.UnitTest
       var crop = Located(g_sync).Crop;
       Assert.That(crop.HasSyncRoi, Is.True);
       Assert.That((two.Roi, two.SyncRoi, two.Scale, two.RoiDownscale), Is.EqualTo((crop.Roi, (PixelRect?)crop.SyncRoi, ((int, int)?)null, 2)));
+    }
+
+    /// <summary>
+    /// What locating the markers found, written down (the region box, 'locate's arguments) and given back, stores what the located
+    /// result itself does: one region with its stored size, or both markers' stacked, so tearing is still checked.
+    /// </summary>
+    [Test]
+    public void ALocatedResultWrittenDown_StoresTheSameAgain_WithoutLocating([Values] bool withSync, [Values(3, 6)] int modulePx)
+    {
+      MarkerLocateResult Never() => throw new AssertionException("nothing to locate");
+      var main = MarkerLock.At(32, 32, modulePx);
+      MarkerLock? sync = withSync ? MarkerLock.At(32, 850, modulePx, MarkerKind.Sync) : null;
+      var located = new MarkerLocateResult(main, MarkerCrop.For(main, sync, 1920, 1080), 1920, 1080) { SyncLock = sync };
+      Assert.That(located.Crop.HasSyncRoi, Is.EqualTo(withSync));
+      Assert.That(located.Crop.Factor, Is.EqualTo(modulePx / 3));
+
+      foreach (var source in new[] { g_live, g_recording })
+      {
+        var again = RegionRule.Apply(source, located.RegionText, located.Scale, false, Never, _ => { });
+        Assert.That(again, Is.EqualTo(located.Apply(source)));
+        Assert.That(FfmpegCommandBuilder.BuildCapture(again), Is.EqualTo(FfmpegCommandBuilder.BuildCapture(located.Apply(source))));
+      }
+      Assert.That(located.RegionText.Contains('+', StringComparison.Ordinal), Is.EqualTo(withSync));
+      string scale = modulePx == 6 ? $" --scale {located.Crop.StoredWidth}x{located.Crop.StoredHeight}" : string.Empty;
+      Assert.That(located.Arguments, Is.EqualTo($"--roi {located.RegionText}{scale}"));
+    }
+
+    [Test]
+    public void TwoRectangles_AreTheMainMarkersRegionThenTheSyncMarkers()
+    {
+      MarkerLocateResult Never() => throw new AssertionException("nothing to locate");
+      var main = new PixelRect(14, 14, 330, 330);
+      var sync = new PixelRect(14, 832, 234, 234);
+
+      Assert.That(RegionRule.RegionText(main, sync), Is.EqualTo("14,14,330,330+14,832,234,234"));
+      Assert.That(RegionRule.RegionText(main), Is.EqualTo("14,14,330,330"));
+      Assert.That(RegionRule.ParseRegions(" 14,14,330,330 + 14,832,234,234 "), Is.EqualTo((main, (PixelRect?)sync)));
+      Assert.That(RegionRule.ParseRegions("14,14,330,330"), Is.EqualTo((main, (PixelRect?)null)));
+
+      // Without a stored size the regions are stored as they are; with one, by the whole-number downscale it stands for
+      var asTheyAre = RegionRule.Apply(g_live, "14,14,330,330+14,832,234,234", null, false, Never, _ => { });
+      var halved = RegionRule.Apply(g_live, "14,14,330,330+14,832,234,234", (165, 282), true, Never, _ => { });
+      Assert.That((asTheyAre.Roi, asTheyAre.SyncRoi, asTheyAre.RoiDownscale, asTheyAre.Scale), Is.EqualTo((main, sync, 1, ((int, int)?)null)));
+      Assert.That((halved.Roi, halved.SyncRoi, halved.RoiDownscale, halved.Scale), Is.EqualTo((main, sync, 2, ((int, int)?)null)));
+      Assert.That(RegionRule.StackedDownscale(main, sync, (55, 94)), Is.EqualTo(6));
+    }
+
+    [TestCase("14,14,330,330+14,832,234,234+1,1,8,8", Description = "three")]
+    [TestCase("14,14,330,330+", Description = "a second one that is missing")]
+    [TestCase("14,14,330,330+auto")]
+    [TestCase("14,14,330,330+14,832,234,0", Description = "an empty second region")]
+    public void RegionTexts_ThatAreNotOneOrTwoRectangles_AreRefused(string text)
+    {
+      Assert.Throws<FormatException>(() => RegionRule.Apply(g_live, text, null, false, () => throw new AssertionException("no"), _ => { }));
+    }
+
+    [TestCase(160, 282, Description = "not the two regions' width divided by a whole number")]
+    [TestCase(165, 280, Description = "another downscale for the height")]
+    [TestCase(660, 1128, Description = "larger than the regions")]
+    [TestCase(66, 113, Description = "by 5: the sync marker's 234 does not divide")]
+    [TestCase(82, 141, Description = "by 4: neither divides")]
+    public void TwoRectangles_RefuseAStoredSizeThatIsNoWholeNumberDownscaleOfBoth(int width, int height)
+    {
+      var exception = Assert.Throws<ArgumentException>(() =>
+        RegionRule.Apply(g_live, "14,14,330,330+14,832,234,234", (width, height), false, () => throw new AssertionException("no"), _ => { })
+      );
+      Assert.That(exception!.Message, Does.Contain("330x564").And.Contain($"{width}x{height}"));
     }
 
     [Test]

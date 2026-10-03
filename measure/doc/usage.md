@@ -141,7 +141,8 @@ rate works. A camera filming the screen needs a calibrated camera rig and `--cam
   result is the same. It relies on the markers staying where they are, as the decoder always has.
   - `--roi full` reads whole frames; so do `--scale` and `--keep-frames` (the frames are stored as they are) without `--roi`. In
     the GUI these are the region box under **Advanced** (`full`), the stored size and **Store video frames**.
-  - `--roi x,y,width,height` reads that rectangle, and `--roi auto` is the default said out loud.
+  - `--roi x,y,width,height` reads that rectangle, two joined by `+` read the main marker's region and the sync marker's (as the
+    import prints them, to import again without searching), and `--roi auto` is the default said out loud.
   - A recording without any marker stops with "No marker was found". A marker that moved while it was located, or that is partly
     outside the frame, makes the import read whole frames and say so.
 - A network stream is recorded live, which is experimental: see [Live capture](live-capture.md#network-streams).

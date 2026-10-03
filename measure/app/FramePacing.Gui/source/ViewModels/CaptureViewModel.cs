@@ -675,7 +675,10 @@ namespace MB.FramePacing.Gui.ViewModels
         note => g_logger.Warn("{0}", note)
       );
 
-    /// <summary>Find the marker now and fill in the region and stored size, so the next captures store only the marker's region.</summary>
+    /// <summary>
+    /// Find the markers now and fill in their regions (the sync marker's too, when the source shows one) and the stored size, so the next
+    /// captures store only those without searching again.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task LocateMarkerAsync()
     {
@@ -693,9 +696,9 @@ namespace MB.FramePacing.Gui.ViewModels
             ?? throw new InvalidOperationException("The synthetic sources need no region; choose a capture device or a file.");
           return FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, CancellationToken.None);
         });
-        RoiText = result.Crop.Roi.ToString();
+        RoiText = result.RegionText;
         ScaleText = result.Scale is { } scale ? $"{scale.Width}x{scale.Height}" : string.Empty;
-        LocateText = result.Summary + " The marker must not move.";
+        LocateText = result.Summary + (result.Crop.HasSyncRoi ? " The markers must not move." : " The marker must not move.");
       }
       catch (Exception ex)
       {

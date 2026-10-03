@@ -40,7 +40,7 @@ capture ends.
 A capture that stores only the markers (`import`'s default for a recording, `--roi auto`) crops the main marker's region and, when
 the source has a sync marker, the sync marker's too, and stores the two as one frame: the first region on top, the second below
 it, both downscaled alike, the narrower one padded with white on its right. The locks are in that stored frame. Without a sync
-marker, and with a region given as a rectangle, there is one region and the second is all 0.
+marker, and with a region given as one rectangle, there is one region and the second is all 0.
 
 ## Records (192 bytes each)
 

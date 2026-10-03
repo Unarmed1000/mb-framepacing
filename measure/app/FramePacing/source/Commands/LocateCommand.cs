@@ -101,11 +101,7 @@ namespace MB.FramePacing.App.Commands
     private static void Print(MarkerLocateResult result)
     {
       AnsiConsole.MarkupLineInterpolated($"{result.Summary}");
-      AnsiConsole.MarkupLineInterpolated(
-        $"[grey]The markers must not move. To store the main marker's region without locating it again: {result.Arguments}[/]"
-      );
-      if (result.Crop.HasSyncRoi)
-        AnsiConsole.MarkupLine("[grey]A region given that way is one rectangle: the sync marker is not stored, so tearing is not checked.[/]");
+      AnsiConsole.MarkupLineInterpolated($"[grey]The markers must not move. To store the same without locating them again: {result.Arguments}[/]");
     }
   }
 }

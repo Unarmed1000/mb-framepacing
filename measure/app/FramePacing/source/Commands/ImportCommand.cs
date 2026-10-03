@@ -38,8 +38,8 @@ namespace MB.FramePacing.App.Commands
       var roiOption = new Option<string?>("--roi")
       {
         Description =
-          "What to read of each frame: x,y,width,height (source pixels, before --scale), 'auto' for the markers' regions, or 'full' for "
-          + "the whole frame. Default for a video file or an image folder: the markers' regions, located first (several times faster; "
+          "What to read of each frame: x,y,width,height (source pixels, before --scale), two joined by '+' (the main marker's region, "
+          + "then the sync marker's), 'auto' for the markers' regions, or 'full' for the whole frame. Default for a video file or an image folder: the markers' regions, located first (several times faster; "
           + "the markers must not move), unless --scale or --keep-frames is given.",
       };
       var durationOption = new Option<string?>("--duration", "-t") { Description = "Stop after this long (mostly for streams), e.g. 30s." };

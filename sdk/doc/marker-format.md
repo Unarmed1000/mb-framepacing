@@ -273,7 +273,8 @@ origin and the settings for each library.
 - An import's default and `--roi auto` (fast capture) crop the region around the marker's origin that holds the marker,
   starting a whole number of downscale steps before the origin, and downscale it by the largest integer ratio that keeps the
   recommended stored size (3 px per module, 4 with MJPEG). A sync marker gets a region of its own, cropped and downscaled the same
-  way and stored below the main marker's, so tearing is still checked. A rectangle given with `--roi` stores only what is in it.
+  way and stored below the main marker's, so tearing is still checked. A rectangle given with `--roi` stores only what is in it; two
+  (`--roi x,y,width,height+x,y,width,height`) are the two markers' regions again.
 
 ### Checks in the tools
 

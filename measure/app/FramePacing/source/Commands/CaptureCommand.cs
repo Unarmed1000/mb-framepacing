@@ -35,12 +35,18 @@ namespace MB.FramePacing.App.Commands
         Description = "Device mode: WIDTHxHEIGHT@FPS, WIDTHxHEIGHT or @FPS (default: device default).",
       };
       var inputFormatOption = new Option<string?>("--input-format") { Description = "Device pixel format or codec: mjpeg, yuyv422, nv12, ..." };
-      var scaleOption = new Option<string?>("--scale") { Description = "Stored frame size WIDTHxHEIGHT (area downscale). Prefer integer ratios." };
+      var scaleOption = new Option<string?>("--scale")
+      {
+        Description =
+          "Stored frame size WIDTHxHEIGHT (area downscale). Prefer integer ratios; of two regions, the size of the two stacked, a "
+          + "whole-number downscale.",
+      };
       var roiOption = new Option<string?>("--roi")
       {
         Description =
-          "Only store this region of the source: x,y,width,height (source pixels, before --scale), or 'auto' to find the markers first and "
-          + "store only their regions (fast capture; the markers must not move).",
+          "Only store this region of the source: x,y,width,height (source pixels, before --scale); two joined by '+' (the main marker's, "
+          + "then the sync marker's, stored one above the other, as 'locate' prints them); or 'auto' to find the markers first and store "
+          + "only their regions (fast capture; the markers must not move).",
       };
       var durationOption = new Option<string?>("--duration", "-t")
       {
@@ -263,7 +269,8 @@ namespace MB.FramePacing.App.Commands
     {
       if (moduleSizePx is not { } module)
         return;
-      int sourceHeight = format.Roi.IsEmpty ? format.SourceHeight : format.Roi.Height;
+      // Two regions are stored one above the other, downscaled alike
+      int sourceHeight = format.Roi.IsEmpty ? format.SourceHeight : format.Roi.Height + format.SyncRoi.Height;
       if (sourceHeight <= 0)
       {
         AnsiConsole.MarkupLine("[yellow]The source size is unknown, the marker size can not be checked.[/]");

@@ -19,8 +19,14 @@ namespace MB.FramePacing.Capture.Ffmpeg
     /// <summary>The sync marker in source pixels, when the source shows one: its region is stored below the main marker's.</summary>
     public MarkerLock? SyncLock { get; init; }
 
-    /// <summary>The stored size of the one region, or null when it is stored at source resolution or there are two regions.</summary>
-    public (int Width, int Height)? Scale => Crop.Factor > 1 && !Crop.HasSyncRoi ? (Crop.StoredWidth, Crop.StoredHeight) : null;
+    /// <summary>The stored size (of the region, or of the two stacked), or null when stored at source resolution.</summary>
+    public (int Width, int Height)? Scale => Crop.Factor > 1 ? (Crop.StoredWidth, Crop.StoredHeight) : null;
+
+    /// <summary>
+    /// The region or the two as the text a capture takes (--roi, the GUI's region box): with <see cref="Scale"/> it stores exactly what
+    /// <see cref="Apply"/> does, without locating the markers again.
+    /// </summary>
+    public string RegionText => RegionRule.RegionText(Crop.Roi, Crop.SyncRoi);
 
     /// <summary>Bytes per record in frames.mbfc with the crop.</summary>
     public int RecordSize => new CaptureFileHeader(Crop.StoredWidth, Crop.StoredHeight, default).RecordSize;
@@ -64,13 +70,10 @@ namespace MB.FramePacing.Capture.Ffmpeg
       }
     }
 
-    /// <summary>
-    /// The 'capture' arguments that store the main marker's region without locating the marker again. A region given this way is one
-    /// rectangle: a sync marker's is not stored with it.
-    /// </summary>
+    /// <summary>The 'capture' arguments that store the same regions without locating the markers again.</summary>
     public string Arguments =>
-      Crop.Factor > 1
-        ? string.Create(CultureInfo.InvariantCulture, $"--roi {Crop.Roi} --scale {Crop.Roi.Width / Crop.Factor}x{Crop.Roi.Height / Crop.Factor}")
-        : string.Create(CultureInfo.InvariantCulture, $"--roi {Crop.Roi}");
+      Scale is { } scale
+        ? string.Create(CultureInfo.InvariantCulture, $"--roi {RegionText} --scale {scale.Width}x{scale.Height}")
+        : string.Create(CultureInfo.InvariantCulture, $"--roi {RegionText}");
   }
 }

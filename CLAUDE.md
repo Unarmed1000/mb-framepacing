@@ -342,7 +342,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   experimental; agreed with the user):
   - **The rule is `RegionRule`** (Capture, shared by the CLI and the GUI): a recording (a video file or an image folder:
     `InputPath` set) with no `--roi`, no `--scale` and no `--keep-frames` stores only its markers' regions; `--roi full` (the GUI's
-    region box: `full`) is the whole frame; `auto` asks for the regions anywhere; a rectangle is one rectangle. Live sources keep the
+    region box: `full`) is the whole frame; `auto` asks for the regions anywhere; a rectangle is one rectangle, and two joined by `+`
+    (`RegionRule.ParseRegions`, agreed with the user) are the main marker's region and the sync marker's, stacked, with `--scale` the
+    size of the two stacked (a whole-number downscale of both, `StackedDownscale`). That is how a located pair is written down:
+    `MarkerLocateResult.RegionText` and `Scale` (what `locate` prints and the GUI's "Locate marker" fills in) give back exactly
+    `Apply`, the same ffmpeg command line (`RegionRuleTests`). Live sources keep the
     whole frame unless asked. It goes in `CaptureCommand.ApplyRegion` / `CaptureViewModel.ApplyRegion`, never in
     `MediaInput.ToCaptureOptions` (the camera-rig tools and the ffmpeg tests call that for whole frames).
   - `FfmpegMarkerLocator` runs ffmpeg uncropped into `MarkerProbe` (nothing is recorded), which returns the main marker's lock and

@@ -106,16 +106,23 @@ mb-framepacing capture --experimental -d "<device>" --mode 1920x1080@240 --roi a
 `--roi auto` reads the source for a moment (nothing is recorded), finds the markers, then records only the regions around them,
 downscaled to 3 stored pixels per module (4 with MJPEG): the main marker's, and below it the sync marker's when the source shows
 one, as one frame. With 6 px modules in a 1080p source that is about 27 KB per captured frame instead of 2 MB (46 KB with a sync
-marker). In the GUI, type `auto` as the region under **Advanced**, or press **Locate marker** to fill in the main marker's region
-and stored size now.
+marker). In the GUI, type `auto` as the region under **Advanced**, or press **Locate marker** to fill in the markers' regions and
+stored size now.
 
 - The application must already draw the marker when the capture starts (idle frame markers are enough), and the markers must
   **not move**: a marker that leaves its region shows as undecodable captures, and the analysis warns about it.
-- With a sync marker's region stored too, tearing is checked as in a whole frame. A region given as a rectangle
-  (`--roi x,y,width,height`, the **Locate marker** button) is one rectangle: the sync marker is not stored and tearing is not
-  checked.
-- `--roi auto` chooses the stored size itself; leave out `--scale`. `locate` prints the main marker's region as
-  `--roi … --scale …` to reuse it without searching again.
+- With a sync marker's region stored too, tearing is checked as in a whole frame.
+- `--roi auto` chooses the stored size itself; leave out `--scale`.
+- To store the same without searching again, write the regions down: `locate` prints them as `--roi … --scale …`, and the
+  **Locate marker** button fills them in. Two regions are two rectangles joined by `+`, the main marker's and then the sync
+  marker's, and `--scale` is the size of the two stacked:
+
+  ```sh
+  mb-framepacing capture --experimental -d "<device>" --roi 14,14,330,330+14,832,234,234 --scale 165x282
+  ```
+
+  The stored size of two regions must be a whole-number downscale of both (here by 2); leave `--scale` out to store them as they
+  are. One rectangle (`--roi x,y,width,height`) stores only what is in it: without the sync marker in it, tearing is not checked.
 
 ## Network streams
 
