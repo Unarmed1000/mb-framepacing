@@ -18,7 +18,59 @@ namespace MB.FramePacing.Analysis
     public static readonly Statistics Empty = new Statistics(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The statistics of <paramref name="spans"/>, in milliseconds.</summary>
-    public static Statistics From(IEnumerable<TimeSpan> spans) => From(spans.Select(s => s.TotalMilliseconds));
+    public static Statistics From(IEnumerable<TimeSpan> spans)
+    {
+      var ticks = new TickList(spans.TryGetNonEnumeratedCount(out int count) ? count : 0);
+      foreach (var span in spans)
+        ticks.Add(span);
+      ticks.Sort();
+      return FromSortedTicks(ticks.Values);
+    }
+
+    /// <summary>
+    /// The statistics, in milliseconds, of spans given as their ticks in ascending order: the same numbers, to the bit, as
+    /// <see cref="From(IEnumerable{double})"/> gives for their milliseconds (ticks and milliseconds sort alike, and the sums run over the
+    /// values in that order), without an array of doubles to sort.
+    /// </summary>
+    internal static Statistics FromSortedTicks(ReadOnlySpan<long> sorted)
+    {
+      if (sorted.Length == 0)
+        return Empty;
+      double sum = 0;
+      foreach (long ticks in sorted)
+        sum += Milliseconds(ticks);
+      double mean = sum / sorted.Length;
+      double squares = 0;
+      if (sorted.Length > 1)
+      {
+        foreach (long ticks in sorted)
+          squares += (Milliseconds(ticks) - mean) * (Milliseconds(ticks) - mean);
+      }
+      double variance = sorted.Length > 1 ? squares / (sorted.Length - 1) : 0;
+      return new Statistics(
+        sorted.Length,
+        Milliseconds(sorted[0]),
+        mean,
+        Math.Sqrt(variance),
+        Percentile(sorted, 0.50),
+        Percentile(sorted, 0.95),
+        Percentile(sorted, 0.99),
+        Percentile(sorted, 0.999),
+        Milliseconds(sorted[^1])
+      );
+    }
+
+    private static double Milliseconds(long ticks) => new TimeSpan(ticks).TotalMilliseconds;
+
+    private static double Percentile(ReadOnlySpan<long> sorted, double fraction)
+    {
+      if (sorted.Length == 1)
+        return Milliseconds(sorted[0]);
+      double rank = fraction * (sorted.Length - 1);
+      int lower = (int)Math.Floor(rank);
+      int upper = Math.Min(lower + 1, sorted.Length - 1);
+      return Milliseconds(sorted[lower]) + ((Milliseconds(sorted[upper]) - Milliseconds(sorted[lower])) * (rank - lower));
+    }
 
     public static Statistics From(IEnumerable<double> values)
     {

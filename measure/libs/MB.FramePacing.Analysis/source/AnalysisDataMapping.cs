@@ -10,6 +10,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Data;
@@ -81,7 +82,7 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>An enum value's name, as its ToString gives it.</summary>
     private static string NameOf<T>(T value)
-      where T : struct, Enum => EnumNames<T>.Names.GetOrAdd(value, v => v.ToString());
+      where T : struct, Enum => EnumNames<T>.Names.TryGetValue(value, out string? name) ? name : value.ToString();
 
     /// <summary>The flags a frames CSV names: each name is one of the enum's (anything else is an <see cref="ArgumentException"/>, as Enum.Parse's).</summary>
     private static PresentedFrameFlags FlagsOf(IReadOnlyList<string> names)
@@ -95,7 +96,8 @@ namespace MB.FramePacing.Analysis
     private static class EnumNames<T>
       where T : struct, Enum
     {
-      public static readonly ConcurrentDictionary<T, string> Names = new ConcurrentDictionary<T, string>();
+      // Every value the enum names, known up front and only read afterwards: a frozen table
+      public static readonly FrozenDictionary<T, string> Names = Enum.GetValues<T>().Distinct().ToFrozenDictionary(v => v, v => v.ToString());
     }
 
     // A marker's value of 0 means unknown: the output leaves it out

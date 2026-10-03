@@ -57,23 +57,29 @@ namespace MB.FramePacing.Analysis
     /// <summary>Median interval between consecutive recorded captures; zero when there is none.</summary>
     public static TimeSpan EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
     {
-      var deltas = new List<TimeSpan>();
-      CaptureRow? previous = null;
-      foreach (var row in rows)
+      var deltas = new TickList(rows.Count);
+      // Only the index and the time of the capture before are needed: a row is too large to copy for each
+      bool hasPrevious = false;
+      long previousIndex = 0;
+      var previousTime = default(TickCount64);
+      for (int i = 0; i < rows.Count; ++i)
       {
+        var row = rows[i];
         if (row.Status == CaptureStatus.NotRecorded)
         {
-          previous = null;
+          hasPrevious = false;
           continue;
         }
-        if (previous is { } p && row.CaptureIndex == p.CaptureIndex + 1 && row.CaptureTime > p.CaptureTime)
-          deltas.Add(row.CaptureTime - p.CaptureTime);
-        previous = row;
+        if (hasPrevious && row.CaptureIndex == previousIndex + 1 && row.CaptureTime > previousTime)
+          deltas.Add(row.CaptureTime - previousTime);
+        hasPrevious = true;
+        previousIndex = row.CaptureIndex;
+        previousTime = row.CaptureTime;
       }
       if (deltas.Count == 0)
         return TimeSpan.Zero;
       deltas.Sort();
-      return deltas[deltas.Count / 2];
+      return new TimeSpan(deltas.Values[deltas.Count / 2]);
     }
 
     private sealed class RunRows
@@ -83,8 +89,15 @@ namespace MB.FramePacing.Analysis
       public DateTime? StartTimeUtc;
       public bool HasStart;
       public bool HasEnd;
-      public readonly List<CaptureRow> Rows = new List<CaptureRow>();
+
+      // The run's rows, as stretches of the capture's rows: not a copy of them
+      public readonly RowRanges Rows;
       public readonly List<string> Warnings = new List<string>();
+
+      public RunRows(IReadOnlyList<CaptureRow> captureRows)
+      {
+        Rows = new RowRanges(captureRows);
+      }
     }
 
     private static List<RunRows> SplitIntoRuns(IReadOnlyList<CaptureRow> rows, List<string> warnings)
@@ -97,27 +110,29 @@ namespace MB.FramePacing.Analysis
         warnings.Add("No start markers found: the whole capture is analysed (one run per run id). Use start/end markers to measure an exact window.");
         var byRun = new Dictionary<uint, RunRows>();
         uint? currentRun = null;
-        foreach (var row in rows)
+        for (int i = 0; i < rows.Count; ++i)
         {
+          var row = rows[i];
           if (row.IsDecoded && row.Payload.Kind == MarkerKind.Frame)
             currentRun = row.Payload.RunId;
           if (currentRun is not { } runId || (row.IsDecoded && row.Payload.Kind != MarkerKind.Frame))
             continue;
           if (!byRun.TryGetValue(runId, out var run))
           {
-            run = new RunRows { RunId = runId };
+            run = new RunRows(rows) { RunId = runId };
             byRun.Add(runId, run);
             runs.Add(run);
           }
-          run.Rows.Add(row);
+          run.Rows.Add(i);
         }
         return runs;
       }
 
       RunRows? current = null;
       bool measuring = false;
-      foreach (var row in rows)
+      for (int i = 0; i < rows.Count; ++i)
       {
+        var row = rows[i];
         if (row.IsDecoded)
         {
           var payload = row.Payload;
@@ -139,7 +154,7 @@ namespace MB.FramePacing.Analysis
               // Consecutive captures of the same start marker keep the pending run
               if (current == null || current.RunId != payload.RunId)
               {
-                current = new RunRows
+                current = new RunRows(rows)
                 {
                   RunId = payload.RunId,
                   SequenceId = row.Start?.SequenceText,
@@ -172,12 +187,12 @@ namespace MB.FramePacing.Analysis
                 continue;
               }
               measuring = true;
-              current.Rows.Add(row);
+              current.Rows.Add(i);
               continue;
           }
         }
         if (current != null && measuring)
-          current.Rows.Add(row);
+          current.Rows.Add(i);
       }
       if (current != null && measuring)
         CloseRun(current, runs, $"Run {current.RunId} has no end marker (the capture ended first)");

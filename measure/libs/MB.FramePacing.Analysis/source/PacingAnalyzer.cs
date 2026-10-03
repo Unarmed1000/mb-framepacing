@@ -49,14 +49,20 @@ namespace MB.FramePacing.Analysis
       TimeSpan? scheduleOffset = null;
       if (schedule)
       {
-        var offsets = frames.Where(f => f.IntendedDisplayTime != default).Select(CaptureMinusPacer).Order().ToArray();
-        scheduleOffset = OnTimeOffset(offsets, half);
+        var offsets = new TickList(frames.Count);
+        foreach (var frame in frames)
+        {
+          if (frame.IntendedDisplayTime != default)
+            offsets.Add(CaptureMinusPacer(frame));
+        }
+        offsets.Sort();
+        scheduleOffset = OnTimeOffset(offsets.Values, half);
       }
 
       // Frames the target dropped before each frame: without a schedule, the frame after them is due their frame times later too
       var dropped = DroppedFrames.Before(frames);
-      var pacingErrors = new List<TimeSpan>();
-      var predictionErrors = new List<TimeSpan>();
+      var pacingErrors = new TickList();
+      var predictionErrors = new TickList();
       long late = 0;
       long counted = 0;
       for (int i = 0; i < frames.Count; ++i)
@@ -131,13 +137,21 @@ namespace MB.FramePacing.Analysis
       }
 
       var (uneven, even) = Split(frames, half, errorThreshold);
-      var targets = frames.Where(f => f.DisplayDelta.HasValue && f.TargetFrameTime.HasValue).Select(f => f.TargetFrameTime!.Value).Order().ToArray();
+      var targets = new TickList(frames.Count);
+      foreach (var frame in frames)
+      {
+        if (frame.DisplayDelta.HasValue && frame.TargetFrameTime is { } frameTarget)
+          targets.Add(frameTarget);
+      }
+      targets.Sort();
+      pacingErrors.Sort();
+      predictionErrors.Sort();
       return new RunPacing(
         refresh,
         refreshCalculated,
         // The median, as a target a frame had: the lower of the two middle ones for an even number of frames
-        targets.Length > 0
-          ? targets[(targets.Length - 1) / 2]
+        targets.Count > 0
+          ? new TimeSpan(targets.Values[(targets.Count - 1) / 2])
           : givenTarget,
         source,
         late,
@@ -148,8 +162,8 @@ namespace MB.FramePacing.Analysis
         Verdict(uneven, even)
       )
       {
-        PacingErrorMs = pacingErrors.Count > 0 ? Statistics.From(pacingErrors) : null,
-        PredictionErrorMs = predictionErrors.Count > 0 ? Statistics.From(predictionErrors) : null,
+        PacingErrorMs = pacingErrors.Count > 0 ? Statistics.FromSortedTicks(pacingErrors.Values) : null,
+        PredictionErrorMs = predictionErrors.Count > 0 ? Statistics.FromSortedTicks(predictionErrors.Values) : null,
       };
     }
 
@@ -163,19 +177,19 @@ namespace MB.FramePacing.Analysis
     /// The earliest offset (capture time minus intended time, sorted) that at least <see cref="OnTimeShare"/> of the frames share within half a
     /// refresh: the run's on-time frames.
     /// </summary>
-    private static TimeSpan OnTimeOffset(TimeSpan[] sorted, TimeSpan half)
+    private static TimeSpan OnTimeOffset(ReadOnlySpan<long> sortedTicks, TimeSpan half)
     {
-      int needed = Math.Max(1, (int)Math.Ceiling(sorted.Length * OnTimeShare));
+      int needed = Math.Max(1, (int)Math.Ceiling(sortedTicks.Length * OnTimeShare));
       int end = 0;
-      for (int start = 0; start < sorted.Length; ++start)
+      for (int start = 0; start < sortedTicks.Length; ++start)
       {
         end = Math.Max(end, start);
-        while (end < sorted.Length && sorted[end] - sorted[start] < half)
+        while (end < sortedTicks.Length && sortedTicks[end] - sortedTicks[start] < half.Ticks)
           ++end;
         if (end - start >= needed)
-          return sorted[start];
+          return new TimeSpan(sortedTicks[start]);
       }
-      return sorted[0];
+      return new TimeSpan(sortedTicks[0]);
     }
 
     private static TimeSpan WholeRefreshes(TimeSpan frameTime, TimeSpan refresh) => FrameTimeRounding.WholeRefreshes(frameTime, refresh);

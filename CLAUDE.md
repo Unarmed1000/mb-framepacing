@@ -450,6 +450,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     error, no late verdict, not in the frame rates; `RunStatistics.UncertainSteps`), and frame indices skipped across the gap are never
     called dropped. A camera decides uncertain starts itself. Out-of-order captures are kept with the newest frame
     (`PresentedFrame.OlderFrames`).
+  - **A long capture's analysis sorts ticks, not doubles, and copies no rows:** the statistics gather each kind of value as ticks
+    (`TickList`), sort it once with a radix sort (`TickSort`) and take every number from that (`Statistics.FromSortedTicks`,
+    `RunStatistics.From`: to the bit what the formulas over sorted milliseconds give, which `StatisticsTests` keeps as the reference);
+    never `OrderBy` or a sorted array per statistic. A run's rows are stretches of the capture's row list (`RowRanges`), not a copy (a
+    row is over 200 bytes). The tick lists own their arrays: rented ones would stay in the pool after the analysis.
+    `AnalysisBenchmarks` (`--long-running`): the timeline of an hour at 240 Hz takes 0.35 s. Each frame is still made twice (the
+    pacing pass copies it to add its values): measured as about 0.05 s and 269 MB of short-lived garbage, left as it is.
   - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
     summary.json). Every frame's target comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`:
     lateness against the schedule, and the animation error split into pacing and prediction error), its target frame time in the
@@ -514,7 +521,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
 --refresh 60 [--tear-every 9]` runs it end to end.
   - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the
     folder's `.slnx` does not build the libraries optimized. The long-running ones (`[BenchmarkCategory(BenchmarkCategories.LongRunning)]`:
-    `CardBenchmarks`, `PlaybackBenchmarks`, `OutputFileBenchmarks`, many minutes) are left out unless the run adds `--long-running`; mark a new one that takes
+    `CardBenchmarks`, `PlaybackBenchmarks`, `OutputFileBenchmarks`, `AnalysisBenchmarks`, many minutes) are left out unless the run adds `--long-running`; mark a new one that takes
     minutes the same way.
   - The precision-by-camera-rate table in `measure/doc/camera.md` is generated: `python tools/camera_rate_table.py --update-doc` (runs
     `selftest --experimental --camera` per rate; selftest prints its error against the simulation for it). Rerun it after changes to the camera
