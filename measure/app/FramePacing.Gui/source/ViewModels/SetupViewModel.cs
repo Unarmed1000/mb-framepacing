@@ -105,7 +105,7 @@ namespace MB.FramePacing.Gui.ViewModels
     [RelayCommand(CanExecute = nameof(CanFinish))]
     private void Done()
     {
-      if (!Program.Demo && Program.OutputRoot == null)
+      if (!Program.Automation && Program.OutputRoot == null)
       {
         try
         {
@@ -121,7 +121,7 @@ namespace MB.FramePacing.Gui.ViewModels
       CloseRequested?.Invoke(true);
     }
 
-    /// <summary>Close without ffmpeg: only the synthetic test game can be captured, analysis works as usual.</summary>
+    /// <summary>Close without ffmpeg: nothing can be captured or imported, analysis of earlier captures works as usual.</summary>
     [RelayCommand]
     private void Skip() => CloseRequested?.Invoke(false);
 

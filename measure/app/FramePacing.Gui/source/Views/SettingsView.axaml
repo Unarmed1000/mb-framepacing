@@ -47,7 +47,7 @@
           <TextBlock
             Classes="subtle"
             TextWrapping="Wrap"
-            Text="Camera capture: film the screen with a calibrated high speed camera instead of a capture card. When enabled, the Capture page shows the Camera card and the synthetic camera source; when disabled, they are hidden and a camera set up earlier is not used."
+            Text="Live capture: record a capture card or a network stream directly (the suggested way is a recording of the card, imported as a video file). Camera capture (very experimental): film the screen with a calibrated high speed camera. When enabled, the Capture page shows the capture cards, the network stream, the Camera card and the synthetic camera source; when disabled, they are hidden and a camera set up earlier is not used."
           />
           <TextBlock Classes="warning" Text="{Binding ExperimentalText}" TextWrapping="Wrap" />
         </StackPanel>

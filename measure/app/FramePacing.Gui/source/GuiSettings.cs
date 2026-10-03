@@ -90,9 +90,9 @@ namespace MB.FramePacing.Gui
 
     public static GuiSettings Load()
     {
-      // A demo or an explicit --output-root run (also DocImages) starts from the defaults: its result must not depend on, or show, what
+      // An automation run (DocImages) or an explicit --output-root run starts from the defaults: its result must not depend on, or show, what
       // the user did last
-      if (Program.Demo || Program.OutputRoot != null)
+      if (Program.Automation || Program.OutputRoot != null)
         return new GuiSettings();
       if (!File.Exists(g_path))
         return new GuiSettings();
@@ -118,8 +118,8 @@ namespace MB.FramePacing.Gui
 
     public void Save()
     {
-      // A demo or an explicit --output-root run must not change the remembered settings
-      if (Program.Demo || Program.OutputRoot != null || m_keepFile)
+      // An automation or an explicit --output-root run must not change the remembered settings
+      if (Program.Automation || Program.OutputRoot != null || m_keepFile)
         return;
       FormatVersion = CurrentFormatVersion;
       try

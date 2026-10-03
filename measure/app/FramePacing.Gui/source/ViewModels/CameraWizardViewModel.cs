@@ -35,7 +35,7 @@ namespace MB.FramePacing.Gui.ViewModels
     private CancellationTokenSource? m_cancel;
 
     /// <param name="libraryDirectory">Where saved cameras live (<see cref="CameraRigLibrary"/>).</param>
-    /// <param name="sources">The capture page's sources; the synthetic test game is left out (it has no camera).</param>
+    /// <param name="sources">The capture page's sources.</param>
     /// <param name="initial">The capture page's current source, pre-selected when it can film.</param>
     /// <param name="openSource">Opens a source as whole camera frames.</param>
     public CameraWizardViewModel(
@@ -49,7 +49,7 @@ namespace MB.FramePacing.Gui.ViewModels
       m_dialogs = dialogs;
       m_libraryDirectory = libraryDirectory;
       m_openSource = openSource;
-      foreach (var source in sources.Where(s => s.Kind != SourceKind.Synthetic))
+      foreach (var source in sources)
         Sources.Add(source);
       SelectedSource =
         Sources.FirstOrDefault(s => s == initial.Source) ?? Sources.FirstOrDefault(s => s.Kind == SourceKind.Device) ?? Sources.FirstOrDefault();
@@ -126,7 +126,8 @@ namespace MB.FramePacing.Gui.ViewModels
 
     public string DoneText =>
       $"Captures will use the camera '{(IsNewCamera ? RigName.Trim() : SelectedSavedRig?.Name)}' filming {SelectedSource?.Title}. Every capture "
-      + "checks first that the camera has not moved, then stores only the two straightened marker zones. Press Finish, then Start capture.";
+      + "checks first that the camera has not moved, then stores only the two straightened marker zones. Press Finish, then Start capture "
+      + "(Analyze recording for a clip).";
 
     private bool CanBack() => Step != CameraWizardStep.Choose && Step != CameraWizardStep.Done && !IsBusy;
 

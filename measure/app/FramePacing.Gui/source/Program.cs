@@ -14,8 +14,8 @@ namespace MB.FramePacing.Gui
 {
   internal static class Program
   {
-    /// <summary>'--demo': start a capture of the built in synthetic test game right away (try the tool without hardware).</summary>
-    public static bool Demo { get; private set; }
+    /// <summary>Driven by a tool (tools/DocImages): no user setting is loaded or saved, captures go to <see cref="OutputRoot"/>.</summary>
+    public static bool Automation { get; private set; }
 
     /// <summary>'--output-root &lt;dir&gt;': store captures there instead of the remembered folder.</summary>
     public static string? OutputRoot { get; private set; }
@@ -23,7 +23,6 @@ namespace MB.FramePacing.Gui
     [STAThread]
     public static void Main(string[] args)
     {
-      Demo = Array.Exists(args, arg => arg == "--demo");
       int outputIndex = Array.IndexOf(args, "--output-root");
       if (outputIndex >= 0 && outputIndex + 1 < args.Length)
         OutputRoot = System.IO.Path.GetFullPath(args[outputIndex + 1]);
@@ -31,10 +30,10 @@ namespace MB.FramePacing.Gui
       BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
-    /// <summary>Used by tools that drive the GUI (tools/DocImages): behave like --demo --output-root, never touch the user's settings.</summary>
+    /// <summary>Used by tools that drive the GUI (tools/DocImages): like --output-root, and never touch the user's settings.</summary>
     internal static void ConfigureForAutomation(string outputRoot)
     {
-      Demo = true;
+      Automation = true;
       OutputRoot = outputRoot;
       GuiLogging.Configure();
     }

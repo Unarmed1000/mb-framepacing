@@ -107,7 +107,7 @@
         Grid.Column="1"
         Content="{Binding SkipText}"
         Command="{Binding SkipCommand}"
-        ToolTip.Tip="Without ffmpeg you can still capture the built in synthetic test game and analyse captures"
+        ToolTip.Tip="Without ffmpeg you can still analyse captures made earlier"
       />
       <Button
         Grid.Column="2"

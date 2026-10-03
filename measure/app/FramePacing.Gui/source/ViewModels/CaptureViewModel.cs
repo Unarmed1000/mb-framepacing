@@ -34,16 +34,16 @@ namespace MB.FramePacing.Gui.ViewModels
   {
     private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
 
-    private const string SyntheticTitle = "Synthetic test game";
-
     private static readonly DeviceItem[] g_otherSources =
     [
       new DeviceItem("Video file...", null, SourceKind.VideoFile),
       new DeviceItem("Image folder...", null, SourceKind.ImageFolder),
-      new DeviceItem("Network stream (URL)...", null, SourceKind.Stream),
-      new DeviceItem(SyntheticTitle, null, SourceKind.Synthetic),
+      new DeviceItem("Network stream (URL, experimental)...", null, SourceKind.Stream),
       new DeviceItem("Synthetic camera (very experimental)", null, SourceKind.SyntheticCamera),
     ];
+
+    /// <summary>The capture cards ffmpeg found: offered only with the experimental features (live capture is experimental).</summary>
+    private readonly List<DeviceItem> m_captureDevices = new List<DeviceItem>();
 
     private readonly IDialogService m_dialogs;
     private readonly GuiSettings m_settings;
@@ -75,7 +75,7 @@ namespace MB.FramePacing.Gui.ViewModels
       TimestampFile = settings.TimestampFile ?? string.Empty;
       foreach (var item in OtherSources())
         Devices.Add(item);
-      SelectedDevice = Devices.First(d => d.Kind == SourceKind.Synthetic);
+      SelectedDevice = Devices.First(d => d.Kind == SourceKind.VideoFile);
       ExperimentalFeatures = settings.ExperimentalFeatures; // adds the experimental sources
       Camera = new CameraRigViewModel(settings, CameraLibraryDirectory, OpenCameraWizardAsync, token => OpenCameraSource(CurrentChoice(), token));
     }
@@ -84,8 +84,8 @@ namespace MB.FramePacing.Gui.ViewModels
     public CameraRigViewModel Camera { get; }
 
     /// <summary>
-    /// Show the experimental features (the Settings page's switch): the camera card and the synthetic camera source. Off, they are hidden and
-    /// a camera chosen earlier is not used.
+    /// Show the experimental features (the Settings page's switch): live capture (the capture cards and network streams), the camera
+    /// card and the synthetic camera source. Off, they are hidden and a camera chosen earlier is not used.
     /// </summary>
     [ObservableProperty]
     public partial bool ExperimentalFeatures { get; set; }
@@ -96,19 +96,35 @@ namespace MB.FramePacing.Gui.ViewModels
     partial void OnExperimentalFeaturesChanged(bool value)
     {
       m_settings.ExperimentalFeatures = value;
-      var syntheticCamera = g_otherSources.First(s => s.Kind == SourceKind.SyntheticCamera);
-      if (value && !Devices.Contains(syntheticCamera))
-        Devices.Add(syntheticCamera);
-      else if (!value && Devices.Contains(syntheticCamera))
-      {
-        if (SelectedDevice == syntheticCamera)
-          SelectedDevice = Devices.First(d => d.Kind == SourceKind.Synthetic);
-        Devices.Remove(syntheticCamera);
-      }
+      ListSources();
     }
 
-    /// <summary>The sources after the capture devices; the synthetic camera only with the experimental features.</summary>
-    private IEnumerable<DeviceItem> OtherSources() => g_otherSources.Where(s => ExperimentalFeatures || s.Kind != SourceKind.SyntheticCamera);
+    /// <summary>Live and experimental sources: capture cards, network streams and the synthetic camera.</summary>
+    private static bool IsExperimental(SourceKind kind) => kind is SourceKind.Device or SourceKind.Stream or SourceKind.SyntheticCamera;
+
+    /// <summary>The sources after the capture devices; the experimental ones only with the experimental features.</summary>
+    private IEnumerable<DeviceItem> OtherSources() => g_otherSources.Where(s => ExperimentalFeatures || !IsExperimental(s.Kind));
+
+    /// <summary>
+    /// The source list: the capture cards and the other sources, the experimental ones only with the experimental features. The source
+    /// chosen stays chosen when it is still offered, else a video file is.
+    /// </summary>
+    private void ListSources()
+    {
+      var previous = SelectedDevice;
+      Devices.Clear();
+      if (ExperimentalFeatures)
+      {
+        foreach (var device in m_captureDevices)
+          Devices.Add(device);
+      }
+      foreach (var item in OtherSources())
+        Devices.Add(item);
+      SelectedDevice =
+        Devices.FirstOrDefault(d => d == previous)
+        ?? Devices.FirstOrDefault(d => d.Title == previous?.Title)
+        ?? Devices.First(d => d.Kind == SourceKind.VideoFile);
+    }
 
     public event Action<string>? CaptureCompleted;
 
@@ -139,7 +155,14 @@ namespace MB.FramePacing.Gui.ViewModels
     [NotifyPropertyChangedFor(nameof(CanBrowseMedia))]
     [NotifyPropertyChangedFor(nameof(MediaPathLabel))]
     [NotifyPropertyChangedFor(nameof(SourceHint))]
+    [NotifyPropertyChangedFor(nameof(StartText))]
     public partial DeviceItem? SelectedDevice { get; set; }
+
+    /// <summary>
+    /// The start button: a recording (a video file or an image folder) is read and analysed, so "Analyze recording"; the live sources
+    /// (experimental) are captured.
+    /// </summary>
+    public string StartText => SelectedDevice?.Kind is SourceKind.VideoFile or SourceKind.ImageFolder ? "Analyze recording" : "Start capture";
 
     /// <summary>Video file, image folder or stream URL, depending on the selected source.</summary>
     [ObservableProperty]
@@ -188,16 +211,16 @@ namespace MB.FramePacing.Gui.ViewModels
     public string SourceHint =>
       SelectedDevice?.Kind switch
       {
-        SourceKind.Synthetic =>
-          "A simulated 144 Hz game with stalls and skipped frames, captured at 144 fps like a capture card. Use it to try the tool without hardware.",
         SourceKind.VideoFile =>
           "Any video ffmpeg can read (mp4, mkv, mov, ...), e.g. a lossless recording or a high speed camera clip. Its own timestamps are used.",
         SourceKind.ImageFolder =>
           "A folder of frames (png, jpg, bmp, ...), in name order at the given frame rate, or with exact times from a CSV (a header line fileName,timeTicks, then a line per image; 100 ns ticks).",
-        SourceKind.Stream => "A live stream ffmpeg can open: rtsp://, srt://, udp://, http(s)://. Stop it with Stop or a duration.",
+        SourceKind.Stream =>
+          "EXPERIMENTAL (live capture): a live stream ffmpeg can open: rtsp://, srt://, udp://, http(s)://. Stop it with Stop or a duration.",
         SourceKind.SyntheticCamera =>
           "VERY EXPERIMENTAL: the synthetic game (60 Hz) filmed by a simulated 1000 fps camera at an angle. Set it up with Set up camera... in the Camera card, then capture.",
-        _ => "Records the capture card through ffmpeg. The defaults use the device's own mode; open Advanced to choose one.",
+        _ =>
+          "EXPERIMENTAL (live capture): records the capture card through ffmpeg. The defaults use the device's own mode; open Advanced to choose one. The suggested way to measure is a recording (OBS) of the card, as a video file.",
       };
 
     [RelayCommand]
@@ -356,11 +379,9 @@ namespace MB.FramePacing.Gui.ViewModels
         FfmpegSummary = DescribeVersion(version);
         FfmpegToolTip = $"{version}{Environment.NewLine}{ffmpeg}";
 
-        Devices.Clear();
+        m_captureDevices.Clear();
         foreach (var device in devices)
-          Devices.Add(new DeviceItem(device.Name, device));
-        foreach (var item in OtherSources())
-          Devices.Add(item);
+          m_captureDevices.Add(new DeviceItem(device.Name, device));
       }
       catch (Exception ex)
       {
@@ -369,23 +390,15 @@ namespace MB.FramePacing.Gui.ViewModels
         FfmpegReady = false;
         FfmpegSummary = "ffmpeg not set up";
         FfmpegToolTip = "Open Settings to set up ffmpeg";
-        Devices.Clear();
-        foreach (var item in OtherSources())
-          Devices.Add(item);
+        m_captureDevices.Clear();
       }
       finally
       {
-        SelectedDevice = Devices.FirstOrDefault(d => d.Title == previous) ?? Devices[0];
+        ListSources();
+        if (Devices.FirstOrDefault(d => d.Title == previous) is { } remembered)
+          SelectedDevice = remembered;
         IsRefreshing = false;
       }
-    }
-
-    /// <summary>Capture the synthetic test game with its default settings (the --demo command line switch).</summary>
-    public void StartDemo()
-    {
-      SelectedDevice = Devices.First(d => d.Kind == SourceKind.Synthetic);
-      if (StartCommand.CanExecute(null))
-        StartCommand.Execute(null);
     }
 
     private bool CanOpenLastCapture() => !string.IsNullOrEmpty(LastCaptureDirectory);
@@ -494,24 +507,9 @@ namespace MB.FramePacing.Gui.ViewModels
         return FfmpegCaptureSource.Start(ffmpegOptions, TimeSpan.FromSeconds(device?.Device != null ? 20 : 30));
       }
 
-      // The synthetic game: a 144 Hz game with stalls and skipped frames, captured at the display's 144 Hz, with start/end markers
-      var scenario = new SyntheticScenario(
-        new SyntheticScenarioOptions
-        {
-          CaptureFps = 144,
-          RefreshHz = 144,
-          RunSeconds = 3,
-          Width = 480,
-          Height = 270,
-          ModuleSizePx = 3,
-          OriginX = 24,
-          OriginY = 24,
-          StallEvery = 37,
-          SkipEvery = 53,
-          SequenceTag = "synthetic game",
-        }
+      throw new InvalidOperationException(
+        "Choose a source: a video file, an image folder, or with the experimental features a capture card or stream."
       );
-      return new SyntheticCaptureSource(scenario, paced: true);
     }
 
     /// <summary>Load the rig and check it against a few frames of <paramref name="source"/> (disposed); throws when the camera moved.</summary>
@@ -556,10 +554,10 @@ namespace MB.FramePacing.Gui.ViewModels
       return FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(30));
     }
 
-    /// <summary>Saved cameras: the shared library, or a folder in the output root for demo and automation runs (never the user's library).</summary>
+    /// <summary>Saved cameras: the shared library, or a folder in the output root for automation runs (never the user's library).</summary>
     private string CameraLibraryDirectory() =>
       Program.OutputRoot != null ? Path.Combine(Program.OutputRoot, CameraRigLibrary.DirectoryName)
-      : Program.Demo ? Path.Combine(DefaultOutputRoot(), CameraRigLibrary.DirectoryName)
+      : Program.Automation ? Path.Combine(DefaultOutputRoot(), CameraRigLibrary.DirectoryName)
       : CameraRigLibrary.DefaultDirectory;
 
     /// <summary>Open the camera rig wizard; when it finishes the capture page films with the chosen camera.</summary>

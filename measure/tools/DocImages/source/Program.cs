@@ -2,8 +2,9 @@
 //* File Description
 //* ----------------
 //* DocImages: renders the images used by README.md and doc/ without touching the desktop.
-//*   - GUI screenshots: the real GUI runs in Avalonia's headless platform with the Skia renderer (offscreen), captures and analyses the
-//*     synthetic test game, and each page is saved as PNG. Machine specific text (paths) is replaced with neutral example values first.
+//*   - GUI screenshots: the real GUI runs in Avalonia's headless platform with the Skia renderer (offscreen), imports and analyses a test
+//*     clip (measure/test-data/videos, through ffmpeg), and each page is saved as PNG. Machine specific text (paths) is replaced with
+//*     neutral example values first.
 //*   - Marker examples: how the markers look inside an application frame.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -37,6 +38,10 @@ namespace MB.FramePacing.DocImages
   {
     private const string ExampleCaptureRoot = @"D:\captures";
     private const string ExampleFfmpeg = @"C:\ffmpeg\bin\ffmpeg.exe";
+    private const string ExampleRecording = @"D:\recordings\capture-card-240hz.mkv";
+
+    /// <summary>The test clip the GUI screenshots import and analyse: a game that adapts its rate to a busy stretch.</summary>
+    private const string ScreenshotClip = "60-busy-adaptive";
 
     private static int Main(string[] args)
     {
@@ -49,7 +54,7 @@ namespace MB.FramePacing.DocImages
         string oldLog = Path.Combine(work, "logs", GuiLogging.FilePrefix + "2000-01-01.log");
         Directory.CreateDirectory(Path.GetDirectoryName(oldLog)!);
         File.WriteAllText(oldLog, string.Empty);
-        // Drive the GUI like --demo --output-root: captures go to a temporary folder and no user setting is ever saved
+        // Drive the GUI like --output-root: captures go to a temporary folder and no user setting is ever loaded or saved
         MB.FramePacing.Gui.Program.ConfigureForAutomation(work);
         using var session = HeadlessUnitTestSession.StartNew(typeof(HeadlessApp));
         session.Dispatch(() => RenderGuiAsync(output), CancellationToken.None).GetAwaiter().GetResult();
@@ -108,19 +113,26 @@ namespace MB.FramePacing.DocImages
       var viewModel = new MainWindowViewModel(new DialogService(window));
       window.DataContext = viewModel;
       window.Show();
-      await viewModel.InitializeAsync(); // --demo mode: starts capturing the synthetic test game
+      await viewModel.InitializeAsync();
+      var capture = viewModel.Capture;
+      if (!capture.FfmpegReady)
+        throw new InvalidOperationException(
+          "The GUI screenshots import a test clip through ffmpeg: install ffmpeg, or set it with mb-framepacing config"
+        );
 
-      // Capture page while recording: wait for a live picture and a marker
-      await WaitUntil(
-        () => viewModel.Capture.HasPreview && viewModel.Capture.MarkerText.Contains("Frame", StringComparison.Ordinal),
-        TimeSpan.FromSeconds(20)
-      );
-      await Task.Delay(700);
-      viewModel.Capture.OutputRoot = ExampleCaptureRoot;
-      viewModel.Capture.FfmpegSummary = "ffmpeg 9.0.2";
+      // The capture page set up the suggested way: a recording of the capture card, imported as a video file
+      capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.VideoFile);
+      capture.DisplayHzText = "60";
+      capture.MediaPath = ExampleRecording;
+      capture.OutputRoot = ExampleCaptureRoot;
+      capture.FfmpegSummary = "ffmpeg 9.0.2";
+      await Task.Delay(300);
       Save(window, Path.Combine(output, "gui-capture.png"));
 
-      // The capture finishes by itself; the analysis page opens and analyses it
+      // Import the test clip itself: the import finishes by itself, and the analysis page opens and analyses it
+      capture.MediaPath = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "videos", ScreenshotClip, "video.mp4");
+      capture.OutputRoot = MB.FramePacing.Gui.Program.OutputRoot!;
+      capture.StartCommand.Execute(null);
       await WaitUntil(() => viewModel.Analysis.HasRun && !viewModel.Analysis.IsBusy, TimeSpan.FromSeconds(60));
       viewModel.Analysis.CaptureDirectory = Path.Combine(ExampleCaptureRoot, "capture-20260923-120000");
       await Task.Delay(300);

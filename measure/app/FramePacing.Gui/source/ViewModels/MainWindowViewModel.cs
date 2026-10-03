@@ -87,7 +87,7 @@ namespace MB.FramePacing.Gui.ViewModels
     [ObservableProperty]
     public partial int SelectedTab { get; set; }
 
-    /// <summary>Remember every option for the next start (not in demo or --output-root runs, see <see cref="GuiSettings.Save"/>).</summary>
+    /// <summary>Remember every option for the next start (not in automation or --output-root runs, see <see cref="GuiSettings.Save"/>).</summary>
     public void SaveSettings()
     {
       Capture.StoreSettings();
@@ -100,12 +100,7 @@ namespace MB.FramePacing.Gui.ViewModels
     public async Task InitializeAsync()
     {
       await Capture.RefreshDevicesAsync();
-      if (Program.Demo)
-      {
-        Capture.StartDemo();
-        return;
-      }
-      if (!Capture.FfmpegReady)
+      if (!Capture.FfmpegReady && !Program.Automation)
         await ShowSetupAsync(firstRun: true);
     }
 

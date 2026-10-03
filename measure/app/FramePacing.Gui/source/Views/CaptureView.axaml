@@ -188,7 +188,7 @@
           </StackPanel>
         </Border>
 
-        <Button Classes="accent big" Content="Start capture" Command="{Binding StartCommand}" IsVisible="{Binding IsIdle}" />
+        <Button Classes="accent big" Content="{Binding StartText}" Command="{Binding StartCommand}" IsVisible="{Binding IsIdle}" />
         <Button Classes="big" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding IsCapturing}" />
         <TextBlock Classes="error" Text="{Binding ErrorText}" />
       </StackPanel>
