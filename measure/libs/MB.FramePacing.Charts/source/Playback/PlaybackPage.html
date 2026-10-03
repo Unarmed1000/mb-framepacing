@@ -1040,7 +1040,40 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
         ];
         const $ = (id) => document.getElementById(id);
         const data = JSON.parse($("pb-data").textContent);
-        const frames = data.frames;
+
+        /**
+         * The frame columns as plain arrays, from the small form the data holds them in (PlaybackData.cs): each column its values or
+         * runs of equal values; capture and index as steps from the frame before; t as what is left of its step after its captures'
+         * whole periods; step as its difference from the time to the next frame. Whole numbers throughout, so the values are exact.
+         */
+        function readFrames(columns, periodTicks) {
+          const values = (column) => {
+            if (!column.rle) return column.values;
+            const out = [];
+            for (let i = 0; i < column.rle.length; i += 2) for (let n = column.rle[i + 1]; n > 0; --n) out.push(column.rle[i]);
+            return out;
+          };
+          const capture = values(columns.capture);
+          const index = values(columns.index);
+          const t = values(columns.t);
+          const step = values(columns.step);
+          for (let i = 1; i < t.length; ++i) {
+            t[i] += t[i - 1] + capture[i] * periodTicks;
+            capture[i] += capture[i - 1];
+            index[i] += index[i - 1];
+          }
+          for (let i = 0; i < step.length; ++i) if (step[i] !== null && i + 1 < t.length) step[i] += t[i + 1] - t[i];
+          return {
+            t,
+            index,
+            capture,
+            step,
+            error: values(columns.error),
+            hold: values(columns.hold),
+            flags: values(columns.flags),
+          };
+        }
+        const frames = readFrames(data.frames, data.periodTicks);
         const frameCount = frames.t.length;
         const flag = data.flagBits;
         const holdKinds = data.holdKinds;

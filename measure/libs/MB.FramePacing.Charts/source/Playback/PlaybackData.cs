@@ -7,6 +7,14 @@
 //* frame), so a video time in seconds times 10^7 minus originTicks is the report's time. The JSON escapes '<', '>' and '&', so it cannot
 //* end its script element.
 //*
+//* The frame columns are written small (an hour at 240 Hz is 864,000 frames), in whole numbers the page turns back exactly:
+//* - capture, index: the first value, then each frame's step from the one before;
+//* - t: the first value, then what is left of the step from the frame before after its captures' whole periods
+//*   (t[i] - t[i-1] - (capture[i] - capture[i-1]) * periodTicks: a tick or two of the recording's timestamps);
+//* - step: its difference from the time to the section's next frame (t[i+1] - t[i]; 0 for the last one), null as null;
+//* - error, hold, flags: as they are.
+//* Each column is then {"values": [...]}, or {"rle": [value, count, value, count, ...]} when that is fewer numbers.
+//*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
@@ -24,7 +32,7 @@ namespace MB.FramePacing.Charts.Playback
   public static class PlaybackData
   {
     /// <summary>The format of the data; the page's script reads this one.</summary>
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
 
     /// <summary>
     /// The data of <paramref name="section"/> drawn as <paramref name="cards"/> (the whole report, then the zoom steps), playing
@@ -163,11 +171,17 @@ namespace MB.FramePacing.Charts.Playback
       var data = section.Data;
       var frames = data.Frames;
       var holds = data.HoldKinds;
+      int first = section.Start;
+      long period = section.Run.CapturePeriod.Ticks;
+      long Time(int i) => (frames[i].FirstSeenTime - data.Origin).Ticks;
+      long CaptureStep(int i) => frames[i].FirstCaptureIndex - frames[i - 1].FirstCaptureIndex;
+      long? Step(int i) => i + 1 < frames.Count ? frames[i + 1].DisplayDelta?.Ticks : null;
       json.WriteStartObject("frames");
-      WriteColumn(json, "t", section, i => (frames[i].FirstSeenTime - data.Origin).Ticks);
-      WriteColumn(json, "index", section, i => (long)frames[i].FrameIndex);
-      WriteColumn(json, "capture", section, i => frames[i].FirstCaptureIndex);
-      WriteColumn(json, "step", section, i => i + 1 < frames.Count ? frames[i + 1].DisplayDelta?.Ticks : null);
+      // The page reads capture before t, and t before step: each is written against the one before it
+      WriteColumn(json, "capture", section, i => i == first ? frames[i].FirstCaptureIndex : CaptureStep(i));
+      WriteColumn(json, "index", section, i => i == first ? (long)frames[i].FrameIndex : (long)frames[i].FrameIndex - (long)frames[i - 1].FrameIndex);
+      WriteColumn(json, "t", section, i => i == first ? Time(i) : Time(i) - Time(i - 1) - (CaptureStep(i) * period));
+      WriteColumn(json, "step", section, i => Step(i) is { } step ? step - (i + 1 < section.End ? Time(i + 1) - Time(i) : 0) : null);
       WriteColumn(json, "error", section, i => frames[i].AnimationError?.Ticks);
       WriteColumn(json, "hold", section, i => (long)holds[i]);
       WriteColumn(json, "flags", section, i => (long)frames[i].Flags);
@@ -183,20 +197,65 @@ namespace MB.FramePacing.Charts.Playback
       json.WriteEndObject();
     }
 
+    /// <summary>
+    /// A column of the section's frames: its values, or runs of equal values (value, count) when that is fewer numbers. The values are
+    /// asked for twice (to count the runs, then to write), so nothing of an hour's column is kept.
+    /// </summary>
     private static void WriteColumn(Utf8JsonWriter json, string name, RunSection section, Func<int, long?> value)
     {
-      json.WriteStartArray(name);
+      int count = section.End - section.Start;
+      int runs = 0;
+      long? previous = null;
       for (int i = section.Start; i < section.End; ++i)
       {
-        if (value(i) is { } number)
-          json.WriteNumberValue(number);
+        long? current = value(i);
+        if (i == section.Start || current != previous)
+          ++runs;
+        previous = current;
+      }
+
+      void Number(long? number)
+      {
+        if (number is { } known)
+          json.WriteNumberValue(known);
         else
           json.WriteNullValue();
         // The writer keeps what it wrote until it is flushed: an hour's columns go on to the stream as they are written
         if (json.BytesPending >= FlushBytes)
           json.Flush();
       }
+
+      json.WriteStartObject(name);
+      if (runs * 2 < count)
+      {
+        json.WriteStartArray("rle");
+        int length = 0;
+        for (int i = section.Start; i < section.End; ++i)
+        {
+          long? current = value(i);
+          if (length > 0 && current != previous)
+          {
+            Number(previous);
+            Number(length);
+            length = 0;
+          }
+          previous = current;
+          ++length;
+        }
+        if (length > 0)
+        {
+          Number(previous);
+          Number(length);
+        }
+      }
+      else
+      {
+        json.WriteStartArray("values");
+        for (int i = section.Start; i < section.End; ++i)
+          Number(value(i));
+      }
       json.WriteEndArray();
+      json.WriteEndObject();
     }
 
     /// <summary>How much the JSON writer holds before it hands it on to the stream.</summary>

@@ -113,14 +113,14 @@ namespace MB.FramePacing.Charts.UnitTest
       );
 
       // Every frame of the run, as the analysis has it
-      var frames = root.GetProperty("frames");
+      var frames = PlaybackFrameColumns.Read(root);
       var origin = run.Frames[0].FirstSeenTime;
-      Assert.That(Column(frames, "t"), Is.EqualTo(run.Frames.Select(f => (long?)(f.FirstSeenTime - origin).Ticks)));
-      Assert.That(Column(frames, "index"), Is.EqualTo(run.Frames.Select(f => (long?)f.FrameIndex)));
-      Assert.That(Column(frames, "capture"), Is.EqualTo(run.Frames.Select(f => (long?)f.FirstCaptureIndex)));
-      Assert.That(Column(frames, "error"), Is.EqualTo(run.Frames.Select(f => f.AnimationError?.Ticks)));
-      Assert.That(Column(frames, "step"), Is.EqualTo(run.Frames.Skip(1).Select(f => f.DisplayDelta?.Ticks).Append(null)));
-      Assert.That(Column(frames, "flags").Count(f => (f!.Value & (long)PresentedFrameFlags.Late) != 0), Is.EqualTo(run.Pacing!.LateFrames));
+      Assert.That(frames["t"], Is.EqualTo(run.Frames.Select(f => (long?)(f.FirstSeenTime - origin).Ticks)));
+      Assert.That(frames["index"], Is.EqualTo(run.Frames.Select(f => (long?)f.FrameIndex)));
+      Assert.That(frames["capture"], Is.EqualTo(run.Frames.Select(f => (long?)f.FirstCaptureIndex)));
+      Assert.That(frames["error"], Is.EqualTo(run.Frames.Select(f => f.AnimationError?.Ticks)));
+      Assert.That(frames["step"], Is.EqualTo(run.Frames.Skip(1).Select(f => f.DisplayDelta?.Ticks).Append(null)));
+      Assert.That(frames["flags"].Count(f => (f!.Value & (long)PresentedFrameFlags.Late) != 0), Is.EqualTo(run.Pacing!.LateFrames));
 
       // A section's report: a folder of its own (with its own copy, answered in advance) and only the section's frames
       var section = await PlaybackExport.WriteAsync(
@@ -137,7 +137,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(section.Pages, Is.EqualTo(new[] { Path.Combine(report.OutputDirectory, "playback", "run-1-2s-4s", "index.html") }));
       Assert.That(section.Video.ExistsIn(Path.GetDirectoryName(section.Pages[0])!), Is.True);
       using var sectionData = PageData(File.ReadAllText(section.Pages[0]));
-      var times = Column(sectionData.RootElement.GetProperty("frames"), "t");
+      var times = PlaybackFrameColumns.Read(sectionData.RootElement)["t"];
       Assert.That(times, Is.Not.Empty);
       Assert.That(times, Is.All.InRange(2 * TimeSpan.TicksPerSecond, 4 * TimeSpan.TicksPerSecond));
 
@@ -159,9 +159,6 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(match.Success, Is.True, "the page's data");
       return JsonDocument.Parse(match.Groups[1].Value);
     }
-
-    private static long?[] Column(JsonElement frames, string name) =>
-      frames.GetProperty(name).EnumerateArray().Select(v => v.ValueKind == JsonValueKind.Null ? (long?)null : v.GetInt64()).ToArray();
 
     private string ImportFile(string video, string output)
     {

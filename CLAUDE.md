@@ -297,7 +297,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **100 % opt-in:** `--playback` on `import`/`analyze`/`render`, the GUI's **Save playback page**; never by `--charts` or Save charts.
   - **One HTML page that runs from the disk** (`PlaybackPage.html`, an embedded resource: markup, CSS, vanilla JS; no network): the
     report card inline (its title and tiles in the page's header), the data inline (`PlaybackData`: the card's `CardPlot`s, the
-    section's frames as tick columns), a player bar, a playhead on every panel. Video time = the capture's time: an import keeps the
+    section's frames as tick columns), a player bar, a playhead on every panel. The frame columns are written small, in whole
+    numbers the page's `readFrames` turns back exactly (the file's header comment has the form: steps from the frame before, the
+    time as what is left after its captures' whole periods, runs of equal values as value and count): about 4 bytes a frame on a
+    test clip instead of 30. `PlaybackFrameColumns` (the unit tests) reads them the same way: change the three together. Video time = the capture's time: an import keeps the
     file's own pts (`-copyts`), so only video-file imports with the Device time source qualify (`PlaybackCapture.Problem`: no camera,
     no `--recorded-fps`, not images). capture.json `inputPath` names the recording (`--video` for older imports).
   - **Zoom steps** (`PlaybackZoom`: whole, 60, 10, 2 s per screen): a zoomed card is `ReportCard.Build(..., visible:)` with its
