@@ -3,7 +3,8 @@
 //* ----------------
 //* The video a playback report holds, and what it was made from: playback.json in the report's folder. The folder is complete in itself and
 //* names nothing outside it: of the recording it keeps only the file name, size and modification time, by which saving the same report
-//* again recognises an unchanged recording and uses the video again without a question. Written through a temporary file and a rename.
+//* again recognises an unchanged recording and uses the video again without a question. The one exception is a video the user names
+//* (--playback-video-url): its URL, as given. Written through a temporary file and a rename.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -25,6 +26,7 @@ namespace MB.FramePacing.Charts.Playback
   /// <param name="SourcePlayable">Browsers can play the recording as it is.</param>
   /// <param name="Description">The recording's video stream ("h264 (High), yuv420p, mp4").</param>
   /// <param name="Problem">Why browsers cannot play the recording, null when they can.</param>
+  /// <param name="Url">The video the user named instead of a copy (<see cref="PlaybackVideoKind.External"/>), as given; else null.</param>
   public sealed record PlaybackVideo(
     PlaybackVideoKind Kind,
     string? VideoFile,
@@ -33,7 +35,8 @@ namespace MB.FramePacing.Charts.Playback
     DateTime SourceModifiedUtc,
     bool SourcePlayable,
     string Description,
-    string? Problem
+    string? Problem,
+    string? Url = null
   )
   {
     public const string FileName = "playback.json";
@@ -51,9 +54,9 @@ namespace MB.FramePacing.Charts.Playback
       Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
     };
 
-    /// <summary>The report has a video it plays.</summary>
+    /// <summary>The report has a video it plays: its own, or the one the user named.</summary>
     [JsonIgnore]
-    public bool Playable => VideoFile != null;
+    public bool Playable => VideoFile != null || Url != null;
 
     /// <summary>The report's video in <paramref name="directory"/>, null without one.</summary>
     public string? PathIn(string directory) => VideoFile != null ? Path.Combine(directory, VideoFile) : null;

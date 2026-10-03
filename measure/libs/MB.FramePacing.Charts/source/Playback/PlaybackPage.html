@@ -1091,6 +1091,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           copied: "copy in this folder",
           transcoded: "playable copy in this folder",
           none: "no video in this report",
+          external: `played from ${data.video.url}`,
         };
         metaItem(
           '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>',
@@ -1566,7 +1567,9 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           ready = false;
           showMessage(
             "This browser cannot play the video",
-            `${data.video.name}: the browser could not play this report's copy. Open another file of the same recording here.`,
+            data.video.kind === "external"
+              ? `${data.video.name} could not be loaded from ${data.video.url} (resolved against this page's address). Open a file of the same recording here.`
+              : `${data.video.name}: the browser could not play this report's copy. Open another file of the same recording here.`,
           );
         });
         video.addEventListener("loadedmetadata", () => {

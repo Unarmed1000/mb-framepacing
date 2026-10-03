@@ -60,18 +60,19 @@ namespace MB.FramePacing.Charts.Playback
 
     /// <summary>
     /// Why the playback page cannot show this capture with <paramref name="video"/> (null: the recording capture.json names), or null when it
-    /// can. A missing recording is not a problem here: the page may still have a copy of it.
+    /// can. A missing recording is not a problem here: the page may still have a copy of it. With <paramref name="namedVideo"/> (the user
+    /// names the page's video, --playback-video-url) the recording itself is not needed, but its times still must be a video's own.
     /// </summary>
-    public string? Problem(string? video = null)
+    public string? Problem(string? video = null, bool namedVideo = false)
     {
       if (Camera)
         return "The playback page needs a recording imported as a video file: this is a camera capture (very experimental), whose frames are the camera rig's zones.";
       if (RecordedFps != null)
         return "The capture's times were made from a recorded frame rate (--recorded-fps), not read from the video: the playback page could not find its frames in the video.";
       string? path = video ?? InputPath;
-      if (string.IsNullOrEmpty(path))
+      if (string.IsNullOrEmpty(path) && !namedVideo)
         return "The capture names no video file it was imported from (a capture card, a stream, or an import made before capture.json named it): name the recording with --video <file>.";
-      if (Directory.Exists(path))
+      if (path != null && Directory.Exists(path))
         return "The capture was imported from a folder of images, not a video file: the playback page needs a video.";
       if (TimeSource != nameof(Analysis.TimeSource.Device))
         return $"The capture's times come from the computer's clock (time source {TimeSource ?? "unknown"}), not from the video: the playback page needs the video's own timestamps (analyse with --time Device).";

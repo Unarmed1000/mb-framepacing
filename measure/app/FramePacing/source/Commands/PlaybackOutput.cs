@@ -42,6 +42,16 @@ namespace MB.FramePacing.App.Commands
         Description = "With --playback: the recording, instead of the one capture.json names (needed for imports made before it named one).",
       };
 
+    public Option<string?> VideoUrl { get; } =
+      new Option<string?>("--playback-video-url")
+      {
+        Description =
+          "With --playback: the video the page plays instead of a copy of the recording, written into the page as given: a URL, or a path "
+          + "relative to the report's folder (e.g. ../../videos/run.mp4). Its frames must have the recording's timestamps (the same start "
+          + "and frame timing). Nothing is copied or asked; a local file that is there and shorter than the run is a warning.",
+        HelpName = "url-or-path",
+      };
+
     public Option<PlaybackTranscodeChoice?> TranscodeChoice { get; } =
       new Option<PlaybackTranscodeChoice?>("--playback-transcode")
       {
@@ -54,16 +64,27 @@ namespace MB.FramePacing.App.Commands
     /// <summary>Add the options to <paramref name="command"/>: the others only with --playback.</summary>
     public void AddTo(Command command)
     {
-      foreach (var option in new Option[] { Playback, Video, TranscodeChoice })
+      foreach (var option in new Option[] { Playback, Video, VideoUrl, TranscodeChoice })
         command.Options.Add(option);
       command.Validators.Add(result =>
       {
-        if (result.GetValue(Playback))
-          return;
-        foreach (var option in new Option[] { Video, TranscodeChoice })
+        if (!result.GetValue(Playback))
         {
-          if (result.GetResult(option) is { Implicit: false })
-            result.AddError($"{option.Name} goes with --playback.");
+          foreach (var option in new Option[] { Video, VideoUrl, TranscodeChoice })
+          {
+            if (result.GetResult(option) is { Implicit: false })
+              result.AddError($"{option.Name} goes with --playback.");
+          }
+          return;
+        }
+        // A named video replaces the copy: the recording and the question about it do not apply
+        if (result.GetResult(VideoUrl) is { Implicit: false })
+        {
+          foreach (var option in new Option[] { Video, TranscodeChoice })
+          {
+            if (result.GetResult(option) is { Implicit: false })
+              result.AddError($"{option.Name} does not go with {VideoUrl.Name}: the page plays the video named, nothing is copied.");
+          }
         }
       });
     }
@@ -105,6 +126,7 @@ namespace MB.FramePacing.App.Commands
       {
         FfmpegPath = ffmpeg,
         VideoPath = parseResult.GetValue(output.Video) is { } path ? Path.GetFullPath(path) : null,
+        VideoUrl = parseResult.GetValue(output.VideoUrl),
         TranscodeChoice = PlaybackExportOptions.Choice(parseResult.GetValue(output.TranscodeChoice), config),
         FromSeconds = fromSeconds,
         ToSeconds = toSeconds,
@@ -118,11 +140,14 @@ namespace MB.FramePacing.App.Commands
       {
         PlaybackVideoKind.Copied => "playing a copy of the recording in its folder",
         PlaybackVideoKind.Transcoded => "playing a playable copy in its folder",
+        PlaybackVideoKind.External => $"playing {result.Video.Url}",
         _ => "without a video (no playable copy was made)",
       };
       AnsiConsole.MarkupLineInterpolated($"Playback report{(result.Pages.Count == 1 ? string.Empty : "s")}, {kind}:");
       foreach (var page in result.Pages)
         AnsiConsole.MarkupLineInterpolated($"  [link]{page}[/]");
+      foreach (var warning in result.Warnings)
+        AnsiConsole.MarkupLineInterpolated($"[yellow]warning:[/] {warning}");
     }
 
     /// <summary>A question on the console; with input that cannot be read, the answer that writes no video, and how to answer in advance.</summary>

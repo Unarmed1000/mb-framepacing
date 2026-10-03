@@ -313,6 +313,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     recording is copied without a question; one browsers cannot play (`VideoCodecInfo`) gets a playable copy (`PlayableCopy`: remux,
     else H.264, every frame and pts kept) only after a yes, else the report has no video. Answer in advance: `--playback-transcode`,
     else the configuration's `playbackTranscode`, else ask; redirected stdin makes no copy. The GUI's dialog can remember the answer.
+  - **The one exception: a video the user names** (`--playback-video-url`, CLI only; asked for by mb-framepacing-explained, whose
+    slides serve their own web encode next to the report): written into the page verbatim (`PlaybackVideoKind.External`), nothing
+    copied, probed or asked, the recording not needed; only a local file that is there and shorter than the run is a warning
+    (`PlaybackResult.Warnings`), never an error.
 - **Media sources**
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file... / Image folder... / Network stream") go through
     `MediaInput` -> ffmpeg.

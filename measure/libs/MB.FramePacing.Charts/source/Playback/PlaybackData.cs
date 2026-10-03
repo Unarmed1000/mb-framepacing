@@ -121,7 +121,10 @@ namespace MB.FramePacing.Charts.Playback
     private static void WriteVideo(Utf8JsonWriter json, PlaybackVideo video)
     {
       json.WriteStartObject("video");
-      if (video.VideoFile is { } file)
+      // A video the user named goes in as given: the browser resolves a relative one against the page's address
+      if (video.Url is { } named)
+        json.WriteString("url", named);
+      else if (video.VideoFile is { } file)
         json.WriteString("url", Uri.EscapeDataString(file));
       else
         json.WriteNull("url");

@@ -20,6 +20,12 @@ namespace MB.FramePacing.Charts.Playback
     /// <summary>The recording, instead of the one capture.json names (null: that one).</summary>
     public string? VideoPath { get; init; }
 
+    /// <summary>
+    /// A video for the page instead of a copy of the recording: a URL, or a path relative to the report's folder, written into the page as
+    /// given (the browser resolves it against the page's address). Nothing is copied or asked; null: the copy.
+    /// </summary>
+    public string? VideoUrl { get; init; }
+
     /// <summary>A recording browsers cannot play: ask, make a playable copy, or no video. One they play is always copied.</summary>
     public PlaybackTranscodeChoice TranscodeChoice { get; init; }
 

@@ -1,20 +1,16 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Writes playback reports: the one path the command line and the GUI share, which differ only in how they ask (the decide callback) and
-//* show progress. Each report (a run, or a section of one) has a folder of its own (PlaybackFiles.FolderOf) with its page, its video and its
-//* playback.json, and names nothing outside it: no link to the recording, no local path. An export touches only the folders of the reports
-//* it writes. In order:
-//*   1. the capture must be one the page can show (PlaybackCapture.Problem);
-//*   2. the recording: the one given, else the one capture.json names;
-//*   3. the report's playback.json: saving the same report again uses its video again, without a question, while the recording is
-//*      unchanged (file name, size and modification time), unless the answer given in advance asks for another;
-//*   4. ffmpeg describes the recording (FfmpegVideoProbe): browsers play it or not;
-//*   5. one browsers play is copied into the folder; for one they cannot play, the question: make a playable copy, or no video, answered
-//*      in advance (an option, the configuration) or asked through decide, once per export (its other reports follow the answer);
-//*   6. the copy, with progress, cancellable (a cancelled copy leaves nothing behind);
-//*   7. playback.json and the page; the video the report played before goes only once the page plays the new one.
-//* No playable copy is made without a yes: given in advance, or to the question.
+//* Writes playback reports, the one path the command line and the GUI share (they differ only in decide and progress). Each report (a run or
+//* a section) has a folder of its own with its page, video and playback.json, naming nothing outside it; an export touches only its own.
+//*   1. the capture must be one the page can show (PlaybackCapture.Problem); the recording: the one given, else capture.json's;
+//*   2. the report's playback.json: saving it again uses its video again, without a question, while the recording is unchanged (file
+//*      name, size, modification time), unless the answer given in advance asks for another;
+//*   3. ffmpeg describes the recording (FfmpegVideoProbe): one browsers play is copied into the folder; for one they cannot play, the
+//*      question (in advance, or through decide, once per export): make a playable copy, or no video;
+//*   4. the copy, with progress, cancellable (nothing left behind); playback.json, the page, then the video the report played before goes.
+//* A video the user names instead (--playback-video-url, a URL or a path relative to the folder) replaces 2 to 4: written into the page as
+//* given, nothing copied or asked; only a file that is there and shorter than the run is a warning.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -22,6 +18,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,9 +68,10 @@ namespace MB.FramePacing.Charts.Playback
       Action<string, string, VideoCodecInfo, IProgress<double>, CancellationToken> makePlayableCopy
     )
     {
-      if (capture.Problem(options.VideoPath) is { } problem)
+      if (capture.Problem(options.VideoPath, namedVideo: options.VideoUrl != null) is { } problem)
         throw new InvalidOperationException(problem);
       var pages = new List<string>();
+      var warnings = new List<string>();
       PlaybackVideo? first = null;
       string? firstFolder = null;
       foreach (var run in runs)
@@ -80,10 +79,18 @@ namespace MB.FramePacing.Charts.Playback
         var section = PlaybackFiles.Section(run.Chart, options.FromSeconds, options.ToSeconds);
         string folder = PlaybackFiles.FolderOf(capture.PlaybackDirectory, run.FilePrefix, section);
         var earlier = PlaybackVideo.Read(folder);
-        var video =
-          first == null
-            ? await PrepareVideoAsync(capture, folder, options, decide, progress, cancellationToken, probe, makePlayableCopy).ConfigureAwait(false)
-            : await ShareVideoAsync(first, firstFolder!, folder, earlier, progress, cancellationToken).ConfigureAwait(false);
+        PlaybackVideo video;
+        if (options.VideoUrl is { } url)
+        {
+          video = NamedVideo(url, folder);
+          if (CheckNamedVideo(url, folder, run.Chart, probe) is { } warning && !warnings.Contains(warning))
+            warnings.Add(warning);
+        }
+        else
+          video =
+            first == null
+              ? await PrepareVideoAsync(capture, folder, options, decide, progress, cancellationToken, probe, makePlayableCopy).ConfigureAwait(false)
+              : await ShareVideoAsync(first, firstFolder!, folder, earlier, progress, cancellationToken).ConfigureAwait(false);
         first ??= video;
         firstFolder ??= folder;
         progress?.Report(new PlaybackProgress("Writing the playback page", null));
@@ -92,7 +99,7 @@ namespace MB.FramePacing.Charts.Playback
         if (earlier?.VideoFile is { } old && old != video.VideoFile)
           File.Delete(Path.Combine(folder, old));
       }
-      return new PlaybackResult(pages, first ?? throw new InvalidOperationException("No run to write a playback page of"));
+      return new PlaybackResult(pages, first ?? throw new InvalidOperationException("No run to write a playback page of"), warnings);
     }
 
     /// <summary>
@@ -193,6 +200,53 @@ namespace MB.FramePacing.Charts.Playback
       return video;
     }
 
+    /// <summary>The video the user named, <paramref name="url"/>, for the report in <paramref name="folder"/>: its playback.json says so.</summary>
+    private static PlaybackVideo NamedVideo(string url, string folder)
+    {
+      Directory.CreateDirectory(folder);
+      string name = url.Split('?', '#')[0].TrimEnd('/', '\\');
+      name = name[(name.LastIndexOfAny(new[] { '/', '\\' }) + 1)..];
+      var video = new PlaybackVideo(PlaybackVideoKind.External, null, name, 0, default, true, "a video named for the report", null, url);
+      video.Write(folder);
+      return video;
+    }
+
+    /// <summary>
+    /// A warning when the video the user named is a file that is there (a path, relative to the report's <paramref name="folder"/>, or a
+    /// file URL) and ffmpeg finds it shorter than the run: perhaps another recording. A web URL, a file not made yet, or one ffmpeg cannot
+    /// describe is not judged; this never fails.
+    /// </summary>
+    internal static string? CheckNamedVideo(string url, string folder, ChartRun run, Func<string, VideoCodecInfo> probe)
+    {
+      string path;
+      if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+      {
+        if (!uri.IsFile)
+          return null;
+        path = uri.LocalPath;
+      }
+      else
+        path = Path.GetFullPath(Path.Combine(folder, Uri.UnescapeDataString(url)));
+      var frames = run.Run.Frames;
+      if (!File.Exists(path) || frames.Count == 0)
+        return null;
+      try
+      {
+        // The page plays the run at its own timestamps: the video must reach the run's last capture
+        double needed = (frames[^1].LastSeenTime.Ticks + run.CapturePeriod.Ticks) / (double)TimeSpan.TicksPerSecond;
+        if (probe(path).Duration is { } duration && duration.TotalSeconds + 0.5 < needed)
+          return string.Create(
+            CultureInfo.InvariantCulture,
+            $"The video {url} is {duration.TotalSeconds:0.0} s long, but the run plays to {needed:0.0} s on the recording's timestamps: is it the same recording?"
+          );
+      }
+      catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or TimeoutException or Win32Exception)
+      {
+        // Not judged
+      }
+      return null;
+    }
+
     /// <summary>The report file prefix of <paramref name="run"/> of <paramref name="report"/>, as its frames CSV is named.</summary>
     public static string PrefixOf(AnalysisReport report, RunAnalysis run)
     {
@@ -223,15 +277,20 @@ namespace MB.FramePacing.Charts.Playback
     /// The video made before still answers the question as asked now: a copy of a playable recording always; for one browsers cannot play,
     /// always when asking, else when it is what the answer makes.
     /// </summary>
-    private static bool Agrees(PlaybackVideo earlier, PlaybackExportOptions options) =>
-      earlier.SourcePlayable
-        ? earlier.Kind == PlaybackVideoKind.Copied
-        : options.TranscodeChoice switch
-        {
-          PlaybackTranscodeChoice.Yes => earlier.Kind == PlaybackVideoKind.Transcoded,
-          PlaybackTranscodeChoice.No => earlier.Kind == PlaybackVideoKind.None,
-          _ => true,
-        };
+    private static bool Agrees(PlaybackVideo earlier, PlaybackExportOptions options)
+    {
+      // A video the user named for an earlier save is not the report's own: the copy is made again
+      if (earlier.Kind == PlaybackVideoKind.External)
+        return false;
+      if (earlier.SourcePlayable)
+        return earlier.Kind == PlaybackVideoKind.Copied;
+      return options.TranscodeChoice switch
+      {
+        PlaybackTranscodeChoice.Yes => earlier.Kind == PlaybackVideoKind.Transcoded,
+        PlaybackTranscodeChoice.No => earlier.Kind == PlaybackVideoKind.None,
+        _ => true,
+      };
+    }
 
     private static PlaybackVideo Video(PlaybackVideoKind kind, string? file, FileInfo source, VideoCodecInfo codec) =>
       new PlaybackVideo(kind, file, source.Name, source.Length, source.LastWriteTimeUtc, codec.Playable, codec.Description, codec.Problem);

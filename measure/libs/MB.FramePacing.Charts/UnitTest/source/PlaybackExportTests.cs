@@ -92,7 +92,9 @@ namespace MB.FramePacing.Charts.UnitTest
       PlaybackTranscodeChoice transcode = PlaybackTranscodeChoice.Ask,
       double? fromSeconds = null,
       double? toSeconds = null,
-      PlaybackCapture? capture = null
+      PlaybackCapture? capture = null,
+      string? videoUrl = null,
+      Func<string, VideoCodecInfo>? probe = null
     ) =>
       PlaybackExport.WriteAsync(
         capture ?? m_capture,
@@ -101,6 +103,7 @@ namespace MB.FramePacing.Charts.UnitTest
         {
           FfmpegPath = "ffmpeg",
           TranscodeChoice = transcode,
+          VideoUrl = videoUrl,
           FromSeconds = fromSeconds,
           ToSeconds = toSeconds,
         },
@@ -111,7 +114,7 @@ namespace MB.FramePacing.Charts.UnitTest
         },
         null,
         CancellationToken.None,
-        _ => codec,
+        probe ?? (_ => codec),
         (_, target, _, _, _) =>
         {
           m_transcoded.Add(target);
@@ -288,6 +291,76 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(unnamed.Problem(), Does.Contain("--video"));
       Assert.That(unnamed.Problem(m_source), Is.Null, "a video named for it");
       Assert.That(host.Problem(), Does.Contain("Host"));
+    }
+
+    [Test]
+    public async Task ANamedVideo_IsWrittenIntoThePageAsGiven_NothingIsCopiedOrAsked()
+    {
+      const string Url = "../../videos/60-busy adaptive.mp4";
+      var result = await Save(g_unplayable, answer: true, videoUrl: Url, probe: _ => throw new AssertionException("nothing to probe"));
+
+      Assert.That(m_asked, Is.Empty);
+      Assert.That(m_transcoded, Is.Empty);
+      Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.External));
+      Assert.That(result.Video.Url, Is.EqualTo(Url));
+      Assert.That(result.Video.Playable, Is.True);
+      Assert.That(result.Warnings, Is.Empty, "a file not made yet is not judged");
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json" }));
+      Assert.That(File.ReadAllText(result.Pages[0]), Does.Contain($"\"url\":\"{Url}\""));
+      Assert.That(PlaybackVideo.Read(WholeRun), Is.EqualTo(result.Video));
+
+      // The recording is not needed: an import that names none, and a URL
+      var unnamed = await Save(g_unplayable, answer: true, capture: m_capture with { InputPath = null }, videoUrl: "https://example.com/run.mp4");
+      Assert.That(unnamed.Video.Url, Is.EqualTo("https://example.com/run.mp4"));
+      Assert.That(unnamed.Video.SourceName, Is.EqualTo("run.mp4"));
+      // Its times must still be a video's own
+      await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        Save(g_playable, answer: true, capture: m_capture with { Camera = true }, videoUrl: Url)
+      );
+    }
+
+    [Test]
+    public async Task ANamedVideo_ReplacesTheReportsCopy_AndWithoutIt_TheCopyComesBack()
+    {
+      await Save(g_playable, answer: false);
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }));
+
+      await Save(g_playable, answer: false, videoUrl: "../../videos/run.mp4");
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json" }), "the report replaced plays the named video");
+
+      var again = await Save(g_playable, answer: false);
+      Assert.That(again.Video.Kind, Is.EqualTo(PlaybackVideoKind.Copied));
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }));
+    }
+
+    [Test]
+    public async Task ANamedVideo_ThatIsThereAndShorterThanTheRun_IsAWarning_NeverAnError()
+    {
+      // ../../videos from the report's folder (analysis/playback/run-1) is analysis/videos
+      string video = Path.Combine(m_capture.AnalysisDirectory, "videos", "run.mp4");
+      Directory.CreateDirectory(Path.GetDirectoryName(video)!);
+      File.WriteAllText(video, "a web encode");
+      var oneSecond = g_playable with { Duration = TimeSpan.FromSeconds(1) };
+
+      var shortVideo = await Save(g_playable, answer: false, videoUrl: "../../videos/run.mp4", probe: _ => oneSecond);
+      Assert.That(shortVideo.Warnings, Has.Count.EqualTo(1));
+      Assert.That(shortVideo.Warnings[0], Does.Contain("1.0 s long"));
+
+      var longVideo = await Save(
+        g_playable,
+        answer: false,
+        videoUrl: "../../videos/run.mp4",
+        probe: _ => g_playable with { Duration = TimeSpan.FromHours(1) }
+      );
+      Assert.That(longVideo.Warnings, Is.Empty);
+
+      var unreadable = await Save(
+        g_playable,
+        answer: false,
+        videoUrl: "../../videos/run.mp4",
+        probe: _ => throw new InvalidDataException("no video")
+      );
+      Assert.That(unreadable.Warnings, Is.Empty, "a file ffmpeg cannot describe is not judged");
     }
 
     [Test]

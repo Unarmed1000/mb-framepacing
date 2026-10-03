@@ -201,6 +201,12 @@ zoomed), and **Open playback page** opens it. A report is written only when you 
 - **The answer can be given in advance**: per run with `--playback-transcode yes|no|ask`, or for good in the configuration
   (`playbackTranscode`; `config --set-playback-transcode yes`, the GUI's Settings page, or **Remember my choice** in its question).
   When the command line cannot ask (its input is redirected), it makes no copy and says which option answers the question.
+- **A video of your own instead of the copy** (command line only): `--playback-video-url <url-or-path>` writes the URL, or a path
+  relative to the report's folder (`../../videos/run.mp4`), into the page as given, and nothing is copied or asked; the browser
+  resolves a relative path against the page's address, so it works from the disk and from a web server alike. Use it when the
+  report is published next to a video you serve yourself, such as a web encode of the same recording. Its frames must have the
+  recording's timestamps (the same start and frame timing): the page finds a frame by its time. The tools do not judge it; a file
+  that is there and shorter than the run is only a warning.
 - Saving the same report again uses its video again while the recording is unchanged (`playback.json` keeps the recording's file
   name, size and modification time, no path), without asking.
 - **A report's folder may be sent on as it is.** The page is part of mb-framepacing and carries its license's terms (PolyForm
