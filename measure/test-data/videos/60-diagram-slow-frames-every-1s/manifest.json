@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 464,
-      "sequenceId": "f2cf2e60-5306-5393-a3fe-84e2355bea73",
-      "sequenceIdHex": "f2cf2e6053065393a3fe84e2355bea73",
+      "sequenceId": "slow-frames",
+      "sequenceIdHex": "736c6f772d6672616d65730000000000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-diagram-slow-frames-every-1s",

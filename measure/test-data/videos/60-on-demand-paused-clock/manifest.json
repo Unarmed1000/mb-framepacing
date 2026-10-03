@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 433,
-      "sequenceId": "dfb2ec89-7c54-57d4-a846-91c9e714cddd",
-      "sequenceIdHex": "dfb2ec897c5457d4a84691c9e714cddd",
+      "sequenceId": "paused-advance",
+      "sequenceIdHex": "7061757365642d616476616e63650000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-on-demand-paused-clock",

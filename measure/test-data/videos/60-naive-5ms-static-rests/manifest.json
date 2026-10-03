@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 480,
-      "sequenceId": "7b3c9956-b955-5be6-9250-991a4fd1b428",
-      "sequenceIdHex": "7b3c9956b9555be69250991a4fd1b428",
+      "sequenceId": "static-rests",
+      "sequenceIdHex": "7374617469632d726573747300000000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-naive-5ms-static-rests",

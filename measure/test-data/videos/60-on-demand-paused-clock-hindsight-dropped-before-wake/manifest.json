@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 433,
-      "sequenceId": "af95462b-3040-5269-8724-5bb63abef702",
-      "sequenceIdHex": "af95462b3040526987245bb63abef702",
+      "sequenceId": "hindsight-rest",
+      "sequenceIdHex": "68696e6473696768742d726573740000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-on-demand-paused-clock-hindsight-dropped-before-wake",

@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 240,
-      "sequenceId": "60d429e7-df6a-5583-9123-be8219433a1d",
-      "sequenceIdHex": "60d429e7df6a55839123be8219433a1d",
+      "sequenceId": "half-rate-even",
+      "sequenceIdHex": "68616c662d726174652d6576656e0000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-diagram-half-rate-even",

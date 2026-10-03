@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1273" viewBox="0 0 1180 1273" role="img" aria-label="Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a'">
-<title>Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a'</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1273" viewBox="0 0 1180 1273" role="img" aria-label="Run 1  'busy-full-rate'">
+<title>Run 1  'busy-full-rate'</title>
 <style>
   text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
          font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
@@ -108,7 +108,7 @@
   .key-light { fill: #adbac7; }
 </style>
 <rect class="card" x="0.5" y="0.5" width="1179" height="1272" rx="14"/>
-<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a'</text>
+<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  'busy-full-rate'</text>
 <text x="20.0" y="54.0" text-anchor="start" class="sub">The whole run: 8.0 s, 388 presented frames on a 60 Hz display, measured against a 16.7 ms target.</text>
 <text x="20.0" y="73.0" text-anchor="start" class="sub">Resolution 16.7 ms (one capture period); error threshold 1 ms.</text>
 <text x="20.0" y="92.0" text-anchor="start" class="sub">Every frame is drawn.</text>

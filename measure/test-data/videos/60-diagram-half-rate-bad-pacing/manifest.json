@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 240,
-      "sequenceId": "aba133d9-4f8a-570f-977f-3336c2565a40",
-      "sequenceIdHex": "aba133d94f8a570f977f3336c2565a40",
+      "sequenceId": "half-rate-uneven",
+      "sequenceIdHex": "68616c662d726174652d756e6576656e",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-diagram-half-rate-bad-pacing",

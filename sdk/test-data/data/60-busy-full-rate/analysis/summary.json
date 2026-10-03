@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "toolVersion": "0.1.0",
   "scanout": "SingleScanout",
-  "analysedUtc": "2026-10-01T23:10:07.8779407Z",
+  "analysedUtc": "2026-10-02T23:55:11.5889362Z",
   "captureDirectory": "60-busy-full-rate",
   "capture": {
     "toolVersion": "0.1.0",
-    "startedUtc": "2026-10-01T23:10:07.2007939Z",
+    "startedUtc": "2026-10-02T23:55:10.9765063Z",
     "source": "ffmpeg Media \u0027video.mp4\u0027",
     "ffmpegVersion": "ffmpeg version 2026-03-15-git-6ba0b59d8b-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
     "ffmpegCommandLine": "-hide_banner -nostats -loglevel info -i measure/test-data/videos/60-busy-full-rate/video.mp4 -an -sn -copyts -fps_mode passthrough -vf format=gray,showinfo -f rawvideo -pix_fmt gray pipe:1",
@@ -17,7 +17,7 @@
     "nominalFps": 60,
     "waitedForStart": false,
     "stopAtEnd": false,
-    "durationSeconds": 0.5656978,
+    "durationSeconds": 0.5128973,
     "framesCaptured": 486,
     "framesWritten": 486,
     "framesDroppedByRecorder": 0,
@@ -26,7 +26,7 @@
     "stopReason": "source ended",
     "sequenceRunId": 1,
     "framesStored": false,
-    "sequenceId": "46521e10-865e-535c-90c0-cc6404c94d2a"
+    "sequenceId": "busy-full-rate"
   },
   "frameSize": "1280x720",
   "timeSource": "Device",
@@ -43,7 +43,7 @@
   "runs": [
     {
       "runId": 1,
-      "sequenceId": "46521e10-865e-535c-90c0-cc6404c94d2a",
+      "sequenceId": "busy-full-rate",
       "hasStartMarker": true,
       "hasEndMarker": true,
       "framesFile": "run-1-frames.csv",

@@ -29,7 +29,7 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1424147350,
+    "hostTicksSum": 1273203365,
     "deviceTicksCount": 486,
     "deviceTicksSum": 19642500000,
     "sourceDropsSum": 0,
@@ -54,7 +54,7 @@
     "runs": [
       {
         "runId": 1,
-        "sequenceId": "46521e10-865e-535c-90c0-cc6404c94d2a",
+        "sequenceId": "busy-full-rate",
         "framesFile": "run-1-frames.csv",
         "hasStartMarker": true,
         "hasEndMarker": true,
@@ -211,7 +211,7 @@
     },
     "captureTicksSum": 19642500000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1424147350,
+    "hostTicksSum": 1273203365,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,

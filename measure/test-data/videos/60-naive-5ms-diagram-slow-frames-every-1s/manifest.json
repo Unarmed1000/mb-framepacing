@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 464,
-      "sequenceId": "022290a6-6990-5826-a42b-a23516a9b10e",
-      "sequenceIdHex": "022290a669905826a42ba23516a9b10e",
+      "sequenceId": "perfect-storm",
+      "sequenceIdHex": "706572666563742d73746f726d000000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-naive-5ms-diagram-slow-frames-every-1s",

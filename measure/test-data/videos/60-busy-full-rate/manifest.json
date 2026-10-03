@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 388,
-      "sequenceId": "46521e10-865e-535c-90c0-cc6404c94d2a",
-      "sequenceIdHex": "46521e10865e535c90c0cc6404c94d2a",
+      "sequenceId": "busy-full-rate",
+      "sequenceIdHex": "627573792d66756c6c2d726174650000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-busy-full-rate",

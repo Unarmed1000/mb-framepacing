@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1692" height="516" viewBox="0 0 1692 516" role="img" aria-label="Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a', frames 493–505 (1.90–2.25 s)">
-<title>Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a', frames 493–505 (1.90–2.25 s)</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1692" height="516" viewBox="0 0 1692 516" role="img" aria-label="Run 1  'busy-full-rate', frames 493–505 (1.90–2.25 s)">
+<title>Run 1  'busy-full-rate', frames 493–505 (1.90–2.25 s)</title>
 <style>
   text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
          font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
@@ -108,7 +108,7 @@
   .key-light { fill: #adbac7; }
 </style>
 <rect class="card" x="0.5" y="0.5" width="1691" height="515" rx="14"/>
-<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '46521e10-865e-535c-90c0-cc6404c94d2a', frames 493–505 (1.90–2.25 s)</text>
+<text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  'busy-full-rate', frames 493–505 (1.90–2.25 s)</text>
 <text x="20.0" y="54.0" text-anchor="start" class="sub">13 presented frames on a 60.00 Hz display (16.7 ms per refresh), one capture per refresh.</text>
 <text x="20.0" y="73.0" text-anchor="start" class="sub">The CPU times are on the pacer's clock, placed on the capture's with the markers' intended display times: on-time frames appear at their intended vsync.</text>
 <g transform="translate(0 0)">

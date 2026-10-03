@@ -68,8 +68,8 @@
       "width": 1280,
       "height": 720,
       "markerFirstFrameIndex": 464,
-      "sequenceId": "09c21ece-390c-517c-a61b-c7d644ab3604",
-      "sequenceIdHex": "09c21ece390c517ca61bc7d644ab3604",
+      "sequenceId": "storm-dropped",
+      "sequenceIdHex": "73746f726d2d64726f70706564000000",
       "measure": "mb-framepacing import video.mp4 --analyze -o analysis",
       "box": {
         "mode": "60-naive-5ms-diagram-slow-frames-every-1s-dropped-frames",
