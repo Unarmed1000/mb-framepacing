@@ -9,6 +9,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Data;
@@ -23,8 +24,8 @@ namespace MB.FramePacing.Analysis
       return new CaptureCsvRow(
         row.CaptureIndex,
         row.Status == CaptureStatus.NotRecorded ? null : row.CaptureTime,
-        row.Status.ToString(),
-        hasMarker ? row.Payload.Kind.ToString() : null,
+        NameOf(row.Status),
+        hasMarker ? NameOf(row.Payload.Kind) : null,
         hasMarker ? row.Payload.RunId : null,
         hasMarker ? row.Payload.FrameIndex : null,
         hasMarker ? row.Payload.AnimationTime : null,
@@ -52,7 +53,7 @@ namespace MB.FramePacing.Analysis
         frame.AnimationDelta,
         frame.AnimationError,
         frame.Drift,
-        frame.Flags == PresentedFrameFlags.None ? Array.Empty<string>() : frame.Flags.ToString().Split(", "),
+        frame.Flags == PresentedFrameFlags.None ? Array.Empty<string>() : g_flagNames.GetOrAdd(frame.Flags, flags => flags.ToString().Split(", ")),
         Known(frame.IntendedDisplayTime),
         Known(frame.MarkerTargetFrameTime),
         frame.TargetFrameTime,
@@ -70,6 +71,32 @@ namespace MB.FramePacing.Analysis
         frame.MainMarkerFirstSeenTime,
         frame.MainMarkerFirstSeenTime is { } main ? frame.FirstSeenTime - main : null
       );
+
+    // The names an output file repeats on every line are made once, not once per line: a run of an hour has a million lines
+    private static readonly ConcurrentDictionary<PresentedFrameFlags, string[]> g_flagNames =
+      new ConcurrentDictionary<PresentedFrameFlags, string[]>();
+    private static readonly ConcurrentDictionary<string, PresentedFrameFlags> g_flagsByName = new ConcurrentDictionary<string, PresentedFrameFlags>(
+      StringComparer.Ordinal
+    );
+
+    /// <summary>An enum value's name, as its ToString gives it.</summary>
+    private static string NameOf<T>(T value)
+      where T : struct, Enum => EnumNames<T>.Names.GetOrAdd(value, v => v.ToString());
+
+    /// <summary>The flags a frames CSV names: each name is one of the enum's (anything else is an <see cref="ArgumentException"/>, as Enum.Parse's).</summary>
+    private static PresentedFrameFlags FlagsOf(IReadOnlyList<string> names)
+    {
+      var flags = PresentedFrameFlags.None;
+      for (int i = 0; i < names.Count; ++i)
+        flags |= g_flagsByName.GetOrAdd(names[i], name => Enum.Parse<PresentedFrameFlags>(name));
+      return flags;
+    }
+
+    private static class EnumNames<T>
+      where T : struct, Enum
+    {
+      public static readonly ConcurrentDictionary<T, string> Names = new ConcurrentDictionary<T, string>();
+    }
 
     // A marker's value of 0 means unknown: the output leaves it out
     private static TickCount64? Known(TickCount64 time) => time != default ? time : null;
@@ -92,7 +119,7 @@ namespace MB.FramePacing.Analysis
         row.AnimationDelta,
         row.AnimationError,
         row.Drift,
-        row.Flags.Aggregate(PresentedFrameFlags.None, (flags, name) => flags | Enum.Parse<PresentedFrameFlags>(name)),
+        FlagsOf(row.Flags),
         row.MainMarkerFirstSeenTime,
         row.IntendedDisplayTime ?? default,
         row.MarkerTargetFrameTime ?? default,

@@ -10,7 +10,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -30,27 +29,25 @@ namespace MB.FramePacing.Data
     public static void Write(TextWriter writer, IEnumerable<CaptureCsvRow> rows)
     {
       writer.WriteLine(Header);
+      // One line at a time in a buffer of its own: no string per cell (an hour at 240 Hz has 864,000 lines)
+      var line = new CsvLineWriter();
       foreach (var row in rows)
       {
-        writer.WriteLine(
-          string.Join(
-            ',',
-            row.CaptureIndex.ToString(CultureInfo.InvariantCulture),
-            row.CaptureTime?.Ticks.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.CaptureStatus,
-            row.Kind ?? string.Empty,
-            row.RunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.FrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.AnimationTime?.Ticks.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.SourceDropsBefore.ToString(CultureInfo.InvariantCulture),
-            row.MissedBefore.ToString(CultureInfo.InvariantCulture),
-            row.SyncRunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.SyncFrameIndex?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.HostTime?.Ticks.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.DeviceTime?.Ticks.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            row.Payload != null ? Convert.ToHexString(row.Payload) : string.Empty
-          )
-        );
+        line.Add(row.CaptureIndex);
+        line.Add(row.CaptureTime?.Ticks);
+        line.Add(row.CaptureStatus);
+        line.Add(row.Kind ?? string.Empty);
+        line.Add((ulong?)row.RunId);
+        line.Add(row.FrameIndex);
+        line.Add(row.AnimationTime?.Ticks);
+        line.Add(row.SourceDropsBefore);
+        line.Add(row.MissedBefore);
+        line.Add((ulong?)row.SyncRunId);
+        line.Add(row.SyncFrameIndex);
+        line.Add(row.HostTime?.Ticks);
+        line.Add(row.DeviceTime?.Ticks);
+        line.AddHex(row.Payload);
+        line.End(writer);
       }
     }
 
@@ -63,7 +60,11 @@ namespace MB.FramePacing.Data
 
     public static IReadOnlyList<CaptureCsvRow> Read(TextReader reader, string name = "captures.csv")
     {
-      var column = CsvRow.Columns(reader.ReadLine() ?? throw new InvalidDataException($"'{name}' is empty"));
+      // Line by line from the reader's buffer, the cells read where they are: no string per line or per cell
+      using var lines = new CsvLineReader(reader);
+      if (!lines.TryReadHeader(out string? header))
+        throw new InvalidDataException($"'{name}' is empty");
+      var column = CsvRow.Columns(header, out int columnCount);
       int Column(string columnName) => column.TryGetValue(columnName, out int index) ? index : -1;
       int captureIndex = Column("captureIndex");
       int capture = Column("captureTicks");
@@ -81,22 +82,26 @@ namespace MB.FramePacing.Data
       int payload = Column("payloadHex");
 
       var rows = new List<CaptureCsvRow>();
+      // Every line names one of a few statuses and kinds: each text is made once
+      var names = new CsvTextCache<string>(text => text);
+      int cellRoom = CsvRow.CellRoom(columnCount);
+      Span<Range> cells = cellRoom <= MaxCellsOnStack ? stackalloc Range[MaxCellsOnStack] : new Range[cellRoom];
+      cells = cells[..cellRoom];
       int lineNumber = 1;
-      string? line;
-      while ((line = reader.ReadLine()) != null)
+      while (lines.TryReadLine(out var line))
       {
         ++lineNumber;
         if (line.Length == 0)
           continue;
-        var row = new CsvRow(line.Split(','));
+        var row = new CsvRow(line, cells);
         try
         {
           rows.Add(
             new CaptureCsvRow(
               row.RequiredLong(captureIndex),
               row.Time(capture),
-              row.Cell(status),
-              row.Cell(kind) is { Length: > 0 } kindText ? kindText : null,
+              row.Cell(status) is { Length: > 0 } statusText ? names.Get(statusText) : string.Empty,
+              row.Cell(kind) is { Length: > 0 } kindText ? names.Get(kindText) : null,
               row.UInt(runId),
               row.ULong(frameIndex),
               row.Span(animation),
@@ -118,7 +123,10 @@ namespace MB.FramePacing.Data
       return rows;
     }
 
-    private static byte[] FromHex(string hex)
+    /// <summary>The cells a line may have for the room to be on the stack.</summary>
+    private const int MaxCellsOnStack = 64;
+
+    private static byte[] FromHex(ReadOnlySpan<char> hex)
     {
       try
       {

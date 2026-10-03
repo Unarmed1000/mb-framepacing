@@ -3,7 +3,8 @@
 //* ----------------
 //* One line of an analysis CSV, split on commas, read by column name so columns added later and columns an older file lacks both work.
 //* Every number is a whole one, written as its digits with a '-' in front when negative; times are 100 ns ticks. A cell that is anything
-//* else, or outside its type's range, is an InvalidDataException.
+//* else, or outside its type's range, is an InvalidDataException. The row is a view of the line's characters (no string per cell): it
+//* is good as long as the line is.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -16,14 +17,26 @@ using System.IO;
 
 namespace MB.FramePacing.Data
 {
-  internal readonly struct CsvRow
+  internal readonly ref struct CsvRow
   {
-    private readonly string[] m_cells;
+    private readonly ReadOnlySpan<char> m_line;
+    private readonly ReadOnlySpan<Range> m_cells;
 
-    public CsvRow(string[] cells) => m_cells = cells;
+    /// <summary>
+    /// The cells of <paramref name="line"/>. <paramref name="cells"/> is the room for them, one more than the file's columns
+    /// (<see cref="CellRoom"/>): what a longer line has beyond them ends up in that last one, which no column reads.
+    /// </summary>
+    public CsvRow(ReadOnlySpan<char> line, Span<Range> cells)
+    {
+      m_line = line;
+      m_cells = cells[..line.Split(cells, ',')];
+    }
+
+    /// <summary>The room a row needs for the cells of a file with <paramref name="columnCount"/> columns.</summary>
+    public static int CellRoom(int columnCount) => columnCount + 1;
 
     /// <summary>The cell's text; empty when the line or the file has no such column.</summary>
-    public string Cell(int index) => index >= 0 && index < m_cells.Length ? m_cells[index] : string.Empty;
+    public ReadOnlySpan<char> Cell(int index) => index >= 0 && index < m_cells.Length ? m_line[m_cells[index]] : default;
 
     public long RequiredLong(int index) => ParseLong(Cell(index));
 
@@ -75,12 +88,14 @@ namespace MB.FramePacing.Data
       throw new InvalidDataException($"'{text}' is not a whole number from 0 to {max}");
     }
 
-    public static Dictionary<string, int> Columns(string header)
+    /// <summary>The header line's column names with their positions, and how many columns it has.</summary>
+    public static Dictionary<string, int> Columns(string header, out int count)
     {
       var columns = new Dictionary<string, int>();
       var names = header.Split(',');
       for (int i = 0; i < names.Length; ++i)
         columns[names[i]] = i;
+      count = names.Length;
       return columns;
     }
   }

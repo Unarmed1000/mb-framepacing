@@ -201,6 +201,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     of its field's type and in its range, and content that is not is one error type per module (C++ `DataFormatError`, C#
     `InvalidDataException`, Python `DataFormatError`), with the file and line for a CSV. A file that cannot be opened is the
     platform's error, not a format error.
+  - **The C# CSV code costs a row per line, not a string per cell** (a run of an hour at 240 Hz has 864,000 lines in each file):
+    `CsvLineWriter` builds a line in its own buffer and `CsvLineReader` hands out each line as a span of its buffer; `CsvRow` is a view
+    of the line's cells; the texts a file repeats (status, kind, a set of flags) are made once (`CsvTextCache`, and the name caches in
+    `AnalysisDataMapping`). The output is byte for byte what `ToString` and `string.Join` wrote. `OutputFileBenchmarks`
+    (`--long-running`): an hour's frames CSV writes in 83 ms with 1 KB allocated and reads in 289 ms with 320 MB (the rows). Regenerating
+    the golden data (`update_test_data.py`) always changes its wall-clock values (start and analysis times, duration, host times);
+    anything else that changes is a real difference.
   - **Capture times** (`MB.FramePacing.Capture`): `CaptureClock.Now` and a frame's host time are `TickCount64` (the time since the capture
     started). A frame's device time is a `DeviceTimestamp`: a time, `Unknown` (the device gave none) or `Pending` (it arrives after the
     pixels: ffmpeg's showinfo lines, resolved by the recorder through `IDeviceTimestampSource`). Pending exists only between a source and
@@ -507,7 +514,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
 --refresh 60 [--tear-every 9]` runs it end to end.
   - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the
     folder's `.slnx` does not build the libraries optimized. The long-running ones (`[BenchmarkCategory(BenchmarkCategories.LongRunning)]`:
-    `CardBenchmarks`, `PlaybackBenchmarks`, many minutes) are left out unless the run adds `--long-running`; mark a new one that takes
+    `CardBenchmarks`, `PlaybackBenchmarks`, `OutputFileBenchmarks`, many minutes) are left out unless the run adds `--long-running`; mark a new one that takes
     minutes the same way.
   - The precision-by-camera-rate table in `measure/doc/camera.md` is generated: `python tools/camera_rate_table.py --update-doc` (runs
     `selftest --experimental --camera` per rate; selftest prints its error against the simulation for it). Rerun it after changes to the camera

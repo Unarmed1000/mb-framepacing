@@ -11,9 +11,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace MB.FramePacing.Data
@@ -36,40 +34,57 @@ namespace MB.FramePacing.Data
     public static void Write(TextWriter writer, IEnumerable<FrameRow> rows, bool camera)
     {
       writer.WriteLine(Header + (camera ? CameraColumns : string.Empty));
+      // One line at a time in a buffer of its own: no string per cell (a run of an hour has a million lines)
+      var line = new CsvLineWriter();
       foreach (var row in rows)
       {
-        writer.WriteLine(
-          string.Join(
-            ',',
-            row.Segment.ToString(CultureInfo.InvariantCulture),
-            row.FrameIndex.ToString(CultureInfo.InvariantCulture),
-            Ticks(row.AnimationTime),
-            row.FirstCaptureIndex.ToString(CultureInfo.InvariantCulture),
-            Ticks(row.FirstSeenTime),
-            Ticks(row.OnScreen),
-            row.Captures.ToString(CultureInfo.InvariantCulture),
-            row.SkippedBefore.ToString(CultureInfo.InvariantCulture),
-            Ticks(row.DisplayDelta),
-            Ticks(row.AnimationDelta),
-            Ticks(row.AnimationError),
-            Ticks(row.Drift),
-            string.Join('|', row.Flags),
-            Ticks(row.IntendedDisplayTime),
-            Ticks(row.MarkerTargetFrameTime),
-            Ticks(row.TargetFrameTime),
-            Ticks(row.MarkerPreferredFrameTime),
-            Ticks(row.PreferredFrameTime),
-            Ticks(row.PacingError),
-            Ticks(row.PredictionError),
-            Ticks(row.Lateness),
-            Ticks(row.LastSeenTime),
-            Ticks(row.CpuStartTime),
-            Ticks(row.CpuBusy),
-            Ticks(row.FrameTime),
-            Ticks(row.CpuWait),
-            string.Join('|', row.OlderFrames.Select(o => o.FrameIndex.ToString(CultureInfo.InvariantCulture) + "@" + Ticks(o.CaptureTime)))
-          ) + (camera ? "," + Ticks(row.MainMarkerFirstSeenTime) + "," + Ticks(row.ScanoutDelay) : string.Empty)
-        );
+        line.Add(row.Segment);
+        line.Add(row.FrameIndex);
+        line.Add(row.AnimationTime.Ticks);
+        line.Add(row.FirstCaptureIndex);
+        line.Add(row.FirstSeenTime.Ticks);
+        line.Add(row.OnScreen.Ticks);
+        line.Add(row.Captures);
+        line.Add(row.SkippedBefore);
+        line.Add(row.DisplayDelta?.Ticks);
+        line.Add(row.AnimationDelta?.Ticks);
+        line.Add(row.AnimationError?.Ticks);
+        line.Add(row.Drift.Ticks);
+        line.Cell();
+        for (int i = 0; i < row.Flags.Count; ++i)
+        {
+          if (i > 0)
+            line.Append('|');
+          line.Append(row.Flags[i]);
+        }
+        line.Add(row.IntendedDisplayTime?.Ticks);
+        line.Add((ulong?)row.MarkerTargetFrameTime?.Ticks);
+        line.Add(row.TargetFrameTime?.Ticks);
+        line.Add((ulong?)row.MarkerPreferredFrameTime?.Ticks);
+        line.Add(row.PreferredFrameTime?.Ticks);
+        line.Add(row.PacingError?.Ticks);
+        line.Add(row.PredictionError?.Ticks);
+        line.Add(row.Lateness?.Ticks);
+        line.Add(row.LastSeenTime?.Ticks);
+        line.Add(row.CpuStartTime?.Ticks);
+        line.Add((ulong?)row.CpuBusy?.Ticks);
+        line.Add(row.FrameTime?.Ticks);
+        line.Add(row.CpuWait?.Ticks);
+        line.Cell();
+        for (int i = 0; i < row.OlderFrames.Count; ++i)
+        {
+          if (i > 0)
+            line.Append('|');
+          line.Append(row.OlderFrames[i].FrameIndex);
+          line.Append('@');
+          line.Append(row.OlderFrames[i].CaptureTime.Ticks);
+        }
+        if (camera)
+        {
+          line.Add(row.MainMarkerFirstSeenTime?.Ticks);
+          line.Add(row.ScanoutDelay?.Ticks);
+        }
+        line.End(writer);
       }
     }
 
@@ -82,7 +97,11 @@ namespace MB.FramePacing.Data
 
     public static IReadOnlyList<FrameRow> Read(TextReader reader, string name = "frames CSV")
     {
-      var column = CsvRow.Columns(reader.ReadLine() ?? throw new InvalidDataException($"'{name}' is empty"));
+      // Line by line from the reader's buffer, the cells read where they are: no string per line or per cell
+      using var lines = new CsvLineReader(reader);
+      if (!lines.TryReadHeader(out string? header))
+        throw new InvalidDataException($"'{name}' is empty");
+      var column = CsvRow.Columns(header, out int columnCount);
       int Column(string columnName) => column.TryGetValue(columnName, out int index) ? index : -1;
       int segment = Column("segment");
       int frameIndex = Column("frameIndex");
@@ -115,17 +134,21 @@ namespace MB.FramePacing.Data
       int scanoutDelay = Column("scanoutDelayTicks");
 
       var rows = new List<FrameRow>();
+      // A run repeats a few sets of flags on every line: each is made once
+      var flagSets = new CsvTextCache<string[]>(Flags);
+      int cellRoom = CsvRow.CellRoom(columnCount);
+      Span<Range> cells = cellRoom <= MaxCellsOnStack ? stackalloc Range[MaxCellsOnStack] : new Range[cellRoom];
+      cells = cells[..cellRoom];
       int lineNumber = 1;
-      string? line;
-      while ((line = reader.ReadLine()) != null)
+      while (lines.TryReadLine(out var line))
       {
         ++lineNumber;
         if (line.Length == 0)
           continue;
-        var row = new CsvRow(line.Split(','));
+        var row = new CsvRow(line, cells);
         try
         {
-          string flagText = row.Cell(flags);
+          var flagText = row.Cell(flags);
           rows.Add(
             new FrameRow(
               row.RequiredInt(segment),
@@ -140,7 +163,7 @@ namespace MB.FramePacing.Data
               row.Span(animationDelta),
               row.Span(error),
               row.RequiredSpan(drift),
-              Flags(flagText),
+              flagText.Length == 0 ? Array.Empty<string>() : flagSets.Get(flagText),
               row.Time(intended),
               row.Span32(markerTarget),
               row.Span(target),
@@ -168,11 +191,12 @@ namespace MB.FramePacing.Data
       return rows;
     }
 
-    /// <summary>The flags cell: names separated by <c>|</c>, empty when none.</summary>
+    /// <summary>The cells a line may have for the room to be on the stack.</summary>
+    private const int MaxCellsOnStack = 64;
+
+    /// <summary>A flags cell that is not empty: names separated by <c>|</c>.</summary>
     private static string[] Flags(string cell)
     {
-      if (cell.Length == 0)
-        return Array.Empty<string>();
       string[] flags = cell.Split('|');
       if (Array.IndexOf(flags, string.Empty) >= 0)
         throw new InvalidDataException($"An empty entry in flags '{cell}'");
@@ -180,27 +204,22 @@ namespace MB.FramePacing.Data
     }
 
     /// <summary>The olderFrames cell: <c>frameIndex@captureTicks</c> entries separated by <c>|</c>, empty when none.</summary>
-    private static IReadOnlyList<OlderFrame> OlderFrames(string cell) =>
-      cell.Length == 0
-        ? Array.Empty<OlderFrame>()
-        : cell.Split('|')
-          .Select(entry =>
-          {
-            int at = entry.IndexOf('@', StringComparison.Ordinal);
-            if (at <= 0)
-              throw new InvalidDataException($"Invalid olderFrames entry '{entry}'");
-            return new OlderFrame(CsvRow.ParseULong(entry.AsSpan(0, at), ulong.MaxValue), new TickCount64(CsvRow.ParseLong(entry.AsSpan(at + 1))));
-          })
-          .ToArray();
-
-    private static string Ticks(TimeSpan span) => span.Ticks.ToString(CultureInfo.InvariantCulture);
-
-    private static string Ticks(TickCount64 time) => time.Ticks.ToString(CultureInfo.InvariantCulture);
-
-    private static string Ticks(TimeSpan? span) => span is { } value ? Ticks(value) : string.Empty;
-
-    private static string Ticks(TickCount64? time) => time is { } value ? Ticks(value) : string.Empty;
-
-    private static string Ticks(TimeSpan32? span) => span is { } value ? value.Ticks.ToString(CultureInfo.InvariantCulture) : string.Empty;
+    private static IReadOnlyList<OlderFrame> OlderFrames(ReadOnlySpan<char> cell)
+    {
+      if (cell.Length == 0)
+        return Array.Empty<OlderFrame>();
+      var frames = new OlderFrame[cell.Count('|') + 1];
+      for (int i = 0; i < frames.Length; ++i)
+      {
+        int bar = cell.IndexOf('|');
+        var entry = bar >= 0 ? cell[..bar] : cell;
+        cell = bar >= 0 ? cell[(bar + 1)..] : default;
+        int at = entry.IndexOf('@');
+        if (at <= 0)
+          throw new InvalidDataException($"Invalid olderFrames entry '{entry}'");
+        frames[i] = new OlderFrame(CsvRow.ParseULong(entry[..at], ulong.MaxValue), new TickCount64(CsvRow.ParseLong(entry[(at + 1)..])));
+      }
+      return frames;
+    }
   }
 }
