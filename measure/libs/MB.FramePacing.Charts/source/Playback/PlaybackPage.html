@@ -4,7 +4,8 @@
 <!--
   The playback page of mb-framepacing (PlaybackPage.cs fills in the title, the report card and the data): the report of a run next to the
   recording it was measured from. One file that runs from the disk: no server, nothing from the network. The video is the folder's own
-  copy or the recording, linked by a relative path. Its times are the recording's own timestamps, so a video time is a report time.
+  copy of the recording, in the page's folder: nothing outside it. Its times are the recording's own timestamps, so a video time is a
+  report time.
 -->
 <!--
 Every page written from this one is a copy of part of mb-framepacing, and carries its license's terms and notice:
@@ -1086,7 +1087,11 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
         );
         if (data.refreshHz)
           metaItem('<path d="M4 17l4-10 4 10 4-10 4 10"/>', `${number(data.refreshHz, 2).replace(/\.?0+$/, "")} Hz display`);
-        const videoKinds = { copied: "copied into this folder", transcoded: "playable copy in this folder", linked: "linked" };
+        const videoKinds = {
+          copied: "copy in this folder",
+          transcoded: "playable copy in this folder",
+          none: "no video in this report",
+        };
         metaItem(
           '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>',
           `${data.video.name} · ${videoKinds[data.video.kind] ?? data.video.kind}`,
@@ -1557,13 +1562,11 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           $("pb-banner").hidden = false;
         }
         video.addEventListener("error", () => {
+          if (!video.getAttribute("src")) return;
           ready = false;
           showMessage(
-            "This browser cannot play the recording",
-            data.video.problem
-              ? `${data.video.name}: ${data.video.problem}. Make a playable copy with the command below, or open another file of the same recording.`
-              : `${data.video.name} could not be loaded from ${decodeURI(data.video.url)}. It may have been moved: open it here.`,
-            data.video.command,
+            "This browser cannot play the video",
+            `${data.video.name}: the browser could not play this report's copy. Open another file of the same recording here.`,
           );
         });
         video.addEventListener("loadedmetadata", () => {
@@ -1584,11 +1587,14 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           $("pb-banner").hidden = true;
           video.src = URL.createObjectURL(file);
         });
-        if (!data.video.playable && data.video.problem)
-          showBanner(
-            `${data.video.name}: ${data.video.problem}. Some browsers play it anyway; if this one does not, it says so above.`,
+        // A report of a recording browsers cannot play, without a playable copy: no video, and a way to open a file by hand
+        if (data.video.url) video.src = data.video.url;
+        else
+          showMessage(
+            "This report has no video",
+            `${data.video.name}: ${data.video.problem ?? "no copy was made"}. Make a playable copy with the command below, or open a file of the same recording here.`,
+            data.video.command,
           );
-        video.src = data.video.url;
 
         // ---- Theme and keyboard --------------------------------------------------------------------------------------------------------
         const root = document.documentElement;

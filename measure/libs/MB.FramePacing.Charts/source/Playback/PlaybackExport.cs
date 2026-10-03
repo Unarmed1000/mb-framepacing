@@ -3,17 +3,18 @@
 //* ----------------
 //* Writes playback reports: the one path the command line and the GUI share, which differ only in how they ask (the decide callback) and
 //* show progress. Each report (a run, or a section of one) has a folder of its own (PlaybackFiles.FolderOf) with its page, its video and its
-//* playback.json: an export touches only the folders of the reports it writes. In order:
+//* playback.json, and names nothing outside it: no link to the recording, no local path. An export touches only the folders of the reports
+//* it writes. In order:
 //*   1. the capture must be one the page can show (PlaybackCapture.Problem);
 //*   2. the recording: the one given, else the one capture.json names;
-//*   3. the report's playback.json: saving the same report again uses its video again, without a question, unless an answer given in
-//*      advance asks for another (a copy where a link was made, ...);
+//*   3. the report's playback.json: saving the same report again uses its video again, without a question, while the recording is
+//*      unchanged (file name, size and modification time), unless the answer given in advance asks for another;
 //*   4. ffmpeg describes the recording (FfmpegVideoProbe): browsers play it or not;
-//*   5. the question: copy or link it (playable), or make a playable copy or link it (not playable), answered in advance (an option, the
-//*      configuration) or asked through decide; once per export (its other reports, the capture's other runs, follow the answer);
+//*   5. one browsers play is copied into the folder; for one they cannot play, the question: make a playable copy, or no video, answered
+//*      in advance (an option, the configuration) or asked through decide, once per export (its other reports follow the answer);
 //*   6. the copy, with progress, cancellable (a cancelled copy leaves nothing behind);
 //*   7. playback.json and the page; the video the report played before goes only once the page plays the new one.
-//* No video is written without a yes: given in advance, or to the question.
+//* No playable copy is made without a yes: given in advance, or to the question.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -86,7 +87,7 @@ namespace MB.FramePacing.Charts.Playback
         first ??= video;
         firstFolder ??= folder;
         progress?.Report(new PlaybackProgress("Writing the playback page", null));
-        pages.Add(PlaybackFiles.Write(section, folder, capture.AnalysisDirectory, video, options.Report, options.ToolVersion));
+        pages.Add(PlaybackFiles.Write(section, folder, video, options.Report, options.ToolVersion));
         // The report's page plays the new video now: the one it played before goes
         if (earlier?.VideoFile is { } old && old != video.VideoFile)
           File.Delete(Path.Combine(folder, old));
@@ -95,9 +96,9 @@ namespace MB.FramePacing.Charts.Playback
     }
 
     /// <summary>
-    /// The video the report in <paramref name="folder"/> plays: the one it played before when the recording is unchanged, or, after
-    /// <paramref name="decide"/> (or the answer given in advance), a copy in the folder or the recording linked. Writes the folder's
-    /// playback.json; the video it names before stays until the page plays the new one.
+    /// The video the report in <paramref name="folder"/> plays: the one it played before when the recording is unchanged, else a copy of the
+    /// recording in the folder, or, for one browsers cannot play, after <paramref name="decide"/> (or the answer given in advance), a playable
+    /// copy or none. Writes the folder's playback.json; the video it names before stays until the page plays the new one.
     /// </summary>
     internal static async Task<PlaybackVideo> PrepareVideoAsync(
       PlaybackCapture capture,
@@ -120,7 +121,7 @@ namespace MB.FramePacing.Charts.Playback
       if (!source.Exists)
       {
         // The report's own copy still plays (the recording was moved or deleted after the copy was made)
-        if (options.VideoPath == null && earlier is { VideoFile: not null } && earlier.ExistsIn(folder) && SamePath(earlier.Source, sourcePath))
+        if (options.VideoPath == null && earlier is { VideoFile: not null } && earlier.ExistsIn(folder) && SameName(earlier.SourceName, source.Name))
           return earlier;
         throw new FileNotFoundException(
           $"The recording {sourcePath} is not there (moved or deleted?): name it with --video <file>, or in the GUI pick it when asked.",
@@ -136,21 +137,10 @@ namespace MB.FramePacing.Charts.Playback
       PlaybackVideo video;
       if (codec.Playable)
       {
+        // Browsers play it: the report keeps a copy, so its folder plays anywhere on its own
         string target = Target(folder, codec.Extension, earlier);
-        bool copy =
-          options.VideoChoice == PlaybackVideoChoice.Copy
-          || (
-            options.VideoChoice == PlaybackVideoChoice.Ask
-            && await decide(new PlaybackQuestion(PlaybackQuestionKind.CopyOrLink, sourcePath, source.Length, codec, target)).ConfigureAwait(false)
-          );
-        if (copy)
-        {
-          await Task.Run(() => CopyFile(source.FullName, source.Length, target, progress, cancellationToken), cancellationToken)
-            .ConfigureAwait(false);
-          video = Video(PlaybackVideoKind.Copied, Path.GetFileName(target), source, codec);
-        }
-        else
-          video = Video(PlaybackVideoKind.Linked, null, source, codec);
+        await Task.Run(() => CopyFile(source.FullName, source.Length, target, progress, cancellationToken), cancellationToken).ConfigureAwait(false);
+        video = Video(PlaybackVideoKind.Copied, Path.GetFileName(target), source, codec);
       }
       else
       {
@@ -159,7 +149,7 @@ namespace MB.FramePacing.Charts.Playback
           options.TranscodeChoice == PlaybackTranscodeChoice.Yes
           || (
             options.TranscodeChoice == PlaybackTranscodeChoice.Ask
-            && await decide(new PlaybackQuestion(PlaybackQuestionKind.Transcode, sourcePath, source.Length, codec, target)).ConfigureAwait(false)
+            && await decide(new PlaybackQuestion(sourcePath, source.Length, codec, target)).ConfigureAwait(false)
           );
         if (transcode)
         {
@@ -170,15 +160,15 @@ namespace MB.FramePacing.Charts.Playback
           video = Video(PlaybackVideoKind.Transcoded, Path.GetFileName(target), source, codec);
         }
         else
-          video = Video(PlaybackVideoKind.Linked, null, source, codec);
+          video = Video(PlaybackVideoKind.None, null, source, codec);
       }
       video.Write(folder);
       return video;
     }
 
     /// <summary>
-    /// Another report of the same export plays what the first one does (<paramref name="first"/>, in <paramref name="firstFolder"/>): the
-    /// recording linked, or a copy of the first report's video in its own folder (unless it has that video already).
+    /// Another report of the same export plays what the first one does (<paramref name="first"/>, in <paramref name="firstFolder"/>): a copy
+    /// of the first report's video in its own folder (unless it has that video already), or none.
     /// </summary>
     private static async Task<PlaybackVideo> ShareVideoAsync(
       PlaybackVideo first,
@@ -195,7 +185,7 @@ namespace MB.FramePacing.Charts.Playback
         first.Write(folder);
         return first;
       }
-      string from = first.PathIn(firstFolder);
+      string from = first.PathIn(firstFolder)!;
       string target = Target(folder, Path.GetExtension(first.VideoFile).TrimStart('.'), earlier);
       await Task.Run(() => CopyFile(from, new FileInfo(from).Length, target, progress, cancellationToken), cancellationToken).ConfigureAwait(false);
       var video = first with { VideoFile = Path.GetFileName(target) };
@@ -229,24 +219,22 @@ namespace MB.FramePacing.Charts.Playback
       return Path.Combine(folder, name);
     }
 
-    /// <summary>The video made before still answers the question as asked now: always when asking, else when it is what the answer makes.</summary>
+    /// <summary>
+    /// The video made before still answers the question as asked now: a copy of a playable recording always; for one browsers cannot play,
+    /// always when asking, else when it is what the answer makes.
+    /// </summary>
     private static bool Agrees(PlaybackVideo earlier, PlaybackExportOptions options) =>
       earlier.SourcePlayable
-        ? options.VideoChoice switch
-        {
-          PlaybackVideoChoice.Copy => earlier.Kind == PlaybackVideoKind.Copied,
-          PlaybackVideoChoice.Link => earlier.Kind == PlaybackVideoKind.Linked,
-          _ => true,
-        }
+        ? earlier.Kind == PlaybackVideoKind.Copied
         : options.TranscodeChoice switch
         {
           PlaybackTranscodeChoice.Yes => earlier.Kind == PlaybackVideoKind.Transcoded,
-          PlaybackTranscodeChoice.No => earlier.Kind == PlaybackVideoKind.Linked,
+          PlaybackTranscodeChoice.No => earlier.Kind == PlaybackVideoKind.None,
           _ => true,
         };
 
     private static PlaybackVideo Video(PlaybackVideoKind kind, string? file, FileInfo source, VideoCodecInfo codec) =>
-      new PlaybackVideo(kind, file, source.FullName, source.Length, source.LastWriteTimeUtc, codec.Playable, codec.Description, codec.Problem);
+      new PlaybackVideo(kind, file, source.Name, source.Length, source.LastWriteTimeUtc, codec.Playable, codec.Description, codec.Problem);
 
     /// <summary>Copy a file through a temporary one, reporting the share copied; a cancelled copy leaves nothing behind.</summary>
     private static void CopyFile(
@@ -285,11 +273,7 @@ namespace MB.FramePacing.Charts.Playback
       }
     }
 
-    private static bool SamePath(string a, string b) =>
-      string.Equals(
-        Path.GetFullPath(a),
-        Path.GetFullPath(b),
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
-      );
+    private static bool SameName(string a, string b) =>
+      string.Equals(a, b, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
   }
 }

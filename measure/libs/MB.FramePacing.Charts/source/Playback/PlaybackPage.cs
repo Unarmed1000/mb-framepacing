@@ -41,20 +41,13 @@ namespace MB.FramePacing.Charts.Playback
       return reader.ReadToEnd();
     });
 
-    /// <summary>The page of <paramref name="section"/> in <paramref name="pageDirectory"/>, playing <paramref name="video"/>.</summary>
-    public static string Build(
-      RunSection section,
-      PlaybackVideo video,
-      string pageDirectory,
-      string analysisDirectory,
-      ReportOptions? options = null,
-      string toolVersion = ""
-    )
+    /// <summary>The page of <paramref name="section"/>, playing <paramref name="video"/> (a file in the page's folder).</summary>
+    public static string Build(RunSection section, PlaybackVideo video, ReportOptions? options = null, string toolVersion = "")
     {
       options ??= ReportOptions.Default;
       var cards = Cards(section, options);
       // The data and every card's SVG at once: they only read the cards
-      var data = Task.Run(() => PlaybackData.Json(section, cards, options, video, pageDirectory, analysisDirectory, toolVersion));
+      var data = Task.Run(() => PlaybackData.Json(section, cards, options, video, toolVersion));
       var svgs = new string[cards.Count];
       Parallel.For(
         0,

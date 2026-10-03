@@ -38,19 +38,12 @@ namespace MB.FramePacing.Charts.Playback
       Path.Combine(playbackDirectory, prefix + SectionSuffix(section));
 
     /// <summary>Write the page of <paramref name="section"/> into <paramref name="folder"/>, playing <paramref name="video"/>. Returns its path.</summary>
-    public static string Write(
-      RunSection section,
-      string folder,
-      string analysisDirectory,
-      PlaybackVideo video,
-      ReportOptions? options = null,
-      string toolVersion = ""
-    )
+    public static string Write(RunSection section, string folder, PlaybackVideo video, ReportOptions? options = null, string toolVersion = "")
     {
       Directory.CreateDirectory(folder);
       string path = Path.Combine(folder, PageName);
       string temporary = path + ".tmp";
-      File.WriteAllText(temporary, PlaybackPage.Build(section, video, folder, analysisDirectory, options, toolVersion), new UTF8Encoding(false));
+      File.WriteAllText(temporary, PlaybackPage.Build(section, video, options, toolVersion), new UTF8Encoding(false));
       File.Move(temporary, path, overwrite: true);
       return path;
     }

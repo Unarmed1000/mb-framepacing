@@ -544,8 +544,8 @@ namespace MB.FramePacing.Gui.ViewModels
       PlaybackProblem.Length > 0
         ? PlaybackProblem
         : "Write a playback report of the selected run (zoomed: the part in view) into a folder of its own in the analysis's playback "
-          + "folder: one HTML page with the report next to the recording, a player and a playhead on the report. It asks before it copies the "
-          + "recording.";
+          + "folder: one HTML page with the report next to a copy of the recording, a player and a playhead on the report. It asks before it "
+          + "makes a playable copy of a recording browsers cannot play.";
 
     /// <summary>
     /// Write the playback page of the selected run (the part of it in view when zoomed) through the same export as 'render --playback': the
@@ -565,7 +565,7 @@ namespace MB.FramePacing.Gui.ViewModels
           return;
       }
       var config = MainWindowViewModel.SafeLoadConfig();
-      var (videoChoice, transcodeChoice) = PlaybackExportOptions.Choices(null, null, config);
+      var transcodeChoice = PlaybackExportOptions.Choice(null, config);
       string ffmpeg;
       try
       {
@@ -580,7 +580,6 @@ namespace MB.FramePacing.Gui.ViewModels
       {
         FfmpegPath = ffmpeg,
         VideoPath = videoPath,
-        VideoChoice = videoChoice,
         TranscodeChoice = transcodeChoice,
         FromSeconds = m_requested?.From,
         ToSeconds = m_requested?.To,
@@ -655,11 +654,11 @@ namespace MB.FramePacing.Gui.ViewModels
       if (answer == null)
         throw new OperationCanceledException("The question was closed without an answer");
       if (answer.Remember)
-        RememberAnswer(question.Kind, answer.Yes);
+        RememberAnswer(answer.Yes);
       return answer.Yes;
     }
 
-    private void RememberAnswer(PlaybackQuestionKind kind, bool yes)
+    private void RememberAnswer(bool yes)
     {
       // Automation and --output-root runs never change the user's files
       if (Program.Automation || Program.OutputRoot != null)
@@ -667,17 +666,7 @@ namespace MB.FramePacing.Gui.ViewModels
       try
       {
         var config = MainWindowViewModel.SafeLoadConfig();
-        config =
-          kind == PlaybackQuestionKind.CopyOrLink
-            ? config with
-            {
-              PlaybackVideo = yes ? PlaybackVideoChoice.Copy : PlaybackVideoChoice.Link,
-            }
-            : config with
-            {
-              PlaybackTranscode = yes ? PlaybackTranscodeChoice.Yes : PlaybackTranscodeChoice.No,
-            };
-        config.Save();
+        (config with { PlaybackTranscode = yes ? PlaybackTranscodeChoice.Yes : PlaybackTranscodeChoice.No }).Save();
         ConfigurationChanged?.Invoke();
       }
       catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

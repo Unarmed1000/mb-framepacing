@@ -157,7 +157,7 @@ capture-20260924-153000/          (import-... for imports)
     └── playback/                 only on request: the playback reports (below), a folder each
         └── run-<id>[-<from>s-<to>s]/
             ├── index.html        the run (or a section of it) next to the recording, with a player
-            ├── video.mp4         only when chosen: the report's own copy of the recording
+            ├── video.mp4         the report's copy of the recording, or a playable copy (none without one)
             └── playback.json     which video the page plays, and the recording it was made from
 ```
 
@@ -192,18 +192,17 @@ zoomed), and **Open playback page** opens it. A report is written only when you 
   so it needs a capture made by `import` of a video file. A capture card recorded live, a folder of images or a camera capture
   have no page. Imports made before capture.json named the recording need it named: `--video <file>` (the GUI asks for it).
 - **Every report has a folder of its own** in `analysis/playback/`, named like the SVG reports (`run-1`, `run-1-120s-125s`), with
-  its page and the video it plays: a copy of the recording, so the folder plays anywhere on its own (zip it and send it), or a link
-  to the recording where it is (no extra disk space, but the folder then needs the recording where it was). The tools **ask**
-  which, before they write anything. Saving the same report again replaces its folder's files; other reports are never touched.
-- **Recordings browsers cannot play** (lossless H.264 or HEVC, 4:4:4, UTVideo, FFV1, and MKV files) get a playable copy: ffmpeg
-  copies the video into an MP4 file when only the container is the problem (quick), and otherwise encodes it as H.264 (this takes
-  a while). Every frame keeps its timestamp. The tools **ask** first; without the copy the page links the recording and says that
-  the browser cannot play it, with the command that makes the copy, and an **Open video...** button for another file.
-- **The answers can be given in advance**: per run with `--playback-video copy|link|ask` and `--playback-transcode yes|no|ask`,
-  or for good in the configuration (`playbackVideo`, `playbackTranscode`; `config --set-playback-video copy`,
-  `config --set-playback-transcode yes`, or the GUI's Settings page, or **Remember my choice** in its question). When the command
-  line cannot ask (its input is redirected), it writes no video and says which option answers the question.
-- Saving the same report again uses its video again while the recording is unchanged, without asking (`playback.json`).
+  its page and a copy of the recording: the folder plays anywhere on its own (zip it and send it), and names nothing outside it,
+  no link and no local path. Saving the same report again replaces its folder's files; other reports are never touched.
+- **Recordings browsers cannot play** (lossless H.264 or HEVC, 4:4:4, UTVideo, FFV1, and MKV files) get a playable copy instead:
+  ffmpeg copies the video into an MP4 file when only the container is the problem (quick), and otherwise encodes it as H.264 (this
+  takes a while). Every frame keeps its timestamp. The tools **ask** first; without the copy the report has no video, and the page
+  shows the command that makes it and an **Open video...** button for a file of the recording.
+- **The answer can be given in advance**: per run with `--playback-transcode yes|no|ask`, or for good in the configuration
+  (`playbackTranscode`; `config --set-playback-transcode yes`, the GUI's Settings page, or **Remember my choice** in its question).
+  When the command line cannot ask (its input is redirected), it makes no copy and says which option answers the question.
+- Saving the same report again uses its video again while the recording is unchanged (`playback.json` keeps the recording's file
+  name, size and modification time, no path), without asking.
 - **A report's folder may be sent on as it is.** The page is part of mb-framepacing and carries its license's terms (PolyForm
   Perimeter 1.0.1) and notice in its source.
 

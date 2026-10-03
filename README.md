@@ -426,8 +426,8 @@ Some features are experimental, hidden unless you ask for them, and described in
 
 ## Configuration
 
-`mb-framepacing.json` stores where ffmpeg is, where captures go and the playback page's answers about a recording
-(`playbackVideo`, `playbackTranscode`); the GUI and the command line share it. Create it with `mb-framepacing config --init` or the
+`mb-framepacing.json` stores where ffmpeg is, where captures go and whether a playback report makes a playable copy of a
+recording browsers cannot play (`playbackTranscode`); the GUI and the command line share it. Create it with `mb-framepacing config --init` or the
 GUI's setup dialog.
 
 Saved settings are safe and versioned:

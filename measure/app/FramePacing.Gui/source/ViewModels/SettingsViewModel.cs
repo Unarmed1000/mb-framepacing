@@ -58,14 +58,8 @@ namespace MB.FramePacing.Gui.ViewModels
     [ObservableProperty]
     public partial string StatusText { get; set; } = string.Empty;
 
-    /// <summary>The playback page and a recording browsers can play, as <see cref="PlaybackVideoChoice"/> (ask, copy, link).</summary>
-    public IReadOnlyList<string> PlaybackVideoChoices { get; } = new[] { "Ask every time", "Copy it into the playback folder", "Link the recording" };
-
-    /// <summary>The playback page and a recording browsers cannot play, as <see cref="PlaybackTranscodeChoice"/> (ask, yes, no).</summary>
-    public IReadOnlyList<string> PlaybackTranscodeChoices { get; } = new[] { "Ask every time", "Make a playable copy", "Link it as it is" };
-
-    [ObservableProperty]
-    public partial int PlaybackVideoIndex { get; set; }
+    /// <summary>A playback report and a recording browsers cannot play, as <see cref="PlaybackTranscodeChoice"/> (ask, yes, no).</summary>
+    public IReadOnlyList<string> PlaybackTranscodeChoices { get; } = new[] { "Ask every time", "Make a playable copy", "No video" };
 
     [ObservableProperty]
     public partial int PlaybackTranscodeIndex { get; set; }
@@ -76,26 +70,17 @@ namespace MB.FramePacing.Gui.ViewModels
     // Set while the page shows what the file says: not a change to save
     private bool m_refreshing;
 
-    partial void OnPlaybackVideoIndexChanged(int value) => SavePlaybackChoices();
-
     partial void OnPlaybackTranscodeIndexChanged(int value) => SavePlaybackChoices();
 
-    /// <summary>Store the playback page's answers in the configuration ("ask" as no value). Automation and --output-root runs never do.</summary>
+    /// <summary>Store the playback report's answer in the configuration ("ask" as no value). Automation and --output-root runs never do.</summary>
     private void SavePlaybackChoices()
     {
       if (m_refreshing || Program.Automation || Program.OutputRoot != null)
         return;
       try
       {
-        var video = (PlaybackVideoChoice)Math.Clamp(PlaybackVideoIndex, 0, 2);
         var transcode = (PlaybackTranscodeChoice)Math.Clamp(PlaybackTranscodeIndex, 0, 2);
-        (
-          MainWindowViewModel.SafeLoadConfig() with
-          {
-            PlaybackVideo = video == PlaybackVideoChoice.Ask ? null : video,
-            PlaybackTranscode = transcode == PlaybackTranscodeChoice.Ask ? null : transcode,
-          }
-        ).Save();
+        (MainWindowViewModel.SafeLoadConfig() with { PlaybackTranscode = transcode == PlaybackTranscodeChoice.Ask ? null : transcode }).Save();
         PlaybackStatusText = string.Empty;
       }
       catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -123,7 +108,6 @@ namespace MB.FramePacing.Gui.ViewModels
       FfmpegPathText = config.FfmpegPath ?? "not set: found on the PATH or in the usual install folders";
       CaptureDirectoryText = config.CaptureDirectory ?? MainWindowViewModel.DefaultCaptureDirectory;
       m_refreshing = true;
-      PlaybackVideoIndex = (int)(config.PlaybackVideo ?? PlaybackVideoChoice.Ask);
       PlaybackTranscodeIndex = (int)(config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask);
       m_refreshing = false;
     }

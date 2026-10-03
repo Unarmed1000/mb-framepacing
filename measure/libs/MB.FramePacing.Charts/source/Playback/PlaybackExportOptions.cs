@@ -20,10 +20,7 @@ namespace MB.FramePacing.Charts.Playback
     /// <summary>The recording, instead of the one capture.json names (null: that one).</summary>
     public string? VideoPath { get; init; }
 
-    /// <summary>A recording browsers can play: ask, copy it into the folder or link it.</summary>
-    public PlaybackVideoChoice VideoChoice { get; init; }
-
-    /// <summary>A recording browsers cannot play: ask, make a playable copy or link it as it is.</summary>
+    /// <summary>A recording browsers cannot play: ask, make a playable copy, or no video. One they play is always copied.</summary>
     public PlaybackTranscodeChoice TranscodeChoice { get; init; }
 
     /// <summary>Where the section starts, in seconds since the run's first frame (null with <see cref="ToSeconds"/> null: the whole run).</summary>
@@ -38,11 +35,8 @@ namespace MB.FramePacing.Charts.Playback
     /// <summary>The tools' version, shown at the bottom of the page.</summary>
     public string ToolVersion { get; init; } = string.Empty;
 
-    /// <summary>The answers in advance: <paramref name="video"/> and <paramref name="transcode"/> (options for one run) win over the configuration's.</summary>
-    public static (PlaybackVideoChoice Video, PlaybackTranscodeChoice Transcode) Choices(
-      PlaybackVideoChoice? video,
-      PlaybackTranscodeChoice? transcode,
-      FramePacingConfig config
-    ) => (video ?? config.PlaybackVideo ?? PlaybackVideoChoice.Ask, transcode ?? config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask);
+    /// <summary>The answer in advance: <paramref name="transcode"/> (an option for one run) wins over the configuration's, else ask.</summary>
+    public static PlaybackTranscodeChoice Choice(PlaybackTranscodeChoice? transcode, FramePacingConfig config) =>
+      transcode ?? config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask;
   }
 }

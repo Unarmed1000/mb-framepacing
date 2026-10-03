@@ -11,7 +11,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using BenchmarkDotNet.Attributes;
 using MB.FramePacing.Charts;
 using MB.FramePacing.Charts.Playback;
@@ -22,8 +21,6 @@ namespace MB.FramePacing.Benchmarks
   [SimpleJob(launchCount: 1, warmupCount: 1, iterationCount: 5)]
   public class PlaybackBenchmarks
   {
-    private static readonly string g_directory = Path.Combine(Path.GetTempPath(), "mb-framepacing-playback-benchmark");
-
     private RunSection m_section = null!;
     private IReadOnlyList<PlaybackCard> m_cards = null!;
     private PlaybackVideo m_video = null!;
@@ -40,9 +37,9 @@ namespace MB.FramePacing.Benchmarks
       var run = SyntheticHour.Create(RefreshHz * 60 * Minutes, refreshHz: RefreshHz);
       m_section = RunSection.Whole(run);
       m_video = new PlaybackVideo(
-        PlaybackVideoKind.Linked,
-        null,
-        Path.Combine(g_directory, "recording.mp4"),
+        PlaybackVideoKind.Copied,
+        "video.mp4",
+        "recording.mp4",
         1,
         DateTime.UnixEpoch,
         true,
@@ -56,7 +53,7 @@ namespace MB.FramePacing.Benchmarks
 
     /// <summary>The whole page: its cards (the whole report and the zoom steps), their SVG and the data.</summary>
     [Benchmark]
-    public string Page() => PlaybackPage.Build(m_section, m_video, g_directory, g_directory);
+    public string Page() => PlaybackPage.Build(m_section, m_video);
 
     /// <summary>The cards alone: the whole report and every zoom step that fits.</summary>
     [Benchmark]
@@ -64,6 +61,6 @@ namespace MB.FramePacing.Benchmarks
 
     /// <summary>The data alone: the cards' plots and every frame's columns.</summary>
     [Benchmark]
-    public string Data() => PlaybackData.Json(m_section, m_cards, ReportOptions.Default, m_video, g_directory, g_directory, "benchmark");
+    public string Data() => PlaybackData.Json(m_section, m_cards, ReportOptions.Default, m_video, "benchmark");
   }
 }

@@ -31,8 +31,9 @@ namespace MB.FramePacing.App.Commands
       new Option<bool>("--playback")
       {
         Description =
-          "Also write a playback report (analysis/playback/run-<id>/index.html, a folder of its own): the report next to the recording it "
-          + "was imported from, with a player and a playhead on the report. Recordings imported as a video file only.",
+          "Also write a playback report (analysis/playback/run-<id>/index.html, a folder of its own with a copy of the recording): the "
+          + "report next to the recording it was imported from, with a player and a playhead on the report. Recordings imported as a video "
+          + "file only.",
       };
 
     public Option<string?> Video { get; } =
@@ -41,20 +42,11 @@ namespace MB.FramePacing.App.Commands
         Description = "With --playback: the recording, instead of the one capture.json names (needed for imports made before it named one).",
       };
 
-    public Option<PlaybackVideoChoice?> VideoChoice { get; } =
-      new Option<PlaybackVideoChoice?>("--playback-video")
-      {
-        Description =
-          "With --playback, a recording browsers can play: copy it into the report's folder (which then plays anywhere), link it, or ask "
-          + "(default: the configuration's playbackVideo, else ask).",
-        HelpName = "ask|copy|link",
-      };
-
     public Option<PlaybackTranscodeChoice?> TranscodeChoice { get; } =
       new Option<PlaybackTranscodeChoice?>("--playback-transcode")
       {
         Description =
-          "With --playback, a recording browsers cannot play: make a playable copy with ffmpeg (yes), link it as it is (no), or ask "
+          "With --playback, a recording browsers cannot play: make a playable copy with ffmpeg (yes), no video (no), or ask "
           + "(default: the configuration's playbackTranscode, else ask).",
         HelpName = "ask|yes|no",
       };
@@ -62,13 +54,13 @@ namespace MB.FramePacing.App.Commands
     /// <summary>Add the options to <paramref name="command"/>: the others only with --playback.</summary>
     public void AddTo(Command command)
     {
-      foreach (var option in new Option[] { Playback, Video, VideoChoice, TranscodeChoice })
+      foreach (var option in new Option[] { Playback, Video, TranscodeChoice })
         command.Options.Add(option);
       command.Validators.Add(result =>
       {
         if (result.GetValue(Playback))
           return;
-        foreach (var option in new Option[] { Video, VideoChoice, TranscodeChoice })
+        foreach (var option in new Option[] { Video, TranscodeChoice })
         {
           if (result.GetResult(option) is { Implicit: false })
             result.AddError($"{option.Name} goes with --playback.");
@@ -109,17 +101,11 @@ namespace MB.FramePacing.App.Commands
     )
     {
       var config = CommonOptions.LoadConfig(parseResult);
-      var (video, transcode) = PlaybackExportOptions.Choices(
-        parseResult.GetValue(output.VideoChoice),
-        parseResult.GetValue(output.TranscodeChoice),
-        config
-      );
       var options = new PlaybackExportOptions
       {
         FfmpegPath = ffmpeg,
         VideoPath = parseResult.GetValue(output.Video) is { } path ? Path.GetFullPath(path) : null,
-        VideoChoice = video,
-        TranscodeChoice = transcode,
+        TranscodeChoice = PlaybackExportOptions.Choice(parseResult.GetValue(output.TranscodeChoice), config),
         FromSeconds = fromSeconds,
         ToSeconds = toSeconds,
         Report = report ?? ReportOptions.Default,
@@ -130,11 +116,11 @@ namespace MB.FramePacing.App.Commands
       progress.Finish();
       string kind = result.Video.Kind switch
       {
-        PlaybackVideoKind.Copied => "a copy of the recording in its folder",
-        PlaybackVideoKind.Transcoded => "a playable copy in its folder",
-        _ => result.Video.Playable ? "the recording, linked" : "the recording, linked (browsers may not play it)",
+        PlaybackVideoKind.Copied => "playing a copy of the recording in its folder",
+        PlaybackVideoKind.Transcoded => "playing a playable copy in its folder",
+        _ => "without a video (no playable copy was made)",
       };
-      AnsiConsole.MarkupLineInterpolated($"Playback report{(result.Pages.Count == 1 ? string.Empty : "s")}, playing {kind}:");
+      AnsiConsole.MarkupLineInterpolated($"Playback report{(result.Pages.Count == 1 ? string.Empty : "s")}, {kind}:");
       foreach (var page in result.Pages)
         AnsiConsole.MarkupLineInterpolated($"  [link]{page}[/]");
     }
@@ -151,16 +137,7 @@ namespace MB.FramePacing.App.Commands
         );
         return Task.FromResult(false);
       }
-      bool yes =
-        question.Kind == PlaybackQuestionKind.CopyOrLink
-          ? AnsiConsole.Prompt(
-            new TextPrompt<string>("[bold]copy[/] into the folder, or [bold]link[/] the recording?")
-              .AddChoice("copy")
-              .AddChoice("link")
-              .DefaultValue("link")
-              .ShowChoices()
-          ) == "copy"
-          : AnsiConsole.Confirm("Make a playable copy?", defaultValue: false);
+      bool yes = AnsiConsole.Confirm("Make a playable copy?", defaultValue: false);
       AnsiConsole.MarkupLineInterpolated(
         $"[grey]Answer it for good with {question.Setting} in the configuration ('config'), or per run with {question.Option}.[/]"
       );

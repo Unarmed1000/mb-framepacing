@@ -39,32 +39,23 @@
         </StackPanel>
       </Border>
 
-      <!-- The playback page's answers about the recording: the configuration file, shared with the command line -->
+      <!-- The playback report's answer about a recording browsers cannot play: the configuration file, shared with the command line -->
       <Border Classes="card">
         <StackPanel Spacing="10">
-          <TextBlock Classes="cardTitle" Text="Playback page" />
+          <TextBlock Classes="cardTitle" Text="Playback report" />
           <TextBlock
             Classes="subtle"
             TextWrapping="Wrap"
-            Text="Save playback page (Analyze page) and 'render --playback' write the report next to the recording the capture was imported from, in the analysis's playback folder. What they do with the recording:"
+            Text="Save playback page (Analyze page) and 'render --playback' write the report next to a copy of the recording the capture was imported from, in a folder of its own that plays anywhere. A recording browsers cannot play needs a playable copy first:"
           />
-          <Grid ColumnDefinitions="240,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-            <TextBlock Classes="subtle" VerticalAlignment="Center" Text="Recordings browsers can play" />
+          <Grid ColumnDefinitions="240,*" ColumnSpacing="12">
+            <TextBlock Classes="subtle" VerticalAlignment="Center" Text="Recordings browsers cannot play" />
             <ComboBox
-              Grid.Column="1"
-              MinWidth="260"
-              ItemsSource="{Binding PlaybackVideoChoices}"
-              SelectedIndex="{Binding PlaybackVideoIndex}"
-              ToolTip.Tip="A copy makes the playback folder play anywhere on its own (it takes the recording's size again); a link needs the recording where it is. Stored as playbackVideo."
-            />
-            <TextBlock Grid.Row="1" Classes="subtle" VerticalAlignment="Center" Text="Recordings browsers cannot play" />
-            <ComboBox
-              Grid.Row="1"
               Grid.Column="1"
               MinWidth="260"
               ItemsSource="{Binding PlaybackTranscodeChoices}"
               SelectedIndex="{Binding PlaybackTranscodeIndex}"
-              ToolTip.Tip="Lossless and 4:4:4 recordings, HEVC, and containers like MKV: ffmpeg makes a copy browsers play, with every frame and its timestamp kept. Stored as playbackTranscode."
+              ToolTip.Tip="Lossless and 4:4:4 recordings, HEVC, and containers like MKV: ffmpeg makes a copy browsers play, with every frame and its timestamp kept. Without it the report has no video. Stored as playbackTranscode."
             />
           </Grid>
           <TextBlock

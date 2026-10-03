@@ -37,9 +37,6 @@ namespace MB.FramePacing.Capture
     /// <summary>Folder that receives new captures (each capture gets its own sub folder). Null = Documents/mb-framepacing.</summary>
     public string? CaptureDirectory { get; init; }
 
-    /// <summary>The playback page and a recording browsers can play: copy it into the page's folder or link it. Null = ask.</summary>
-    public PlaybackVideoChoice? PlaybackVideo { get; init; }
-
     /// <summary>The playback page and a recording browsers cannot play: make a playable copy or not. Null = ask.</summary>
     public PlaybackTranscodeChoice? PlaybackTranscode { get; init; }
 
@@ -54,7 +51,7 @@ namespace MB.FramePacing.Capture
       ReadCommentHandling = JsonCommentHandling.Skip,
       AllowTrailingCommas = true,
       DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-      // "ask", "copy", ...; a value that is none of them is refused as invalid JSON
+      // "ask", "yes" or "no"; a value that is none of them is refused as invalid JSON
       Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
     };
 
@@ -150,11 +147,9 @@ namespace MB.FramePacing.Capture
         // Folder that receives new captures (each capture gets its own sub folder).
         // "captureDirectory": "D:\\captures",
 
-        // The playback page (render --playback, the GUI's Save playback page) plays the recording a capture was imported from.
-        // A recording browsers can play: "ask" (the default), "copy" (into the page's folder, which then plays anywhere) or "link".
-        // "playbackVideo": "ask",
-
-        // A recording browsers cannot play: "ask" (the default), "yes" (make a playable copy with ffmpeg) or "no" (link it as it is).
+        // The playback report (render --playback, the GUI's Save playback page) holds a copy of the recording a capture was imported
+        // from. A recording browsers cannot play: "ask" (the default), "yes" (make a playable copy with ffmpeg) or "no" (the report has no
+        // video).
         // "playbackTranscode": "ask"
       }
 

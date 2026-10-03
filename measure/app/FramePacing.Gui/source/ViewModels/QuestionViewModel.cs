@@ -34,7 +34,7 @@ namespace MB.FramePacing.Gui.ViewModels
     /// <summary>The answer that does not.</summary>
     public string No { get; }
 
-    /// <summary>What remembering does ("Remember my choice: stored as playbackVideo in the configuration").</summary>
+    /// <summary>What remembering does ("Remember my choice: stored as playbackTranscode in the configuration").</summary>
     public string RememberText { get; }
 
     [ObservableProperty]

@@ -2,10 +2,10 @@
 //* File Description
 //* ----------------
 //* Playback reports (PlaybackExport.WriteAsync) of the SDK's golden analysis, with ffmpeg's steps replaced: every report has a folder of its
-//* own, and saving one never touches another; no video is written without a yes (given in advance or to the question); a playable recording
-//* is copied or linked, one browsers cannot play is made playable or linked; saving the same report again uses its video again while the
-//* recording is unchanged; a capture the page cannot show is refused. Also the answers' precedence (an option over the configuration over
-//* asking) and where a page's video URL points.
+//* own that names nothing outside it, and saving one never touches another; a recording browsers play is copied, one they cannot play is
+//* made playable only after a yes (given in advance or to the question), else the report has no video; saving the same report again uses
+//* its video again while the recording is unchanged; a capture the page cannot show is refused. Also the answer's precedence (an option over
+//* the configuration over asking) and the license notice every page carries.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -89,7 +89,6 @@ namespace MB.FramePacing.Charts.UnitTest
     private Task<PlaybackResult> Save(
       VideoCodecInfo codec,
       bool answer,
-      PlaybackVideoChoice video = PlaybackVideoChoice.Ask,
       PlaybackTranscodeChoice transcode = PlaybackTranscodeChoice.Ask,
       double? fromSeconds = null,
       double? toSeconds = null,
@@ -101,7 +100,6 @@ namespace MB.FramePacing.Charts.UnitTest
         new PlaybackExportOptions
         {
           FfmpegPath = "ffmpeg",
-          VideoChoice = video,
           TranscodeChoice = transcode,
           FromSeconds = fromSeconds,
           ToSeconds = toSeconds,
@@ -127,21 +125,44 @@ namespace MB.FramePacing.Charts.UnitTest
     private static string[] Files(string folder) =>
       Directory.GetFiles(folder).Select(f => Path.GetFileName(f)!).Order(StringComparer.Ordinal).ToArray();
 
-    [Test]
-    public async Task Playable_AskedAndCopied_TheReportsFolderHasItsOwnVideo()
+    /// <summary>No file of the report's folder names a local path: not the recording's folder, not the capture's (as text or as JSON).</summary>
+    private void AssertNamesNoLocalPath(string folder)
     {
-      var result = await Save(g_playable, answer: true);
+      foreach (
+        string file in Directory
+          .GetFiles(folder)
+          .Where(f => f.EndsWith(".html", StringComparison.Ordinal) || f.EndsWith(".json", StringComparison.Ordinal))
+      )
+      {
+        string text = File.ReadAllText(file);
+        foreach (string local in new[] { m_directory, Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar) })
+        {
+          Assert.That(text, Does.Not.Contain(local), $"{Path.GetFileName(file)} names a local path");
+          Assert.That(
+            text,
+            Does.Not.Contain(System.Text.Json.JsonSerializer.Serialize(local).Trim('"')),
+            $"{Path.GetFileName(file)} names a local path"
+          );
+        }
+      }
+    }
 
+    [Test]
+    public async Task Playable_IsCopied_WithoutAQuestion_TheReportsFolderPlaysOnItsOwn()
+    {
+      var result = await Save(g_playable, answer: false);
+
+      Assert.That(m_asked, Is.Empty, "a copy needs no question");
       Assert.That(result.Pages, Is.EqualTo(new[] { Path.Combine(WholeRun, "index.html") }));
-      Assert.That(m_asked.Single().Kind, Is.EqualTo(PlaybackQuestionKind.CopyOrLink));
-      Assert.That(m_asked.Single().Target, Is.EqualTo(Path.Combine(WholeRun, "video.mp4")));
       Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.Copied));
       Assert.That(result.Video.Playable, Is.True);
       Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }));
       Assert.That(File.ReadAllText(Path.Combine(WholeRun, "video.mp4")), Is.EqualTo("the recording"));
       Assert.That(PlaybackVideo.Read(WholeRun), Is.EqualTo(result.Video));
+      Assert.That(result.Video.SourceName, Is.EqualTo("my capture.mp4"));
       Assert.That(File.ReadAllText(result.Pages[0]), Does.Contain("\"url\":\"video.mp4\""));
       Assert.That(m_transcoded, Is.Empty);
+      AssertNamesNoLocalPath(WholeRun);
     }
 
     [Test]
@@ -162,52 +183,38 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
-    public async Task Playable_AskedAndLinked_WritesNoVideo()
-    {
-      var result = await Save(g_playable, answer: false);
-
-      Assert.That(m_asked, Has.Count.EqualTo(1));
-      Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.Linked));
-      Assert.That(result.Video.VideoFile, Is.Null);
-      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json" }));
-      Assert.That(File.ReadAllText(result.Pages[0]), Does.Contain("\"url\":\"../../../../recordings/my%20capture.mp4\""));
-    }
-
-    [Test]
     public async Task Unplayable_AskedAndTranscoded_TheReportHasAPlayableCopy()
     {
       var result = await Save(g_unplayable, answer: true);
 
-      Assert.That(m_asked.Single().Kind, Is.EqualTo(PlaybackQuestionKind.Transcode));
+      Assert.That(m_asked, Has.Count.EqualTo(1));
+      Assert.That(m_asked[0].Target, Is.EqualTo(Path.Combine(WholeRun, "video.mp4")));
       Assert.That(m_transcoded, Is.EqualTo(new[] { Path.Combine(WholeRun, "video.mp4") }));
       Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.Transcoded));
       Assert.That(result.Video.Playable, Is.True);
       Assert.That(result.Video.SourcePlayable, Is.False);
+      AssertNamesNoLocalPath(WholeRun);
     }
 
     [Test]
-    public async Task Unplayable_Declined_LinksTheRecording_AndSaysWhy()
+    public async Task Unplayable_Declined_TheReportHasNoVideo_AndSaysHowToMakeOne()
     {
       var result = await Save(g_unplayable, answer: false);
 
       Assert.That(m_asked, Has.Count.EqualTo(1));
       Assert.That(m_transcoded, Is.Empty);
-      Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.Linked));
+      Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.None));
       Assert.That(result.Video.Playable, Is.False);
       Assert.That(result.Video.Problem, Does.Contain("4:4:4"));
-      Assert.That(File.ReadAllText(result.Pages[0]), Does.Contain("--playback-transcode yes"), "the page names the command that makes the copy");
-    }
-
-    [TestCase(PlaybackVideoChoice.Copy, PlaybackVideoKind.Copied)]
-    [TestCase(PlaybackVideoChoice.Link, PlaybackVideoKind.Linked)]
-    public async Task Playable_AnsweredInAdvance_NeverAsks(PlaybackVideoChoice choice, PlaybackVideoKind kind)
-    {
-      Assert.That((await Save(g_playable, answer: false, video: choice)).Video.Kind, Is.EqualTo(kind));
-      Assert.That(m_asked, Is.Empty);
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json" }));
+      string page = File.ReadAllText(result.Pages[0]);
+      Assert.That(page, Does.Contain("\"url\":null"));
+      Assert.That(page, Does.Contain("mb-framepacing render \\u003Ccapture folder\\u003E --playback --playback-transcode yes"));
+      AssertNamesNoLocalPath(WholeRun);
     }
 
     [TestCase(PlaybackTranscodeChoice.Yes, PlaybackVideoKind.Transcoded)]
-    [TestCase(PlaybackTranscodeChoice.No, PlaybackVideoKind.Linked)]
+    [TestCase(PlaybackTranscodeChoice.No, PlaybackVideoKind.None)]
     public async Task Unplayable_AnsweredInAdvance_NeverAsks(PlaybackTranscodeChoice choice, PlaybackVideoKind kind)
     {
       Assert.That((await Save(g_unplayable, answer: false, transcode: choice)).Video.Kind, Is.EqualTo(kind));
@@ -217,21 +224,22 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public async Task EachReport_HasAFolderOfItsOwn_AndSavingOneNeverTouchesAnother()
     {
-      var whole = await Save(g_playable, answer: false, video: PlaybackVideoChoice.Copy);
-      var section = await Save(g_playable, answer: false, video: PlaybackVideoChoice.Link, fromSeconds: 1, toSeconds: 3);
+      var whole = await Save(g_unplayable, answer: false, transcode: PlaybackTranscodeChoice.Yes);
+      var section = await Save(g_unplayable, answer: false, transcode: PlaybackTranscodeChoice.Yes, fromSeconds: 1, toSeconds: 3);
 
       string sectionFolder = Path.Combine(m_capture.PlaybackDirectory, "run-1-1s-3s");
       Assert.That(section.Pages, Is.EqualTo(new[] { Path.Combine(sectionFolder, "index.html") }));
-      Assert.That(Files(sectionFolder), Is.EqualTo(new[] { "index.html", "playback.json" }));
-      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }), "the whole run's report keeps its copy");
-      Assert.That(PlaybackVideo.Read(WholeRun), Is.EqualTo(whole.Video));
+      Assert.That(Files(sectionFolder), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }), "the section's own copy");
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }));
 
       // The whole run's report saved again with another answer: only its own folder changes
       string sectionPage = File.ReadAllText(section.Pages[0]);
-      await Save(g_playable, answer: false, video: PlaybackVideoChoice.Link);
-      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json" }), "the report replaced plays the recording now");
+      await Save(g_unplayable, answer: false, transcode: PlaybackTranscodeChoice.No);
+      Assert.That(Files(WholeRun), Is.EqualTo(new[] { "index.html", "playback.json" }), "the report replaced has no video now");
       Assert.That(File.ReadAllText(section.Pages[0]), Is.EqualTo(sectionPage));
+      Assert.That(Files(sectionFolder), Is.EqualTo(new[] { "index.html", "playback.json", "video.mp4" }));
       Assert.That(PlaybackVideo.Read(sectionFolder), Is.EqualTo(section.Video));
+      Assert.That(PlaybackVideo.Read(WholeRun)?.Kind, Is.Not.EqualTo(whole.Video.Kind));
     }
 
     [Test]
@@ -254,24 +262,14 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
-    public async Task AnAnswerInAdvance_ThatDiffers_MakesTheReportsVideoAgain()
-    {
-      await Save(g_playable, answer: false);
-      var copied = await Save(g_playable, answer: false, video: PlaybackVideoChoice.Copy);
-
-      Assert.That(copied.Video.Kind, Is.EqualTo(PlaybackVideoKind.Copied));
-      Assert.That(m_asked, Has.Count.EqualTo(1));
-    }
-
-    [Test]
     public async Task TheRecordingGone_TheReportsCopyStillPlays_ElseItIsAnError()
     {
-      var copied = await Save(g_playable, answer: true);
+      var copied = await Save(g_playable, answer: false);
       File.Delete(m_source);
 
-      Assert.That((await Save(g_playable, answer: true)).Video, Is.EqualTo(copied.Video));
+      Assert.That((await Save(g_playable, answer: false)).Video, Is.EqualTo(copied.Video));
       File.Delete(Path.Combine(WholeRun, "video.mp4"));
-      await Assert.ThrowsAsync<FileNotFoundException>(() => Save(g_playable, answer: true));
+      await Assert.ThrowsAsync<FileNotFoundException>(() => Save(g_playable, answer: false));
     }
 
     [Test]
@@ -293,29 +291,13 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
-    public void Choices_AnOptionWins_OverTheConfiguration_OverAsking()
+    public void Choice_AnOptionWins_OverTheConfiguration_OverAsking()
     {
-      var config = new FramePacingConfig { PlaybackVideo = PlaybackVideoChoice.Copy, PlaybackTranscode = PlaybackTranscodeChoice.No };
+      var config = new FramePacingConfig { PlaybackTranscode = PlaybackTranscodeChoice.No };
 
-      Assert.That(
-        PlaybackExportOptions.Choices(null, null, new FramePacingConfig()),
-        Is.EqualTo((PlaybackVideoChoice.Ask, PlaybackTranscodeChoice.Ask))
-      );
-      Assert.That(PlaybackExportOptions.Choices(null, null, config), Is.EqualTo((PlaybackVideoChoice.Copy, PlaybackTranscodeChoice.No)));
-      Assert.That(
-        PlaybackExportOptions.Choices(PlaybackVideoChoice.Link, PlaybackTranscodeChoice.Ask, config),
-        Is.EqualTo((PlaybackVideoChoice.Link, PlaybackTranscodeChoice.Ask))
-      );
-    }
-
-    [Test]
-    public void Url_IsRelative_AndEscaped()
-    {
-      string page = Path.Combine(m_directory, "a", "playback");
-      Assert.That(PlaybackUrl.For(page, Path.Combine(page, "video.mp4")), Is.EqualTo("video.mp4"));
-      Assert.That(PlaybackUrl.For(page, Path.Combine(m_directory, "b #1", "50% done.mkv")), Is.EqualTo("../../b%20%231/50%25%20done.mkv"));
-      if (OperatingSystem.IsWindows())
-        Assert.That(PlaybackUrl.For(@"C:\pages", @"Z:\videos\take 1.mp4"), Is.EqualTo("file:///Z:/videos/take%201.mp4"));
+      Assert.That(PlaybackExportOptions.Choice(null, new FramePacingConfig()), Is.EqualTo(PlaybackTranscodeChoice.Ask));
+      Assert.That(PlaybackExportOptions.Choice(null, config), Is.EqualTo(PlaybackTranscodeChoice.No));
+      Assert.That(PlaybackExportOptions.Choice(PlaybackTranscodeChoice.Yes, config), Is.EqualTo(PlaybackTranscodeChoice.Yes));
     }
   }
 }

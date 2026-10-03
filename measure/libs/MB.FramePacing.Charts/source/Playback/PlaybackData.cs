@@ -28,17 +28,9 @@ namespace MB.FramePacing.Charts.Playback
 
     /// <summary>
     /// The data of <paramref name="section"/> drawn as <paramref name="cards"/> (the whole report, then the zoom steps), playing
-    /// <paramref name="video"/> from a page in <paramref name="pageDirectory"/>.
+    /// <paramref name="video"/>: a file in the page's folder, named by its file name only, as nothing in the page names a local path.
     /// </summary>
-    public static string Json(
-      RunSection section,
-      IReadOnlyList<PlaybackCard> cards,
-      ReportOptions options,
-      PlaybackVideo video,
-      string pageDirectory,
-      string analysisDirectory,
-      string toolVersion
-    )
+    public static string Json(RunSection section, IReadOnlyList<PlaybackCard> cards, ReportOptions options, PlaybackVideo video, string toolVersion)
     {
       var run = section.Run;
       var data = section.Data;
@@ -119,26 +111,28 @@ namespace MB.FramePacing.Charts.Playback
         }
         json.WriteEndArray();
 
-        WriteVideo(json, video, pageDirectory, analysisDirectory);
+        WriteVideo(json, video);
         WriteFrames(json, section);
         json.WriteEndObject();
       }
       return Encoding.UTF8.GetString(stream.ToArray());
     }
 
-    private static void WriteVideo(Utf8JsonWriter json, PlaybackVideo video, string pageDirectory, string analysisDirectory)
+    private static void WriteVideo(Utf8JsonWriter json, PlaybackVideo video)
     {
-      string path = video.PathIn(pageDirectory);
       json.WriteStartObject("video");
-      json.WriteString("url", PlaybackUrl.For(pageDirectory, path));
-      json.WriteString("name", Path.GetFileName(video.Source));
+      if (video.VideoFile is { } file)
+        json.WriteString("url", Uri.EscapeDataString(file));
+      else
+        json.WriteNull("url");
+      json.WriteString("name", video.SourceName);
       json.WriteString("kind", video.Kind.ToString().ToLowerInvariant());
       json.WriteBoolean("playable", video.Playable);
       json.WriteString("description", video.Description);
       if (!video.Playable && video.Problem != null)
       {
         json.WriteString("problem", video.Problem);
-        json.WriteString("command", $"mb-framepacing render \"{analysisDirectory}\" --playback --playback-transcode yes");
+        json.WriteString("command", "mb-framepacing render <capture folder> --playback --playback-transcode yes");
       }
       json.WriteEndObject();
     }

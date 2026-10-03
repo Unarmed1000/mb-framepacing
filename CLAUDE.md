@@ -307,11 +307,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     (`measure/tools/Benchmarks`): a whole page of 10 min or an hour at 60 or 240 Hz takes 0.2 to 0.3 s; the video's copy is ffmpeg's time.
   - **A folder per report** (`analysis/playback/<prefix>[-<from>s-<to>s]/`: `index.html`, its own video, `playback.json`). An export
     touches only the folders it writes; saving the same report again replaces that folder only. Never share or delete another
-    report's files.
-  - **Never write a video without a yes** (`PlaybackExport`, shared by CLI and GUI, which differ only in `decide` and progress):
-    copy or link a playable recording, make a playable copy (`PlayableCopy`: remux, else H.264, every frame and pts kept) of one
-    browsers cannot play (`VideoCodecInfo`). Answers in advance: `--playback-video`/`--playback-transcode`, else the configuration's
-    `playbackVideo`/`playbackTranscode`, else ask; redirected stdin writes no video. The GUI's dialog can remember the answer.
+    report's files. **Nothing in it names anything outside it** (agreed with the user): no link to the recording, no local path
+    (`playback.json` keeps the recording's file name, size and time; the page's command says `<capture folder>`).
+  - **The video is always a copy** (`PlaybackExport`, shared by CLI and GUI, which differ only in `decide` and progress): a playable
+    recording is copied without a question; one browsers cannot play (`VideoCodecInfo`) gets a playable copy (`PlayableCopy`: remux,
+    else H.264, every frame and pts kept) only after a yes, else the report has no video. Answer in advance: `--playback-transcode`,
+    else the configuration's `playbackTranscode`, else ask; redirected stdin makes no copy. The GUI's dialog can remember the answer.
 - **Media sources**
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file... / Image folder... / Network stream") go through
     `MediaInput` -> ffmpeg.

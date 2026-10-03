@@ -63,12 +63,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var run = report.Timeline.Runs.Single();
       var chart = ChartRun.From(report, run);
       var runs = new[] { new AnalysisOutputRun(chart, PlaybackExport.PrefixOf(report, run)) };
-      var options = new PlaybackExportOptions
-      {
-        FfmpegPath = m_ffmpeg,
-        VideoChoice = PlaybackVideoChoice.Ask,
-        TranscodeChoice = PlaybackTranscodeChoice.Ask,
-      };
+      var options = new PlaybackExportOptions { FfmpegPath = m_ffmpeg, TranscodeChoice = PlaybackTranscodeChoice.Ask };
 
       // The clip is lossless 4:4:4 H.264, which browsers do not play: the export asks, and the answer makes a copy
       PlaybackQuestion? asked = null;
@@ -82,7 +77,7 @@ namespace MB.FramePacing.Charts.UnitTest
           return Task.FromResult(true);
         }
       );
-      Assert.That(asked?.Kind, Is.EqualTo(PlaybackQuestionKind.Transcode));
+      Assert.That(asked?.Title, Does.Contain("playable copy"));
       Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.Transcoded));
       Assert.That(result.Pages, Is.EqualTo(new[] { Path.Combine(report.OutputDirectory, "playback", "run-1", "index.html") }));
 
@@ -148,7 +143,7 @@ namespace MB.FramePacing.Charts.UnitTest
 
       // The copy shows every capture at the time the import read from the recording
       var again = CaptureAnalyzer.Analyze(
-        ImportFile(result.Video.PathIn(Path.GetDirectoryName(result.Pages[0])!), Path.Combine(m_directory, "copy")),
+        ImportFile(result.Video.PathIn(Path.GetDirectoryName(result.Pages[0])!)!, Path.Combine(m_directory, "copy")),
         new AnalysisOptions()
       );
       Assert.That(

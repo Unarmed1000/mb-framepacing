@@ -1,9 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The video a playback folder's pages play, and what it was made from: playback.json in the folder. It keeps the answer to the question
-//* asked about the recording (copy or link, transcode or not) for as long as the recording is unchanged (same path, size and modification
-//* time), so a later page of the same capture (a section) asks nothing. Written through a temporary file and a rename.
+//* The video a playback report holds, and what it was made from: playback.json in the report's folder. The folder is complete in itself and
+//* names nothing outside it: of the recording it keeps only the file name, size and modification time, by which saving the same report
+//* again recognises an unchanged recording and uses the video again without a question. Written through a temporary file and a rename.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -17,9 +17,9 @@ using System.Text.Json.Serialization;
 
 namespace MB.FramePacing.Charts.Playback
 {
-  /// <param name="Kind">The recording linked, copied into the folder, or a playable copy of it in the folder.</param>
-  /// <param name="VideoFile">The folder's own video ("video.mp4"); null when the recording is linked.</param>
-  /// <param name="Source">The recording's absolute path.</param>
+  /// <param name="Kind">A copy of the recording, a playable copy of it, or no video.</param>
+  /// <param name="VideoFile">The report's video in its folder ("video.mp4"); null without one.</param>
+  /// <param name="SourceName">The recording's file name (no folder).</param>
   /// <param name="SourceSize">Its size in bytes when the video was made.</param>
   /// <param name="SourceModifiedUtc">Its modification time then.</param>
   /// <param name="SourcePlayable">Browsers can play the recording as it is.</param>
@@ -28,7 +28,7 @@ namespace MB.FramePacing.Charts.Playback
   public sealed record PlaybackVideo(
     PlaybackVideoKind Kind,
     string? VideoFile,
-    string Source,
+    string SourceName,
     long SourceSize,
     DateTime SourceModifiedUtc,
     bool SourcePlayable,
@@ -51,23 +51,19 @@ namespace MB.FramePacing.Charts.Playback
       Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
     };
 
-    /// <summary>The pages can play what they link: a copy, or a recording browsers play.</summary>
+    /// <summary>The report has a video it plays.</summary>
     [JsonIgnore]
-    public bool Playable => Kind != PlaybackVideoKind.Linked || SourcePlayable;
+    public bool Playable => VideoFile != null;
 
-    /// <summary>The file the pages in <paramref name="directory"/> play.</summary>
-    public string PathIn(string directory) => VideoFile != null ? Path.Combine(directory, VideoFile) : Source;
+    /// <summary>The report's video in <paramref name="directory"/>, null without one.</summary>
+    public string? PathIn(string directory) => VideoFile != null ? Path.Combine(directory, VideoFile) : null;
 
-    /// <summary>The video is there: the linked recording, or the folder's own file.</summary>
-    public bool ExistsIn(string directory) => File.Exists(PathIn(directory));
+    /// <summary>The report's video is there (or it has none).</summary>
+    public bool ExistsIn(string directory) => PathIn(directory) is not { } path || File.Exists(path);
 
-    /// <summary>The recording at <paramref name="source"/> is the one this video was made from: same path, size and modification time.</summary>
+    /// <summary>The recording <paramref name="source"/> is the one this video was made from: same file name, size and modification time.</summary>
     public bool IsFrom(FileInfo source) =>
-      string.Equals(
-        Path.GetFullPath(Source),
-        source.FullName,
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
-      )
+      string.Equals(SourceName, source.Name, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
       && source.Length == SourceSize
       && source.LastWriteTimeUtc == SourceModifiedUtc;
 
@@ -80,7 +76,7 @@ namespace MB.FramePacing.Charts.Playback
       try
       {
         var video = JsonSerializer.Deserialize<PlaybackVideo>(File.ReadAllText(path), g_options);
-        return video is { FormatVersion: CurrentFormatVersion } && !string.IsNullOrEmpty(video.Source) ? video : null;
+        return video is { FormatVersion: CurrentFormatVersion } && !string.IsNullOrEmpty(video.SourceName) ? video : null;
       }
       catch (JsonException)
       {
