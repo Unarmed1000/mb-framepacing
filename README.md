@@ -41,7 +41,7 @@ There are two halves, and both are needed:
   recorded frame and compare the animation time the frame carries with the time it actually appeared in the recording.
 
 > [!IMPORTANT]
-> **mb-framepacing is a cooperative tool (for now).** It only measures applications that take part: every frame, the
+> **mb-framepacing is a cooperative tool.** It only measures applications that take part: every frame, the
 > application writes **its own frame index and its animation timer** into the image as a marker (a small QR code), using
 > one of the marker libraries below.
 >
