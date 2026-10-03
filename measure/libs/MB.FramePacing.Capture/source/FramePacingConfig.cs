@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* mb-framepacing.json - the user's configuration, shared by the command line tool and the GUI. It points the tools at the user's ffmpeg
-//* installation and sets the default capture folder.
+//* installation, sets the default capture folder and answers the playback page's questions about the recording.
 //*
 //* Lookup order: an explicit path (--config), a file next to the executable (portable installs), the per user configuration folder:
 //*   Windows  %APPDATA%\mb-framepacing\mb-framepacing.json
@@ -37,6 +37,12 @@ namespace MB.FramePacing.Capture
     /// <summary>Folder that receives new captures (each capture gets its own sub folder). Null = Documents/mb-framepacing.</summary>
     public string? CaptureDirectory { get; init; }
 
+    /// <summary>The playback page and a recording browsers can play: copy it into the page's folder or link it. Null = ask.</summary>
+    public PlaybackVideoChoice? PlaybackVideo { get; init; }
+
+    /// <summary>The playback page and a recording browsers cannot play: make a playable copy or not. Null = ask.</summary>
+    public PlaybackTranscodeChoice? PlaybackTranscode { get; init; }
+
     /// <summary>The file this configuration was loaded from, null if none exists yet.</summary>
     [JsonIgnore]
     public string? SourcePath { get; init; }
@@ -48,6 +54,8 @@ namespace MB.FramePacing.Capture
       ReadCommentHandling = JsonCommentHandling.Skip,
       AllowTrailingCommas = true,
       DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+      // "ask", "copy", ...; a value that is none of them is refused as invalid JSON
+      Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
     };
 
     /// <summary>The per user configuration file.</summary>
@@ -140,7 +148,14 @@ namespace MB.FramePacing.Capture
         // "ffmpegPath": "C:\\ffmpeg\\bin\\ffmpeg.exe",
 
         // Folder that receives new captures (each capture gets its own sub folder).
-        // "captureDirectory": "D:\\captures"
+        // "captureDirectory": "D:\\captures",
+
+        // The playback page (render --playback, the GUI's Save playback page) plays the recording a capture was imported from.
+        // A recording browsers can play: "ask" (the default), "copy" (into the page's folder, which then plays anywhere) or "link".
+        // "playbackVideo": "ask",
+
+        // A recording browsers cannot play: "ask" (the default), "yes" (make a playable copy with ffmpeg) or "no" (link it as it is).
+        // "playbackTranscode": "ask"
       }
 
       """;

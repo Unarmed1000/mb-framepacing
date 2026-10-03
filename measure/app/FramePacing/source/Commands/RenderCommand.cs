@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* 'render': draw a run of an analysis, or a section of it, as an SVG report and distribution cards (and PNG through a headless Edge or
-//* Chrome) from the analysis output (summary.json and the run's frames CSV), without the capture.
+//* Chrome) from the analysis output (summary.json and the run's frames CSV), without the capture; with --playback, as a playback page
+//* (the report next to the recording the capture was imported from) instead.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -14,6 +15,7 @@ using System.CommandLine;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Charts;
+using MB.FramePacing.Charts.Playback;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -91,6 +93,8 @@ namespace MB.FramePacing.App.Commands
         Description = $"The distribution cards to draw next to the report, comma separated: {cardIds}; 'all' (the default) or 'none'.",
         DefaultValueFactory = _ => "all",
       };
+      var playback = new PlaybackOutput();
+      var ffmpegOption = CommonOptions.Ffmpeg();
 
       var command = new Command("render", "Draw an analysed run, or a section of it, as an SVG report and distribution cards (and PNG).")
       {
@@ -112,7 +116,20 @@ namespace MB.FramePacing.App.Commands
         noStaticClampOption,
         tilesPerRowOption,
         cardsOption,
+        ffmpegOption,
       };
+      playback.AddTo(command);
+      command.Validators.Add(result =>
+      {
+        if (!result.GetValue(playback.Playback))
+          return;
+        // The page goes into the analysis's playback folder, and is one page per run (or section)
+        foreach (var option in new Option[] { timelineOption, detailsOption, pngOption, outputOption, cardsOption })
+        {
+          if (result.GetResult(option) is { Implicit: false })
+            result.AddError($"{option.Name} does not go with --playback.");
+        }
+      });
       command.SetAction(parseResult =>
       {
         try
@@ -141,6 +158,20 @@ namespace MB.FramePacing.App.Commands
             ClampStatic = !parseResult.GetValue(noStaticClampOption),
             TilesPerRow = parseResult.GetValue(tilesPerRowOption),
           };
+          if (parseResult.GetValue(playback.Playback))
+          {
+            PlaybackOutput.Write(
+              parseResult,
+              playback,
+              PlaybackCapture.Read(folder),
+              runs,
+              PlaybackOutput.FindFfmpeg(parseResult, ffmpegOption),
+              parseResult.GetValue(fromOption),
+              parseResult.GetValue(toOption),
+              options
+            );
+            return Program.ResultSuccess;
+          }
           var cards = ParseCards(parseResult.GetValue(cardsOption)!);
           Directory.CreateDirectory(output);
           foreach (var run in runs)

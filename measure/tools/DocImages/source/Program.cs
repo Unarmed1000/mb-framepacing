@@ -6,6 +6,7 @@
 //*     clip (measure/test-data/videos, through ffmpeg), and each page is saved as PNG. Machine specific text (paths) is replaced with
 //*     neutral example values first.
 //*   - Marker examples: the start, frame and end markers as an application draws them.
+//*   - The playback page: Save playback page on the imported clip (its question answered in the dialog), and the page in a headless browser.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -28,6 +29,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Charts;
+using MB.FramePacing.Charts.Playback;
 using MB.FramePacing.Gui;
 using MB.FramePacing.Gui.ViewModels;
 using MB.FramePacing.Gui.Views;
@@ -139,6 +141,7 @@ namespace MB.FramePacing.DocImages
       Save(window, Path.Combine(output, "gui-analysis.png"));
 
       await CheckTimelineInteractionAsync(window, viewModel.Analysis);
+      await CheckPlaybackAsync(window, viewModel.Analysis, output);
 
       // The setup dialog as a user without ffmpeg sees it after pressing 'Find automatically'
       var setupViewModel = new SetupViewModel(
@@ -234,6 +237,16 @@ namespace MB.FramePacing.DocImages
       Save(window, Path.Combine(output, "gui-camera.png"));
       capture.StopCommand.Execute(null);
       await WaitUntil(() => !capture.IsCapturing, TimeSpan.FromSeconds(60));
+
+      // The capture is analysed when it ends: a camera capture has no playback page, and the button says why
+      var analysis = viewModel.Analysis;
+      await WaitUntil(() => !analysis.IsBusy, TimeSpan.FromSeconds(60));
+      if (analysis.HasRun)
+      {
+        if (analysis.CanSavePlayback || !analysis.PlaybackToolTip.Contains("camera capture", StringComparison.Ordinal))
+          throw new InvalidOperationException($"Save playback page is not off for the camera capture: '{analysis.PlaybackToolTip}'");
+        Console.WriteLine("  Save playback page: off for the camera capture, with the reason in its tooltip");
+      }
     }
 
     /// <summary>
@@ -372,6 +385,43 @@ namespace MB.FramePacing.DocImages
       );
     }
 
+    /// <summary>
+    /// Save playback page on the imported test clip, as a user does: the clip is lossless 4:4:4 H.264, which browsers cannot play, so the GUI
+    /// asks before it makes a playable copy (answered yes in the dialog; automation never remembers an answer). Then the page in a headless
+    /// browser at the clip's busy stretch: playback-page.png (skipped without a browser). Throws when a step does not happen.
+    /// </summary>
+    private static async Task CheckPlaybackAsync(Window window, AnalysisViewModel analysis, string output)
+    {
+      if (!analysis.CanSavePlayback)
+        throw new InvalidOperationException($"Save playback page is off for the imported clip: {analysis.PlaybackProblem}");
+      var saving = analysis.SavePlaybackCommand.ExecuteAsync(null);
+      QuestionWindow? question = null;
+      await WaitUntil(
+        () => (question = window.OwnedWindows.OfType<QuestionWindow>().FirstOrDefault()) != null || saving.IsCompleted,
+        TimeSpan.FromSeconds(30)
+      );
+      if (question?.DataContext is not QuestionViewModel asked || !asked.Title.Contains("playable copy", StringComparison.Ordinal))
+        throw new InvalidOperationException($"Save playback page did not ask before making a playable copy: {analysis.ErrorText}");
+      asked.AnswerYesCommand.Execute(null);
+      await WaitUntil(() => saving.IsCompleted, TimeSpan.FromSeconds(120));
+      await saving;
+      if (analysis.PlaybackPage is not { } page || !File.Exists(page))
+        throw new InvalidOperationException($"Save playback page wrote no page: {analysis.ErrorText}");
+      string folder = Path.GetDirectoryName(page)!;
+      if (PlaybackVideo.Read(folder) is not { Kind: PlaybackVideoKind.Transcoded } video || !video.ExistsIn(folder))
+        throw new InvalidOperationException($"Save playback page made no playable copy in {folder}");
+      Console.WriteLine($"  Save playback page: asked, made a playable copy, wrote {Path.GetFileName(folder)}/{Path.GetFileName(page)}");
+      try
+      {
+        HeadlessBrowser.SavePagePng(page, "t=2.05&theme=dark", Path.Combine(output, "playback-page.png"), 1600, 1000);
+        Console.WriteLine("  playback-page.png");
+      }
+      catch (InvalidOperationException ex) when (HeadlessBrowser.Find() == null)
+      {
+        Console.WriteLine("  playback-page.png skipped: " + ex.Message);
+      }
+    }
+
     /// <summary>The Timeline tab's plots, one below the other, as one image.</summary>
     private static void Save(TopLevel topLevel, string path)
     {
@@ -424,7 +474,7 @@ namespace MB.FramePacing.DocImages
         string imported = Path.Combine(work, clip);
         var media = MB.FramePacing.Capture.Ffmpeg.MediaInput.Create(video, new MB.FramePacing.Capture.Ffmpeg.MediaInputOptions(), imported);
         using (var source = MB.FramePacing.Capture.Ffmpeg.FfmpegCaptureSource.Start(media.ToCaptureOptions(ffmpeg), TimeSpan.FromSeconds(30)))
-          CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = imported }, null, CancellationToken.None);
+          CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = imported, InputPath = media.InputPath }, null, CancellationToken.None);
         WriteReport(
           imported,
           Path.Combine(output, $"report-example-{name}.svg"),

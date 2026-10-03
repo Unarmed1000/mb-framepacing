@@ -1,0 +1,28 @@
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<Window
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:MB.FramePacing.Gui.ViewModels"
+  x:Class="MB.FramePacing.Gui.Views.QuestionWindow"
+  x:DataType="vm:QuestionViewModel"
+  Title="{Binding Title}"
+  Width="560"
+  SizeToContent="Height"
+  CanResize="False"
+  CanMinimize="False"
+  CanMaximize="False"
+  WindowStartupLocation="CenterOwner"
+>
+  <StackPanel Margin="24" Spacing="16">
+    <TextBlock Classes="title" Text="{Binding Title}" TextWrapping="Wrap" />
+    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+    <CheckBox IsChecked="{Binding Remember}">
+      <TextBlock Classes="subtle" Text="{Binding RememberText}" TextWrapping="Wrap" />
+    </CheckBox>
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="{Binding No}" Command="{Binding AnswerNoCommand}" MinWidth="120" />
+      <Button Classes="accent" Content="{Binding Yes}" Command="{Binding AnswerYesCommand}" MinWidth="120" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

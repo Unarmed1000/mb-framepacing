@@ -150,6 +150,29 @@ namespace MB.FramePacing.Capture.Ffmpeg
       }
     }
 
+    /// <summary>
+    /// A copy of <paramref name="source"/>'s first video stream that browsers play, as MP4 at <paramref name="target"/>, with every frame and
+    /// its timestamp as they are ('-copyts', no frame dropped or added, no negative timestamps shifted): the playback page finds a capture's
+    /// frame in the copy by the time the import read from the source. When the stream plays in a browser (<see cref="VideoCodecInfo.RemuxIsEnough"/>)
+    /// it is copied into the new container; otherwise it is encoded as H.264 4:2:0 of high quality, a keyframe about every second and no
+    /// B-frames, so stepping back a frame stays quick. The progress goes to stdout ('-progress').
+    /// </summary>
+    public static List<string> BuildPlayableCopy(string source, string target, VideoCodecInfo info)
+    {
+      var args = new List<string> { "-hide_banner", "-nostdin", "-nostats", "-loglevel", "error", "-progress", "pipe:1", "-i", source };
+      args.AddRange(new[] { "-map", "0:v:0", "-an", "-sn", "-dn", "-copyts", "-avoid_negative_ts", "disabled" });
+      if (info.RemuxIsEnough)
+        args.AddRange(new[] { "-c:v", "copy" });
+      else
+      {
+        args.AddRange(new[] { "-fps_mode", "passthrough", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p" });
+        args.AddRange(new[] { "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-bf", "0" });
+        args.AddRange(new[] { "-g", info.KeyframeInterval.ToString(CultureInfo.InvariantCulture) });
+      }
+      args.AddRange(new[] { "-movflags", "+faststart", "-f", "mp4", "-y", target });
+      return args;
+    }
+
     private static void AddSizeAndRate(List<string> args, RequestedMode mode)
     {
       if (mode.HasSize)

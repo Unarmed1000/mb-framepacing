@@ -382,12 +382,15 @@ mb-framepacing analyze <capture folder>                     # analyse again
 mb-framepacing analyze <capture folder> --target-fps 30     # ... with late frames judged against 30 fps
 mb-framepacing name <capture folder> "menu scroll"          # name it; analyse again to use the name
 mb-framepacing render <capture folder> --from 120 --to 125 --png   # the report of 5 s of the run, SVG and PNG
+mb-framepacing render <capture folder> --playback           # the report next to the recording, with a player (HTML)
 ```
 
 `mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
 `captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
 the report and the distribution cards as SVG (`run-<id>-report.svg`, `run-<id>-error-histogram.svg`, ...). `render --png` writes
-PNGs.
+PNGs. `--playback` (on `import`, `analyze` and `render`, and the GUI's **Save playback page**) writes a
+[playback report](measure/doc/usage.md#the-playback-page) in a folder of its own (`analysis/playback/run-<id>/index.html`): one HTML
+page that plays the imported recording next to its report, with a playhead on the report where the frame on screen is.
 
 ### What you need
 
@@ -416,8 +419,9 @@ Some features are experimental, hidden unless you ask for them, and described in
 
 ## Configuration
 
-`mb-framepacing.json` stores where ffmpeg is and where captures go; the GUI and the command line share it. Create it with
-`mb-framepacing config --init` or the GUI's setup dialog.
+`mb-framepacing.json` stores where ffmpeg is, where captures go and the playback page's answers about a recording
+(`playbackVideo`, `playbackTranscode`); the GUI and the command line share it. Create it with `mb-framepacing config --init` or the
+GUI's setup dialog.
 
 Saved settings are safe and versioned:
 

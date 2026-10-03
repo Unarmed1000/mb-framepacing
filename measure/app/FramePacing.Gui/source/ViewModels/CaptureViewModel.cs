@@ -491,6 +491,7 @@ namespace MB.FramePacing.Gui.ViewModels
         {
           Camera = ffmpegOptions.Camera,
           RecordedFps = ffmpegOptions.RecordedFps,
+          InputPath = ffmpegOptions.InputPath,
           FfmpegVersion = m_ffmpegVersion,
           FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(ffmpegOptions)),
         };
@@ -499,8 +500,11 @@ namespace MB.FramePacing.Gui.ViewModels
       if (ffmpegOptions != null)
       {
         ffmpegOptions = ApplyRegion(ffmpegOptions, cancellationToken);
+        // The recorded rate too: the device times were generated from it, which capture.json must say
         runOptions = runOptions with
         {
+          RecordedFps = ffmpegOptions.RecordedFps,
+          InputPath = ffmpegOptions.InputPath,
           FfmpegVersion = m_ffmpegVersion,
           FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(ffmpegOptions)),
         };

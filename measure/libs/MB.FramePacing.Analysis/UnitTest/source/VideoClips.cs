@@ -59,7 +59,17 @@ namespace MB.FramePacing.Analysis.UnitTest
     {
       var media = MediaInput.Create(Path.Combine(Directory(), clip, "video.mp4"), new MediaInputOptions(), output);
       using (var source = FfmpegCaptureSource.Start(media.ToCaptureOptions(ffmpeg), TimeSpan.FromSeconds(30)))
-        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output, KeepFrames = keepFrames }, null, CancellationToken.None);
+        CaptureRunner.Run(
+          source,
+          new CaptureRunOptions
+          {
+            OutputDirectory = output,
+            KeepFrames = keepFrames,
+            InputPath = media.InputPath,
+          },
+          null,
+          CancellationToken.None
+        );
       return output;
     }
   }

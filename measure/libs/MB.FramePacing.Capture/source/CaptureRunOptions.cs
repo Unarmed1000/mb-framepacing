@@ -59,6 +59,9 @@ namespace MB.FramePacing.Capture
     /// <summary>The display refresh rate the user expects, stored in capture.json for the analysis to compare with (null = none).</summary>
     public double? ExpectedRefreshHz { get; init; }
 
+    /// <summary>The imported file or folder (<see cref="Ffmpeg.MediaSource.InputPath"/>), stored in capture.json; null for devices and streams.</summary>
+    public string? InputPath { get; init; }
+
     public string ToolVersion { get; init; } = string.Empty;
     public string? FfmpegVersion { get; init; }
     public string? FfmpegCommandLine { get; init; }

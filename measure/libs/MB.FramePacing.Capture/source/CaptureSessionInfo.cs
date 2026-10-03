@@ -27,6 +27,13 @@ namespace MB.FramePacing.Capture
     public string Source { get; init; } = string.Empty;
     public string? FfmpegVersion { get; init; }
     public string? FfmpegCommandLine { get; init; }
+
+    /// <summary>
+    /// The absolute path of the imported recording: a video file, or an image sequence's folder. Null for capture cards and streams, and
+    /// in captures imported before the field existed. The playback page links the video by it.
+    /// </summary>
+    public string? InputPath { get; init; }
+
     public int Width { get; init; }
     public int Height { get; init; }
     public int SourceWidth { get; init; }

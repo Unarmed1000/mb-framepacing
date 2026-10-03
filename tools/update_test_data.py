@@ -55,7 +55,7 @@ def main() -> int:
         for file in (capture / "analysis").iterdir():
             _ = shutil.copy2(file, TARGET / "analysis" / file.name)
 
-    # The clip's path in ffmpeg's command line, and the capture folder in summary.json
+    # The clip's path (capture.json's inputPath and ffmpeg's command line), and the capture folder in summary.json
     replacements = {str(video): f"measure/test-data/videos/{CLIP}/video.mp4", str(capture): CLIP}
     neutralise(TARGET / "capture.json", replacements)
     neutralise(TARGET / "analysis" / "summary.json", replacements)

@@ -152,12 +152,57 @@ capture-20260924-153000/          (import-... for imports)
     ├── captures.csv              one row per captured frame: its times, what its marker said and the marker's bytes
     ├── run-<id>-frames.csv       one row per application frame shown: display time step, animation error, drift
     ├── run-<id>-report*.svg      only on request: the run (or a section of it) as one SVG report card
-    └── run-<id>-<card>*.svg      only on request: the distribution cards of the Analyze page (error-histogram,
-                                  error-percentiles, display-time-step-histogram, drift)
+    ├── run-<id>-<card>*.svg      only on request: the distribution cards of the Analyze page (error-histogram,
+    │                             error-percentiles, display-time-step-histogram, drift)
+    └── playback/                 only on request: the playback reports (below), a folder each
+        └── run-<id>[-<from>s-<to>s]/
+            ├── index.html        the run (or a section of it) next to the recording, with a player
+            ├── video.mp4         only when chosen: the report's own copy of the recording
+            └── playback.json     which video the page plays, and the recording it was made from
 ```
 
 `summary.json` and the CSV files are specified in [the analysis output format](../../sdk/doc/analysis-output-format.md), `captures.mbcd` in
 [the capture data format](../../sdk/doc/capture-data-format.md); the SDK's [data modules](../../sdk/README.md#the-data-module) read them in your own code.
+
+### The playback page
+
+![The playback page: the recording with its player on the left, the run's report with the playhead on the right](images/playback-page.png)
+
+A playback report shows the recording a capture was imported from next to its report: play it, step it a video frame or an
+application frame at a time, slow it down, and see on every panel of the report where the frame on screen is. Click or drag on a
+panel to go to that moment; the readout says which frame is on screen, its display time step and animation error, and whether it
+was late or static. It is one HTML file that runs from the disk in any current browser (Edge, Chrome, Firefox, Safari): no server,
+nothing loaded from the network.
+
+```sh
+mb-framepacing import recording.mkv --display-hz 60 --playback   # import, analyse and write the page
+mb-framepacing render <capture folder> --playback                # the page of an analysed import
+mb-framepacing render <capture folder> --playback --from 120 --to 125   # a page for 5 s of the run
+```
+
+In the GUI: **Save playback page** on the Analyze page writes the selected run's report (the part in view when the Timeline is
+zoomed), and **Open playback page** opens it. A report is written only when you ask for it.
+
+- **Recordings imported as a video file only.** The page finds a capture in the video by its time, the video's own timestamps,
+  so it needs a capture made by `import` of a video file. A capture card recorded live, a folder of images or a camera capture
+  have no page. Imports made before capture.json named the recording need it named: `--video <file>` (the GUI asks for it).
+- **Every report has a folder of its own** in `analysis/playback/`, named like the SVG reports (`run-1`, `run-1-120s-125s`), with
+  its page and the video it plays: a copy of the recording, so the folder plays anywhere on its own (zip it and send it), or a link
+  to the recording where it is (no extra disk space, but the folder then needs the recording where it was). The tools **ask**
+  which, before they write anything. Saving the same report again replaces its folder's files; other reports are never touched.
+- **Recordings browsers cannot play** (lossless H.264 or HEVC, 4:4:4, UTVideo, FFV1, and MKV files) get a playable copy: ffmpeg
+  copies the video into an MP4 file when only the container is the problem (quick), and otherwise encodes it as H.264 (this takes
+  a while). Every frame keeps its timestamp. The tools **ask** first; without the copy the page links the recording and says that
+  the browser cannot play it, with the command that makes the copy, and an **Open video...** button for another file.
+- **The answers can be given in advance**: per run with `--playback-video copy|link|ask` and `--playback-transcode yes|no|ask`,
+  or for good in the configuration (`playbackVideo`, `playbackTranscode`; `config --set-playback-video copy`,
+  `config --set-playback-transcode yes`, or the GUI's Settings page, or **Remember my choice** in its question). When the command
+  line cannot ask (its input is redirected), it writes no video and says which option answers the question.
+- Saving the same report again uses its video again while the recording is unchanged, without asking (`playback.json`).
+
+Keys: **Space** plays and pauses, **←** **→** step a video frame, **Shift**+**←** **→** an application frame, **Home** and
+**End** go to the start and the end, **1** to **4** set the speed (1×, ½×, ¼×, ⅛×). The address keeps the moment on screen
+(`run-1.html#t=12.345`, seconds since the run's first frame), so a link opens the page there.
 
 The whole run's report and distribution cards are written by `--charts` (`analyze`, `import --analyze`, `capture --analyze`) or
 the GUI's **Save charts**; both write the same files, as SVG. `render` draws reports from an analysis (the capture itself is not needed):

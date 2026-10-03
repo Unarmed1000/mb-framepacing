@@ -53,6 +53,7 @@ PATTERNS = (
     "*CMakeLists.txt",
     "*.py",
     "*.axaml",
+    "*.html",
     "*.csproj",
     "*.props",
     "*.slnx",
@@ -72,7 +73,7 @@ def license_for(relative: str) -> str:
 
 def header_line(relative: str, identifier: str) -> str:
     name = relative.rsplit("/", 1)[-1]
-    if name.endswith((".axaml", ".csproj", ".props", ".slnx")):
+    if name.endswith((".axaml", ".html", ".csproj", ".props", ".slnx")):
         return f"<!-- {TAG} {identifier} -->"
     if name.endswith((".py", ".yml", ".cmake.in")) or name == "CMakeLists.txt":
         return f"# {TAG} {identifier}"
@@ -82,13 +83,13 @@ def header_line(relative: str, identifier: str) -> str:
 
 
 def insert_at(relative: str, lines: list[str]) -> int:
-    """Where the identifier goes: at the end of the C# file header box, after a shebang, XML declaration or GLSL #version line (which
-    must come first), otherwise first."""
+    """Where the identifier goes: at the end of the C# file header box, after a shebang, XML declaration, HTML doctype or GLSL #version
+    line (which must come first), otherwise first."""
     if relative.endswith(".cs"):
         boxes = [i for i, line in enumerate(lines[:HEADER_LINES]) if line.startswith("//****")]
         if len(boxes) >= 2:
             return boxes[1]
-    if lines and lines[0].startswith(("#!", "<?xml", "#version")):
+    if lines and lines[0].lower().startswith(("#!", "<?xml", "<!doctype", "#version")):
         return 1
     return 0
 

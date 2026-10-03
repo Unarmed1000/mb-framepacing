@@ -8,4 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="..\MB.FramePacing.Analysis\MB.FramePacing.Analysis.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- The playback page's markup, style and script; PlaybackPage fills in the report and the data -->
+    <EmbeddedResource Include="source\Playback\PlaybackPage.html" LogicalName="MB.FramePacing.Charts.Playback.PlaybackPage.html" />
+  </ItemGroup>
 </Project>

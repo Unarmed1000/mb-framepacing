@@ -293,6 +293,20 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     prints `CommonOptions.LiveCaptureNotice` first. Every documented command for them carries `--experimental`.
   - **No synthetic test game in the GUI** (agreed with the user): no source, no `--demo`. `selftest` keeps it (the CLI's check
     without hardware), and the synthetic camera (very experimental) stays behind the experimental switch.
+- **Playback reports** (`MB.FramePacing.Charts/source/Playback`, `measure/doc/usage.md` "The playback page"; agreed with the user):
+  - **100 % opt-in:** `--playback` on `import`/`analyze`/`render`, the GUI's **Save playback page**; never by `--charts` or Save charts.
+  - **One HTML page that runs from the disk** (`PlaybackPage.html`, an embedded resource: markup, CSS, vanilla JS; no network): the
+    report card inline (its title and tiles in the page's header), the data inline (`PlaybackData`: the card's `CardPlot`s, the
+    section's frames as tick columns), a player bar, a playhead on every panel. Video time = the capture's time: an import keeps the
+    file's own pts (`-copyts`), so only video-file imports with the Device time source qualify (`PlaybackCapture.Problem`: no camera,
+    no `--recorded-fps`, not images). capture.json `inputPath` names the recording (`--video` for older imports).
+  - **A folder per report** (`analysis/playback/<prefix>[-<from>s-<to>s]/`: `index.html`, its own video, `playback.json`). An export
+    touches only the folders it writes; saving the same report again replaces that folder only. Never share or delete another
+    report's files.
+  - **Never write a video without a yes** (`PlaybackExport`, shared by CLI and GUI, which differ only in `decide` and progress):
+    copy or link a playable recording, make a playable copy (`PlayableCopy`: remux, else H.264, every frame and pts kept) of one
+    browsers cannot play (`VideoCodecInfo`). Answers in advance: `--playback-video`/`--playback-transcode`, else the configuration's
+    `playbackVideo`/`playbackTranscode`, else ask; redirected stdin writes no video. The GUI's dialog can remember the answer.
 - **Media sources**
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file... / Image folder... / Network stream") go through
     `MediaInput` -> ffmpeg.

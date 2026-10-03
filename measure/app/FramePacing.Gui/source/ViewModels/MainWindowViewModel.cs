@@ -38,6 +38,7 @@ namespace MB.FramePacing.Gui.ViewModels
       Capture = new CaptureViewModel(dialogs, settings);
       Analysis = new AnalysisViewModel(dialogs, settings);
       Settings = new SettingsViewModel(dialogs, Capture, () => ShowSetupAsync(firstRun: false));
+      Analysis.ConfigurationChanged += Settings.Refresh;
       SelectedTab = settings.SelectedTab is CaptureTab or AnalysisTab or SettingsTab ? settings.SelectedTab : CaptureTab;
       Capture.CaptureCompleted += directory =>
       {

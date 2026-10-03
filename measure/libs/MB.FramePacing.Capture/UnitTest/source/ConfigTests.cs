@@ -93,6 +93,34 @@ namespace MB.FramePacing.Capture.UnitTest
     }
 
     [Test]
+    public void PlaybackChoices_RoundTrip_AndAFileWithoutThemAsks()
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("mb-framepacing.json");
+      File.WriteAllText(path, "{ \"captureDirectory\": \"x\" }");
+      var empty = FramePacingConfig.Load(path);
+      Assert.That(empty.PlaybackVideo, Is.Null);
+      Assert.That(empty.PlaybackTranscode, Is.Null);
+
+      (empty with { PlaybackVideo = PlaybackVideoChoice.Copy, PlaybackTranscode = PlaybackTranscodeChoice.No }).Save(path);
+      Assert.That(File.ReadAllText(path), Does.Contain("\"playbackVideo\": \"copy\"").And.Contain("\"playbackTranscode\": \"no\""));
+      var loaded = FramePacingConfig.Load(path);
+      Assert.That(loaded.PlaybackVideo, Is.EqualTo(PlaybackVideoChoice.Copy));
+      Assert.That(loaded.PlaybackTranscode, Is.EqualTo(PlaybackTranscodeChoice.No));
+    }
+
+    [TestCase("{ \"playbackVideo\": \"maybe\" }")]
+    [TestCase("{ \"playbackTranscode\": 1 }")]
+    public void PlaybackChoices_AnUnknownValue_IsRefused(string text)
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("mb-framepacing.json");
+      File.WriteAllText(path, text);
+
+      Assert.Throws<InvalidDataException>(() => FramePacingConfig.Load(path));
+    }
+
+    [Test]
     public void Load_ExplicitMissingFile_Throws_InvalidJson_IsReported()
     {
       using var temp = new TempDirectory();

@@ -12,7 +12,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
         <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
         <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
         <ComboBox
@@ -51,8 +51,12 @@
           IsEnabled="{Binding HasRun}"
           ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
         />
+        <!-- A wrapper carries the tooltip: a disabled button shows none -->
+        <Border Grid.Column="9" Background="Transparent" ToolTip.Tip="{Binding PlaybackToolTip}">
+          <Button Content="Save playback page" Command="{Binding SavePlaybackCommand}" />
+        </Border>
         <CheckBox
-          Grid.Column="9"
+          Grid.Column="10"
           Content="Clamp static"
           IsChecked="{Binding ClampStatic}"
           VerticalAlignment="Center"
@@ -64,6 +68,24 @@
     <!-- Status, warnings -->
     <StackPanel Grid.Row="1" Spacing="4">
       <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" IsVisible="{Binding IsBusy}" />
+      <!-- The playback page: its progress (a copy of the recording can take a while), then a way to open it -->
+      <Grid ColumnDefinitions="200,Auto,*" ColumnSpacing="10" IsVisible="{Binding IsSavingPlayback}">
+        <ProgressBar
+          VerticalAlignment="Center"
+          Minimum="0"
+          Maximum="100"
+          Value="{Binding PlaybackPercentValue}"
+          IsIndeterminate="{Binding PlaybackProgressUnknown}"
+        />
+        <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" Text="{Binding PlaybackStatus}" />
+        <Button Grid.Column="2" HorizontalAlignment="Left" Content="Cancel" Command="{Binding CancelPlaybackCommand}" />
+      </Grid>
+      <Button
+        Content="Open playback page"
+        Command="{Binding OpenPlaybackPageCommand}"
+        IsVisible="{Binding HasPlaybackPage}"
+        ToolTip.Tip="{Binding PlaybackPage}"
+      />
       <TextBlock Classes="subtle" Text="{Binding SummaryText}" TextWrapping="Wrap" />
       <TextBlock Classes="error" Text="{Binding ErrorText}" />
       <ItemsControl ItemsSource="{Binding Warnings}">

@@ -171,6 +171,7 @@ namespace MB.FramePacing.Capture
         Source = source.Description,
         FfmpegVersion = options.FfmpegVersion,
         FfmpegCommandLine = options.FfmpegCommandLine,
+        InputPath = options.InputPath,
         Width = format.Width,
         Height = format.Height,
         SourceWidth = format.SourceWidth,

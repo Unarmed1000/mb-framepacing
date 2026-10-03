@@ -1,0 +1,1573 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<!--
+  The playback page of mb-framepacing (PlaybackPage.cs fills in the title, the report card and the data): the report of a run next to the
+  recording it was measured from. One file that runs from the disk: no server, nothing from the network. The video is the folder's own
+  copy or the recording, linked by a relative path. Its times are the recording's own timestamps, so a video time is a report time.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>__PB_TITLE__</title>
+    <style>
+      :root {
+        --pb-bg: #0d1117;
+        --pb-surface: #161b22;
+        --pb-surface-raised: #1c2128;
+        --pb-report-bg: #161a1f;
+        --pb-border: rgba(240, 246, 252, 0.1);
+        --pb-border-strong: rgba(240, 246, 252, 0.18);
+        --pb-text: #e6edf3;
+        --pb-muted: #8b949e;
+        --pb-faint: #6e7681;
+        --pb-accent: #58a6ff;
+        --pb-accent-strong: #1f6feb;
+        --pb-accent-soft: rgba(56, 139, 253, 0.15);
+        --pb-on-accent: #ffffff;
+        --pb-green: #3fb950;
+        --pb-red: #f47067;
+        --pb-amber: #d29922;
+        --pb-violet: #bc8cff;
+        --pb-orange: #f0883e;
+        --pb-pink: #db61a2;
+        --pb-grey: #8b949e;
+        --pb-track: rgba(240, 246, 252, 0.14);
+        --pb-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px rgba(1, 4, 9, 0.5);
+        --pb-radius: 14px;
+        --pb-radius-small: 9px;
+        --pb-font:
+          "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue",
+          Arial, sans-serif;
+        --pb-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          --pb-bg: #f3f5f8;
+          --pb-surface: #ffffff;
+          --pb-surface-raised: #f6f8fa;
+          --pb-border: rgba(31, 35, 40, 0.1);
+          --pb-border-strong: rgba(31, 35, 40, 0.2);
+          --pb-text: #1f2328;
+          --pb-muted: #59636e;
+          --pb-faint: #818b98;
+          --pb-accent: #0969da;
+          --pb-accent-strong: #0969da;
+          --pb-accent-soft: rgba(9, 105, 218, 0.1);
+          --pb-green: #1a7f37;
+          --pb-red: #cf222e;
+          --pb-amber: #9a6700;
+          --pb-violet: #8250df;
+          --pb-orange: #bc4c00;
+          --pb-pink: #bf3989;
+          --pb-grey: #59636e;
+          --pb-track: rgba(31, 35, 40, 0.14);
+          --pb-shadow: 0 1px 2px rgba(31, 35, 40, 0.06), 0 8px 24px rgba(66, 74, 83, 0.1);
+          color-scheme: light;
+        }
+      }
+      :root[data-theme="light"] {
+        --pb-bg: #f3f5f8;
+        --pb-surface: #ffffff;
+        --pb-surface-raised: #f6f8fa;
+        --pb-border: rgba(31, 35, 40, 0.1);
+        --pb-border-strong: rgba(31, 35, 40, 0.2);
+        --pb-text: #1f2328;
+        --pb-muted: #59636e;
+        --pb-faint: #818b98;
+        --pb-accent: #0969da;
+        --pb-accent-strong: #0969da;
+        --pb-accent-soft: rgba(9, 105, 218, 0.1);
+        --pb-green: #1a7f37;
+        --pb-red: #cf222e;
+        --pb-amber: #9a6700;
+        --pb-violet: #8250df;
+        --pb-orange: #bc4c00;
+        --pb-pink: #bf3989;
+        --pb-grey: #59636e;
+        --pb-track: rgba(31, 35, 40, 0.14);
+        --pb-shadow: 0 1px 2px rgba(31, 35, 40, 0.06), 0 8px 24px rgba(66, 74, 83, 0.1);
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--pb-bg);
+        color: var(--pb-text);
+        font: 14px/1.5 var(--pb-font);
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
+      }
+      button,
+      input {
+        font: inherit;
+        color: inherit;
+      }
+      [hidden] {
+        display: none !important;
+      }
+
+      .pb-app {
+        max-width: 2200px;
+        margin: 0 auto;
+        padding: 20px 24px 28px;
+      }
+
+      /* Header: what this is, then the run's headline numbers */
+      .pb-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .pb-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--pb-muted);
+      }
+      .pb-logo {
+        width: 18px;
+        height: 18px;
+        color: var(--pb-accent);
+      }
+      .pb-title {
+        margin: 4px 0 2px;
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+      .pb-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        color: var(--pb-muted);
+        font-size: 13px;
+      }
+      .pb-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pb-meta svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.8;
+      }
+      .pb-header-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .pb-tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .pb-tile {
+        padding: 10px 14px 11px;
+        background: var(--pb-surface);
+        border: 1px solid var(--pb-border);
+        border-radius: var(--pb-radius-small);
+      }
+      .pb-tile-caption {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--pb-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pb-tile-value {
+        margin-top: 2px;
+        font-size: 20px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .pb-tile-detail {
+        margin-top: 1px;
+        font-size: 12px;
+        color: var(--pb-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pb-tile.pb-warning .pb-tile-value {
+        color: var(--pb-amber);
+      }
+
+      /* The page: player on the left, report on the right */
+      .pb-layout {
+        display: grid;
+        grid-template-columns: minmax(380px, 0.82fr) minmax(0, 1.18fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .pb-layout > * {
+        min-width: 0;
+      }
+      .pb-player {
+        display: grid;
+        gap: 16px;
+        position: sticky;
+        top: 16px;
+      }
+      .pb-card {
+        background: var(--pb-surface);
+        border: 1px solid var(--pb-border);
+        border-radius: var(--pb-radius);
+        box-shadow: var(--pb-shadow);
+        min-width: 0;
+      }
+      .pb-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 16px 0;
+      }
+      .pb-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--pb-muted);
+      }
+      .pb-hint {
+        font-size: 12px;
+        color: var(--pb-faint);
+      }
+
+      /* The video */
+      .pb-video-card {
+        overflow: hidden;
+      }
+      .pb-stage {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        background: #000;
+        border-bottom: 1px solid var(--pb-border);
+      }
+      .pb-stage video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+      .pb-message {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 24px;
+        text-align: center;
+        background: radial-gradient(ellipse at center, rgba(22, 27, 34, 0.94), rgba(13, 17, 23, 0.98));
+        color: #e6edf3;
+      }
+      .pb-message h2 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 650;
+      }
+      .pb-message p {
+        margin: 0;
+        max-width: 46ch;
+        color: #adbac7;
+        font-size: 13px;
+      }
+      .pb-message code {
+        max-width: 100%;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: rgba(240, 246, 252, 0.08);
+        border: 1px solid rgba(240, 246, 252, 0.12);
+        font: 12px/1.5 var(--pb-mono);
+        color: #e6edf3;
+        overflow-wrap: anywhere;
+        user-select: all;
+      }
+      .pb-message-icon {
+        width: 36px;
+        height: 36px;
+        color: #d29922;
+      }
+      .pb-banner {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        margin: 12px 16px 0;
+        padding: 9px 12px;
+        border-radius: var(--pb-radius-small);
+        border: 1px solid color-mix(in srgb, var(--pb-amber) 40%, transparent);
+        background: color-mix(in srgb, var(--pb-amber) 10%, transparent);
+        color: var(--pb-text);
+        font-size: 13px;
+      }
+      .pb-banner svg {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        margin-top: 2px;
+        color: var(--pb-amber);
+      }
+
+      /* The transport: scrubber, then the buttons */
+      .pb-transport {
+        padding: 12px 16px 14px;
+      }
+      .pb-scrub {
+        position: relative;
+        height: 30px;
+        --pb-fill: 0%;
+      }
+      .pb-track {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        border-radius: 999px;
+        background: var(--pb-track);
+        overflow: hidden;
+        transition:
+          height 150ms ease,
+          margin-top 150ms ease;
+      }
+      .pb-track-fill {
+        width: var(--pb-fill);
+        height: 100%;
+        background: var(--pb-accent);
+      }
+      .pb-scrub:hover .pb-track,
+      .pb-scrub:focus-within .pb-track {
+        height: 6px;
+        margin-top: -3px;
+      }
+      .pb-marks {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .pb-range {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+      }
+      .pb-range:focus-visible {
+        outline: none;
+      }
+      .pb-range::-webkit-slider-runnable-track {
+        height: 100%;
+        background: transparent;
+      }
+      .pb-range::-moz-range-track {
+        height: 100%;
+        background: transparent;
+      }
+      .pb-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        margin-top: 8px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 0;
+        box-shadow:
+          0 0 0 3px var(--pb-accent),
+          0 2px 6px rgba(0, 0, 0, 0.4);
+        transition: transform 150ms ease;
+      }
+      .pb-range::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 0;
+        box-shadow:
+          0 0 0 3px var(--pb-accent),
+          0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+      .pb-scrub:hover .pb-range::-webkit-slider-thumb {
+        transform: scale(1.15);
+      }
+      .pb-range:focus-visible::-webkit-slider-thumb {
+        box-shadow:
+          0 0 0 3px var(--pb-accent),
+          0 0 0 7px var(--pb-accent-soft);
+      }
+      .pb-range:focus-visible::-moz-range-thumb {
+        box-shadow:
+          0 0 0 3px var(--pb-accent),
+          0 0 0 7px var(--pb-accent-soft);
+      }
+
+      .pb-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px 16px;
+        margin-top: 6px;
+      }
+      .pb-buttons {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .pb-icon-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 1px solid transparent;
+        border-radius: var(--pb-radius-small);
+        background: transparent;
+        color: var(--pb-text);
+        cursor: pointer;
+        transition:
+          background-color 150ms ease,
+          border-color 150ms ease,
+          transform 100ms ease;
+      }
+      .pb-icon-button svg {
+        width: 18px;
+        height: 18px;
+      }
+      .pb-icon-button:hover {
+        background: var(--pb-surface-raised);
+        border-color: var(--pb-border);
+      }
+      .pb-icon-button:active {
+        transform: scale(0.94);
+      }
+      .pb-icon-button:disabled {
+        opacity: 0.4;
+        cursor: default;
+        transform: none;
+      }
+      .pb-header-actions .pb-icon-button {
+        border-color: var(--pb-border);
+        background: var(--pb-surface);
+        font-weight: 650;
+      }
+      .pb-play {
+        width: 44px;
+        height: 44px;
+        margin: 0 4px;
+        border-radius: 50%;
+        background: var(--pb-accent-strong);
+        color: var(--pb-on-accent);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--pb-accent-strong) 45%, transparent);
+      }
+      .pb-play:hover {
+        background: color-mix(in srgb, var(--pb-accent-strong) 88%, white);
+        border-color: transparent;
+      }
+      .pb-play svg {
+        width: 20px;
+        height: 20px;
+      }
+      :focus-visible {
+        outline: 2px solid var(--pb-accent);
+        outline-offset: 2px;
+      }
+
+      .pb-time {
+        font: 600 13px/1 var(--pb-mono);
+        color: var(--pb-text);
+        white-space: nowrap;
+      }
+      .pb-time-total {
+        color: var(--pb-faint);
+        font-weight: 500;
+      }
+
+      .pb-segmented {
+        display: inline-flex;
+        padding: 3px;
+        gap: 2px;
+        border-radius: 10px;
+        background: var(--pb-surface-raised);
+        border: 1px solid var(--pb-border);
+      }
+      .pb-segmented button {
+        min-width: 38px;
+        height: 28px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--pb-muted);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background-color 150ms ease,
+          color 150ms ease;
+      }
+      .pb-segmented button:hover {
+        color: var(--pb-text);
+      }
+      .pb-segmented button[aria-pressed="true"] {
+        background: var(--pb-surface);
+        color: var(--pb-text);
+        box-shadow:
+          0 1px 2px rgba(0, 0, 0, 0.25),
+          0 0 0 1px var(--pb-border);
+      }
+
+      /* The frame on screen */
+      .pb-readout {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        margin: 12px 16px 16px;
+        border-radius: var(--pb-radius-small);
+        overflow: hidden;
+        background: var(--pb-border);
+        border: 1px solid var(--pb-border);
+      }
+      .pb-readout > div {
+        padding: 9px 12px 10px;
+        background: var(--pb-surface);
+        min-width: 0;
+      }
+      .pb-readout dt {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--pb-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pb-readout dd {
+        margin: 2px 0 0;
+        font-size: 16px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pb-readout dd small {
+        margin-left: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--pb-muted);
+      }
+      .pb-pills {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+        min-height: 22px;
+      }
+      .pb-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--pb-pill);
+        background: color-mix(in srgb, var(--pb-pill) 14%, transparent);
+        border: 1px solid color-mix(in srgb, var(--pb-pill) 35%, transparent);
+        white-space: nowrap;
+      }
+      .pb-pill::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--pb-pill);
+      }
+      .pb-pill-green {
+        --pb-pill: var(--pb-green);
+      }
+      .pb-pill-red {
+        --pb-pill: var(--pb-red);
+      }
+      .pb-pill-violet {
+        --pb-pill: var(--pb-violet);
+      }
+      .pb-pill-orange {
+        --pb-pill: var(--pb-orange);
+      }
+      .pb-pill-pink {
+        --pb-pill: var(--pb-pink);
+      }
+      .pb-pill-grey {
+        --pb-pill: var(--pb-grey);
+      }
+
+      /* The report card (always dark: it is the report's own image) */
+      .pb-report {
+        margin: 12px;
+        border-radius: 10px;
+        background: var(--pb-report-bg);
+        overflow: hidden;
+      }
+      .pb-report > svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        cursor: crosshair;
+        touch-action: pan-y;
+        user-select: none;
+      }
+      .pb-ov-band {
+        fill: #58a6ff;
+        fill-opacity: 0.16;
+      }
+      .pb-ov-line {
+        stroke: #58a6ff;
+        stroke-width: 2;
+      }
+      .pb-ov-hover {
+        stroke: #e6edf3;
+        stroke-opacity: 0.5;
+        stroke-width: 1;
+        stroke-dasharray: 3 3;
+      }
+      .pb-ov-tag {
+        fill: #1f6feb;
+      }
+      .pb-ov-tag-hover {
+        fill: #30363d;
+      }
+      .pb-ov-text {
+        fill: #ffffff;
+        font: 600 12px var(--pb-mono);
+      }
+
+      .pb-footer {
+        margin-top: 20px;
+        color: var(--pb-faint);
+        font-size: 12px;
+        text-align: center;
+      }
+
+      /* Keyboard shortcuts */
+      .pb-keys {
+        position: fixed;
+        right: 24px;
+        top: 64px;
+        z-index: 10;
+        width: min(340px, calc(100vw - 32px));
+        padding: 14px 16px 12px;
+        background: var(--pb-surface);
+        border: 1px solid var(--pb-border-strong);
+        border-radius: var(--pb-radius);
+        box-shadow: 0 16px 48px rgba(1, 4, 9, 0.45);
+      }
+      .pb-keys h2 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .pb-keys dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 7px 14px;
+        margin: 0;
+        font-size: 13px;
+      }
+      .pb-keys dt {
+        white-space: nowrap;
+      }
+      .pb-keys dd {
+        margin: 0;
+        color: var(--pb-muted);
+      }
+      kbd {
+        display: inline-block;
+        min-width: 22px;
+        padding: 1px 6px;
+        border-radius: 5px;
+        border: 1px solid var(--pb-border-strong);
+        border-bottom-width: 2px;
+        background: var(--pb-surface-raised);
+        font: 600 11px/1.6 var(--pb-mono);
+        text-align: center;
+      }
+
+      @media (max-width: 1100px) {
+        .pb-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .pb-player {
+          position: static;
+        }
+      }
+      @media (max-width: 600px) {
+        .pb-app {
+          padding: 14px 16px 20px;
+        }
+        .pb-title {
+          font-size: 19px;
+        }
+        .pb-readout {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .pb-controls {
+          justify-content: center;
+        }
+        .pb-time {
+          order: -1;
+          width: 100%;
+          text-align: center;
+        }
+        .pb-hint {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="pb-app">
+      <header class="pb-header">
+        <div>
+          <div class="pb-eyebrow">
+            <svg class="pb-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="14" rx="2.5" />
+              <path d="M6 14l3-4 3 2 3-5 3 4" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M8 21h8" stroke-linecap="round" />
+            </svg>
+            Frame pacing · Playback
+          </div>
+          <h1 class="pb-title" id="pb-title"></h1>
+          <div class="pb-meta" id="pb-meta"></div>
+        </div>
+        <div class="pb-header-actions">
+          <button
+            class="pb-icon-button"
+            id="pb-keys-button"
+            type="button"
+            aria-label="Keyboard shortcuts"
+            aria-expanded="false"
+            title="Keyboard shortcuts (?)"
+          >
+            ?
+          </button>
+          <button class="pb-icon-button" id="pb-theme" type="button" aria-label="Theme">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="8" />
+              <path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="pb-tiles" id="pb-tiles" aria-label="Headline numbers"></div>
+
+      <main class="pb-layout">
+        <section class="pb-player" aria-label="Recording">
+          <div class="pb-card pb-video-card">
+            <div class="pb-stage">
+              <video id="pb-video" preload="auto" muted playsinline disablepictureinpicture></video>
+              <div class="pb-message" id="pb-message" hidden>
+                <svg
+                  class="pb-message-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3l9.5 17h-19z" stroke-linejoin="round" />
+                  <path d="M12 10v4.5M12 17.2v.3" stroke-linecap="round" />
+                </svg>
+                <h2 id="pb-message-title">This browser cannot play the recording</h2>
+                <p id="pb-message-text"></p>
+                <code id="pb-message-command" hidden></code>
+                <button
+                  class="pb-icon-button pb-open"
+                  id="pb-open"
+                  type="button"
+                  style="width: auto; padding: 0 14px; border-color: rgba(240, 246, 252, 0.2)"
+                >
+                  Open video…
+                </button>
+                <input id="pb-file" type="file" accept="video/*" hidden />
+              </div>
+            </div>
+            <div class="pb-banner" id="pb-banner" role="status" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7.5v5.5M12 16v.5" stroke-linecap="round" />
+              </svg>
+              <span id="pb-banner-text"></span>
+            </div>
+            <div class="pb-transport">
+              <div class="pb-scrub" id="pb-scrub">
+                <div class="pb-track"><div class="pb-track-fill"></div></div>
+                <canvas class="pb-marks" id="pb-marks" aria-hidden="true"></canvas>
+                <input
+                  class="pb-range"
+                  id="pb-range"
+                  type="range"
+                  min="0"
+                  max="0"
+                  step="1"
+                  value="0"
+                  aria-label="Position in the recording"
+                />
+              </div>
+              <div class="pb-controls">
+                <div class="pb-buttons" role="group" aria-label="Playback">
+                  <button
+                    class="pb-icon-button"
+                    id="pb-frame-back"
+                    type="button"
+                    aria-label="Previous application frame"
+                    title="Previous application frame (Shift+←)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path d="M10 4.5L3.5 10l6.5 5.5zM17 4.5L10.5 10l6.5 5.5z" />
+                    </svg>
+                  </button>
+                  <button
+                    class="pb-icon-button"
+                    id="pb-step-back"
+                    type="button"
+                    aria-label="One video frame back"
+                    title="One video frame back (←)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path d="M4 4.5h2.2v11H4zM16 4.5L7.5 10l8.5 5.5z" />
+                    </svg>
+                  </button>
+                  <button class="pb-icon-button pb-play" id="pb-play" type="button" aria-label="Play" title="Play (Space)">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" id="pb-play-icon">
+                      <path d="M6.5 4.2v11.6L16 10z" />
+                    </svg>
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" id="pb-pause-icon" hidden>
+                      <path d="M5.5 4.5h3v11h-3zM11.5 4.5h3v11h-3z" />
+                    </svg>
+                  </button>
+                  <button
+                    class="pb-icon-button"
+                    id="pb-step-forward"
+                    type="button"
+                    aria-label="One video frame forward"
+                    title="One video frame forward (→)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path d="M13.8 4.5H16v11h-2.2zM4 4.5l8.5 5.5L4 15.5z" />
+                    </svg>
+                  </button>
+                  <button
+                    class="pb-icon-button"
+                    id="pb-frame-forward"
+                    type="button"
+                    aria-label="Next application frame"
+                    title="Next application frame (Shift+→)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path d="M3 4.5L9.5 10 3 15.5zM10 4.5l6.5 5.5-6.5 5.5z" />
+                    </svg>
+                  </button>
+                </div>
+                <span class="pb-time"
+                  ><span id="pb-time-now">0.000</span><span class="pb-time-total" id="pb-time-total"></span
+                ></span>
+                <div class="pb-segmented" id="pb-speeds" role="group" aria-label="Playback speed"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pb-card">
+            <div class="pb-card-head">
+              <span class="pb-label">Frame on screen</span>
+              <span class="pb-pills" id="pb-pills" aria-live="polite"></span>
+            </div>
+            <dl class="pb-readout">
+              <div>
+                <dt>Frame index</dt>
+                <dd id="pb-r-frame">–</dd>
+              </div>
+              <div>
+                <dt>Video frame</dt>
+                <dd id="pb-r-capture">–</dd>
+              </div>
+              <div>
+                <dt>Display time</dt>
+                <dd id="pb-r-time">–</dd>
+              </div>
+              <div>
+                <dt>Display time step</dt>
+                <dd id="pb-r-step">–</dd>
+              </div>
+              <div>
+                <dt>Animation error</dt>
+                <dd id="pb-r-error">–</dd>
+              </div>
+              <div>
+                <dt>Until the next frame</dt>
+                <dd id="pb-r-hold">–</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <section class="pb-card pb-report-card" aria-label="Report">
+          <div class="pb-card-head">
+            <span class="pb-label">Report</span>
+            <span class="pb-hint">Click or drag on a panel to go there</span>
+          </div>
+          <div class="pb-report" id="pb-report"><!--PB:REPORT--></div>
+        </section>
+      </main>
+
+      <footer class="pb-footer" id="pb-footer"></footer>
+    </div>
+
+    <div class="pb-keys" id="pb-keys" role="dialog" aria-label="Keyboard shortcuts" hidden>
+      <h2>Keyboard shortcuts</h2>
+      <dl>
+        <dt><kbd>Space</kbd></dt>
+        <dd>Play or pause</dd>
+        <dt><kbd>←</kbd> <kbd>→</kbd></dt>
+        <dd>One video frame back or forward</dd>
+        <dt><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt>
+        <dd>The previous or next application frame</dd>
+        <dt><kbd>Home</kbd> <kbd>End</kbd></dt>
+        <dd>The start or the end</dd>
+        <dt><kbd>1</kbd> – <kbd>4</kbd></dt>
+        <dd>Speed 1×, ½×, ¼×, ⅛×</dd>
+        <dt><kbd>?</kbd></dt>
+        <dd>Show or hide this list</dd>
+      </dl>
+    </div>
+
+    <!--PB:DATA-->
+    <script>
+      (() => {
+        "use strict";
+        const TICKS_PER_SECOND = 1e7;
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const SPEEDS = [
+          [1, "1×"],
+          [0.5, "½×"],
+          [0.25, "¼×"],
+          [0.125, "⅛×"],
+        ];
+        const $ = (id) => document.getElementById(id);
+        const data = JSON.parse($("pb-data").textContent);
+        const frames = data.frames;
+        const frameCount = frames.t.length;
+        const flag = data.flagBits;
+        const holdKinds = data.holdKinds;
+        const video = $("pb-video");
+
+        // Video frames (captures) and times: the run's first and last frames' first sightings give the exact mean period
+        const captures = data.captures ?? { firstIndex: 0, firstTicks: 0, lastIndex: 0, lastTicks: 0 };
+        const capturePeriod =
+          captures.lastIndex > captures.firstIndex
+            ? (captures.lastTicks - captures.firstTicks) / (captures.lastIndex - captures.firstIndex)
+            : data.periodTicks;
+        const captureAt = (ticks) => captures.firstIndex + (ticks - captures.firstTicks) / capturePeriod;
+        const ticksOfCapture = (capture) => captures.firstTicks + (capture - captures.firstIndex) * capturePeriod;
+        const firstCapture = Math.ceil(captureAt(data.section.from * TICKS_PER_SECOND) - 1e-6);
+        const lastCapture = Math.max(firstCapture, Math.ceil(captureAt(data.section.to * TICKS_PER_SECOND) - 1e-6) - 1);
+        // A video frame is shown from its timestamp on: seek to its middle, so the browser shows exactly it
+        const mediaTimeOf = (capture) => (data.originTicks + ticksOfCapture(capture) + capturePeriod / 2) / TICKS_PER_SECOND;
+        const captureOfMediaTime = (seconds) => Math.floor(captureAt(seconds * TICKS_PER_SECOND - data.originTicks) + 1e-3);
+        const clampCapture = (capture) => Math.min(lastCapture, Math.max(firstCapture, capture));
+
+        /** The frame on screen at report time <ticks>: the last one first seen by then. */
+        function frameAt(ticks) {
+          let low = 0;
+          let high = frameCount - 1;
+          if (frameCount === 0 || frames.t[0] > ticks + capturePeriod / 4) return -1;
+          while (low < high) {
+            const middle = (low + high + 1) >> 1;
+            if (frames.t[middle] <= ticks + capturePeriod / 4) low = middle;
+            else high = middle - 1;
+          }
+          return low;
+        }
+
+        // ---- Text --------------------------------------------------------------------------------------------------------------------
+        const number = (value, digits) =>
+          value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        const seconds = (ticks) => number(ticks / TICKS_PER_SECOND, 3) + " s";
+        const ms = (ticks) => number(ticks / 1e4, 1) + " ms";
+        const signedMs = (ticks) => {
+          const text = number(Math.abs(ticks) / 1e4, 1);
+          return (text === "0.0" ? "" : ticks > 0 ? "+" : "−") + text + " ms";
+        };
+        const element = (tag, className, text) => {
+          const node = document.createElement(tag);
+          if (className) node.className = className;
+          if (text !== undefined) node.textContent = text;
+          return node;
+        };
+
+        $("pb-title").textContent =
+          data.title + (data.section.whole ? "" : `, ${number(data.section.from, 3)}–${number(data.section.to, 3)} s`);
+        const meta = $("pb-meta");
+        const metaItem = (path, text) => {
+          const span = element("span");
+          span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${path}</svg>`;
+          span.append(text);
+          meta.append(span);
+        };
+        if (data.startedUtc)
+          metaItem(
+            '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+            new Date(data.startedUtc).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
+          );
+        metaItem(
+          '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+          data.section.whole
+            ? `Whole run, ${number(data.section.to, 1)} s`
+            : `Section ${number(data.section.from, 3)}–${number(data.section.to, 3)} s`,
+        );
+        if (data.refreshHz)
+          metaItem('<path d="M4 17l4-10 4 10 4-10 4 10"/>', `${number(data.refreshHz, 2).replace(/\.?0+$/, "")} Hz display`);
+        const videoKinds = { copied: "copied into this folder", transcoded: "playable copy in this folder", linked: "linked" };
+        metaItem(
+          '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>',
+          `${data.video.name} · ${videoKinds[data.video.kind] ?? data.video.kind}`,
+        );
+        $("pb-footer").textContent =
+          (data.toolVersion ? `mb-framepacing ${data.toolVersion}` : "mb-framepacing") +
+          " · the report's times are seconds since the run's first frame, from the video's own timestamps";
+
+        const tiles = $("pb-tiles");
+        for (const tile of data.tiles) {
+          const node = element("div", "pb-tile" + (tile.warning ? " pb-warning" : ""));
+          node.title = tile.explanation;
+          node.append(element("div", "pb-tile-caption", tile.caption));
+          node.append(element("div", "pb-tile-value", tile.value));
+          node.append(element("div", "pb-tile-detail", tile.detail || " "));
+          tiles.append(node);
+        }
+
+        // ---- The report card: playhead, the frame's band, hover, click to seek --------------------------------------------------------
+        const svg = document.querySelector("#pb-report > svg");
+        const overlay = document.createElementNS(SVG_NS, "g");
+        overlay.setAttribute("pointer-events", "none");
+        const svgElement = (tag, className, attributes = {}) => {
+          const node = document.createElementNS(SVG_NS, tag);
+          node.setAttribute("class", className);
+          for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+          overlay.append(node);
+          return node;
+        };
+        const plots = data.plots.map((plot) => ({
+          ...plot,
+          band: svgElement("rect", "pb-ov-band", { y: plot.top, height: plot.bottom - plot.top }),
+          line: svgElement("line", "pb-ov-line", { y1: plot.top, y2: plot.bottom }),
+        }));
+        const hoverLine = svgElement("line", "pb-ov-hover");
+        const topPlot = plots.reduce((top, plot) => (top === null || plot.top < top.top ? plot : top), null);
+        const tag = (className) => {
+          const group = document.createElementNS(SVG_NS, "g");
+          const rect = document.createElementNS(SVG_NS, "rect");
+          rect.setAttribute("class", className);
+          rect.setAttribute("rx", "4");
+          rect.setAttribute("height", "18");
+          const text = document.createElementNS(SVG_NS, "text");
+          text.setAttribute("class", "pb-ov-text");
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("y", "13");
+          group.append(rect, text);
+          overlay.append(group);
+          return { group, rect, text };
+        };
+        const playTag = tag("pb-ov-tag");
+        const hoverTag = tag("pb-ov-tag pb-ov-tag-hover");
+        if (svg) svg.append(overlay);
+        const xOf = (plot, secondsValue) =>
+          plot.left + ((plot.right - plot.left) * (secondsValue - plot.xFrom)) / (plot.xTo - plot.xFrom);
+        const secondsOf = (plot, x) => plot.xFrom + ((plot.xTo - plot.xFrom) * (x - plot.left)) / (plot.right - plot.left);
+        const inside = (plot, x) => x >= plot.left - 0.5 && x <= plot.right + 0.5;
+
+        function placeTag(tagParts, x, y, label) {
+          tagParts.text.textContent = label;
+          const width = label.length * 7.4 + 14;
+          const left = Math.min(Math.max(x - width / 2, topPlot.left - 6), topPlot.right + 6 - width);
+          tagParts.rect.setAttribute("x", String(left));
+          tagParts.rect.setAttribute("width", String(width));
+          tagParts.text.setAttribute("x", String(left + width / 2));
+          tagParts.group.setAttribute("transform", `translate(0 ${y})`);
+        }
+
+        function drawOverlay(ticks, frame) {
+          if (!svg) return;
+          const now = ticks / TICKS_PER_SECOND;
+          const start = frame >= 0 ? frames.t[frame] / TICKS_PER_SECOND : now;
+          const step = frame >= 0 ? (frames.step[frame] ?? data.periodTicks) / TICKS_PER_SECOND : 0;
+          for (const plot of plots) {
+            const x = xOf(plot, now);
+            const shown = inside(plot, x);
+            plot.line.setAttribute("visibility", shown ? "visible" : "hidden");
+            plot.line.setAttribute("x1", String(x));
+            plot.line.setAttribute("x2", String(x));
+            const left = Math.max(plot.left, xOf(plot, start));
+            const right = Math.min(plot.right, xOf(plot, start + step));
+            plot.band.setAttribute("visibility", right > left ? "visible" : "hidden");
+            plot.band.setAttribute("x", String(left));
+            plot.band.setAttribute("width", String(Math.max(0, right - left)));
+          }
+          if (topPlot) {
+            const x = xOf(topPlot, now);
+            playTag.group.setAttribute("visibility", inside(topPlot, x) ? "visible" : "hidden");
+            placeTag(playTag, x, topPlot.top + 2, number(now, 3) + " s");
+          }
+        }
+
+        function plotAt(event) {
+          if (!svg) return null;
+          const point = svg.createSVGPoint();
+          point.x = event.clientX;
+          point.y = event.clientY;
+          const matrix = svg.getScreenCTM();
+          if (!matrix) return null;
+          const local = point.matrixTransform(matrix.inverse());
+          const plot = plots.find(
+            (p) => local.x >= p.left && local.x <= p.right && local.y >= p.top - 6 && local.y <= p.bottom + 6,
+          );
+          return plot ? { plot, x: local.x, seconds: secondsOf(plot, local.x) } : null;
+        }
+
+        let dragging = false;
+        if (svg) {
+          svg.addEventListener("pointerdown", (event) => {
+            const hit = plotAt(event);
+            if (!hit || event.button !== 0) return;
+            dragging = true;
+            svg.setPointerCapture(event.pointerId);
+            seekSeconds(hit.seconds);
+          });
+          svg.addEventListener("pointermove", (event) => {
+            const hit = plotAt(event);
+            if (dragging && hit) seekSeconds(hit.seconds);
+            if (!hit) {
+              hoverLine.setAttribute("visibility", "hidden");
+              hoverTag.group.setAttribute("visibility", "hidden");
+              return;
+            }
+            hoverLine.setAttribute("visibility", "visible");
+            hoverLine.setAttribute("x1", String(hit.x));
+            hoverLine.setAttribute("x2", String(hit.x));
+            hoverLine.setAttribute("y1", String(hit.plot.top));
+            hoverLine.setAttribute("y2", String(hit.plot.bottom));
+            hoverTag.group.setAttribute("visibility", "visible");
+            placeTag(hoverTag, hit.x, hit.plot.bottom + 4, number(hit.seconds, 3) + " s");
+          });
+          const stop = () => (dragging = false);
+          svg.addEventListener("pointerup", stop);
+          svg.addEventListener("pointercancel", stop);
+          svg.addEventListener("pointerleave", () => {
+            hoverLine.setAttribute("visibility", "hidden");
+            hoverTag.group.setAttribute("visibility", "hidden");
+          });
+        }
+        hoverLine.setAttribute("visibility", "hidden");
+        hoverTag.group.setAttribute("visibility", "hidden");
+
+        // ---- The scrubber and its marks ------------------------------------------------------------------------------------------------
+        const scrub = $("pb-scrub");
+        const range = $("pb-range");
+        range.max = String(lastCapture - firstCapture);
+        const marks = $("pb-marks");
+        const sectionTicks = (data.section.to - data.section.from) * TICKS_PER_SECOND;
+
+        function drawMarks() {
+          const width = marks.clientWidth;
+          const height = marks.clientHeight;
+          if (width === 0) return;
+          const ratio = window.devicePixelRatio || 1;
+          marks.width = Math.round(width * ratio);
+          marks.height = Math.round(height * ratio);
+          const context = marks.getContext("2d");
+          context.setTransform(ratio, 0, 0, ratio, 0, 0);
+          context.clearRect(0, 0, width, height);
+          const colors = getComputedStyle(document.documentElement);
+          const xOfTicks = (ticks) => ((ticks - data.section.from * TICKS_PER_SECOND) / sectionTicks) * width;
+          // Static stretches: a band on the track; late frames: a tick above and below it
+          context.fillStyle = colors.getPropertyValue("--pb-violet");
+          context.globalAlpha = 0.45;
+          for (let i = 0; i < frameCount; ++i) {
+            if (frames.flags[i] & flag.staticAfter) {
+              const left = xOfTicks(frames.t[i]);
+              const right = xOfTicks(frames.t[i] + (frames.step[i] ?? data.periodTicks));
+              context.fillRect(left, height / 2 - 3, Math.max(1, right - left), 6);
+            }
+          }
+          context.globalAlpha = 1;
+          context.fillStyle = colors.getPropertyValue("--pb-red");
+          let lastX = -2;
+          for (let i = 0; i < frameCount; ++i) {
+            if (frames.flags[i] & flag.late) {
+              const x = Math.round(xOfTicks(frames.t[i]));
+              if (x === lastX) continue;
+              lastX = x;
+              context.fillRect(x - 0.75, height / 2 - 9, 1.5, 5);
+              context.fillRect(x - 0.75, height / 2 + 4, 1.5, 5);
+            }
+          }
+        }
+        if ("ResizeObserver" in window) new ResizeObserver(drawMarks).observe(marks);
+        else window.addEventListener("resize", drawMarks);
+
+        // ---- Showing a video frame -----------------------------------------------------------------------------------------------------
+        let current = firstCapture;
+        let shownFrame = -2;
+        const pills = $("pb-pills");
+        const holdText = {
+          asPlanned: ["As planned", "green"],
+          late: ["Next frame late", "red"],
+          olderFrameBack: ["An older frame came back", "pink"],
+          framesDropped: ["Frames dropped by the target", "orange"],
+          unknown: ["Not judged: capture gap", "grey"],
+        };
+        const pill = (text, color) => element("span", "pb-pill pb-pill-" + color, text);
+
+        function showFrame(frame) {
+          if (frame === shownFrame) return;
+          shownFrame = frame;
+          pills.replaceChildren();
+          if (frame < 0) {
+            for (const id of ["pb-r-frame", "pb-r-time", "pb-r-step", "pb-r-error", "pb-r-hold"]) $(id).textContent = "–";
+            return;
+          }
+          const flags = frames.flags[frame];
+          $("pb-r-frame").textContent = number(frames.index[frame], 0);
+          $("pb-r-time").textContent = seconds(frames.t[frame]);
+          const step = frames.step[frame];
+          const stepNode = $("pb-r-step");
+          stepNode.textContent = step === null ? "–" : ms(step);
+          if (step !== null) {
+            const refreshes = step / data.periodTicks;
+            const whole = Math.abs(refreshes - Math.round(refreshes)) < 0.05;
+            const count = whole ? number(Math.round(refreshes), 0) : number(refreshes, 2);
+            stepNode.append(element("small", "", count === "1" ? "1 refresh" : `${count} refreshes`));
+          }
+          const error = frames.error[frame];
+          $("pb-r-error").textContent = error === null ? "not judged" : signedMs(error);
+          const [holdLabel, holdColor] = holdText[holdKinds[frames.hold[frame]]] ?? ["–", "grey"];
+          $("pb-r-hold").replaceChildren(pill(holdLabel, holdColor));
+          if (flags & flag.late) pills.append(pill("Late", "red"));
+          if (flags & flag.staticAfter) pills.append(pill(flags & flag.staticAssumed ? "Static (assumed)" : "Static", "violet"));
+          if (flags & flag.skippedBefore) pills.append(pill("Frames skipped before", "orange"));
+          if (flags & (flag.uncertainStep | flag.uncertainStart)) pills.append(pill("Uncertain", "grey"));
+          if (!(flags & (flag.late | flag.staticAfter | flag.skippedBefore | flag.uncertainStep | flag.uncertainStart)))
+            pills.append(pill("On time", "green"));
+        }
+
+        function show(capture) {
+          current = capture;
+          const ticks = ticksOfCapture(capture);
+          const frame = frameAt(ticks);
+          range.value = String(capture - firstCapture);
+          scrub.style.setProperty("--pb-fill", `${((capture - firstCapture) / Math.max(1, lastCapture - firstCapture)) * 100}%`);
+          $("pb-time-now").textContent = number(ticks / TICKS_PER_SECOND, 3);
+          $("pb-r-capture").textContent = number(capture, 0);
+          showFrame(frame);
+          drawOverlay(ticks, frame);
+        }
+        $("pb-time-total").textContent = " / " + number(data.section.to, 3) + " s";
+
+        // ---- Playing and seeking -------------------------------------------------------------------------------------------------------
+        let ready = false;
+        let pendingCapture = null;
+
+        function seekTo(capture) {
+          capture = clampCapture(capture);
+          video.pause();
+          show(capture);
+          if (!ready) {
+            pendingCapture = capture;
+            return;
+          }
+          video.currentTime = mediaTimeOf(capture);
+          rememberPosition();
+        }
+        const seekSeconds = (value) => seekTo(Math.floor(captureAt(value * TICKS_PER_SECOND) + 1e-3));
+
+        function stepFrame(direction) {
+          const frame = frameAt(ticksOfCapture(current));
+          let target;
+          if (direction < 0) {
+            const start = frame >= 0 ? Math.round(captureAt(frames.t[frame])) : current;
+            target = current > start ? start : frame > 0 ? Math.round(captureAt(frames.t[frame - 1])) : current;
+          } else target = frame + 1 < frameCount ? Math.round(captureAt(frames.t[frame + 1])) : lastCapture;
+          seekTo(target);
+        }
+
+        function togglePlay() {
+          if (!video.paused) {
+            video.pause();
+            return;
+          }
+          if (current >= lastCapture) seekTo(firstCapture);
+          video.play().catch(() => {});
+        }
+
+        function onMediaTime(mediaTime) {
+          const capture = captureOfMediaTime(mediaTime);
+          if (!video.paused && capture >= lastCapture) {
+            video.pause();
+            seekTo(lastCapture);
+            return;
+          }
+          if (capture < firstCapture && !video.paused) {
+            seekTo(firstCapture);
+            return;
+          }
+          show(clampCapture(capture));
+        }
+
+        if ("requestVideoFrameCallback" in HTMLVideoElement.prototype) {
+          const onFrame = (_, metadata) => {
+            onMediaTime(metadata.mediaTime);
+            video.requestVideoFrameCallback(onFrame);
+          };
+          video.requestVideoFrameCallback(onFrame);
+        } else video.addEventListener("timeupdate", () => onMediaTime(video.currentTime));
+        video.addEventListener("seeked", () => onMediaTime(video.currentTime));
+
+        const playButton = $("pb-play");
+        const updatePlaying = () => {
+          const playing = !video.paused;
+          $("pb-play-icon").hidden = playing;
+          $("pb-pause-icon").hidden = !playing;
+          playButton.setAttribute("aria-label", playing ? "Pause" : "Play");
+          playButton.title = playing ? "Pause (Space)" : "Play (Space)";
+          if (!playing) rememberPosition();
+        };
+        video.addEventListener("play", updatePlaying);
+        video.addEventListener("pause", updatePlaying);
+
+        playButton.addEventListener("click", togglePlay);
+        $("pb-step-back").addEventListener("click", () => seekTo(current - 1));
+        $("pb-step-forward").addEventListener("click", () => seekTo(current + 1));
+        $("pb-frame-back").addEventListener("click", () => stepFrame(-1));
+        $("pb-frame-forward").addEventListener("click", () => stepFrame(1));
+        range.addEventListener("input", () => seekTo(firstCapture + Number(range.value)));
+
+        const speeds = $("pb-speeds");
+        const speedButtons = SPEEDS.map(([rate, label]) => {
+          const button = element("button", "", label);
+          button.type = "button";
+          button.setAttribute("aria-label", `Speed ${label}`);
+          button.addEventListener("click", () => setSpeed(rate));
+          speeds.append(button);
+          return [rate, button];
+        });
+        function setSpeed(rate) {
+          video.playbackRate = rate;
+          for (const [value, button] of speedButtons) button.setAttribute("aria-pressed", String(value === rate));
+        }
+        setSpeed(1);
+
+        // ---- The address: #t=<seconds> opens the page on a moment ----------------------------------------------------------------------
+        const hash = new URLSearchParams(location.hash.slice(1));
+        let rememberTimer = 0;
+        function rememberPosition() {
+          clearTimeout(rememberTimer);
+          rememberTimer = setTimeout(() => {
+            if (!video.paused) return;
+            const parameters = new URLSearchParams(location.hash.slice(1));
+            parameters.set("t", (ticksOfCapture(current) / TICKS_PER_SECOND).toFixed(3));
+            try {
+              history.replaceState(null, "", "#" + parameters.toString());
+            } catch {
+              // A browser that keeps file:// pages from changing their address: the page works without it
+            }
+          }, 250);
+        }
+
+        // ---- The video: load, check, or explain why it does not play -------------------------------------------------------------------
+        const message = $("pb-message");
+        function showMessage(title, text, command) {
+          $("pb-message-title").textContent = title;
+          $("pb-message-text").textContent = text;
+          const commandNode = $("pb-message-command");
+          commandNode.hidden = !command;
+          commandNode.textContent = command ?? "";
+          message.hidden = false;
+        }
+        function showBanner(text) {
+          $("pb-banner-text").textContent = text;
+          $("pb-banner").hidden = false;
+        }
+        video.addEventListener("error", () => {
+          ready = false;
+          showMessage(
+            "This browser cannot play the recording",
+            data.video.problem
+              ? `${data.video.name}: ${data.video.problem}. Make a playable copy with the command below, or open another file of the same recording.`
+              : `${data.video.name} could not be loaded from ${decodeURI(data.video.url)}. It may have been moved: open it here.`,
+            data.video.command,
+          );
+        });
+        video.addEventListener("loadedmetadata", () => {
+          ready = true;
+          message.hidden = true;
+          const needed = (data.originTicks + ticksOfCapture(lastCapture)) / TICKS_PER_SECOND;
+          if (Number.isFinite(video.duration) && video.duration + 0.5 < needed)
+            showBanner(
+              `The video is ${number(video.duration, 1)} s long, but the capture runs to ${number(needed, 1)} s: is it the recording this capture was imported from?`,
+            );
+          const start = hash.has("t") ? Math.floor(captureAt(Number(hash.get("t")) * TICKS_PER_SECOND) + 1e-3) : firstCapture;
+          seekTo(pendingCapture ?? (Number.isFinite(start) ? start : firstCapture));
+          pendingCapture = null;
+        });
+        $("pb-open").addEventListener("click", () => $("pb-file").click());
+        $("pb-file").addEventListener("change", () => {
+          const file = $("pb-file").files[0];
+          if (!file) return;
+          $("pb-banner").hidden = true;
+          video.src = URL.createObjectURL(file);
+        });
+        if (!data.video.playable && data.video.problem)
+          showBanner(
+            `${data.video.name}: ${data.video.problem}. Some browsers play it anyway; if this one does not, it says so above.`,
+          );
+        video.src = data.video.url;
+
+        // ---- Theme and keyboard --------------------------------------------------------------------------------------------------------
+        const root = document.documentElement;
+        const themeButton = $("pb-theme");
+        const themes = ["auto", "light", "dark"];
+        function setTheme(theme, remember) {
+          if (theme === "auto") delete root.dataset.theme;
+          else root.dataset.theme = theme;
+          const label = { auto: "Theme: as the system", light: "Theme: light", dark: "Theme: dark" }[theme];
+          themeButton.title = label;
+          themeButton.setAttribute("aria-label", label);
+          if (remember)
+            try {
+              localStorage.setItem("pb-theme", theme);
+            } catch {
+              // No storage (a private window, file:// in some browsers): the theme is not remembered
+            }
+          drawMarks();
+        }
+        let theme = hash.get("theme");
+        if (!themes.includes(theme))
+          try {
+            theme = localStorage.getItem("pb-theme");
+          } catch {
+            theme = null;
+          }
+        setTheme(themes.includes(theme) ? theme : "auto", false);
+        themeButton.addEventListener("click", () => {
+          const next = themes[(themes.indexOf(root.dataset.theme ?? "auto") + 1) % themes.length];
+          setTheme(next, true);
+        });
+        window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", drawMarks);
+
+        const keys = $("pb-keys");
+        const keysButton = $("pb-keys-button");
+        const toggleKeys = (open = keys.hidden) => {
+          keys.hidden = !open;
+          keysButton.setAttribute("aria-expanded", String(open));
+        };
+        keysButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          toggleKeys();
+        });
+        document.addEventListener("click", (event) => {
+          if (!keys.hidden && !keys.contains(event.target)) toggleKeys(false);
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.ctrlKey || event.metaKey || event.altKey) return;
+          const target = event.target;
+          if (target instanceof HTMLInputElement && target !== range) return;
+          let handled = true;
+          switch (event.key) {
+            case " ":
+            case "k":
+              if (target instanceof HTMLButtonElement && event.key === " ") return;
+              togglePlay();
+              break;
+            case "ArrowLeft":
+              if (event.shiftKey) stepFrame(-1);
+              else seekTo(current - 1);
+              break;
+            case "ArrowRight":
+              if (event.shiftKey) stepFrame(1);
+              else seekTo(current + 1);
+              break;
+            case "Home":
+              seekTo(firstCapture);
+              break;
+            case "End":
+              seekTo(lastCapture);
+              break;
+            case "1":
+            case "2":
+            case "3":
+            case "4":
+              setSpeed(SPEEDS[Number(event.key) - 1][0]);
+              break;
+            case "?":
+              toggleKeys();
+              break;
+            case "Escape":
+              toggleKeys(false);
+              break;
+            default:
+              handled = false;
+          }
+          if (handled) event.preventDefault();
+        });
+
+        show(firstCapture);
+        drawMarks();
+      })();
+    </script>
+  </body>
+</html>

@@ -41,6 +41,8 @@ namespace MB.FramePacing.App.Commands
       var nameOption = CommonOptions.Name("overrides the one stored in capture.json");
       var displayOption = CommonOptions.DisplayHz("overrides the one stored in capture.json");
       var chartsOption = CommonOptions.Charts();
+      var playback = new PlaybackOutput();
+      var ffmpegOption = CommonOptions.Ffmpeg();
       var thresholdOption = new Option<double?>("--error-threshold-ms")
       {
         Description =
@@ -75,7 +77,9 @@ namespace MB.FramePacing.App.Commands
         thresholdOption,
         noStaticGuessOption,
         chartsOption,
+        ffmpegOption,
       };
+      playback.AddTo(command);
       command.SetAction(parseResult =>
       {
         var options = new AnalysisOptions
@@ -96,13 +100,23 @@ namespace MB.FramePacing.App.Commands
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,
         };
-        return Run(Path.GetFullPath(parseResult.GetValue(directoryArgument)!), options, charts: parseResult.GetValue(chartsOption));
+        return Run(
+          Path.GetFullPath(parseResult.GetValue(directoryArgument)!),
+          options,
+          charts: parseResult.GetValue(chartsOption),
+          playback: parseResult.GetValue(playback.Playback)
+            ? report => PlaybackOutput.Write(parseResult, playback, report, PlaybackOutput.FindFfmpeg(parseResult, ffmpegOption))
+            : null
+        );
       });
       return command;
     }
 
-    /// <summary>Analyses a capture, writes the reports (and the charts when <paramref name="charts"/> is set) and prints the results.</summary>
-    public static int Run(string directory, AnalysisOptions options, bool charts)
+    /// <summary>
+    /// Analyses a capture, writes the reports (and the charts when <paramref name="charts"/> is set) and prints the results; then
+    /// <paramref name="playback"/>, when given, writes the playback pages.
+    /// </summary>
+    public static int Run(string directory, AnalysisOptions options, bool charts, Action<AnalysisReport>? playback = null)
     {
       try
       {
@@ -122,6 +136,7 @@ namespace MB.FramePacing.App.Commands
           AnsiConsole.MarkupLineInterpolated(
             $"[grey]{chartFiles.Count} chart(s) written next to them (run-*-report.svg, run-*-error-histogram.svg, ...)[/]"
           );
+        playback?.Invoke(report!);
         return Program.ResultSuccess;
       }
       catch (Exception ex)

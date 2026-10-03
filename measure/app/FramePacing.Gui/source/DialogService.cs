@@ -76,6 +76,12 @@ namespace MB.FramePacing.Gui
       return m_topLevel is Window owner ? await window.ShowDialog<bool>(owner) : false;
     }
 
+    public async Task<ViewModels.QuestionAnswer?> AskAsync(ViewModels.QuestionViewModel question)
+    {
+      var window = new Views.QuestionWindow { DataContext = question };
+      return m_topLevel is Window owner ? await window.ShowDialog<ViewModels.QuestionAnswer?>(owner) : null;
+    }
+
     public void ShowInFileManager(string directory)
     {
       if (Directory.Exists(directory))

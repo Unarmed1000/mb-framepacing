@@ -16,6 +16,9 @@ namespace MB.FramePacing.Capture.Ffmpeg
   /// <param name="RecordedFps">The real recording rate of a slow motion video file (see <see cref="FfmpegCaptureOptions.RecordedFps"/>).</param>
   public sealed record MediaSource(CaptureDevice Device, RequestedMode Mode, IReadOnlyList<TickCount64>? FrameTimestamps, double? RecordedFps = null)
   {
+    /// <summary>The absolute path of the imported video file or image folder, for capture.json; null for a stream.</summary>
+    public string? InputPath { get; init; }
+
     public FfmpegCaptureOptions ToCaptureOptions(string ffmpegPath) =>
       new FfmpegCaptureOptions
       {
@@ -24,6 +27,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
         Mode = Mode,
         FrameTimestamps = FrameTimestamps,
         RecordedFps = RecordedFps,
+        InputPath = InputPath,
       };
   }
 }

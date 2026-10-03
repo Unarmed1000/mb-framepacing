@@ -2,8 +2,9 @@
 //* File Description
 //* ----------------
 //* Saves an SVG as a PNG at twice its size through a headless Edge or Chrome, as mb-framepacing-explained's diagrams do (find_browser and
-//* save_png in generate_diagrams.py): the browser draws the style sheet and the fonts exactly as it shows the SVG. The browser comes from
-//* MB_BROWSER, the usual install locations, then PATH.
+//* save_png in generate_diagrams.py): the browser draws the style sheet and the fonts exactly as it shows the SVG. It also screenshots an HTML
+//* page (the playback page) in a window of a given size, after virtual time for what it loads. The browser comes from MB_BROWSER, the usual
+//* install locations, then PATH.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -69,12 +70,50 @@ namespace MB.FramePacing.Charts
       int width = int.Parse(Regex.Match(content, "width=\"(\\d+)\"").Groups[1].Value);
       int height = int.Parse(Regex.Match(content, "height=\"(\\d+)\"").Groups[1].Value);
 
-      var result = SaveWithRetries(noSandbox => Attempt(found, svgPath, pngPath, width, height, noSandbox), OperatingSystem.IsLinux());
+      string url = new Uri(Path.GetFullPath(svgPath)).AbsoluteUri;
+      var result = SaveWithRetries(
+        noSandbox =>
+          Attempt(found, url, pngPath, width, height, noSandbox, new[] { "--default-background-color=00000000", "--force-device-scale-factor=2" }),
+        OperatingSystem.IsLinux()
+      );
+      ThrowUnlessSaved(result, found, pngPath);
+    }
+
+    /// <summary>
+    /// Screenshot the HTML page at <paramref name="pagePath"/> (with the address fragment <paramref name="fragment"/>, without the '#') in a
+    /// window of <paramref name="width"/> by <paramref name="height"/> into <paramref name="pngPath"/>. The page gets
+    /// <paramref name="settleMilliseconds"/> of virtual time to load what it plays (a video) first. Throws when there is no browser or it fails.
+    /// </summary>
+    public static void SavePagePng(
+      string pagePath,
+      string fragment,
+      string pngPath,
+      int width,
+      int height,
+      int settleMilliseconds = 10000,
+      string? browser = null
+    )
+    {
+      string found =
+        browser ?? Find() ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
+      string url = new Uri(Path.GetFullPath(pagePath)).AbsoluteUri + (fragment.Length > 0 ? "#" + fragment : string.Empty);
+      var extra = new[]
+      {
+        "--force-device-scale-factor=1",
+        "--autoplay-policy=no-user-gesture-required",
+        $"--virtual-time-budget={settleMilliseconds}",
+      };
+      var result = SaveWithRetries(noSandbox => Attempt(found, url, pngPath, width, height, noSandbox, extra), OperatingSystem.IsLinux());
+      ThrowUnlessSaved(result, found, pngPath);
+    }
+
+    private static void ThrowUnlessSaved(BrowserAttempt result, string browser, string pngPath)
+    {
       if (result.Saved)
         return;
       if (result.TimedOut)
-        throw new TimeoutException($"{found} did not save {pngPath} within {g_timeout.TotalSeconds:0} s{Tail(result.Errors)}");
-      throw new InvalidOperationException($"{found} failed to save {pngPath} (exit code {result.ExitCode}){Tail(result.Errors)}");
+        throw new TimeoutException($"{browser} did not save {pngPath} within {g_timeout.TotalSeconds:0} s{Tail(result.Errors)}");
+      throw new InvalidOperationException($"{browser} failed to save {pngPath} (exit code {result.ExitCode}){Tail(result.Errors)}");
     }
 
     /// <summary>
@@ -112,7 +151,15 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>One run of the browser, in a profile of its own that is deleted afterwards.</summary>
-    private static BrowserAttempt Attempt(string browser, string svgPath, string pngPath, int width, int height, bool noSandbox)
+    private static BrowserAttempt Attempt(
+      string browser,
+      string url,
+      string pngPath,
+      int width,
+      int height,
+      bool noSandbox,
+      IReadOnlyList<string> extraArguments
+    )
     {
       // An image that is already there would count as this run's: the browser is ended as soon as the file is whole
       File.Delete(pngPath);
@@ -125,11 +172,9 @@ namespace MB.FramePacing.Charts
         arguments.AddRange(
           new[]
           {
-            "--default-background-color=00000000",
             "--headless=new",
             "--disable-gpu",
             "--hide-scrollbars",
-            "--force-device-scale-factor=2",
             // A fresh profile every time: no first run dialogs, no default browser question, no extensions
             "--no-first-run",
             "--no-default-browser-check",
@@ -145,7 +190,8 @@ namespace MB.FramePacing.Charts
         // Linux: containers and CI machines often have a small /dev/shm
         if (OperatingSystem.IsLinux())
           arguments.Add("--disable-dev-shm-usage");
-        arguments.Add(new Uri(Path.GetFullPath(svgPath)).AbsoluteUri);
+        arguments.AddRange(extraArguments);
+        arguments.Add(url);
         return Run(browser, arguments, pngPath);
       }
       finally

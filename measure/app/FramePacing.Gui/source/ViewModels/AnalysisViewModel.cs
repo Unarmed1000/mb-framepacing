@@ -18,11 +18,16 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Capture;
+using MB.FramePacing.Capture.Ffmpeg;
 using MB.FramePacing.Charts;
+using MB.FramePacing.Charts.Playback;
 using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels
@@ -161,6 +166,8 @@ namespace MB.FramePacing.Gui.ViewModels
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRun))]
+    [NotifyPropertyChangedFor(nameof(CanSavePlayback))]
+    [NotifyCanExecuteChangedFor(nameof(SavePlaybackCommand))]
     public partial RunViewModel? SelectedRun { get; set; }
 
     /// <summary>The Timeline card of the section: a sliding window around it when zoomed.</summary>
@@ -491,6 +498,205 @@ namespace MB.FramePacing.Gui.ViewModels
         m_dialogs.ShowInFileManager(ReportDirectory);
     }
 
+    /// <summary>The configuration changed here (a remembered answer of the playback page): the Settings page shows it.</summary>
+    public event Action? ConfigurationChanged;
+
+    private CancellationTokenSource? m_playbackCancel;
+
+    /// <summary>A playback page is being written (its video copied or made playable first, perhaps).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSavePlayback))]
+    [NotifyPropertyChangedFor(nameof(HasPlaybackPage))]
+    [NotifyCanExecuteChangedFor(nameof(SavePlaybackCommand))]
+    public partial bool IsSavingPlayback { get; set; }
+
+    /// <summary>What the playback export is doing ("Making a playable copy... 40 %").</summary>
+    [ObservableProperty]
+    public partial string PlaybackStatus { get; set; } = string.Empty;
+
+    /// <summary>How far the playback export's copy is (0 to 100); null when not known.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlaybackProgressUnknown))]
+    [NotifyPropertyChangedFor(nameof(PlaybackPercentValue))]
+    public partial double? PlaybackPercent { get; set; }
+
+    public bool PlaybackProgressUnknown => !PlaybackPercent.HasValue;
+
+    public double PlaybackPercentValue => PlaybackPercent ?? 0;
+
+    /// <summary>Why the analysed capture can have no playback page; empty when it can.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSavePlayback))]
+    [NotifyPropertyChangedFor(nameof(PlaybackToolTip))]
+    [NotifyCanExecuteChangedFor(nameof(SavePlaybackCommand))]
+    public partial string PlaybackProblem { get; set; } = string.Empty;
+
+    /// <summary>The last playback page written, for Open playback page.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPlaybackPage))]
+    public partial string? PlaybackPage { get; set; }
+
+    public bool HasPlaybackPage => PlaybackPage != null && !IsSavingPlayback;
+
+    public bool CanSavePlayback => m_report != null && SelectedRun != null && !IsSavingPlayback && PlaybackProblem.Length == 0;
+
+    public string PlaybackToolTip =>
+      PlaybackProblem.Length > 0
+        ? PlaybackProblem
+        : "Write a playback report of the selected run (zoomed: the part in view) into a folder of its own in the analysis's playback "
+          + "folder: one HTML page with the report next to the recording, a player and a playhead on the report. It asks before it copies the "
+          + "recording.";
+
+    /// <summary>
+    /// Write the playback page of the selected run (the part of it in view when zoomed) through the same export as 'render --playback': the
+    /// questions about the recording come up as dialogs, unless the configuration answers them.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSavePlayback))]
+    private async Task SavePlaybackAsync()
+    {
+      if (m_report is not { } report || SelectedRun?.Chart is not { } chart)
+        return;
+      var capture = PlaybackCapture.From(report);
+      string? videoPath = null;
+      if (capture.NamesNoVideo)
+      {
+        videoPath = await m_dialogs.PickFileAsync("The capture does not name its recording: pick the video file it was imported from");
+        if (videoPath == null)
+          return;
+      }
+      var config = MainWindowViewModel.SafeLoadConfig();
+      var (videoChoice, transcodeChoice) = PlaybackExportOptions.Choices(null, null, config);
+      string ffmpeg;
+      try
+      {
+        ffmpeg = FfmpegLocator.Find(null, config);
+      }
+      catch (FileNotFoundException ex)
+      {
+        ErrorText = "The playback page needs ffmpeg: " + ex.Message;
+        return;
+      }
+      var options = new PlaybackExportOptions
+      {
+        FfmpegPath = ffmpeg,
+        VideoPath = videoPath,
+        VideoChoice = videoChoice,
+        TranscodeChoice = transcodeChoice,
+        FromSeconds = m_requested?.From,
+        ToSeconds = m_requested?.To,
+        Report = ReportOptions.Default with { ClampStatic = ClampStatic },
+        ToolVersion = MainWindowViewModel.Version,
+      };
+      var runs = new[] { new AnalysisOutputRun(chart, PlaybackExport.PrefixOf(report, chart.Run)) };
+
+      IsSavingPlayback = true;
+      ErrorText = string.Empty;
+      PlaybackStatus = "Writing the playback page...";
+      PlaybackPercent = null;
+      using var cancel = new CancellationTokenSource();
+      m_playbackCancel = cancel;
+      var progress = new Progress<PlaybackProgress>(value =>
+      {
+        PlaybackStatus = value.Fraction is { } fraction
+          ? string.Create(CultureInfo.InvariantCulture, $"{value.Step}... {fraction * 100:0} %")
+          : value.Step + "...";
+        PlaybackPercent = value.Fraction * 100;
+      });
+      try
+      {
+        // The export goes on on the thread pool: a question comes back to the window
+        var result = await PlaybackExport.WriteAsync(
+          capture,
+          runs,
+          options,
+          question => Dispatcher.UIThread.InvokeAsync(() => AskAsync(question)),
+          progress,
+          cancel.Token
+        );
+        PlaybackPage = result.Pages[0];
+        SummaryText = $"Playback report written: {result.Pages[0]}";
+        g_logger.Info(
+          "Playback report {Page} written, playing {Kind} {Video}",
+          result.Pages[0],
+          result.Video.Kind,
+          result.Video.PathIn(Path.GetDirectoryName(result.Pages[0])!)
+        );
+      }
+      catch (OperationCanceledException)
+      {
+        SummaryText = "The playback page was not written (cancelled).";
+      }
+      catch (Exception ex)
+      {
+        ErrorText = "Could not write the playback page: " + ex.Message;
+        g_logger.Error(ex, "Could not write the playback page");
+      }
+      finally
+      {
+        m_playbackCancel = null;
+        IsSavingPlayback = false;
+        PlaybackStatus = string.Empty;
+        PlaybackPercent = null;
+      }
+    }
+
+    /// <summary>A question about the recording as a dialog; closing it cancels the export. A remembered answer goes into the configuration.</summary>
+    private async Task<bool> AskAsync(PlaybackQuestion question)
+    {
+      var answer = await m_dialogs.AskAsync(
+        new QuestionViewModel(
+          question.Title,
+          question.Text,
+          question.Yes,
+          question.No,
+          $"Remember my choice (stored as {question.Setting} in the configuration; the Settings page changes it)"
+        )
+      );
+      if (answer == null)
+        throw new OperationCanceledException("The question was closed without an answer");
+      if (answer.Remember)
+        RememberAnswer(question.Kind, answer.Yes);
+      return answer.Yes;
+    }
+
+    private void RememberAnswer(PlaybackQuestionKind kind, bool yes)
+    {
+      // Automation and --output-root runs never change the user's files
+      if (Program.Automation || Program.OutputRoot != null)
+        return;
+      try
+      {
+        var config = MainWindowViewModel.SafeLoadConfig();
+        config =
+          kind == PlaybackQuestionKind.CopyOrLink
+            ? config with
+            {
+              PlaybackVideo = yes ? PlaybackVideoChoice.Copy : PlaybackVideoChoice.Link,
+            }
+            : config with
+            {
+              PlaybackTranscode = yes ? PlaybackTranscodeChoice.Yes : PlaybackTranscodeChoice.No,
+            };
+        config.Save();
+        ConfigurationChanged?.Invoke();
+      }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+      {
+        ErrorText = "Could not remember the answer in the configuration: " + ex.Message;
+        g_logger.Error(ex, "Could not save the configuration");
+      }
+    }
+
+    [RelayCommand]
+    private void CancelPlayback() => m_playbackCancel?.Cancel();
+
+    [RelayCommand]
+    private void OpenPlaybackPage()
+    {
+      if (PlaybackPage != null)
+        m_dialogs.OpenFile(PlaybackPage);
+    }
+
     /// <summary>Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts').</summary>
     [RelayCommand]
     private async Task SaveChartsAsync()
@@ -522,6 +728,8 @@ namespace MB.FramePacing.Gui.ViewModels
       Runs.Clear();
       SelectedRun = null;
       m_report = null;
+      PlaybackPage = null;
+      PlaybackProblem = string.Empty;
       SummaryText = "Decoding markers...";
       try
       {
@@ -556,6 +764,11 @@ namespace MB.FramePacing.Gui.ViewModels
         SelectedRun = Runs.Count > 0 ? Runs[0] : null;
         ReportDirectory = report.OutputDirectory;
         m_report = report;
+        // A capture that names no recording can still have a page: the user picks the video
+        var playbackCapture = PlaybackCapture.From(report);
+        PlaybackProblem = playbackCapture.Problem(playbackCapture.NamesNoVideo ? "the picked video" : null) ?? string.Empty;
+        OnPropertyChanged(nameof(CanSavePlayback));
+        SavePlaybackCommand.NotifyCanExecuteChanged();
         ProgressPercent = 100;
       }
       catch (Exception ex)

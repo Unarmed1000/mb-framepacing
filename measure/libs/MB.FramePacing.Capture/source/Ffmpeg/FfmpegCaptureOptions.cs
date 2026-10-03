@@ -47,6 +47,9 @@ namespace MB.FramePacing.Capture.Ffmpeg
     /// </summary>
     public double? RecordedFps { get; init; }
 
+    /// <summary>The absolute path of the imported video file or image folder (<see cref="MediaSource.InputPath"/>); null for devices and streams.</summary>
+    public string? InputPath { get; init; }
+
     /// <summary>
     /// EXPERIMENTAL camera capture: rectify and store only the rig's marker zones, stacked top to bottom in scanout order (replaces Roi and
     /// Scale).

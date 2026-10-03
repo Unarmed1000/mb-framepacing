@@ -37,5 +37,8 @@ namespace MB.FramePacing.Gui
 
     /// <summary>Show the camera rig wizard (VERY EXPERIMENTAL). True when a camera was set up or chosen.</summary>
     Task<bool> ShowCameraWizardAsync(ViewModels.CameraWizardViewModel viewModel);
+
+    /// <summary>Ask a yes/no question. Null when the dialog was closed without an answer.</summary>
+    Task<ViewModels.QuestionAnswer?> AskAsync(ViewModels.QuestionViewModel question);
   }
 }

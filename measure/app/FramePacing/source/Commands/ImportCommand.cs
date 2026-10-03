@@ -51,6 +51,7 @@ namespace MB.FramePacing.App.Commands
       var displayOption = CommonOptions.DisplayHz("stored in capture.json");
       var analyzeOption = new Option<bool>("--analyze") { Description = "Run 'analyze' on the result." };
       var chartsOption = CommonOptions.Charts();
+      var playback = new PlaybackOutput();
       var keepFramesOption = CommonOptions.KeepFrames();
       var ffmpegOption = CommonOptions.Ffmpeg();
       var cameraOption = CameraRigCommand.CameraOption();
@@ -80,6 +81,7 @@ namespace MB.FramePacing.App.Commands
         chartsOption,
         ffmpegOption,
       };
+      playback.AddTo(command);
 
       command.SetAction(
         async (parseResult, cancellationToken) =>
@@ -121,6 +123,7 @@ namespace MB.FramePacing.App.Commands
             {
               Camera = options.Camera,
               RecordedFps = options.RecordedFps,
+              InputPath = options.InputPath,
               OutputDirectory = output,
               Duration = DurationParser.ParseOptional(parseResult.GetValue(durationOption)),
               WaitForStart = parseResult.GetValue(waitOption),
@@ -142,11 +145,15 @@ namespace MB.FramePacing.App.Commands
             var result = await Task.Run(() => CaptureCommand.RunWithStatus(source, runOptions, cancellationToken), CancellationToken.None);
             CaptureCommand.PrintResult(result.Session);
 
-            if (parseResult.GetValue(analyzeOption))
+            // The playback page needs the analysis: --playback analyses too
+            if (parseResult.GetValue(analyzeOption) || parseResult.GetValue(playback.Playback))
               return AnalyzeCommand.Run(
                 result.Directory,
                 new AnalysisOptions { ToolVersion = Program.VersionString },
-                charts: parseResult.GetValue(chartsOption)
+                charts: parseResult.GetValue(chartsOption),
+                playback: parseResult.GetValue(playback.Playback)
+                  ? report => PlaybackOutput.Write(parseResult, playback, report, ffmpeg, cancellationToken)
+                  : null
               );
             return Program.ResultSuccess;
           }
