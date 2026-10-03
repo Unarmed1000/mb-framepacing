@@ -4,6 +4,10 @@ Draws the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) frame 
 that carries the frame index and the animation time. A capture of the display output, analysed with the mb-framepacing tools, then
 shows the **animation error**: how far what the game animated is from what was actually shown on screen.
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
+> [Photosensitivity](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md#photosensitivity).
+
 ## Contents
 
 - **`MB.FramePacing`** (`Runtime/Core`) and **`MB.FramePacing.Marker`** (`Runtime/Marker`): the SDK's C# core and marker modules (no

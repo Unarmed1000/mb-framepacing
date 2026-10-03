@@ -9,6 +9,10 @@ tools, then shows the **animation error**: how far what the application animated
 module and draws exactly the same pixels (the tests check it against the golden images in [`test-data/markers`](../../test-data/markers)). The format is specified in
 [marker-format.md](../../doc/marker-format.md); what to write in each field is in [Filling the marker fields](../../doc/marker-fields.md).
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
+> [Photosensitivity](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md#photosensitivity).
+
 ## Add it
 
 It is not published as a NuGet package. Use the source at an `sdk-v*` tag, as a project reference to

@@ -26,6 +26,10 @@ python sdk/unity/build_upm.py --output <folder>
 
 ## Quick start
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Use the overlay in test builds only; see
+> [Photosensitivity](integrating.md#photosensitivity).
+
 1. Add a GameObject with **Add Component → MB → Frame Marker Overlay**.
 2. Set **Stored Height** to the height the capture tool stores (for example 540 for `--scale 960x540`). The module size follows from
    it: 3 stored pixels per module, 4 with **MJPEG**.

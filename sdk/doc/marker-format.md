@@ -232,6 +232,9 @@ marker is enough.
 
 ## Sizing
 
+A marker is a flickering high-contrast pattern: its size also decides whether it is within the guidelines on flashing content. See
+[Photosensitivity](integrating.md#photosensitivity) before choosing a larger one than the capture needs.
+
 What matters is how many **stored pixels** one QR module covers after all scaling: the GPU output resolution, the capture
 card's mode and the tools' `--scale` (`import`, or the experimental live `capture`).
 

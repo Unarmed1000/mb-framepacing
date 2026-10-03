@@ -13,6 +13,10 @@ All four produce exactly the same pixels. The libraries are renderer independent
 whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md);
 [Filling the marker fields](marker-fields.md) says where each field's value comes from and what the analysis does with it.
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame. Flickering patterns can trigger
+> seizures in people with photosensitive epilepsy. Draw it in test builds only, never in what players see, and read
+> [Photosensitivity](#photosensitivity) before you show it to anyone.
+
 ## 1. Add the C++ library
 
 CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`; `::pacer` is experimental and off by default); the marker
@@ -119,6 +123,34 @@ namespace FM = MB::FramePacing::Marker;
 const auto options = FM::Options::Recommended(1080, 540);                                  // 6 px modules
 const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080, /*alignPx*/ 2); // (32, 32)
 ```
+
+### Photosensitivity
+
+The marker's modules change every frame: black and white, far more than three times a second. That is the kind of content the
+guidelines on flashing limit ([WCAG 2.3.1](https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html);
+broadcasting has ITU-R BT.1702). It is inside WCAG's only while it is small:
+
+- **The area that may flash** is a quarter of a 10° field of view: by WCAG's estimate for a screen at a usual distance, about 2.8 %
+  of the screen.
+- **A fine, balanced pattern is exempt** while its squares are smaller than 0.1° of view: by the same estimate, a module of at
+  most 1/300 of the screen's width.
+
+| Output stored as             | Module size | The symbol's share of the screen | Module in view | Within the guideline              |
+| ---------------------------- | ----------- | -------------------------------- | -------------- | --------------------------------- |
+| 1080p at 1080p (1:1)         | 3 px        | 0.7 %                            | 0.05°          | yes                               |
+| 1080p at 540p, 2160p at 540p | 6 px, 12 px | 2.9 %                            | 0.09°          | only as a fine pattern, by little |
+| 1080p at 360p, 720p at 360p  | 9 px, 6 px  | 6.6 %                            | 0.14°          | **no**                            |
+
+So the library's default is at the edge of the guideline, and a capture that stores fewer lines needs a marker beyond it.
+`mb-framepacing marker-size` prints these numbers for a setup and says when it is outside. The estimate assumes a screen that
+fills about 30° of the view: a very large or close display, or a headset, makes the marker larger than it says. And the guideline
+lowers the risk; it does not remove it. Therefore:
+
+- **Test builds only.** Never draw the marker in a build players use, and make the switch that turns it on hard to hit by accident.
+- **No larger than the capture needs:** the recommended module size, and a capture that stores as many lines as it can.
+- **Tell the people at the screen** before a run, and keep anyone who is photosensitive away from it.
+- **Nobody has to look at it.** A capture card records the signal, not the screen: cover the marker's corner of the display, or
+  turn the display away, and the measurement is the same.
 
 ## 3. Draw it every frame
 

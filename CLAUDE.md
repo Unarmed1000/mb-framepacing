@@ -632,6 +632,13 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
 - **Licenses:** every third-party component (vendored, NuGet, FetchContent, test-only) needs its license text in `licenses/` and a
   row in `licenses/README.md`, in the same change.
 - **Two counters:** the capture index (capture card) and the marker frame index (application) are unrelated; never compare them.
+- **Photosensitivity:** the marker is a high-contrast pattern that changes every frame, so every guide that tells someone to draw it
+  carries the warning (the README's workflow step 1, `integrating.md`, `unity.md`, every SDK README: `sdk/`, `cpp`, `csharp/marker`,
+  `python`, `unity`, `shaders`; a pointer in `marker-format.md` "Sizing"), and `integrating.md` "Photosensitivity" has the numbers.
+  `FlashGuideline` (MarkerDecoding) is WCAG 2.3.1's estimate: a quarter of a 10° field may flash (2.8 % of the screen), a fine
+  pattern with squares under 0.1° (1/300 of the width) is exempt. The library default (6 px on 1080p) is at its edge; `marker-size`
+  prints the numbers and says when a setup is outside. Never describe the marker as safe: the guideline lowers the risk. A new
+  guide or sample that draws the marker gets the warning too.
 - **GUI log:** `GuiLogging` configures NLog in code: a file per day (`gui-yyyy-MM-dd.log`, the last 7 days kept) in `logs` next to
   the GUI settings, or under the output root for `--output-root` and DocImages runs (DocImages checks it). It also logs the exceptions
   nothing else handles (UI thread, tasks, app domain); catch blocks that show an error also log it.

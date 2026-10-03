@@ -78,6 +78,10 @@ last marker carried. The sample is there for
 
 ### 1. Once: build the marker into your application
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only, keep it at the recommended size, and see
+> [Photosensitivity](sdk/doc/integrating.md#photosensitivity) before you show it to anyone.
+
 Link the library and draw the marker as the very last thing in every frame, after post effects and UI, in pure black and white.
 It writes pixel aligned triangles straight into your vertex buffer, without allocating:
 

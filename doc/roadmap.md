@@ -114,13 +114,35 @@ people notice at sound 45 ms early to 125 ms late, and EBU R37 allows 40 ms earl
 **The option that looks best: a sync burst and a coded payload**, the QR code's shape in sound (a finder pattern, then data):
 
 - a preamble the decoder finds by cross-correlation, to the sample: a pseudo-random sequence or a chirp, somewhere in 1 to 8 kHz;
-- then a small payload (the run id and the audio clock's sample count at the burst's first sample) with a checksum and the
-  Reed-Solomon code the QR encoder already has;
+- then a payload far smaller than the picture's: the frame marker carries 53 bytes (the frame, its animation time, the pacing and
+  the CPU's work), and the sound needs none of that again. Which run it is and where the audio clock was at the burst's first
+  sample is enough, about a dozen bytes, less than the sync marker's 16; the run id joins it to everything the picture's markers
+  say. It has to be that small: sound carries far fewer bits a second than a picture, so every byte makes the burst longer, easier
+  to hear and easier to damage;
+- a checksum and the Reed-Solomon code the QR encoder already has, over that payload;
 - a few bursts a second, and perhaps a steady tone between them, whose breaks would show dropped and repeated buffers;
+- played alone: a sync test need not share the output with the application's other sound. The application can mute the rest, or
+  play the signal in a test mode, so the signal can be plain and loud, and the hard problem of hiding it under other sound (what
+  spread spectrum and watermarks are for) may never have to be solved;
 - a format document of its own, as the marker has, and generators written from it in each SDK language: integers only, no
   allocation in the audio callback, no third-party code.
 
 Linear timecode would be the first experiment and the fallback: standard, simple, and existing decoders can check ours.
+
+**Harmless to hear, for people and animals**, as a rule of the design and not an afterthought:
+
+- **It never has to be loud, or heard at all.** What harms hearing is how loud a sound is and for how long, whatever the sound:
+  the [WHO](https://www.who.int/news-room/questions-and-answers/item/deafness-and-hearing-loss-safe-listening) gives 80 dB as safe
+  for up to 40 hours a week, and less time the louder it gets. The tools read the signal from the recording, which a capture card
+  takes from the output itself, so the speakers can be turned down or off. The signal has to work at a low level, and the guide
+  would say to measure that way.
+- **Nothing ultrasonic or near it.** An adult's hearing falls off sharply from about 15 kHz, so the person setting the volume
+  cannot tell how loud a signal up there is, while children still hear it, and so do pets: dogs to about 45 kHz and cats to
+  about 79 kHz ([hearing ranges](https://en.wikipedia.org/wiki/Hearing_range)). The signal stays in the band every adult hears
+  clearly (the 1 to 8 kHz above), where anyone who finds it too loud notices and turns it down. That rules out the "inaudible"
+  modes some data-over-sound libraries offer (ggwave's ultrasound, Quiet's 18.5 to 19.5 kHz).
+- **No sudden full-level starts:** bursts fade in and out, so nothing clicks or startles, and a mistake in the level is a loud
+  tone, not a bang.
 
 What only measurements can settle:
 
@@ -131,8 +153,9 @@ What only measurements can settle:
    the sound is late by that much. OBS can record PCM, FLAC or ALAC instead, which is what a measurement should use.
 3. **The capture path's own offset:** a capture card delivers picture and sound separately, so an absolute offset needs a source
    known to be in sync to calibrate against. Drift, jitter and lost buffers do not.
-4. **Under the application's own sound:** a test signal on a channel of its own comes first. Whether it can be found under game
-   audio, and which preamble does that best, is open.
+4. **Whether it ever has to sit under the application's own sound:** not for a sync test, where the signal plays alone. Only
+   measuring during normal play, with the game's sound on, would need it; whether a burst can be found there, and which preamble
+   does that best, is open, and may never need an answer.
 
 The work:
 

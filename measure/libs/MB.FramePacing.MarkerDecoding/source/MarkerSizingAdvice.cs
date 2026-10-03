@@ -52,5 +52,20 @@ namespace MB.FramePacing.MarkerDecoding
 
     /// <summary>The source height is not an integer multiple of the stored height (works, but module edges blur).</summary>
     public bool NonIntegerRatio => AlignPx == 1 && SourceHeight != StoredHeight;
+
+    /// <summary>The share of the screen the main marker's symbol covers at the recommended size: it changes every frame (<see cref="FlashGuideline"/>).</summary>
+    public double FlashAreaShare => FlashGuideline.AreaShare(RecommendedModulePx, SourceWidth, SourceHeight);
+
+    /// <summary>The size of a module at the recommended size, in degrees of view at a usual distance.</summary>
+    public double ModuleDegrees => FlashGuideline.ModuleDegrees(RecommendedModulePx, SourceWidth);
+
+    /// <summary>The modules are small enough for the guideline's exemption of fine patterns.</summary>
+    public bool FinePattern => ModuleDegrees < FlashGuideline.FinePatternDegrees;
+
+    /// <summary>
+    /// The marker at the recommended size is within the guideline for flashing content: a fine pattern, or no larger than the area that
+    /// may flash. Outside it the marker needs more care still; inside it the risk is lower, not gone.
+    /// </summary>
+    public bool WithinFlashGuideline => FinePattern || FlashAreaShare <= FlashGuideline.AreaLimit;
   }
 }

@@ -19,6 +19,10 @@ Every folder has two fragment shaders; pick one:
 | **Packed** (`*packed*`, fastest) | 211 bytes: `ModuleMatrix::Bits()` as they are | 14 `uint4` of constants (`hlsl/`, `gl/`, `vulkan/`), or a 211 × 1 texture (`gles2/`: no integers, no large arrays)  |
 | **Modules** (`*modules*`)        | 1,681 bytes: one byte per module              | A 41 × 41 single channel texture: `ModulesToBitmap(matrix, Options(1, 0), {0, 0}, texels, 41, 41, PixelFormat::R8)` |
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
+> [Photosensitivity](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md#photosensitivity).
+
 ## Drawing it
 
 Once:

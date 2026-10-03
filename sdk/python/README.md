@@ -14,6 +14,10 @@ subpackages. Standard library only, Python 3.12 or later.
   [format](../doc/analysis-output-format.md)). It reads what the C# library reads: the tests check it against the same golden data
   ([`test-data/data`](../test-data/data)).
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
+> [Photosensitivity](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md#photosensitivity).
+
 ## The marker
 
 ```python

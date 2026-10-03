@@ -75,7 +75,38 @@ namespace MB.FramePacing.App.Commands
       table.AddRow("Marker", $"{advice.MarkerPx}x{advice.MarkerPx} px");
       table.AddRow("Top-left origin", $"{advice.OriginX}, {advice.OriginY}");
       table.AddRow("Sync marker (optional)", $"{advice.SyncMarkerPx}x{advice.SyncMarkerPx} px at {advice.SyncOriginX}, {advice.SyncOriginY}");
+      table.AddRow(
+        "Changes every frame",
+        Markup.Escape(
+          string.Create(
+            CultureInfo.InvariantCulture,
+            $"{advice.FlashAreaShare:0.0 %} of the screen (WCAG 2.3.1 allows {FlashGuideline.AreaLimit:0.0 %} to flash)"
+          )
+        )
+      );
+      table.AddRow(
+        "Module in view",
+        Markup.Escape(
+          string.Create(
+            CultureInfo.InvariantCulture,
+            $"{advice.ModuleDegrees:0.00}° (a fine pattern below {FlashGuideline.FinePatternDegrees:0.0}° is exempt)"
+          )
+        )
+      );
       AnsiConsole.Write(table);
+
+      // The marker flickers at the frame rate: say so for every setup, and louder when it is outside the guideline
+      if (advice.WithinFlashGuideline)
+        AnsiConsole.MarkupLine(
+          "[yellow]Photosensitivity:[/] the marker is a high-contrast pattern that changes every frame. This size is within the guideline for"
+            + " flashing content, which lowers the risk and does not remove it: draw it in test builds only, and tell the people at the screen."
+        );
+      else
+        AnsiConsole.MarkupLine(
+          "[red]Photosensitivity:[/] at this size the marker is larger than the guideline for flashing content allows, and its modules are too"
+            + " coarse for the fine-pattern exemption. Store more lines (a smaller marker) if you can, cover the marker on the display (a"
+            + " capture card records the signal, not the screen), and keep photosensitive people away from it."
+        );
 
       if (advice.StoredHeight > advice.SourceHeight)
         AnsiConsole.MarkupLine("[yellow]The stored height is larger than the output: the capture upscales, which adds nothing.[/]");

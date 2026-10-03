@@ -32,6 +32,10 @@ The **data** module reads the capture data (`captures.mbcd`,
 reads: the tests check it against the same golden data (`test-data/data`). summary.json is parsed with
 [nlohmann/json](https://github.com/nlohmann/json), inside the module only: it is not part of the API.
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
+> [Photosensitivity](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md#photosensitivity).
+
 ## Add it
 
 The release archive, pinned by its hash (the release page lists it in `SHA256SUMS`):

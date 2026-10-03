@@ -15,6 +15,10 @@ It has modules:
 Everything here is under the BSD 3-Clause License. The measuring tools themselves (capture, analysis, GUI) are in
 [`measure/`](../measure) under another license.
 
+> **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
+> trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
+> [Photosensitivity](doc/integrating.md#photosensitivity).
+
 ## Where to start
 
 | You want to                                  | Start with                                                                                                                                                                  |
