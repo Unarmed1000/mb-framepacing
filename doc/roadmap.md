@@ -1,6 +1,7 @@
 # Roadmap
 
-What is planned but not done yet. Nothing here is promised for a particular release.
+Possible ways forward, not a plan: each section is an option the project could take up, written down so the thinking is not lost.
+Nothing here is decided, scheduled or promised, and an option may be changed or dropped.
 
 ## HDR capture
 
@@ -52,7 +53,100 @@ default and its API may change.
 - **Variable refresh and vsync off:** pacing where there is no grid of refreshes to round to.
 - **A C# port** (`MB.FramePacing.Pacer`): the same pacer for .NET, giving the golden data's results byte for byte.
 
+## A capture card and a camera on the same run
+
+Two recordings of one run, made at the same time: a capture card records what the PC sends to the display, and a camera films what
+the display shows ([camera capture](../measure/doc/camera.md), very experimental). Both see the same markers, so the two analyses
+can be lined up frame by frame and compared. Today each recording is analysed on its own, and nothing says how far to trust either.
+
+What comparing them would confirm:
+
+- **The capture card's result:** that the display shows the frames as its input carries them. A capture card records the signal,
+  usually from a second output or behind a splitter; the display may add processing or run at another rate. A frame the display
+  held longer or never showed would stand out as a difference between the two.
+- **The camera's result:** with the capture card as the reference, the camera's display times and the refresh rate it calculates
+  can be checked on real hardware, which is what camera capture needs before it can stop being very experimental
+  ([status](../measure/doc/camera-status.md)).
+
+The work:
+
+1. **Match the frames** of the two analyses by run id and frame index, the application's own counter (each recording's capture
+   index is its own and is never compared).
+2. **Fit the two clocks:** the recordings have separate clocks, so a line through the matched frames' display times gives their
+   offset and the difference in rate. What is left per frame is the disagreement between the two.
+3. **Report it:** the difference per frame in display time and display time step, the frames one recording has and the other has
+   not, and summary numbers; as a command and a card.
+4. **Validate with real hardware:** a capture card and a camera on one display, at a few refresh rates.
+
+Open question: the fit removes the constant offset between the clocks, so it shows jitter and drift but not the display's latency.
+That would need a time both recordings share.
+
+## Audio markers
+
+The marker is in the picture only. An audio counterpart, an "audio QR code", would let the tools measure the sound against the
+frames: the application writes a short machine-readable signal into its audio output that says which run it is and where its audio
+clock was, the recording keeps it in its audio track, and the tools find it there. That would give the sound's offset from the
+picture, how that offset drifts and jitters over a run, and the audio buffers that were dropped or repeated.
+
+What exists (looked up in October 2026; none of it measured by this project yet):
+
+- **A flash and a beep**, the film and television way: the [2-pop](https://en.wikipedia.org/wiki/2-pop), and
+  [EBU R37](https://tech.ebu.ch/docs/r/r037.pdf)'s one white frame with a 1 kHz tone of the same length. Meters built for it
+  ([Sync-One2](https://harkwood.co.uk/products/sync-one2/)) resolve 0.05 ms. It carries no payload: nothing says which frame or
+  which run a beep belongs to.
+- **SMPTE linear timecode** ([LTC](https://en.wikipedia.org/wiki/Linear_timecode)): 80 bits per video frame in biphase mark code
+  (the time, 32 user bits, a 16-bit sync word), without error correction. One code word per frame, and it needs a channel of its
+  own. [libltc](https://github.com/x42/libltc) is LGPL: a reference to compare with, not code the SDK can include.
+- **Data-over-sound libraries** ([ggwave](https://github.com/ggerganov/ggwave), MIT; [Quiet](https://github.com/quiet/quiet), BSD
+  with an LGPL dependency; [minimodem](https://github.com/kamalmostafa/minimodem), GPL; [amodem](https://github.com/romanz/amodem),
+  MIT): made to carry data, not to mark a moment. ggwave sends 8 to 16 bytes a second.
+- **A burst found by cross-correlation:** Android's
+  [OboeTester](https://android.googlesource.com/platform/external/oboe/+/HEAD/apps/OboeTester/docs/Usage.md) measures audio latency
+  with about a second of random bits in smoothed Manchester code, located by normalised cross-correlation, and finds glitches by
+  locking onto a sine. It is the nearest thing to what is wanted here.
+- **Continuous spread spectrum**, as GPS signals: a time fix every code period, and quiet enough to sit under other sound, but a
+  noise-like signal under louder sound is what lossy codecs remove, and the products that solve that (audio watermarks) are
+  patented.
+
+For scale: [ITU-R BT.1359-1](https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.1359-1-199811-I!!PDF-E.pdf) puts the offsets
+people notice at sound 45 ms early to 125 ms late, and EBU R37 allows 40 ms early to 60 ms late end to end.
+
+**The option that looks best: a sync burst and a coded payload**, the QR code's shape in sound (a finder pattern, then data):
+
+- a preamble the decoder finds by cross-correlation, to the sample: a pseudo-random sequence or a chirp, somewhere in 1 to 8 kHz;
+- then a small payload (the run id and the audio clock's sample count at the burst's first sample) with a checksum and the
+  Reed-Solomon code the QR encoder already has;
+- a few bursts a second, and perhaps a steady tone between them, whose breaks would show dropped and repeated buffers;
+- a format document of its own, as the marker has, and generators written from it in each SDK language: integers only, no
+  allocation in the audio callback, no third-party code.
+
+Linear timecode would be the first experiment and the fallback: standard, simple, and existing decoders can check ours.
+
+What only measurements can settle:
+
+1. **Lossy codecs and resampling:** whether a burst survives AAC, Opus and MP3 at OBS's bitrates and a 44.1/48 kHz conversion, and
+   whether they shift where it is found. No published numbers were found.
+2. **The recording's own audio offset:** lossy encoders put priming samples in front of the sound (1024 samples, 21.3 ms at 48
+   kHz, from ffmpeg's AAC encoder; 2048 and 2112 from others; 312, 6.5 ms, from Opus) and the file must say so. Where that is lost,
+   the sound is late by that much. OBS can record PCM, FLAC or ALAC instead, which is what a measurement should use.
+3. **The capture path's own offset:** a capture card delivers picture and sound separately, so an absolute offset needs a source
+   known to be in sync to calibrate against. Drift, jitter and lost buffers do not.
+4. **Under the application's own sound:** a test signal on a channel of its own comes first. Whether it can be found under game
+   audio, and which preamble does that best, is open.
+
+The work:
+
+1. **An experiment before any format:** generate the candidate signals, put them through the codecs with ffmpeg, and measure how
+   exactly each is found.
+2. **The format document** and its golden data.
+3. **The SDK's generators**, one per language, from the document.
+4. **The tools:** read the recording's audio track through ffmpeg, find and decode the bursts, and report the sound against the
+   frames.
+5. **Validate with real hardware:** an application with both markers through a capture card, recorded by OBS.
+
 ## Later
 
-- **Synced playback (GUI):** click a spike in a chart to open the captured frame it came from.
+- **Synced playback in the GUI:** click a spike in the Timeline to see the captured frame it came from, inside the GUI. Today
+  [the playback page](../measure/doc/usage.md#the-playback-page) does it in a browser: a run's report next to its recording, with a
+  playhead on every panel.
 - **A C++17 fallback** for the C++ marker library, for toolchains without C++20.

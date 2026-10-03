@@ -225,7 +225,7 @@ diagrams and sources.
 | 2. Put the marker into your app    | **[Integrating the marker](sdk/doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](sdk/doc/marker-fields.md)** |
 | 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (OBS and a capture card, video/image import, results, troubleshooting)                                          |
 
-The platform guides cover ffmpeg, building the tools and putting them on your PATH, and building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).
+The platform guides cover ffmpeg, building the tools and putting them on your PATH, and building the C++ library. The short version is below. Possible next steps (HDR capture among them) are on the [roadmap](doc/roadmap.md): options, not promises.
 
 ### The GUI
 
