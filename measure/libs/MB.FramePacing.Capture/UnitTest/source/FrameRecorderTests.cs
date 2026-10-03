@@ -363,6 +363,14 @@ namespace MB.FramePacing.Capture.UnitTest
       }
     }
 
+    /// <summary>Wait until the recorder's ring has room for a frame (at most 10 s, then the frame is dropped and the test says so).</summary>
+    private static void WaitForRoom(FrameRecorder recorder)
+    {
+      var waited = System.Diagnostics.Stopwatch.StartNew();
+      while (recorder.Stats is var stats && stats.RingFill >= stats.RingCapacity && waited.Elapsed < TimeSpan.FromSeconds(10))
+        Thread.Sleep(1);
+    }
+
     [TestCase(true, TestName = "Inspector_OneFrameStartAndEnd_Trigger(waiting source, like a file)")]
     [TestCase(false, TestName = "Inspector_OneFrameStartAndEnd_Trigger(live source)")]
     public void Inspector_OneFrameStartAndEnd_Trigger(bool waitWhenFull)
@@ -386,14 +394,17 @@ namespace MB.FramePacing.Capture.UnitTest
         // As fast as possible: far faster than real time, like a video file
         for (long i = 0; i < 1000; ++i)
         {
+          // A live source drops a frame the ring has no room for, and a dropped marker frame is never inspected. Real frames come no
+          // faster than the inspector here: wait for room, so the test never depends on the machine's speed (a waiting source waits
+          // in BeginFrame itself)
+          if (!waitWhenFull)
+            WaitForRoom(recorder);
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)(i & 0xFF));
           recorder.EndFrame(new TickCount64(i * 100), new DeviceTimestamp(new TickCount64(i * 7)), 0);
-          // A live source cannot run ahead of the inspector without dropping; give it the time real frames would take
-          if (!waitWhenFull && i % 16 == 0)
-            Thread.Sleep(1);
         }
         recorder.Complete();
+        Assert.That(recorder.Stats.FramesDropped, Is.Zero);
         Assert.That(recorder.StopRequested, Is.True);
         if (waitWhenFull)
         {
