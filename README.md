@@ -23,6 +23,13 @@ every panel).
 
 ![The report of the perfect storm: delta time jitter and late frames at once](measure/doc/images/report-example-storm.svg)
 
+**See every number on screen.** A [playback report](measure/doc/usage.md#the-playback-page) plays the recording next to its report:
+play it, slow it down, step it a frame at a time, and a playhead on every panel shows where the frame on screen is. Click a spike
+in the report and the video jumps to that frame. It is one HTML file you open from the disk and can send on, with the recording in
+its folder (`mb-framepacing import recording.mkv --playback`, or the GUI's **Save playback page**).
+
+![A playback report: the recording with its player on the left, the run's report with the playhead on the right](measure/doc/images/playback-page.png)
+
 There are two halves, and both are needed:
 
 - **Inside your application:** the SDK's marker module: C++20 ([`sdk/cpp/`](sdk/cpp)), C# ([`sdk/csharp/marker/`](sdk/csharp/marker)) or
