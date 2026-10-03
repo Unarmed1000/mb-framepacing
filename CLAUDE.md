@@ -303,6 +303,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Zoom steps** (`PlaybackZoom`: whole, 60, 10, 2 s per screen): a zoomed card is `ReportCard.Build(..., visible:)` with its
     `ScrollShape` layers kept (`SvgCardWriter.Write(..., scrollLayers:)`, clipped groups the page translates, as the GUI's Timeline);
     the steps that fit a 64 MB estimate (300 bytes per frame or pixel column drawn, measured), each kept as inert text until shown.
+  - **Speed:** the cards build at once (`Parallel.For`, each also builds its panels at once), then their SVG and the data. `PlaybackBenchmarks`
+    (`measure/tools/Benchmarks`): a whole page of 10 min or an hour at 60 or 240 Hz takes 0.2 to 0.3 s; the video's copy is ffmpeg's time.
   - **A folder per report** (`analysis/playback/<prefix>[-<from>s-<to>s]/`: `index.html`, its own video, `playback.json`). An export
     touches only the folders it writes; saving the same report again replaces that folder only. Never share or delete another
     report's files.

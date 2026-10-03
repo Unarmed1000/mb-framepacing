@@ -18,6 +18,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace MB.FramePacing.Charts.Playback
 {
@@ -52,14 +53,22 @@ namespace MB.FramePacing.Charts.Playback
     {
       options ??= ReportOptions.Default;
       var cards = Cards(section, options);
-      string json = PlaybackData.Json(section, cards, options, video, pageDirectory, analysisDirectory, toolVersion);
+      // The data and every card's SVG at once: they only read the cards
+      var data = Task.Run(() => PlaybackData.Json(section, cards, options, video, pageDirectory, analysisDirectory, toolVersion));
+      var svgs = new string[cards.Count];
+      Parallel.For(
+        0,
+        cards.Count,
+        i => svgs[i] = SvgCardWriter.Write(cards[i].Drawing, null, cards[i].SecondsPerScreen != null ? $"pb-card-{i}" : null)
+      );
+      string json = data.GetAwaiter().GetResult();
       string title = (options.Title ?? RunHeadline.Title(section.Run.Run)) + SectionTitle(section) + " · playback";
       // Each card in its own view, the whole report first and shown. A zoomed card keeps its scrolling layers, and waits as text (an inert
       // script element) until it is first shown: a page of an hour parses only the cards it shows
       var views = new StringBuilder();
       for (int i = 0; i < cards.Count; ++i)
       {
-        string svg = SvgCardWriter.Write(cards[i].Drawing, null, cards[i].SecondsPerScreen != null ? $"pb-card-{i}" : null);
+        string svg = svgs[i];
         if (i == 0)
         {
           views.Append(CultureInfo.InvariantCulture, $"<div class=\"pb-card-view\" data-card=\"{i}\">{svg}</div>");
@@ -80,15 +89,24 @@ namespace MB.FramePacing.Charts.Playback
     /// <summary>
     /// The page's report cards of <paramref name="section"/>: the whole report, then each zoom step that fits (<see cref="PlaybackZoom"/>),
     /// its plots showing the section's first seconds. The page's header has the title and the headline tiles (from the same options): the
-    /// cards have the rest.
+    /// cards have the rest. The cards are built at once (each also builds its panels at once); the run's prepared data they share is made
+    /// once (RunChartData).
     /// </summary>
     public static IReadOnlyList<PlaybackCard> Cards(RunSection section, ReportOptions options)
     {
       var cardOptions = options.Hide(new[] { ReportItem.Title, ReportItem.Tiles });
-      var cards = new List<PlaybackCard> { new PlaybackCard(null, ReportCard.Build(section, cardOptions)) };
       double from = section.FromSeconds;
-      foreach (double step in PlaybackZoom.Steps(section.ToSeconds - from, section.FrameCount, ReportCard.PlotWidth(ReportCard.Width)))
-        cards.Add(new PlaybackCard(step, ReportCard.Build(section, cardOptions, visible: (from, from + step))));
+      var steps = PlaybackZoom.Steps(section.ToSeconds - from, section.FrameCount, ReportCard.PlotWidth(ReportCard.Width));
+      var cards = new PlaybackCard[steps.Count + 1];
+      Parallel.For(
+        0,
+        cards.Length,
+        i =>
+          cards[i] =
+            i == 0
+              ? new PlaybackCard(null, ReportCard.Build(section, cardOptions))
+              : new PlaybackCard(steps[i - 1], ReportCard.Build(section, cardOptions, visible: (from, from + steps[i - 1])))
+      );
       return cards;
     }
 
