@@ -305,7 +305,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     the steps that fit a 64 MB estimate (300 bytes per frame or pixel column drawn, measured), each kept as inert text until shown.
   - **Speed and memory:** the cards build at once (`Parallel.For`, each also builds its panels at once), then their SVG; the page is
     streamed to its file (`PlaybackPage.Write`: the template's pieces, each SVG, the data straight from its `Utf8JsonWriter`), never held as
-    one string. `PlaybackBenchmarks` (`measure/tools/Benchmarks`): a whole page of 10 min or an hour at 60 or 240 Hz takes about 0.2 s and
+    one string. `PlaybackBenchmarks` (`measure/tools/Benchmarks`, `--long-running`): a whole page of 10 min or an hour at 60 or 240 Hz takes about 0.2 s and
     allocates about 100 MB; the video's copy is ffmpeg's time. What keeps it small, shared with every card: numbers are written in place
     (`SvgNumber` is `ISpanFormattable`, `SvgMarkup.TryFormatFixed`: interpolate `N(...)`, not `Fixed(...)`, into paths), `SvgCardWriter`
     writes into one `StringBuilder`, and the per-column searches (`PixelColumns.Walk`, `RunEvents`) make no closure.
@@ -356,7 +356,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       its statistics are computed only when a tile needs them. The panels walk the pixel columns (`PixelColumns.Walk`) and query min, max,
       median, percentiles and histograms (`SectionHistograms`) exactly: the output is byte-identical to sorting. The GUI builds cards
       at the window's width (`width`), with the whole run's scales (`wholeRunScales`), in the background (`SectionCards`,
-      `LatestRequest`: a newer zoom cancels an older build). `CardBenchmarks` measures 1 and 10 hours at 240 Hz: a few ms per zoom or
+      `LatestRequest`: a newer zoom cancels an older build). `CardBenchmarks` (`--long-running`) measures 1 and 10 hours at 240 Hz: a few ms per zoom or
       window. `--charts` and "Save
       charts" write the SVG cards (`ChartFiles`: the report and every `DistributionCard`). Test chart changes with
       `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
@@ -503,7 +503,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - The synthetic camera (`Capture/source/Synthetic/SyntheticCamera.cs`) is the ground truth. `selftest --experimental --camera --fps 1000
 --refresh 60 [--tear-every 9]` runs it end to end.
   - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the
-    folder's `.slnx` does not build the libraries optimized.
+    folder's `.slnx` does not build the libraries optimized. The long-running ones (`[BenchmarkCategory(BenchmarkCategories.LongRunning)]`:
+    `CardBenchmarks`, `PlaybackBenchmarks`, many minutes) are left out unless the run adds `--long-running`; mark a new one that takes
+    minutes the same way.
   - The precision-by-camera-rate table in `measure/doc/camera.md` is generated: `python tools/camera_rate_table.py --update-doc` (runs
     `selftest --experimental --camera` per rate; selftest prints its error against the simulation for it). Rerun it after changes to the camera
     pipeline.

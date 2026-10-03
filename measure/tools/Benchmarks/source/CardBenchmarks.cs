@@ -15,6 +15,7 @@ using MB.FramePacing.Charts;
 
 namespace MB.FramePacing.Benchmarks
 {
+  [BenchmarkCategory(BenchmarkCategories.LongRunning)]
   [MemoryDiagnoser]
   public class CardBenchmarks
   {

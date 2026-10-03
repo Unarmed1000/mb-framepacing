@@ -18,6 +18,7 @@ using MB.FramePacing.Charts.Playback;
 
 namespace MB.FramePacing.Benchmarks
 {
+  [BenchmarkCategory(BenchmarkCategories.LongRunning)]
   [MemoryDiagnoser]
   [SimpleJob(launchCount: 1, warmupCount: 1, iterationCount: 5)]
   public class PlaybackBenchmarks
