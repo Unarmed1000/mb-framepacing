@@ -52,7 +52,6 @@ flowchart LR
     D --> C[Display]
     D -->|USB / PCIe| O["OBS Studio<br/>records at the display's refresh rate"]
     O -->|recording.mkv| E["mb-framepacing import<br/>(GUI: Analyze recording)"]
-    D -.->|"live capture (experimental)"| E
     E --> F[("captures.mbcd<br/>every recorded frame's markers + its time")]
     F --> G["mb-framepacing analyze"]
     G --> H["Animation error, display time steps,<br/>drops, tearing: GUI, CSV, JSON"]
@@ -60,13 +59,13 @@ flowchart LR
 
 The marker in a real application: the FramePacing sample of the author's **unofficial**
 [gtec-demo-framework](https://github.com/Unarmed1000/gtec-demo-framework), with the marker top-left and, next to it, the values the
-last marker carried and the (experimental) pacer. The sample is there for
+last marker carried. The sample is there for
 [Vulkan](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/Vulkan/FramePacing),
 [OpenGL ES 3](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES3/FramePacing) and
 [OpenGL ES 2](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES2/FramePacing)
 ([integrating.md](sdk/doc/integrating.md) has more):
 
-![The Vulkan FramePacing sample of the unofficial gtec-demo-framework: the marker top-left over a fractal flight, the last marker's values and the pacer](measure/doc/images/example-app-marker.png)
+![The Vulkan FramePacing sample of the unofficial gtec-demo-framework: the marker top-left over a fractal flight, and the last marker's values](measure/doc/images/example-app-marker.png)
 
 ## The typical workflow
 
@@ -141,9 +140,7 @@ sequenceDiagram
 3. Import the recording: **Analyze recording** in the GUI (source **Video file...**), or
    `mb-framepacing import recording.mkv --display-hz 240 --wait-for-start --stop-at-end --analyze`. The run between the markers is
    measured, and the analysis opens.
-4. Other equipment works too: any lossless video or image sequence (`import`). Recording the card live with mb-framepacing itself
-   is **experimental** ([Live capture](measure/doc/live-capture.md)); filming the screen with a calibrated high speed camera is
-   **very experimental** ([camera capture](measure/doc/camera.md)).
+4. Other recordings work too: any lossless video or image sequence (`import`).
 
 The start and end markers bracket exactly the part you want measured. The start marker also carries a sequence id (a UUID, or a
 short text tag) and the wall clock time, so every report knows what it measured:
@@ -160,7 +157,7 @@ flowchart LR
 | ![Start marker](measure/doc/images/marker-start.png) | ![Frame marker](measure/doc/images/marker-frame.png) | ![End marker](measure/doc/images/marker-end.png) |
 
 For tearing checks, also draw the small **sync marker** at the bottom left. It carries the run id and frame index; when it disagrees with
-the main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
+the main marker, the capture shows parts of two frames:
 
 ![The same sample with the sync marker on: the main marker top-left, the sync marker bottom-left, over the scrolling hall](measure/doc/images/example-app-sync-marker.png)
 
@@ -232,8 +229,7 @@ Run `mb-framepacing-gui`. If ffmpeg is not found, a short setup dialog helps you
 | -------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | ![The capture page, set up to analyse a recording](measure/doc/images/gui-capture.png) | ![The first-run setup dialog](measure/doc/images/gui-setup.png) |
 
-- **Capture:** pick a recording (a video file or an image folder) and press **Analyze recording**. Capture cards and network
-  streams (live capture) appear with **Settings → Experimental features**: [Live capture](measure/doc/live-capture.md).
+- **Capture:** pick a recording (a video file or an image folder) and press **Analyze recording**.
 - **Analyze:** opens by itself after a capture, with the headline numbers, detailed statistics and charts. **Open reports** shows
   the CSV and JSON files for your own tooling.
 
@@ -246,8 +242,8 @@ A capture card captures at the display's refresh rate, so every capture is one r
 period is the capture period, and display time steps are whole refreshes, measured exactly. The animation error (the marker's animation
 time step against the display time step) is then exact too, to the 100 ns tick. The report's animation error panel marks every
 whole refresh an error reaches with a dashed amber line (±16.7 ms at 60 Hz, ±20 ms at 50 Hz): an error that size is a frame shown a
-whole refresh early or late. A camera filming the screen (**very experimental**) films faster than the display; there the refresh rate is calculated
-from the frames, and compared with the display rate you expect when you give one (`--display-hz`, **Display refresh rate**).
+whole refresh early or late. The display rate you expect (`--display-hz`, **Display refresh rate**) is checked against the
+capture's rate.
 
 **Late frames** are shown later than the application meant. When its frame pacer writes the **intended display time** into the
 marker, a frame is late when it appears half a refresh or more after that time, which also catches frames that stay late after a
@@ -388,11 +384,7 @@ mb-framepacing name <capture folder> "menu scroll"          # name it; analyse a
 mb-framepacing render <capture folder> --from 120 --to 125 --png   # the report of 5 s of the run, SVG and PNG
 ```
 
-Live capture (`capture`, `locate`, `devices`, a stream URL for `import`) is **experimental** and the camera (`camera-rig`,
-`--camera`) **very experimental**: they need `--experimental`, and [Live capture](measure/doc/live-capture.md) and
-[camera capture](measure/doc/camera.md) have their commands.
-
-`mb-framepacing <command> --help` lists every option (`--help --experimental` also the experimental ones). Results go to `<capture folder>/analysis/`: `summary.json`,
+`mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
 `captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
 the report and the distribution cards as SVG (`run-<id>-report.svg`, `run-<id>-error-histogram.svg`, ...). `render --png` writes
 PNGs.
@@ -409,14 +401,18 @@ PNGs.
 ### How fast can it record?
 
 There is no built-in frame rate limit. A recording (a video file or an image folder) is read as fast as the disk allows and nothing
-is dropped; the times come from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording
-works. Footage of a camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see
-[measure/doc/camera.md](measure/doc/camera.md)). Recording a capture card live has to keep up with every frame as it comes; it is
-experimental: [Live capture](measure/doc/live-capture.md#how-fast-can-it-record).
+is dropped; the times come from the file (or from `--fps` / a timestamp file).
 
 **Precision:** a capture card captures at the display's refresh rate, and so does its recording, so display time steps are whole
-refreshes and exact; a camera filming the screen is good to about one camera period (1 ms at 1000 fps), which shows as noise in its
-errors.
+refreshes and exact.
+
+### Experimental features
+
+Some features are experimental, hidden unless you ask for them, and described in their own guides:
+
+- [Live capture](measure/doc/live-capture.md): recording a capture card or a network stream with mb-framepacing itself.
+- [Camera capture](measure/doc/camera.md): a high speed camera filming the screen.
+- [The frame pacer](sdk/doc/pacer.md): a C++ module that paces a frame loop and fills the marker's pacing fields.
 
 ## Configuration
 
@@ -425,7 +421,7 @@ errors.
 
 Saved settings are safe and versioned:
 
-- **Safe saves:** the configuration file, the GUI's remembered settings and saved cameras are written to a temporary file,
+- **Safe saves:** the configuration file and the GUI's remembered settings are written to a temporary file,
   flushed to the disk and then renamed over the old file. A crash or power cut leaves the old or the new version, never a
   broken file.
 - **Backups:** the `backup` folder next to the file keeps `<file>.bak`, the version the last save replaced (hand edits included)
@@ -456,8 +452,7 @@ AppleClang 15+), Python 3, and Node.js for formatting the docs.
 mb-quality -r --all .
 dotnet test mb-framepacing.slnx
 
-# C++ library: every module; the tests fetch GoogleTest. The pacer is experimental and off by default
-# (-DMB_FRAMEPACING_BUILD_PACER=ON): only the windows and linux-sanitize presets build it.
+# C++ library: every module; the tests fetch GoogleTest
 # Presets: windows, linux, linux-clang, linux-sanitize, macos
 cd sdk/cpp && cmake --preset windows && cmake --build --preset windows && ctest --preset windows
 python sdk/cpp/tests/consumer/check_consumers.py   # the documented CMake integrations
@@ -494,7 +489,7 @@ flowchart TB
     end
     subgraph dotnet["measure/ (.NET 10): records and analyses"]
         M["MB.FramePacing.MarkerDecoding<br/>QR decoding"]
-        CAP["MB.FramePacing.Capture<br/>recorder, ffmpeg, video/image/stream sources"]
+        CAP["MB.FramePacing.Capture<br/>recorder, ffmpeg, video and image sources"]
         AN["MB.FramePacing.Analysis<br/>timeline, animation error, reports"]
         CH["MB.FramePacing.Charts<br/>report and distribution cards"]
         CLI["mb-framepacing<br/>command line"]
@@ -508,27 +503,27 @@ flowchart TB
     CH --> GUI
 ```
 
-| Path                        | Contents                                                                                                                                                 |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                                               |
-| `sdk/VERSION`               | The SDK's version: every module, every language                                                                                                          |
-| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`, and `pacer/`, experimental and off by default), its Conan recipe |
-| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10)                            |
-| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                                                  |
-| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                                             |
-| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                                                       |
-| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats, the pacer, encoding performance                              |
-| `sdk/test-data/`            | Golden marker images (checked by every marker module), the data modules' golden data and the pacer's                                                     |
-| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                                                      |
-| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                                            |
-| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                                                      |
-| `measure/tools/Benchmarks`  | BenchmarkDotNet benchmarks of the tools' libraries                                                                                                       |
-| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                                                |
-| `measure/doc/`              | Platform, usage and camera guides, images                                                                                                                |
-| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                                                          |
-| `doc/`                      | Release guide and roadmap                                                                                                                                |
-| `tools/`                    | Repository scripts: checks, golden data                                                                                                                  |
-| `licenses/`                 | Licenses of every third-party component                                                                                                                  |
+| Path                        | Contents                                                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`sdk/`](sdk/README.md)     | **BSD 3-Clause**: everything applications embed or use to read the results; its README says where to start                    |
+| `sdk/VERSION`               | The SDK's version: every module, every language                                                                               |
+| `sdk/cpp/`                  | The C++20 library: one CMake project, a module per folder (`core/`, `marker/`, `data/`), its Conan recipe                     |
+| `sdk/csharp/`               | The C# modules `MB.FramePacing` (core) and `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9), `MB.FramePacing.Data` (.NET 10) |
+| `sdk/python/`               | The Python package `mb_framepacing` (`marker` and `data`; standard library only) and its unittest tests                       |
+| `sdk/unity/`                | The Unity package's helpers, samples and build scripts (`build_upm.py`, `check_in_unity.py`)                                  |
+| `sdk/shaders/`              | Reference shaders that draw the marker as one quad                                                                            |
+| `sdk/doc/`                  | Marker specification, integration, marker field and Unity guides, vocabulary, data formats, encoding performance              |
+| `sdk/test-data/`            | Golden marker images (checked by every marker module) and the data modules' golden data                                       |
+| `measure/`                  | **Measures it**: the recording and analysis tools and their version                                                           |
+| `measure/libs/`             | MarkerDecoding, Capture, Analysis and Charts libraries with their NUnit tests                                                 |
+| `measure/app/`              | `mb-framepacing` (command line) and `mb-framepacing-gui` (Avalonia)                                                           |
+| `measure/tools/Benchmarks`  | BenchmarkDotNet benchmarks of the tools' libraries                                                                            |
+| `measure/tools/DocImages`   | Renders `measure/doc/images` (GUI screenshots offscreen, marker examples)                                                     |
+| `measure/doc/`              | Platform and usage guides, images                                                                                             |
+| `measure/test-data/videos/` | 60 Hz test clips with manifests                                                                                               |
+| `doc/`                      | Release guide and roadmap                                                                                                     |
+| `tools/`                    | Repository scripts: checks, golden data                                                                                       |
+| `licenses/`                 | Licenses of every third-party component                                                                                       |
 
 ## License
 

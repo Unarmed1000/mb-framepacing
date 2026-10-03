@@ -277,6 +277,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   the display's refresh rate must be the capture source's FPS and OBS's video FPS (the rate the file is saved at), with no scaling and
   little or no compression. Its OBS settings are proposed, not yet verified with a recording: say so until they are. The README
   opens with the sister repository's page (the slides), then how it works and this workflow.
+- **The root README never mentions an experimental feature** (the user's rule) except in its one "Experimental features" section,
+  which names each (live capture, camera capture, the pacer) with a link to its guide: no experimental commands, options, GUI
+  switches or diagram paths anywhere else in it. The other documents say "experimental" wherever the feature appears.
 - **Live capture is EXPERIMENTAL** (`measure/doc/live-capture.md`, agreed with the user): recording a capture card or a network stream
   with the tools themselves. It is out of the workflow documents (README, usage.md, the install guides); live-capture.md has it,
   with the per-platform details and the caution that on some platforms, macOS among them, it is probably too slow to be usable.
