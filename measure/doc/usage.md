@@ -204,6 +204,8 @@ zoomed), and **Open playback page** opens it. A report is written only when you 
   `config --set-playback-transcode yes`, or the GUI's Settings page, or **Remember my choice** in its question). When the command
   line cannot ask (its input is redirected), it writes no video and says which option answers the question.
 - Saving the same report again uses its video again while the recording is unchanged, without asking (`playback.json`).
+- **A report's folder may be sent on as it is.** The page is part of mb-framepacing and carries its license's terms (PolyForm
+  Perimeter 1.0.1) and notice in its source.
 
 Keys: **Space** plays and pauses, **←** **→** step a video frame, **Shift**+**←** **→** an application frame, **Home** and
 **End** go to the start and the end, **1** to **4** set the speed (1×, ½×, ¼×, ⅛×), **+** and **−** zoom the report. The address

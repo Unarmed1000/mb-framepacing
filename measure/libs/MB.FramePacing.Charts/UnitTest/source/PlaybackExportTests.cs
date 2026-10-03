@@ -145,6 +145,23 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
+    public async Task ThePage_CarriesTheLicensesTermsAndRequiredNotice_SoItCanBeSentOn()
+    {
+      var result = await Save(g_playable, answer: false);
+
+      // The root LICENSE's own lines: the terms' URL and every "Required Notice:" line, each on a line of its own in the page
+      string root = Path.GetFullPath(Path.Combine(VideoClips.Directory(), "..", "..", ".."));
+      var license = File.ReadAllLines(Path.Combine(root, "LICENSE"));
+      var notices = license.Where(line => line.StartsWith("Required Notice:", StringComparison.Ordinal)).ToList();
+      Assert.That(notices, Is.Not.Empty);
+      var page = File.ReadAllLines(result.Pages[0]);
+      Assert.That(page, Has.Some.EqualTo("PolyForm Perimeter License 1.0.1: https://polyformproject.org/licenses/perimeter/1.0.1"));
+      Assert.That(license, Has.Some.EqualTo("<https://polyformproject.org/licenses/perimeter/1.0.1>"), "the LICENSE names the same terms");
+      foreach (string notice in notices)
+        Assert.That(page, Has.Some.EqualTo(notice));
+    }
+
+    [Test]
     public async Task Playable_AskedAndLinked_WritesNoVideo()
     {
       var result = await Save(g_playable, answer: false);
