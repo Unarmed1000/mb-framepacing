@@ -2,10 +2,36 @@
 
 [![ci](https://github.com/Unarmed1000/mb-framepacing/actions/workflows/ci.yml/badge.svg)](https://github.com/Unarmed1000/mb-framepacing/actions/workflows/ci.yml)
 
-**An animation error metric, measured on the real display output.** mb-framepacing calculates, frame by frame, how far a game's
-or real-time application's **animation timer** is from **what was actually seen on screen**: the application writes its
-animation time into every frame, a capture records when each frame really appeared, and the difference is the **animation
-error**.
+**Animation error: stutter, quantified.**
+
+Measured on the real display output, mb-framepacing calculates, frame by frame, how far a game's or real-time application's
+**animation timer** is from **what was actually seen on screen**: the application writes its animation time into every frame, a
+capture records when each frame really appeared, and the difference is the **animation error**.
+
+> [!TIP]
+> **New to stutter, frame pacing and animation error?** Watch
+> **[▶ Frame pacing, explained](https://unarmed1000.github.io/mb-framepacing-explained/)** from the companion repository
+> [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained): two blind tests, then slides with the
+> videos playing live next to timing diagrams.
+
+## How it works
+
+What comes out is a report of every frame: how far its animation was off (the animation error), how long it stayed on screen,
+which frames were late, and more. This one is the perfect storm, a test clip with both causes of stutter at once: a naive timer
+that is off by up to 5 ms either way, and slow frames that miss a refresh ([Reading the results](#reading-the-results) explains
+every panel).
+
+![The report of the perfect storm: delta time jitter and late frames at once](measure/doc/images/report-example-storm.svg)
+
+There are two halves, and both are needed:
+
+- **Inside your application:** the SDK's marker module: C++20 ([`sdk/cpp/`](sdk/cpp)), C# ([`sdk/csharp/marker/`](sdk/csharp/marker)) or
+  the [Unity package](sdk/doc/unity.md). Every frame, it turns "frame index + animation time + run id" into pixel aligned black and white
+  triangles (or rectangles) that your renderer draws on top of the finished image. No dependencies, no allocations per frame, any
+  graphics API.
+- **On the recording side:** the `mb-framepacing` tools ([`measure/`](measure), command line and GUI). They read a recording of
+  the display signal (OBS Studio recording a capture card at the display's refresh rate), read the marker back from every
+  recorded frame and compare the animation time the frame carries with the time it actually appeared in the recording.
 
 > [!IMPORTANT]
 > **mb-framepacing is a cooperative tool (for now).** It only measures applications that take part: every frame, the
@@ -17,6 +43,63 @@ error**.
 > to compare, so this needs the application's source code and a small change to its renderer. It cannot measure an
 > unmodified game or app that you cannot rebuild.
 
+```mermaid
+flowchart LR
+    subgraph app["Your application (source changed once)"]
+        A[Render the frame] --> B["Draw the marker last<br/>(frame index, animation time, run id)"]
+    end
+    B -->|HDMI / DisplayPort| D["Capture card<br/>passes the signal on"]
+    D --> C[Display]
+    D -->|USB / PCIe| O["OBS Studio<br/>records at the display's refresh rate"]
+    O -->|recording.mkv| E["mb-framepacing import<br/>(GUI: Analyze recording)"]
+    D -.->|"live capture (experimental)"| E
+    E --> F[("captures.mbcd<br/>every recorded frame's markers + its time")]
+    F --> G["mb-framepacing analyze"]
+    G --> H["Animation error, display time steps,<br/>drops, tearing: GUI, CSV, JSON"]
+```
+
+The marker in a real application: the FramePacing sample of the author's **unofficial**
+[gtec-demo-framework](https://github.com/Unarmed1000/gtec-demo-framework), with the marker top-left and, next to it, the values the
+last marker carried and the (experimental) pacer. The sample is there for
+[Vulkan](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/Vulkan/FramePacing),
+[OpenGL ES 3](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES3/FramePacing) and
+[OpenGL ES 2](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES2/FramePacing)
+([integrating.md](sdk/doc/integrating.md) has more):
+
+![The Vulkan FramePacing sample of the unofficial gtec-demo-framework: the marker top-left over a fractal flight, the last marker's values and the pacer](measure/doc/images/example-app-marker.png)
+
+## The typical workflow
+
+### 1. Once: build the marker into your application
+
+Link the library and draw the marker as the very last thing in every frame, after post effects and UI, in pure black and white.
+It writes pixel aligned triangles straight into your vertex buffer, without allocating:
+
+```cpp
+#include <mb/framepacing/marker/FrameMarker.hpp>
+#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
+#include <mb/framepacing/marker/geometry/Vertex.hpp>
+namespace FM = MB::FramePacing::Marker;
+
+std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
+FM::ModuleMatrix matrix;
+FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime}, matrix);    // encode once
+const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);        // draw it
+DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
+```
+
+`frameIndex` counts rendered frames, `animationTime` is the time the frame was animated for (an `MB::FramePacing::TimeSpan`).
+
+- **C++:** see **[Integrating the marker](sdk/doc/integrating.md)** for adding the library with CMake (a release archive, git,
+  `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
+- **C#:** the marker module [`sdk/csharp/marker`](sdk/csharp/marker/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `FrameMarker.ModulesToTriangles`).
+- **Unity:** the **[Unity package](sdk/doc/unity.md)** adds an overlay component that does all of this for you.
+- **Every field:** **[Filling the marker fields](sdk/doc/marker-fields.md)** says where each value comes from, when it changes and what
+  the analysis does with it, with examples for typical frame pacers.
+- **Python:** [`sdk/python`](sdk/python/README.md) (`mb_framepacing.marker`), which also draws into pixel buffers.
+
+[`sdk/README.md`](sdk/README.md) compares the libraries; each has its own README with a quick start and its API.
+
 The SDK's marker modules put the marker into your application. All of them draw exactly the same pixels; the C++ and C# modules
 allocate nothing per frame:
 
@@ -27,9 +110,61 @@ allocate nothing per frame:
 | Unity 2021.3+                    | Unity package `com.manabattery.framepacing`: the C# module plus a drop-in overlay component                                            | [Unity](sdk/doc/unity.md)                        |
 | Python 3.12+                     | [`sdk/python`](sdk/python/README.md): `mb_framepacing.marker`, standard library only                                                   | [Python library](sdk/python/README.md)           |
 
-**Get started:** install on [Windows](measure/doc/install/windows.md) · [Ubuntu](measure/doc/install/ubuntu.md) ·
-[macOS (Homebrew)](measure/doc/install/macos.md), add the marker with [Integrating the marker](sdk/doc/integrating.md) (C++ or C#) or the
-[Unity package](sdk/doc/unity.md), then measure with [Using mb-framepacing](measure/doc/usage.md).
+### 2. Every test: record, run, analyse
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor You
+    participant App as Your application
+    participant Card as Capture card
+    participant OBS as OBS Studio
+    participant Tool as mb-framepacing
+    You->>OBS: start recording
+    You->>App: start the test (benchmark path, camera pan, ...)
+    App->>Card: START marker: run id, sequence id, date (a few refreshes)
+    loop every frame of the test
+        App->>Card: frame + marker (frame index, animation time)
+        Card->>OBS: every refresh, recorded
+    end
+    App->>Card: END marker (a few refreshes)
+    You->>OBS: stop recording
+    You->>Tool: import the recording (GUI: Analyze recording)
+    Tool->>Tool: between START and END, compare each frame's animation time with when it appeared
+    Tool->>You: report: animation error, display time steps, drops, tearing
+```
+
+1. Connect the application's display output through a capture card (it passes the signal on to your monitor), and record the card
+   with OBS Studio at the display's refresh rate: [Measure with OBS and a capture card](measure/doc/usage.md#2-measure-with-obs-and-a-capture-card)
+   has the settings (proposed, not yet verified with a recording).
+2. Run the test in your application. It shows the **start** marker, then the normal frame markers, then the **end** marker.
+3. Import the recording: **Analyze recording** in the GUI (source **Video file...**), or
+   `mb-framepacing import recording.mkv --display-hz 240 --wait-for-start --stop-at-end --analyze`. The run between the markers is
+   measured, and the analysis opens.
+4. Other equipment works too: any lossless video or image sequence (`import`). Recording the card live with mb-framepacing itself
+   is **experimental** ([Live capture](measure/doc/live-capture.md)); filming the screen with a calibrated high speed camera is
+   **very experimental** ([camera capture](measure/doc/camera.md)).
+
+The start and end markers bracket exactly the part you want measured. The start marker also carries a sequence id (a UUID, or a
+short text tag) and the wall clock time, so every report knows what it measured:
+
+```mermaid
+flowchart LR
+    S["START marker<br/>run 7, sequence id, date<br/>(a few capture frames)"] --> F1[frame marker] --> F2[frame marker] --> F3[" … "] --> E["END marker<br/>run 7<br/>(a few capture frames)"]
+    style S fill:#1a7f37,color:#fff
+    style E fill:#c62828,color:#fff
+```
+
+| Start (with sequence id and time)                    | Frame                                                | End                                              |
+| ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| ![Start marker](measure/doc/images/marker-start.png) | ![Frame marker](measure/doc/images/marker-frame.png) | ![End marker](measure/doc/images/marker-end.png) |
+
+For tearing checks, also draw the small **sync marker** at the bottom left. It carries the run id and frame index; when it disagrees with
+the main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
+
+![The same sample with the sync marker on: the main marker top-left, the sync marker bottom-left, over the scrolling hall](measure/doc/images/example-app-sync-marker.png)
+
+The exact format, sizing rules and placement are in [`sdk/doc/marker-format.md`](sdk/doc/marker-format.md).
 
 ## Why this exists
 
@@ -78,150 +213,34 @@ diagrams and sources.
 
 ![The Analyze page: every presented frame, its animation error and the headline numbers](measure/doc/images/gui-analysis.png)
 
-## How it works
-
-There are two halves, and both are needed:
-
-- **Inside your application:** the SDK's marker module: C++20 ([`sdk/cpp/`](sdk/cpp)), C# ([`sdk/csharp/marker/`](sdk/csharp/marker)) or
-  the [Unity package](sdk/doc/unity.md). Every frame, it turns "frame index + animation time + run id" into pixel aligned black and white
-  triangles (or rectangles) that your renderer draws on top of the finished image. No dependencies, no allocations per frame, any
-  graphics API.
-- **On the recording side:** the `mb-framepacing` tools ([`measure/`](measure), command line and GUI). They record the display
-  signal with their own clock, read the marker back from every recorded frame and compare the animation time the frame
-  carries with the time it actually appeared in the capture.
-
-```mermaid
-flowchart LR
-    subgraph app["Your application (source changed once)"]
-        A[Render the frame] --> B["Draw the marker last<br/>(frame index, animation time, run id)"]
-    end
-    B -->|HDMI / DisplayPort| C[Display]
-    B -->|split / passthrough| D["Capture card<br/>at the display's refresh rate"]
-    V["Video file / image folder / stream<br/>(high speed camera, recorder, ...)"] --> E
-    D --> E["mb-framepacing<br/>capture / import"]
-    E --> F[("captures.mbcd<br/>every captured frame's markers + its time")]
-    F --> G["mb-framepacing analyze"]
-    G --> H["Animation error, display time steps,<br/>drops, tearing: GUI, CSV, JSON"]
-```
-
-![A marker drawn into a game frame at the recommended position](measure/doc/images/marker-in-frame.png)
-
-## The process
-
-### 1. Once: build the marker into your application
-
-Link the library and draw the marker as the very last thing in every frame, after post effects and UI, in pure black and white.
-It writes pixel aligned triangles straight into your vertex buffer, without allocating:
-
-```cpp
-#include <mb/framepacing/marker/FrameMarker.hpp>
-#include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
-#include <mb/framepacing/marker/geometry/Vertex.hpp>
-namespace FM = MB::FramePacing::Marker;
-
-std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
-FM::ModuleMatrix matrix;
-FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime}, matrix);    // encode once
-const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);        // draw it
-DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
-```
-
-`frameIndex` counts rendered frames, `animationTime` is the time the frame was animated for (an `MB::FramePacing::TimeSpan`).
-
-- **C++:** see **[Integrating the marker](sdk/doc/integrating.md)** for adding the library with CMake (a release archive, git,
-  `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
-- **C#:** the marker module [`sdk/csharp/marker`](sdk/csharp/marker/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `FrameMarker.ModulesToTriangles`).
-- **Unity:** the **[Unity package](sdk/doc/unity.md)** adds an overlay component that does all of this for you.
-- **Every field:** **[Filling the marker fields](sdk/doc/marker-fields.md)** says where each value comes from, when it changes and what
-  the analysis does with it, with examples for typical frame pacers.
-- **Python:** [`sdk/python`](sdk/python/README.md) (`mb_framepacing.marker`), which also draws into pixel buffers.
-
-[`sdk/README.md`](sdk/README.md) compares the libraries; each has its own README with a quick start and its API.
-
-### 2. Every test: record, run, analyse
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor You
-    participant App as Your application
-    participant Card as Capture card
-    participant Tool as mb-framepacing
-    You->>Tool: start recording (waits for the START marker)
-    You->>App: start the test (benchmark path, camera pan, ...)
-    App->>Card: START marker: run id, sequence id, date (a few capture frames)
-    Card->>Tool: START seen, keep recording
-    loop every frame of the test
-        App->>Card: frame + marker (frame index, animation time)
-        Card->>Tool: every captured frame + its capture time
-    end
-    App->>Card: END marker (a few capture frames)
-    Card->>Tool: END seen, stop
-    Tool->>Tool: compare each frame's animation time (from the marker) with its capture time
-    Tool->>You: report: animation error, display time steps, drops, tearing
-```
-
-1. Connect the application's display output through a capture card (it passes the signal on to your monitor). The recording
-   can run on the same PC or a second one.
-2. Start the recording: **Start capture** in the GUI, or `mb-framepacing capture -d "<device>" --wait-for-start --stop-at-end --analyze`.
-3. Run the test in your application. It shows the **start** marker, then the normal frame markers, then the **end** marker.
-4. The recording stops by itself at the end marker and the analysis opens. Record with other equipment instead (a lossless video,
-   a high speed camera's image sequence)? Use `mb-framepacing import` or the GUI's video/image/stream sources. **The way we suggest
-   for now** is to record the capture card with OBS Studio at the display's refresh rate and import the recording:
-   [Measure with OBS and a capture card](measure/doc/usage.md#2-measure-with-obs-and-a-capture-card). Filming the screen
-   with a calibrated high speed camera is **very experimental**: see [measure/doc/camera.md](measure/doc/camera.md).
-
-The start and end markers bracket exactly the part you want measured. The start marker also carries a sequence id (a UUID, or a
-short text tag) and the wall clock time, so every report knows what it measured:
-
-```mermaid
-flowchart LR
-    S["START marker<br/>run 7, sequence id, date<br/>(a few capture frames)"] --> F1[frame marker] --> F2[frame marker] --> F3[" … "] --> E["END marker<br/>run 7<br/>(a few capture frames)"]
-    style S fill:#1a7f37,color:#fff
-    style E fill:#c62828,color:#fff
-```
-
-| Start (with sequence id and time)                    | Frame                                                | End                                              |
-| ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
-| ![Start marker](measure/doc/images/marker-start.png) | ![Frame marker](measure/doc/images/marker-frame.png) | ![End marker](measure/doc/images/marker-end.png) |
-
-For tearing checks, also draw the small **sync marker** at the bottom left. It carries the run id and frame index; when it disagrees with
-the main marker, the capture shows parts of two frames. A camera filming the screen (very experimental) needs it for its timing:
-
-![The main marker top-left and the sync marker bottom-left](measure/doc/images/marker-tearing.png)
-
-The exact format, sizing rules and placement are in [`sdk/doc/marker-format.md`](sdk/doc/marker-format.md).
-
 ## Getting started
 
 | Step                               | Guide                                                                                                                                                            |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1. Install and build, per platform | **[Windows](measure/doc/install/windows.md)** · **[Ubuntu](measure/doc/install/ubuntu.md)** · **[macOS (Homebrew)](measure/doc/install/macos.md)**               |
 | 2. Put the marker into your app    | **[Integrating the marker](sdk/doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](sdk/doc/marker-fields.md)** |
-| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (test game, OBS and a capture card, direct capture, video/image import, results, troubleshooting)               |
+| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (OBS and a capture card, video/image import, results, troubleshooting)                                          |
 
-The platform guides cover ffmpeg, building the tools and putting them on your PATH, capture card devices and permissions, and
-building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).
+The platform guides cover ffmpeg, building the tools and putting them on your PATH, and building the C++ library. The short version is below. What is planned next (HDR capture among it) is on the [roadmap](doc/roadmap.md).
 
 ### The GUI
 
 Run `mb-framepacing-gui`. If ffmpeg is not found, a short setup dialog helps you get it and choose where captures go
 (**Settings → Set up...** opens it at any time).
 
-| Capture                                                                  | Setup                                                           |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| ![Capturing the synthetic test game](measure/doc/images/gui-capture.png) | ![The first-run setup dialog](measure/doc/images/gui-setup.png) |
+| Capture                                                                                | Setup                                                           |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| ![The capture page, set up to analyse a recording](measure/doc/images/gui-capture.png) | ![The first-run setup dialog](measure/doc/images/gui-setup.png) |
 
-- **Capture:** pick a capture card, a video file, an image folder or a stream, and press **Start capture**. Pick _Synthetic test
-  game_ to try everything without any hardware.
+- **Capture:** pick a recording (a video file or an image folder) and press **Analyze recording**. Capture cards and network
+  streams (live capture) appear with **Settings → Experimental features**: [Live capture](measure/doc/live-capture.md).
 - **Analyze:** opens by itself after a capture, with the headline numbers, detailed statistics and charts. **Open reports** shows
   the CSV and JSON files for your own tooling.
-- `mb-framepacing-gui --demo` captures and analyses the synthetic test game straight away.
 
 ### Reading the results
 
-The examples below are the synthetic test game (a 144 Hz game with injected stalls and skipped frames), captured at 144 fps
-like a capture card.
+The examples below come from the 60 Hz test clips in [`measure/test-data/videos`](measure/test-data/videos), imported as a
+recording of a capture card would be.
 
 A capture card captures at the display's refresh rate, so every capture is one refresh. The analysis relies on that: the refresh
 period is the capture period, and display time steps are whole refreshes, measured exactly. The animation error (the marker's animation
@@ -350,26 +369,27 @@ are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad
 ```sh
 mb-framepacing selftest                                   # check this machine, no hardware needed
 mb-framepacing config --init --set-ffmpeg /path/to/ffmpeg # once, if ffmpeg is not found automatically
-mb-framepacing devices --modes                            # list capture cards and their modes
 mb-framepacing marker-size --source 3840x2160 --stored 960x540  # the module size the application should draw
-mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --scale 960x540 --wait-for-start --stop-at-end --analyze
-mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end  # fast capture
-mb-framepacing locate -d "Cam Link 4K" --mode 1920x1080@240  # where the marker is, and the region a fast capture stores
-mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
 mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-end --analyze  # an OBS recording of the capture card
+mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
 mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images at a known frame rate
 mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeTicks)
-mb-framepacing import rtsp://camera/stream -t 30s         # a live network stream
 mb-framepacing analyze <capture folder>                   # (re)analyse
 mb-framepacing analyze <capture folder> --target-fps 30   # ... measuring late frames against a 30 fps target
 mb-framepacing render <capture folder> --from 120 --to 125 --png  # the report of 5 s of the run, as SVG and PNG
+# EXPERIMENTAL: live capture (measure/doc/live-capture.md)
+mb-framepacing devices --experimental --modes             # list capture cards and their modes
+mb-framepacing capture --experimental -d "Cam Link 4K" --mode 1920x1080@240 --scale 960x540 --wait-for-start --stop-at-end --analyze
+mb-framepacing capture --experimental -d "Cam Link 4K" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end  # fast capture
+mb-framepacing locate --experimental -d "Cam Link 4K" --mode 1920x1080@240  # where the marker is, and the region a fast capture stores
+mb-framepacing import --experimental rtsp://camera/stream -t 30s          # a live network stream
 # VERY EXPERIMENTAL: a high speed camera filming the screen (measure/doc/camera.md)
-mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
-mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --display-hz 60 --analyze  # later: checks the camera and the display rate
-mb-framepacing selftest --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
+mb-framepacing camera-rig calibrate --experimental clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
+mb-framepacing import --experimental run.mp4 --recorded-fps 960 --camera desk --display-hz 60 --analyze  # later: checks the camera and the display rate
+mb-framepacing selftest --experimental --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
 ```
 
-`mb-framepacing <command> --help` lists every option. Results go to `<capture folder>/analysis/`: `summary.json`,
+`mb-framepacing <command> --help` lists every option (`--help --experimental` also the experimental ones). Results go to `<capture folder>/analysis/`: `summary.json`,
 `captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
 the report and the distribution cards as SVG (`run-<id>-report.svg`, `run-<id>-error-histogram.svg`, ...). `render --png` writes
 PNGs.
@@ -378,36 +398,22 @@ PNGs.
 
 | For              | You need                                                                                                                                                                    |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recording        | ffmpeg 5.1+ (installed separately), and a capture card, a video file, image frames or a stream                                                                              |
-| Live capture     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common)                                           |
+| Recording        | ffmpeg 5.1+ (installed separately), and a recording: a video file (OBS recording a capture card) or image frames                                                            |
+| Capture card     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common)                                           |
 | Disk             | Little: the capture data is 192 bytes per captured frame (about 170 MB for an hour at 240 Hz). Stored frames (`--keep-frames`) need a fast SSD: 0.5 MB per frame at 960×540 |
 | Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                                                                                            |
 
 ### How fast can it record?
 
-There is no built-in frame rate limit: mb-framepacing records whatever the source delivers.
+There is no built-in frame rate limit. A recording (a video file or an image folder) is read as fast as the disk allows and nothing
+is dropped; the times come from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording
+works. Footage of a camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see
+[measure/doc/camera.md](measure/doc/camera.md)). Recording a capture card live has to keep up with every frame as it comes; it is
+experimental: [Live capture](measure/doc/live-capture.md#how-fast-can-it-record).
 
-- **Capture cards:** the card's own modes decide (`mb-framepacing devices --modes`). 1080p at 240 fps is common, some cards go
-  higher at lower resolutions. The live path is then limited by the card's USB/PCIe link, ffmpeg's decoding and scaling, and
-  decoding the markers of every frame as it arrives (a locked marker decodes in well under a millisecond). Only the decoded
-  markers and timestamps are stored (the capture data, [sdk/doc/capture-data-format.md](sdk/doc/capture-data-format.md)); with
-  `--keep-frames` the frames are stored too, width × height bytes (grey) each, so 960×540 at 500 fps is about 250 MiB/s. When
-  decoding or the disk falls behind, frames are counted as dropped, never silently lost.
-- **Video files and image folders:** any rate. They are read as fast as the disk allows and nothing is dropped; the times come
-  from the file (or from `--fps` / a timestamp file), so a 1000 fps or faster high speed camera recording works. Footage of a
-  camera filming the screen needs a calibrated camera rig (`--camera`, **very experimental**, see [measure/doc/camera.md](measure/doc/camera.md)).
-- **Precision:** a capture card captures at the display's refresh rate, so display time steps are whole refreshes and exact; a camera
-  filming the screen is good to about one camera period (1 ms at 1000 fps), which shows as noise in its errors.
-
-**Fast capture** (`--roi auto`, or **Locate marker** in the GUI) has ffmpeg deliver only the marker instead of whole frames. It
-first reads the source for a moment to find the marker, then has ffmpeg crop to that region and downscale it to 3 stored pixels per
-module: about 27 KB per captured frame instead of 2 MB from a 1080p source, which lowers what ffmpeg passes on (and stores, with
-`--keep-frames`). The marker must stay at a fixed position, and only the top marker is kept, so tearing is not checked. `locate`
-prints the region as `--roi … --scale …`, to reuse it without searching again.
-
-`mb-framepacing selftest --fps <rate>` checks what this machine sustains (add `--keep-frames` to include storing the frames). On
-the development PC, 1000 fps ran with the recorder's ring nearly empty; with stored frames (NVMe SSD), 960×540 at 2000 fps (about
-980 MiB/s) ran with no drops and every frame matched.
+**Precision:** a capture card captures at the display's refresh rate, and so does its recording, so display time steps are whole
+refreshes and exact; a camera filming the screen is good to about one camera period (1 ms at 1000 fps), which shows as noise in its
+errors.
 
 ## Configuration
 

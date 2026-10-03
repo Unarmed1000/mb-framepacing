@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Marker example images for the documentation: markers drawn into a mock game frame exactly the way an application draws them (pixel
-//* aligned modules, pure black/white, drawn last on top of the scene).
+//* Marker example images for the documentation: the start, frame and end markers drawn exactly the way an application draws them (pixel
+//* aligned modules, pure black/white). The README's pictures of the marker in a real application are screenshots of the unofficial
+//* gtec-demo-framework's FramePacing sample.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -52,11 +53,6 @@ namespace MB.FramePacing.DocImages
       var frameMarker = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, TimeSpan.FromSeconds(20.567));
       var start = StartMetadata.FromTag(new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc).Ticks, "menu scroll");
 
-      // A marker in a 1280x720 frame at the recommended place: top-left, 32 px in
-      var scene = CreateScene(1280, 720);
-      DrawMarker(scene, frameMarker, null, 32, 32, 4);
-      scene.Save(Path.Combine(directory, "marker-in-frame.png"));
-
       // The three kinds at the same module size
       foreach (
         var (name, payload, metadata) in new (string, MarkerPayload, StartMetadata?)[]
@@ -73,43 +69,7 @@ namespace MB.FramePacing.DocImages
         DrawModules(image, modules, 0, 0, 6);
         image.Save(Path.Combine(directory, name));
       }
-
-      // Tearing check and camera timing: the main marker top-left, the small sync marker (same frame index) bottom-left
-      var tearing = CreateScene(1280, 720);
-      int syncSize = MarkerRenderer.MarkerSizePx(3, MarkerRenderer.RecommendedQuietZoneModules, MarkerKind.Sync);
-      DrawMarker(tearing, frameMarker, null, 32, 32, 3);
-      DrawMarker(tearing, frameMarker with { Kind = MarkerKind.Sync }, null, 32, 720 - 32 - syncSize, 3);
-      tearing.Save(Path.Combine(directory, "marker-tearing.png"));
     }
-
-    /// <summary>A colourful stand-in for a game frame: sky gradient, ground, a few shapes.</summary>
-    private static RgbImage CreateScene(int width, int height)
-    {
-      var image = new RgbImage(width, height);
-      int horizon = height * 3 / 5;
-      for (int y = 0; y < height; ++y)
-      {
-        int color =
-          y < horizon
-            ? Rgb(40 + (y * 60 / horizon), 90 + (y * 90 / horizon), 170 + (y * 60 / horizon))
-            : Rgb(60 + ((y - horizon) * 40 / (height - horizon)), 120 - ((y - horizon) * 30 / (height - horizon)), 60);
-        Array.Fill(image.Pixels, color, y * width, width);
-      }
-      var random = new Random(7);
-      for (int i = 0; i < 9; ++i)
-      {
-        int w = random.Next(60, 180);
-        int h = random.Next(80, 260);
-        int x = random.Next(260, width - w);
-        image.Fill(x, horizon - h, w, h, Rgb(random.Next(70, 160), random.Next(60, 120), random.Next(90, 170)));
-        image.Fill(x + 10, horizon - h + 12, w - 20, 10, Rgb(240, 220, 140));
-      }
-      image.Fill(width / 2 - 20, horizon + 40, 40, 90, Rgb(220, 70, 60));
-      return image;
-    }
-
-    private static void DrawMarker(RgbImage image, MarkerPayload payload, StartMetadata? metadata, int originX, int originY, int moduleSize) =>
-      DrawModules(image, MarkerRenderer.GenerateModules(payload, metadata), originX, originY, moduleSize);
 
     /// <summary>White quiet zone + black modules on pixel edges, like GenerateQuads draws them.</summary>
     private static void DrawModules(RgbImage image, ModuleMatrix modules, int originX, int originY, int moduleSize)

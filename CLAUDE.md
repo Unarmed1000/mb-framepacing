@@ -177,7 +177,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. The SVG report examples (`report-example-*.svg`) come from test clips
     imported through ffmpeg (skipped without it): example pictures use the test clips, not the synthetic game. It renders the real GUI **offscreen**
     (Avalonia.Headless) in no-save mode and neutralises machine specific text; the GUI screenshots import the test clip `60-busy-adaptive` as a
-    video file (so they need ffmpeg). Never take desktop screenshots.
+    video file (so they need ffmpeg). Never take desktop screenshots. The README's two pictures of the marker in an application
+    (`example-app-marker.png`, `example-app-sync-marker.png`) are not DocImages': they are the Vulkan FramePacing sample of the user's
+    unofficial gtec-demo-framework (`DemoApps/Vulkan/FramePacing/ExampleMarker.png`, `ExampleSyncMarker.png`, taken with the
+    framework's screenshot option), copied unchanged; new ones come from there.
 - **Data modules (BSD 3-Clause):** `MB.FramePacing.Data` reads and writes `captures.mbcd` (`sdk/doc/capture-data-format.md`) and
   the analysis output (`sdk/doc/analysis-output-format.md`: `summary.json` with `formatVersion`, which covers the CSVs, and the CSVs). The
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in

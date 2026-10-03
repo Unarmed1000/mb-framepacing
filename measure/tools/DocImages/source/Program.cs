@@ -5,7 +5,7 @@
 //*   - GUI screenshots: the real GUI runs in Avalonia's headless platform with the Skia renderer (offscreen), imports and analyses a test
 //*     clip (measure/test-data/videos, through ffmpeg), and each page is saved as PNG. Machine specific text (paths) is replaced with
 //*     neutral example values first.
-//*   - Marker examples: how the markers look inside an application frame.
+//*   - Marker examples: the start, frame and end markers as an application draws them.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -395,7 +395,8 @@ namespace MB.FramePacing.DocImages
 
     /// <summary>
     /// The SVG report examples of the README, from test clips made by mb-framepacing-explained (measure/test-data/videos): a game adapting its
-    /// rate, a busy stretch at the full rate, and delta time jitter from a naive timer. Imported through ffmpeg; skipped without it.
+    /// rate, a busy stretch at the full rate, delta time jitter from a naive timer, and the perfect storm (the jitter and late frames at
+    /// once). Imported through ffmpeg; skipped without it.
     /// </summary>
     private static void WriteReportExamples(string output, string work)
     {
@@ -409,7 +410,15 @@ namespace MB.FramePacing.DocImages
         Console.WriteLine("  report-example-*.svg skipped: ffmpeg is not installed");
         return;
       }
-      foreach (var (clip, name) in new[] { ("60-busy-adaptive", "adaptive"), ("60-busy-full-rate", "busy"), ("60-naive-5ms", "jitter") })
+      foreach (
+        var (clip, name) in new[]
+        {
+          ("60-busy-adaptive", "adaptive"),
+          ("60-busy-full-rate", "busy"),
+          ("60-naive-5ms", "jitter"),
+          ("60-naive-5ms-diagram-slow-frames-every-1s", "storm"),
+        }
+      )
       {
         string video = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "videos", clip, "video.mp4");
         string imported = Path.Combine(work, clip);
