@@ -64,34 +64,13 @@ Prints `PASS` when a synthetic 500 fps capture comes back frame-exact. If it rep
 with `--keep-frames`).
 Then start `mb-framepacing-gui`: if ffmpeg is not found, a short setup dialog helps you get it and asks where captures go.
 
-## 4. Capture cards
+## 4. Take a measurement
 
-Linux exposes capture cards as **Video4Linux2** devices (`/dev/video0`, `/dev/video1`, ...).
+Continue with **[Using mb-framepacing](../usage.md)**: recording a capture card with OBS, importing the recording, and
+reading the results, in the GUI and on the command line. Recording a capture card live with mb-framepacing itself is
+experimental: [Live capture](../live-capture.md) has the Video4Linux2 details.
 
-```sh
-sudo usermod -aG video $USER     # once, then log out and in again: access to /dev/video*
-mb-framepacing devices --modes   # lists the devices and their formats
-v4l2-ctl --list-formats-ext -d /dev/video0   # frame rates per size, if you need them
-```
-
-Capture with the device path (or just its number):
-
-```sh
-mb-framepacing capture -d /dev/video0 --mode 1920x1080@60 --input-format yuyv422 --scale 960x540 -t 30s --analyze
-```
-
-Tips:
-
-- Many USB capture devices create two nodes per card; the first one usually carries the video.
-- Prefer `yuyv422`/`nv12` over `mjpeg` when the card reaches the rate you need.
-- v4l2 gives kernel timestamps for every frame, which the analysis uses automatically.
-
-## 5. Take a measurement
-
-Continue with **[Using mb-framepacing](../usage.md)**: the test game, a capture card, importing video files or image folders,
-and reading the results, in the GUI and on the command line.
-
-## 6. Build the C++ marker library (for your application)
+## 5. Build the C++ marker library (for your application)
 
 The library needs CMake 4.0 or newer; Ubuntu's `cmake` package may be older. Get a current one from Kitware's
 [apt repository](https://apt.kitware.com/), with `sudo snap install cmake --classic`, or with `pip install cmake`. Then:

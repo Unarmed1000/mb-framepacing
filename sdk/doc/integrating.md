@@ -255,13 +255,17 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
 
 Every main marker kind has the same size, so the start and end markers cover exactly the frame marker's area.
 
-## 5. Capture and analyse
+## 5. Record and analyse
+
+Record the capture card with OBS Studio at the display's refresh rate, then import the recording
+([Measure with OBS and a capture card](../../measure/doc/usage.md#2-measure-with-obs-and-a-capture-card)):
 
 ```sh
-mb-framepacing capture -d "<your capture card>" --scale 960x540 --wait-for-start --stop-at-end --analyze
+mb-framepacing import recording.mkv --display-hz 60 --scale 960x540 --wait-for-start --stop-at-end --analyze
 ```
 
-or record with any other tool (a lossless video, a high speed camera's image sequence) and use `mb-framepacing import`. To film
+Any other lossless recording works too (a video, a high speed camera's image sequence). Recording the card live with
+mb-framepacing itself is experimental ([Live capture](../../measure/doc/live-capture.md)). To film
 the screen with a high speed camera, draw the sync marker as well and see the very experimental
 [camera capture](../../measure/doc/camera.md).
 
@@ -279,11 +283,12 @@ This project's author keeps an **unofficial** version of the gtec-demo-framework
   [Vulkan](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/Vulkan/FramePacing), [OpenGL ES 3](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES3/FramePacing) and [OpenGL ES 2](https://github.com/Unarmed1000/gtec-demo-framework/tree/master/DemoApps/GLES2/FramePacing). The pacer is in those three samples only, not in the
   framework.
 
-Its example, any sample measured for 30 seconds:
+Its example, any sample measured for 30 seconds (it records the card live, which is experimental; a recording imported with
+`--scale 960x540` measures the same):
 
 ```sh
 GLES3.Stats --FramePacing.Run "Stats 30s" --FramePacing.Duration 30 --FramePacing.CaptureHeight 540
-mb-framepacing capture -d "<capture card>" --scale 960x540 --wait-for-start --stop-at-end --analyze
+mb-framepacing capture --experimental -d "<capture card>" --scale 960x540 --wait-for-start --stop-at-end --analyze
 ```
 
 ## Checking your integration

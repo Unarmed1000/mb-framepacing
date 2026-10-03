@@ -64,35 +64,13 @@ Prints `PASS` when a synthetic 500 fps capture comes back frame-exact. If it rep
 with `--keep-frames`).
 Then start `mb-framepacing-gui`: if ffmpeg is not found, a short setup dialog helps you get it and asks where captures go.
 
-## 4. Capture cards
+## 4. Take a measurement
 
-macOS exposes capture cards as **AVFoundation** video devices (Elgato, Blackmagic UltraStudio, Magewell USB and UVC dongles).
+Continue with **[Using mb-framepacing](../usage.md)**: recording a capture card with OBS, importing the recording, and
+reading the results, in the GUI and on the command line. Recording a capture card live with mb-framepacing itself is
+experimental: [Live capture](../live-capture.md) has the AVFoundation details (on macOS it is probably too slow to be usable).
 
-```sh
-mb-framepacing devices
-```
-
-lists them by index. Capture with the index:
-
-```sh
-mb-framepacing capture -d 0 --mode 1920x1080@60 --scale 960x540 -t 30s --analyze
-```
-
-**Camera permission:** macOS asks before any program reads a video device. The first capture from Terminal (or iTerm, or the GUI)
-triggers the prompt. If you declined it, enable the app under **System Settings → Privacy & Security → Camera** and start it
-again. Without permission ffmpeg reports that no frames arrive.
-
-Tips:
-
-- AVFoundation does not report the supported modes; use the card vendor's documentation or try `--mode` values.
-- Keep the Mac awake during long captures (`caffeinate -dims mb-framepacing capture ...`).
-
-## 5. Take a measurement
-
-Continue with **[Using mb-framepacing](../usage.md)**: the test game, a capture card, importing video files or image folders,
-and reading the results, in the GUI and on the command line.
-
-## 6. Build the C++ marker library (for your application)
+## 5. Build the C++ marker library (for your application)
 
 ```sh
 xcode-select --install     # AppleClang 15+

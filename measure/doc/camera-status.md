@@ -15,25 +15,25 @@ labelled "very experimental" until the validation below has been done.
 
 ## What exists and how it was checked
 
-| Area                                                                               | State                                    | Checked by                                                         |
-| ---------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
-| Rig calibration (`camera-rig calibrate`, GUI wizard)                               | Implemented                              | Synthetic camera unit tests, `selftest --camera`, real ffmpeg test |
-| Homography refinement (Gauss-Newton on the module pattern)                         | Implemented                              | Unit tests: ~1 px detector error down to 0.1–0.2 px                |
-| Rig verification before every capture                                              | Implemented                              | Unit tests (moved camera fails, start markers accepted)            |
-| Saved cameras (`camera-rigs/` library, `--name`, `list`, `delete`)                 | Implemented                              | Unit tests, DocImages                                              |
-| Import of recorded clips (`import --camera`, `--recorded-fps`)                     | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)           |
-| Rectification in ffmpeg (`crop,perspective,scale,vstack`)                          | Implemented                              | End to end through a real ffmpeg                                   |
-| Rectification in C# (`CameraRectifier`, sources without ffmpeg)                    | Implemented                              | `selftest --camera`, benchmarks (no allocations)                   |
-| Camera decoding (module grid sampler, camera captures only)                        | Implemented                              | Unit tests; capture cards keep the pure barcode path               |
-| Camera analysis (scanout delay, camera tears, second zone only)                    | Implemented                              | Unit tests against the synthetic ground truth                      |
-| Zones decoded live, only the capture data stored (`--keep-frames` keeps the zones) | Implemented                              | `selftest --camera --fps 1000` (no drops), `FfmpegCameraTests`     |
-| Refresh rate calculated per run (`RefreshEstimator`), late frames                  | Implemented                              | Unit tests, `selftest --camera` (60 Hz found as 16.67 ms)          |
-| GUI camera wizard (shows the camera frames), camera card                           | Implemented                              | DocImages (headless); no unit tests for the wizard view model      |
-| GUI: hidden unless Settings → Experimental features is on                          | Implemented                              | DocImages (headless: off for the capture page, on for the camera)  |
-| Live UVC cameras (`capture -d <camera> --camera`)                                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                |
-| Real cameras and displays                                                          | **Not validated**                        | Nothing yet                                                        |
+| Area                                                                               | State                                    | Checked by                                                                        |
+| ---------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| Rig calibration (`camera-rig calibrate`, GUI wizard)                               | Implemented                              | Synthetic camera unit tests, `selftest --experimental --camera`, real ffmpeg test |
+| Homography refinement (Gauss-Newton on the module pattern)                         | Implemented                              | Unit tests: ~1 px detector error down to 0.1–0.2 px                               |
+| Rig verification before every capture                                              | Implemented                              | Unit tests (moved camera fails, start markers accepted)                           |
+| Saved cameras (`camera-rigs/` library, `--name`, `list`, `delete`)                 | Implemented                              | Unit tests, DocImages                                                             |
+| Import of recorded clips (`import --camera`, `--recorded-fps`)                     | Implemented                              | End to end through a real ffmpeg (slow motion FFV1 clip)                          |
+| Rectification in ffmpeg (`crop,perspective,scale,vstack`)                          | Implemented                              | End to end through a real ffmpeg                                                  |
+| Rectification in C# (`CameraRectifier`, sources without ffmpeg)                    | Implemented                              | `selftest --experimental --camera`, benchmarks (no allocations)                   |
+| Camera decoding (module grid sampler, camera captures only)                        | Implemented                              | Unit tests; capture cards keep the pure barcode path                              |
+| Camera analysis (scanout delay, camera tears, second zone only)                    | Implemented                              | Unit tests against the synthetic ground truth                                     |
+| Zones decoded live, only the capture data stored (`--keep-frames` keeps the zones) | Implemented                              | `selftest --experimental --camera --fps 1000` (no drops), `FfmpegCameraTests`     |
+| Refresh rate calculated per run (`RefreshEstimator`), late frames                  | Implemented                              | Unit tests, `selftest --experimental --camera` (60 Hz found as 16.67 ms)          |
+| GUI camera wizard (shows the camera frames), camera card                           | Implemented                              | DocImages (headless); no unit tests for the wizard view model                     |
+| GUI: hidden unless Settings → Experimental features is on                          | Implemented                              | DocImages (headless: off for the capture page, on for the camera)                 |
+| Live UVC cameras (`capture -d <camera> --camera`)                                  | Implemented, **never run with a camera** | Same code path as import; never tried with hardware                               |
+| Real cameras and displays                                                          | **Not validated**                        | Nothing yet                                                                       |
 
-Results on the synthetic camera (`selftest --camera --fps 1000 --refresh 60`):
+Results on the synthetic camera (`selftest --experimental --camera --fps 1000 --refresh 60`):
 
 - Every presented frame is found.
 - Display deltas are within two camera periods of the truth, with a mean error of about 0.62 ms (timed by the sync marker).
@@ -78,15 +78,15 @@ of C# rectification, well above 1000 fps on one core.
   from 64 times on. The expected rate is taken when the times are on its grid, and the intervals' estimate stays where it is that
   period. On simulated sightings (12 monitor refresh rates from 50 to 500 Hz, cameras from 1.7 to 16.7 times as fast, a fifth of
   the sightings late, a game at full and at half rate) the intervals alone are off in about a sixth of the runs and the grid in
-  none; `selftest --camera` finds the display's rate within 0.01 % at 22 combinations of display and camera rate.
+  none; `selftest --experimental --camera` finds the display's rate within 0.01 % at 22 combinations of display and camera rate.
   **Known limit:** at exactly twice the refresh rate with about half of the sightings late, every time is on one of two camera
   frames half a refresh apart, the times are on no grid the camera can see, and nothing can calculate the rate: the analysis then
-  warns that the calculated rate is unreliable (`selftest --camera` at 150 fps on 75 Hz, 240 on 120 and 288 on 144). The
+  warns that the calculated rate is unreliable (`selftest --experimental --camera` at 150 fps on 75 Hz, 240 on 120 and 288 on 144). The
   calibration's clip in the selftest is too short for the search to be sure (half a second: at most one stretch of 64 sightings), so
   its rate is the intervals' and can be off at these camera rates. The period found is then measured with a least squares line through every
   reliable first-seen time against its refresh number (`RefreshEstimator.RefinePeriodTicks`; the average of the intervals only uses
   the two ends of each unbroken stretch). On simulated sightings its error is 10 to 20 times smaller, from 130 to 2000 fps on a
-  60 Hz display; `selftest --camera` finds 59.99 to 60.00 Hz at every rate of the table (59.90 to 60.11 Hz before). The line is
+  60 Hz display; `selftest --experimental --camera` finds 59.99 to 60.00 Hz at every rate of the table (59.90 to 60.11 Hz before). The line is
   not taken when its own numbering does not hold up against it (a camera below about twice the refresh rate) or when it leaves
   the estimate by more than 1 %. The user can give the **expected display rate** (`--display-hz`, GUI "Display refresh
   rate"): it settles the ambiguity first, and the analysis compares it with the calculated rate (`runs[].pacing.refreshDeviation`,
@@ -140,6 +140,6 @@ Quick checks after a change:
 
 ```sh
 mb-quality -r --all .
-dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --camera --fps 1000 --refresh 60 --tear-every 9
+dotnet run --project measure/app/FramePacing/FramePacing.csproj -- selftest --experimental --camera --fps 1000 --refresh 60 --tear-every 9
 dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>   # the wizard and camera card, headless
 ```

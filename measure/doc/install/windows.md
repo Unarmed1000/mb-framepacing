@@ -70,35 +70,13 @@ known answer. If it reports dropped frames, this machine cannot decode that rate
 with `--keep-frames`).
 Then start `mb-framepacing-gui`: if ffmpeg is not found, a short setup dialog helps you get it and asks where captures go.
 
-## 4. Capture cards
+## 4. Take a measurement
 
-Windows exposes capture cards as **DirectShow** devices (Elgato, AVerMedia, Magewell, Blackmagic and most USB/HDMI dongles).
+Continue with **[Using mb-framepacing](../usage.md)**: recording a capture card with OBS, importing the recording, and
+reading the results, in the GUI and on the command line. Recording a capture card live with mb-framepacing itself is
+experimental: [Live capture](../live-capture.md) has the DirectShow details.
 
-```powershell
-mb-framepacing devices --modes
-```
-
-lists them with their modes. Use the name as shown, for example:
-
-```powershell
-mb-framepacing capture -d "Cam Link 4K" --mode 1920x1080@60 --input-format nv12 --scale 960x540 -t 30s --analyze
-```
-
-Tips:
-
-- Close the vendor's own capture software first: most cards can only be opened by one program at a time.
-- Prefer an uncompressed format (`nv12`, `yuyv422`) over `mjpeg` when the card offers the rate you need; MJPEG blurs the
-  marker (see the "Sizing" section of [marker-format.md](../../../sdk/doc/marker-format.md#sizing)).
-- Set the application's output to the card's native mode and capture at the same refresh rate (for example 1920×1080 at 240 Hz,
-  captured at 240 fps). Turn off HDR for the capture.
-- `dshow` buffers frames in memory (`-rtbufsize`, 1 GB by default); dropped frames are reported in the results.
-
-## 5. Take a measurement
-
-Continue with **[Using mb-framepacing](../usage.md)**: the test game, a capture card, importing video files or image folders,
-and reading the results, in the GUI and on the command line.
-
-## 6. Build the C++ marker library (for your application)
+## 5. Build the C++ marker library (for your application)
 
 Install Visual Studio 2026 with the "Desktop development with C++" workload and CMake 4.0 or newer
 (`winget install Kitware.CMake`), then:

@@ -36,7 +36,8 @@ The shaders' module lookup is the reference shaders' (`FrameMarker.hlsl`, from `
 1. Add a GameObject with **Frame Marker Overlay** (menu **Add Component → MB → Frame Marker Overlay**).
 2. Set **Stored Height** to the height the capture tool stores (for example 540 for `--scale 960x540`).
 3. Turn HDR output off while capturing.
-4. Record with `mb-framepacing capture --wait-for-start --stop-at-end --analyze`, and call `BeginRun()` / `EndRun()` (or
+4. Record the capture card with OBS, import the recording with `mb-framepacing import recording.mkv --wait-for-start
+--stop-at-end --analyze`, and call `BeginRun()` / `EndRun()` (or
    `StartCoroutine(overlay.RunFor(10))`) around the part to measure. Each run gets a new UUID as its sequence id; pass your own
    `SequenceId` (a UUID, or a text tag of at most 16 ASCII characters) to match captures to your own records.
 

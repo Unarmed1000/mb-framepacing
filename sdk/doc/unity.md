@@ -44,7 +44,8 @@ python sdk/unity/build_upm.py --output <folder>
    yourself, pass any 16 bytes unique to the run: `SequenceId.FromGuid(...)`, or a text tag of at most 16 ASCII characters
    (`SequenceId.TryFromText("camera pan", out var id)`).
 
-5. Record with `mb-framepacing capture --wait-for-start --stop-at-end --analyze` (see [Using mb-framepacing](../../measure/doc/usage.md)).
+5. Record the capture card with OBS and import the recording with `mb-framepacing import recording.mkv --wait-for-start
+--stop-at-end --analyze` (see [Using mb-framepacing](../../measure/doc/usage.md)).
 
 The Package Manager also offers the **Benchmark** sample: it turns the camera for a few seconds and measures exactly that.
 

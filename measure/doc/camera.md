@@ -123,16 +123,16 @@ The steps:
 3. **Calibrate once** from a live camera or a short clip filmed with it, and save it by name. Fix every warning and calibrate again:
 
    ```sh
-   mb-framepacing camera-rig calibrate -d "<camera>" --mode 640x360@330 --input-format mjpeg --name desk
-   mb-framepacing camera-rig calibrate clip.mp4 --recorded-fps 960 --name desk   # a slow motion clip
+   mb-framepacing camera-rig calibrate --experimental -d "<camera>" --mode 640x360@330 --input-format mjpeg --name desk
+   mb-framepacing camera-rig calibrate --experimental clip.mp4 --recorded-fps 960 --name desk   # a slow motion clip
    ```
 
 4. **Capture** with the saved camera. Every capture verifies it first, then straightens only the two marker zones and stores what
    their markers say (add `--keep-frames` to keep the straightened zones too, useful while setting up a rig):
 
    ```sh
-   mb-framepacing capture -d "<camera>" --mode 640x360@330 --input-format mjpeg --camera desk --wait-for-start --stop-at-end --analyze
-   mb-framepacing import run.mp4 --recorded-fps 960 --camera desk --analyze
+   mb-framepacing capture --experimental -d "<camera>" --mode 640x360@330 --input-format mjpeg --camera desk --wait-for-start --stop-at-end --analyze
+   mb-framepacing import --experimental run.mp4 --recorded-fps 960 --camera desk --analyze
    ```
 
 `camera-rig list` shows the saved cameras. `camera-rig delete <name>` removes one (its file is kept as `camera-rigs/backup/<name>.camera-rig.json.bak`). `camera-rig verify --rig desk (-d "<camera>" |
@@ -245,7 +245,7 @@ core unless noted):
 | Calibrating a rig from 500 camera frames (all cores) | ~45 ms  |
 
 Per camera frame, capture needs about 35 µs of decoding (two zones) plus the rectification. That is far above 1000 fps on one core.
-The analysis runs on all cores. In `selftest --camera` it analysed about 8,000 camera frames per second.
+The analysis runs on all cores. In `selftest --experimental --camera` it analysed about 8,000 camera frames per second.
 
 ## Follow-ups
 

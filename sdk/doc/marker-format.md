@@ -226,13 +226,14 @@ one run (with a warning). A `FrameIndex` that goes back by more than 1000 (the a
 counted as an error; one that goes back less is an older frame shown again (out of order). An application that restarts gives the new
 run a new run id.
 
-`mb-framepacing capture --wait-for-start --stop-at-end` uses the same markers to start and stop the recording automatically. It
-checks every captured frame (a live capture as it arrives, a video file frame by frame), so one captured frame of each marker is enough.
+`mb-framepacing import --wait-for-start --stop-at-end` (and the experimental live `capture`) uses the same markers to measure only
+the run. It checks every captured frame (a video file frame by frame, a live capture as it arrives), so one captured frame of each
+marker is enough.
 
 ## Sizing
 
 What matters is how many **stored pixels** one QR module covers after all scaling: the GPU output resolution, the capture
-card's mode and `mb-framepacing capture --scale`.
+card's mode and the tools' `--scale` (`import`, or the experimental live `capture`).
 
 Let `s = storedHeight / sourceHeight`. For example, a 2160p source stored at 540p gives `s = 0.25`.
 
@@ -272,7 +273,8 @@ origin and the settings for each library.
 
 ### Checks in the tools
 
-- `mb-framepacing capture --module-px <n>` logs the stored pixels per module it expects for the chosen mode and scale.
+- `mb-framepacing capture --module-px <n>` (live capture, experimental) logs the stored pixels per module it expects for the
+  chosen mode and scale.
   It warns below 3 and errors below 2.
 - `mb-framepacing analyze` measures the module size of the first detected marker. It warns if the size is below 3 stored px per
   module and errors if it is below 2.

@@ -54,7 +54,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames from test clips and every scenario's result (`pacer-sim --golden`)       |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
-| `measure/doc/`                                    | Usage, camera, install guides, and the README images (`measure/doc/images`)                                       |
+| `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
 | `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                   |
 | `doc/`                                            | Project docs: releasing, roadmap                                                                                  |
 | `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                              |
@@ -176,7 +176,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `.prettierignore`).
   - Regenerate the README images with `dotnet run --project measure/tools/DocImages`. The SVG report examples (`report-example-*.svg`) come from test clips
     imported through ffmpeg (skipped without it): example pictures use the test clips, not the synthetic game. It renders the real GUI **offscreen**
-    (Avalonia.Headless) in no-save mode and neutralises machine specific text. Never take desktop screenshots.
+    (Avalonia.Headless) in no-save mode and neutralises machine specific text; the GUI screenshots import the test clip `60-busy-adaptive` as a
+    video file (so they need ffmpeg). Never take desktop screenshots.
 - **Data modules (BSD 3-Clause):** `MB.FramePacing.Data` reads and writes `captures.mbcd` (`sdk/doc/capture-data-format.md`) and
   the analysis output (`sdk/doc/analysis-output-format.md`: `summary.json` with `formatVersion`, which covers the CSVs, and the CSVs). The
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
@@ -271,15 +272,29 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     live and afterwards give identical records, so keep the two paths on the shared decoder.
 - **The suggested way to measure today** is OBS recording a capture card and `import` of the recording (`measure/doc/usage.md` section 2):
   the display's refresh rate must be the capture source's FPS and OBS's video FPS (the rate the file is saved at), with no scaling and
-  little or no compression. Its OBS settings are proposed, not yet verified with a recording: say so until they are.
+  little or no compression. Its OBS settings are proposed, not yet verified with a recording: say so until they are. The README
+  opens with the sister repository's page (the slides), then how it works and this workflow.
+- **Live capture is EXPERIMENTAL** (`measure/doc/live-capture.md`, agreed with the user): recording a capture card or a network stream
+  with the tools themselves. It is out of the workflow documents (README, usage.md, the install guides); live-capture.md has it,
+  with the per-platform details and the caution that on some platforms, macOS among them, it is probably too slow to be usable.
+  - **GUI:** the capture cards and "Network stream (URL, experimental)..." are offered only with **Settings → Experimental features**
+    (`CaptureViewModel.ListSources`, `IsExperimental`). The default source is a video file, and the start button says
+    **Analyze recording** for a video file or an image folder, **Start capture** for a live source (`StartText`).
+  - **CLI:** `--experimental` (`CommonOptions.Experimental`, recursive) shows and allows the experimental parts: `capture`, `locate`,
+    `devices` and `camera-rig` (`CommonOptions.ExperimentalCommand`), `--camera`, `--recorded-fps` and `selftest`'s `--camera`,
+    `--refresh`, `--tear-every` (`ExperimentalOption`), and a stream URL for `import`. Without it they are left out of `--help`
+    (read from the arguments before the commands are made: `ExperimentalRequested`) and refused with a one-line hint. Live capture
+    prints `CommonOptions.LiveCaptureNotice` first. Every documented command for them carries `--experimental`.
+  - **No synthetic test game in the GUI** (agreed with the user): no source, no `--demo`. `selftest` keeps it (the CLI's check
+    without hardware), and the synthetic camera (very experimental) stays behind the experimental switch.
 - **Media sources**
-  - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file / Image folder / Network stream") go through
+  - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file... / Image folder... / Network stream") go through
     `MediaInput` -> ffmpeg.
   - Image sequences get their exact times from `--fps` or the timestamp CSV (`FrameTimestamps`), not from ffmpeg: its concat
     timestamps are 40 ms coarse. The CSV (`ImageSequence.ReadTimestamps`) needs its header line, `fileName,timeTicks` found by name,
     and holds whole ticks: a headerless file, or one with `timeMs`, is refused, since whole milliseconds would read as ticks.
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
-- **Fast capture** (`--roi auto`, `locate`, the GUI's "Locate marker"):
+- **Fast capture** (`--roi auto`, `locate`, the GUI's "Locate marker"; live capture, experimental, but `--roi` works on imports too):
   - `FfmpegMarkerLocator` runs ffmpeg uncropped into `MarkerProbe` (nothing is recorded). `MarkerCrop` then picks the region and
     the integer downscale, and the capture starts a new ffmpeg with `crop=...:exact=1,scale=...`.
   - The crop starts a whole number of downscale steps before the marker origin; otherwise module edges fall between stored pixels
@@ -381,7 +396,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     refresh in two or three frames, and the times are on no grid at exactly twice the refresh rate with half of the sightings late:
     the analysis then warns that the rate is unreliable), `RefinePeriodTicks` measures it with a line through every
     first-seen time, the maximum likelihood estimate once the refresh numbers are known; also used
-    by the calibration). After a change to it run `RefreshGridTests` and `selftest --camera --fps <2 x refresh> --refresh <rate>`
+    by the calibration). After a change to it run `RefreshGridTests` and `selftest --experimental --camera --fps <2 x refresh> --refresh <rate>`
     for a few monitor rates. The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
     estimate and is compared with the calculated rate (a capture card: with its capture rate); more than 1 %
     (`TimelineAnalyzer.RefreshTolerance`) is a warning.
@@ -436,12 +451,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `Options.RecommendedOrigin(kind, …)`
     places both; there are no other slots.
 - **Camera capture (VERY EXPERIMENTAL, `measure/doc/camera.md`):**
-  - The GUI hides it (the camera card, the synthetic camera source) unless **Settings → Experimental features** is on
+  - The GUI hides it (the camera card, the synthetic camera source) unless **Settings → Experimental features** is on, and the CLI
+    unless `--experimental` is given (see live capture above)
     (`GuiSettings.ExperimentalFeatures`, `CaptureViewModel.ExperimentalFeatures`); switched off, a camera chosen earlier is not used.
   - Every place users meet it says "very experimental": CLI help, the GUI card, `CameraRig.ExperimentalNotice` in rig files and
     analysis warnings, docs. Keep it that way until it is validated with real hardware, and keep `measure/doc/camera-status.md`
     (status, known issues, next steps) current with every camera change.
-  - Saved cameras: `CameraRigLibrary` (`camera-rigs/` next to the config file; demo/automation GUI runs use their output root, never
+  - Saved cameras: `CameraRigLibrary` (`camera-rigs/` next to the config file; automation (DocImages) and `--output-root` GUI runs use their output root, never
     the user's library). GUI: `CameraWizardViewModel` + `CameraWizardWindow` (the wizard), `CameraRigViewModel` (the capture page card).
   - `Capture/source/Camera/`: `CameraCalibrator` (calibrate/verify), `CameraRig`/`CameraZone` (the rig file), `CameraRectifier` and
     `RectifyingCaptureSource` (C# path). `FfmpegCommandBuilder.BuildCameraFilter` is the ffmpeg path; both produce the same layout:
@@ -450,12 +466,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - Zones: `CameraZone.MainZone` (the main marker, identifies each frame) and `CameraZone.SyncZone` (the sync marker, times it:
     `TimelineAnalyzer.TimeBySyncMarker`). A camera decode only counts when every sampled module matches the decoded payload's symbol
     (`MarkerDecoder.MaxModuleMismatchFraction`).
-  - The synthetic camera (`Capture/source/Synthetic/SyntheticCamera.cs`) is the ground truth. `selftest --camera --fps 1000
+  - The synthetic camera (`Capture/source/Synthetic/SyntheticCamera.cs`) is the ground truth. `selftest --experimental --camera --fps 1000
 --refresh 60 [--tear-every 9]` runs it end to end.
   - Benchmarks: `dotnet run -c Release --project measure/tools/Benchmarks/Benchmarks.csproj -- --filter "*"`. Name the csproj: the
     folder's `.slnx` does not build the libraries optimized.
   - The precision-by-camera-rate table in `measure/doc/camera.md` is generated: `python tools/camera_rate_table.py --update-doc` (runs
-    `selftest --camera` per rate; selftest prints its error against the simulation for it). Rerun it after changes to the camera
+    `selftest --experimental --camera` per rate; selftest prints its error against the simulation for it). Rerun it after changes to the camera
     pipeline.
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
@@ -498,9 +514,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   `sdk/cpp/build/<preset>/marker/marker-render --golden sdk/test-data/markers` (Windows: `sdk\cpp\build\windows\marker\Release\marker-render.exe`),
   then run the C# tests and the Python tests (`python -m unittest discover -s sdk/python -t sdk/python`).
 - **Verify the GUI without touching the desktop:** `dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>` renders
-  every page offscreen (Avalonia.Headless) and runs the synthetic demo capture and analysis; compare the images with `measure/doc/images`
-  (live numbers on the capture page vary). `mb-framepacing-gui --demo` is **not** headless: it opens a real window and waits for it to
-  be closed. Demo, `--output-root` and DocImages runs never load or save the user's GUI settings. Do not take screenshots.
+  every page offscreen (Avalonia.Headless), imports and analyses a test clip, and runs the synthetic camera; compare the images with
+  `measure/doc/images` (live numbers on the camera capture page vary). `--output-root` and DocImages (`Program.Automation`) runs never
+  load or save the user's GUI settings. Do not take screenshots.
 
 ## Conventions
 
