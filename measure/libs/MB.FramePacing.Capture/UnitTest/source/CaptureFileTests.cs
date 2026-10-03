@@ -29,6 +29,98 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(header.RecordSize, Is.GreaterThanOrEqualTo(CaptureFileHeader.RecordHeaderSize + (960 * 540)));
     }
 
+    /// <summary>Both markers' regions, stacked: the header names the second one too, and the records still start on a 64 byte boundary.</summary>
+    [Test]
+    public void Header_RoundTrips_WithTheSyncMarkersRegion()
+    {
+      var header = new CaptureFileHeader(
+        165,
+        282,
+        FrameRate.FromFps(60),
+        1920,
+        1080,
+        new PixelRect(14, 14, 330, 330),
+        new PixelRect(14, 832, 234, 234)
+      );
+      var bytes = new byte[CaptureFileHeader.HeaderSize];
+      bytes.AsSpan().Fill(0xEE);
+      header.Write(bytes);
+
+      var read = CaptureFileHeader.Read(bytes);
+      Assert.That(read, Is.EqualTo(header));
+      Assert.That(read.SyncRoi, Is.EqualTo(new PixelRect(14, 832, 234, 234)));
+      Assert.That(CaptureFileHeader.HeaderSize % CaptureFileHeader.RecordAlignment, Is.Zero);
+      // The second region follows the first; what is left of the header is reserved, written as 0
+      Assert.That(BitConverter.ToInt32(bytes, 64), Is.EqualTo(14));
+      Assert.That(BitConverter.ToInt32(bytes, 68), Is.EqualTo(832));
+      Assert.That(bytes.AsSpan(80).ToArray(), Is.All.Zero);
+      Assert.That(bytes.AsSpan(28, 4).ToArray(), Is.All.Zero);
+    }
+
+    /// <summary>
+    /// The second region is there when the header is long enough to hold it: a file with the shortest header (64 bytes) has none, and
+    /// what follows those 64 bytes is its first record, not a region.
+    /// </summary>
+    [Test]
+    public void Header_OfTheShortestSize_HasNoSecondRegion()
+    {
+      var header = new CaptureFileHeader(
+        165,
+        165,
+        FrameRate.FromFps(60),
+        1920,
+        1080,
+        new PixelRect(14, 14, 330, 330),
+        new PixelRect(14, 832, 234, 234)
+      );
+      var bytes = new byte[CaptureFileHeader.HeaderSize];
+      header.Write(bytes);
+      bytes[6] = CaptureFileHeader.MinHeaderSize;
+
+      var read = CaptureFileHeader.Read(bytes, out int headerSize);
+      Assert.That(headerSize, Is.EqualTo(64));
+      Assert.That(read, Is.EqualTo(header with { SyncRoi = default }));
+      Assert.That(CaptureFileHeader.Read(bytes.AsSpan(0, 64)), Is.EqualTo(read), "the 64 bytes alone are a whole header");
+    }
+
+    [Test]
+    public void Header_RefusesAHeaderSizeBelowTheShortest_AndAFileThatEndsInsideItsHeader()
+    {
+      var bytes = new byte[CaptureFileHeader.HeaderSize];
+      new CaptureFileHeader(8, 4, FrameRate.FromFps(60)).Write(bytes);
+      Assert.Throws<InvalidDataException>(() => CaptureFileHeader.Read(bytes.AsSpan(0, 100)), "128 bytes of header, 100 of file");
+      bytes[6] = 48;
+      Assert.Throws<InvalidDataException>(() => CaptureFileHeader.Read(bytes));
+    }
+
+    /// <summary>A longer header than this reader knows: the fields it knows are read, and the records start after the whole header.</summary>
+    [Test]
+    public void Reader_FindsTheRecordsAfterTheFilesOwnHeader([Values(64, 128, 192)] int headerSize)
+    {
+      using var temp = new TempDirectory();
+      var path = temp.File("frames.mbfc");
+      var header = new CaptureFileHeader(6, 3, FrameRate.FromFps(60), 1920, 1080, new PixelRect(1, 2, 6, 3), new PixelRect(3, 4, 6, 3));
+      var bytes = new byte[headerSize + (2 * header.RecordSize)];
+      var written = new byte[CaptureFileHeader.HeaderSize];
+      header.Write(written);
+      written.AsSpan(0, Math.Min(headerSize, written.Length)).CopyTo(bytes);
+      bytes[6] = (byte)headerSize;
+      for (int i = 0; i < 2; ++i)
+      {
+        var slot = bytes.AsSpan(headerSize + (i * header.RecordSize), header.RecordSize);
+        new CaptureRecordHeader(70 + i, new TickCount64(i), DeviceTimestamp.Unknown, 0, header.PixelByteCount).Write(slot);
+        slot.Slice(CaptureFileHeader.RecordHeaderSize, header.PixelByteCount).Fill((byte)(200 + i));
+      }
+      File.WriteAllBytes(path, bytes);
+
+      using var reader = new CaptureFileReader(path);
+      Assert.That(reader.Header, Is.EqualTo(headerSize >= 80 ? header : header with { SyncRoi = default }));
+      Assert.That(reader.RecordCount, Is.EqualTo(2));
+      var image = reader.CreateFrameImage();
+      Assert.That(reader.ReadRecord(1, image).CaptureIndex, Is.EqualTo(71));
+      Assert.That(image[5, 2], Is.EqualTo(201));
+    }
+
     [Test]
     public void Header_SizeText_NamesTheSourceWhenLessOfItWasStored()
     {

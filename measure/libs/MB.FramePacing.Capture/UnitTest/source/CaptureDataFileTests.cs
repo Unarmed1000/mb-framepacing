@@ -26,7 +26,8 @@ namespace MB.FramePacing.Capture.UnitTest
       new FrameRate(60000, 1001),
       1920,
       1080,
-      new PixelRect(10, 20, 300, 400)
+      new PixelRect(10, 20, 300, 400),
+      new PixelRect(10, 700, 200, 200)
     );
 
     private static readonly MarkerLock[] g_locks = { MarkerLock.At(40, 32, 3), MarkerLock.At(40, 400, 3, MarkerKind.Sync) };
@@ -39,6 +40,7 @@ namespace MB.FramePacing.Capture.UnitTest
       header.Write(bytes);
       var read = CaptureDataHeader.Read(bytes);
       Assert.That(read.ToFileHeader(), Is.EqualTo(g_frames));
+      Assert.That(read.SyncRegion, Is.EqualTo(new Rectangle(10, 700, 200, 200)));
       Assert.That(read.ToLocks(), Is.EqualTo(g_locks));
       Assert.That((read.FramesStored, read.Camera), Is.EqualTo((true, false)));
     }

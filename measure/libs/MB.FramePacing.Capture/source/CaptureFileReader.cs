@@ -18,16 +18,21 @@ namespace MB.FramePacing.Capture
   {
     private readonly SafeFileHandle m_handle;
 
+    // Where the records start: the file's own header size
+    private readonly int m_headerSize;
+
     public CaptureFileReader(string path)
     {
       m_handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read, FileOptions.RandomAccess);
       try
       {
+        // As much of the header as this reader knows; a file with a shorter header has records there, which the header's size tells
         Span<byte> headerBytes = stackalloc byte[CaptureFileHeader.HeaderSize];
-        if (RandomAccess.Read(m_handle, headerBytes, 0) != CaptureFileHeader.HeaderSize)
+        int read = RandomAccess.Read(m_handle, headerBytes, 0);
+        if (read < CaptureFileHeader.MinHeaderSize)
           throw new InvalidDataException($"'{path}' is too short to be a capture file");
-        Header = CaptureFileHeader.Read(headerBytes);
-        long payloadLength = RandomAccess.GetLength(m_handle) - CaptureFileHeader.HeaderSize;
+        Header = CaptureFileHeader.Read(headerBytes.Slice(0, read), out m_headerSize);
+        long payloadLength = Math.Max(0, RandomAccess.GetLength(m_handle) - m_headerSize);
         // A capture that was killed mid-write may end with a partial record; it is ignored
         RecordCount = payloadLength / Header.RecordSize;
       }
@@ -75,7 +80,7 @@ namespace MB.FramePacing.Capture
     {
       if (recordIndex < 0 || recordIndex >= RecordCount)
         throw new ArgumentOutOfRangeException(nameof(recordIndex));
-      return CaptureFileHeader.HeaderSize + (recordIndex * Header.RecordSize);
+      return m_headerSize + (recordIndex * Header.RecordSize);
     }
 
     private void ReadExactly(Span<byte> buffer, long offset)

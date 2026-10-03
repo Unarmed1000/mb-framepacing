@@ -30,6 +30,6 @@ namespace MB.FramePacing.Capture
   {
     public int PixelByteCount => checked(Width * Height);
 
-    public CaptureFileHeader ToFileHeader() => new CaptureFileHeader(Width, Height, FrameRate, SourceWidth, SourceHeight, Roi);
+    public CaptureFileHeader ToFileHeader() => new CaptureFileHeader(Width, Height, FrameRate, SourceWidth, SourceHeight, Roi, SyncRoi);
   }
 }

@@ -355,7 +355,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     overlap become one. Two regions are stored as one frame, the main marker's on top (`FfmpegCommandBuilder.BuildStackedFilter`:
     split, crop, scale, pad the narrower with white, vstack; `FfmpegCaptureOptions.SyncRoi` / `RoiDownscale`), so the tearing check
     stays. `capture.json` has `roi` and `syncRoi`, the `captures.mbcd` header the second region at offset 168 (`SyncRegion`, all
-    three languages); `frames.mbfc`'s header has room for the first only.
+    three languages), and `frames.mbfc`'s header at offset 64 (`CaptureFileHeader.SyncRoi`), so frames decoded again give the same
+    capture data.
+  - **`frames.mbfc`'s header says how long it is** (128 bytes as written; the records start after it) and its first 64 bytes are what
+    every file has: a field after them is there when the header is long enough, and "none" otherwise (`CaptureFileHeader.Read`,
+    `MinHeaderSize`). Add a field in the reserved bytes the same way: optional, never a reason to refuse a file.
   - The analysis needs no change: locks are in stored pixels. It warns when a region capture has many undecodable captures, counted
     from the first capture with a marker to the end, or to the end marker when that is the last marker seen (footage before and
     after the run is not a marker that moved).

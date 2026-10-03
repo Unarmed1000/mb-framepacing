@@ -17,17 +17,8 @@ namespace MB.FramePacing.Capture
 {
   public static class CaptureDataMapping
   {
-    /// <summary>
-    /// The captures.mbcd header of frames with <paramref name="frames"/>'s header and markers at <paramref name="locks"/>;
-    /// <paramref name="syncRoi"/> is the second region of the source stored below the first (empty: none).
-    /// </summary>
-    public static CaptureDataHeader ToDataHeader(
-      this CaptureFileHeader frames,
-      IReadOnlyList<MarkerLock> locks,
-      bool framesStored,
-      bool camera,
-      PixelRect syncRoi = default
-    ) =>
+    /// <summary>The captures.mbcd header of frames with <paramref name="frames"/>'s header and markers at <paramref name="locks"/>.</summary>
+    public static CaptureDataHeader ToDataHeader(this CaptureFileHeader frames, IReadOnlyList<MarkerLock> locks, bool framesStored, bool camera) =>
       new CaptureDataHeader(
         frames.Width,
         frames.Height,
@@ -41,7 +32,7 @@ namespace MB.FramePacing.Capture
         camera
       )
       {
-        SyncRegion = new Rectangle(syncRoi.X, syncRoi.Y, syncRoi.Width, syncRoi.Height),
+        SyncRegion = new Rectangle(frames.SyncRoi.X, frames.SyncRoi.Y, frames.SyncRoi.Width, frames.SyncRoi.Height),
       };
 
     /// <summary>The header of the frames the capture data was read from.</summary>
@@ -52,7 +43,8 @@ namespace MB.FramePacing.Capture
         new FrameRate(header.FrameRateNumerator, header.FrameRateDenominator),
         header.SourceWidth,
         header.SourceHeight,
-        new PixelRect(header.Region.X, header.Region.Y, header.Region.Width, header.Region.Height)
+        new PixelRect(header.Region.X, header.Region.Y, header.Region.Width, header.Region.Height),
+        new PixelRect(header.SyncRegion.X, header.SyncRegion.Y, header.SyncRegion.Width, header.SyncRegion.Height)
       );
 
     /// <summary>Where the markers were, as the decoder's locks.</summary>

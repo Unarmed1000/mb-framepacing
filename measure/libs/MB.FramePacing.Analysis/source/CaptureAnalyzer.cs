@@ -64,7 +64,7 @@ namespace MB.FramePacing.Analysis
       warnings.AddRange(timeline.Warnings);
       if (MarkerMayHaveMoved(capture))
         warnings.Add(
-          $"Many captures could not be decoded and only the region {capture.Header.Roi} was stored: the marker may have moved out of it, or the "
+          $"Many captures could not be decoded and only the region {StoredRegions(capture.Header)} was stored: the marker may have moved out of it, or the "
             + "recording goes on after the application stopped drawing it. Keep the marker at a fixed position, or store the whole frame "
             + "(--roi full)."
         );
@@ -140,6 +140,10 @@ namespace MB.FramePacing.Analysis
           File.Delete(temporary);
       }
     }
+
+    /// <summary>The region a capture stored, or its two: "14,14,330,330 and 14,832,234,234".</summary>
+    private static string StoredRegions(CaptureFileHeader header) =>
+      header.SyncRoi.IsEmpty ? header.Roi.ToString() : $"{header.Roi} and {header.SyncRoi}";
 
     /// <summary>
     /// A capture that stored only a region relies on the marker staying inside it: more than <see cref="MovedMarkerUndecodableFraction"/>

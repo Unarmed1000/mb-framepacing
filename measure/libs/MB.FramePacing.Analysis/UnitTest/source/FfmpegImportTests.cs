@@ -250,7 +250,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     /// <summary>
     /// A recording with both markers: the two regions are located, stored as one frame (the main marker's on top) at 3 px per module, every
-    /// frame is recovered and the tearing check still works: the capture whose sync marker names another frame is torn.
+    /// frame is recovered and the tearing check still works: the capture whose sync marker names another frame is torn. The frames are
+    /// kept too: their file names both regions, and decoding them again gives the same capture data.
     /// </summary>
     [Test]
     public void VideoFile_BothMarkers_AreStoredAsOneStackedFrame_AndTearingIsChecked()
@@ -288,16 +289,20 @@ namespace MB.FramePacing.Analysis.UnitTest
       );
 
       using (var source = FfmpegCaptureSource.Start(stacked, TimeSpan.FromSeconds(30)))
-        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output }, null, CancellationToken.None);
+        CaptureRunner.Run(source, new CaptureRunOptions { OutputDirectory = output, KeepFrames = true }, null, CancellationToken.None);
       var report = CaptureAnalyzer.Analyze(output, new AnalysisOptions());
 
-      // One stored frame holds both regions, and the capture says which regions they are
+      // One stored frame holds both regions, and the capture says which regions they are: capture.json, the capture data and the frames
       var header = report.Capture.Header;
       Assert.That((header.Width, header.Height), Is.EqualTo((crop.StoredWidth, crop.StoredHeight)));
-      Assert.That(header.Roi, Is.EqualTo(crop.Roi));
+      Assert.That((header.Roi, header.SyncRoi), Is.EqualTo((crop.Roi, crop.SyncRoi)));
       Assert.That((report.Session!.Roi, report.Session.SyncRoi), Is.EqualTo((crop.Roi.ToString(), crop.SyncRoi.ToString())));
-      using (var data = new CaptureDataReader(Path.Combine(output, CaptureSessionInfo.DataFileName)))
-        Assert.That(data.Header.SyncRegion, Is.EqualTo(new Rectangle(crop.SyncRoi.X, crop.SyncRoi.Y, crop.SyncRoi.Width, crop.SyncRoi.Height)));
+      var syncRegion = new Rectangle(crop.SyncRoi.X, crop.SyncRoi.Y, crop.SyncRoi.Width, crop.SyncRoi.Height);
+      var dataPath = Path.Combine(output, CaptureSessionInfo.DataFileName);
+      using (var data = new CaptureDataReader(dataPath))
+        Assert.That(data.Header.SyncRegion, Is.EqualTo(syncRegion));
+      using (var frames = new CaptureFileReader(Path.Combine(output, CaptureSessionInfo.FramesFileName)))
+        Assert.That(frames.Header, Is.EqualTo(header));
       Assert.That(crop.StoredWidth * crop.StoredHeight * 10, Is.LessThan(960 * 640), "far less to read than whole frames");
 
       // Both markers are decoded from it, and the one capture whose markers disagree is torn
@@ -309,6 +314,12 @@ namespace MB.FramePacing.Analysis.UnitTest
       var found = report.Timeline.Runs.Single().Frames.Select(f => f.FrameIndex).ToList();
       Assert.That(found, Is.SubsetOf(expected));
       Assert.That(found, Has.Count.GreaterThanOrEqualTo(expected.Count - 1), "every frame, but perhaps the torn capture's");
+
+      // The frames decoded again: the same capture data, the second region with it
+      var liveData = File.ReadAllBytes(dataPath);
+      var again = CaptureAnalyzer.Analyze(output, new AnalysisOptions { Redecode = true });
+      Assert.That(again.Capture.Header, Is.EqualTo(header));
+      Assert.That(File.ReadAllBytes(dataPath), Is.EqualTo(liveData));
     }
   }
 }
