@@ -167,6 +167,20 @@ The work:
    frames.
 5. **Validate with real hardware:** an application with both markers through a capture card, recorded by OBS.
 
+## Long runs in less memory
+
+A possible optimization, worth it only if runs of many hours become a real use. A run that is loaded keeps an object per presented
+frame (about 320 bytes) and a row per capture (over 200 bytes), and its payload bytes: about 550 MB for an hour at 240 Hz, so ten
+hours would need several gigabytes. A report made from an analysis also keeps a second set of capture rows, which only the events
+panel reads, and only seven of their values.
+
+The option: keep frames and captures as columns of values (a list of display times, a list of frame indices, and so on) instead
+of an object each, and give the events panel the few columns it reads. The charts already work that way on their prepared data;
+this would take it back to what the analysis produces and what a report holds.
+
+It touches the analysis, the charts and everything that reads a frame, so it is a redesign, not a pass. What was measured and done
+without it: the output files, the analysis and the report cards of an hour take seconds and allocate little beyond what they keep.
+
 ## Later
 
 - **Synced playback in the GUI:** click a spike in the Timeline to see the captured frame it came from, inside the GUI. Today
