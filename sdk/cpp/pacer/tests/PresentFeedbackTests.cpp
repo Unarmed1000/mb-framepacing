@@ -104,8 +104,7 @@ namespace
 
   //! A frame loop on a swap chain that queues presents: a frame is shown QueueRefreshes after the refresh it is presented in, no
   //! earlier than its swap interval after the frame before it, and its display time is reported FeedbackDelay frames later. The frames
-  //! start a swap interval apart (plus their wobble), not when the previous one is shown: the queue holds the loop to the display's
-  //! rate, not to its refreshes.
+  //! start on a refresh, a swap interval apart, plus their wobble: the time a busy machine takes to give the thread the CPU.
   class QueuedLoop
   {
     struct Shown
@@ -171,8 +170,8 @@ namespace
     }
   };
 
-  //! The long and short frame starts a queued swap chain gives (the real log's pattern): every fourth frame starts 0.7 refresh late,
-  //! and the one after it on its refresh again
+  //! The long and short frame starts of a busy machine (the real log's pattern): every fourth frame starts 0.7 refresh late, and the
+  //! one after it on its refresh again
   FP::TimeSpan Wobble(const PC::RefreshPeriod period, const int64_t frame) noexcept
   {
     return frame % 4 == 3 ? Span(period.ToTimeSpan().Ticks() * 7 / 10) : Span(0);
@@ -623,7 +622,7 @@ TEST(PacerRefreshClockFeedback, TheDisplayMovesOnByTheSwapIntervalAndWhatWasLate
 
 TEST(PacerFeedback, FrameStartsThatWobbleAreLateByTheirStartsAndOnTimeByFeedback)
 {
-  // The display shows every frame one refresh after the one before it; only the starts are uneven, as a queue makes them
+  // The display shows every frame one refresh after the one before it; only the starts are uneven, as a busy machine makes them
   PC::FramePacer byStarts{PC::PacerSettings(g_hz240)};
   PC::FramePacer byFeedback(FeedbackSettings(g_hz240));
   QueuedLoop startsLoop(byStarts, g_hz240);
@@ -913,8 +912,9 @@ TEST(PacerFeedback, AFrameWithoutEndFrameIsPresentedAtItsStart)
 
 TEST(PacerFeedback, ARealSwapChainsFrameStartsReadAsLateAndItsDisplayTimesDoNot)
 {
-  // 1999 frames of a Vulkan FIFO swap chain on a 240 Hz display (fixed refresh, windowed, VK_EXT_present_timing), not paced: when each
-  // frame started, when it was presented, when its first pixel left for the display, and the frame in which that was reported
+  // 1999 frames of a Vulkan FIFO swap chain on a 240 Hz display (fixed refresh, windowed, VK_EXT_present_timing), not paced, on a
+  // machine busy with other work: when each frame started, when it was presented, when its first pixel left for the display, and the
+  // frame in which that was reported
   const std::optional<std::filesystem::path> path = FindTestData();
   if (!path)
   {

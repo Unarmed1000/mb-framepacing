@@ -39,20 +39,24 @@ FramePacing samples, for [Vulkan](https://github.com/Unarmed1000/gtec-demo-frame
 the marker filled from the schedule. There the pacer has paced Vulkan swap chains on Windows, where it held its targets by its own
 count of late frames; the OpenGL ES samples have only run on an emulator whose swap is not locked to vsync. No capture of it has
 been analysed with the tools, so the "not checked" column above stands. What that integration found is in this guide
-([Applying the schedule](#applying-the-schedule), `EndFrame`'s work, and [Present feedback](#present-feedback-optional): its Vulkan
-swap chain starts frames up to 3 ms off the display's refreshes, which the pacer read as late frames at 240 Hz).
+([Applying the schedule](#applying-the-schedule), `EndFrame`'s work, and [Present feedback](#present-feedback-optional)). Its
+present logs (the driver's times, not captures) show the pacer holding a swap interval of one by the frame starts alone at 23.98,
+24, 25, 29.97, 60, 100, 120 and 240 Hz on an idle machine, with the frames starting within 0.2 ms of a refresh. On the same machine
+busy with other work the frames started up to 3 ms off the refreshes, which the pacer read as late frames at 240 Hz.
 
 ## What it needs
 
 - **A steady clock**, read by the application and passed in as a `TickCount64` (the core's time types: `TickCount64::FromNanoseconds`,
   `TickCount64::FromCounter(counter, frequency)`, or a `std::chrono` clock through `core/time/ChronoConversion.hpp`).
 - **A loop paced by vsync**: vsync on, a fixed refresh rate, and a `Present` (or the wait for a free buffer) that waits for the
-  display, so every frame starts when the previous one is shown. A swap chain that queues presents starts its frames a little off
-  that: fine while they stay within half a refresh of it, and what [present feedback](#present-feedback-optional) is for where
-  they do not.
+  display, so every frame starts when the previous one is shown, or on a refresh at least: the first integration's swap chain
+  queues its presents (a frame is shown four refreshes after its present) and still starts every frame within 0.2 ms of a
+  refresh. A machine busy with other work starts them less evenly: fine while they stay within half a refresh, and what
+  [present feedback](#present-feedback-optional) is for where they do not.
 - **The display's refresh period**: from the display mode, or a hard-coded value to start with (not every window system reports
   it). Give it with its fraction: `RefreshPeriod::FromRate(24002, 100)` for 240.02 Hz, or `FromNanoseconds`; whole ticks
-  (`FromTimeSpan`) lose it.
+  (`FromTimeSpan`) lose it. Not from a swap chain's present timing without a check: the first integration's driver reported a
+  refresh duration of 8.33 ms at every display rate from 23.98 to 120 Hz.
 
 Nothing else: no vsync timestamps, no scheduled presents. Present feedback is used where the application gives it and never
 needed. [Not used yet](#not-used-yet) lists what a newer platform could add.
@@ -212,15 +216,19 @@ Some platforms report when a frame was shown, a few frames after it was presente
 measures the frames by their display times and not by their starts. It is off by default, and without it the pacer is exactly the
 baseline above.
 
-**What it is for.** A swap chain that queues presents does not start a frame when the previous one is shown. The first integration
-logged a Vulkan FIFO swap chain on a 240 Hz display with a fixed refresh rate: the display showed 1953 of 1955 frames one refresh
-(4.17 ms) apart, while the frame starts were 1.3 to 7.0 ms apart (5 % to 95 %), in a long/short pattern that no point of the loop was
-free of. That is more than half a refresh off, so by their starts 214 of 1999 frames read as late: the animation stepped a refresh
-too far each time, and the rule slowed down and sped up again every frame window. By their display times 2 frames were late, the
-two the display held longer. That log is in the tests (`sdk/test-data/pacer/240-vulkan-present-log.csv`).
+**What it is for.** The frame starts measure the display while they stay within half a refresh of its refreshes, and on an idle
+machine they do: the first integration's Vulkan FIFO swap chain started its frames within 0.2 ms of a refresh (5 % to 95 %) at
+every fixed refresh rate from 23.98 to 240 Hz. On the same machine busy with other work (other programs were being built and
+tested), at 240 Hz, the display still showed 1953 of 1955 frames one refresh (4.17 ms) apart, while the frame starts were 1.3 to
+7.0 ms apart. That is more than half a refresh off, so by their starts 214 of 1999 frames read as late: the animation stepped a
+refresh too far each time, and the rule slowed down and sped up again every frame window. By their display times 2 frames were
+late, the two the display held longer. That log is in the tests (`sdk/test-data/pacer/240-vulkan-present-log.csv`).
+
+So present feedback is for a high refresh rate on a machine that is not idle. At 60 Hz half a refresh is 8.3 ms; how far a busy
+machine moves the frame starts there has not been measured.
 
 ```cpp
-PC::PacerSettings settings(PC::RefreshPeriod::FromNanoseconds(refreshDurationNs));
+PC::PacerSettings settings(refreshPeriod);                          // from the display mode, as without feedback
 settings.SetUsePresentFeedback(true);
 PC::FramePacer pacer(settings);
 
@@ -385,6 +393,6 @@ The simulation's display runs exactly at the nominal rate. `PacerRefreshClock`'s
 jitter on every frame start, the clock's wrap.
 
 `240-vulkan-present-log.csv` is not written by `pacer-sim`: it is a present log of the first integration's Vulkan sample, not paced,
-on a 240 Hz display with a fixed refresh rate (1999 frames: when each frame started, was presented and was shown, and the frame in
-which the application read that, all in ticks). The [present feedback](#present-feedback-optional) tests pace it by the frame
+on a 240 Hz display with a fixed refresh rate and a machine busy with other work (1999 frames: when each frame started, was
+presented and was shown, and the frame in which the application read that, all in ticks). The [present feedback](#present-feedback-optional) tests pace it by the frame
 starts and by the display times, and pin both results.

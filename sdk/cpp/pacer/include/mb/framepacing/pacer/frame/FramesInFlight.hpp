@@ -18,10 +18,10 @@ namespace MB::FramePacing::Pacer
   //! measurement of each from the display time the platform reports for it. FramePacer uses it when PacerSettings::UsePresentFeedback is
   //! on; an application with its own frame loop can use it alone.
   //!
-  //! On a swap chain that queues presents a frame does not start when the previous one is shown, so the frame starts say little about
-  //! the display (PacerRefreshClock). The display times do: the whole refreshes between two of them, against the swap intervals of the
-  //! frames between, is how many refreshes late the newer frame was. Feedback comes a few frames after its frame, may be missing for
-  //! any frame, and is refused when it can not be a refresh of the display: before the frame's present, or not a whole number of
+  //! The frame starts measure the display while they stay within half a refresh of its refreshes (PacerRefreshClock); on a machine busy
+  //! with other work, at a high refresh rate, they do not. The display times do: the whole refreshes between two of them, against the
+  //! swap intervals of the frames between, is how many refreshes late the newer frame was. Feedback comes a few frames after its frame, may be
+  //! missing for any frame, and is refused when it can not be a refresh of the display: before the frame's present, or not a whole number of
   //! refreshes (within an eighth of one) after the display time used before it. A refused display time is remembered: when the next
   //! one is a whole number of refreshes after it, the measurement starts again from that one (a new swap chain, a mode change).
   //!

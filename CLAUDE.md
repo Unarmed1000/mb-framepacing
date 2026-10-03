@@ -247,9 +247,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Present feedback is the one optional input** (agreed with the user; `PacerSettings::UsePresentFeedback`, off by default, and
     without it the pacer and its golden data are unchanged): the application gives each frame's measured display time back by its
     `FrameSchedule::FrameId` (`AddPresentFeedback(PresentFeedback)`, a few frames later), and the frames are measured by those
-    (`FramesInFlight`, `pacer/frame/`: a ring of 64 frames, no allocation) and not by their starts. Why: a swap chain that queues
-    presents starts frames up to 3 ms off the display's refreshes (the first integration's Vulkan logs at 240 Hz), which the
-    refresh clock's rounding reads as late frames.
+    (`FramesInFlight`, `pacer/frame/`: a ring of 64 frames, no allocation) and not by their starts. Why: on a machine busy with
+    other work the frames start up to 3 ms off the display's refreshes (the first integration's Vulkan logs at 240 Hz), which the
+    refresh clock's rounding reads as late frames. On an idle machine they start within 0.2 ms of a refresh at every rate from
+    23.98 to 240 Hz, and the frame starts are enough: it is the machine's load, not the swap chain's queue (first believed, and
+    wrong). Ask what else ran on the machine before reading a present log.
     - Late = more whole refreshes between two display times than the swap intervals between them; a late frame is caught up when
       its feedback comes (`PacerRefreshClock::MeasureLate`); a frame without feedback counts as on time, also when it leaves the
       ring. Refused (`FeedbackState()` counts it): before the frame's present, not a whole number of refreshes (within an eighth)
@@ -258,7 +260,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `NextFrameStartTime` (the frame's start plus its swap interval, the old value) is what a loop that sleeps holds to.
     - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works): with G-SYNC on the display
       times are on no grid and are refused. Those logs come from a G-SYNC display: ask for its state before reading a new one.
-    - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off; not written by `pacer-sim`):
+    - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off, a busy machine; not written by `pacer-sim`):
       the tests pace it both ways and pin the counts (214 frames late by their starts, 2 by their display times).
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with

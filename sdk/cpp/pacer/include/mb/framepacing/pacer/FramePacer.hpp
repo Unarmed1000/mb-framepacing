@@ -30,8 +30,8 @@ namespace MB::FramePacing::Pacer
   //!
   //! Optional, where the platform has present feedback and the display a fixed refresh rate (PacerSettings::UsePresentFeedback): the
   //! application gives each frame's measured display time back (AddPresentFeedback), a few frames after the frame, and the frames are
-  //! measured by those and not by their starts (FramesInFlight). A swap chain that queues presents starts a frame before the previous
-  //! one is shown, so there the frame starts say little about the display.
+  //! measured by those and not by their starts (FramesInFlight). For where the frames start more than half a refresh off the display's
+  //! refreshes: a machine busy with other work, at a high refresh rate.
   //!
   //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); pacing
   //! frames never allocates, and only SetSettings with settings that need a larger window does.
