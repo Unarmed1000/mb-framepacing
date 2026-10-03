@@ -44,11 +44,21 @@ namespace MB.FramePacing.Analysis.UnitTest
           var expected = (long[])values.Clone();
           Array.Sort(expected);
 
+          var withScratch = (long[])values.Clone();
           TickSort.Sort(values);
+          TickSort.Sort(withScratch, new long[count + 3]);
 
           Assert.That(values, Is.EqualTo(expected), $"{count} values of kind {kind}");
+          Assert.That(withScratch, Is.EqualTo(expected), $"{count} values of kind {kind}, with the caller's scratch array");
         }
       }
+    }
+
+    [Test]
+    public void TickSort_AScratchArrayTooShort_IsRefused()
+    {
+      Assert.Throws<ArgumentException>(() => TickSort.Sort(new long[1000], new long[999]));
+      Assert.DoesNotThrow(() => TickSort.Sort(new long[10], Span<long>.Empty), "few values need none");
     }
 
     [Test]

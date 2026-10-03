@@ -21,18 +21,28 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The value <paramref name="valueOf"/> gives each of <paramref name="frameCount"/> frames, where it gives one.</summary>
     public FrameSequence(int frameCount, Func<int, long?> valueOf)
+      : this(new RankBits(frameCount, i => valueOf(i).HasValue), valueOf) { }
+
+    /// <summary>
+    /// The value <paramref name="valueOf"/> gives each frame of <paramref name="frames"/>: it gives one for exactly the frames that are
+    /// set there. For a sequence over the same frames as another one (an error and its size), which then share the frames.
+    /// </summary>
+    public FrameSequence(RankBits frames, Func<int, long?> valueOf)
     {
-      Frames = new RankBits(frameCount, i => valueOf(i).HasValue);
+      Frames = frames ?? throw new ArgumentNullException(nameof(frames));
+      int frameCount = frames.Length;
       m_values = new Lazy<WaveletMatrix>(
         () =>
         {
-          var values = new long[Frames.Count];
+          var values = GC.AllocateUninitializedArray<long>(Frames.Count);
           int next = 0;
           for (int i = 0; i < frameCount; ++i)
           {
             if (valueOf(i) is { } value)
               values[next++] = value;
           }
+          if (next != values.Length)
+            throw new InvalidOperationException("The sequence's values are not those of its frames");
           return new WaveletMatrix(values);
         },
         LazyThreadSafetyMode.ExecutionAndPublication

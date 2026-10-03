@@ -14,7 +14,9 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Numerics;
+using MB.FramePacing.Analysis;
 
 namespace MB.FramePacing.Charts
 {
@@ -30,22 +32,16 @@ namespace MB.FramePacing.Charts
     public WaveletMatrix(ReadOnlySpan<long> values)
     {
       Count = values.Length;
-      var sorted = values.ToArray();
-      Array.Sort(sorted);
-      int distinct = 0;
-      for (int i = 0; i < sorted.Length; ++i)
-      {
-        if (i == 0 || sorted[i] != sorted[i - 1])
-          sorted[distinct++] = sorted[i];
-      }
-      m_distinct = sorted[..distinct];
+      m_distinct = DistinctSorted(values);
+      int distinct = m_distinct.Length;
       m_levels = Math.Max(1, 64 - BitOperations.LeadingZeroCount((ulong)Math.Max(1, distinct - 1)));
 
       // Each value as its rank among the distinct values; level by level, the most significant bit first, zeros stably before ones
-      var current = new int[Count];
+      // Both are filled before they are read: no need to clear them first
+      var current = GC.AllocateUninitializedArray<int>(Count);
       for (int i = 0; i < Count; ++i)
         current[i] = Array.BinarySearch(m_distinct, values[i]);
-      var next = new int[Count];
+      var next = GC.AllocateUninitializedArray<int>(Count);
       int words = (Count + 63) / 64;
       m_bits = new ulong[m_levels][];
       m_ranks = new int[m_levels][];
@@ -80,6 +76,51 @@ namespace MB.FramePacing.Charts
         m_ranks[level] = ranks;
         m_zeros[level] = zeros;
       }
+    }
+
+    /// <summary>The most distinct values that are collected one by one before the values are sorted as a whole.</summary>
+    internal const int MaxCollectedDistinct = 4096;
+
+    /// <summary>
+    /// The different values among <paramref name="values"/>, ascending. A run's values are mostly a few different ones many times over
+    /// (whole refreshes, a handful of errors): those are collected and sorted on their own, which costs neither a copy of all the values
+    /// nor a sort of them. Values with more different ones than <see cref="MaxCollectedDistinct"/> are copied and sorted as a whole.
+    /// </summary>
+    private static long[] DistinctSorted(ReadOnlySpan<long> values)
+    {
+      var seen = new HashSet<long>();
+      bool collected = true;
+      long previous = 0;
+      for (int i = 0; i < values.Length; ++i)
+      {
+        // Equal values come in runs: the set is asked only when the value changes
+        if (i > 0 && values[i] == previous)
+          continue;
+        previous = values[i];
+        if (seen.Add(previous) && seen.Count > MaxCollectedDistinct)
+        {
+          collected = false;
+          break;
+        }
+      }
+      if (collected)
+      {
+        var few = new long[seen.Count];
+        seen.CopyTo(few);
+        Array.Sort(few);
+        return few;
+      }
+
+      // The scratch array is this sort's own: a rented one would stay in the pool, and the panels prepare their data at once
+      var sorted = values.ToArray();
+      TickSort.Sort(sorted, GC.AllocateUninitializedArray<long>(sorted.Length));
+      int distinct = 0;
+      for (int i = 0; i < sorted.Length; ++i)
+      {
+        if (i == 0 || sorted[i] != sorted[i - 1])
+          sorted[distinct++] = sorted[i];
+      }
+      return sorted[..distinct];
     }
 
     /// <summary>How many values the sequence holds.</summary>

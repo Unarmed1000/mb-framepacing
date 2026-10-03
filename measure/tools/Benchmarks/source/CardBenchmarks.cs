@@ -76,5 +76,12 @@ namespace MB.FramePacing.Benchmarks
       var run = m_run with { };
       return SectionCards.Build(RunSection.Whole(run), g_panels)!;
     }
+
+    /// <summary>
+    /// The report card of a run nobody has shown yet (a new run object, so nothing is cached): preparing its data and drawing it, of
+    /// which the drawing is a few milliseconds (<see cref="TimelineCard"/>). What `render` and --charts pay per run.
+    /// </summary>
+    [Benchmark]
+    public CardDrawing? FirstReportCard() => Seconds > 0 ? null : ReportCard.Build(RunSection.Whole(m_run with { }), ReportOptions.Default);
   }
 }

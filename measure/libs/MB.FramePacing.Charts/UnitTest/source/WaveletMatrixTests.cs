@@ -23,12 +23,17 @@ namespace MB.FramePacing.Charts.UnitTest
     [TestCase(1000, 3)]
     [TestCase(5000, 100)]
     [TestCase(20000, 1_000_000)]
+    // On either side of where the different values stop being collected one by one and all the values are sorted
+    [TestCase(30000, 1000)]
+    [TestCase(30000, 1100)]
     public void Queries_AreWhatSortingTheRangeGives(int count, int spread)
     {
       var random = new Random(count + spread);
       var values = Enumerable.Range(0, count).Select(_ => (long)random.Next(-spread, spread + 1) * 1000 + random.Next(0, 2)).ToArray();
       var matrix = new WaveletMatrix(values);
       Assert.That(matrix.Count, Is.EqualTo(count));
+      if (count == 30000)
+        Assert.That(values.Distinct().Count() > WaveletMatrix.MaxCollectedDistinct, Is.EqualTo(spread > 1000), "the case it is meant to be");
       for (int query = 0; query < 300; ++query)
       {
         int start = random.Next(0, count);

@@ -385,7 +385,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       median, percentiles and histograms (`SectionHistograms`) exactly: the output is byte-identical to sorting. The GUI builds cards
       at the window's width (`width`), with the whole run's scales (`wholeRunScales`), in the background (`SectionCards`,
       `LatestRequest`: a newer zoom cancels an older build). `CardBenchmarks` (`--long-running`) measures 1 and 10 hours at 240 Hz: a few ms per zoom or
-      window. `--charts` and "Save
+      window. **Preparing the data** is the cost of a run's first card (an hour at 240 Hz: about 0.55 s and 150 MB allocated to keep
+      25 MB; `CardBenchmarks.FirstReportCard`): a `WaveletMatrix` collects and sorts only the different values while there are few
+      (`MaxCollectedDistinct`; else all of them, `TickSort` with a scratch array of its own, since a rented one would stay in the pool
+      while the panels prepare at once); a run without a static frame prepares each `Animating…` sequence as its unfiltered twin, the
+      same object; sequences over the same frames share their `RankBits` (`Errors`, `AbsoluteErrors`); the holds of a kind are
+      prepared when a panel asks for that kind (never the holds as planned). `--charts` and "Save
       charts" write the SVG cards (`ChartFiles`: the report and every `DistributionCard`). Test chart changes with
       `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
       with `VideoClipTests` by linked source files).
