@@ -183,6 +183,9 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(license, Has.Some.EqualTo("<https://polyformproject.org/licenses/perimeter/1.0.1>"), "the LICENSE names the same terms");
       foreach (string notice in notices)
         Assert.That(page, Has.Some.EqualTo(notice));
+
+      // And the footer a reader sees links the project the page was made with
+      Assert.That(string.Join('\n', page), Does.Contain("<a href=\"https://github.com/Unarmed1000/mb-framepacing\""));
     }
 
     [Test]
