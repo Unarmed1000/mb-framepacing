@@ -367,27 +367,30 @@ are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad
 ### The command line
 
 ```sh
-mb-framepacing selftest                                   # check this machine, no hardware needed
-mb-framepacing config --init --set-ffmpeg /path/to/ffmpeg # once, if ffmpeg is not found automatically
-mb-framepacing marker-size --source 3840x2160 --stored 960x540  # the module size the application should draw
-mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-end --analyze  # an OBS recording of the capture card
-mb-framepacing import recording.mkv --analyze             # a video file (its own timestamps are used)
-mb-framepacing import frames/ --fps 1000 --analyze        # a folder of images at a known frame rate
-mb-framepacing import frames/ --timestamps times.csv      # ... or with exact times per image (fileName,timeTicks)
-mb-framepacing analyze <capture folder>                   # (re)analyse
-mb-framepacing analyze <capture folder> --target-fps 30   # ... measuring late frames against a 30 fps target
-mb-framepacing render <capture folder> --from 120 --to 125 --png  # the report of 5 s of the run, as SVG and PNG
-# EXPERIMENTAL: live capture (measure/doc/live-capture.md)
-mb-framepacing devices --experimental --modes             # list capture cards and their modes
-mb-framepacing capture --experimental -d "Cam Link 4K" --mode 1920x1080@240 --scale 960x540 --wait-for-start --stop-at-end --analyze
-mb-framepacing capture --experimental -d "Cam Link 4K" --mode 1920x1080@240 --roi auto --wait-for-start --stop-at-end  # fast capture
-mb-framepacing locate --experimental -d "Cam Link 4K" --mode 1920x1080@240  # where the marker is, and the region a fast capture stores
-mb-framepacing import --experimental rtsp://camera/stream -t 30s          # a live network stream
-# VERY EXPERIMENTAL: a high speed camera filming the screen (measure/doc/camera.md)
-mb-framepacing camera-rig calibrate --experimental clip.mp4 --recorded-fps 960 --name desk  # calibrate the mounted camera once, save it
-mb-framepacing import --experimental run.mp4 --recorded-fps 960 --camera desk --display-hz 60 --analyze  # later: checks the camera and the display rate
-mb-framepacing selftest --experimental --camera --fps 1000 --refresh 60  # the camera pipeline on a simulated camera
+# Once
+mb-framepacing selftest                                     # check this machine, no hardware needed
+mb-framepacing config --init --set-ffmpeg /path/to/ffmpeg   # only if ffmpeg is not found automatically
+mb-framepacing marker-size --source 3840x2160 --stored 960x540   # the module size your application should draw
+
+# Every test: import the OBS recording of the capture card; the run between its markers is measured
+mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-end --analyze
+mb-framepacing import recording.mkv --display-hz 60 --target-fps 30 --name "menu scroll" --analyze
+
+# Other recordings
+mb-framepacing import clip.mp4 --analyze                    # any video file (its own timestamps are used)
+mb-framepacing import frames/ --fps 1000 --analyze          # a folder of images at a known frame rate
+mb-framepacing import frames/ --timestamps times.csv        # ... or with each image's time (fileName,timeTicks)
+
+# The results
+mb-framepacing analyze <capture folder>                     # analyse again
+mb-framepacing analyze <capture folder> --target-fps 30     # ... with late frames judged against 30 fps
+mb-framepacing name <capture folder> "menu scroll"          # name it; analyse again to use the name
+mb-framepacing render <capture folder> --from 120 --to 125 --png   # the report of 5 s of the run, SVG and PNG
 ```
+
+Live capture (`capture`, `locate`, `devices`, a stream URL for `import`) is **experimental** and the camera (`camera-rig`,
+`--camera`) **very experimental**: they need `--experimental`, and [Live capture](measure/doc/live-capture.md) and
+[camera capture](measure/doc/camera.md) have their commands.
 
 `mb-framepacing <command> --help` lists every option (`--help --experimental` also the experimental ones). Results go to `<capture folder>/analysis/`: `summary.json`,
 `captures.csv` (one row per captured frame), `run-<id>-frames.csv` (one row per presented application frame) and, with `--charts`,
