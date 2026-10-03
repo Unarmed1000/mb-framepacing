@@ -111,10 +111,10 @@ namespace MB.FramePacing.Charts
       string title =
         RunHeadline.Title(run)
         + $", frames {frames[0].FrameIndex.ToString(CultureInfo.InvariantCulture)}–{last.FrameIndex.ToString(CultureInfo.InvariantCulture)}"
-        + $" ({Fixed(section.FromSeconds, 2)}–{Fixed(section.ToSeconds, 2)} s)";
+        + $" ({N(section.FromSeconds, 2)}–{N(section.ToSeconds, 2)} s)";
       var description = new List<string>
       {
-        $"{frames.Count} presented frames on a {Fixed(1000 / refreshMs, 2)} Hz display ({Ms(refreshMs)} ms per refresh), one capture per refresh.",
+        $"{frames.Count} presented frames on a {N(1000 / refreshMs, 2)} Hz display ({Ms(refreshMs)} ms per refresh), one capture per refresh.",
         offset == null ? "The markers carry no CPU start time and CPU busy: only the display side is drawn."
         : alignedBySchedule
           ? "The CPU times are on the pacer's clock, placed on the capture's with the markers' intended display times: on-time frames appear at their intended vsync."
@@ -177,12 +177,7 @@ namespace MB.FramePacing.Charts
           parts.Add(new TextShape(cx, y + 26, Label(frames[index]), "box-time"));
         double tip = displayY - 4;
         parts.Add(new LineShape("arrow", N(x1, 1), N(y + LaneH + 8, 1), N(x1, 1), N(tip - 8, 1)));
-        parts.Add(
-          new PathShape(
-            "arrowhead",
-            $"M{Fixed(x1 - 5, 1)},{Fixed(tip - 9, 1)} L{Fixed(x1 + 5, 1)},{Fixed(tip - 9, 1)} L{Fixed(x1, 1)},{Fixed(tip, 1)} z"
-          )
-        );
+        parts.Add(new PathShape("arrowhead", $"M{N(x1 - 5, 1)},{N(tip - 9, 1)} L{N(x1 + 5, 1)},{N(tip - 9, 1)} L{N(x1, 1)},{N(tip, 1)} z"));
       }
 
       // Display cells: what every refresh showed; each frame's values under its first refresh
@@ -305,7 +300,7 @@ namespace MB.FramePacing.Charts
       parts.Add(
         new PathShape(
           "arrowhead",
-          $"M{Fixed(arrowX - 4, 1)},{Fixed(arrowY - 3, 1)} L{Fixed(arrowX + 4, 1)},{Fixed(arrowY - 3, 1)} L{Fixed(arrowX, 1)},{Fixed(arrowY + 4, 1)} z"
+          $"M{N(arrowX - 4, 1)},{N(arrowY - 3, 1)} L{N(arrowX + 4, 1)},{N(arrowY - 3, 1)} L{N(arrowX, 1)},{N(arrowY + 4, 1)} z"
         )
       );
       const string present = "present: the frame is handed over and waits for its vsync";

@@ -49,9 +49,29 @@ namespace MB.FramePacing.Charts.UnitTest
     [TestCase(-0.04, 0, "-0")]
     [TestCase(1180.0, 1, "1180.0")]
     [TestCase(9.96, 1, "10.0")]
+    [TestCase(-999.96, 1, "-1000.0")]
+    [TestCase(9.5, 0, "10")]
+    [TestCase(0.0, 3, "0.000")]
+    [TestCase(1e15, 0, "1000000000000000")]
+    [TestCase(5e-324, 2, "0.00")]
     public void Fixed_IsPythonsFormatting(double value, int decimals, string expected)
     {
       Assert.That(SvgMarkup.Fixed(value, decimals), Is.EqualTo(expected));
+      // A card number interpolated into a string or a StringBuilder writes the same text in place
+      Assert.That($"<{SvgMarkup.N(value, decimals)}>", Is.EqualTo($"<{expected}>"));
+      Assert.That(new StringBuilder().Append($"<{SvgMarkup.N(value, decimals)}>").ToString(), Is.EqualTo($"<{expected}>"));
+    }
+
+    [Test]
+    public void TryFormatFixed_TooSmall_WritesNothing()
+    {
+      Span<char> text = stackalloc char[7];
+      Assert.That(SvgMarkup.TryFormatFixed(-1180.25, 1, text, out int written), Is.True);
+      Assert.That(text[..written].ToString(), Is.EqualTo("-1180.2"));
+      Assert.That(SvgMarkup.TryFormatFixed(-11800.25, 1, text, out written), Is.False);
+      Assert.That(written, Is.Zero);
+      Assert.Throws<ArgumentOutOfRangeException>(() => SvgMarkup.Fixed(double.NaN, 1));
+      Assert.Throws<ArgumentOutOfRangeException>(() => SvgMarkup.Fixed(double.PositiveInfinity, 1));
     }
 
     [Test]

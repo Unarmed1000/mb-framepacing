@@ -11,7 +11,6 @@
 
 using System.Globalization;
 using System.IO;
-using System.Text;
 
 namespace MB.FramePacing.Charts.Playback
 {
@@ -43,7 +42,8 @@ namespace MB.FramePacing.Charts.Playback
       Directory.CreateDirectory(folder);
       string path = Path.Combine(folder, PageName);
       string temporary = path + ".tmp";
-      File.WriteAllText(temporary, PlaybackPage.Build(section, video, options, toolVersion), new UTF8Encoding(false));
+      using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16))
+        PlaybackPage.Write(stream, section, video, options, toolVersion);
       File.Move(temporary, path, overwrite: true);
       return path;
     }

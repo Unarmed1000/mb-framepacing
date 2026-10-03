@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using BenchmarkDotNet.Attributes;
 using MB.FramePacing.Charts;
 using MB.FramePacing.Charts.Playback;
@@ -48,12 +49,14 @@ namespace MB.FramePacing.Benchmarks
       );
       // The data is prepared once per run, when it is first shown
       m_cards = PlaybackPage.Cards(m_section, ReportOptions.Default);
-      Console.WriteLine($"// {Minutes} min at {RefreshHz} Hz: {m_cards.Count - 1} zoom step(s), the page {Page().Length / 1e6:0.0} MB");
+      Console.WriteLine(
+        $"// {Minutes} min at {RefreshHz} Hz: {m_cards.Count - 1} zoom step(s), the page {PlaybackPage.Build(m_section, m_video).Length / 1e6:0.0} M characters"
+      );
     }
 
-    /// <summary>The whole page: its cards (the whole report and the zoom steps), their SVG and the data.</summary>
+    /// <summary>The whole page as the export writes it, streamed (here into nothing): its cards (the whole report and the zoom steps), their SVG and the data.</summary>
     [Benchmark]
-    public string Page() => PlaybackPage.Build(m_section, m_video);
+    public void Page() => PlaybackPage.Write(Stream.Null, m_section, m_video);
 
     /// <summary>The cards alone: the whole report and every zoom step that fits.</summary>
     [Benchmark]
@@ -61,6 +64,6 @@ namespace MB.FramePacing.Benchmarks
 
     /// <summary>The data alone: the cards' plots and every frame's columns.</summary>
     [Benchmark]
-    public string Data() => PlaybackData.Json(m_section, m_cards, ReportOptions.Default, m_video, "benchmark");
+    public void Data() => PlaybackData.Write(Stream.Null, m_section, m_cards, ReportOptions.Default, m_video, "benchmark");
   }
 }

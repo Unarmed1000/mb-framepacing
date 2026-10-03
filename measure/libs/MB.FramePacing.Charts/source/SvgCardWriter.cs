@@ -13,6 +13,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text;
 using static MB.FramePacing.Charts.SvgMarkup;
 
 namespace MB.FramePacing.Charts
@@ -31,40 +33,48 @@ namespace MB.FramePacing.Charts
       var layers = scrollLayers != null ? new LayerIds(scrollLayers) : null;
       string width = Fixed(drawing.Width, 0);
       string height = Fixed(drawing.Height, 0);
-      var parts = new List<string>
-      {
-        $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\" aria-label=\"{Escape(drawing.Title)}\">",
-        $"<title>{Escape(drawing.Title)}</title>",
-        $"<style>{DiagramStyle}{ChartStyle}{ReportStyle}</style>",
-      };
-      if (background != null)
-        parts.Add($"<rect width=\"100%\" height=\"100%\" fill=\"{Escape(background)}\"/>");
-      parts.Add(
-        $"<rect class=\"card\" x=\"0.5\" y=\"0.5\" width=\"{Fixed(drawing.Width - 1, 0)}\" height=\"{Fixed(drawing.Height - 1, 0)}\" rx=\"14\"/>"
+      var parts = new StringBuilder();
+      Line(
+        parts,
+        $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\" aria-label=\"{Escape(drawing.Title)}\">"
       );
+      Line(parts, $"<title>{Escape(drawing.Title)}</title>");
+      Line(parts, $"<style>{DiagramStyle}{ChartStyle}{ReportStyle}</style>");
+      if (background != null)
+        Line(parts, $"<rect width=\"100%\" height=\"100%\" fill=\"{Escape(background)}\"/>");
+      Line(parts, $"<rect class=\"card\" x=\"0.5\" y=\"0.5\" width=\"{N(drawing.Width - 1, 0)}\" height=\"{N(drawing.Height - 1, 0)}\" rx=\"14\"/>");
       foreach (var shape in drawing.Shapes)
         Add(parts, shape, layers);
-      parts.Add("</svg>");
-      return string.Join("\n", parts) + "\n";
+      Line(parts, "</svg>");
+      return parts.ToString();
     }
 
-    private static void Add(List<string> parts, CardShape shape, LayerIds? layers)
+    /// <summary>A line of the SVG: an interpolated one is written straight into <paramref name="parts"/>, its numbers too.</summary>
+    private static void Line(
+      StringBuilder parts,
+      [InterpolatedStringHandlerArgument(nameof(parts))] ref StringBuilder.AppendInterpolatedStringHandler text
+    ) => parts.Append('\n');
+
+    private static void Line(StringBuilder parts, string text) => parts.Append(text).Append('\n');
+
+    private static void Add(StringBuilder parts, CardShape shape, LayerIds? layers)
     {
       switch (shape)
       {
         case RectShape r:
-          parts.Add(
+          Line(
+            parts,
             $"<rect class=\"{r.Class}\" x=\"{r.X}\" y=\"{r.Y}\" width=\"{r.Width}\" height=\"{r.Height}\"{(r.Rx.Length > 0 ? $" rx=\"{r.Rx}\"" : string.Empty)}/>"
           );
           break;
         case LineShape l:
-          parts.Add($"<line class=\"{l.Class}\" x1=\"{l.X1}\" y1=\"{l.Y1}\" x2=\"{l.X2}\" y2=\"{l.Y2}\"/>");
+          Line(parts, $"<line class=\"{l.Class}\" x1=\"{l.X1}\" y1=\"{l.Y1}\" x2=\"{l.X2}\" y2=\"{l.Y2}\"/>");
           break;
         case PathShape p:
-          parts.Add($"<path class=\"{p.Class}\" d=\"{p.Data}\"/>");
+          Line(parts, $"<path class=\"{p.Class}\" d=\"{p.Data}\"/>");
           break;
         case TextShape t:
-          parts.Add(Text(t.X, t.Y, t.Content, t.Class, t.Anchor));
+          Line(parts, Text(t.X, t.Y, t.Content, t.Class, t.Anchor));
           break;
         case TextRunsShape t:
         {
@@ -73,19 +83,20 @@ namespace MB.FramePacing.Charts
           string body = string.Concat(
             t.Runs.Select(r => r.Class.Length > 0 ? $"<tspan class=\"{r.Class}\">{Escape(r.Text)}</tspan>" : Escape(r.Text))
           );
-          parts.Add($"<text x=\"{Fixed(t.X, 1)}\" y=\"{Fixed(t.Y, 1)}\" text-anchor=\"{t.Anchor}\"{cls}>{body}</text>");
+          Line(parts, $"<text x=\"{N(t.X, 1)}\" y=\"{N(t.Y, 1)}\" text-anchor=\"{t.Anchor}\"{cls}>{body}</text>");
           break;
         }
         case ScrollShape scroll when layers != null:
         {
           string id = $"{layers.Prefix}-clip-{layers.Count++}";
-          parts.Add(
-            $"<clipPath id=\"{id}\"><rect x=\"{Fixed(scroll.Left, 1)}\" y=\"{Fixed(scroll.Top, 1)}\" width=\"{Fixed(scroll.Right - scroll.Left, 1)}\" height=\"{Fixed(scroll.Bottom - scroll.Top, 1)}\"/></clipPath>"
+          Line(
+            parts,
+            $"<clipPath id=\"{id}\"><rect x=\"{N(scroll.Left, 1)}\" y=\"{N(scroll.Top, 1)}\" width=\"{N(scroll.Right - scroll.Left, 1)}\" height=\"{N(scroll.Bottom - scroll.Top, 1)}\"/></clipPath>"
           );
-          parts.Add($"<g clip-path=\"url(#{id})\"><g class=\"{ScrollLayerClass}\">");
+          Line(parts, $"<g clip-path=\"url(#{id})\"><g class=\"{ScrollLayerClass}\">");
           foreach (var child in scroll.Children)
             Add(parts, child, layers);
-          parts.Add("</g></g>");
+          Line(parts, "</g></g>");
           break;
         }
         case ScrollShape scroll:
@@ -94,10 +105,10 @@ namespace MB.FramePacing.Charts
             Add(parts, child, layers);
           break;
         case GroupShape g:
-          parts.Add($"<g transform=\"translate(0 {Fixed(g.TranslateY, 0)})\">");
+          Line(parts, $"<g transform=\"translate(0 {N(g.TranslateY, 0)})\">");
           foreach (var child in g.Children)
             Add(parts, child, layers);
-          parts.Add("</g>");
+          Line(parts, "</g>");
           break;
         default:
           throw new ArgumentException($"Unknown card shape {shape.GetType().Name}", nameof(shape));

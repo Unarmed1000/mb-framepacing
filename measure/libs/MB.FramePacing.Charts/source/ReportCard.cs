@@ -625,7 +625,7 @@ namespace MB.FramePacing.Charts
           double bottom = YOf(Math.Min(0, low));
           if (bottom - top < MinBarHeight)
             (top, bottom) = high > 1e-9 ? (zeroY - MinBarHeight, zeroY) : (zeroY, zeroY + MinBarHeight);
-          path.Append($"M{Fixed(column, 0)} {Fixed(top, 1)}h1V{Fixed(bottom, 1)}h-1Z");
+          path.Append($"M{N(column, 0)} {N(top, 1)}h1V{N(bottom, 1)}h-1Z");
         }
         foreach (var (column, frameStart, frameEnd) in view.Columns(section.Start, section.End))
         {
@@ -766,8 +766,8 @@ namespace MB.FramePacing.Charts
           double x1 = X1(i);
           double y = YOf(level);
           if (previous is { } before && Math.Abs(before.X1 - x0) < 1e-6 && Math.Abs(before.Level - level) > 1e-9)
-            risers.Append($"M{Fixed(x0, 1)} {Fixed(YOf(before.Level), 1)}V{Fixed(y, 1)}");
-          byKind[data.HoldKinds[i]].Append($"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}");
+            risers.Append($"M{N(x0, 1)} {N(YOf(before.Level), 1)}V{N(y, 1)}");
+          byKind[data.HoldKinds[i]].Append($"M{N(x0, 1)} {N(y, 1)}H{N(x1, 1)}");
           if (level > top)
             clipped.Add(((x0 + x1) / 2, level, true));
           previous = (x1, level);
@@ -797,7 +797,7 @@ namespace MB.FramePacing.Charts
           double lowest = TicksMs(holds.Values.KthSmallest(start, end, 0));
           double highest = MaxMs(holds.Values, start, end);
           var boxKind = g_holdPriority.FirstOrDefault(kind => data.HoldsOf(kind).Frames.CountIn(frameStart, frameEnd) > 0, HoldKind.AsPlanned);
-          string box = $"M{Fixed(key, 0)} {Fixed(YOf(highest) - 1.25, 1)}H{Fixed(columnEnd, 1)}V{Fixed(YOf(lowest) + 1.25, 1)}H{Fixed(key, 0)}Z";
+          string box = $"M{N(key, 0)} {N(YOf(highest) - 1.25, 1)}H{N(columnEnd, 1)}V{N(YOf(lowest) + 1.25, 1)}H{N(key, 0)}Z";
           if (highest > top)
             clipped.Add((key + 0.5, highest, true));
           if (count < MinFramesForTypical)
@@ -819,7 +819,7 @@ namespace MB.FramePacing.Charts
             },
             HoldKind.AsPlanned
           );
-          medians[middleKind].Append($"M{Fixed(key, 0)} {Fixed(YOf(TicksMs(middle)), 1)}H{Fixed(columnEnd, 1)}");
+          medians[middleKind].Append($"M{N(key, 0)} {N(YOf(TicksMs(middle)), 1)}H{N(columnEnd, 1)}");
         }
         foreach (var kind in Enum.GetValues<HoldKind>())
         {
@@ -860,9 +860,7 @@ namespace MB.FramePacing.Charts
         double ms = frameTime.TotalMilliseconds;
         double y = yOf(ms);
         // Joined to the stretch before when it ends where this one starts
-        path.Append(
-          end is { } before && Math.Abs(before - x0) < 1e-6 ? $"V{Fixed(y, 1)}H{Fixed(x1, 1)}" : $"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}"
-        );
+        path.Append(end is { } before && Math.Abs(before - x0) < 1e-6 ? $"V{N(y, 1)}H{N(x1, 1)}" : $"M{N(x0, 1)} {N(y, 1)}H{N(x1, 1)}");
         end = x1;
         if (ms > top)
           clipped.Add(((x0 + x1) / 2, ms, true));
@@ -923,11 +921,7 @@ namespace MB.FramePacing.Charts
           double x1 = x1Of(i);
           double y = yOf(view.Data.Frames[i + 1].AnimationDelta!.Value.TotalMilliseconds);
           // Joined to the hold before when it ends where this one starts (a gap in the segment starts a new line)
-          line.Append(
-            previousX1 is { } before && Math.Abs(before - x0) < 1e-6
-              ? $"V{Fixed(y, 1)}H{Fixed(x1, 1)}"
-              : $"M{Fixed(x0, 1)} {Fixed(y, 1)}H{Fixed(x1, 1)}"
-          );
+          line.Append(previousX1 is { } before && Math.Abs(before - x0) < 1e-6 ? $"V{N(y, 1)}H{N(x1, 1)}" : $"M{N(x0, 1)} {N(y, 1)}H{N(x1, 1)}");
           previousX1 = x1;
         }
         view.MovePath(parts, "step-line", line, stepY, stepY + StepH);
@@ -946,9 +940,9 @@ namespace MB.FramePacing.Charts
         double columnEnd = Math.Max(key + 1, x1Of(last));
         double lowest = TicksMs(steps.Values.KthSmallest(start, end, 0));
         double highest = MaxMs(steps.Values, start, end);
-        range.Append($"M{Fixed(key, 0)} {Fixed(yOf(highest) - 0.6, 1)}H{Fixed(columnEnd, 1)}V{Fixed(yOf(lowest) + 0.6, 1)}H{Fixed(key, 0)}Z");
+        range.Append($"M{N(key, 0)} {N(yOf(highest) - 0.6, 1)}H{N(columnEnd, 1)}V{N(yOf(lowest) + 0.6, 1)}H{N(key, 0)}Z");
         double middle = TicksMs(steps.Values.KthSmallest(start, end, (count - 1) / 2));
-        line.Append($"M{Fixed(key, 0)} {Fixed(yOf(middle), 1)}H{Fixed(columnEnd, 1)}");
+        line.Append($"M{N(key, 0)} {N(yOf(middle), 1)}H{N(columnEnd, 1)}");
       }
       view.MovePath(parts, "step-range", range, stepY, stepY + StepH);
       view.MovePath(parts, "step-line", line, stepY, stepY + StepH);
@@ -1057,9 +1051,9 @@ namespace MB.FramePacing.Charts
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
           if (cpuBusyMs > 0)
-            busy.Append($"M{Fixed(x0, 1)} {Fixed(YOf(cpuBusyMs), 1)}H{Fixed(x1, 1)}V{Fixed(bottom, 1)}H{Fixed(x0, 1)}Z");
+            busy.Append($"M{N(x0, 1)} {N(YOf(cpuBusyMs), 1)}H{N(x1, 1)}V{N(bottom, 1)}H{N(x0, 1)}Z");
           if (frameTime > 0)
-            steps.Append($"M{Fixed(x0, 1)} {Fixed(YOf(frameTime), 1)}H{Fixed(x1, 1)}");
+            steps.Append($"M{N(x0, 1)} {N(YOf(frameTime), 1)}H{N(x1, 1)}");
           double highest = Math.Max(frameTime, cpuBusyMs);
           if (highest > top)
             clipped.Add(((x0 + x1) / 2, highest, true));
@@ -1096,7 +1090,7 @@ namespace MB.FramePacing.Charts
           if (busyCount > 0)
           {
             double middleBusy = TicksMs(cpuBusy.Values.KthSmallest(busyStart, busyEnd, (busyCount - 1) / 2));
-            busy.Append($"M{Fixed(key, 0)} {Fixed(YOf(middleBusy), 1)}H{Fixed(end, 1)}V{Fixed(bottom, 1)}H{Fixed(key, 0)}Z");
+            busy.Append($"M{N(key, 0)} {N(YOf(middleBusy), 1)}H{N(end, 1)}V{N(bottom, 1)}H{N(key, 0)}Z");
           }
           double highest = Math.Max(
             levelCount > 0 ? MaxMs(frameTimes.Values, levelStart, levelEnd) : 0,
@@ -1108,7 +1102,7 @@ namespace MB.FramePacing.Charts
             continue;
           double lowest = TicksMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, 0));
           double levelMax = MaxMs(frameTimes.Values, levelStart, levelEnd);
-          string box = $"M{Fixed(key, 0)} {Fixed(YOf(levelMax) - 1.25, 1)}H{Fixed(end, 1)}V{Fixed(YOf(lowest) + 1.25, 1)}H{Fixed(key, 0)}Z";
+          string box = $"M{N(key, 0)} {N(YOf(levelMax) - 1.25, 1)}H{N(end, 1)}V{N(YOf(lowest) + 1.25, 1)}H{N(key, 0)}Z";
           if (levelCount < MinFramesForTypical)
           {
             solid.Append(box);
@@ -1116,7 +1110,7 @@ namespace MB.FramePacing.Charts
           }
           range.Append(box);
           double middle = TicksMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, (levelCount - 1) / 2));
-          median.Append($"M{Fixed(key, 0)} {Fixed(YOf(middle), 1)}H{Fixed(end, 1)}");
+          median.Append($"M{N(key, 0)} {N(YOf(middle), 1)}H{N(end, 1)}");
         }
         view.MovePath(parts, "cpu-busy", busy, frameTimeY, frameTimeY + FrameTimeH);
         view.MovePath(parts, "frametime-range", range, frameTimeY, frameTimeY + FrameTimeH);
@@ -1176,14 +1170,14 @@ namespace MB.FramePacing.Charts
         var path = paths[style];
         if (lastStyle != style)
         {
-          path.Append(last is { } previous ? $"M{Fixed(previous.X, 1)} {Fixed(previous.Y, 1)}L" : "M");
+          path.Append(last is { } previous ? $"M{N(previous.X, 1)} {N(previous.Y, 1)}L" : "M");
           lastStyle = style;
         }
         else
         {
           path.Append('L');
         }
-        path.Append($"{Fixed(x, 1)} {Fixed(y, 1)}");
+        path.Append($"{N(x, 1)} {N(y, 1)}");
         last = (x, y);
       }
       string Style(int start, int end) =>
@@ -1422,11 +1416,12 @@ namespace MB.FramePacing.Charts
           var start = columnStart > from ? columnStart : from;
           var end = columnEnd < to ? columnEnd : to;
           string? cls = null;
-          foreach (var kind in kinds)
+          // Indexed: an enumerator of the list would be a new object per column
+          for (int k = 0; k < kinds.Count; ++k)
           {
-            if (start < end && events.Any(kind, start, end))
+            if (start < end && events.Any(kinds[k], start, end))
             {
-              cls = g_eventKinds[kind].Class;
+              cls = g_eventKinds[kinds[k]].Class;
               break;
             }
           }
@@ -1503,7 +1498,7 @@ namespace MB.FramePacing.Charts
       {
         double edge = atTop ? top : bottom;
         double inside = atTop ? edge + 6 : edge - 6;
-        add(new PathShape("clip-mark", $"M{Fixed(x, 1)} {Fixed(edge, 1)}L{Fixed(x - 4, 1)} {Fixed(inside, 1)}H{Fixed(x + 4, 1)}Z"));
+        add(new PathShape("clip-mark", $"M{N(x, 1)} {N(edge, 1)}L{N(x - 4, 1)} {N(inside, 1)}H{N(x + 4, 1)}Z"));
         string text = format(value);
         double left = x + 6;
         double right = left + (text.Length * 6.2);

@@ -32,51 +32,90 @@ namespace MB.FramePacing.Charts.Playback
     /// <summary>The id of the script element that holds the data.</summary>
     public const string DataElementId = "pb-data";
 
-    private static readonly Lazy<string> g_template = new Lazy<string>(() =>
+    /// <summary>The template's text around its placeholders: before the title, before the report cards, before the data, after it.</summary>
+    private static readonly Lazy<string[]> g_template = new Lazy<string[]>(() =>
     {
       using var stream =
         Assembly.GetExecutingAssembly().GetManifestResourceStream(TemplateName)
         ?? throw new InvalidOperationException($"The resource {TemplateName} is missing");
       using var reader = new StreamReader(stream);
-      return reader.ReadToEnd();
+      string template = reader.ReadToEnd();
+      var parts = new List<string>();
+      int at = 0;
+      foreach (string token in new[] { TitleToken, ReportToken, DataToken })
+      {
+        int found = template.IndexOf(token, at, StringComparison.Ordinal);
+        if (found < 0 || template.IndexOf(token, found + token.Length, StringComparison.Ordinal) >= 0)
+          throw new InvalidOperationException($"The template must have {token} once, after the placeholders before it");
+        parts.Add(template[at..found]);
+        at = found + token.Length;
+      }
+      parts.Add(template[at..]);
+      return parts.ToArray();
     });
 
-    /// <summary>The page of <paramref name="section"/>, playing <paramref name="video"/> (a file in the page's folder).</summary>
+    /// <summary>The page of <paramref name="section"/>, playing <paramref name="video"/> (a file in the page's folder), as text.</summary>
     public static string Build(RunSection section, PlaybackVideo video, ReportOptions? options = null, string toolVersion = "")
+    {
+      using var stream = new MemoryStream();
+      Write(stream, section, video, options, toolVersion);
+      return Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
+    }
+
+    /// <summary>
+    /// The page of <paramref name="section"/>, playing <paramref name="video"/>, written into <paramref name="output"/> as UTF-8 piece by
+    /// piece: the template's text, each card's SVG, then the data straight from its writer. A page of an hour is tens of megabytes; it is
+    /// never all in memory at once.
+    /// </summary>
+    public static void Write(Stream output, RunSection section, PlaybackVideo video, ReportOptions? options = null, string toolVersion = "")
     {
       options ??= ReportOptions.Default;
       var cards = Cards(section, options);
-      // The data and every card's SVG at once: they only read the cards
-      var data = Task.Run(() => PlaybackData.Json(section, cards, options, video, toolVersion));
       var svgs = new string[cards.Count];
       Parallel.For(
         0,
         cards.Count,
         i => svgs[i] = SvgCardWriter.Write(cards[i].Drawing, null, cards[i].SecondsPerScreen != null ? $"pb-card-{i}" : null)
       );
-      string json = data.GetAwaiter().GetResult();
       string title = (options.Title ?? RunHeadline.Title(section.Run.Run)) + SectionTitle(section) + " · playback";
-      // Each card in its own view, the whole report first and shown. A zoomed card keeps its scrolling layers, and waits as text (an inert
-      // script element) until it is first shown: a page of an hour parses only the cards it shows
-      var views = new StringBuilder();
-      for (int i = 0; i < cards.Count; ++i)
+      var template = g_template.Value;
+      var encoding = new UTF8Encoding(false);
+      using (var writer = new StreamWriter(output, encoding, 1 << 16, leaveOpen: true))
       {
-        string svg = svgs[i];
-        if (i == 0)
+        writer.Write(template[0]);
+        writer.Write(WebUtility.HtmlEncode(title));
+        writer.Write(template[1]);
+        // Each card in its own view, the whole report first and shown. A zoomed card keeps its scrolling layers, and waits as text (an inert
+        // script element) until it is first shown: a page of an hour parses only the cards it shows
+        for (int i = 0; i < cards.Count; ++i)
         {
-          views.Append(CultureInfo.InvariantCulture, $"<div class=\"pb-card-view\" data-card=\"{i}\">{svg}</div>");
-          continue;
+          string svg = svgs[i];
+          if (i == 0)
+          {
+            writer.Write(string.Create(CultureInfo.InvariantCulture, $"<div class=\"pb-card-view\" data-card=\"{i}\">"));
+            writer.Write(svg);
+            writer.Write("</div>");
+            continue;
+          }
+          // Card text has no script end tag or comment, which would end or confuse the script element
+          if (svg.Contains("</script", StringComparison.OrdinalIgnoreCase) || svg.Contains("<!--", StringComparison.Ordinal))
+            throw new InvalidOperationException("A report card's SVG can not be kept in a script element");
+          writer.Write(string.Create(CultureInfo.InvariantCulture, $"<div class=\"pb-card-view\" data-card=\"{i}\" hidden></div>"));
+          writer.Write(string.Create(CultureInfo.InvariantCulture, $"<script type=\"text/plain\" id=\"pb-card-source-{i}\">"));
+          writer.Write(svg);
+          writer.Write("</script>");
+          // Written: the page needs it no more
+          svgs[i] = null!;
         }
-        // Card text has no script end tag or comment, which would end or confuse the script element
-        if (svg.Contains("</script", StringComparison.OrdinalIgnoreCase) || svg.Contains("<!--", StringComparison.Ordinal))
-          throw new InvalidOperationException("A report card's SVG can not be kept in a script element");
-        views.Append(CultureInfo.InvariantCulture, $"<div class=\"pb-card-view\" data-card=\"{i}\" hidden></div>");
-        views.Append(CultureInfo.InvariantCulture, $"<script type=\"text/plain\" id=\"pb-card-source-{i}\">{svg}</script>");
+        writer.Write(template[2]);
+        writer.Write($"<script id=\"{DataElementId}\" type=\"application/json\">");
       }
-      return g_template
-        .Value.Replace(TitleToken, WebUtility.HtmlEncode(title), StringComparison.Ordinal)
-        .Replace(ReportToken, views.ToString(), StringComparison.Ordinal)
-        .Replace(DataToken, $"<script id=\"{DataElementId}\" type=\"application/json\">{json}</script>", StringComparison.Ordinal);
+      PlaybackData.Write(output, section, cards, options, video, toolVersion);
+      using (var writer = new StreamWriter(output, encoding, 1 << 16, leaveOpen: true))
+      {
+        writer.Write("</script>");
+        writer.Write(template[3]);
+      }
     }
 
     /// <summary>

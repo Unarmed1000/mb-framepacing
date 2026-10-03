@@ -155,7 +155,7 @@ namespace MB.FramePacing.Charts
     public static string Text(double x, double y, string content, string cls = "", string anchor = "middle")
     {
       string classAttribute = cls.Length > 0 ? $" class=\"{cls}\"" : string.Empty;
-      return $"<text x=\"{Fixed(x, 1)}\" y=\"{Fixed(y, 1)}\" text-anchor=\"{anchor}\"{classAttribute}>{Escape(content)}</text>";
+      return $"<text x=\"{N(x, 1)}\" y=\"{N(y, 1)}\" text-anchor=\"{anchor}\"{classAttribute}>{Escape(content)}</text>";
     }
 
     /// <summary>
@@ -182,26 +182,70 @@ namespace MB.FramePacing.Charts
     /// </summary>
     public static string Fixed(double value, int decimals)
     {
+      Span<char> text = stackalloc char[FixedBufferLength];
+      if (!TryFormatFixed(value, decimals, text, out int written))
+        throw new ArgumentOutOfRangeException(nameof(value), value, "The number does not fit the buffer");
+      return new string(text[..written]);
+    }
+
+    /// <summary>The characters <see cref="Fixed"/> writes at most: every whole digit of a double, the sign, the point and 60 decimals.</summary>
+    private const int FixedBufferLength = 400;
+
+    /// <summary>
+    /// <see cref="Fixed"/> written into <paramref name="destination"/> without allocating (a card writes hundreds of thousands of numbers);
+    /// false when it does not fit.
+    /// </summary>
+    public static bool TryFormatFixed(double value, int decimals, Span<char> destination, out int written)
+    {
+      if (!double.IsFinite(value))
+        throw new ArgumentOutOfRangeException(nameof(value), value, "A card number must be finite");
+      if (decimals is < 0 or > 60)
+        throw new ArgumentOutOfRangeException(nameof(decimals), decimals, "From 0 to 60 decimals");
       // .NET formats doubles exactly: 60 decimals hold every digit of the values drawn here
-      string exact = Math.Abs(value).ToString("F60", CultureInfo.InvariantCulture);
-      int point = exact.IndexOf('.');
-      var digits = new List<char>(exact[..point]);
-      digits.AddRange(exact.Substring(point + 1, decimals));
-      string rest = exact[(point + 1 + decimals)..];
-      bool up = rest.Length > 0 && (rest[0] > '5' || (rest[0] == '5' && (rest.AsSpan(1).IndexOfAnyExcept('0') >= 0 || (digits[^1] - '0') % 2 == 1)));
+      Span<char> exact = stackalloc char[FixedBufferLength];
+      if (!Math.Abs(value).TryFormat(exact, out int length, "F60", CultureInfo.InvariantCulture))
+        throw new InvalidOperationException("A double's F60 text does not fit the buffer");
+      int point = exact[..length].IndexOf('.');
+      // The digits kept (the whole ones and the decimals), after a slot for a carry out of the first
+      Span<char> digits = stackalloc char[point + decimals + 1];
+      digits[0] = '0';
+      exact[..point].CopyTo(digits[1..]);
+      exact.Slice(point + 1, decimals).CopyTo(digits[(1 + point)..]);
+      var rest = exact[(point + 1 + decimals)..length];
+      bool up = rest.Length > 0 && (rest[0] > '5' || (rest[0] == '5' && (rest[1..].IndexOfAnyExcept('0') >= 0 || (digits[^1] - '0') % 2 == 1)));
+      int first = 1;
       if (up)
       {
-        int i = digits.Count - 1;
-        for (; i >= 0 && digits[i] == '9'; --i)
+        int i = digits.Length - 1;
+        for (; i >= 1 && digits[i] == '9'; --i)
           digits[i] = '0';
-        if (i < 0)
-          digits.Insert(0, '1');
+        if (i < 1)
+        {
+          digits[0] = '1';
+          first = 0;
+        }
         else
           digits[i] = (char)(digits[i] + 1);
       }
-      string whole = new string(digits.ToArray(), 0, digits.Count - decimals);
-      string text = decimals > 0 ? whole + "." + new string(digits.ToArray(), digits.Count - decimals, decimals) : whole;
-      return double.IsNegative(value) ? "-" + text : text;
+      bool negative = double.IsNegative(value);
+      var whole = digits[first..^decimals];
+      written = (negative ? 1 : 0) + whole.Length + (decimals > 0 ? 1 + decimals : 0);
+      if (written > destination.Length)
+      {
+        written = 0;
+        return false;
+      }
+      int at = 0;
+      if (negative)
+        destination[at++] = '-';
+      whole.CopyTo(destination[at..]);
+      at += whole.Length;
+      if (decimals > 0)
+      {
+        destination[at++] = '.';
+        digits[^decimals..].CopyTo(destination[at..]);
+      }
+      return true;
     }
 
     /// <summary>xml.sax.saxutils.escape: &amp;, &lt; and &gt;.</summary>

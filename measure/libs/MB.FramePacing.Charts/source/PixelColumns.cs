@@ -37,7 +37,16 @@ namespace MB.FramePacing.Charts
           high = Math.Min(end, high + step);
           step *= 2;
         }
-        int columnEnd = RunChartData.FirstWhere(low, Math.Min(high, end), k => Key(k) > key);
+        // RunChartData.FirstWhere's search, inline: a predicate would be a new closure per column
+        int columnEnd = low;
+        for (int last = Math.Min(high, end); columnEnd < last; )
+        {
+          int middle = columnEnd + ((last - columnEnd) / 2);
+          if (Key(middle) > key)
+            last = middle;
+          else
+            columnEnd = middle + 1;
+        }
         yield return (key, i, columnEnd);
         i = columnEnd;
       }

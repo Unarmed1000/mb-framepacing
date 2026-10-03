@@ -32,9 +32,23 @@ namespace MB.FramePacing.Charts.Playback
     /// </summary>
     public static string Json(RunSection section, IReadOnlyList<PlaybackCard> cards, ReportOptions options, PlaybackVideo video, string toolVersion)
     {
+      using var stream = new MemoryStream();
+      Write(stream, section, cards, options, video, toolVersion);
+      return Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
+    }
+
+    /// <summary><see cref="Json"/> written into <paramref name="stream"/> as UTF-8, as the page holds it: no text of it in memory.</summary>
+    public static void Write(
+      Stream stream,
+      RunSection section,
+      IReadOnlyList<PlaybackCard> cards,
+      ReportOptions options,
+      PlaybackVideo video,
+      string toolVersion
+    )
+    {
       var run = section.Run;
       var data = section.Data;
-      using var stream = new MemoryStream();
       using (var json = new Utf8JsonWriter(stream))
       {
         json.WriteStartObject();
@@ -115,7 +129,6 @@ namespace MB.FramePacing.Charts.Playback
         WriteFrames(json, section);
         json.WriteEndObject();
       }
-      return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private static void WriteVideo(Utf8JsonWriter json, PlaybackVideo video)
@@ -179,8 +192,14 @@ namespace MB.FramePacing.Charts.Playback
           json.WriteNumberValue(number);
         else
           json.WriteNullValue();
+        // The writer keeps what it wrote until it is flushed: an hour's columns go on to the stream as they are written
+        if (json.BytesPending >= FlushBytes)
+          json.Flush();
       }
       json.WriteEndArray();
     }
+
+    /// <summary>How much the JSON writer holds before it hands it on to the stream.</summary>
+    private const int FlushBytes = 1 << 16;
   }
 }

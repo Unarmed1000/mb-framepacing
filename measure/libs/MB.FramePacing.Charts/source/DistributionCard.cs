@@ -170,7 +170,7 @@ namespace MB.FramePacing.Charts
       }
       var d = new StringBuilder();
       foreach (double p in CurvePercentiles)
-        d.Append(d.Length == 0 ? 'M' : 'L').Append($"{Fixed(plot.PixelX(p), 1)} {Fixed(plot.PixelY(Percentile(p / 100)), 1)}");
+        d.Append(d.Length == 0 ? 'M' : 'L').Append($"{N(plot.PixelX(p), 1)} {N(plot.PixelY(Percentile(p / 100)), 1)}");
       ReportCard.AddPath(card.Parts, "curve", d);
       return card.Finish("percentile of the presented frames");
     }
@@ -213,7 +213,7 @@ namespace MB.FramePacing.Charts
 
       double XOfFrame(int index) => plot.PixelX(data.Seconds(index));
       var d = new StringBuilder();
-      void Point(double x, double value) => d.Append(d.Length == 0 ? 'M' : 'L').Append($"{Fixed(x, 1)} {Fixed(plot.PixelY(value), 1)}");
+      void Point(double x, double value) => d.Append(d.Length == 0 ? 'M' : 'L').Append($"{N(x, 1)} {N(plot.PixelY(value), 1)}");
       if ((card.PlotX1 - PlotX0) / frameCount >= 1)
       {
         for (int i = section.Start; i < section.End; ++i)

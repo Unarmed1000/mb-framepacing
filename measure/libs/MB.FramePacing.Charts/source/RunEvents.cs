@@ -82,9 +82,26 @@ namespace MB.FramePacing.Charts
     private (int Start, int End) Range(RunEventKind kind, TickCount64 from, TickCount64 to)
     {
       var list = m_events[(int)kind];
-      int start = RunChartData.FirstWhere(0, list.Length, i => list[i].Time >= from);
-      int end = RunChartData.FirstWhere(start, list.Length, i => list[i].Time >= to);
-      return (start, end);
+      int start = FirstAt(list, 0, from);
+      return (start, FirstAt(list, start, to));
+    }
+
+    /// <summary>
+    /// The first event from <paramref name="start"/> on at or after <paramref name="time"/> (RunChartData.FirstWhere's search, inline: the
+    /// events panel asks per pixel column and kind, and a predicate would be a new closure each time).
+    /// </summary>
+    private static int FirstAt(RunEvent[] list, int start, TickCount64 time)
+    {
+      int end = list.Length;
+      while (start < end)
+      {
+        int middle = start + ((end - start) / 2);
+        if (list[middle].Time >= time)
+          end = middle;
+        else
+          start = middle + 1;
+      }
+      return start;
     }
 
     public static RunEvents Of(RunChartData data)
