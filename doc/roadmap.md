@@ -61,8 +61,9 @@ default and its API may change.
   thought of is a mode of the same pacer (the same calls and schedule, the same sleep to `NextFrameStartTime`) with a clock and a
   rule of its own: a frame time chosen from the display's range and held, not a multiple of the refresh, changed rarely and in
   steps. A slot it has to be: the pacer still predicts when a frame is shown before the frame's work is known, since the frame is
-  rendered for that time. Open: the platform did not say that variable refresh was on, so the application would have to; and a capture card does
-  not see variable refresh, so the tools could not check it.
+  rendered for that time. Open: the swap chain did not say that variable refresh was on, so the application would have to tell the pacer (the guide's
+  [A variable refresh rate](../sdk/doc/pacer.md#a-variable-refresh-rate) lists where it can ask, and how to measure it); and a
+  capture card does not see variable refresh, so the tools could not check it.
 - **A C# port** (`MB.FramePacing.Pacer`): the same pacer for .NET, giving the golden data's results byte for byte.
 
 ## A capture card and a camera on the same run

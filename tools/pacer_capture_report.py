@@ -69,6 +69,9 @@ class Run:
     name: str
     refresh_period: int
     swapchain_refresh_ns: int
+    # How often the swap chain reported its refresh, and how often as a fixed one (its interval equal to its duration)
+    swapchain_reads: int
+    swapchain_reads_fixed: int
     gsync: str
     load: str
     pacer: str
@@ -124,6 +127,8 @@ class Run:
             ("run", self.name),
             ("refreshPeriodTicks", self.refresh_period),
             ("swapchainRefreshNs", self.swapchain_refresh_ns),
+            ("swapchainRefreshReads", self.swapchain_reads),
+            ("swapchainRefreshReadsFixed", self.swapchain_reads_fixed),
             ("gsync", self.gsync),
             ("load", self.load),
             ("pacer", self.pacer),
@@ -216,6 +221,7 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
     timing: dict[str, str] = {}
     refresh_period = 0
     swapchain_refresh: list[int] = []
+    swapchain_fixed = 0
     for row in csv.reader(io.StringIO(read_text(archive, f"{prefix}.events.csv"))):
         if len(row) < 4 or row[0] == "frameIndex":
             continue
@@ -232,7 +238,9 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
         elif event == "display":
             refresh_period = number(details(text).get("refreshIntervalTicks"))
         elif event == "refreshProperties":
-            swapchain_refresh.append(number(details(text).get("refreshDurationNs")))
+            reported = details(text)
+            swapchain_refresh.append(number(reported.get("refreshDurationNs")))
+            swapchain_fixed += 1 if reported.get("refreshIntervalNs") == reported.get("refreshDurationNs") else 0
     notes_name = f"{prefix}.run.txt"
     notes = read_text(archive, notes_name) if notes_name in archive.namelist() else ""
     gsync = next((line.split(":", 1)[1] for line in notes.splitlines() if line.strip().startswith("gsync:")), "")
@@ -269,6 +277,8 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
         name=name,
         refresh_period=refresh_period,
         swapchain_refresh_ns=statistics.median_low(swapchain_refresh) if swapchain_refresh else 0,
+        swapchain_reads=len(swapchain_refresh),
+        swapchain_reads_fixed=swapchain_fixed,
         gsync=gsync.split("(")[0].strip(),
         load=load if load in ("idle", "loaded") else "",
         pacer=("adaptive" if config.get("adaptive") == "1" else "fixed") if pacer_on else "off",
@@ -846,11 +856,21 @@ def gsync_table(runs: list[Run]) -> str:
             f"{of(run.exact, run.steps)}",
             f"{ms(run.start_step_p1, 2)} to {ms(run.start_step_p99, 2)} ms",
             of(run.feedback_refused, run.feedback_refused + run.feedback_used) if run.present_feedback else "",
+            of(run.swapchain_reads_fixed, run.swapchain_reads),
         ]
         for run in chosen
     ]
-    header = ["G-SYNC on for", "Run", "Asked for", "Hold", "Shown for its swap interval", "Frame start to frame start", "Display times refused"]
-    return table(header, rows, frozenset({4, 5, 6}))
+    header = [
+        "G-SYNC on for",
+        "Run",
+        "Asked for",
+        "Hold",
+        "Shown for its swap interval",
+        "Frame start to frame start",
+        "Display times refused",
+        "Swap chain reports saying fixed refresh",
+    ]
+    return table(header, rows, frozenset({4, 5, 6, 7}))
 
 
 def summary_table(runs: list[Run]) -> str:

@@ -348,7 +348,8 @@ refreshes when a frame arrives and has no grid of refreshes to count in. The pac
 feedback; switch feedback off there. The first integration's logs with G-SYNC on had display times on no grid, some before their
 present. In [that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md), of the 597 display times a run gave the pacer it could count from 5 to 9; the other 588 to 592 were
 refused (of 1195 in the longer runs, 1186 to 1190). The swap chain went on reporting the fixed refresh of the mode all the while.
-So nearly every display time refused is the sign of a variable refresh rate, and it may be the only sign the platform gives.
+So nearly every display time refused is a sign of a variable refresh rate that needs no query of the platform
+([A variable refresh rate](#a-variable-refresh-rate) has the queries).
 
 **What it does not do.** It does not pace, it does not steady the swap chain's queue or the latency, and it does not make a sleep
 land on the right refresh: the last two need the platform to take a time for the present ([Not used yet](#not-used-yet)).
@@ -365,6 +366,36 @@ Where a display time comes from. Only the first has been looked at, and only on 
 
 The times must be on the clock `BeginFrame` gets: convert them where the platform has another clock (Vulkan's calibrated
 timestamps).
+
+## A variable refresh rate
+
+The pacer needs a fixed refresh rate. A display with a variable one (G-SYNC, FreeSync, HDMI VRR) refreshes when a frame arrives, so
+there are no whole refreshes to count in. What the pacer does there, as [that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md) saw it with G-SYNC on:
+
+- **A fixed frame rate held by a timer sleep still holds**: the frame starts are as even as with a fixed refresh rate, and at 80,
+  60 and 30 fps on a 240 Hz display every frame was shown a swap interval after the one before.
+- **A wait on the vertical blank holds no frame**: the vertical blank follows the frames.
+- **Present feedback is refused**, nearly all of it ([above](#present-feedback-optional)).
+- **The pacer does not use what the display offers**: with work over a refresh it goes to every second refresh, where such a
+  display could show each frame for as long as it took. Pacing by a frame time that is no multiple of the refresh is a possible
+  upgrade ([Not used yet](#not-used-yet)).
+
+**How an application can tell.** There is no way that works everywhere. Only the first of these has been seen here; the others
+are as their documentation has them:
+
+| Where                           | What to ask                                                                                                                                                                                           | What it says                                                                                                                                                                                              |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vulkan, `VK_EXT_present_timing` | `VkSwapchainTimingPropertiesEXT`: `refreshInterval` equal to `refreshDuration` is a fixed refresh rate, `UINT64_MAX` a variable one (`refreshDuration` is then the shortest refresh), zero is unknown | The swap chain's own answer. The first integration's driver gave the two as equal in all 186 reads with G-SYNC on, 77 of them with it on for windowed apps too, so check it against the measurement below |
+| Windows, NVIDIA                 | NVAPI's `NvAPI_Disp_GetVRRInfo` for a display                                                                                                                                                         | Whether it is enabled, and whether the display is in variable refresh mode now                                                                                                                            |
+| Windows, AMD                    | ADLX's `IADLXDisplayFreeSync`: `IsSupported`, `IsEnabled`                                                                                                                                             | Whether FreeSync is supported and enabled on a display                                                                                                                                                    |
+| Windows, DXGI                   | `CheckFeatureSupport` with `DXGI_FEATURE_PRESENT_ALLOW_TEARING`                                                                                                                                       | That the system can do it, not that it is on                                                                                                                                                              |
+| Linux, KMS                      | The connector's `vrr_capable` and the CRTC's `VRR_ENABLED` properties                                                                                                                                 | Exact, for the program that owns the display: a compositor, or an application that runs without one                                                                                                       |
+| Wayland                         | The `refresh` of presentation-time's `presented` event                                                                                                                                                | Zero when the output has no constant refresh rate (from version 2 of the protocol it may be a rate the compositor picked)                                                                                 |
+
+**Or measure it**, which needs no such query. Both signs showed within a second in that session:
+
+- the display times the platform reports are not whole refreshes apart (what present feedback's `Refused` counts);
+- a wait on the vertical blank comes back at uneven times, a few refreshes apart, instead of every refresh.
 
 ## Settings
 
@@ -445,7 +476,7 @@ upgrade on the [roadmap](https://github.com/Unarmed1000/mb-framepacing/blob/mast
 | Pacing by the display times of present feedback | The platforms of [present feedback](#present-feedback-optional)                                                  | Late frames as the display had them where the frame starts are uneven: a busy machine at a high refresh rate |
 | The refresh period measured from the frames     | Anywhere                                                                                                         | A change of rate followed without being told; 59.94 Hz taken for 60                                          |
 | Slewing against drift                           | Audio and display times in one system clock                                                                      | Animation that stays in step with audio or a server over hours                                               |
-| Variable refresh and vsync off                  | G-SYNC, FreeSync, tearing presents                                                                               | Pacing where there is no grid of refreshes to round to                                                       |
+| Variable refresh and vsync off                  | G-SYNC, FreeSync, tearing presents                                                                               | Pacing by a frame time that is no multiple of the refresh                                                    |
 
 Measured so far, on one machine ([that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md)): a wait on the vertical blank the platform reports held a frame for
 its swap interval no better than the timer sleep did. The desktop compositor's time (DWM's) was that of the fastest display there:
