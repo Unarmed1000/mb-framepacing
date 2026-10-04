@@ -218,7 +218,7 @@ const FP::TimeSpan32 cpuBusy = pacer.EndFrame(presentTime);    // as you draw th
 ```
 
 The pacer needs a steady clock and a `Present` that waits for vsync, nothing else: a baseline for any platform. Where the platform
-reports when frames were shown, the application can pass that on (present feedback, optional). It is values in, values
+reports when frames were shown, the application can pass that on (present feedback, optional, statistics only). It is values in, values
 out: it calls no platform API and never reads a clock, and `BeginFrame` and `EndFrame` never allocate.
 [The frame pacer](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/pacer.md) (a release archive's `doc/pacer.md`) has
 the frame loop, how to apply the schedule, the target frame rate, the rule, every setting, and what newer platforms offer that it does
@@ -230,10 +230,10 @@ not use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/fram
 | `PacerSettings`, `SlowDownRule`                              | The refresh period (required), the target frame rate and the rule's settings; always valid                                                     |
 | `RefreshPeriod`, `RefreshTime`                               | The refresh period, exact (`FromRate`, `FromNanoseconds`, `FromTimeSpan`; always valid, no default), and a time counted in whole refreshes     |
 | `FrameSchedule`                                              | What a frame gets: its id, its swap interval, its animation time and the marker's pacing values                                                |
-| `PresentFeedback`, `PresentResult`, `PresentFeedbackState`   | Optional: what the platform measured for an earlier frame (its display time, or that it was not shown), and what became of the feedback        |
+| `PresentFeedback`, `PresentResult`, `PresentFeedbackState`   | Optional: what the platform measured for an earlier frame (its display time, or that it was not shown), and the statistics of it               |
 | `SwapIntervalRule`, `SwapIntervalChange`, `FrameWindowState` | The adaptive swap interval rule on its own, for a frame loop of your own                                                                       |
 | `PacerRefreshClock`, `AnimationTime`, `FrameMeasurement`     | The part that measures the frame starts and counts refreshes, for an application that decides its swap interval itself                         |
-| `FramesInFlight`, `MeasuredFrame`                            | The part that measures the frames by their display times (present feedback), for the same application                                          |
+| `FramesInFlight`                                             | The part that counts what the display did from the frames' display times (present feedback), for the same application                          |
 
 ## The core
 

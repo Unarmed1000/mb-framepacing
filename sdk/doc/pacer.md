@@ -7,8 +7,8 @@
 The pacer module paces a frame loop with nothing but a steady clock and a `Present` that waits for vsync: a baseline that works on any
 platform, with the oldest graphics APIs too. It gives every frame the **swap interval** to hold it for, the **animation time** to render
 it for, and what to write into the frame marker. It holds a **target frame rate**, and it adapts the swap interval to how the frames
-do. Where the platform reports when frames were shown, it can measure them by that instead of by their starts
-([Present feedback](#present-feedback-optional), optional).
+do. Where the platform reports when frames were shown, it counts what the display did and aims the marker's intended display time
+at a real refresh ([Present feedback](#present-feedback-optional), optional); it paces the same with it.
 
 It is **values in, values out**: the application passes the time a frame starts and gets back a plan. The pacer calls no graphics or
 platform API, has no callbacks and never reads a clock. Made once (it allocates its frame window then), it never allocates again while
@@ -54,14 +54,14 @@ rounds to one ([How a frame is paced](#how-a-frame-is-paced) has what changed).
 - **A loop paced by vsync**: vsync on, a fixed refresh rate, and a `Present` (or the wait for a free buffer) that waits for the
   display, so every frame starts when the previous one is shown, or on a refresh at least: the first integration's swap chain
   queues its presents (a frame is shown four refreshes after its present) and still starts every frame within 0.2 ms of a
-  refresh. A machine busy with other work starts them less evenly: fine while they stay within half a refresh, and what
-  [present feedback](#present-feedback-optional) is for where they do not.
+  refresh. A machine busy with other work starts them less evenly: fine while they stay within half a refresh. Beyond it a
+  frame on time reads as late; the statistics of [present feedback](#present-feedback-optional) show when that happens.
 - **The display's refresh period**: from the display mode, or a hard-coded value to start with (not every window system reports
   it). Give it with its fraction: `RefreshPeriod::FromRate(24002, 100)` for 240.02 Hz, or `FromNanoseconds`; whole ticks
   (`FromTimeSpan`) lose it. Not from a swap chain's present timing without a check: the first integration's driver reported a
   refresh duration of 8.33 ms at every display rate from 23.98 to 120 Hz.
 
-Nothing else: no vsync timestamps, no scheduled presents. Present feedback is used where the application gives it and never
+Nothing else: no vsync timestamps, no scheduled presents. Present feedback is counted where the application gives it and never
 needed. [Not used yet](#not-used-yet) lists what a newer platform could add.
 
 ## The two clocks
@@ -228,19 +228,28 @@ swap interval it decides.
 ## Present feedback (optional)
 
 Some platforms report when a frame was shown, a few frames after it was presented. Where the application passes that on, the pacer
-measures the frames by their display times and not by their starts. It is off by default, and without it the pacer is exactly the
-baseline above.
+counts what the display did and aims the intended display time at a refresh of the display. **It is statistics only: the pacer
+paces exactly as without it**, by the frame starts and the frames' work. It is off by default.
 
-**What it is for.** The frame starts measure the display while they stay within half a refresh of its refreshes, and on an idle
-machine they do: the first integration's Vulkan FIFO swap chain started its frames within 0.2 ms of a refresh (5 % to 95 %) at
-every fixed refresh rate from 23.98 to 240 Hz. On the same machine busy with other work (other programs were being built and
-tested), at 240 Hz, the display still showed 1953 of 1955 frames one refresh (4.17 ms) apart, while the frame starts were 1.3 to
-7.0 ms apart. That is more than half a refresh off, so by their starts 214 of 1999 frames read as late: the animation stepped a
-refresh too far each time, and the rule slowed down and sped up again every frame window. By their display times 2 frames were
-late, the two the display held longer. That log is in the tests (`sdk/test-data/pacer/240-vulkan-present-log.csv`).
+**What it is for.**
 
-So present feedback is for a high refresh rate on a machine that is not idle. At 60 Hz half a refresh is 8.3 ms; how far a busy
-machine moves the frame starts there has not been measured.
+- **Seeing what the display did**, next to what the pacer read. `pacer.FeedbackState()` counts the refreshes the display fell
+  behind and the frames it never showed; `pacer.FrameWindow()` has the pacer's own count of late frames. They differ where the
+  frame starts stop measuring the display. The first integration's Vulkan FIFO swap chain started its frames within 0.2 ms of a
+  refresh (5 % to 95 %) at every fixed refresh rate from 23.98 to 240 Hz on an idle machine. On the same machine busy with other
+  work (other programs were being built and tested), at 240 Hz, the display still showed 1953 of 1955 frames one refresh (4.17 ms)
+  apart, while the frame starts were 1.3 to 7.0 ms apart. That is more than half a refresh off, so by their starts 214 of 1999
+  frames read as late; the display times say two refreshes were lost. That log is in the tests
+  (`sdk/test-data/pacer/240-vulkan-present-log.csv`).
+- **An intended display time that is a refresh of the display**, for the marker: the analysis then judges the frames against
+  where they really were due.
+
+**Why it does not pace.** A first version measured the frames by their display times and not by their starts. In the first
+integration's sample that changed nothing with work of 20 % and of 130 % of a refresh (120 and 240 Hz, an idle machine and one
+under CPU load), it reacted two to four frames later (the display times come that long after their frames), and with work of 90 %
+at 240 Hz, right at the rule's threshold, it counted a frame that was never shown and the late frame after it as two where the
+frame starts count one. So the rule has one input on every platform, and pacing by display times is a possible upgrade
+([Not used yet](#not-used-yet)).
 
 ```cpp
 PC::PacerSettings settings(refreshPeriod);                          // from the display mode, as without feedback
@@ -259,33 +268,36 @@ RememberFrameId(schedule.FrameId);                                  // yours: th
 `PresentFeedback::Shown(frameId, displayTime, presentTime)` is a frame that was shown: the start of its first refresh, and the time
 it was presented (the present call, or the time the platform took it over), both on the clock `BeginFrame` gets. The present time
 can be left out; the time `EndFrame` was given counts then, which is too early for **an application that waits between `EndFrame`
-and its present: it must pass the present time**. `PresentFeedback::NotShown(frameId)` is a frame the platform says was never shown;
-it counts as a late frame. A frame the platform reports nothing for gets no feedback. A result without a display time is one or
+and its present: it must pass the present time**. `PresentFeedback::NotShown(frameId)` is a frame the platform says was never shown.
+A frame the platform reports nothing for gets no feedback. A result without a display time is one or
 the other by platform: on the first integration's driver (`VK_EXT_present_timing`) such a result, reported as complete, was a frame
 replaced before the display took it (across each the display moved on two or three refreshes), so the sample gives it as not
 shown.
 
-What the pacer does with it:
+**The statistics** (`pacer.FeedbackState()`, counted since the pacer was made):
 
-- **Late frames come from the display.** The whole refreshes between two display times, against the swap intervals of the frames
-  from one to the other: when the display fell behind, the frame is late. A frame held a refresh longer after one that was shown a
-  refresh sooner is not: no refresh was lost over the two (a loop paced by sleeping lands a present on the wrong side of a refresh
-  now and then, and slowing down does not cure that). A frame the platform reports as never shown is late. So is a frame whose
-  work was over its frame time, as [without feedback](#how-a-frame-is-paced). A frame with no feedback at all counts as on time,
-  and the next display time measures across it.
-- **A late frame is caught up when its feedback comes**, a few frames after it (4 in that log), not on the next frame.
-- **The intended display time is a refresh of the display**: the newest display time plus the swap intervals of the frames since,
-  this one included. It has the swap chain's queue in it and none of the frame starts' wobble, so the analysis judges the frames
-  against where they really were due. It is unknown (0, as the marker has it) until the first display time comes, and again after a
-  restart.
-- **A frame shown sooner than its swap interval** (two frames the display took in one refresh; a loop paced by sleeping that
-  lands a frame a refresh early): the animation is a refresh ahead of the display until a frame is held a refresh longer, which
-  then costs no animation step. The intended display time is not moved by it: it is counted from the display time alone.
-- **The frame starts** still say when the loop paused (a gap longer than the frame window), and `NextFrameStartTime` is counted
-  from them.
+| `PresentFeedbackState` | What it counts                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `Used`                 | Display times that were counted from                                                               |
+| `Refused`              | Feedback that can not be a refresh of the display (below)                                          |
+| `NotShown`             | Frames the platform reported as never shown                                                        |
+| `Missing`              | Frames no feedback came for: feedback for a newer frame came first, or the frame got 64 frames old |
+| `LateRefreshes`        | Refreshes the display fell behind the frames' swap intervals: what late frames cost on the display |
 
-**Feedback is refused** when it can not be a refresh of the display, and `pacer.FeedbackState()` counts what became of it (`Used`,
-`Refused`, `NotShown`, `Missing`):
+`LateRefreshes` is the whole refreshes between two display times beyond the swap intervals of the frames from one to the other.
+A frame held a refresh longer right after one that was shown a refresh sooner lost none, and is not counted: a loop paced by
+sleeping lands a present on the wrong side of a refresh now and then. A frame with no feedback is counted across by the next
+display time.
+
+**The intended display time is a refresh of the display**: the newest display time plus the swap intervals of the frames since,
+this one included. It has the swap chain's queue in it and none of the frame starts' wobble. It is unknown (0, as the marker has
+it) until the first display time comes, again after a restart, and when no display time has come for 64 frames. The display times
+come a few frames late, so the frames begun between a late frame and its display time are aimed as if it had not been late.
+
+**Everything else is the baseline's**: the swap interval, the animation time and its step, `NextFrameStartTime`, the rule's frame
+window and when a frame is late.
+
+**Feedback is refused** when it can not be a refresh of the display:
 
 - a display time before the frame's present;
 - a display time that is not a whole number of refreshes, within an eighth of one, after the display time used before it. When the
@@ -298,12 +310,8 @@ refreshes when a frame arrives and has no grid of refreshes to count in. The pac
 feedback; switch feedback off there. The first integration's logs with G-SYNC on had display times on no grid, some before their
 present.
 
-**While it is on and no feedback comes, no frame counts as late.** A frame leaves as on time once it is 64 frames old, so the rule
-can still speed up, but it never slows down. An application whose platform stops reporting (a new swap chain without support) sees
-`Missing` grow and switches back with `SetSettings`, which works on a live pacer: it starts again, as for any other setting.
-
-**What it does not do.** It does not steady the swap chain's queue or the latency, and it does not make a sleep land on the right
-refresh: both need the platform to take a time for the present ([Not used yet](#not-used-yet)).
+**What it does not do.** It does not pace, it does not steady the swap chain's queue or the latency, and it does not make a sleep
+land on the right refresh: the last two need the platform to take a time for the present ([Not used yet](#not-used-yet)).
 
 Where a display time comes from. Only the first has been looked at, and only as one driver's present log:
 
@@ -324,18 +332,18 @@ timestamps).
 (without asserts it clamps a value outside into the range). The rule's defaults are those of the simulation it reproduces; they are
 settings, not properties of frame pacing in general.
 
-| Setting                 | Default                              | Range                     | What it is                                                                                     |
-| ----------------------- | ------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------- |
-| `Refresh`               | required                             | 100 µs to 1 s             | The display's refresh period (`RefreshPeriod::FromRate`, `FromNanoseconds`, `FromTimeSpan`)    |
-| `PreferredFrameTime`    | none                                 | 0 (none) to 10 s          | The target frame rate as a frame time (`SetPreferredFrameRate` takes a rate)                   |
-| `PreferredSwapInterval` | 1                                    | 1 to 100                  | The swap interval the application wants; the pacer never goes faster                           |
-| `AutoSwapInterval`      | on                                   |                           | Adapt the swap interval with the rule                                                          |
-| `SlowDown`              | LateCount                            | `LateCount`, `FullWindow` | When the rule slows down                                                                       |
-| `FrameWindowLength`     | 2 s                                  | 1 tick to 60 s            | How long a stretch of frames the rule looks at; a longer gap between frames is a pause         |
-| `SlowDownLatePercent`   | 10                                   | 0 to 100                  | The share of late frames the rule slows down beyond                                            |
-| `FrameMargin`           | 1 ms, at most an eighth of a refresh | 0 to 1 s                  | Added to the frames' average work before it is compared with swap intervals                    |
-| `SlowestFrameTime`      | 50 ms                                | 0 to 10 s                 | The rule slows down no further once the swap interval is longer than this plus the margin      |
-| `UsePresentFeedback`    | off                                  |                           | Measure the frames by the display times given ([Present feedback](#present-feedback-optional)) |
+| Setting                 | Default                              | Range                     | What it is                                                                                    |
+| ----------------------- | ------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------------- |
+| `Refresh`               | required                             | 100 µs to 1 s             | The display's refresh period (`RefreshPeriod::FromRate`, `FromNanoseconds`, `FromTimeSpan`)   |
+| `PreferredFrameTime`    | none                                 | 0 (none) to 10 s          | The target frame rate as a frame time (`SetPreferredFrameRate` takes a rate)                  |
+| `PreferredSwapInterval` | 1                                    | 1 to 100                  | The swap interval the application wants; the pacer never goes faster                          |
+| `AutoSwapInterval`      | on                                   |                           | Adapt the swap interval with the rule                                                         |
+| `SlowDown`              | LateCount                            | `LateCount`, `FullWindow` | When the rule slows down                                                                      |
+| `FrameWindowLength`     | 2 s                                  | 1 tick to 60 s            | How long a stretch of frames the rule looks at; a longer gap between frames is a pause        |
+| `SlowDownLatePercent`   | 10                                   | 0 to 100                  | The share of late frames the rule slows down beyond                                           |
+| `FrameMargin`           | 1 ms, at most an eighth of a refresh | 0 to 1 s                  | Added to the frames' average work before it is compared with swap intervals                   |
+| `SlowestFrameTime`      | 50 ms                                | 0 to 10 s                 | The rule slows down no further once the swap interval is longer than this plus the margin     |
+| `UsePresentFeedback`    | off                                  |                           | Take the display times given, for statistics ([Present feedback](#present-feedback-optional)) |
 
 `RefreshPeriod` is always valid too: from 100 µs (10 kHz) to 1 s (1 Hz), with no default. The application gives the pacer its display's
 period.
@@ -378,27 +386,26 @@ has shown.
   measurement: `FrameMeasurement` says how many refreshes after the frame before it the previous frame was shown, whether that was
   late, and when on the display's clock.
 - It is given its longest gap (the pacer gives it the frame window's length): a longer one is a pause.
-- `MeasureLate(frameStartTime, lateRefreshes)` takes the measurement from elsewhere: the display moved on by the previous frame's
-  swap interval and the refreshes given, and the frame start only says whether this is a pause.
 
-`FramesInFlight` is that elsewhere for [present feedback](#present-feedback-optional): it keeps the frames that were begun (`Begin`,
-`End`), measures each from its display time (`Add`), and hands out how many refreshes they were late by (`TakeLateRefreshes`), each
-frame as it is decided (`TakeMeasured`, for the rule) and the newest frame's `IntendedDisplayTime`.
+`FramesInFlight` is the part behind [present feedback](#present-feedback-optional), for the same application: it keeps the frames
+that were begun (`Begin`, `End`), takes each one's display time (`Add`), and has the statistics (`State`) and the newest frame's
+`IntendedDisplayTime`.
 
 ## Not used yet
 
-The baseline takes nothing a platform may not have, and of what newer platforms offer the pacer uses one thing when it is given:
-[present feedback](#present-feedback-optional). What it does not use yet; each is a possible upgrade on the
-[roadmap](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/roadmap.md), as is a C# port:
+The baseline takes nothing a platform may not have, and of what newer platforms offer the pacer takes one thing when it is given:
+[present feedback](#present-feedback-optional), which it counts and does not pace by. What it does not use yet; each is a possible
+upgrade on the [roadmap](https://github.com/Unarmed1000/mb-framepacing/blob/master/doc/roadmap.md), as is a C# port:
 
-| Not used yet                                | Where it exists                                                                                                  | What it would improve                                                        |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Vsync times the platform reports            | DWM's `qpcVBlank`, Choreographer's frame time, `CADisplayLink`'s `timestamp`                                     | The intended display time without the frame starts' jitter                   |
-| Predicted display times                     | Choreographer's expected presentation time, OpenXR's `predictedDisplayTime`, `CADisplayLink`'s `targetTimestamp` | The animation time the platform itself aims for                              |
-| Scheduled presents and per-frame targets    | `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`, Metal's `present(at:)`, Windows' `SetTargetTime`       | Back at full rate a frame sooner after one slow frame; no sleep that guesses |
-| The refresh period measured from the frames | Anywhere                                                                                                         | A change of rate followed without being told; 59.94 Hz taken for 60          |
-| Slewing against drift                       | Audio and display times in one system clock                                                                      | Animation that stays in step with audio or a server over hours               |
-| Variable refresh and vsync off              | G-SYNC, FreeSync, tearing presents                                                                               | Pacing where there is no grid of refreshes to round to                       |
+| Not used yet                                    | Where it exists                                                                                                  | What it would improve                                                                                        |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Vsync times the platform reports                | DWM's `qpcVBlank`, Choreographer's frame time, `CADisplayLink`'s `timestamp`                                     | The intended display time without the frame starts' jitter                                                   |
+| Predicted display times                         | Choreographer's expected presentation time, OpenXR's `predictedDisplayTime`, `CADisplayLink`'s `targetTimestamp` | The animation time the platform itself aims for                                                              |
+| Scheduled presents and per-frame targets        | `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`, Metal's `present(at:)`, Windows' `SetTargetTime`       | Back at full rate a frame sooner after one slow frame; no sleep that guesses                                 |
+| Pacing by the display times of present feedback | The platforms of [present feedback](#present-feedback-optional)                                                  | Late frames as the display had them where the frame starts are uneven: a busy machine at a high refresh rate |
+| The refresh period measured from the frames     | Anywhere                                                                                                         | A change of rate followed without being told; 59.94 Hz taken for 60                                          |
+| Slewing against drift                           | Audio and display times in one system clock                                                                      | Animation that stays in step with audio or a server over hours                                               |
+| Variable refresh and vsync off                  | G-SYNC, FreeSync, tearing presents                                                                               | Pacing where there is no grid of refreshes to round to                                                       |
 
 ## Tests and golden data
 
@@ -416,8 +423,9 @@ jitter on every frame start, the clock's wrap.
 
 `240-vulkan-present-log.csv` is not written by `pacer-sim`: it is a present log of the first integration's Vulkan sample, not paced,
 on a 240 Hz display with a fixed refresh rate and a machine busy with other work (1999 frames: when each frame started, was
-presented and was shown, and the frame in which the application read that, all in ticks). The [present feedback](#present-feedback-optional) tests pace it by the frame
-starts and by the display times, and pin both results.
+presented and was shown, and the frame in which the application read that, all in ticks). The [present feedback](#present-feedback-optional) tests pace it without and
+with the display times and pin that the pacing is the same (214 frames late by their starts) and that the statistics count the two
+refreshes the display lost.
 
 `120-vulkan-work-130-log.csv` is a frame log of the same sample on a 120 Hz display with a fixed refresh rate and an idle machine,
 with CPU work of 11.1 ms a frame (133 % of a refresh): 1500 frames, when each started, when its work ended, the work, and when it

@@ -6,7 +6,6 @@
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/clock/AnimationTime.hpp>
 #include <mb/framepacing/pacer/clock/FrameMeasurement.hpp>
-#include <mb/framepacing/pacer/frame/MeasuredFrame.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <limits>
 
@@ -38,24 +37,16 @@ namespace MB::FramePacing::Pacer
     {
       // No EndFrame: the frame is taken as presented now
       m_work = ToTimeSpan32(cpuStartTime - m_cpuStartTime).ToTimeSpan();
-      m_inFlight.End(m_work, m_cpuStartTime, false);
     }
     // The previous frame: how it did goes to the rule. After a pause (and on the first frame) nothing was measured: the window starts
-    // empty, and the swap interval stays. With present feedback the frames are measured by their display times, as those come in:
-    // the frame start only says whether this is a pause
-    const bool useFeedback = m_rule.Settings().UsePresentFeedback();
-    const FrameMeasurement previous =
-      useFeedback ? m_clock.MeasureLate(cpuStartTime, m_inFlight.TakeLateRefreshes()) : m_clock.Measure(cpuStartTime, knownWork);
+    // empty, and the swap interval stays. Present feedback changes none of this: it gives statistics and the intended display time
+    const FrameMeasurement previous = m_clock.Measure(cpuStartTime, knownWork);
     const RefreshPeriod period = m_rule.Refresh();
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
     if (previous.Restarted)
     {
       m_rule.Clear();
       m_inFlight.Restart();
-    }
-    else if (useFeedback)
-    {
-      change = AddMeasuredFrames();
     }
     else
     {
@@ -69,8 +60,14 @@ namespace MB::FramePacing::Pacer
     m_cpuStartTime = cpuStartTime;
     m_work = TimeSpan();
 
+    const bool useFeedback = m_rule.Settings().UsePresentFeedback();
     FrameSchedule schedule;
-    schedule.FrameId = m_inFlight.Begin(swapInterval, animation.Time, cpuStartTime);
+    schedule.FrameId = m_inFlight.Begin(swapInterval, cpuStartTime);
+    if (!useFeedback)
+    {
+      // Only the frame's id is wanted: no feedback is taken for it, so the frame is not kept and none is missing for it
+      m_inFlight.Restart();
+    }
     schedule.SwapInterval = swapInterval;
     schedule.AnimationTime = animation.Time;
     schedule.AnimationStep = animation.Step;
@@ -93,7 +90,7 @@ namespace MB::FramePacing::Pacer
     const TimeSpan32 busy = ToTimeSpan32(presentTime - m_cpuStartTime);
     m_work = work > TimeSpan() ? work : busy.ToTimeSpan();
     m_frameEnded = true;
-    m_inFlight.End(m_work, presentTime);
+    m_inFlight.End(presentTime);
     return busy;
   }
 
@@ -134,25 +131,5 @@ namespace MB::FramePacing::Pacer
     m_inFlight.Restart();
     m_frameOpen = false;
     m_frameEnded = false;
-  }
-
-  SwapIntervalChange FramePacer::AddMeasuredFrames() noexcept
-  {
-    // The frames their feedback has decided since the last frame began, oldest first. A change of swap interval empties the rule's
-    // window: the frames still in flight were paced at the old one, and are left out
-    SwapIntervalChange change = SwapIntervalChange::Unchanged;
-    MeasuredFrame frame;
-    while (m_inFlight.TakeMeasured(frame))
-    {
-      if (frame.FrameId >= m_firstRuleFrameId)
-      {
-        change = m_rule.AddFrame(frame.AnimationTime, frame.Work, frame.Late);
-        if (change != SwapIntervalChange::Unchanged)
-        {
-          m_firstRuleFrameId = m_inFlight.NewestFrameId() + 1u;
-        }
-      }
-    }
-    return change;
   }
 }

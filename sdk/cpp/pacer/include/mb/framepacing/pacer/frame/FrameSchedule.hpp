@@ -25,8 +25,8 @@ namespace MB::FramePacing::Pacer
     TimeSpan AnimationTime;
     //! The step from the previous frame's animation time: the frame's delta time.
     TimeSpan AnimationStep;
-    //! When the pacer aims for this frame to be shown, on the application's steady clock: the marker's intended display time. Measured
-    //! by the frame starts it is the frame's start plus its swap interval (NextFrameStartTime), as the frame starts when the previous
+    //! When the pacer aims for this frame to be shown, on the application's steady clock: the marker's intended display time. Without
+    //! present feedback it is the frame's start plus its swap interval (NextFrameStartTime), as the frame starts when the previous
     //! one is shown. With present feedback it is the newest display time the platform reported plus the swap intervals of the frames
     //! since, this one included: the refresh the frame reaches when none of them is late, however many presents are queued. Unknown
     //! (TickCount64(), the marker's 0) while there is no display time to count from.

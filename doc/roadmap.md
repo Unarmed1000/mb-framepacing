@@ -35,8 +35,9 @@ The work:
 The SDK's [frame pacer](../sdk/doc/pacer.md) is a first version and experimental: a baseline that needs only a steady clock and a
 `Present` that waits for vsync, so it works on any platform, and it is off by default. It is checked against its own simulation
 only; a first integration (the author's unofficial gtec-demo-framework, see the guide's Status) runs it on real swap chains, not
-yet measured with the tools. From that integration's present logs it can now take present feedback where the application gives it
-(optional, off by default; fixed refresh rates only): the frames are then measured by when the display showed them.
+yet measured with the tools. From that integration's present logs it can take present feedback where the application gives it
+(optional, off by default; fixed refresh rates only): statistics of what the display did, and the marker's intended display time
+as a refresh of the display. It paces the same with it.
 
 **Out of experimental:** measure it on real swap chains, with the marker and the tools, on each platform and for each way of applying
 a schedule (the platform's swap interval, presenting a frame again, sleeping until the frame is due). Until then it stays off by
@@ -48,6 +49,9 @@ default and its API may change.
 - **Vsync times the platform reports:** the intended display time without the jitter of the frame starts.
 - **Predicted display times:** the animation time the platform itself aims for.
 - **Scheduled presents and per-frame targets:** back at full rate a frame sooner after one slow frame, and no sleep that guesses.
+- **Pacing by the display times of present feedback:** late frames as the display had them where the frame starts are uneven (a
+  busy machine at a high refresh rate). A first version did this; in the first integration's sample it made no difference at work
+  of 20 % and 130 % of a refresh and was no better at 90 %, so feedback is statistics only until a run shows the gain.
 - **The refresh period measured from the frames:** a change of rate followed without being told, 59.94 Hz taken for 60.
 - **Slewing against drift:** animation that stays in step with audio or a server over hours.
 - **Variable refresh and vsync off:** pacing where there is no grid of refreshes to round to. Present feedback refuses the

@@ -29,9 +29,9 @@ namespace MB::FramePacing::Pacer
   //! rate the application prefers down.
   //!
   //! Optional, where the platform has present feedback and the display a fixed refresh rate (PacerSettings::UsePresentFeedback): the
-  //! application gives each frame's measured display time back (AddPresentFeedback), a few frames after the frame, and the frames are
-  //! measured by those and not by their starts (FramesInFlight). For where the frames start more than half a refresh off the display's
-  //! refreshes: a machine busy with other work, at a high refresh rate.
+  //! application gives each frame's measured display time back (AddPresentFeedback), a few frames after the frame. The pacer paces
+  //! exactly as without it; the display times give statistics (FeedbackState: what the display did, to hold against the pacer's own
+  //! count of late frames) and the intended display time as a refresh of the display (FramesInFlight).
   //!
   //! Values in, values out: the pacer calls no platform API and never reads a clock. Made once (it allocates the rule's window); pacing
   //! frames never allocates, and only SetSettings with settings that need a larger window does.
@@ -40,8 +40,6 @@ namespace MB::FramePacing::Pacer
     SwapIntervalRule m_rule;
     PacerRefreshClock m_clock;
     FramesInFlight m_inFlight;
-    // With present feedback: the first frame the rule counts, the one its last change was for
-    uint64_t m_firstRuleFrameId{0};
     // The frame between BeginFrame and the next BeginFrame
     TickCount64 m_cpuStartTime;
     TimeSpan m_work;
@@ -65,9 +63,9 @@ namespace MB::FramePacing::Pacer
     TimeSpan32 EndFrame(TickCount64 presentTime, TimeSpan work = {}) noexcept;
 
     //! What the platform measured for an earlier frame (its FrameSchedule::FrameId): any number of calls between two BeginFrames,
-    //! oldest frame first; the next BeginFrame plans with it. Nothing while PacerSettings::UsePresentFeedback is off. A late frame is
-    //! caught up when its feedback comes, a few frames after it; feedback that can not be a refresh of the display is refused
-    //! (FeedbackState counts it), and a frame without any counts as on time. Never allocates.
+    //! oldest frame first. Nothing while PacerSettings::UsePresentFeedback is off. It changes no swap interval and no animation
+    //! time: it is counted (FeedbackState), and the next BeginFrame's intended display time is counted from it. Feedback that can
+    //! not be a refresh of the display is refused. Never allocates.
     void AddPresentFeedback(const PresentFeedback& feedback) noexcept;
 
     //! The display's refresh period changed (a mode change, another monitor): the pacer starts again on it, with an empty window, at the
@@ -89,7 +87,7 @@ namespace MB::FramePacing::Pacer
       return m_rule.FrameWindow();
     }
 
-    //! What became of the present feedback given so far.
+    //! The statistics of the present feedback given so far: what the display did, and what became of the feedback.
     [[nodiscard]] PresentFeedbackState FeedbackState() const noexcept
     {
       return m_inFlight.State();
@@ -112,9 +110,6 @@ namespace MB::FramePacing::Pacer
     {
       return m_rule.Settings();
     }
-
-  private:
-    SwapIntervalChange AddMeasuredFrames() noexcept;
   };
 }
 

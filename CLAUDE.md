@@ -13,7 +13,8 @@ The repository has two parts, and the license follows them (see Conventions):
   - **pacer** (C++ `MB::FramePacing::Pacer` only; **experimental**, off by default): paces a frame loop with nothing but a steady clock
     and vsync: frame starts measured on the CPU's clock and counted in whole refreshes on the display's (`PacerRefreshClock`), a
     target frame rate, and the adaptive swap interval rule (the full-window rule of mb-framepacing-explained's simulation, and its fix
-    as the default); optionally the frames are measured by the display times the platform reports (present feedback) instead;
+    as the default); optionally it counts what the display did from the display times the platform reports (present feedback,
+    statistics only);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
     language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, and the optional `core/time/ChronoConversion.hpp`; `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
@@ -252,27 +253,35 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `sdk/test-data/pacer/120-vulkan-work-130-log.csv` is the real log the tests pin.
   - **Nothing a platform may not have:** vsync times, predicted display times, scheduled presents, a
     measured refresh period, VRR are the guide's "Not used yet" and `doc/roadmap.md`. Agree with the user before adding one.
-  - **Present feedback is the one optional input** (agreed with the user; `PacerSettings::UsePresentFeedback`, off by default, and
-    without it the pacer and its golden data are unchanged): the application gives each frame's measured display time back by its
-    `FrameSchedule::FrameId` (`AddPresentFeedback(PresentFeedback)`, a few frames later), and the frames are measured by those
-    (`FramesInFlight`, `pacer/frame/`: a ring of 64 frames, no allocation) and not by their starts. Why: on a machine busy with
-    other work the frames start up to 3 ms off the display's refreshes (the first integration's Vulkan logs at 240 Hz), which the
-    refresh clock's rounding reads as late frames. On an idle machine they start within 0.2 ms of a refresh at every rate from
-    23.98 to 240 Hz, and the frame starts are enough: it is the machine's load, not the swap chain's queue (first believed, and
-    wrong). Ask what else ran on the machine before reading a present log.
-    - Late = the display fell behind: more whole refreshes between two display times than the swap intervals between them **and
-      the lead** (a frame shown sooner than its swap interval puts the count ahead; a frame held as much longer after it lost no
-      refresh, so it is neither late nor caught up: a loop paced by sleeping makes such pairs, and counting them took the rule
-      from a swap interval of 2 to 3 in the first integration's capture). Also late: a frame reported `NotShown`, and one whose
-      work was over its frame time (as without feedback). A late frame is caught up when its feedback comes
-      (`PacerRefreshClock::MeasureLate`); a frame without feedback counts as on time, also when it leaves the ring. Refused (`FeedbackState()` counts it): before the frame's present, not a whole number of refreshes (within an eighth)
-      after the display time used before it, a frame not kept. Two refused in a row that agree start the count again.
+  - **Present feedback is the one optional input, and statistics only** (the user, 2026-10-04: "stats only, to simplify";
+    `PacerSettings::UsePresentFeedback`, off by default, and without it the pacer and its golden data are unchanged): the
+    application gives each frame's measured display time back by its `FrameSchedule::FrameId`
+    (`AddPresentFeedback(PresentFeedback)`, a few frames later). **The pacer paces exactly as without it** (frame starts and work):
+    feedback gives `FeedbackState()` (`Used`, `Refused`, `NotShown`, `Missing`, `LateRefreshes`: what the display did, to hold
+    against the pacer's own late count) and the intended display time (`FramesInFlight`, `pacer/frame/`: a ring of 64 frames, no
+    allocation). Never let it change a swap interval or an animation time again without the user's word.
+    - Why statistics only: a first version measured the frames by their display times. The first integration's capture (120 and
+      240 Hz, work of 20, 90 and 130 %, idle and under CPU load) showed no difference at 20 and 130 %, a reaction 2 to 4 frames
+      later, and at 90 % (the rule's threshold) a count about 40 % above the display's events, as a frame never shown and the late
+      frame after it counted as two. The one case for it stays the busy-machine log below; pacing by display times is the guide's
+      "Not used yet" and a roadmap option.
+    - On a machine busy with other work the frames start up to 3 ms off the display's refreshes (the first integration's Vulkan
+      logs at 240 Hz), which the refresh clock's rounding reads as late frames. On an idle machine they start within 0.2 ms of a
+      refresh at every rate from 23.98 to 240 Hz: it is the machine's load, not the swap chain's queue (first believed, and
+      wrong). Ask what else ran on the machine before reading a present log.
+    - `LateRefreshes` = the display fell behind: more whole refreshes between two display times than the swap intervals between
+      them **and the lead** (a frame shown sooner than its swap interval puts the count ahead; a frame held as much longer after
+      it lost no refresh: a loop paced by sleeping makes such pairs). `Missing`: a frame that feedback for a newer frame passed,
+      or that left the ring without any. Refused: before the frame's present, not a whole number of refreshes (within an eighth)
+      after the display time used before it, a frame not kept. Two refused in a row that agree start the count again. With
+      feedback off the pacer keeps no frame (only the id counts on).
     - `IntendedDisplayTime` is then the newest display time plus the swap intervals since (0 = unknown while there is none);
       `NextFrameStartTime` (the frame's start plus its swap interval, the old value) is what a loop that sleeps holds to.
     - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works): with G-SYNC on the display
       times are on no grid and are refused. Those logs come from a G-SYNC display: ask for its state before reading a new one.
     - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off, a busy machine; not written by `pacer-sim`):
-      the tests pace it both ways and pin the counts (214 frames late by their starts, 2 by their display times).
+      the tests pace it without and with feedback and pin the counts (214 frames late by their starts both ways, 2 refreshes
+      lost by the display times).
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
     `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.

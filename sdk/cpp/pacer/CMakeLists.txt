@@ -27,7 +27,6 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/FramePacer.hpp
       include/mb/framepacing/pacer/frame/FrameSchedule.hpp
       include/mb/framepacing/pacer/frame/FramesInFlight.hpp
-      include/mb/framepacing/pacer/frame/MeasuredFrame.hpp
       include/mb/framepacing/pacer/frame/PresentFeedback.hpp
       include/mb/framepacing/pacer/frame/PresentFeedbackState.hpp
       include/mb/framepacing/pacer/frame/PresentResult.hpp

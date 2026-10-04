@@ -145,9 +145,10 @@ namespace MB::FramePacing::Pacer
 
     void SetSlowestFrameTime(TimeSpan frameTime) noexcept;
 
-    //! Measure the frames by the display times the application reports (FramePacer::AddPresentFeedback), not by their starts: for a
-    //! platform with present feedback, on a display with a fixed refresh rate. false, the default: by their starts, which needs
-    //! nothing from the platform. While it is on and no feedback comes, no frame counts as late.
+    //! Take the display times the application reports (FramePacer::AddPresentFeedback): for a platform with present feedback, on a
+    //! display with a fixed refresh rate. The pacer paces the same with it (by the frame starts and the frames' work); the display
+    //! times are counted (FramePacer::FeedbackState) and the intended display time is counted from them, unknown while there is
+    //! none. false, the default: feedback is not looked at.
     [[nodiscard]] bool UsePresentFeedback() const noexcept
     {
       return m_usePresentFeedback;

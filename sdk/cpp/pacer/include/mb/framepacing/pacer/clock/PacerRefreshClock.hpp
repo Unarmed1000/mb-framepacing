@@ -62,12 +62,6 @@ namespace MB::FramePacing::Pacer
     //! carried to the next such frame, so their refreshes add up to the time that passed.
     FrameMeasurement Measure(TickCount64 frameStartTime, TimeSpan work = {}) noexcept;
 
-    //! A frame starts at frameStartTime, and what the display did is known from elsewhere (present feedback, FramesInFlight): the
-    //! frames measured since the last call were shown lateRefreshes later than their swap intervals, in all. The display's clock moves
-    //! on by the previous frame's swap interval and those; the frame start only says whether the clock starts again (the first frame,
-    //! a gap longer than its longest, a start before the previous one), and then lateRefreshes is not counted. Step follows.
-    FrameMeasurement MeasureLate(TickCount64 frameStartTime, uint32_t lateRefreshes) noexcept;
-
     //! The frame measured last is held for swapInterval refreshes (at least 1): its animation time. The first frame's is the clock's
     //! start; after a restart the step is the swap interval. Without a Measure since the last Step it counts as restarted.
     AnimationTime Step(uint32_t swapInterval) noexcept;
@@ -105,9 +99,6 @@ namespace MB::FramePacing::Pacer
     {
       return m_current;
     }
-
-  private:
-    FrameMeasurement Measure(TickCount64 frameStartTime, bool fromStarts, TimeSpan work, uint32_t lateRefreshes) noexcept;
   };
 }
 

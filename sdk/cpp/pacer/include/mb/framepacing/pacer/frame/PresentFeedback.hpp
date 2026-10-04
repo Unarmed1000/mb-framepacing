@@ -11,8 +11,8 @@ namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What the platform measured for a frame that was presented earlier, where it has
   //! present feedback (VK_EXT_present_timing, Wayland's presentation-time, Android's frame timestamps): given to
-  //! FramePacer::AddPresentFeedback, a few frames after the frame it is about. Optional: a pacer that gets none measures the frames by
-  //! their starts.
+  //! FramePacer::AddPresentFeedback, a few frames after the frame it is about. Optional, and statistics only: the pacer paces by the
+  //! frame starts with or without it.
   struct PresentFeedback
   {
     //! The frame: its FrameSchedule::FrameId.

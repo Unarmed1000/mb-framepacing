@@ -25,46 +25,29 @@ namespace MB::FramePacing::Pacer
 
   FrameMeasurement PacerRefreshClock::Measure(const TickCount64 frameStartTime, const TimeSpan work) noexcept
   {
-    return Measure(frameStartTime, true, work, 0);
-  }
-
-  FrameMeasurement PacerRefreshClock::MeasureLate(const TickCount64 frameStartTime, const uint32_t lateRefreshes) noexcept
-  {
-    return Measure(frameStartTime, false, TimeSpan(), lateRefreshes);
-  }
-
-  FrameMeasurement PacerRefreshClock::Measure(const TickCount64 frameStartTime, const bool fromStarts, const TimeSpan work,
-                                              const uint32_t lateRefreshes) noexcept
-  {
     m_measurement = FrameMeasurement{};
     // What rounding the frames that worked over their time left over: kept only from one such frame to the next
     const TimeSpan carried = std::exchange(m_carried, TimeSpan());
     if (m_hasLast)
     {
       // The frame starts when the previous one is shown, so the time between two starts is the refreshes between two displays: the
-      // previous frame was aimed its swap interval after the frame before it, and can not have been shown sooner. Where the display
-      // was measured, the refreshes are the swap interval and what the frames measured were late by
+      // previous frame was aimed its swap interval after the frame before it, and can not have been shown sooner
       const TimeSpan gap = frameStartTime - m_lastStartTime;
       const TimeSpan reach = std::max(m_longestGap, m_period.TimeFor(int64_t{2} * m_lastSwapInterval));
       if (gap >= TimeSpan() && gap <= reach)
       {
-        uint32_t refreshes = m_lastSwapInterval + lateRefreshes;
-        bool overTime = false;
-        if (fromStarts)
+        // A frame that worked longer than its swap interval's time did not make it, and its loop is not held by vsync (a swap chain
+        // with room takes the present at once): the next frame starts when the work is done, 1.4 refreshes later, say, and not on a
+        // refresh. Each rounded on its own, such frames would all count one refresh; so their time is taken as real time, and what
+        // rounding leaves is carried to the next one. Frames that fit are rounded each on its own: no grid of the clock's own
+        const TimeSpan frameTime = m_period.TimeFor(m_lastSwapInterval);
+        const bool overTime = work > frameTime;
+        const TimeSpan counted(gap.Ticks() + (overTime ? carried.Ticks() : 0));
+        const auto refreshes = static_cast<uint32_t>(std::max(m_period.NearestRefreshes(counted), int64_t{m_lastSwapInterval}));
+        if (overTime)
         {
-          // A frame that worked longer than its swap interval's time did not make it, and its loop is not held by vsync (a swap chain
-          // with room takes the present at once): the next frame starts when the work is done, 1.4 refreshes later, say, and not on
-          // a refresh. Each rounded on its own, such frames would all count one refresh; so their time is taken as real time, and
-          // what rounding leaves is carried to the next one. Frames that fit are rounded each on its own: no grid of the clock's own
-          const TimeSpan frameTime = m_period.TimeFor(m_lastSwapInterval);
-          overTime = work > frameTime;
-          const TimeSpan counted(gap.Ticks() + (overTime ? carried.Ticks() : 0));
-          refreshes = static_cast<uint32_t>(std::max(m_period.NearestRefreshes(counted), int64_t{m_lastSwapInterval}));
-          if (overTime)
-          {
-            const int64_t one = m_period.ToTimeSpan().Ticks();
-            m_carried = TimeSpan(std::clamp(counted.Ticks() - m_period.TimeFor(refreshes).Ticks(), -one, one));
-          }
+          const int64_t one = m_period.ToTimeSpan().Ticks();
+          m_carried = TimeSpan(std::clamp(counted.Ticks() - m_period.TimeFor(refreshes).Ticks(), -one, one));
         }
         m_displayTime.Add(refreshes, m_period);
         m_measurement.Restarted = false;
