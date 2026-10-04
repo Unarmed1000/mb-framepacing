@@ -260,9 +260,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     refresh clock's rounding reads as late frames. On an idle machine they start within 0.2 ms of a refresh at every rate from
     23.98 to 240 Hz, and the frame starts are enough: it is the machine's load, not the swap chain's queue (first believed, and
     wrong). Ask what else ran on the machine before reading a present log.
-    - Late = more whole refreshes between two display times than the swap intervals between them; a late frame is caught up when
-      its feedback comes (`PacerRefreshClock::MeasureLate`); a frame without feedback counts as on time, also when it leaves the
-      ring. Refused (`FeedbackState()` counts it): before the frame's present, not a whole number of refreshes (within an eighth)
+    - Late = the display fell behind: more whole refreshes between two display times than the swap intervals between them **and
+      the lead** (a frame shown sooner than its swap interval puts the count ahead; a frame held as much longer after it lost no
+      refresh, so it is neither late nor caught up: a loop paced by sleeping makes such pairs, and counting them took the rule
+      from a swap interval of 2 to 3 in the first integration's capture). Also late: a frame reported `NotShown`, and one whose
+      work was over its frame time (as without feedback). A late frame is caught up when its feedback comes
+      (`PacerRefreshClock::MeasureLate`); a frame without feedback counts as on time, also when it leaves the ring. Refused (`FeedbackState()` counts it): before the frame's present, not a whole number of refreshes (within an eighth)
       after the display time used before it, a frame not kept. Two refused in a row that agree start the count again.
     - `IntendedDisplayTime` is then the newest display time plus the swap intervals since (0 = unknown while there is none);
       `NextFrameStartTime` (the frame's start plus its swap interval, the old value) is what a loop that sleeps holds to.

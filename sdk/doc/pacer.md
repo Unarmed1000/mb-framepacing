@@ -259,21 +259,28 @@ RememberFrameId(schedule.FrameId);                                  // yours: th
 `PresentFeedback::Shown(frameId, displayTime, presentTime)` is a frame that was shown: the start of its first refresh, and the time
 it was presented (the present call, or the time the platform took it over), both on the clock `BeginFrame` gets. The present time
 can be left out; the time `EndFrame` was given counts then, which is too early for **an application that waits between `EndFrame`
-and its present: it must pass the present time**. `PresentFeedback::NotShown(frameId)` is a frame the platform says was never shown.
-A frame the platform reports nothing for, or no display time for, gets no feedback.
+and its present: it must pass the present time**. `PresentFeedback::NotShown(frameId)` is a frame the platform says was never shown;
+it counts as a late frame. A frame the platform reports nothing for gets no feedback. A result without a display time is one or
+the other by platform: on the first integration's driver (`VK_EXT_present_timing`) such a result, reported as complete, was a frame
+replaced before the display took it (across each the display moved on two or three refreshes), so the sample gives it as not
+shown.
 
 What the pacer does with it:
 
 - **Late frames come from the display.** The whole refreshes between two display times, against the swap intervals of the frames
-  from one to the other: more is a late frame. A frame without a display time counts as on time, and the next display time measures
-  across it.
+  from one to the other: when the display fell behind, the frame is late. A frame held a refresh longer after one that was shown a
+  refresh sooner is not: no refresh was lost over the two (a loop paced by sleeping lands a present on the wrong side of a refresh
+  now and then, and slowing down does not cure that). A frame the platform reports as never shown is late. So is a frame whose
+  work was over its frame time, as [without feedback](#how-a-frame-is-paced). A frame with no feedback at all counts as on time,
+  and the next display time measures across it.
 - **A late frame is caught up when its feedback comes**, a few frames after it (4 in that log), not on the next frame.
 - **The intended display time is a refresh of the display**: the newest display time plus the swap intervals of the frames since,
   this one included. It has the swap chain's queue in it and none of the frame starts' wobble, so the analysis judges the frames
   against where they really were due. It is unknown (0, as the marker has it) until the first display time comes, and again after a
   restart.
-- **Two frames the display took in one refresh** (the same display time): the earlier one was not seen, and the pacer's count is a
-  refresh ahead of the display until a frame is held a refresh longer, which then costs no animation step.
+- **A frame shown sooner than its swap interval** (two frames the display took in one refresh; a loop paced by sleeping that
+  lands a frame a refresh early): the animation is a refresh ahead of the display until a frame is held a refresh longer, which
+  then costs no animation step. The intended display time is not moved by it: it is counted from the display time alone.
 - **The frame starts** still say when the loop paused (a gap longer than the frame window), and `NextFrameStartTime` is counted
   from them.
 

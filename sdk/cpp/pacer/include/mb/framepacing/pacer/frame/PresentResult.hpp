@@ -13,7 +13,8 @@ namespace MB::FramePacing::Pacer
   {
     //! The frame was shown, at the display time given.
     Shown = 0,
-    //! The platform says the frame was never shown: discarded, or replaced before the display took it (Wayland's "discarded").
+    //! The platform says the frame was never shown: discarded, or replaced before the display took it (Wayland's "discarded"; a
+    //! VK_EXT_present_timing result that is complete without a display time, on the one driver tried). It counts as a late frame.
     NotShown = 1,
   };
 }

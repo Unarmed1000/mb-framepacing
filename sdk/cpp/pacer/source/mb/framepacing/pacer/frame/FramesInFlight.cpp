@@ -39,17 +39,18 @@ namespace MB::FramePacing::Pacer
       m_lead = 0;
     }
     m_swapSum += swapInterval;
-    At(m_newestId) = Entry{m_swapSum, animationTime, TimeSpan(), startTime, false, false};
+    At(m_newestId) = Entry{m_swapSum, swapInterval, animationTime, TimeSpan(), startTime, false, false};
     return m_newestId;
   }
 
-  void FramesInFlight::End(const TimeSpan work, const TickCount64 presentTime) noexcept
+  void FramesInFlight::End(const TimeSpan work, const TickCount64 presentTime, const bool workKnown) noexcept
   {
     if (m_newestId >= m_oldestId)
     {
       Entry& rEntry = At(m_newestId);
       rEntry.Work = work;
       rEntry.PresentTime = presentTime;
+      rEntry.Late = workKnown && work > m_period.TimeFor(rEntry.SwapInterval);
     }
   }
 
@@ -66,6 +67,8 @@ namespace MB::FramePacing::Pacer
     rEntry.HasFeedback = true;
     if (feedback.Result != PresentResult::Shown)
     {
+      // Never shown: it missed its refresh, and the display time after it measures across it
+      rEntry.Late = true;
       ++m_state.NotShown;
       return;
     }
@@ -84,7 +87,7 @@ namespace MB::FramePacing::Pacer
         const int64_t refreshes = m_period.NearestRefreshes(step);
         const auto swapIntervals = static_cast<int64_t>(rEntry.SwapSum - m_anchorSwapSum);
         const int64_t behind = refreshes - swapIntervals - int64_t{m_lead};
-        rEntry.Late = refreshes > swapIntervals;
+        rEntry.Late = rEntry.Late || behind > 0;
         m_lateRefreshes += static_cast<uint32_t>(std::clamp(behind, int64_t{0}, MaxRefreshes));
         m_lead = static_cast<uint32_t>(std::clamp(-behind, int64_t{0}, MaxRefreshes));
       }
@@ -131,7 +134,9 @@ namespace MB::FramePacing::Pacer
 
   TickCount64 FramesInFlight::IntendedDisplayTime() const noexcept
   {
-    return m_hasAnchor ? m_anchorTime + m_period.TimeFor(int64_t{m_lead} + static_cast<int64_t>(m_swapSum - m_anchorSwapSum)) : TickCount64();
+    // From the display time alone: the lead is the animation's, not the display's. A frame shown a refresh early (a loop paced by
+    // sleeping does that now and then) is followed by frames a swap interval after it, not a refresh later still
+    return m_hasAnchor ? m_anchorTime + m_period.TimeFor(static_cast<int64_t>(m_swapSum - m_anchorSwapSum)) : TickCount64();
   }
 
   void FramesInFlight::Restart() noexcept

@@ -18,7 +18,8 @@ namespace MB::FramePacing::Pacer
     TimeSpan AnimationTime;
     //! How long it worked, as EndFrame was given it.
     TimeSpan Work;
-    //! It was shown more refreshes after the display time used before it than the swap intervals between the two.
+    //! It was late: the display fell behind the frames' swap intervals with it (a refresh was lost; a frame held longer after one
+    //! shown as much sooner is not), the platform reported it as never shown, or its work took longer than its swap interval's time.
     bool Late{false};
   };
 }

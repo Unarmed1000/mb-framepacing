@@ -18,7 +18,7 @@ namespace MB::FramePacing::Pacer
     //! restart, never begun), not newer than the feedback before it, a display time before the frame's present, or one that is not a
     //! whole number of refreshes after the display time used before it.
     uint64_t Refused{0};
-    //! Frames the platform reported as never shown.
+    //! Frames the platform reported as never shown: each counted as a late frame.
     uint64_t NotShown{0};
     //! Frames that were counted as on time without any feedback for them.
     uint64_t Missing{0};

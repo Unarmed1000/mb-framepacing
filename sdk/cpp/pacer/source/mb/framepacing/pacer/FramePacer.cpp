@@ -38,7 +38,7 @@ namespace MB::FramePacing::Pacer
     {
       // No EndFrame: the frame is taken as presented now
       m_work = ToTimeSpan32(cpuStartTime - m_cpuStartTime).ToTimeSpan();
-      m_inFlight.End(m_work, m_cpuStartTime);
+      m_inFlight.End(m_work, m_cpuStartTime, false);
     }
     // The previous frame: how it did goes to the rule. After a pause (and on the first frame) nothing was measured: the window starts
     // empty, and the swap interval stays. With present feedback the frames are measured by their display times, as those come in:

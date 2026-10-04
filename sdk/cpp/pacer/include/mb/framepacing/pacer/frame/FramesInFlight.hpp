@@ -26,8 +26,10 @@ namespace MB::FramePacing::Pacer
   //! one is a whole number of refreshes after it, the measurement starts again from that one (a new swap chain, a mode change).
   //!
   //! The count never runs behind the display: a frame shown sooner than its swap interval after the frame before it (two presents the
-  //! display took in one refresh) puts the count ahead (the lead), and later late refreshes use the lead up before they count. No
-  //! allocation.
+  //! display took in one refresh, a sleep that lands a present a refresh early) puts the count ahead (the lead), and later late
+  //! refreshes use the lead up before they count. So a frame is late when the display fell behind the count: a frame shown early and
+  //! its neighbour shown as much later are no late frame, as no refresh was lost. A frame the platform reports as never shown is late
+  //! too, and so is one that worked longer than its swap interval's time. No allocation.
   class FramesInFlight
   {
   public:
@@ -40,6 +42,7 @@ namespace MB::FramePacing::Pacer
     {
       // The swap intervals of every frame begun up to this one, added up
       uint64_t SwapSum{0};
+      uint32_t SwapInterval{0};
       TimeSpan AnimationTime;
       TimeSpan Work;
       TickCount64 PresentTime;
@@ -77,7 +80,9 @@ namespace MB::FramePacing::Pacer
     uint64_t Begin(uint32_t swapInterval, TimeSpan animationTime, TickCount64 startTime) noexcept;
 
     //! The newest frame's work, and the time it is presented at (the frame's start until this is called). Nothing without a frame.
-    void End(TimeSpan work, TickCount64 presentTime) noexcept;
+    //! A frame that worked longer than its swap interval's time is late, whatever the display says later (as PacerRefreshClock has
+    //! it). workKnown false: the work is only the time to the next frame's start, which says nothing about that.
+    void End(TimeSpan work, TickCount64 presentTime, bool workKnown = true) noexcept;
 
     //! Present feedback for a frame that was begun: oldest first, at most once a frame.
     void Add(const PresentFeedback& feedback) noexcept;
@@ -90,7 +95,7 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] bool TakeMeasured(MeasuredFrame& rFrame) noexcept;
 
     //! When the newest frame is shown if no frame from the newest display time used to it is late, on the application's steady clock:
-    //! that display time plus the swap intervals since (and the lead). TickCount64() (unknown) while no display time is in use.
+    //! that display time plus the swap intervals since. TickCount64() (unknown) while no display time is in use.
     [[nodiscard]] TickCount64 IntendedDisplayTime() const noexcept;
 
     //! The id of the newest frame begun, 0 before the first.
