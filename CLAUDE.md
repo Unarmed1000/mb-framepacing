@@ -51,7 +51,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, the data formats, the pacer guide, encoding performance |
 | `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                       |
 | `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
-| `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames, every scenario's result (`pacer-sim --golden`), a real present log      |
+| `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames, every scenario's result (`pacer-sim --golden`), real frame logs         |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
@@ -242,6 +242,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     intended display time the frame's start plus that step. A gap longer than the frame window (or two frames), or a frame before
     the previous one, starts again. The pacer keeps **no grid of refreshes of its own**: one that runs on the CPU's clock slides
     against the display and double-steps (why the earlier design went).
+  - **A frame whose work is over its frame time** (`EndFrame`'s work against the swap interval's time; agreed with the user) is late
+    whatever the frame starts say, and for such frames only the time between the starts counts as real time, the rounding's
+    remainder carried to the next one (`PacerRefreshClock::Measure(frameStartTime, work)`). Why: a swap chain with a buffer to
+    spare takes the present at once, so frames with work of 130 % of a refresh start 1.37 refreshes apart, which rounds to one:
+    the pacer never slowed down and the animation ran at 73 % of real time (the first integration's work matrix, 120 and 240 Hz).
+    The simulation never showed it, as its frames always start on a refresh; there such frames are late already, so the golden
+    data did not change. A frame without `EndFrame` is never judged by its work (its work is the time to the next start).
+    `sdk/test-data/pacer/120-vulkan-work-130-log.csv` is the real log the tests pin.
   - **Nothing a platform may not have:** vsync times, predicted display times, scheduled presents, a
     measured refresh period, VRR are the guide's "Not used yet" and `doc/roadmap.md`. Agree with the user before adding one.
   - **Present feedback is the one optional input** (agreed with the user; `PacerSettings::UsePresentFeedback`, off by default, and

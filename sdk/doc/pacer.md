@@ -30,6 +30,7 @@ it paces; only other settings that need a larger frame window do.
 | Every line and branch of the module by its tests; no allocation per frame                                                                                                |                                                                 |
 | Present feedback: a simulated display that queues presents, with frame starts that wobble and feedback that is late, missing, refused or stops                           | Present feedback in a running application, on any platform      |
 | Present feedback: one present log of a real swap chain (Vulkan FIFO, 240 Hz, `VK_EXT_present_timing`), replayed                                                          | Any platform's feedback but that one driver's                   |
+| Work over a refresh in a loop no vsync holds: simulated, and one frame log of a real swap chain (Vulkan FIFO, 120 Hz, CPU work of 133 % of a refresh), replayed          | That rule in a running application                              |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
 
@@ -42,7 +43,9 @@ been analysed with the tools, so the "not checked" column above stands. What tha
 ([Applying the schedule](#applying-the-schedule), `EndFrame`'s work, and [Present feedback](#present-feedback-optional)). Its
 present logs (the driver's times, not captures) show the pacer holding a swap interval of one by the frame starts alone at 23.98,
 24, 25, 29.97, 60, 100, 120 and 240 Hz on an idle machine, with the frames starting within 0.2 ms of a refresh. On the same machine
-busy with other work the frames started up to 3 ms off the refreshes, which the pacer read as late frames at 240 Hz.
+busy with other work the frames started up to 3 ms off the refreshes, which the pacer read as late frames at 240 Hz. With work of
+130 % of a refresh the pacer of that time never slowed down, at 120 and 240 Hz: the frames started 1.37 refreshes apart, which
+rounds to one ([How a frame is paced](#how-a-frame-is-paced) has what changed).
 
 ## What it needs
 
@@ -69,8 +72,10 @@ after the previous one.
 
 The pacer measures on the first and counts on the second. The time from one frame start to the next, rounded to whole refreshes, is
 how many refreshes the display moved on. Rounding removes the frame starts' jitter while it stays under half a refresh (8.3 ms at
-60 Hz, 2.1 ms at 240 Hz; beyond it a frame on time reads as late), and every step is measured on its own, so a display that runs a little off its nominal rate never adds up to
-a jump. The refreshes counted add up exactly (`RefreshTime`): an hour of 60 Hz frames is an hour to the tick.
+60 Hz, 2.1 ms at 240 Hz; beyond it a frame on time reads as late), and every step is measured on its own, so a display that runs
+a little off its nominal rate never adds up to a jump. The refreshes counted add up exactly (`RefreshTime`): an hour of 60 Hz
+frames is an hour to the tick. The one exception is a frame whose work took longer than its swap interval
+([below](#how-a-frame-is-paced)).
 
 ## The frame loop
 
@@ -109,12 +114,14 @@ Present(schedule.SwapInterval);                                 // hold the fram
 
 `EndFrame(presentTime, work)` takes the time the frame's work is done and returns its CPU busy time for the marker. Call it as you
 draw the marker: before the present, and before any wait for the frame's time (the sleep below). A wait inside it would count as
-work, and the rule would slow down. A frame without `EndFrame` counts as presented when the next one begins.
+work, and the rule would slow down. A frame without `EndFrame` counts as presented when the next one begins, and is never
+judged by its work.
 
 `work` is how long the frame needed as the rule should count it; leave it out and the CPU busy time counts. **An application that
-the GPU limits must put the GPU's time into it** (a timer query; the time of the last frame that was measured will do). The late
-frames slow the pacer down without it too, but the work the rule sees then fits a refresh, so after a frame window without a late
-frame it speeds up again, is late again, and goes on like that.
+the GPU limits must put the GPU's time into it** (a timer query; the time of the last frame that was measured will do). The work
+is what tells the pacer that a frame did not fit its swap interval: where the swap chain takes the present at once the frame starts
+do not show it ([How a frame is paced](#how-a-frame-is-paced)). And where late frames slow the pacer down without it, the work the
+rule sees fits a refresh, so after a frame window without a late frame it speeds up again, is late again, and goes on like that.
 
 ### Applying the schedule
 
@@ -145,7 +152,15 @@ display time is the refresh the frame is shown on, the swap chain's queue includ
 
 - **The previous frame is measured** when the next one starts: the time between the two frame starts, rounded to whole refreshes and
   at least the previous frame's swap interval, is how many refreshes after the frame before it it was shown. It was **late** when that
-  is more than its swap interval.
+  is more than its swap interval, or when its work (what `EndFrame` was given) took longer than its swap interval's time.
+- **A frame that worked over its time is not held by vsync.** A swap chain with a buffer to spare (triple buffering; the first
+  integration's Vulkan swap chain with two images does it too) takes the present at once, so a frame that worked 1.3 refreshes is
+  followed by one that starts 1.3 refreshes later, not 2. Rounded on its own, every such frame would count one refresh: never late,
+  the rule never slowing down, and the animation at 73 % of real time. So such a frame is late by its work, and the time between
+  the frame starts counts as real time: what rounding it to whole refreshes leaves is carried to the next such frame, and their
+  refreshes add up to the time that passed. On a swap chain that does wait, the next frame starts two whole refreshes later and
+  nothing is left to carry. A frame whose work fits is rounded on its own, as above: the pacer has no grid of its own. The
+  application gives nothing new for this; the work is `EndFrame`'s.
 - **The rule decides** this frame's swap interval from the frames it has seen ([below](#the-swap-interval-rule)).
 - **The frame animates for its predicted display time**: the previous frame's display plus its own swap interval. A late frame shows
   a moment already past, and the frame after it catches up exactly: the lost refresh is in its step.
@@ -396,3 +411,8 @@ jitter on every frame start, the clock's wrap.
 on a 240 Hz display with a fixed refresh rate and a machine busy with other work (1999 frames: when each frame started, was
 presented and was shown, and the frame in which the application read that, all in ticks). The [present feedback](#present-feedback-optional) tests pace it by the frame
 starts and by the display times, and pin both results.
+
+`120-vulkan-work-130-log.csv` is a frame log of the same sample on a 120 Hz display with a fixed refresh rate and an idle machine,
+with CPU work of 11.1 ms a frame (133 % of a refresh): 1500 frames, when each started, when its work ended, the work, and when it
+was shown. The frame starts are 1.37 refreshes apart and the display showed 550 of 1495 frames for two refreshes. The tests pin
+that every frame is late, that the animation's refreshes are the time that passed, and the frame the rule slows down at.

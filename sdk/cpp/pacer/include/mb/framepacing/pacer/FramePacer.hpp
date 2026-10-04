@@ -57,9 +57,11 @@ namespace MB::FramePacing::Pacer
 
     //! The frame's work is done and it is about to be presented, at presentTime on the same clock: call it as the marker is drawn,
     //! before the present and before any wait for the frame's time (a wait inside it would count as work). work: how long the frame
-    //! needed, as the rule should count it; zero takes the CPU busy time. An application the GPU limits must put the GPU's time in
-    //! (the last frame's that was measured will do): without it the rule speeds up again after every frame window without a late
-    //! frame. Returns the CPU busy time (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
+    //! needed, as the rule should count it; zero takes the CPU busy time. A frame whose work is longer than its swap interval's time
+    //! is late, whenever the next frame starts (a swap chain with a buffer to spare does not hold the loop to the display). An
+    //! application the GPU limits must put the GPU's time in (the last frame's that was measured will do): without it the pacer does
+    //! not see that, and the rule speeds up again after every frame window without a late frame. Returns the CPU busy time
+    //! (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
     TimeSpan32 EndFrame(TickCount64 presentTime, TimeSpan work = {}) noexcept;
 
     //! What the platform measured for an earlier frame (its FrameSchedule::FrameId): any number of calls between two BeginFrames,

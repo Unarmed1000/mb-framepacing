@@ -31,6 +31,9 @@ namespace MB::FramePacing::Pacer
 
   FrameSchedule FramePacer::BeginFrame(const TickCount64 cpuStartTime) noexcept
   {
+    // The work EndFrame was given says whether the previous frame fitted its swap interval. Without an EndFrame the work is the time
+    // to this frame's start, which says nothing about that
+    const TimeSpan knownWork = m_frameOpen && m_frameEnded ? m_work : TimeSpan();
     if (m_frameOpen && !m_frameEnded)
     {
       // No EndFrame: the frame is taken as presented now
@@ -41,7 +44,8 @@ namespace MB::FramePacing::Pacer
     // empty, and the swap interval stays. With present feedback the frames are measured by their display times, as those come in:
     // the frame start only says whether this is a pause
     const bool useFeedback = m_rule.Settings().UsePresentFeedback();
-    const FrameMeasurement previous = useFeedback ? m_clock.MeasureLate(cpuStartTime, m_inFlight.TakeLateRefreshes()) : m_clock.Measure(cpuStartTime);
+    const FrameMeasurement previous =
+      useFeedback ? m_clock.MeasureLate(cpuStartTime, m_inFlight.TakeLateRefreshes()) : m_clock.Measure(cpuStartTime, knownWork);
     const RefreshPeriod period = m_rule.Refresh();
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
     if (previous.Restarted)

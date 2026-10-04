@@ -18,7 +18,8 @@ namespace MB::FramePacing::Pacer
     //! The refreshes from the display of the frame before it to the previous frame's display, as measured: the time between the two
     //! frame starts rounded to whole refreshes, at least the previous frame's swap interval. 0 when restarted.
     uint32_t Refreshes{0};
-    //! The previous frame was late: shown more refreshes after the frame before it than its swap interval.
+    //! The previous frame was late: shown more refreshes after the frame before it than its swap interval, or its work took longer
+    //! than its swap interval's time (it can not have made it then, whatever the frame starts say).
     bool Late{false};
     //! The display's clock: when the previous frame was shown, in the refreshes counted since the clock was made (exact: the
     //! refresh period's fraction is carried). Only differences mean anything.

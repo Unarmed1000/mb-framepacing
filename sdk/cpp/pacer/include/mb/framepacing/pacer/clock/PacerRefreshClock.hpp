@@ -27,7 +27,8 @@ namespace MB::FramePacing::Pacer
   //!
   //! Rounding removes the frame starts' jitter while it stays under half a refresh. Every step is measured on its own, so a display
   //! that runs a little off its nominal rate never adds up to a jump; the steps add up exactly (RefreshTime), so the animation time is
-  //! the refreshes counted. No allocation.
+  //! the refreshes counted. The exception is a frame that worked longer than its swap interval's time (Measure's work): no vsync held
+  //! it, so its steps are counted together. No allocation.
   class PacerRefreshClock
   {
     RefreshPeriod m_period;
@@ -37,6 +38,8 @@ namespace MB::FramePacing::Pacer
     RefreshTime m_displayTime;
     TickCount64 m_lastStartTime;
     uint32_t m_lastSwapInterval{0};
+    // What rounding left over at the last frame that worked over its time
+    TimeSpan m_carried;
     bool m_hasLast{false};
     bool m_stepped{false};
     FrameMeasurement m_measurement;
@@ -53,8 +56,11 @@ namespace MB::FramePacing::Pacer
     AnimationTime Advance(TickCount64 frameStartTime, uint32_t swapInterval) noexcept;
 
     //! A frame starts at frameStartTime: what that says about the previous frame. For a loop that decides the frame's swap interval
-    //! from it (FramePacer does); Step follows.
-    FrameMeasurement Measure(TickCount64 frameStartTime) noexcept;
+    //! from it (FramePacer does); Step follows. work: how long the previous frame worked (the GPU's time included where the GPU
+    //! limits the loop), zero when unknown. A frame that worked longer than its swap interval's time is late, and its loop is not
+    //! held by vsync: the time between the frame starts then counts as real time, what rounding it to whole refreshes leaves being
+    //! carried to the next such frame, so their refreshes add up to the time that passed.
+    FrameMeasurement Measure(TickCount64 frameStartTime, TimeSpan work = {}) noexcept;
 
     //! A frame starts at frameStartTime, and what the display did is known from elsewhere (present feedback, FramesInFlight): the
     //! frames measured since the last call were shown lateRefreshes later than their swap intervals, in all. The display's clock moves
@@ -101,7 +107,7 @@ namespace MB::FramePacing::Pacer
     }
 
   private:
-    FrameMeasurement Measure(TickCount64 frameStartTime, bool fromStarts, uint32_t lateRefreshes) noexcept;
+    FrameMeasurement Measure(TickCount64 frameStartTime, bool fromStarts, TimeSpan work, uint32_t lateRefreshes) noexcept;
   };
 }
 
