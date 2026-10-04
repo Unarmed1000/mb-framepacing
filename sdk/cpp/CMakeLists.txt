@@ -42,7 +42,7 @@ project(mb_framepacing VERSION ${MB_FRAMEPACING_VERSION_NUMBERS} DESCRIPTION "Th
 # project, so engines that add_subdirectory/FetchContent the library never download GoogleTest.
 option(MB_FRAMEPACING_BUILD_MARKER "Build the marker module (mb_framepacing::marker)" ON)
 option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; needs the marker module, fetches nlohmann/json unless one is installed)" ON)
-# The pacer is experimental (sdk/doc/pacer.md: checked against its own simulation only), so nobody gets it without asking for it
+# The pacer is experimental (sdk/doc/pacer.md: no capture of it has been analysed with the tools), so nobody gets it without asking for it
 option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer); EXPERIMENTAL, its API may change in any release" OFF)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})

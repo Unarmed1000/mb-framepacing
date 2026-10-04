@@ -4,9 +4,9 @@ Frame logs of the experimental [frame pacer](../sdk/doc/pacer.md) on real swap c
 the guide's statements about real swap chains rest on, and what a change to the pacer can be held against. They are not test data:
 no test reads them. The small logs the tests pin are in `sdk/test-data/pacer`.
 
-Each capture session is one zip file. The zips are not in the source tree: they are assets of this repository's
-[`pacer-captures` release](https://github.com/Unarmed1000/mb-framepacing/releases/tag/pacer-captures). Download one and unpack it to read it; inside, `README.txt` says what was run and what the run
-summaries show.
+Each capture session is one zip file, with a document here that says what its logs show. The zips are not in the source tree:
+they are assets of this repository's [`pacer-captures` release](https://github.com/Unarmed1000/mb-framepacing/releases/tag/pacer-captures). Download one and unpack it to read the logs; inside,
+`README.txt` says what was run.
 
 | File                                                                                                                                        | Runs | Unpacked | What it is                                                                           |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | ---- | -------- | ------------------------------------------------------------------------------------ |
@@ -42,20 +42,8 @@ A run is four files: `<run>.csv` (a row per frame, times in ticks of 100 ns), `<
 G-SYNC was off for every folder but the four named for it, and present feedback was on only in the 8 runs of the two G-SYNC
 `-hold` folders.
 
-What the run summaries show. The logs have not been analysed frame by frame, and no capture card recorded these runs:
-
-- **A timer sleep and a wait on the vsync hold a frame equally well** at 50, 60 and 120 Hz: every run at a fixed frame rate shows
-  every frame for exactly its swap interval, idle and loaded, with at most two frames off in a run. At 240 Hz the sleep had at
-  most 7 of 537 frames off and the vsync wait at most 4 of 1137.
-- **Work of 130 % of a refresh** takes the pacer to a swap interval of two at frame 11 to 49, by the rate, and it stays there.
-- **GPU work of 90 % of a refresh at 240 Hz** is at the rule's threshold: 149 of 2221 frames were shown for two or three refreshes
-  with the pacer staying at one, and with two frames in flight it went to two after 331 frames.
-- **Where the present is placed** matters at 240 Hz (55 to 75 % of the refresh before the target is clean) and next to nothing at
-  120, 60 and 50 Hz (5 to 85 % is clean).
-- **The refresh a swap chain reports** (`VK_EXT_present_timing`'s refresh duration) was that of the fastest display of the
-  desktop, not of the display the window was on. The window system's rate was right.
-- **With G-SYNC on** the timer sleep keeps its frame starts, the wait on the vsync holds no frame (the vertical blank follows the
-  frames), the swap chain still reports a fixed refresh, and present feedback shows it: nearly every display time is refused.
+What they show is in [Windows hold captures, 2026-10-04](2026-10-04-windows-hold.md), with the charts and the row per run
+(`2026-10-04-windows-hold/runs.csv`) that `tools/pacer_capture_report.py` works out from the zip.
 
 ## Adding a capture
 
@@ -63,3 +51,8 @@ One zip per session, named for its date and what it is about, with a `README.txt
 is known about it. Check the files for hardware models, user names and local directories before packing them. Upload the zip to the
 release (`gh release upload pacer-captures <zip>`) and add its row to the table above. Git ignores a zip in this folder, so one can
 be downloaded here to work with it.
+
+Its numbers come from its logs, not from a summary someone wrote: `python tools/pacer_capture_report.py <zip>` writes the row per
+run and the charts into a folder named as the zip, `--update-doc` fills the tables of the session's document (the zip's name with
+`.md`), and `--check` fails when any of them is not what the zip gives. The charts and tables it makes are for the runs of the
+session it was written for; a session with other runs needs its own selections there.

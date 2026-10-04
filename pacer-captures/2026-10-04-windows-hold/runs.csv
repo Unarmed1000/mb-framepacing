@@ -1,0 +1,248 @@
+folder,run,refreshPeriodTicks,swapchainRefreshNs,gsync,load,pacer,holdMethod,vsyncSource,vsyncPhasePercent,targetSwapInterval,framesInFlight,presentTiming,presentFeedback,workMedianTicks,startStepMedianTicks,startStepP1Ticks,startStepP99Ticks,frames,framesTimed,shownForSwapInterval,shownLonger,shownShorter,neverShown,refreshesLost,firstSlowerFrame,finalSwapInterval,mostLateFramesInWindow,lateFramesToSlowDown,feedbackUsed,feedbackRefused,feedbackNotShown,feedbackLateRefreshes
+120hz-phase-sweep,phase05_idle,83333,8333200,off,idle,fixed,vsync,dxgi,5,2,1,1,0,2806,166669,165440,167676,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase05_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,5,2,1,1,0,3031,166664,165892,167602,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase15_idle,83333,8333200,off,idle,fixed,vsync,dxgi,15,2,1,1,0,2767,166663,165522,167889,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase15_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,15,2,1,1,0,3028,166667,165773,167555,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase25_idle,83333,8333100,off,idle,fixed,vsync,dxgi,25,2,1,1,0,2802,166697,165414,167803,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase25_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,25,2,1,1,0,3022,166673,165799,167495,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase35_idle,83333,8333200,off,idle,fixed,vsync,dxgi,35,2,1,1,0,2786,166686,165509,167893,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase35_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,35,2,1,1,0,3014,166665,165701,167512,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase45_idle,83333,8333200,off,idle,fixed,vsync,dxgi,45,2,1,1,0,2803,166673,165501,167896,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase45_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,45,2,1,1,0,3007,166663,165898,167523,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase55_idle,83333,8333200,off,idle,fixed,vsync,dxgi,55,2,1,1,0,2779,166663,165417,167924,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase55_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,55,2,1,1,0,3003,166665,165731,167666,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase65_idle,83333,8333300,off,idle,fixed,vsync,dxgi,65,2,1,1,0,2779,166658,165420,167785,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase65_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,2995,166668,165866,167471,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase75_idle,83333,8333100,off,idle,fixed,vsync,dxgi,75,2,1,1,0,2817,166670,165271,167965,400,332,329,1,1,0,1,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase75_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,75,2,1,1,0,2983,166669,165780,167549,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase85_idle,83333,8333000,off,idle,fixed,vsync,dxgi,85,2,1,1,0,2831,166667,165495,167905,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase85_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,85,2,1,1,0,2983,166668,165849,167467,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase95_idle,83333,8333100,off,idle,fixed,vsync,dxgi,95,2,1,1,0,3092,166682,164270,168907,400,332,329,1,1,0,1,0,2,0,13,0,0,0,0
+120hz-phase-sweep,phase95_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,95,2,1,1,0,2957,166667,163872,169720,400,332,331,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-plain-vulkan,fps15_vsync_idle,83333,8333100,off,idle,fixed,vsync,dxgi,65,8,1,1,0,21337,666663,665275,668104,400,332,331,0,0,0,0,0,8,0,4,0,0,0,0
+120hz-plain-vulkan,fps15_vsync_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,65,8,1,1,0,21442,666667,665619,667803,400,332,331,0,0,0,0,0,8,0,4,0,0,0,0
+120hz-plain-vulkan,fps15_wait_idle,83333,8333400,off,idle,fixed,sleep,dxgi,65,8,1,1,0,21360,666665,666664,666667,400,332,331,0,0,0,0,0,8,0,4,0,0,0,0
+120hz-plain-vulkan,fps15_wait_loaded,83333,8333500,off,loaded,fixed,sleep,dxgi,65,8,1,1,0,21499,666665,666664,666718,400,332,331,0,0,0,0,0,8,0,4,0,0,0,0
+120hz-plain-vulkan,fps30_vsync_idle,83333,8333300,off,idle,fixed,vsync,dxgi,65,4,1,1,0,21279,333325,331838,334623,400,332,331,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_vsync_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,65,4,1,1,0,21427,333338,332418,334212,400,332,331,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_vsync_plain_idle,83333,0,off,idle,fixed,vsync,dxgi,65,4,1,0,0,21189,333342,331885,334748,400,0,0,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_vsync_plain_loaded,83333,0,off,loaded,fixed,vsync,dxgi,65,4,1,0,0,21352,333338,332317,334431,400,0,0,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_wait_idle,83333,8333200,off,idle,fixed,sleep,dxgi,65,4,1,1,0,21271,333333,333332,333334,400,332,331,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_wait_loaded,83333,8333500,off,loaded,fixed,sleep,dxgi,65,4,1,1,0,21465,333333,333332,333340,400,332,331,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_wait_plain_idle,83333,0,off,idle,fixed,sleep,dxgi,65,4,1,0,0,21195,333333,333332,333334,400,0,0,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps30_wait_plain_loaded,83333,0,off,loaded,fixed,sleep,dxgi,65,4,1,0,0,21405,333333,333332,333424,400,0,0,0,0,0,0,0,4,0,7,0,0,0,0
+120hz-plain-vulkan,fps60_vsync_idle,83333,8333000,off,idle,fixed,vsync,dxgi,65,2,1,1,0,21185,166665,165549,167860,750,682,681,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-plain-vulkan,fps60_vsync_loaded,83333,8333500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,21408,166664,165718,167583,750,682,679,1,1,0,1,0,2,0,13,0,0,0,0
+120hz-plain-vulkan,fps60_wait_idle,83333,8333200,off,idle,fixed,sleep,dxgi,65,2,1,1,0,21223,166667,166666,166679,750,682,681,0,0,0,0,0,2,0,13,0,0,0,0
+120hz-plain-vulkan,fps60_wait_loaded,83333,8333500,off,loaded,fixed,sleep,dxgi,65,2,1,1,0,21419,166667,166666,166719,750,682,680,1,0,0,1,0,2,0,13,0,0,0,0
+120hz-plain-vulkan,w130_vsync_idle,83333,8333100,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,111244,166660,165467,167931,1500,1432,1431,0,0,0,0,25,2,24,25,0,0,0,0
+120hz-plain-vulkan,w130_vsync_loaded,83333,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,111389,166668,165739,167586,1500,1432,1431,0,0,0,0,25,2,24,25,0,0,0,0
+120hz-plain-vulkan,w130_vsync_plain_idle,83333,0,off,idle,adaptive,vsync,dxgi,65,1,1,0,0,111168,166667,165810,167543,1500,0,0,0,0,0,0,25,2,24,25,0,0,0,0
+120hz-plain-vulkan,w130_vsync_plain_loaded,83333,0,off,loaded,adaptive,vsync,dxgi,65,1,1,0,0,111352,166669,165449,167751,1500,0,0,0,0,0,0,25,2,24,25,0,0,0,0
+120hz-plain-vulkan,w130_wait_idle,83333,8333000,off,idle,adaptive,sleep,dxgi,65,1,1,1,0,111239,166667,166666,166668,1500,1432,1431,0,0,0,0,25,2,24,25,0,0,0,0
+120hz-plain-vulkan,w130_wait_loaded,83333,8333500,off,loaded,adaptive,sleep,dxgi,65,1,1,1,0,111454,166667,166666,166685,1500,1432,1431,0,0,0,0,25,2,24,25,0,0,0,0
+120hz-plain-vulkan,w20_idle,83333,8332900,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,21197,83358,81584,85098,1500,1432,1431,0,0,0,0,0,1,1,25,0,0,0,0
+120hz-plain-vulkan,w20_loaded,83333,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,21291,83324,81965,84643,1500,1432,1431,0,0,0,0,0,1,1,25,0,0,0,0
+120hz-plain-vulkan,w90_flight1_idle,83333,8333000,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,71172,83331,82160,84484,1500,1431,1429,0,0,1,0,0,1,1,25,0,0,0,0
+120hz-plain-vulkan,w90_flight1_loaded,83333,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,71303,83344,81909,84521,1500,1431,1429,0,0,1,0,0,1,1,25,0,0,0,0
+120hz-plain-vulkan,w90_flight2_idle,83333,8333100,off,idle,adaptive,vsync,dxgi,65,1,2,1,0,71121,83344,81775,84785,1500,1432,1431,0,0,0,0,0,1,2,25,0,0,0,0
+120hz-plain-vulkan,w90_flight2_loaded,83333,8333500,off,loaded,adaptive,vsync,dxgi,65,1,2,1,0,71244,83362,81929,84719,1500,1432,1431,0,0,0,0,0,1,1,25,0,0,0,0
+120hz-plain-vulkan,w90_idle,83333,8333100,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,71170,83309,82128,84406,1500,1431,1429,0,0,1,0,0,1,1,25,0,0,0,0
+120hz-plain-vulkan,w90_loaded,83333,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,71323,83334,73592,84862,1500,1430,1427,0,0,2,0,0,1,2,25,0,0,0,0
+240hz-gsync-fullscreen-only-hold,fps120_vsync,41664,4166600,on for full screen apps only,,fixed,vsync,dxgi,65,2,1,1,1,9008,82544,62971,103417,1200,1132,721,169,241,0,169,0,2,0,25,7,1188,3,0
+240hz-gsync-fullscreen-only-hold,fps120_wait,41664,4166500,on for full screen apps only,,fixed,sleep,dxgi,65,2,1,1,1,9004,83329,83328,83331,1200,1132,763,125,243,0,125,0,2,0,25,5,1190,3,0
+240hz-gsync-fullscreen-only-hold,fps60_vsync,41664,4166400,on for full screen apps only,,fixed,vsync,dxgi,65,4,1,1,1,9056,170576,146136,186998,600,532,183,209,139,0,375,0,4,0,13,9,588,1,0
+240hz-gsync-fullscreen-only-hold,fps60_wait,41664,4166600,on for full screen apps only,,fixed,sleep,dxgi,65,4,1,1,1,9054,166657,166656,166658,600,532,531,0,0,0,0,0,4,0,13,5,592,1,0
+240hz-gsync-fullscreen-only-variable-refresh,L1_pacer_off_gpu_load,41664,4194800,on for full screen apps only,,off,,dxgi,65,1,1,1,0,64581,66075,64584,72991,1000,931,280,649,0,1,650,0,1,0,49,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,L2_pacer_off_cpu_load,41664,4166600,on for full screen apps only,,off,,dxgi,65,1,1,1,0,61031,63016,62416,66531,1000,932,345,586,0,0,586,0,1,0,49,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,V1_120fps,41664,4166600,on for full screen apps only,,fixed,sleep,dxgi,65,2,1,1,0,1156,83329,83328,83330,1000,932,637,97,197,0,97,0,2,0,25,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,V2_80fps,41664,4166600,on for full screen apps only,,fixed,sleep,dxgi,65,3,1,1,0,1182,124993,124992,124994,1000,932,931,0,0,0,0,0,3,0,17,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,V3_60fps,41664,4166600,on for full screen apps only,,fixed,sleep,dxgi,65,4,1,1,0,1196,166657,166656,166660,1000,932,931,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,V4_30fps,41664,4166700,on for full screen apps only,,fixed,sleep,dxgi,65,8,1,1,0,1281,333313,333312,333314,1000,932,931,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,V5_fullscreen_pacer_off,41664,4166500,on for full screen apps only,,off,,dxgi,65,1,1,1,0,1929,41649,40094,43251,1000,932,931,0,0,0,0,0,1,0,49,0,0,0,0
+240hz-gsync-fullscreen-only-variable-refresh,V6_fullscreen_120fps,41664,4166100,on for full screen apps only,,fixed,sleep,dxgi,65,2,1,1,0,1685,83329,83328,83330,1000,932,648,97,186,0,97,0,2,0,25,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-hold,fps120_vsync,41664,4166600,on for windowed and full screen apps,,fixed,vsync,dxgi,65,2,1,1,1,9001,84221,63073,103762,1200,1132,733,174,224,0,174,0,2,0,25,6,1189,3,0
+240hz-gsync-windowed-and-fullscreen-hold,fps120_wait,41664,4166500,on for windowed and full screen apps,,fixed,sleep,dxgi,65,2,1,1,1,8988,83329,83328,83330,1200,1132,805,103,223,0,103,0,2,0,25,9,1186,3,0
+240hz-gsync-windowed-and-fullscreen-hold,fps60_vsync,41664,4166500,on for windowed and full screen apps,,fixed,vsync,dxgi,65,4,1,1,1,9007,171071,146258,187004,600,532,180,211,140,0,381,0,4,0,13,8,589,1,0
+240hz-gsync-windowed-and-fullscreen-hold,fps60_wait,41664,4166600,on for windowed and full screen apps,,fixed,sleep,dxgi,65,4,1,1,1,9042,166657,166656,166660,600,532,529,1,1,0,2,0,4,0,13,5,592,1,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,L1_pacer_off_gpu_load,41664,4166500,on for windowed and full screen apps,,off,,dxgi,65,1,1,1,0,63761,65459,64141,73072,1000,931,281,648,0,1,649,0,1,0,49,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,L2_pacer_off_cpu_load,41664,4166600,on for windowed and full screen apps,,off,,dxgi,65,1,1,1,0,61033,63006,62434,65915,1000,932,308,623,0,0,623,0,1,0,49,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,V1_120fps,41664,4166600,on for windowed and full screen apps,,fixed,sleep,dxgi,65,2,1,1,0,1283,83329,83328,83331,1000,932,637,100,194,0,100,0,2,0,25,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,V2_80fps,41664,4166600,on for windowed and full screen apps,,fixed,sleep,dxgi,65,3,1,1,0,1244,124993,124992,124994,1000,932,931,0,0,0,0,0,3,0,17,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,V3_60fps,41664,4166600,on for windowed and full screen apps,,fixed,sleep,dxgi,65,4,1,1,0,1197,166657,166656,166658,1000,932,931,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,V4_30fps,41664,4169700,on for windowed and full screen apps,,fixed,sleep,dxgi,65,8,1,1,0,1285,333313,333312,333314,1000,932,931,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,V5_fullscreen_pacer_off,41664,4166600,on for windowed and full screen apps,,off,,dxgi,65,1,1,1,0,1862,41644,40348,43262,1000,932,931,0,0,0,0,0,1,0,49,0,0,0,0
+240hz-gsync-windowed-and-fullscreen-variable-refresh,V6_fullscreen_120fps,41664,4165900,on for windowed and full screen apps,,fixed,sleep,dxgi,65,2,1,1,0,1668,83329,83328,83330,1000,932,632,107,192,0,107,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase05_idle,41664,4166400,off,idle,fixed,vsync,dxgi,5,2,1,1,0,2862,83341,82194,84284,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase05_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,5,2,1,1,0,3048,83324,82468,84367,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase15_idle,41664,4166500,off,idle,fixed,vsync,dxgi,15,2,1,1,0,2763,83324,82553,84034,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase15_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,15,2,1,1,0,3089,83319,82024,84745,400,330,325,2,0,2,4,0,2,1,25,0,0,0,0
+240hz-phase-sweep,phase25_idle,41664,4166500,off,idle,fixed,vsync,dxgi,25,2,1,1,0,2770,83337,81908,84665,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase25_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,25,2,1,1,0,3124,83328,81723,84758,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase35_idle,41664,4166400,off,idle,fixed,vsync,dxgi,35,2,1,1,0,2750,83344,82186,84325,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase35_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,35,2,1,1,0,3102,83332,81985,84629,400,331,326,2,1,1,2,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase45_idle,41664,4166400,off,idle,fixed,vsync,dxgi,45,2,1,1,0,2761,83327,81811,84872,400,331,328,1,0,1,1,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase45_loaded,41664,4166400,off,loaded,fixed,vsync,dxgi,45,2,1,1,0,3000,83326,82470,84235,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase55_idle,41664,4166500,off,idle,fixed,vsync,dxgi,55,2,1,1,0,2745,83332,82322,84296,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase55_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,55,2,1,1,0,3020,83331,82161,84451,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase65_idle,41664,4166400,off,idle,fixed,vsync,dxgi,65,2,1,1,0,2723,83330,82107,84589,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase65_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,2988,83324,82065,84610,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase75_idle,41664,4166400,off,idle,fixed,vsync,dxgi,75,2,1,1,0,2750,83325,82293,84388,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase75_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,75,2,1,1,0,3063,83331,81482,84767,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase85_idle,41664,4166500,off,idle,fixed,vsync,dxgi,85,2,1,1,0,2753,83367,82549,84232,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase85_loaded,41664,4166400,off,loaded,fixed,vsync,dxgi,85,2,1,1,0,2990,83322,81727,84877,400,332,327,2,2,0,2,0,2,1,25,0,0,0,0
+240hz-phase-sweep,phase95_idle,41664,4166400,off,idle,fixed,vsync,dxgi,95,2,1,1,0,2915,83319,80628,85531,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-phase-sweep,phase95_loaded,41664,4166400,off,loaded,fixed,vsync,dxgi,95,2,1,1,0,3028,83413,78455,87644,400,332,331,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-plain-vulkan,fps120_vsync_idle,41664,4166400,off,idle,fixed,vsync,dxgi,65,2,1,1,0,9020,83324,82127,84570,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-plain-vulkan,fps120_vsync_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,9271,83331,82523,84164,1200,1132,1129,1,1,0,1,0,2,0,25,0,0,0,0
+240hz-plain-vulkan,fps120_wait_idle,41664,4166400,off,idle,fixed,sleep,dxgi,65,2,1,1,0,9030,83329,83328,83331,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-plain-vulkan,fps120_wait_loaded,41664,4166500,off,loaded,fixed,sleep,dxgi,65,2,1,1,0,9222,83329,83328,83331,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-plain-vulkan,fps30_vsync_idle,41664,4166400,off,idle,fixed,vsync,dxgi,65,8,1,1,0,9179,333329,331853,334557,400,332,331,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-plain-vulkan,fps30_vsync_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,8,1,1,0,9331,333308,332407,334189,400,332,329,1,1,0,1,0,8,0,7,0,0,0,0
+240hz-plain-vulkan,fps30_wait_idle,41664,4166400,off,idle,fixed,sleep,dxgi,65,8,1,1,0,9138,333313,333312,333314,400,332,331,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-plain-vulkan,fps30_wait_loaded,41664,4166500,off,loaded,fixed,sleep,dxgi,65,8,1,1,0,9288,333313,333312,333314,400,332,329,1,1,0,1,0,8,0,7,0,0,0,0
+240hz-plain-vulkan,fps60_vsync_idle,41664,4166400,off,idle,fixed,vsync,dxgi,65,4,1,1,0,9092,166641,165469,167865,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_vsync_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,4,1,1,0,9271,166658,165844,167516,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_vsync_plain_idle,41664,0,off,idle,fixed,vsync,dxgi,65,4,1,0,0,8966,166652,165963,167356,600,0,0,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_vsync_plain_loaded,41664,0,off,loaded,fixed,vsync,dxgi,65,4,1,0,0,9241,166654,165884,167416,600,0,0,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_wait_idle,41664,4166400,off,idle,fixed,sleep,dxgi,65,4,1,1,0,9008,166657,166656,166659,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_wait_loaded,41664,4166500,off,loaded,fixed,sleep,dxgi,65,4,1,1,0,9317,166657,166656,166658,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_wait_plain_idle,41664,0,off,idle,fixed,sleep,dxgi,65,4,1,0,0,8956,166657,166656,166658,600,0,0,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,fps60_wait_plain_loaded,41664,0,off,loaded,fixed,sleep,dxgi,65,4,1,0,0,9228,166657,166656,166658,600,0,0,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-plain-vulkan,w130_vsync_idle,41664,4166300,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,52332,83329,82353,84449,2400,2332,2331,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-plain-vulkan,w130_vsync_loaded,41664,4166500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,52506,83330,82558,84094,2400,2332,2331,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-plain-vulkan,w130_vsync_plain_idle,41664,0,off,idle,adaptive,vsync,dxgi,65,1,1,0,0,51931,83325,82292,84368,2400,0,0,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-plain-vulkan,w130_vsync_plain_loaded,41664,0,off,loaded,adaptive,vsync,dxgi,65,1,1,0,0,52375,83329,82600,84062,2400,0,0,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-plain-vulkan,w130_wait_idle,41664,4166400,off,idle,adaptive,sleep,dxgi,65,1,1,1,0,52193,83329,83328,83330,2400,2332,2331,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-plain-vulkan,w130_wait_loaded,41664,4166500,off,loaded,adaptive,sleep,dxgi,65,1,1,1,0,52559,83329,83328,83350,2400,2332,2330,1,0,0,1,49,2,48,49,0,0,0,0
+240hz-plain-vulkan,w20_idle,41664,4166500,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,9086,41639,40143,43166,2400,2332,2331,0,0,0,0,0,1,1,49,0,0,0,0
+240hz-plain-vulkan,w20_loaded,41664,4166500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,9180,41646,40437,43003,2400,2332,2331,0,0,0,0,0,1,3,49,0,0,0,0
+240hz-plain-vulkan,w90_flight1_idle,41664,4166400,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,39215,40709,38275,84747,2400,2216,2052,50,0,116,112,0,1,38,49,0,0,0,0
+240hz-plain-vulkan,w90_flight1_loaded,41664,4166500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,39952,41177,38825,83621,2400,2269,2184,22,0,63,57,0,1,28,49,0,0,0,0
+240hz-plain-vulkan,w90_flight2_idle,41664,4166500,off,idle,adaptive,vsync,dxgi,65,1,2,1,0,36661,83301,39606,84785,2400,2306,2254,24,1,26,33,331,2,48,49,0,0,0,0
+240hz-plain-vulkan,w90_flight2_loaded,41664,4166500,off,loaded,adaptive,vsync,dxgi,65,1,2,1,0,37147,82965,38383,84636,2400,2287,2167,72,2,45,91,1179,2,45,49,0,0,0,0
+240hz-plain-vulkan,w90_idle,41664,4166400,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,39265,40671,38110,84675,2400,2217,2067,37,0,115,86,0,1,35,49,0,0,0,0
+240hz-plain-vulkan,w90_loaded,41664,4166500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,39905,41089,38498,84074,2400,2268,2171,33,0,64,63,0,1,37,49,0,0,0,0
+240hz-vsync-sources,fps120_dwm_idle,41664,4166400,off,idle,fixed,vsync,dwm,65,2,1,1,0,9046,83330,81948,84711,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-vsync-sources,fps120_dwm_loaded,41664,4166500,off,loaded,fixed,vsync,dwm,65,2,1,1,0,9336,83330,82421,84192,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-vsync-sources,fps120_dxgi_idle,41664,4166400,off,idle,fixed,vsync,dxgi,65,2,1,1,0,9064,83335,81909,84650,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-vsync-sources,fps120_dxgi_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,9340,83333,82225,84374,1200,1132,1127,2,2,0,2,0,2,0,25,0,0,0,0
+240hz-vsync-sources,fps120_wait_idle,41664,4166400,off,idle,fixed,sleep,dxgi,65,2,1,1,0,9027,83329,83328,83330,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-vsync-sources,fps120_wait_loaded,41664,4166500,off,loaded,fixed,sleep,dxgi,65,2,1,1,0,9377,83329,83328,83402,1200,1132,1131,0,0,0,0,0,2,0,25,0,0,0,0
+240hz-vsync-sources,fps30_dwm_idle,41664,4166400,off,idle,fixed,vsync,dwm,65,8,1,1,0,9124,333320,331819,334716,400,332,331,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-vsync-sources,fps30_dwm_loaded,41664,4166400,off,loaded,fixed,vsync,dwm,65,8,1,1,0,9314,333320,332418,334106,400,332,331,0,0,0,0,0,8,1,7,0,0,0,0
+240hz-vsync-sources,fps30_dxgi_idle,41664,4166500,off,idle,fixed,vsync,dxgi,65,8,1,1,0,9164,333324,332539,334143,400,332,331,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-vsync-sources,fps30_dxgi_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,8,1,1,0,9320,333303,332461,334186,400,332,331,0,0,0,0,0,8,0,7,0,0,0,0
+240hz-vsync-sources,fps60_dwm_idle,41664,4166400,off,idle,fixed,vsync,dwm,65,4,1,1,0,9062,166660,165948,167369,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_dwm_loaded,41664,4166500,off,loaded,fixed,vsync,dwm,65,4,1,1,0,9339,166660,165798,167438,600,532,529,1,1,0,1,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_dwm_plain,41664,0,off,,fixed,vsync,dwm,65,4,1,0,0,8979,166660,166584,166716,600,0,0,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_dxgi_idle,41664,4166500,off,idle,fixed,vsync,dxgi,65,4,1,1,0,9081,166649,165399,167902,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_dxgi_loaded,41664,4166500,off,loaded,fixed,vsync,dxgi,65,4,1,1,0,9332,166653,165880,167454,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_dxgi_plain,41664,0,off,,fixed,vsync,dxgi,65,4,1,0,0,8991,166652,165634,167913,600,0,0,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_wait_idle,41664,4166500,off,idle,fixed,sleep,dxgi,65,4,1,1,0,9031,166657,166656,166658,600,532,531,0,0,0,0,0,4,0,13,0,0,0,0
+240hz-vsync-sources,fps60_wait_loaded,41664,4166500,off,loaded,fixed,sleep,dxgi,65,4,1,1,0,9335,166657,166656,174330,600,532,524,5,2,0,5,0,4,1,13,0,0,0,0
+240hz-vsync-sources,w130_dwm_idle,41664,4166500,off,idle,adaptive,vsync,dwm,65,1,1,1,0,52140,83330,82631,83938,2400,2331,2328,0,1,1,0,49,2,48,49,0,0,0,0
+240hz-vsync-sources,w130_dwm_loaded,41664,4166500,off,loaded,adaptive,vsync,dwm,65,1,1,1,0,52430,83330,82223,84439,2400,2332,2331,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-vsync-sources,w130_dxgi_idle,41664,4166400,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,52090,83338,82156,84618,2400,2332,2331,0,0,0,0,49,2,48,49,0,0,0,0
+240hz-vsync-sources,w130_dxgi_loaded,41664,4166500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,52355,83325,82336,84253,2400,2332,2331,0,0,0,0,49,2,48,49,0,0,0,0
+50hz-phase-sweep,phase05_idle,200000,8333300,off,idle,fixed,vsync,dxgi,5,2,1,1,0,2896,399998,399093,400849,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase05_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,5,2,1,1,0,3045,400010,399135,400849,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase15_idle,200000,8333300,off,idle,fixed,vsync,dxgi,15,2,1,1,0,2888,400005,399168,400838,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase15_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,15,2,1,1,0,3117,400009,399273,400727,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase25_idle,200000,8333000,off,idle,fixed,vsync,dxgi,25,2,1,1,0,2895,400008,399324,400597,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase25_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,25,2,1,1,0,3126,400010,399279,400768,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase35_idle,200000,8333200,off,idle,fixed,vsync,dxgi,35,2,1,1,0,2899,400009,398967,401071,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase35_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,35,2,1,1,0,3114,400012,399220,400772,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase45_idle,200000,8333200,off,idle,fixed,vsync,dxgi,45,2,1,1,0,2905,400028,399262,400812,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase45_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,45,2,1,1,0,3119,400008,399194,400817,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase55_idle,200000,8333300,off,idle,fixed,vsync,dxgi,55,2,1,1,0,2913,400022,399140,400735,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase55_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,55,2,1,1,0,3086,400011,399138,400875,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase65_idle,200000,8333200,off,idle,fixed,vsync,dxgi,65,2,1,1,0,2905,400018,399263,400857,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase65_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,3091,400010,399241,400767,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase75_idle,200000,8333400,off,idle,fixed,vsync,dxgi,75,2,1,1,0,2903,400007,399245,400929,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase75_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,75,2,1,1,0,3061,400011,399226,400736,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase85_idle,200000,8333100,off,idle,fixed,vsync,dxgi,85,2,1,1,0,2904,400004,399353,400653,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase85_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,85,2,1,1,0,3043,400009,399232,400661,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase95_idle,200000,8333100,off,idle,fixed,vsync,dxgi,95,2,1,1,0,2919,399982,398803,401036,400,332,327,2,2,0,2,0,2,0,6,0,0,0,0
+50hz-phase-sweep,phase95_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,95,2,1,1,0,3008,400007,399335,400671,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_vsync_idle,200000,8333200,off,idle,fixed,vsync,dxgi,65,2,1,1,0,41330,400006,399234,400699,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_vsync_loaded,200000,8333500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,41471,400009,398675,400888,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_vsync_plain_idle,200000,0,off,idle,fixed,vsync,dxgi,65,2,1,0,0,41258,400004,399028,400841,400,0,0,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_vsync_plain_loaded,200000,0,off,loaded,fixed,vsync,dxgi,65,2,1,0,0,41356,400005,399193,400818,400,0,0,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_wait_idle,200000,8333100,off,idle,fixed,sleep,dxgi,65,2,1,1,0,41302,400001,400000,400002,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_wait_loaded,200000,8333500,off,loaded,fixed,sleep,dxgi,65,2,1,1,0,41531,400001,400000,400006,400,332,331,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_wait_plain_idle,200000,0,off,idle,fixed,sleep,dxgi,65,2,1,0,0,41226,400001,400000,400002,400,0,0,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,fps25_wait_plain_loaded,200000,0,off,loaded,fixed,sleep,dxgi,65,2,1,0,0,41370,400001,400000,400003,400,0,0,0,0,0,0,0,2,0,6,0,0,0,0
+50hz-plain-vulkan,w130_vsync_idle,200000,8333400,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,261300,400008,399130,400926,750,682,681,0,0,0,0,11,2,10,11,0,0,0,0
+50hz-plain-vulkan,w130_vsync_loaded,200000,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,261549,400011,399233,400793,750,682,681,0,0,0,0,11,2,10,11,0,0,0,0
+50hz-plain-vulkan,w130_vsync_plain_idle,200000,0,off,idle,adaptive,vsync,dxgi,65,1,1,0,0,261234,400017,398994,400845,750,0,0,0,0,0,0,11,2,10,11,0,0,0,0
+50hz-plain-vulkan,w130_vsync_plain_loaded,200000,0,off,loaded,adaptive,vsync,dxgi,65,1,1,0,0,261482,400013,399205,400776,750,0,0,0,0,0,0,11,2,10,11,0,0,0,0
+50hz-plain-vulkan,w130_wait_idle,200000,8333200,off,idle,adaptive,sleep,dxgi,65,1,1,1,0,261286,400001,400000,400002,750,682,681,0,0,0,0,11,2,10,11,0,0,0,0
+50hz-plain-vulkan,w130_wait_loaded,200000,8333500,off,loaded,adaptive,sleep,dxgi,65,1,1,1,0,261539,400001,400000,400090,750,682,681,0,0,0,0,11,2,10,11,0,0,0,0
+50hz-plain-vulkan,w20_idle,200000,8333200,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,41267,200023,198061,201862,750,682,681,0,0,0,0,0,1,1,11,0,0,0,0
+50hz-plain-vulkan,w20_loaded,200000,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,41355,200033,198387,201688,750,682,681,0,0,0,0,0,1,1,11,0,0,0,0
+50hz-plain-vulkan,w90_flight1_idle,200000,8333000,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,181236,200027,198802,201101,750,682,681,0,0,0,0,0,1,0,11,0,0,0,0
+50hz-plain-vulkan,w90_flight1_loaded,200000,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,181389,200005,198774,201166,750,682,681,0,0,0,0,0,1,0,11,0,0,0,0
+50hz-plain-vulkan,w90_flight2_idle,200000,8333100,off,idle,adaptive,vsync,dxgi,65,1,2,1,0,181178,200015,198453,201458,750,682,681,0,0,0,0,0,1,0,11,0,0,0,0
+50hz-plain-vulkan,w90_flight2_loaded,200000,8333500,off,loaded,adaptive,vsync,dxgi,65,1,2,1,0,181320,200000,198739,201217,750,682,681,0,0,0,0,0,1,0,11,0,0,0,0
+50hz-plain-vulkan,w90_idle,200000,8333200,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,181241,199997,198809,201281,750,682,681,0,0,0,0,0,1,0,11,0,0,0,0
+50hz-plain-vulkan,w90_loaded,200000,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,181385,199998,198760,201224,750,682,681,0,0,0,0,0,1,0,11,0,0,0,0
+60hz-phase-sweep,phase05_idle,166675,8333300,off,idle,fixed,vsync,dxgi,5,2,1,1,0,2866,333354,332445,334266,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase05_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,5,2,1,1,0,3118,333352,332641,334143,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase15_idle,166675,8333300,off,idle,fixed,vsync,dxgi,15,2,1,1,0,2874,333365,332485,334325,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase15_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,15,2,1,1,0,3136,333357,332658,334054,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase25_idle,166675,8333400,off,idle,fixed,vsync,dxgi,25,2,1,1,0,2884,333357,332654,334207,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase25_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,25,2,1,1,0,3121,333357,332574,334067,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase35_idle,166675,8333300,off,idle,fixed,vsync,dxgi,35,2,1,1,0,2865,333361,332444,334187,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase35_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,35,2,1,1,0,3130,333354,332569,334121,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase45_idle,166675,8333400,off,idle,fixed,vsync,dxgi,45,2,1,1,0,2875,333370,332527,334279,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase45_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,45,2,1,1,0,3018,333355,332579,334191,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase55_idle,166675,8333400,off,idle,fixed,vsync,dxgi,55,2,1,1,0,2887,333374,332431,334111,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase55_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,55,2,1,1,0,3095,333357,332520,334104,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase65_idle,166675,8333200,off,idle,fixed,vsync,dxgi,65,2,1,1,0,2887,333364,332398,334356,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase65_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,3002,333356,332619,334115,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase75_idle,166675,8333300,off,idle,fixed,vsync,dxgi,75,2,1,1,0,2886,333341,332524,334185,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase75_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,75,2,1,1,0,3048,333357,332527,334145,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase85_idle,166675,8333300,off,idle,fixed,vsync,dxgi,85,2,1,1,0,2878,333362,332447,334158,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase85_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,85,2,1,1,0,2996,333357,332698,334095,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase95_idle,166675,8333400,off,idle,fixed,vsync,dxgi,95,2,1,1,0,2914,333392,332385,334342,400,332,331,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-phase-sweep,phase95_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,95,2,1,1,0,3007,333355,331867,334829,400,332,329,1,1,0,1,0,2,0,7,0,0,0,0
+60hz-plain-vulkan,fps20_vsync_idle,166675,8333200,off,idle,fixed,vsync,dxgi,65,3,1,1,0,31341,500040,499291,500788,400,332,331,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_vsync_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,65,3,1,1,0,31421,500040,499332,500784,400,332,331,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_vsync_plain_idle,166675,0,off,idle,fixed,vsync,dxgi,65,3,1,0,0,31269,500036,499139,501056,400,0,0,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_vsync_plain_loaded,166675,0,off,loaded,fixed,vsync,dxgi,65,3,1,0,0,31339,500037,499289,500727,400,0,0,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_wait_idle,166675,8333300,off,idle,fixed,sleep,dxgi,65,3,1,1,0,31351,500026,500025,500027,400,332,331,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_wait_loaded,166675,8333500,off,loaded,fixed,sleep,dxgi,65,3,1,1,0,31513,500026,500025,500058,400,332,331,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_wait_plain_idle,166675,0,off,idle,fixed,sleep,dxgi,65,3,1,0,0,31293,500026,500025,500027,400,0,0,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps20_wait_plain_loaded,166675,0,off,loaded,fixed,sleep,dxgi,65,3,1,0,0,31348,500026,500025,500027,400,0,0,0,0,0,0,0,3,0,5,0,0,0,0
+60hz-plain-vulkan,fps30_vsync_idle,166675,8333200,off,idle,fixed,vsync,dxgi,65,2,1,1,0,31299,333352,332472,334281,450,382,381,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-plain-vulkan,fps30_vsync_loaded,166675,8333500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,31445,333352,332677,334111,450,382,381,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-plain-vulkan,fps30_wait_idle,166675,8333300,off,idle,fixed,sleep,dxgi,65,2,1,1,0,31283,333351,333350,333352,450,382,381,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-plain-vulkan,fps30_wait_loaded,166675,8333500,off,loaded,fixed,sleep,dxgi,65,2,1,1,0,31438,333351,333350,333386,450,382,381,0,0,0,0,0,2,0,7,0,0,0,0
+60hz-plain-vulkan,w130_vsync_idle,166675,8333300,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,221292,333367,332387,334266,900,832,831,0,0,0,0,13,2,12,13,0,0,0,0
+60hz-plain-vulkan,w130_vsync_loaded,166675,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,221530,333355,332659,334164,900,832,831,0,0,0,0,13,2,12,13,0,0,0,0
+60hz-plain-vulkan,w130_vsync_plain_idle,166675,0,off,idle,adaptive,vsync,dxgi,65,1,1,0,0,221218,333362,332395,334252,900,0,0,0,0,0,0,13,2,12,13,0,0,0,0
+60hz-plain-vulkan,w130_vsync_plain_loaded,166675,0,off,loaded,adaptive,vsync,dxgi,65,1,1,0,0,221462,333355,332632,334154,900,0,0,0,0,0,0,13,2,12,13,0,0,0,0
+60hz-plain-vulkan,w130_wait_idle,166675,8333400,off,idle,adaptive,sleep,dxgi,65,1,1,1,0,221267,333351,333350,333352,900,832,831,0,0,0,0,13,2,12,13,0,0,0,0
+60hz-plain-vulkan,w130_wait_loaded,166675,8333500,off,loaded,adaptive,sleep,dxgi,65,1,1,1,0,221539,333351,333350,333369,900,832,831,0,0,0,0,13,2,12,13,0,0,0,0
+60hz-plain-vulkan,w20_idle,166675,8333200,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,31278,166643,164955,168489,900,832,831,0,0,0,0,0,1,1,13,0,0,0,0
+60hz-plain-vulkan,w20_loaded,166675,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,31412,166667,165432,168006,900,832,831,0,0,0,0,0,1,1,13,0,0,0,0
+60hz-plain-vulkan,w90_flight1_idle,166675,8333300,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,151224,166673,165199,167959,900,832,831,0,0,0,0,0,1,0,13,0,0,0,0
+60hz-plain-vulkan,w90_flight1_loaded,166675,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,151373,166694,153628,168118,900,831,829,0,0,1,0,0,1,1,13,0,0,0,0
+60hz-plain-vulkan,w90_flight2_idle,166675,8333200,off,idle,adaptive,vsync,dxgi,65,1,2,1,0,151163,166685,165404,168008,900,832,831,0,0,0,0,0,1,0,13,0,0,0,0
+60hz-plain-vulkan,w90_flight2_loaded,166675,8333500,off,loaded,adaptive,vsync,dxgi,65,1,2,1,0,151300,166668,165507,168109,900,832,831,0,0,0,0,0,1,1,13,0,0,0,0
+60hz-plain-vulkan,w90_idle,166675,8333300,off,idle,adaptive,vsync,dxgi,65,1,1,1,0,151231,166698,165282,167969,900,832,831,0,0,0,0,0,1,0,13,0,0,0,0
+60hz-plain-vulkan,w90_loaded,166675,8333500,off,loaded,adaptive,vsync,dxgi,65,1,1,1,0,151368,166698,165050,167961,900,832,831,0,0,0,0,0,1,1,13,0,0,0,0
+second-display-120hz-vsync-sources,fps30_dwm_idle,83333,4166400,off,idle,fixed,vsync,dwm,65,4,1,1,0,9034,166660,165892,167329,400,332,0,0,331,0,0,0,4,0,7,0,0,0,0
+second-display-120hz-vsync-sources,fps30_dwm_loaded,83333,4166500,off,loaded,fixed,vsync,dwm,65,4,1,1,0,9324,166660,165599,167662,400,332,0,0,331,0,0,0,4,0,7,0,0,0,0
+second-display-120hz-vsync-sources,fps30_dxgi_idle,83333,4166500,off,idle,fixed,vsync,dxgi,65,4,1,1,0,9119,333345,332565,334169,400,332,331,0,0,0,0,0,4,0,7,0,0,0,0
+second-display-120hz-vsync-sources,fps30_dxgi_loaded,83333,4166500,off,loaded,fixed,vsync,dxgi,65,4,1,1,0,9307,333339,332171,334310,400,332,331,0,0,0,0,0,4,0,7,0,0,0,0
+second-display-120hz-vsync-sources,fps60_dwm_idle,83333,4166500,off,idle,fixed,vsync,dwm,65,2,1,1,0,9007,83330,83306,83332,600,532,0,0,531,0,0,0,2,0,13,0,0,0,0
+second-display-120hz-vsync-sources,fps60_dwm_loaded,83333,4166500,off,loaded,fixed,vsync,dwm,65,2,1,1,0,9324,83330,82442,84137,600,532,0,0,531,0,0,0,2,0,13,0,0,0,0
+second-display-120hz-vsync-sources,fps60_dxgi_idle,83333,4166500,off,idle,fixed,vsync,dxgi,65,2,1,1,0,9037,166668,164991,168110,600,532,531,0,0,0,0,0,2,0,13,0,0,0,0
+second-display-120hz-vsync-sources,fps60_dxgi_loaded,83333,4166500,off,loaded,fixed,vsync,dxgi,65,2,1,1,0,9371,166685,165570,167731,600,532,531,0,0,0,0,0,2,0,13,0,0,0,0
+second-display-120hz-vsync-sources,fps60_wait_idle,83333,4166500,off,idle,fixed,sleep,dxgi,65,2,1,1,0,9072,166667,166666,166668,600,532,531,0,0,0,0,0,2,0,13,0,0,0,0
+second-display-120hz-vsync-sources,fps60_wait_loaded,83333,4166500,off,loaded,fixed,sleep,dxgi,65,2,1,1,0,9399,166667,166666,166731,600,532,531,0,0,0,0,0,2,0,13,0,0,0,0
+swapchain-refresh-probes,fullscreen,200000,8333400,,,adaptive,sleep,dxgi,65,1,1,1,0,10502,167261,164954,251543,200,124,115,0,0,8,0,0,1,0,11,0,0,0,0
+swapchain-refresh-probes,s24_primary,200000,20000200,,,adaptive,sleep,dxgi,65,1,1,1,0,2923,200068,195893,203132,150,82,81,0,0,0,0,0,1,1,11,0,0,0,0
+swapchain-refresh-probes,s24_second,416667,20000300,,,adaptive,sleep,dxgi,65,1,1,1,0,3492,416661,412712,419108,150,82,81,0,0,0,0,0,1,1,5,0,0,0,0

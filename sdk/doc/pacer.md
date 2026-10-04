@@ -1,7 +1,7 @@
 # The frame pacer (experimental)
 
-> **Experimental.** The pacer is checked against its own simulation only: no capture of it on a real swap chain has been analysed
-> yet. It is off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's `with_pacer`), its API may change in any release, and it is not
+> **Experimental.** The pacer is checked against its own simulation and, on one machine, against the display times a graphics
+> driver reports: no capture of it on a real swap chain has been analysed with the tools yet. It is off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's `with_pacer`), its API may change in any release, and it is not
 > what the marker and the tools need: they measure any pacer. See [Status](#status).
 
 The pacer module paces a frame loop with nothing but a steady clock and a `Present` that waits for vsync: a baseline that works on any
@@ -20,17 +20,19 @@ it paces; only other settings that need a larger frame window do.
 
 ## Status
 
-| Checked                                                                                                                                                                  | Not checked                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Its simulation of a frame loop, against golden results (`sdk/test-data/pacer`)                                                                                           | Any real swap chain, on any platform or graphics API            |
-| The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                                                                | A real display's clock against a real CPU clock                 |
-| That repository's timing diagrams (the vsync timer, half rate, switching rates)                                                                                          | A compositor, a frame queue longer than one, a real GPU's limit |
-| A simulated display 0.1 % off its nominal rate with 2 ms of jitter on every frame start, for an hour                                                                     | Variable refresh, vsync off                                     |
-| The refresh rates monitors have, 50 to 540 Hz: frames on time, a display off its rate, target frame rates, a load that comes and goes, a loop the GPU limits (simulated) |                                                                 |
-| Every line and branch of the module by its tests; no allocation per frame                                                                                                |                                                                 |
-| Present feedback: a simulated display that queues presents, with frame starts that wobble and feedback that is late, missing, refused or stops                           | Present feedback in a running application, on any platform      |
-| Present feedback: one present log of a real swap chain (Vulkan FIFO, 240 Hz, `VK_EXT_present_timing`), replayed                                                          | Any platform's feedback but that one driver's                   |
-| Work over a refresh in a loop no vsync holds: simulated, and one frame log of a real swap chain (Vulkan FIFO, 120 Hz, CPU work of 133 % of a refresh), replayed          | That rule in a running application                              |
+| Checked                                                                                                                                                                                            | Not checked                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Its simulation of a frame loop, against golden results (`sdk/test-data/pacer`)                                                                                                                     | Any real swap chain recorded by a capture card and analysed with the tools                                                                          |
+| The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                                                                                          | Any platform but Windows, any graphics API but Vulkan, any GPU vendor but one                                                                       |
+| That repository's timing diagrams (the vsync timer, half rate, switching rates)                                                                                                                    | A real display's clock against a real CPU clock for longer than 20 seconds                                                                          |
+| A simulated display 0.1 % off its nominal rate with 2 ms of jitter on every frame start, for an hour                                                                                               | Vsync off; variable refresh as something to pace (it is not: what G-SYNC does to the pacer is under [Present feedback](#present-feedback-optional)) |
+| The refresh rates monitors have, 50 to 540 Hz: frames on time, a display off its rate, target frame rates, a load that comes and goes, a loop the GPU limits (simulated)                           |                                                                                                                                                     |
+| Every line and branch of the module by its tests; no allocation per frame                                                                                                                          |                                                                                                                                                     |
+| Present feedback: a simulated display that queues presents, with frame starts that wobble and feedback that is late, missing, refused or stops                                                     | Present feedback's statistics in a running application on a display with a fixed refresh rate                                                       |
+| Present feedback: one present log of a real swap chain (Vulkan FIFO, 240 Hz, `VK_EXT_present_timing`), replayed                                                                                    | Any platform's feedback but that one driver's                                                                                                       |
+| Work over a refresh in a loop no vsync holds: simulated, one frame log of a real swap chain replayed (Vulkan FIFO, 120 Hz, CPU work of 133 % of a refresh), and the running sample at 50 to 240 Hz | Work close to a whole refresh, which the rule does not settle ([The swap interval rule](#the-swap-interval-rule))                                   |
+| Frames held for a fixed frame rate on one real swap chain (Vulkan FIFO, Windows, 50 to 240 Hz, a timer sleep and a wait on the vertical blank), by the driver's display times                      | The same recorded by a capture card and analysed with the tools                                                                                     |
+| That swap chain in a window under the desktop compositor, with one and two frames in flight and GPU work of 90 % and 130 % of a refresh                                                            | A compositor, a frame queue and a GPU's limit on any other machine                                                                                  |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
 
@@ -40,12 +42,18 @@ FramePacing samples, for [Vulkan](https://github.com/Unarmed1000/gtec-demo-frame
 the marker filled from the schedule. There the pacer has paced Vulkan swap chains on Windows, where it held its targets by its own
 count of late frames; the OpenGL ES samples have only run on an emulator whose swap is not locked to vsync. No capture of it has
 been analysed with the tools, so the "not checked" column above stands. What that integration found is in this guide
-([Applying the schedule](#applying-the-schedule), `EndFrame`'s work, and [Present feedback](#present-feedback-optional)). Its
+([Applying the schedule](#applying-the-schedule), `EndFrame`'s work, [The swap interval rule](#the-swap-interval-rule) and
+[Present feedback](#present-feedback-optional)). Its
 present logs (the driver's times, not captures) show the pacer holding a swap interval of one by the frame starts alone at 23.98,
 24, 25, 29.97, 60, 100, 120 and 240 Hz on an idle machine, with the frames starting within 0.2 ms of a refresh. On the same machine
 busy with other work the frames started up to 3 ms off the refreshes, which the pacer read as late frames at 240 Hz. With work of
 130 % of a refresh the pacer of that time never slowed down, at 120 and 240 Hz: the frames started 1.37 refreshes apart, which
 rounds to one ([How a frame is paced](#how-a-frame-is-paced) has what changed).
+
+**A capture session kept with its results.** 247 runs of that sample (Vulkan FIFO on Windows, displays at 50, 60, 120 and 240 Hz,
+an idle machine and one under CPU load) are in the repository, with the row per run, the tables and the charts worked out from
+their frame logs: [Windows hold captures, 2026-10-04](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md). This guide quotes its numbers where it says "that session".
+They are the display times a driver reports on one machine, not a capture of the display.
 
 ## What it needs
 
@@ -58,8 +66,9 @@ rounds to one ([How a frame is paced](#how-a-frame-is-paced) has what changed).
   frame on time reads as late; the statistics of [present feedback](#present-feedback-optional) show when that happens.
 - **The display's refresh period**: from the display mode, or a hard-coded value to start with (not every window system reports
   it). Give it with its fraction: `RefreshPeriod::FromRate(24002, 100)` for 240.02 Hz, or `FromNanoseconds`; whole ticks
-  (`FromTimeSpan`) lose it. Not from a swap chain's present timing without a check: the first integration's driver reported a
-  refresh duration of 8.33 ms at every display rate from 23.98 to 120 Hz.
+  (`FromTimeSpan`) lose it. Not from a swap chain's present timing without a check: on the first integration's machine the
+  swap chain's refresh duration was that of the fastest display of the desktop (8.33 ms for a window on a 60 Hz or a 50 Hz
+  display next to a 120 Hz one), while the window system gave the rate of the display the window was on.
 
 Nothing else: no vsync timestamps, no scheduled presents. Present feedback is counted where the application gives it and never
 needed. [Not used yet](#not-used-yet) lists what a newer platform could add.
@@ -125,13 +134,15 @@ rule sees fits a refresh, so after a frame window without a late frame it speeds
 
 ### Applying the schedule
 
-Use the first way your platform has:
+Use the platform's swap interval where it has one. Core Vulkan's FIFO and core Wayland hold a frame for one refresh only: there the
+application holds the frame itself, in one of the other ways.
 
-| Way                     | What to do                                                                                                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Swap interval**       | Present with `SwapInterval`: DXGI's `SyncInterval`, `eglSwapInterval`, `wglSwapIntervalEXT`, `glXSwapIntervalEXT`, Unity's `QualitySettings.vSyncCount`                                                                                          |
-| **Present it again**    | Where vsync holds a frame for one refresh only (core Vulkan's FIFO, core Wayland): present the finished frame `SwapInterval` times. In Vulkan an image that was presented can not be presented again: draw or copy the frame into the next image |
-| **Sleep, then present** | Sleep until one refresh before `NextFrameStartTime`, then present. A guess: the thread wakes a little late, differently every time                                                                                                               |
+| Way                                           | What to do                                                                                                                                                                                           |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Swap interval**                             | Present with `SwapInterval`: DXGI's `SyncInterval`, `eglSwapInterval`, `wglSwapIntervalEXT`, `glXSwapIntervalEXT`, Unity's `QualitySettings.vSyncCount`                                              |
+| **Sleep, then present**                       | Sleep until one refresh before `NextFrameStartTime`, then present, and hold the next frame's start (below). Nothing ties the sleep to the display: measure it on your platform                       |
+| **Wait for the vertical blank, then present** | Where the platform has a wait for the display's vertical blank (DXGI's `WaitForVBlank`): wait for the one before the refresh aimed at, then present a share of a refresh before that refresh (below) |
+| **Present it again**                          | Present the finished frame `SwapInterval` times. In Vulkan an image that was presented can not be presented again: draw or copy the frame into the next image. Not tried in any integration          |
 
 **A platform's swap interval has a largest value.** DXGI's `SyncInterval` takes at most 4, and `eglSwapInterval` fails above the
 config's `EGL_MAX_SWAP_INTERVAL`. A target of 30 fps on a 240 Hz display is a swap interval of 8: set the largest the platform takes
@@ -141,12 +152,32 @@ and wait for the rest, as below.
 the swap chain has an image to spare, the present returns at once, the next frame starts early, and the loop runs faster than the
 swap interval says (a 30 fps target ran at 33 fps). The pacer can not see that: it counts a frame start that comes early as the
 previous frame's swap interval, never less. So begin the next frame no earlier than the previous frame's `NextFrameStartTime`. The
-frame starts then follow your steady clock, not the display's, so now and then a frame is held a refresh more or less: this way
-stays the guess the table calls it. (At 30 fps on a 240 Hz display, the first integration's log has 6 % of the frames shown a
-refresh early or late.)
+frame starts then follow your steady clock, not the display's, and nothing keeps the present away from the moment the display
+takes a frame.
 
-Use `NextFrameStartTime` for this, not `IntendedDisplayTime`: without present feedback the two are equal, with it the intended
+Hold to `NextFrameStartTime`, not to `IntendedDisplayTime`: without present feedback the two are equal, with it the intended
 display time is the refresh the frame is shown on, the swap chain's queue included, and a loop that waited for that would run late.
+
+**What the sleep did when it was measured.** In [that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md) (G-SYNC off) the sleep, with the next frame's start
+held, showed every frame for exactly its swap interval on the idle machine: at 240, 120, 60 and 50 Hz, at frame rates from 120 to
+15 fps. Under CPU load a few frames were off at 240 and 120 Hz (at most 7 of 1062, at 60 fps on 240 Hz) and none at 60 and 50 Hz.
+
+| Display | Frame rates     | Frames off, idle | Frames off, loaded |
+| ------- | --------------- | ---------------- | ------------------ |
+| 240 Hz  | 120, 60, 30 fps | 0 of 3655        | 9 of 3655          |
+| 120 Hz  | 60, 30, 15 fps  | 0 of 1343        | 1 of 1343          |
+| 60 Hz   | 30, 20 fps      | 0 of 712         | 0 of 712           |
+| 50 Hz   | 25 fps          | 0 of 331         | 0 of 331           |
+
+Earlier logs of the same sample had more: 6 % of the frames a refresh early or late at 30 fps on 240 Hz, and from 1 % to 35 %
+by where the timer happened to start. That session did not reproduce it and does not explain it, and a run there is 6 to 20
+seconds, so a sleep that drifts across a refresh over minutes would not show.
+
+**A wait on the vertical blank** in place of the sleep (DXGI's `WaitForVBlank` there) held a frame no better: the same frames
+off within a few, and frame starts that spread by 0.1 ms to each side where the sleep's are flat. Where you use one, place the
+present well before the refresh you aim at: at 240 Hz 55 to 75 % of a refresh before it was clean and 5 to 45 % was not; at 120,
+60 and 50 Hz every place from 5 to 65 % was. On a display with a variable refresh rate the wait holds no frame, as the vertical
+blank follows the frames; the sleep keeps its frame starts there.
 
 ### How a frame is paced
 
@@ -221,6 +252,13 @@ whole ticks only, so every port decides alike.
   and the frames' average work plus twice the margin fits one refresh less: to the larger of the preferred swap interval and the
   frames' need.
 - `AutoSwapInterval` off keeps the preferred swap interval: the pacer still paces every frame and counts late frames.
+
+**Work close to a whole refresh is decided by the run.** The rule slows down on late frames, and with work a little under a refresh
+whether enough frames are late is not settled by anything in it. In [that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md), with GPU work of about 90 % of a
+refresh at 240 Hz, the display showed 22 to 50 frames of a 10 s run longer than a refresh and never showed 63 to 116 more, while
+the pacer counted 28 to 38 late frames of the 48 it slows down beyond: it stayed at one refresh in four runs of four. With two
+frames in flight it went to two refreshes, after 1.4 s on the idle machine and 4.9 s under load. At 120, 60 and 50 Hz the same
+share of work fitted. With work of 130 % it goes to two refreshes after 0.2 s at every one of those rates, and stays.
 
 `SwapIntervalRule` is public: an application with a frame loop of its own can feed it frames (display time, work, late) and read the
 swap interval it decides.
@@ -308,12 +346,14 @@ window and when a frame is late.
 Nearly everything refused means a wrong refresh period or **a display with a variable refresh rate** (G-SYNC, FreeSync), which
 refreshes when a frame arrives and has no grid of refreshes to count in. The pacer needs a fixed refresh rate with or without
 feedback; switch feedback off there. The first integration's logs with G-SYNC on had display times on no grid, some before their
-present.
+present. In [that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md), of the 597 display times a run gave the pacer it could count from 5 to 9; the other 588 to 592 were
+refused (of 1195 in the longer runs, 1186 to 1190). The swap chain went on reporting the fixed refresh of the mode all the while.
+So nearly every display time refused is the sign of a variable refresh rate, and it may be the only sign the platform gives.
 
 **What it does not do.** It does not pace, it does not steady the swap chain's queue or the latency, and it does not make a sleep
 land on the right refresh: the last two need the platform to take a time for the present ([Not used yet](#not-used-yet)).
 
-Where a display time comes from. Only the first has been looked at, and only as one driver's present log:
+Where a display time comes from. Only the first has been looked at, and only on one driver:
 
 | Platform                           | The display time                                              | The frame's name there          |
 | ---------------------------------- | ------------------------------------------------------------- | ------------------------------- |
@@ -382,9 +422,9 @@ its swap interval itself. It is not the application's animation clock: it has no
 has shown.
 
 - `Advance(frameStartTime, swapInterval)` gives the frame's `AnimationTime` (`Time`, `Step`, `StepRefreshes`).
-- `Measure(frameStartTime)` and then `Step(swapInterval)` do the same in two steps, for a loop that decides the swap interval from the
-  measurement: `FrameMeasurement` says how many refreshes after the frame before it the previous frame was shown, whether that was
-  late, and when on the display's clock.
+- `Measure(frameStartTime, work)` and then `Step(swapInterval)` do the same in two steps, for a loop that decides the swap interval
+  from the measurement: `FrameMeasurement` says how many refreshes after the frame before it the previous frame was shown, whether
+  that was late (by those refreshes, or by its work where that is given), and when on the display's clock.
 - It is given its longest gap (the pacer gives it the frame window's length): a longer one is a pause.
 
 `FramesInFlight` is the part behind [present feedback](#present-feedback-optional), for the same application: it keeps the frames
@@ -399,13 +439,17 @@ upgrade on the [roadmap](https://github.com/Unarmed1000/mb-framepacing/blob/mast
 
 | Not used yet                                    | Where it exists                                                                                                  | What it would improve                                                                                        |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Vsync times the platform reports                | DWM's `qpcVBlank`, Choreographer's frame time, `CADisplayLink`'s `timestamp`                                     | The intended display time without the frame starts' jitter                                                   |
+| Vsync times the platform reports                | DXGI's vertical blank wait, Choreographer's frame time, `CADisplayLink`'s `timestamp`                            | The intended display time without the frame starts' jitter                                                   |
 | Predicted display times                         | Choreographer's expected presentation time, OpenXR's `predictedDisplayTime`, `CADisplayLink`'s `targetTimestamp` | The animation time the platform itself aims for                                                              |
-| Scheduled presents and per-frame targets        | `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`, Metal's `present(at:)`, Windows' `SetTargetTime`       | Back at full rate a frame sooner after one slow frame; no sleep that guesses                                 |
+| Scheduled presents and per-frame targets        | `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`, Metal's `present(at:)`, Windows' `SetTargetTime`       | Back at full rate a frame sooner after one slow frame; the present placed by the platform                    |
 | Pacing by the display times of present feedback | The platforms of [present feedback](#present-feedback-optional)                                                  | Late frames as the display had them where the frame starts are uneven: a busy machine at a high refresh rate |
 | The refresh period measured from the frames     | Anywhere                                                                                                         | A change of rate followed without being told; 59.94 Hz taken for 60                                          |
 | Slewing against drift                           | Audio and display times in one system clock                                                                      | Animation that stays in step with audio or a server over hours                                               |
 | Variable refresh and vsync off                  | G-SYNC, FreeSync, tearing presents                                                                               | Pacing where there is no grid of refreshes to round to                                                       |
+
+Measured so far, on one machine ([that session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-hold.md)): a wait on the vertical blank the platform reports held a frame for
+its swap interval no better than the timer sleep did. The desktop compositor's time (DWM's) was that of the fastest display there:
+wrong for a window on a slower one.
 
 ## Tests and golden data
 

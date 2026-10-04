@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="546" viewBox="0 0 1180 546" role="img" aria-label="How evenly the frames start: a timer sleep against a wait on the vsync">
+<title>How evenly the frames start: a timer sleep against a wait on the vsync</title>
+<style>
+  text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+         font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
+  .card { fill: #1f242b; stroke: #8b949e; stroke-opacity: 0.25; stroke-width: 1; }
+  .title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { fill: #8b949e; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; fill: #8b949e; }
+  .axis { font-size: 12px; fill: #c9d1d9; }
+  .value { font-size: 11px; fill: #c9d1d9; }
+  .grid { stroke: #ffffff; stroke-opacity: 0.1; stroke-width: 1; }
+  .zero-line { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; }
+  .band { fill: #ffffff; fill-opacity: 0.06; }
+  .green { fill: #2ea043; }
+  .green-faint { fill: #2ea043; fill-opacity: 0.45; }
+  .blue { fill: #58a6ff; }
+  .blue-faint { fill: #58a6ff; fill-opacity: 0.45; }
+  .red { fill: #e5534b; }
+  .amber { fill: #d29922; }
+  .line { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+  .line-blue { stroke: #58a6ff; }
+  .line-green { stroke: #2ea043; }
+  .line-amber { stroke: #d29922; }
+  .line-pink { stroke: #db61a2; }
+  .threshold { stroke: #e5534b; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  .threshold-text { fill: #ff7b72; font-size: 12px; }
+  .mark { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; stroke-dasharray: 2 4; }
+</style>
+<rect class="card" x="0.5" y="0.5" width="1179" height="545" rx="10"/>
+<text class="title" x="28" y="40">How evenly the frames start: a timer sleep against a wait on the vsync</text>
+<text class="sub" x="28" y="62">The time from one frame start to the next, from its 1st to its 99th percentile, against its median. G-SYNC off.</text>
+<rect class="green" x="28" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="46" y="92">Timer sleep, idle</text>
+<rect class="green-faint" x="190.4" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="208.4" y="92">Timer sleep, loaded</text>
+<rect class="blue" x="367.2" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="385.2" y="92">Vsync wait, idle</text>
+<rect class="blue-faint" x="522.4" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="540.4" y="92">Vsync wait, loaded</text>
+<line class="grid" x1="190" y1="116" x2="190" y2="512"/>
+<text class="axis" x="190" y="530" text-anchor="middle">-0.2 ms</text>
+<line class="grid" x1="286" y1="116" x2="286" y2="512"/>
+<text class="axis" x="286" y="530" text-anchor="middle">-0.1 ms</text>
+<line class="zero-line" x1="382" y1="116" x2="382" y2="512"/>
+<text class="axis" x="382" y="530" text-anchor="middle">median</text>
+<line class="grid" x1="478" y1="116" x2="478" y2="512"/>
+<text class="axis" x="478" y="530" text-anchor="middle">+0.1 ms</text>
+<line class="grid" x1="574" y1="116" x2="574" y2="512"/>
+<text class="axis" x="574" y="530" text-anchor="middle">+0.2 ms</text>
+<line class="grid" x1="670" y1="116" x2="670" y2="512"/>
+<text class="axis" x="670" y="530" text-anchor="middle">+0.3 ms</text>
+<line class="grid" x1="766" y1="116" x2="766" y2="512"/>
+<text class="axis" x="766" y="530" text-anchor="middle">+0.4 ms</text>
+<line class="grid" x1="862" y1="116" x2="862" y2="512"/>
+<text class="axis" x="862" y="530" text-anchor="middle">+0.5 ms</text>
+<line class="grid" x1="958" y1="116" x2="958" y2="512"/>
+<text class="axis" x="958" y="530" text-anchor="middle">+0.6 ms</text>
+<line class="grid" x1="1054" y1="116" x2="1054" y2="512"/>
+<text class="axis" x="1054" y="530" text-anchor="middle">+0.7 ms</text>
+<line class="grid" x1="1150" y1="116" x2="1150" y2="512"/>
+<text class="axis" x="1150" y="530" text-anchor="middle">+0.8 ms</text>
+<text class="axis" x="28" y="142">240 Hz, 120 fps</text>
+<rect class="green" x="381.9" y="121" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="130" width="7.1" height="6" rx="1"/>
+<rect class="blue" x="245.1" y="139" width="263.1" height="6" rx="1"/>
+<rect class="blue-faint" x="275.6" y="148" width="206.3" height="6" rx="1"/>
+<text class="axis" x="28" y="186">240 Hz, 60 fps</text>
+<rect class="green" x="381.9" y="165" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="174" width="736.7" height="6" rx="1"/>
+<rect class="blue" x="262" y="183" width="240.3" height="6" rx="1"/>
+<rect class="blue-faint" x="303.9" y="192" width="160.5" height="6" rx="1"/>
+<text class="axis" x="28" y="230">240 Hz, 30 fps</text>
+<rect class="green" x="381.9" y="209" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="218" width="2" height="6" rx="1"/>
+<rect class="blue" x="240.3" y="227" width="259.6" height="6" rx="1"/>
+<rect class="blue-faint" x="295.5" y="236" width="171.3" height="6" rx="1"/>
+<text class="axis" x="28" y="274">120 Hz, 60 fps</text>
+<rect class="green" x="381.9" y="253" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="262" width="5.1" height="6" rx="1"/>
+<rect class="blue" x="274.9" y="271" width="221.9" height="6" rx="1"/>
+<rect class="blue-faint" x="291.2" y="280" width="179" height="6" rx="1"/>
+<text class="axis" x="28" y="318">120 Hz, 30 fps</text>
+<rect class="green" x="381.9" y="297" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="306" width="2" height="6" rx="1"/>
+<rect class="blue" x="239.2" y="315" width="267.4" height="6" rx="1"/>
+<rect class="blue-faint" x="293.7" y="324" width="172.2" height="6" rx="1"/>
+<text class="axis" x="28" y="362">120 Hz, 15 fps</text>
+<rect class="green" x="381.9" y="341" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="350" width="5.2" height="6" rx="1"/>
+<rect class="blue" x="248.8" y="359" width="271.6" height="6" rx="1"/>
+<rect class="blue-faint" x="281.4" y="368" width="209.7" height="6" rx="1"/>
+<text class="axis" x="28" y="406">60 Hz, 30 fps</text>
+<rect class="green" x="381.9" y="385" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="394" width="3.5" height="6" rx="1"/>
+<rect class="blue" x="297.5" y="403" width="173.7" height="6" rx="1"/>
+<rect class="blue-faint" x="317.2" y="412" width="137.7" height="6" rx="1"/>
+<text class="axis" x="28" y="450">60 Hz, 20 fps</text>
+<rect class="green" x="381.9" y="429" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="438" width="3.2" height="6" rx="1"/>
+<rect class="blue" x="310.1" y="447" width="143.7" height="6" rx="1"/>
+<rect class="blue-faint" x="314" y="456" width="139.4" height="6" rx="1"/>
+<text class="axis" x="28" y="494">50 Hz, 25 fps</text>
+<rect class="green" x="381.9" y="473" width="2" height="6" rx="1"/>
+<rect class="green-faint" x="381.9" y="482" width="2" height="6" rx="1"/>
+<rect class="blue" x="307.9" y="491" width="140.6" height="6" rx="1"/>
+<rect class="blue-faint" x="253.9" y="500" width="212.4" height="6" rx="1"/>
+</svg>
