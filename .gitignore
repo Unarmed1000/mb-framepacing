@@ -37,3 +37,6 @@ node_modules/
 
 # BenchmarkDotNet results (measure/tools/Benchmarks)
 BenchmarkDotNet.Artifacts/
+
+# Capture session zips are release assets (pacer-captures/README.md): one downloaded here is not committed
+/pacer-captures/*.zip

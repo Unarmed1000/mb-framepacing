@@ -15,3 +15,4 @@ sdk/test-data/pacer/*.csv text eol=lf
 *.mbfc binary
 *.mbcd binary
 *.mp4  binary
+*.zip  binary

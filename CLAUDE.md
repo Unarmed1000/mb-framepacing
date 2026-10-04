@@ -58,6 +58,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
 | `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                   |
 | `doc/`                                            | Project docs: releasing, roadmap                                                                                  |
+| `pacer-captures/`                                 | Capture sessions of the pacer on real swap chains (not test data); their zips are assets of a GitHub release      |
 | `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                              |
 | root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                                |
 | `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                              |
@@ -279,6 +280,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `NextFrameStartTime` (the frame's start plus its swap interval, the old value) is what a loop that sleeps holds to.
     - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works): with G-SYNC on the display
       times are on no grid and are refused. Those logs come from a G-SYNC display: ask for its state before reading a new one.
+    - **Whole capture sessions** of the first integration are one zip each, kept as assets of the GitHub release `pacer-captures`
+      (the user's choice: never in git, so no clone carries them; `gh release upload pacer-captures <zip>`), with a row in
+      `pacer-captures/README.md`. Git ignores a zip in `pacer-captures/`: download one there to work with it. Before packing, check the
+      files for hardware models (the user's graphics card must never be named: vendor and driver version only), user names and
+      local directories. A capture's findings are "summary level" until someone has read the logs frame by frame: say which.
     - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off, a busy machine; not written by `pacer-sim`):
       the tests pace it without and with feedback and pin the counts (214 frames late by their starts both ways, 2 refreshes
       lost by the display times).
