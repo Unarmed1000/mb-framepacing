@@ -183,7 +183,7 @@ display time is the refresh the frame is shown on, the swap chain's queue includ
 
 **What a loop that does not hold the frame start did.** The first integration's sample left the hold out at a swap interval of
 one, on a FIFO swap chain whose present and acquire returned at once in every frame. With light work that loop still ran at the
-display's rate, with a queue of three refreshes below the swap chain. With work close to a refresh it ran at the GPU's speed, a
+display's rate, a present reaching the display three to four refreshes later. With work close to a refresh it ran at the GPU's speed, a
 little faster than the display, and frames were dropped. With the hold ([the second session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-session2.md), 240 Hz, a swap interval of
 one):
 
@@ -194,15 +194,12 @@ one):
 | 95 % of a refresh | Not held                     | 92                   | 44 of 2147          | 3.83 to 8.41 ms            |
 | 97 % of a refresh | Held to `NextFrameStartTime` | 5                    | 57 of 2321          | 4.17 to 4.68 ms            |
 
-One run each, so the size of the effect and not its value. The rows without the hold are what an application gets when it ignores
+One run each, from a sample whose swap chain code is still being checked: a first look, not a result. The rows without the hold are what an application gets when it ignores
 `NextFrameStartTime`, not what the pacer gives. Waiting for a fence on the acquire did as much for the heavy case as the hold (5
 never shown, 6 shown longer); two frames in flight or a third swap chain image did not help.
 
-The hold does not empty a queue that is already there. A loop paced at exactly the display's rate keeps whatever is queued below
-the swap chain when the pacing begins: in the held run with light work a present reached the display after 3.1 ms, where the loop
-without the hold took 15.3 ms, and later runs of the same held loop were back at three refreshes. So that one run was not what the
-hold gives; draining the queue is a separate step (holding one present back for a few refreshes when pacing begins), and it has
-not been tried.
+How long a present takes to reach the display in those runs is not understood (about three refreshes in most, 3 ms in one), and
+that sample's swap chain code is being checked for a fault. Nothing is concluded from it here until there is more data.
 
 **What the sleep did when it was measured.** Mostly it held, and now and then it did not. With an idle machine and one display,
 the sleep had these frames not shown for exactly their swap interval ([the second session](https://github.com/Unarmed1000/mb-framepacing/blob/master/pacer-captures/2026-10-04-windows-session2.md)), next to a wait on the vertical

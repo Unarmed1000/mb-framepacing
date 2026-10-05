@@ -376,15 +376,17 @@ affected.
   finish on the GPU, draws, submits and presents. Its timing columns have the acquire and the present returning at once in every
   frame. So the wait for the pacer's time is what holds the loop, and this loop did not have it at a swap interval of one.
 - **With light work the loop without it still runs at the display's rate**, and a frame reaches the display 15.3 ms after its present: 3.7
-  refreshes, more than two swap chain images explain. So there is a queue below the swap chain.
+  refreshes, more than two swap chain images explain. It climbs there over the first frames of the run (14.1, 16.5, 19.0, 22.1,
+  23.5 ms), four presents are not shown, and it settles at 15.3 ms. What the delay is made of is not known.
 - **With work close to a refresh the loop runs at the GPU's speed**, a little faster than the display, and frames are dropped: 92
   presents without a display time in the run without the hold.
 - **A fence on the acquire that the loop waits for** brings that to 5, with 6 frames shown longer.
 - **The frame start held to the pacer's `NextFrameStartTime`** brings it to 5 too, with 57 frames shown longer (its work was the
-  highest of the four, 97 % of a refresh). With light work the frames start exactly a refresh apart. In that run a frame also
-  reached the display after 3.1 ms where it took 15.3 ms without the hold, but that is one run and not what the hold gives: runs
-  of the same held loop made after this session were back at three refreshes. A loop paced at the display's rate keeps the queue
-  it had when the pacing began.
+  highest of the four, 97 % of a refresh). With light work the frames start exactly a refresh apart. A frame reached the
+  display after 14.1 ms for the first 68 frames of that run, as without the hold; then three presents were not shown (frames 68,
+  72 and 73) and it was 3.1 ms for the remaining 2300 frames. Why it fell is not known, and runs of the same held loop made
+  after this session stayed at three refreshes. The sample's swap chain code is being checked for a fault; nothing is concluded
+  from these delays until there is more data.
 - **The frame start held to the nearest vertical blank** works in a borderless full screen window (1 and 2 presents never shown
   where the loop without a hold had 87 and 103) and is the worst in a window (156). The sample takes the nearest vertical blank and
   flips between two of them when the frame start falls in the middle of a refresh: that is the sample's code, not the method.

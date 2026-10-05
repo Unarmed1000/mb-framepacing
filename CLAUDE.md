@@ -301,8 +301,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - **What the two sessions of 2026-10-04 taught** (Vulkan FIFO, Windows, one driver; the results documents have the numbers):
       the present and the acquire never waited there, so an application must hold the frame start to `NextFrameStartTime` at
       every swap interval, one included (the first integration's sample did not at one, so every capture of it at a swap
-      interval of one up to those sessions is of a loop that ran ahead; the hold does not empty a queue below the swap chain,
-      and the 3.1 ms from present to display of one held run was that run only); the timer sleep mostly holds a frame and now and then lands on the wrong side of a refresh for a stretch; a
+      interval of one up to those sessions is of a loop that ran ahead; a present takes about three refreshes to reach
+      the display there from the first frame on, and 3.1 ms in one held run after three lost presents. That
+      is not understood and the sample's swap chain code is being checked for a fault. **The user: wait for more data before
+      drawing conclusions.** Three explanations of it were written into the guide and withdrawn within a day (a queue the
+      application fills, a drain as the remedy, the hold emptying it): a finding from one run, or one that the other session has
+      not confirmed with a second capture, goes into a results document as a number and not into the guide as advice); the timer sleep mostly holds a frame and now and then lands on the wrong side of a refresh for a stretch; a
       swap chain's reported refresh is the fastest display's of the desktop, so a second display at another rate changes
       results (the first session's 60 and 50 Hz runs had one on: **ask what displays were on, and at what rates, before reading
       a capture**); most findings are one run each and two runs of the same settings differ by several frames.
