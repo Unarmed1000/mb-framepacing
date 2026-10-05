@@ -50,8 +50,8 @@ namespace MB::FramePacing::Pacer
     }
     else
     {
-      // This frame began before the time the previous one gave for it: the application's loop is not held to that time
-      change = m_rule.AddFrame(previous.DisplayTime, m_work, previous.Late, cpuStartTime < m_nextFrameStartTime);
+      // How long before the time the previous frame gave for it this frame began: what shows a loop that nothing holds
+      change = m_rule.AddFrame(previous.DisplayTime, m_work, previous.Late, m_nextFrameStartTime - cpuStartTime);
     }
 
     const uint32_t swapInterval = m_rule.SwapInterval();

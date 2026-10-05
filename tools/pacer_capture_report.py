@@ -66,6 +66,8 @@ class Frame:
     # thousandths of the mode's refresh period, and the share of them more than a tenth off it, in thousandths
     vblank_interval: int
     vblank_off: int
+    # The time the pacer gave for the start of the next frame (FrameSchedule::NextFrameStartTime), zero where the log has none
+    next_start: int
 
 
 @dataclass(frozen=True)
@@ -115,6 +117,10 @@ class Run:
     present_to_display_median: int
     vblank_interval_median: int
     vblank_off_median: int
+    # How far ahead of the pacer's times the frames began, added up over the frames that are not late (what the pacer reports as
+    # FrameWindowState::StartsAhead for its frame window, here for the run), and the time from the first frame start to the last
+    starts_ahead: int
+    start_span: int
     log: tuple[Frame, ...]
 
     @property
@@ -179,6 +185,8 @@ class Run:
             ("presentToDisplayMedianTicks", self.present_to_display_median),
             ("vblankIntervalMilliPeriods", self.vblank_interval_median),
             ("vblankOffPeriodPerMille", self.vblank_off_median),
+            ("startsAheadTicks", self.starts_ahead),
+            ("startSpanTicks", self.start_span),
         ]
 
 
@@ -228,6 +236,7 @@ def read_frames(text: str) -> tuple[tuple[Frame, ...], int, list[str]]:
             present=number(cell(row, "presentCallTicks")),
             vblank_interval=number(cell(row, "displayVBlankIntervalMilliPeriods")),
             vblank_off=number(cell(row, "displayVBlankOffPeriodPerMille")),
+            next_start=number(cell(row, "nextFrameStartTicks")),
         )
         for row in rows
     )
@@ -295,6 +304,12 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
         planned = 0
 
     start_steps = [after.start - before.start for before, after in itertools.pairwise(counted)]
+    # A frame is late here when the time to the next frame start is more whole refreshes than its swap interval
+    starts_ahead = sum(
+        before.next_start - after.start
+        for before, after in itertools.pairwise(counted)
+        if before.next_start and (2 * (after.start - before.start) + refresh_period) // (2 * refresh_period) <= before.swap_interval
+    )
     slower = next((after.index for before, after in itertools.pairwise(log) if after.swap_interval > before.swap_interval), 0)
     full_window = (FRAME_WINDOW_TICKS + (refresh_period * preferred) // 2) // (refresh_period * preferred)
     pacer_on = config.get("on") == "1"
@@ -342,6 +357,8 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
         present_to_display_median=percentile([frame.shown - frame.present for frame in counted if frame.shown is not None and frame.present], 50),
         vblank_interval_median=percentile([frame.vblank_interval for frame in counted if frame.vblank_interval], 50),
         vblank_off_median=percentile([frame.vblank_off for frame in counted if frame.vblank_interval], 50),
+        starts_ahead=starts_ahead,
+        start_span=counted[-1].start - counted[0].start if counted else 0,
         log=log,
     )
 

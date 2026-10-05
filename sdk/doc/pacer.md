@@ -122,15 +122,22 @@ does not, this wait is the only thing that keeps the loop from running ahead of 
 never waits and never reads a clock. And it can not make up for a wait that was left out: it counts a frame start that comes early
 as the previous frame's swap interval, never less. [Applying the schedule](#applying-the-schedule) has what a loop without it did.
 
-**The pacer counts the frames that began early**, so a loop that leaves the wait out shows: `pacer.FrameWindow().EarlyStarts` is
-the frames of the frame window (the last 2 s) whose next frame began before that time. Put it in your overlay or log next to
-`Frames`. It is a check of the loop; the rule does not use it.
+**The pacer shows a loop that leaves the wait out**: `pacer.FrameWindow().StartsAhead` is how far ahead of those times the frames
+of the frame window (the last 2 s) began, added up, with the late frames left out. Put it in your overlay or log. It is a check of
+the loop; the rule does not use it.
 
-| `EarlyStarts`, of `Frames` | What it says about the loop                                                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| None                       | It waits for `NextFrameStartTime` (a sleep wakes on the time or after it)                                      |
-| About half                 | Only a present that waits for the display holds it: the frame starts jitter around the refreshes. That is fine |
-| Nearly all                 | Nothing holds it and it runs ahead of the display, or the refresh period given is longer than the display's    |
+| `StartsAhead`                   | What it says about the loop                                                                              |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Close to zero                   | It is in step with the display: the jitter of the frame starts cancels in the sum                        |
+| A refresh or more               | It runs ahead of the display: nothing holds it, or the refresh period given is longer than the display's |
+| Below zero by a refresh or more | It falls behind its times: a wait that wakes late every frame adds up                                    |
+
+A sum, and not a count of the frames that began early, because a loop in step with the display begins about half its frames a few
+microseconds early. Worked out for the 507 runs of the first integration's two capture sessions that have display times and a
+fixed refresh rate (`startsAheadTicks` in their `runs.csv`): 446 were no more than a tenth of a refresh a second ahead and no more
+than one behind, with no present never shown at the median; 13 were more than a refresh a second ahead, and those were the runs of
+the loop that left the wait out with work close to a refresh (15 to 50 presents of 1000 never shown) and four runs of a loop at
+twice the display's rate.
 
 `BeginFrame` returns a `FrameSchedule`:
 

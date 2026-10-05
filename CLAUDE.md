@@ -247,11 +247,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **The application holds the next frame's start to `FrameSchedule::NextFrameStartTime` at every swap interval, one included**
     (the guide's frame loop has the wait): the pacer never waits, and a present does not always (the first integration's Vulkan
     FIFO swap chain never did, and its sample left the wait out at a swap interval of one, so its loop ran ahead of the display
-    through every capture of 2026-10-04 and before). The pacer counts what it can not prevent (agreed with the user):
-    `FrameWindowState::EarlyStarts`, the frames of the frame window whose next frame began before that time
-    (`SwapIntervalRule::AddFrame(..., nextStartedEarly)`, of no weight in the rule). None = the loop waits; about half = a
-    present that waits holds it (jitter); nearly all = nothing holds it. It is a share to read, not an assertion: the fault was
-    0.10 ms a frame.
+    through every capture of 2026-10-04 and before). The pacer shows what it can not prevent (agreed with the user):
+    `FrameWindowState::StartsAhead`, how far ahead of those times the frames of the frame window began, added up, late frames left
+    out (`SwapIntervalRule::AddFrame(..., nextStartAhead)`, of no weight in the rule). Close to zero = in step; a refresh or more
+    = the loop runs ahead; below zero = it falls behind (wake-up delays add up). **A sum, not a count**: a count of the frames
+    that began early (`EarlyStarts`, shipped in 76218fc for a few hours) read about half for healthy and faulty loops alike, as
+    frame starts jitter by microseconds around the pacer's times. On the 507 stored runs the sum put 446 within 0.1 refresh a
+    second of zero and exactly the 13 faulty ones more than one ahead: try a diagnostic on the stored runs before shipping it.
   - **A frame whose work is over its frame time** (`EndFrame`'s work against the swap interval's time; agreed with the user) is late
     whatever the frame starts say, and for such frames only the time between the starts counts as real time, the rounding's
     remainder carried to the next one (`PacerRefreshClock::Measure(frameStartTime, work)`). Why: a swap chain with a buffer to
