@@ -188,6 +188,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   tools write and read every file through it; their own types map to it (`CaptureDataMapping` in Capture, `AnalysisDataMapping` in
   Analysis). Keep the output byte for byte: the golden data (`sdk/test-data/data`, `digest.json`) is written back exactly, and every
   language's reader must read the digest's values. After a format change: `python tools/update_test_data.py` (needs ffmpeg).
+  - **A `captures.mbcd` record is 256 bytes** with two equal 112-byte slots for the markers' bytes as read: either holds any payload
+    a main marker's QR code can carry (106), so a field added to the markers does not change the records (the user's choice over
+    the smallest slots that fit). Readers refuse another record size.
   - **Typed times** (C++ and C#, the same names; the tools are typed throughout too, with these names: `PresentedFrame`, `CaptureRow`,
     `ChartRun`): points in time are `TickCount64` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
@@ -570,6 +573,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   pacing (preferred frame time, target frame time, intended display time), the CPU's work (CPU start time and CPU busy, named as
   PresentMon's CPUStartTime and MsCPUBusy). Start/end carry the values of the frame that shows them, and the tearing check compares
   their run id and frame index with the sync marker's. Every main marker (frame, start, end) is QR version 6 (41×41), so it never changes size and has room for future fields.
+  - **CRC** (agreed with the user): every payload ends with the CRC-32 of zlib and Ethernet over all the bytes before it, little
+    endian: a frame or end marker is 57 bytes, a start marker 81, a sync marker 20, and a field added later goes before the CRC. A
+    payload whose CRC does not match is not decoded (`TryDecodePayload` false: `MarkerDecodeStatus.InvalidPayload`, the capture
+    `Undecodable`): the QR code's Reed-Solomon code repairs, the CRC refuses what it repaired into other bytes. Private in each
+    library (`detail/Crc32.hpp`, `Crc32.cs`: a 16-entry table, for the executable size; Python's `binascii.crc32`). The tests' expected
+    CRC bytes come from Python's `binascii`, never from our own code.
   - **Pacing terms:** the intended display time is the pacer's aim; the animation time is the predicted display time the game
     animated for (`sdk/doc/vocabulary.md`). The target frame time is what the pacer aims for now, the **preferred frame time** what the
     application wants (it differs only while the pacer runs slower); `0xFFFFFFFF` in both = on demand. Never call the preferred frame
@@ -598,9 +607,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     description and the statistics tables say "excluding N static frames" (`RunHeadline.ExcludedStatic`).
   - **Late share:** amber = on screen at least half a refresh longer than the preferred frame time (the marker's, else
     `--target-fps`, else one refresh) without being late; never for static steps or on-demand frames (`LateShareData`, `PresentedFrame.PreferredFrameTime`).
-  - The start marker (77 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
+  - The start marker (81 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
     most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
-    captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 16 bytes: the header's start, run id and frame index; matched to its main marker by both) is QR version 2 (25×25), drawn
+    captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 20 bytes: the header's start, run id and frame index, and the CRC; matched to its main marker by both) is QR version 2 (25×25), drawn
     bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `Options.RecommendedOrigin(kind, …)`
     places both; there are no other slots.
 - **Camera capture (VERY EXPERIMENTAL, `measure/doc/camera.md`):**
@@ -668,6 +677,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
 - **Golden set:** if you change the marker payload or geometry, regenerate it with
   `sdk/cpp/build/<preset>/marker/marker-render --golden sdk/test-data/markers` (Windows: `sdk\cpp\build\windows\marker\Release\marker-render.exe`),
   then run the C# tests and the Python tests (`python -m unittest discover -s sdk/python -t sdk/python`).
+  - The digest's seed (`marker-render`'s `WriteModuleDigest`) is one with which both symbol versions use all eight masks in its
+    rows. Check that again when the payload's bytes change (the mask is in a symbol's format bits: row 8, columns 2 to 4, XOR 5)
+    and take the next seed that does.
+  - **A change to the payload's bytes also needs new test clips** (`measure/test-data/videos`: their markers are in the pixels).
+    mb-framepacing-explained makes them from a local, unpublished commit of this repository (it fetches a named branch into its
+    submodule, exports into its own folder and never writes here). Copy the 22 folders unchanged, then `update_test_data.py`,
+    DocImages and `camera_rate_table.py --update-doc`. The format change, the golden data and the clips go in one commit: `master`
+    never holds clips its own tools refuse. The sister repository and the applications that embed the SDK move their pins after.
 - **Verify the GUI without touching the desktop:** `dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>` renders
   every page offscreen (Avalonia.Headless), imports and analyses a test clip, and runs the synthetic camera; compare the images with
   `measure/doc/images` (live numbers on the camera capture page vary). `--output-root` and DocImages (`Program.Automation`) runs never

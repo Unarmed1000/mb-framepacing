@@ -39,8 +39,8 @@ namespace MB.FramePacing.Benchmarks
     {
       var frames = SyntheticHour.Create(RefreshHz * 60 * Minutes, refreshHz: RefreshHz).Run.Frames;
       m_frames = frames.Select(f => f.ToRow()).ToList();
-      // A capture per frame, each with a frame marker's 53 bytes
-      var payload = Enumerable.Range(0, 53).Select(i => (byte)(i * 5)).ToArray();
+      // A capture per frame, each with a frame marker's 57 bytes
+      var payload = Enumerable.Range(0, 57).Select(i => (byte)(i * 5)).ToArray();
       m_captures = frames
         .Select(f => new CaptureCsvRow(
           f.FirstCaptureIndex,

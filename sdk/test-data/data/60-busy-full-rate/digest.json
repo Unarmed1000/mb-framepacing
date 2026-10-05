@@ -35,14 +35,14 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1336671806,
+    "hostTicksSum": 1274051618,
     "deviceTicksCount": 486,
     "deviceTicksSum": 19642500000,
     "sourceDropsSum": 0,
     "statusCounts": {
       "Decoded": 486
     },
-    "mainByteCount": 25830,
+    "mainByteCount": 27774,
     "secondByteCount": 0,
     "decodedMainPayloads": 486,
     "frameIndexSum": 280133,
@@ -217,11 +217,11 @@
     },
     "captureTicksSum": 19642500000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1336671806,
+    "hostTicksSum": 1274051618,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,
     "syncFrameIndexSum": 0,
-    "payloadByteCount": 25830
+    "payloadByteCount": 27774
   }
 }

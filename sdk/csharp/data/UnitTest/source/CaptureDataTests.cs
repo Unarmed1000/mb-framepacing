@@ -199,7 +199,10 @@ namespace MB.FramePacing.Data.UnitTest
         Throws.InstanceOf<InvalidDataException>(),
         "a second marker longer than its slot"
       );
-      Assert.That(CaptureDataRecord.Read(With(CaptureDataRecord.MainLengthOffset, CaptureDataRecord.MainCapacity)).MainBytes, Has.Length.EqualTo(80));
+      Assert.That(
+        CaptureDataRecord.Read(With(CaptureDataRecord.MainLengthOffset, CaptureDataRecord.MainCapacity)).MainBytes,
+        Has.Length.EqualTo(112)
+      );
       // Too few bytes are content that is not a record, not a caller's mistake: the bytes come from a file
       Assert.That(() => CaptureDataRecord.Read(new byte[CaptureDataRecord.Size - 1]), Throws.InstanceOf<InvalidDataException>(), "a byte short");
       Assert.That(
@@ -222,7 +225,7 @@ namespace MB.FramePacing.Data.UnitTest
       );
       var sync = new byte[Payload.MaxEncodedByteCount];
       int syncLength = FrameMarker.EncodePayload(new Payload(MarkerKind.Sync, 7, 11, MarkerFlags.NoFlags, TimeSpan.Zero), default, sync);
-      Assert.That((mainLength, syncLength), Is.EqualTo((77, 16)), "the longest and the shortest marker");
+      Assert.That((mainLength, syncLength), Is.EqualTo((81, 20)), "the longest and the shortest marker");
       Assert.That(mainLength, Is.LessThanOrEqualTo(CaptureDataRecord.MainCapacity), "any marker fits a slot");
 
       // The recorder writes the capture part when the frame arrives and the decoded part when the decoder is done
@@ -257,7 +260,7 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(none.TryDecodeMain(out var noPayload, out _), Is.False);
       Assert.That(noPayload, Is.EqualTo(default(Payload)));
       Assert.That(none.TryDecodeSecond(out _), Is.False);
-      var garbage = none with { MainBytes = new byte[53], SecondBytes = new byte[] { 1, 2, 3 } };
+      var garbage = none with { MainBytes = new byte[57], SecondBytes = new byte[] { 1, 2, 3 } };
       Assert.That(garbage.TryDecodeMain(out _, out _), Is.False);
       Assert.That(garbage.TryDecodeSecond(out _), Is.False);
     }

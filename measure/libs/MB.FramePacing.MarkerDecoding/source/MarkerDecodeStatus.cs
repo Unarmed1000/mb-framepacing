@@ -17,7 +17,7 @@ namespace MB.FramePacing.MarkerDecoding
     /// <summary>No readable QR code (missing, torn, blended between two frames or too small).</summary>
     NotFound,
 
-    /// <summary>A QR code was read but it is not a frame marker (wrong length, magic or format version).</summary>
+    /// <summary>A QR code was read but it is not a frame marker (wrong length, magic, format version or CRC).</summary>
     InvalidPayload,
   }
 }

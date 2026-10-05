@@ -34,7 +34,10 @@ namespace MB::FramePacing::Marker::WireFormat
   inline constexpr uint8_t PayloadMagic1 = 'F';
   inline constexpr uint8_t PayloadFormatVersion = 1;
 
-  //! The header every kind starts with (a sync marker is its first SyncPayloadByteCount bytes: which run and frame), little endian,
+  //! Every payload ends with the CRC-32 (Crc32.hpp, a u32) of all the bytes before it.
+  inline constexpr std::size_t CrcByteCount = 4;
+
+  //! The header every kind starts with (a sync marker has its first SyncFieldsByteCount bytes: which run and frame), little endian,
   //! grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work.
   inline constexpr std::size_t OffsetMagic0 = 0;
   inline constexpr std::size_t OffsetMagic1 = 1;
@@ -49,26 +52,30 @@ namespace MB::FramePacing::Marker::WireFormat
   inline constexpr std::size_t OffsetIntendedDisplayTicks = 33;
   inline constexpr std::size_t OffsetCpuStartTicks = 41;
   inline constexpr std::size_t OffsetCpuBusyTicks = 49;
-  inline constexpr std::size_t PayloadByteCount = 53;
-  inline constexpr std::size_t SyncPayloadByteCount = 16;
+  inline constexpr std::size_t HeaderByteCount = 53;
+  inline constexpr std::size_t SyncFieldsByteCount = 16;
 
-  //! A start marker: the header, then its start time (UTC i64) and sequence id.
-  inline constexpr std::size_t OffsetStartUtcTicks = PayloadByteCount;
+  //! A frame or end marker: the header and the CRC. A sync marker: the header's start and the CRC.
+  inline constexpr std::size_t PayloadByteCount = HeaderByteCount + CrcByteCount;
+  inline constexpr std::size_t SyncPayloadByteCount = SyncFieldsByteCount + CrcByteCount;
+
+  //! A start marker: the header, then its start time (UTC i64) and sequence id, and the CRC.
+  inline constexpr std::size_t OffsetStartUtcTicks = HeaderByteCount;
   inline constexpr std::size_t OffsetSequenceId = OffsetStartUtcTicks + 8;
-  inline constexpr std::size_t StartPayloadByteCount = OffsetSequenceId + SequenceId::ByteCount;
+  inline constexpr std::size_t StartPayloadByteCount = OffsetSequenceId + SequenceId::ByteCount + CrcByteCount;
 
   static_assert(OffsetKind + 1 == OffsetRunId);
   static_assert(OffsetRunId + 4 == OffsetFrameIndex);
-  static_assert(OffsetFrameIndex + 8 == SyncPayloadByteCount);
-  static_assert(SyncPayloadByteCount == OffsetFlags);
+  static_assert(OffsetFrameIndex + 8 == SyncFieldsByteCount);
+  static_assert(SyncFieldsByteCount == OffsetFlags);
   static_assert(OffsetFlags + 1 == OffsetAnimationTicks);
   static_assert(OffsetAnimationTicks + 8 == OffsetPreferredFrameTicks);
   static_assert(OffsetPreferredFrameTicks + 4 == OffsetTargetFrameTicks);
   static_assert(OffsetTargetFrameTicks + 4 == OffsetIntendedDisplayTicks);
   static_assert(OffsetIntendedDisplayTicks + 8 == OffsetCpuStartTicks);
   static_assert(OffsetCpuStartTicks + 8 == OffsetCpuBusyTicks);
-  static_assert(OffsetCpuBusyTicks + 4 == PayloadByteCount);
-  static_assert(StartPayloadByteCount == 77u);
+  static_assert(OffsetCpuBusyTicks + 4 == HeaderByteCount);
+  static_assert(PayloadByteCount == 57u && SyncPayloadByteCount == 20u && StartPayloadByteCount == 81u);
   static_assert(StartPayloadByteCount == Payload::MaxEncodedByteCount);
   static_assert(Payload::MaxEncodedByteCount <= QrCapacityBytes);
   static_assert(SyncPayloadByteCount <= SyncQrCapacityBytes);

@@ -8,6 +8,7 @@
 //****************************************************************************************************************************************************
 
 using System;
+using System.Buffers.Binary;
 using System.Text;
 using NUnit.Framework;
 
@@ -16,6 +17,13 @@ namespace MB.FramePacing.Marker.UnitTest
   [TestFixture]
   public class PayloadTests
   {
+    // Puts the CRC of the bytes before it into the last four bytes: a payload changed on purpose that the CRC does not give away
+    private static void PutCrc(Span<byte> payload)
+    {
+      int fieldByteCount = payload.Length - WireFormat.CrcByteCount;
+      BinaryPrimitives.WriteUInt32LittleEndian(payload.Slice(fieldByteCount), Crc32.Compute(payload.Slice(0, fieldByteCount)));
+    }
+
     [Test]
     public void Encode_ProducesTheDocumentedLittleEndianLayout()
     {
@@ -101,7 +109,13 @@ namespace MB.FramePacing.Marker.UnitTest
         0x63,
         0x62,
         0x61,
+        // CRC (0x7ED16A3D: what Python's binascii.crc32 gives for the 53 bytes before it)
+        0x3D,
+        0x6A,
+        0xD1,
+        0x7E,
       };
+      Assert.That(count, Is.EqualTo(57));
       Assert.That(bytes.AsSpan(0, count).ToArray(), Is.EqualTo(expected));
     }
 
@@ -193,9 +207,10 @@ namespace MB.FramePacing.Marker.UnitTest
     {
       var bytes = new byte[Payload.MaxEncodedByteCount + 1];
       int count = FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.NoFlags, new TimeSpan(2)), default, bytes);
-      Assert.That(count, Is.EqualTo(53));
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 52), out _, out _), Is.False);
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 54), out _, out _), Is.False);
+      Assert.That(count, Is.EqualTo(57));
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 56), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 58), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 53), out _, out _), Is.False, "the header alone, as it was before the CRC");
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 48), out _, out _), Is.False, "the older 48 byte header");
     }
 
@@ -217,10 +232,17 @@ namespace MB.FramePacing.Marker.UnitTest
         bytes
       );
       Assert.That(count, Is.EqualTo(WireFormat.SyncPayloadByteCount));
-      Assert.That(bytes.AsSpan(0, count).ToArray(), Is.EqualTo(new byte[] { (byte)'M', (byte)'F', 1, 3, 4, 0, 0, 0, 8, 7, 6, 5, 4, 3, 2, 1 }));
+      // The header's first 16 bytes and their CRC (0xC0A3D4F2 by Python's binascii.crc32)
+      Assert.That(count, Is.EqualTo(20));
+      Assert.That(
+        bytes.AsSpan(0, count).ToArray(),
+        Is.EqualTo(new byte[] { (byte)'M', (byte)'F', 1, 3, 4, 0, 0, 0, 8, 7, 6, 5, 4, 3, 2, 1, 0xF2, 0xD4, 0xA3, 0xC0 })
+      );
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
       Assert.That(decoded, Is.EqualTo(new Payload(MarkerKind.Sync, 4, 0x0102030405060708u, MarkerFlags.NoFlags, new TimeSpan(0))));
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count + 1), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count - 1), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.SyncFieldsByteCount), out _, out _), Is.False, "without its CRC");
     }
 
     [Test]
@@ -241,7 +263,7 @@ namespace MB.FramePacing.Marker.UnitTest
       var id = new SequenceId(0x0011_2233_4455_6677, 0x8899_AABB_CCDD_EEFF);
       int count = FrameMarker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), bytes.AsSpan(5));
       Assert.That(count, Is.EqualTo(WireFormat.StartPayloadByteCount));
-      Assert.That(count, Is.EqualTo(77));
+      Assert.That(count, Is.EqualTo(81));
       // The sequence id's 16 bytes as they are, at offset 61
       Assert.That(
         bytes.AsSpan(5 + 61, 16).ToArray(),
@@ -330,19 +352,28 @@ namespace MB.FramePacing.Marker.UnitTest
       var bytes = new byte[WireFormat.PayloadByteCount];
       FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 0, 1, MarkerFlags.NoFlags, new TimeSpan(2)), default, bytes);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.PayloadByteCount - 1), out _, out _), Is.False, "short");
+      // Each with the CRC put right, so it is the magic, the format version and the kind that are refused
       bytes[0] = (byte)'X';
+      PutCrc(bytes);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "magic");
       bytes[0] = (byte)'M';
+      bytes[1] = (byte)'X';
+      PutCrc(bytes);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "the magic's second byte");
+      bytes[1] = (byte)'F';
       bytes[2] = 2;
+      PutCrc(bytes);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "format version");
       bytes[2] = 1;
       bytes[3] = 3;
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "a sync marker is 16 bytes");
+      PutCrc(bytes);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "a sync marker is 20 bytes");
       foreach (byte kind in new byte[] { 4, 5, 127, 128, 255 })
       {
         bytes[3] = kind;
+        PutCrc(bytes);
         Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False, "an unknown kind: " + kind);
-        // The same in a sync marker's 16 bytes: the kind is checked before the length it implies
+        // The same in a sync marker's 20 bytes: the kind is checked before the length it implies
         Assert.That(
           FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.SyncPayloadByteCount), out _, out _),
           Is.False,
@@ -350,6 +381,7 @@ namespace MB.FramePacing.Marker.UnitTest
         );
       }
       bytes[3] = 0;
+      PutCrc(bytes);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.True);
 
       // A start marker without its metadata block, or with a byte too many
@@ -361,6 +393,63 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.PayloadByteCount), out _, out _), Is.False);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, bytes.Length), out _, out _), Is.False);
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, WireFormat.StartPayloadByteCount), out _, out _), Is.True);
+    }
+
+    [Test]
+    public void TheCrc_IsTheStandardOne()
+    {
+      // The check value every description of the CRC-32 of zlib, PNG and Ethernet gives
+      Assert.That(Crc32.Compute(Encoding.ASCII.GetBytes("123456789")), Is.EqualTo(0xCBF43926u));
+      Assert.That(Crc32.Compute(ReadOnlySpan<byte>.Empty), Is.Zero);
+      Assert.That(Crc32.Compute(new byte[32]), Is.EqualTo(0x190A55ADu));
+      var ones = new byte[32];
+      ones.AsSpan().Fill(0xFF);
+      Assert.That(Crc32.Compute(ones), Is.EqualTo(0xFF6CAB0Bu));
+    }
+
+    [Test]
+    public void AChangedBit_IsRefused([Values] MarkerKind kind)
+    {
+      // Every single bit of the payload, the CRC's own bits too: none decodes, and the payload put back decodes again
+      var payload = new Payload(
+        kind,
+        0x21222324u,
+        0x0102030405060708u,
+        MarkerFlags.StaticAfter,
+        new TimeSpan(0x1112131415161718),
+        preferredFrameTime: new TimeSpan32(0x71727374u),
+        targetFrameTime: new TimeSpan32(0x41424344u),
+        intendedDisplayTime: new TickCount64(0x3132333435363738),
+        cpuStartTime: new TickCount64(0x5152535455565758),
+        cpuBusy: new TimeSpan32(0x61626364u)
+      );
+      Assert.That(SequenceId.TryFromText("a changed bit", out var id), Is.True);
+      var buffer = new byte[Payload.MaxEncodedByteCount];
+      int count = FrameMarker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), buffer);
+      var bytes = buffer.AsSpan(0, count);
+      Assert.That(FrameMarker.TryDecodePayload(bytes, out _, out _), Is.True);
+      for (int bit = 0; bit < count * 8; ++bit)
+      {
+        bytes[bit / 8] ^= (byte)(1 << (bit % 8));
+        Assert.That(FrameMarker.TryDecodePayload(bytes, out _, out _), Is.False, "bit " + bit);
+        bytes[bit / 8] ^= (byte)(1 << (bit % 8));
+      }
+      Assert.That(FrameMarker.TryDecodePayload(bytes, out _, out _), Is.True);
+    }
+
+    [Test]
+    public void AFieldChangedWithoutItsCrc_IsRefused()
+    {
+      // What a QR decoder's error correction can hand back for a symbol that mixes two frames: a well-formed payload of bytes that were
+      // never drawn. Only the CRC tells
+      var bytes = new byte[WireFormat.PayloadByteCount];
+      FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 7, 1000, MarkerFlags.NoFlags, new TimeSpan(166_667)), default, bytes);
+      Assert.That(FrameMarker.TryDecodePayload(bytes, out _, out _), Is.True);
+      bytes[WireFormat.OffsetFrameIndex] = 0xE9;
+      Assert.That(FrameMarker.TryDecodePayload(bytes, out _, out _), Is.False);
+      PutCrc(bytes);
+      Assert.That(FrameMarker.TryDecodePayload(bytes, out var decoded, out _), Is.True);
+      Assert.That(decoded.FrameIndex, Is.EqualTo(1001ul));
     }
 
     [Test]

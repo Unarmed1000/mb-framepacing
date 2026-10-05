@@ -42,31 +42,43 @@ show) and the CPU's work:
 | 49     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                    |
 
 Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
-carries the same frame index. Frame and end markers are exactly these 53 bytes. A **start marker** appends its metadata, 77 bytes
-in all:
+carries the same frame index. A frame or end marker is these 53 bytes and the CRC (below), 57 bytes. A **start marker** appends
+its metadata before the CRC, 81 bytes in all:
 
 | Offset | Size | Field       | Notes                                                                                                                                                     |
 | ------ | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
 | 61     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).   |
+| 77     | 4    | CRC         | `u32`, the CRC-32 of the 77 bytes before it (see below).                                                                                                  |
 
 The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
 8-4-4-4-12 form of a UUID.
 
 A **sync marker** (kind `3`) is a small second marker for tearing checks and camera timing. It carries only what those need, which
-identifies the frame: the header's first 16 bytes.
+identifies the frame: the header's first 16 bytes, and the CRC, 20 bytes in all.
 
-| Offset | Size | Field          | Notes                                      |
-| ------ | ---- | -------------- | ------------------------------------------ |
-| 0      | 2    | Magic          | ASCII `"MF"`                               |
-| 2      | 1    | Format version | `1`                                        |
-| 3      | 1    | Kind           | `3` = Sync                                 |
-| 4      | 4    | Run id         | `u32`, the same as the frame's main marker |
-| 8      | 8    | Frame index    | `u64`, the same as the frame's main marker |
+| Offset | Size | Field          | Notes                                       |
+| ------ | ---- | -------------- | ------------------------------------------- |
+| 0      | 2    | Magic          | ASCII `"MF"`                                |
+| 2      | 1    | Format version | `1`                                         |
+| 3      | 1    | Kind           | `3` = Sync                                  |
+| 4      | 4    | Run id         | `u32`, the same as the frame's main marker  |
+| 8      | 8    | Frame index    | `u64`, the same as the frame's main marker  |
+| 16     | 4    | CRC            | `u32`, the CRC-32 of the 16 bytes before it |
 
 A sync marker belongs to the main marker with the same run id and frame index.
 
-Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, or an unknown kind.
+**Every payload ends with a CRC-32** of all the bytes before it, a `u32`, little endian like the other fields: at offset 53 of a
+frame or end marker, 77 of a start marker and 16 of a sync marker. It is the CRC-32 of zlib, PNG and Ethernet: the polynomial
+`0x04C11DB7` with the bits reflected in and out, the start value and the final XOR `0xFFFFFFFF` (Python's `zlib.crc32`). Its check
+value, the CRC of the ASCII text `123456789`, is `0xCBF43926`. A field added to a payload later goes before the CRC, which stays
+last.
+
+An example: the sync marker of run 4, frame index `0x0102030405060708` is the bytes `4D 46 01 03 04 00 00 00 08 07 06 05 04 03 02 01`,
+their CRC is `0xC0A3D4F2`, so the payload ends with `F2 D4 A3 C0`.
+
+Decoders reject a payload with the wrong length for its kind, the wrong magic or format version, an unknown kind, or a CRC that does
+not match its bytes.
 
 The animation time must come from the same clock the application's animation uses (its "game time"), not from a separate
 wall clock. Examples: `TimeSpanUtil.FromSeconds(t)` in C# (not `TimeSpan.FromSeconds`, which Unity's runtime rounds to a
@@ -155,12 +167,14 @@ where the next frame index was captured too. Leave the fields `0` when the appli
   (ISO/IEC 18004), the lowest numbered one when masks score the same. Every implementation must pick the same mask, since the modules
   must match; how the libraries find it quickly is in [encoding-performance.md](encoding-performance.md).
 - **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
-  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 53 of them and a start marker 77, which leaves room
+  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 57 of them and a start marker 81, which leaves room
   for future fields.
-- **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 16.
-- The Reed-Solomon error correction is the integrity check. A capture that mixes two frames (tearing, or a capture taken
-  while the display changed frame) either fails ECC or decodes one of the two frames. The analyzer reports what it saw and never
-  guesses.
+- **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 20.
+- **Two integrity checks.** The QR code's Reed-Solomon error correction repairs a damaged symbol, and the payload's CRC-32 then
+  refuses bytes that are not the ones that were drawn: an error correction given more damage than it can repair may hand back
+  another, well-formed payload (a wrong one passes a CRC-32 by chance once in four billion). A capture that mixes two frames
+  (tearing, or a capture taken while the display changed frame) is either refused by one of the two or decodes as one of the two
+  frames. The analyzer reports what it saw and never guesses.
 - **Quiet zone:** 4 modules of white around the symbol, as the QR standard requires. It is part of the marker geometry, so
   the application does not need to clear the area first.
 

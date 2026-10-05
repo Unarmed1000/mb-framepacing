@@ -46,7 +46,7 @@ namespace MB::FramePacing::Data
   {
     if (bytes.size() < CaptureDataFormat::RecordSize)
     {
-      throw DataFormatError("A capture data record is 192 bytes");
+      throw DataFormatError("A capture data record is 256 bytes");
     }
     const uint8_t status = bytes[OffsetStatus];
     const std::size_t mainLength = bytes[OffsetMainLength];

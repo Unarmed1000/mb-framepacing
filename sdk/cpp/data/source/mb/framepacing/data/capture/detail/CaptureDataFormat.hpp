@@ -14,13 +14,14 @@ namespace MB::FramePacing::Data::CaptureDataFormat
   inline constexpr uint32_t Magic = 0x4443424Du;    // "MBCD" little endian
   inline constexpr uint16_t Version = 1;
   inline constexpr std::size_t HeaderSize = 256;
-  inline constexpr std::size_t RecordSize = 192;
+  inline constexpr std::size_t RecordSize = 256;
   inline constexpr std::size_t MaxMarkerLocations = 4;
   //! A record's device timestamp when the capture source gave none.
   inline constexpr int64_t UnknownTicks = std::numeric_limits<int64_t>::min();
-  //! Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes).
-  inline constexpr std::size_t MainMarkerCapacity = 80;
-  inline constexpr std::size_t SecondMarkerCapacity = 80;
+  //! Two equal slots: either can hold any payload a main marker's QR code can carry (106 bytes; the longest today, a start marker, is
+  //! 81), so a field added to the markers does not change the records.
+  inline constexpr std::size_t MainMarkerCapacity = 112;
+  inline constexpr std::size_t SecondMarkerCapacity = 112;
 }
 
 #endif

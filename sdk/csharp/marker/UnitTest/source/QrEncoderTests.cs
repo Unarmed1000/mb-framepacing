@@ -181,12 +181,12 @@ namespace MB.FramePacing.Marker.UnitTest
       {
         for (int i = 0; i < 1000; ++i)
         {
-          // Mostly the lengths the markers have: 16 bytes in version 2; 53 and 77 in version 6
+          // Mostly the lengths the markers have: 20 bytes in version 2; 57 and 81 in version 6
           int length =
             i % 3 == 0 ? random.Next(CapacityOf(version) + 1)
-            : version == 2 ? 16
-            : i % 3 == 1 ? 53
-            : 77;
+            : version == 2 ? 20
+            : i % 3 == 1 ? 57
+            : 81;
           var payload = Bytes(random, length);
           if (i % 4 == 0)
           {

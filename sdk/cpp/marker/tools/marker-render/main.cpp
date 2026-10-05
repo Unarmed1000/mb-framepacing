@@ -207,8 +207,9 @@ namespace
     digest << "kind,runId,frameIndex,flags,animationTicks,preferredFrameTicks,targetFrameTicks,intendedDisplayTicks,cpuStartTicks,cpuBusyTicks,"
               "startUtcTicks,sequenceIdHex,size,modulesHex\n";
 
-    // "mb-frame" + 5: the first seed from "mb-frame" on whose rows both symbol versions (2 and 6) use all eight masks
-    uint64_t state = 0x6D622D6672616D6Au;
+    // "mb-frame": with it both symbol versions (2 and 6) use all eight masks in these rows. Check that again when the payload's bytes
+    // change (the mask is in a symbol's format bits), and take the next seed that does when it no longer holds
+    uint64_t state = 0x6D622D6672616D65u;
     for (int32_t row = 0; row < RowCount; ++row)
     {
       // Drawn in this order, not the wire format's: the digest's values depend on it

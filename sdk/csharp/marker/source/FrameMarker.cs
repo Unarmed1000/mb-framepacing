@@ -30,8 +30,9 @@ namespace MB.FramePacing.Marker
 
     /// <summary>
     /// Serialize the payload into <paramref name="destination"/>. Start markers append the metadata, other kinds ignore it. A frame or end
-    /// marker is 53 bytes, a start marker 77, a sync marker 16; <see cref="Payload.MaxEncodedByteCount"/> bytes are always enough. Returns
-    /// the number of bytes written, or 0 if the destination is too small.
+    /// marker is 57 bytes, a start marker 81, a sync marker 20, each ending with the CRC-32 of the bytes before it;
+    /// <see cref="Payload.MaxEncodedByteCount"/> bytes are always enough. Returns the number of bytes written, or 0 if the destination is
+    /// too small.
     /// </summary>
     public static int EncodePayload(in Payload payload, in StartMetadata metadata, Span<byte> destination)
     {
@@ -49,9 +50,9 @@ namespace MB.FramePacing.Marker
       destination[WireFormat.OffsetKind] = (byte)payload.Kind;
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetRunId), payload.RunId);
       BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetFrameIndex), payload.FrameIndex);
-      // A sync marker is the start of the header: magic, format version, kind, run id and frame index
+      // A sync marker has the start of the header: magic, format version, kind, run id and frame index
       if (payload.Kind == MarkerKind.Sync)
-        return byteCount;
+        return WithCrc(destination, byteCount);
       destination[WireFormat.OffsetFlags] = (byte)payload.Flags;
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetAnimationTicks), payload.AnimationTime.Ticks);
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetPreferredFrameTicks), payload.PreferredFrameTime.Ticks);
@@ -64,12 +65,20 @@ namespace MB.FramePacing.Marker
         BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetStartUtcTicks), metadata.UtcTicks);
         metadata.SequenceId.TryCopyTo(destination.Slice(WireFormat.OffsetSequenceId));
       }
+      return WithCrc(destination, byteCount);
+    }
+
+    // Every kind ends with the CRC of all the bytes before it
+    private static int WithCrc(Span<byte> destination, int byteCount)
+    {
+      int fieldByteCount = byteCount - WireFormat.CrcByteCount;
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(fieldByteCount), Crc32.Compute(destination.Slice(0, fieldByteCount)));
       return byteCount;
     }
 
     /// <summary>
-    /// Parse the wire format: <paramref name="source"/> is exactly one payload. Returns false on a wrong length, magic, format version or an
-    /// unknown kind.
+    /// Parse the wire format: <paramref name="source"/> is exactly one payload. Returns false on a wrong length, magic, format version, an
+    /// unknown kind or a CRC that does not match.
     /// </summary>
     public static bool TryDecodePayload(ReadOnlySpan<byte> source, out Payload payload, out StartMetadata metadata)
     {
@@ -85,10 +94,20 @@ namespace MB.FramePacing.Marker
         return false;
 
       var kind = (MarkerKind)source[WireFormat.OffsetKind];
+      int byteCount =
+        kind == MarkerKind.Sync ? WireFormat.SyncPayloadByteCount
+        : kind == MarkerKind.SequenceStart ? WireFormat.StartPayloadByteCount
+        : WireFormat.PayloadByteCount;
+      // Exactly its kind's bytes, the last four the CRC of the ones before them
+      int fieldByteCount = byteCount - WireFormat.CrcByteCount;
+      if (
+        source.Length != byteCount
+        || BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(fieldByteCount)) != Crc32.Compute(source.Slice(0, fieldByteCount))
+      )
+        return false;
+
       if (kind == MarkerKind.Sync)
       {
-        if (source.Length != WireFormat.SyncPayloadByteCount)
-          return false;
         payload = new Payload(
           kind,
           BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetRunId)),
@@ -98,20 +117,12 @@ namespace MB.FramePacing.Marker
         );
         return true;
       }
-      if (source.Length < WireFormat.PayloadByteCount)
-        return false;
       if (kind == MarkerKind.SequenceStart)
       {
-        if (source.Length != WireFormat.StartPayloadByteCount)
-          return false;
         metadata = new StartMetadata(
           BinaryPrimitives.ReadInt64LittleEndian(source.Slice(WireFormat.OffsetStartUtcTicks)),
           SequenceId.FromBytes(source.Slice(WireFormat.OffsetSequenceId, SequenceId.ByteCount))
         );
-      }
-      else if (source.Length != WireFormat.PayloadByteCount)
-      {
-        return false;
       }
 
       payload = new Payload(

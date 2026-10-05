@@ -49,12 +49,12 @@ What is implemented, how it was checked, known issues and the next steps are in
 
   | Camera (on 60 Hz) | × refresh | Camera period | All frames found | Mean error    | P95 error     | Max error     |
   | ----------------- | --------- | ------------- | ---------------- | ------------- | ------------- | ------------- |
-  | 100 fps           | 1.7×      | 10.0 ms       | yes              | 4.4 ms (27 %) | 6.7 ms (40 %) | 6.7 ms (40 %) |
-  | 130 fps           | 2.2×      | 7.7 ms        | yes              | 2.1 ms (13 %) | 6.4 ms (38 %) | 6.4 ms (38 %) |
+  | 100 fps           | 1.7×      | 10.0 ms       | yes              | 4.5 ms (27 %) | 6.7 ms (40 %) | 6.7 ms (40 %) |
+  | 130 fps           | 2.2×      | 7.7 ms        | yes              | 2.2 ms (13 %) | 6.4 ms (38 %) | 6.4 ms (38 %) |
   | 250 fps           | 4.2×      | 4.0 ms        | yes              | 1.2 ms (7 %)  | 3.3 ms (20 %) | 4.7 ms (28 %) |
-  | 330 fps           | 5.5×      | 3.0 ms        | yes              | 1.5 ms (9 %)  | 1.5 ms (9 %)  | 3.0 ms (18 %) |
+  | 330 fps           | 5.5×      | 3.0 ms        | yes              | 1.5 ms (9 %)  | 1.5 ms (9 %)  | 1.5 ms (9 %)  |
   | 500 fps           | 8.3×      | 2.0 ms        | yes              | 0.9 ms (5 %)  | 1.3 ms (8 %)  | 1.3 ms (8 %)  |
-  | 1000 fps          | 16.7×     | 1.0 ms        | yes              | 0.6 ms (4 %)  | 1.7 ms (10 %) | 1.7 ms (10 %) |
+  | 1000 fps          | 16.7×     | 1.0 ms        | yes              | 0.6 ms (4 %)  | 1.3 ms (8 %)  | 1.7 ms (10 %) |
 
   <!-- /camera-rate-table -->
 

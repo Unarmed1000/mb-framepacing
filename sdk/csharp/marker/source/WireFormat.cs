@@ -36,7 +36,10 @@ namespace MB.FramePacing.Marker
     public const byte PayloadMagic1 = (byte)'F';
     public const byte PayloadFormatVersion = 1;
 
-    // The header every kind starts with (a sync marker is its first SyncPayloadByteCount bytes: which run and frame), little endian,
+    /// <summary>Every payload ends with the CRC-32 (<see cref="Crc32"/>, a u32) of all the bytes before it.</summary>
+    public const int CrcByteCount = 4;
+
+    // The header every kind starts with (a sync marker has its first SyncFieldsByteCount bytes: which run and frame), little endian,
     // grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work.
     public const int OffsetMagic0 = 0;
     public const int OffsetMagic1 = 1;
@@ -51,12 +54,16 @@ namespace MB.FramePacing.Marker
     public const int OffsetIntendedDisplayTicks = 33;
     public const int OffsetCpuStartTicks = 41;
     public const int OffsetCpuBusyTicks = 49;
-    public const int PayloadByteCount = 53;
-    public const int SyncPayloadByteCount = 16;
+    public const int HeaderByteCount = 53;
+    public const int SyncFieldsByteCount = 16;
 
-    // A start marker: the header, then its start time (UTC i64) and sequence id.
-    public const int OffsetStartUtcTicks = PayloadByteCount;
+    // A frame or end marker: the header and the CRC. A sync marker: the header's start and the CRC.
+    public const int PayloadByteCount = HeaderByteCount + CrcByteCount;
+    public const int SyncPayloadByteCount = SyncFieldsByteCount + CrcByteCount;
+
+    // A start marker: the header, then its start time (UTC i64) and sequence id, and the CRC.
+    public const int OffsetStartUtcTicks = HeaderByteCount;
     public const int OffsetSequenceId = OffsetStartUtcTicks + 8;
-    public const int StartPayloadByteCount = OffsetSequenceId + SequenceId.ByteCount;
+    public const int StartPayloadByteCount = OffsetSequenceId + SequenceId.ByteCount + CrcByteCount;
   }
 }

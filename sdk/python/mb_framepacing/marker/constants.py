@@ -13,24 +13,29 @@ QR_CAPACITY_BYTES = 106
 """Version 6-M holds 106 bytes: a frame or end marker uses PAYLOAD_BYTE_COUNT of them, a start marker START_PAYLOAD_BYTE_COUNT; the rest
 is room for future fields."""
 
+CRC_BYTE_COUNT = 4
+"""Every payload ends with the CRC-32 (zlib's, PNG's and Ethernet's: binascii.crc32; a u32) of all the bytes before it."""
+
 SYNC_QR_VERSION = 2
 """The sync marker (MarkerKind.SYNC) is QR version 2 (25x25 modules), error correction level M: magic | format version | kind | run id
-u32 | frame index u64."""
+u32 | frame index u64 | CRC u32."""
 SYNC_QR_MODULE_COUNT = (4 * SYNC_QR_VERSION) + 17
-SYNC_PAYLOAD_BYTE_COUNT = 16
+SYNC_PAYLOAD_BYTE_COUNT = 16 + CRC_BYTE_COUNT
 
-PAYLOAD_BYTE_COUNT = 53
+HEADER_BYTE_COUNT = 53
 """Payload header, shared by every marker kind (little endian), grouped: magic "MF" | format version | kind | run id u32 | frame index
 u64 | flags u8 | animation ticks i64 | preferred frame ticks u32 | target frame ticks u32 | intended display ticks i64 | CPU start ticks
 i64 | CPU busy ticks u32. Start and end markers carry the values of the frame that shows them."""
+PAYLOAD_BYTE_COUNT = HEADER_BYTE_COUNT + CRC_BYTE_COUNT
+"""A frame or end marker's payload: header | CRC u32."""
 PAYLOAD_MAGIC = b"MF"
 PAYLOAD_FORMAT_VERSION = 1
 
 ON_DEMAND_FRAME_TICKS = 0xFFFF_FFFF
 """The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for."""
 
-START_PAYLOAD_BYTE_COUNT = PAYLOAD_BYTE_COUNT + 8 + SEQUENCE_ID_BYTE_COUNT
-"""Start marker payload: header | start time UTC i64 | sequence id (16 bytes)."""
+START_PAYLOAD_BYTE_COUNT = HEADER_BYTE_COUNT + 8 + SEQUENCE_ID_BYTE_COUNT + CRC_BYTE_COUNT
+"""Start marker payload: header | start time UTC i64 | sequence id (16 bytes) | CRC u32."""
 MAX_ENCODED_PAYLOAD_BYTE_COUNT = START_PAYLOAD_BYTE_COUNT
 """The longest payload of any kind: the start marker's."""
 

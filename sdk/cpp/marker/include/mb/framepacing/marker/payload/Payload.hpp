@@ -23,7 +23,7 @@ namespace MB::FramePacing::Marker
   {
   public:
     //! The most bytes a payload encodes to (a start marker's): EncodePayload's buffer size.
-    static constexpr std::size_t MaxEncodedByteCount = 77;
+    static constexpr std::size_t MaxEncodedByteCount = 81;
     //! The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.
     static constexpr TimeSpan32 OnDemandFrameTime = TimeSpan32::MaxValue();
 

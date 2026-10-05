@@ -26,6 +26,7 @@
 #include <array>
 #include <bit>
 #include <cassert>
+#include "detail/Crc32.hpp"
 #include "detail/QrEncoder.hpp"
 #include "detail/QrSymbol.hpp"
 #include "detail/WireFormat.hpp"
@@ -35,10 +36,10 @@ namespace MB::FramePacing::Marker
   namespace
   {
 
-    //! The 53 byte header every kind starts with (a sync marker is its first 16 bytes: which run and frame).
-    std::array<uint8_t, WireFormat::PayloadByteCount> EncodeHeader(const Payload& payload) noexcept
+    //! The 53 byte header every kind starts with (a sync marker has its first 16 bytes: which run and frame).
+    std::array<uint8_t, WireFormat::HeaderByteCount> EncodeHeader(const Payload& payload) noexcept
     {
-      std::array<uint8_t, WireFormat::PayloadByteCount> bytes{};
+      std::array<uint8_t, WireFormat::HeaderByteCount> bytes{};
       bytes[WireFormat::OffsetMagic0] = WireFormat::PayloadMagic0;
       bytes[WireFormat::OffsetMagic1] = WireFormat::PayloadMagic1;
       bytes[WireFormat::OffsetVersion] = WireFormat::PayloadFormatVersion;
@@ -263,14 +264,17 @@ namespace MB::FramePacing::Marker
       return 0;
     }
 
-    // A sync marker is the start of the header: magic, format version, kind, run id and frame index
-    const std::array<uint8_t, WireFormat::PayloadByteCount> header = EncodeHeader(payload);
-    std::copy_n(header.begin(), std::min(byteCount, WireFormat::PayloadByteCount), dst.begin());
+    // A sync marker has the start of the header: magic, format version, kind, run id and frame index
+    const std::size_t fieldByteCount = byteCount - WireFormat::CrcByteCount;
+    const std::array<uint8_t, WireFormat::HeaderByteCount> header = EncodeHeader(payload);
+    std::copy_n(header.begin(), std::min(fieldByteCount, WireFormat::HeaderByteCount), dst.begin());
     if (isStart)
     {
       ByteSpanUtil::WriteLE(dst, WireFormat::OffsetStartUtcTicks, metadata.UtcTicks);
       std::copy_n(metadata.Id.Bytes.begin(), SequenceId::ByteCount, dst.subspan(WireFormat::OffsetSequenceId).begin());
     }
+    // Every kind ends with the CRC of all the bytes before it
+    ByteSpanUtil::WriteLE(dst, fieldByteCount, Crc32::Compute(dst.first(fieldByteCount)));
     return byteCount;
   }
 
@@ -284,12 +288,18 @@ namespace MB::FramePacing::Marker
     }
 
     const auto kind = static_cast<MarkerKind>(bytes[WireFormat::OffsetKind]);
+    const std::size_t byteCount = kind == MarkerKind::Sync            ? WireFormat::SyncPayloadByteCount
+                                  : kind == MarkerKind::SequenceStart ? WireFormat::StartPayloadByteCount
+                                                                      : WireFormat::PayloadByteCount;
+    // Exactly its kind's bytes, the last four the CRC of the ones before them
+    const std::size_t fieldByteCount = byteCount - WireFormat::CrcByteCount;
+    if (bytes.size() != byteCount || ByteSpanUtil::ReadLE<uint32_t>(bytes, fieldByteCount) != Crc32::Compute(bytes.first(fieldByteCount)))
+    {
+      return false;
+    }
+
     if (kind == MarkerKind::Sync)
     {
-      if (bytes.size() != WireFormat::SyncPayloadByteCount)
-      {
-        return false;
-      }
       rPayload = Payload{kind, ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRunId),
                          ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex), MarkerFlags::NoFlags, TimeSpan()};
       if (pMetadata != nullptr)
@@ -298,23 +308,11 @@ namespace MB::FramePacing::Marker
       }
       return true;
     }
-    if (bytes.size() < WireFormat::PayloadByteCount)
-    {
-      return false;
-    }
     StartMetadata metadata;
     if (kind == MarkerKind::SequenceStart)
     {
-      if (bytes.size() != WireFormat::StartPayloadByteCount)
-      {
-        return false;
-      }
       metadata.UtcTicks = ByteSpanUtil::ReadLE<int64_t>(bytes, WireFormat::OffsetStartUtcTicks);
       std::copy_n(bytes.subspan(WireFormat::OffsetSequenceId).begin(), SequenceId::ByteCount, metadata.Id.Bytes.begin());
-    }
-    else if (bytes.size() != WireFormat::PayloadByteCount)
-    {
-      return false;
     }
 
     // Every flags value is accepted: bits without a name are reserved and kept

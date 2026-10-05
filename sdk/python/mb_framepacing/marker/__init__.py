@@ -27,7 +27,9 @@ from ..point import Point
 from ..rectangle import Rectangle
 from .bitmap import modules_to_bitmap
 from .constants import (
+    CRC_BYTE_COUNT,
     DEFAULT_MODULE_SIZE_PX,
+    HEADER_BYTE_COUNT,
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
     MAX_GRID_VERTEX_COUNT,
     MAX_MODULE_SIZE_PX,
@@ -81,7 +83,9 @@ from .structures import (
 )
 
 __all__ = [
+    "CRC_BYTE_COUNT",
     "DEFAULT_MODULE_SIZE_PX",
+    "HEADER_BYTE_COUNT",
     "MAX_ENCODED_PAYLOAD_BYTE_COUNT",
     "MAX_GRID_VERTEX_COUNT",
     "MAX_MODULE_SIZE_PX",

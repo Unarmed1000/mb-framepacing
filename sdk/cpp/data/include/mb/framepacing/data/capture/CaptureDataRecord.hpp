@@ -36,7 +36,7 @@ namespace MB::FramePacing::Data
     //! The second marker's payload (a sync marker), decoded with the marker library.
     bool TryDecodeSecond(MB::FramePacing::Marker::Payload& rPayload) const noexcept;
 
-    //! Parse a record (192 bytes). Throws DataFormatError for an invalid one.
+    //! Parse a record (256 bytes). Throws DataFormatError for an invalid one.
     static CaptureDataRecord Parse(std::span<const uint8_t> bytes);
 
     bool operator==(const CaptureDataRecord&) const = default;

@@ -22,7 +22,7 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(FrameMarker.MaxQuadCount, Is.EqualTo(862));
       Assert.That(FrameMarker.MaxTriangleVertexCount, Is.EqualTo(862 * 6));
       Assert.That(FrameMarker.MaxIndexCount, Is.EqualTo(862 * 6));
-      Assert.That(Payload.MaxEncodedByteCount, Is.EqualTo(77));
+      Assert.That(Payload.MaxEncodedByteCount, Is.EqualTo(81));
       Assert.That(Payload.MaxEncodedByteCount, Is.LessThanOrEqualTo(WireFormat.QrCapacityBytes));
     }
 

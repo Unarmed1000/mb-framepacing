@@ -76,7 +76,7 @@ runs' sequence id (the GUI's **Name** field).
 **What is stored**
 
 A capture decodes every frame's markers as it records and stores only them with the frame's timestamps: the capture data
-(`captures.mbcd`, 192 bytes per captured frame, about 170 MB for an hour at 240 Hz; [format](../../sdk/doc/capture-data-format.md)).
+(`captures.mbcd`, 256 bytes per captured frame, about 220 MB for an hour at 240 Hz; [format](../../sdk/doc/capture-data-format.md)).
 That is all the analysis needs. To also store the frames themselves (to look at them, or decode them again later with
 `analyze --redecode`), add `--keep-frames`, or tick **Store video frames** in the GUI: 0.5 MB per frame at 960×540.
 

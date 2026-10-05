@@ -69,7 +69,7 @@ namespace MB.FramePacing.MarkerDecoding
       return buffer.Slice(0, count).ToArray();
     }
 
-    /// <summary>Parse the wire format. Fails on a wrong length, magic, format version or unknown kind.</summary>
+    /// <summary>Parse the wire format. Fails on a wrong length, magic, format version, unknown kind or a CRC that does not match.</summary>
     /// <param name="metadata">The start metadata for a start marker, otherwise null.</param>
     public static bool TryDecode(ReadOnlySpan<byte> src, out MarkerPayload payload, out StartMetadata? metadata)
     {

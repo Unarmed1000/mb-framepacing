@@ -94,6 +94,11 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         0x63,
         0x62,
         0x61,
+        // CRC (0x7ED16A3D: what Python's binascii.crc32 gives for the 53 bytes before it)
+        0x3D,
+        0x6A,
+        0xD1,
+        0x7E,
       ];
       Assert.That(payload.Encode(), Is.EqualTo(expected));
     }
@@ -127,7 +132,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         CpuStartTime: new TickCount64(60)
       );
       var bytes = payload.Encode(metadata);
-      Assert.That(bytes, Has.Length.EqualTo(77), "a start marker's payload");
+      Assert.That(bytes, Has.Length.EqualTo(81), "a start marker's payload");
       Assert.That(MarkerPayload.TryDecode(bytes, out var decoded, out var start), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
       Assert.That(start, Is.EqualTo(metadata));
@@ -150,14 +155,22 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode(
         StartMetadata.FromTag(5, "ignored")
       );
-      Assert.That(bytes, Has.Length.EqualTo(53), "a frame marker's payload");
+      Assert.That(bytes, Has.Length.EqualTo(57), "a frame marker's payload");
     }
 
     [Test]
     public void TryDecode_RejectsBadInput()
     {
       var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode();
-      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 52), out _), Is.False);
+      Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.True);
+      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 56), out _), Is.False);
+      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 53), out _), Is.False, "the header without its CRC");
+
+      // One bit of a field: only the CRC tells
+      bytes[8] ^= 1;
+      Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.False);
+      bytes[8] ^= 1;
+      Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.True);
 
       bytes[0] = (byte)'X';
       Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.False);

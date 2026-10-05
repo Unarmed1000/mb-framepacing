@@ -18,7 +18,7 @@ namespace MB.FramePacing.Marker
   public readonly struct Payload : IEquatable<Payload>
   {
     /// <summary>The most bytes a payload encodes to (a start marker's): the buffer size for <see cref="FrameMarker.EncodePayload"/>.</summary>
-    public const int MaxEncodedByteCount = 77;
+    public const int MaxEncodedByteCount = 81;
 
     /// <summary>The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.</summary>
     public static readonly TimeSpan32 OnDemandFrameTime = TimeSpan32.MaxValue;

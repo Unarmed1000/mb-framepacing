@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""captures.mbcd (doc/capture-data-format.md): a 256 byte header, then one 192 byte record per capture, little endian. The header describes
+"""captures.mbcd (doc/capture-data-format.md): a 256 byte header, then one 256 byte record per capture, little endian. The header describes
 the frames the markers were read from and where the markers are; a record holds a capture's times and its markers' bytes as read."""
 
 import struct
@@ -19,13 +19,14 @@ FILE_NAME = "captures.mbcd"
 MAGIC = 0x4443424D  # "MBCD" little endian
 FORMAT_VERSION = 1
 HEADER_SIZE = 256
-RECORD_SIZE = 192
+RECORD_SIZE = 256
 MAX_MARKERS = 4
 UNKNOWN_TICKS = -(2**63)
 """A device timestamp the capture source did not give (i64 minimum)."""
 
-MAIN_CAPACITY = 80
-"""Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes)."""
+MAIN_CAPACITY = 112
+"""Two equal slots: either can hold any payload a main marker's QR code can carry (106 bytes; the longest today, a start marker, is 81),
+so a field added to the markers does not change the records."""
 SECOND_CAPACITY = RECORD_SIZE - 32 - MAIN_CAPACITY
 
 _HEADER = struct.Struct("<IHHIIiiIIiiiiii8xI")
@@ -141,10 +142,10 @@ class CaptureDataRecord:
 
     @staticmethod
     def parse(data: bytes | memoryview) -> "CaptureDataRecord":
-        """Parse a record. Raises DataFormatError for bytes that are not one: fewer than 192, an unknown status, or a marker longer than
+        """Parse a record. Raises DataFormatError for bytes that are not one: fewer than 256, an unknown status, or a marker longer than
         its slot."""
         if len(data) < RECORD_SIZE:
-            raise DataFormatError("A capture data record is 192 bytes")
+            raise DataFormatError("A capture data record is 256 bytes")
         capture_index, host, device, source_drops, status, main_length, second_length = cast(
             tuple[int, int, int, int, int, int, int], _RECORD.unpack_from(data)
         )

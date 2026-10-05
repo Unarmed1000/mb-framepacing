@@ -20,7 +20,7 @@ write through it.
 | 0      | 4    | Magic `MBCD` (`0x4443424D`)                                                                                                        |
 | 4      | 2    | Format version: 1. Readers refuse a newer version ("update the tools")                                                             |
 | 6      | 2    | Header size: 256                                                                                                                   |
-| 8      | 4    | Record size: 192                                                                                                                   |
+| 8      | 4    | Record size: 256                                                                                                                   |
 | 12     | 4    | Flags: bit 0 = the frames were stored too (`frames.mbfc`), bit 1 = camera capture (very experimental)                              |
 | 16     | 8    | Stored frame width, height (`i32` each): the frames the markers were read from                                                     |
 | 24     | 8    | Nominal frame rate: numerator, denominator (`u32` each; 0/0 = unknown)                                                             |
@@ -42,7 +42,7 @@ the source has a sync marker, the sync marker's too, and stores the two as one f
 it, both downscaled alike, the narrower one padded with white on its right. The locks are in that stored frame. Without a sync
 marker, and with a region given as one rectangle, there is one region and the second is all 0.
 
-## Records (192 bytes each)
+## Records (256 bytes each)
 
 | Offset | Size | Field                                                                                                         |
 | ------ | ---- | ------------------------------------------------------------------------------------------------------------- |
@@ -54,8 +54,12 @@ marker, and with a region given as one rectangle, there is one region and the se
 | 29     | 1    | Main marker byte count (0 = not read)                                                                         |
 | 30     | 1    | Second marker byte count (0 = not read)                                                                       |
 | 31     | 1    | Reserved (0)                                                                                                  |
-| 32     | 80   | The main marker's encoded bytes exactly as read from the QR code ([marker format](marker-format.md)), then 0s |
-| 112    | 80   | The second marker's encoded bytes (the sync marker, or a camera's second zone), then 0s                       |
+| 32     | 112  | The main marker's encoded bytes exactly as read from the QR code ([marker format](marker-format.md)), then 0s |
+| 144    | 112  | The second marker's encoded bytes (the sync marker, or a camera's second zone), then 0s                       |
+
+The two slots are equal, and each holds any payload a main marker's QR code can carry (106 bytes; the longest today, a start
+marker, is 81), so a field added to the markers does not change the records. A reader refuses a file whose header gives another
+record size.
 
 The first 28 bytes have the layout of a `frames.mbfc` record header, so a record's capture part is the same in both files. A capture
 that was stopped mid-write may end with a partial record; readers ignore it.

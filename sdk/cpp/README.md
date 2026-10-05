@@ -266,8 +266,8 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 | Toolchain               | Compiler                   | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      20.4 KiB |            220.5 KiB |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.1 KiB |            192.6 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      20.8 KiB |            221.3 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.3 KiB |            192.8 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.3 KiB |            214.0 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.0 KiB |            141.5 KiB |
 | Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      19.8 KiB |            186.4 KiB |

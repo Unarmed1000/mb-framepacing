@@ -61,8 +61,10 @@ The start marker also carries a sequence id: the mode's name, or a UUID made fro
 against its manifest, frame by frame (skipped without ffmpeg); `ClipManifest` reads the manifests.
 
 **Made by** [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained):
-`tools/frame_pacing_video/export_test_clips.py --output-dir <this folder>`, with its copy of the Python marker module
-(`sdk/python`, `mb_framepacing.marker`). Regenerate them there when the marker format changes, and copy the folders here unchanged.
+`tools/frame_pacing_video/export_test_clips.py`, with this repository's Python marker module (`sdk/python`,
+`mb_framepacing.marker`), which it has as a submodule pinned to a commit. Regenerate them there when the marker format changes, from
+the commit that changes it and before that commit is published, so the format and the clips arrive together; copy the folders here
+unchanged.
 
 **License:** PolyForm Perimeter License 1.0.1, (c) 2026 Mana Battery ApS, like the rest of the tools' test data (the root
 [`LICENSE`](../../../LICENSE)). mb-framepacing-explained publishes its own copies under CC BY-NC-SA 4.0; the copies here are licensed

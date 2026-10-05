@@ -9,6 +9,7 @@ Every output walks the marker in the same order: the light background (symbol + 
 run of dark modules. Draw it in that order, last in the frame (after post effects and UI), without blending, in pure black and white.
 """
 
+import binascii
 import struct
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -16,6 +17,8 @@ from typing import cast
 from ..point import Point
 from ..rectangle import Rectangle
 from .constants import (
+    CRC_BYTE_COUNT,
+    HEADER_BYTE_COUNT,
     PAYLOAD_BYTE_COUNT,
     PAYLOAD_FORMAT_VERSION,
     PAYLOAD_MAGIC,
@@ -45,6 +48,7 @@ from .third_party.qrcodegen import encode as _encode_qr
 _HEADER = struct.Struct("<2sBBIQBqIIqqI")
 _SYNC = struct.Struct("<2sBBIQ")
 _START_FIELDS = struct.Struct(f"<q{SEQUENCE_ID_BYTE_COUNT}s")
+_CRC = struct.Struct("<I")
 _DATE_TIME_EPOCH = datetime(1, 1, 1, tzinfo=UTC)
 _KINDS = frozenset(int(kind) for kind in MarkerKind)
 
@@ -61,15 +65,21 @@ def seconds_to_ticks(seconds: float) -> int:
     return int(seconds * TICKS_PER_SECOND)
 
 
+def _with_crc(fields: bytes) -> bytes:
+    """The payload of fields: every kind ends with the CRC of all the bytes before it."""
+    return fields + _CRC.pack(binascii.crc32(fields))
+
+
 def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> bytes:
     """Serialize the payload. Start markers append the metadata, other kinds ignore it; a sync marker is SYNC_PAYLOAD_BYTE_COUNT bytes
-    (the start of the header: the run id and the frame index) and ignores the other fields. Raises ValueError when an encoded field is out of its
-    range, or the kind is not a MarkerKind (try_decode_payload would refuse the bytes)."""
+    (the start of the header: the run id and the frame index) and ignores the other fields. Every kind ends with the CRC-32 of the
+    bytes before it. Raises ValueError when an encoded field is out of its range, or the kind is not a MarkerKind (try_decode_payload
+    would refuse the bytes)."""
     if payload.kind not in _KINDS:
         raise ValueError(f"not a marker kind: {payload.kind!r}")
     if payload.kind == MarkerKind.SYNC:
         try:
-            return _SYNC.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.run_id, payload.frame_index)
+            return _with_crc(_SYNC.pack(PAYLOAD_MAGIC, PAYLOAD_FORMAT_VERSION, payload.kind, payload.run_id, payload.frame_index))
         except struct.error as error:
             raise ValueError(f"payload out of range: {payload}") from error
     try:
@@ -90,27 +100,31 @@ def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> b
     except struct.error as error:
         raise ValueError(f"payload out of range: {payload}") from error
     if payload.kind != MarkerKind.SEQUENCE_START:
-        return header
+        return _with_crc(header)
     start = metadata or StartMetadata()
     try:
         fields = _START_FIELDS.pack(start.utc_ticks, start.sequence_id.data)
     except struct.error as error:
         raise ValueError(f"start time out of range: {start.utc_ticks}") from error
-    return header + fields
+    return _with_crc(header + fields)
 
 
 def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | None:
-    """Parse the wire format: the payload and, for a start marker, its metadata. None on a wrong length, magic, format version or an
-    unknown kind. A sync payload (exactly SYNC_PAYLOAD_BYTE_COUNT bytes) decodes to its run id and frame index with the other fields 0."""
+    """Parse the wire format: the payload and, for a start marker, its metadata. None on a wrong length, magic, format version, an
+    unknown kind or a CRC that does not match. A sync payload (exactly SYNC_PAYLOAD_BYTE_COUNT bytes) decodes to its run id and frame
+    index with the other fields 0."""
     if len(data) < SYNC_PAYLOAD_BYTE_COUNT:
         return None
     magic, version, kind, run_id, frame_index = cast(tuple[bytes, int, int, int, int], _SYNC.unpack_from(data))
     if magic != PAYLOAD_MAGIC or version != PAYLOAD_FORMAT_VERSION or kind > max(MarkerKind):
         return None
-    if kind == MarkerKind.SYNC:
-        return (Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0), None) if len(data) == SYNC_PAYLOAD_BYTE_COUNT else None
-    if len(data) < PAYLOAD_BYTE_COUNT:
+    byte_count = SYNC_PAYLOAD_BYTE_COUNT if kind == MarkerKind.SYNC else START_PAYLOAD_BYTE_COUNT if kind == MarkerKind.SEQUENCE_START else PAYLOAD_BYTE_COUNT
+    # Exactly its kind's bytes, the last four the CRC of the ones before them
+    field_byte_count = byte_count - CRC_BYTE_COUNT
+    if len(data) != byte_count or cast(tuple[int], _CRC.unpack_from(data, field_byte_count))[0] != binascii.crc32(data[:field_byte_count]):
         return None
+    if kind == MarkerKind.SYNC:
+        return Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0), None
     fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))
     _, _, _, _, _, flags, animation_ticks, preferred, target_frame_ticks, intended_display_ticks, cpu_start_ticks, cpu_busy_ticks = fields
     payload = Payload(
@@ -127,10 +141,8 @@ def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | No
         cpu_busy_ticks=cpu_busy_ticks,
     )
     if payload.kind != MarkerKind.SEQUENCE_START:
-        return (payload, None) if len(data) == PAYLOAD_BYTE_COUNT else None
-    if len(data) != START_PAYLOAD_BYTE_COUNT:
-        return None
-    utc_ticks, sequence_id = cast(tuple[int, bytes], _START_FIELDS.unpack_from(data, PAYLOAD_BYTE_COUNT))
+        return payload, None
+    utc_ticks, sequence_id = cast(tuple[int, bytes], _START_FIELDS.unpack_from(data, HEADER_BYTE_COUNT))
     return payload, StartMetadata(utc_ticks, SequenceId(sequence_id))
 
 

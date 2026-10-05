@@ -127,9 +127,9 @@ people notice at sound 45 ms early to 125 ms late, and EBU R37 allows 40 ms earl
 **The option that looks best: a sync burst and a coded payload**, the QR code's shape in sound (a finder pattern, then data):
 
 - a preamble the decoder finds by cross-correlation, to the sample: a pseudo-random sequence or a chirp, somewhere in 1 to 8 kHz;
-- then a payload far smaller than the picture's: the frame marker carries 53 bytes (the frame, its animation time, the pacing and
+- then a payload far smaller than the picture's: the frame marker carries 57 bytes (the frame, its animation time, the pacing and
   the CPU's work), and the sound needs none of that again. Which run it is and where the audio clock was at the burst's first
-  sample is enough, about a dozen bytes, less than the sync marker's 16; the run id joins it to everything the picture's markers
+  sample is enough, about a dozen bytes, less than the sync marker's 20; the run id joins it to everything the picture's markers
   say. It has to be that small: sound carries far fewer bits a second than a picture, so every byte makes the burst longer, easier
   to hear and easier to damage;
 - a checksum and the Reed-Solomon code the QR encoder already has, over that payload;

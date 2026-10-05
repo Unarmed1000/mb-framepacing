@@ -72,7 +72,7 @@ modules_to_bitmap(sync, options, sync_origin, rgb_frame, width, height, PixelFor
 ```
 
 `options.recommended_origin(kind, ...)` places the main marker top-left and the sync marker bottom-left, both inset 32 px (rounded up to the
-`align_px` downscale ratio). A sync payload is 16 bytes (magic, format version, kind, run id, frame index); its other fields are not
+`align_px` downscale ratio). A sync payload is 20 bytes (magic, format version, kind, run id, frame index, CRC); its other fields are not
 encoded and decode as `0`.
 
 ### Ways to draw it, most efficient first

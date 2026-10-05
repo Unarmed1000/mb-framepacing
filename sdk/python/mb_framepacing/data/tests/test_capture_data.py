@@ -38,7 +38,7 @@ def record_bytes(index: int, device: int, status: int, main: bytes, second: byte
     data = bytearray(RECORD_SIZE)
     struct.pack_into("<qqqIBBB", data, 0, index, index * 100, device, 3 if index == 2 else 0, status, len(main), len(second))
     data[32 : 32 + len(main)] = main
-    data[112 : 112 + len(second)] = second
+    data[144 : 144 + len(second)] = second
     return bytes(data)
 
 
@@ -60,8 +60,8 @@ class CaptureDataTests(unittest.TestCase):
             _ = CaptureDataHeader.parse(bytes(header_bytes(markers=5)))
 
     def test_records_read_back_and_a_partial_last_record_is_ignored(self) -> None:
-        main = bytes(range(80))
-        second = bytes([0x5A] * 80)
+        main = bytes(range(112))
+        second = bytes([0x5A] * 112)
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "captures.mbcd"
             _ = path.write_bytes(
@@ -108,18 +108,19 @@ class CaptureDataTests(unittest.TestCase):
         cases = {
             "a byte short": good[:-1],
             "an unknown status": record_bytes(7, 200, 3, b"", b""),
-            "a main marker longer than its slot": record_bytes(7, 200, 1, bytes(81), b"")[:RECORD_SIZE],
-            "a second marker longer than its slot": record_bytes(7, 200, 1, b"", bytes(81))[:RECORD_SIZE],
+            "a main marker longer than its slot": record_bytes(7, 200, 1, bytes(113), b"")[:RECORD_SIZE],
+            "a second marker longer than its slot": record_bytes(7, 200, 1, b"", bytes(113))[:RECORD_SIZE],
         }
         for what, data in cases.items():
             with self.subTest(what), self.assertRaises(DataFormatError):
                 _ = CaptureDataRecord.parse(data)
-        self.assertEqual(len(CaptureDataRecord.parse(record_bytes(7, 200, 1, bytes(80), bytes(80))).second_bytes or b""), 80)
+        self.assertEqual(len(CaptureDataRecord.parse(record_bytes(7, 200, 1, bytes(112), bytes(112))).second_bytes or b""), 112)
+        self.assertEqual(RECORD_SIZE, 256)
 
     def test_a_records_markers_decode(self) -> None:
         main = encode_payload(Payload(MarkerKind.SEQUENCE_START, 7, 12, MarkerFlags.STATIC_AFTER, 34), StartMetadata(5, SequenceId.from_text("run 7")))
         sync = encode_payload(Payload(MarkerKind.SYNC, 7, 11, MarkerFlags.NO_FLAGS, 0))
-        self.assertEqual((len(main), len(sync)), (77, 16), "the longest and the shortest marker")
+        self.assertEqual((len(main), len(sync)), (81, 20), "the longest and the shortest marker")
         record = CaptureDataRecord.parse(record_bytes(5, 200, 2, main, sync))
         decoded = record.try_decode_main()
         assert decoded is not None
@@ -134,7 +135,7 @@ class CaptureDataTests(unittest.TestCase):
         # A record without markers, and bytes that are no marker
         none = CaptureDataRecord.parse(record_bytes(5, 200, 0, b"", b""))
         self.assertEqual((none.try_decode_main(), none.try_decode_second()), (None, None))
-        garbage = CaptureDataRecord.parse(record_bytes(5, 200, 1, bytes(53), b"\x01\x02\x03"))
+        garbage = CaptureDataRecord.parse(record_bytes(5, 200, 1, bytes(57), b"\x01\x02\x03"))
         self.assertEqual((garbage.try_decode_main(), garbage.try_decode_second()), (None, None))
 
     def test_records_are_read_in_order_whatever_is_read_between_them(self) -> None:

@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* One record of captures.mbcd (doc/capture-data-format.md): 192 bytes per capture, little endian. The capture part (index, host and device
+//* One record of captures.mbcd (doc/capture-data-format.md): 256 bytes per capture, little endian. The capture part (index, host and device
 //* ticks, source drops) is laid out like a frames.mbfc record header; then the status and the markers' encoded bytes as they were read.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -32,7 +32,7 @@ namespace MB.FramePacing.Data
     byte[]? SecondBytes
   )
   {
-    public const int Size = 192;
+    public const int Size = 256;
 
     // The file's device timestamp when the capture source gave none
     private const long UnknownTicks = long.MinValue;
@@ -42,8 +42,9 @@ namespace MB.FramePacing.Data
     public const int SecondLengthOffset = 30;
     public const int MainOffset = 32;
 
-    // Two equal slots: either can hold any marker payload (the longest, a start marker, is 77 bytes)
-    public const int MainCapacity = 80;
+    // Two equal slots: either can hold any payload a main marker's QR code can carry (106 bytes; the longest today, a start marker, is
+    // 81), so a field added to the markers does not change the records
+    public const int MainCapacity = 112;
     public const int SecondOffset = MainOffset + MainCapacity;
     public const int SecondCapacity = Size - SecondOffset;
 

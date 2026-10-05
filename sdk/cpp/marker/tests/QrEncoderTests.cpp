@@ -424,9 +424,9 @@ TEST(QrEncoder, GivesTheReferencesSymbolForRandomPayloads)
   {
     for (int32_t i = 0; i < 1500; ++i)
     {
-      // Mostly the lengths the markers have: 16 bytes in version 2; 53 and 77 in version 6
+      // Mostly the lengths the markers have: 20 bytes in version 2; 57 and 81 in version 6
       const std::size_t length =
-        i % 3 == 0 ? static_cast<std::size_t>(random.Next() % (CapacityOf(version) + 1u)) : (version == 2 ? 16u : (i % 3 == 1 ? 53u : 77u));
+        i % 3 == 0 ? static_cast<std::size_t>(random.Next() % (CapacityOf(version) + 1u)) : (version == 2 ? 20u : (i % 3 == 1 ? 57u : 81u));
       std::vector<uint8_t> payload = random.Bytes(length);
       if (i % 4 == 0)
       {

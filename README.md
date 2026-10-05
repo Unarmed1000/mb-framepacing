@@ -409,7 +409,7 @@ page that plays the imported recording next to its report, with a playhead on th
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Recording        | ffmpeg 5.1+ (installed separately), and a recording: a video file (OBS recording a capture card) or image frames                                                            |
 | Capture card     | An HDMI/DP capture card that passes the signal through and captures at the display's refresh rate (1080p 240 Hz cards are common)                                           |
-| Disk             | Little: the capture data is 192 bytes per captured frame (about 170 MB for an hour at 240 Hz). Stored frames (`--keep-frames`) need a fast SSD: 0.5 MB per frame at 960×540 |
+| Disk             | Little: the capture data is 256 bytes per captured frame (about 220 MB for an hour at 240 Hz). Stored frames (`--keep-frames`) need a fast SSD: 0.5 MB per frame at 960×540 |
 | Your application | Its source code, built with the C++20 or C# marker library, or the Unity package                                                                                            |
 
 ### How fast can it record?

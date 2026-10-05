@@ -88,7 +88,7 @@ namespace
     bytes[29] = static_cast<uint8_t>(main.size());
     bytes[30] = static_cast<uint8_t>(second.size());
     std::copy(main.begin(), main.end(), bytes.begin() + 32);
-    std::copy(second.begin(), second.end(), bytes.begin() + 112);
+    std::copy(second.begin(), second.end(), bytes.begin() + 144);
     return bytes;
   }
 }
@@ -213,10 +213,11 @@ TEST(CaptureData, ARecordThatIsNotOneIsRefused)
     return bytes;
   };
   EXPECT_THROW((void)FD::CaptureDataRecord::Parse(with(28, 3)), FD::DataFormatError) << "an unknown status";
-  EXPECT_THROW((void)FD::CaptureDataRecord::Parse(with(29, 81)), FD::DataFormatError) << "a main marker longer than its slot";
-  EXPECT_THROW((void)FD::CaptureDataRecord::Parse(with(30, 81)), FD::DataFormatError) << "a second marker longer than its slot";
-  EXPECT_EQ(FD::CaptureDataRecord::Parse(with(29, 80)).MainBytes.size(), 80u);
-  EXPECT_EQ(FD::CaptureDataRecord::Parse(with(30, 80)).SecondBytes.size(), 80u);
+  EXPECT_EQ(good.size(), 256u);
+  EXPECT_THROW((void)FD::CaptureDataRecord::Parse(with(29, 113)), FD::DataFormatError) << "a main marker longer than its slot";
+  EXPECT_THROW((void)FD::CaptureDataRecord::Parse(with(30, 113)), FD::DataFormatError) << "a second marker longer than its slot";
+  EXPECT_EQ(FD::CaptureDataRecord::Parse(with(29, 112)).MainBytes.size(), 112u);
+  EXPECT_EQ(FD::CaptureDataRecord::Parse(with(30, 112)).SecondBytes.size(), 112u);
 }
 
 TEST(CaptureData, ARecordsMarkersDecode)
@@ -229,8 +230,8 @@ TEST(CaptureData, ARecordsMarkersDecode)
   const std::vector<uint8_t> main(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(mainSize));
   const std::size_t syncSize = FM::EncodePayload({FM::MarkerKind::Sync, 7u, 11u, FM::MarkerFlags::NoFlags, FP::TimeSpan(0)}, {}, buffer);
   const std::vector<uint8_t> sync(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(syncSize));
-  ASSERT_EQ(main.size(), 77u) << "the longest marker";
-  ASSERT_EQ(sync.size(), 16u) << "the shortest";
+  ASSERT_EQ(main.size(), 81u) << "the longest marker";
+  ASSERT_EQ(sync.size(), 20u) << "the shortest";
 
   const auto record = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 2, main, sync));
   FM::Payload payload;
@@ -255,7 +256,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
   FM::Payload untouched{FM::MarkerKind::Frame, 99u, 98u, FM::MarkerFlags::NoFlags, FP::TimeSpan(97)};
   EXPECT_FALSE(none.TryDecodeMain(untouched));
   EXPECT_FALSE(none.TryDecodeSecond(untouched));
-  const auto garbage = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 1, std::vector<uint8_t>(53), {1, 2, 3}));
+  const auto garbage = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 1, std::vector<uint8_t>(57), {1, 2, 3}));
   EXPECT_FALSE(garbage.TryDecodeMain(untouched));
   EXPECT_FALSE(garbage.TryDecodeSecond(untouched));
 }

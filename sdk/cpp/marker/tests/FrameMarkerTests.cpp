@@ -27,6 +27,7 @@
 #include <string_view>
 #include <type_traits>
 #include <vector>
+#include "mb/framepacing/marker/detail/Crc32.hpp"
 #include "mb/framepacing/marker/detail/WireFormat.hpp"
 
 namespace FP = MB::FramePacing;
@@ -81,12 +82,23 @@ namespace
   constexpr FP::TickCount64 MinClock{std::numeric_limits<int64_t>::min()};
   constexpr FP::TickCount64 MaxClock{std::numeric_limits<int64_t>::max()};
 
-  //! The payload's bytes (the header for frame, end and sync markers), through the one EncodePayload.
-  std::vector<uint8_t> PayloadBytes(const FM::Payload& payload)
+  //! The payload's bytes (the header and the CRC for frame and end markers), through the one EncodePayload.
+  std::vector<uint8_t> PayloadBytes(const FM::Payload& payload, const FM::StartMetadata& metadata = {})
   {
     std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
-    const std::size_t count = FM::EncodePayload(payload, {}, buffer);
+    const std::size_t count = FM::EncodePayload(payload, metadata, buffer);
     return {buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(count)};
+  }
+
+  //! Puts the CRC of the bytes before it into the last four bytes: a payload changed on purpose that the CRC does not give away.
+  void PutCrc(std::vector<uint8_t>& rBytes)
+  {
+    const std::size_t fieldByteCount = rBytes.size() - FM::WireFormat::CrcByteCount;
+    const uint32_t crc = FM::Crc32::Compute(std::span<const uint8_t>(rBytes).first(fieldByteCount));
+    for (std::size_t i = 0; i < FM::WireFormat::CrcByteCount; ++i)
+    {
+      rBytes[fieldByteCount + i] = static_cast<uint8_t>(crc >> (8u * i));
+    }
   }
 
   //! The documented vertex order of a quad: (TL, TR, BL) (BL, TR, BR), written independently of the library.
@@ -218,12 +230,12 @@ TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
                             FP::TimeSpan32{0x61626364u}};
   const auto bytes = PayloadBytes(payload);
   // magic, version, kind | run id | frame index | flags | animation time | preferred, target frame time | intended display time |
-  // CPU start time | CPU busy
+  // CPU start time | CPU busy | CRC (0x7ED16A3D: what Python's binascii.crc32 gives for the 53 bytes before it)
   const std::array<uint8_t, FM::WireFormat::PayloadByteCount> expected{
-    'M',   'F',   1u,    2u,    0x24u, 0x23u, 0x22u, 0x21u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u, 0x01u, 0x18u,
-    0x17u, 0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x74u, 0x73u, 0x72u, 0x71u, 0x44u, 0x43u, 0x42u, 0x41u, 0x38u, 0x37u, 0x36u,
-    0x35u, 0x34u, 0x33u, 0x32u, 0x31u, 0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u};
-  EXPECT_EQ(FM::WireFormat::PayloadByteCount, 53u);
+    'M',   'F',   1u,    2u,    0x24u, 0x23u, 0x22u, 0x21u, 0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u, 0x01u, 0x18u, 0x17u,
+    0x16u, 0x15u, 0x14u, 0x13u, 0x12u, 0x11u, 0x74u, 0x73u, 0x72u, 0x71u, 0x44u, 0x43u, 0x42u, 0x41u, 0x38u, 0x37u, 0x36u, 0x35u, 0x34u,
+    0x33u, 0x32u, 0x31u, 0x58u, 0x57u, 0x56u, 0x55u, 0x54u, 0x53u, 0x52u, 0x51u, 0x64u, 0x63u, 0x62u, 0x61u, 0x3Du, 0x6Au, 0xD1u, 0x7Eu};
+  EXPECT_EQ(FM::WireFormat::PayloadByteCount, 57u);
   EXPECT_TRUE(std::equal(bytes.begin(), bytes.end(), expected.begin(), expected.end()));
 }
 
@@ -246,17 +258,21 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
   }
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
   ASSERT_EQ(FM::EncodePayload(payload, metadata, buffer), FM::WireFormat::StartPayloadByteCount);
-  EXPECT_EQ(FM::WireFormat::StartPayloadByteCount, 77u);
+  EXPECT_EQ(FM::WireFormat::StartPayloadByteCount, 81u);
   EXPECT_EQ(FM::Payload::MaxEncodedByteCount, FM::WireFormat::StartPayloadByteCount);
 
-  const auto header = PayloadBytes(payload);
-  EXPECT_TRUE(std::equal(header.begin(), header.begin() + FM::WireFormat::PayloadByteCount, buffer.begin())) << "the header comes first";
+  const auto header = PayloadBytes(payload.WithKind(FM::MarkerKind::Frame));
+  EXPECT_EQ(buffer[FM::WireFormat::OffsetKind], 1u);
+  EXPECT_TRUE(std::equal(header.begin() + 4, header.begin() + FM::WireFormat::HeaderByteCount, buffer.begin() + 4)) << "the header comes first";
   const std::array<uint8_t, 8> utcTicks{0x68u, 0x67u, 0x66u, 0x65u, 0x64u, 0x63u, 0x62u, 0x61u};
   EXPECT_TRUE(std::equal(utcTicks.begin(), utcTicks.end(), buffer.begin() + 53));
   for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
   {
     EXPECT_EQ(buffer[61u + i], 0xA0u + i) << "byte " << (61u + i);
   }
+  // The CRC of the 77 bytes before it, last (0x2F72BE00 by Python's binascii.crc32)
+  const std::array<uint8_t, 4> crc{0x00u, 0xBEu, 0x72u, 0x2Fu};
+  EXPECT_TRUE(std::equal(crc.begin(), crc.end(), buffer.begin() + 77));
 }
 
 TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
@@ -395,19 +411,87 @@ TEST(Payload, TryDecodeRejectsBadInput)
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::PayloadByteCount - 1), decoded));
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::SyncPayloadByteCount - 1), decoded));
+  // Each with the CRC put right, so it is the magic, the format version and the kind that are refused
   bytes[0] = 'X';
+  PutCrc(bytes);
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[0] = 'M';
   bytes[1] = 'X';
+  PutCrc(bytes);
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[1] = 'F';
   bytes[2] = 2u;
+  PutCrc(bytes);
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[2] = 1u;
   bytes[3] = FM::WireFormat::MaxMarkerKindValue + 1u;
+  PutCrc(bytes);
   EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
   bytes[3] = 0u;
+  PutCrc(bytes);
   EXPECT_TRUE(FM::TryDecodePayload(bytes, decoded));
+}
+
+TEST(Payload, TheCrcIsTheStandardOne)
+{
+  // The check value every description of the CRC-32 of zlib, PNG and Ethernet gives
+  const std::string_view digits = "123456789";
+  const std::vector<uint8_t> bytes(digits.begin(), digits.end());
+  EXPECT_EQ(FM::Crc32::Compute(bytes), 0xCBF43926u);
+  EXPECT_EQ(FM::Crc32::Compute({}), 0u);
+  EXPECT_EQ(FM::Crc32::Compute(std::vector<uint8_t>(32, 0x00u)), 0x190A55ADu);
+  EXPECT_EQ(FM::Crc32::Compute(std::vector<uint8_t>(32, 0xFFu)), 0xFF6CAB0Bu);
+
+  // The table made at run time is the compile time one, and the one every half byte implementation of this CRC lists
+  EXPECT_EQ(FM::Crc32::MakeTable(), FM::Crc32::Table);
+  const std::array<uint32_t, 16> listed{0x00000000u, 0x1DB71064u, 0x3B6E20C8u, 0x26D930ACu, 0x76DC4190u, 0x6B6B51F4u, 0x4DB26158u, 0x5005713Cu,
+                                        0xEDB88320u, 0xF00F9344u, 0xD6D6A3E8u, 0xCB61B38Cu, 0x9B64C2B0u, 0x86D3D2D4u, 0xA00AE278u, 0xBDBDF21Cu};
+  EXPECT_EQ(FM::Crc32::Table, listed);
+}
+
+TEST(Payload, AChangedBitIsRefused)
+{
+  // Every single bit of every kind's payload, the CRC's own bits too: none decodes, and the payload put back decodes again
+  const FM::Payload fields{FM::MarkerKind::Frame,
+                           0x21222324u,
+                           0x0102030405060708u,
+                           FM::MarkerFlags::StaticAfter,
+                           FP::TimeSpan{0x1112131415161718},
+                           FP::TimeSpan32{0x71727374u},
+                           FP::TimeSpan32{0x41424344u},
+                           FP::TickCount64{0x3132333435363738},
+                           FP::TickCount64{0x5152535455565758},
+                           FP::TimeSpan32{0x61626364u}};
+  FM::SequenceId id;
+  ASSERT_TRUE(FM::SequenceId::TryFromText("a changed bit", id));
+  for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::SequenceStart, FM::MarkerKind::SequenceEnd, FM::MarkerKind::Sync})
+  {
+    std::vector<uint8_t> bytes = PayloadBytes(fields.WithKind(kind), {638'000'000'000'000'000, id});
+    FM::Payload decoded{};
+    ASSERT_TRUE(FM::TryDecodePayload(bytes, decoded)) << static_cast<int>(kind);
+    for (std::size_t bit = 0; bit < bytes.size() * 8u; ++bit)
+    {
+      const auto mask = static_cast<uint8_t>(1u << (bit % 8u));
+      bytes[bit / 8u] ^= mask;
+      EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded)) << "kind " << static_cast<int>(kind) << ", bit " << bit;
+      bytes[bit / 8u] ^= mask;
+    }
+    EXPECT_TRUE(FM::TryDecodePayload(bytes, decoded)) << static_cast<int>(kind);
+  }
+}
+
+TEST(Payload, AFieldChangedWithoutItsCrcIsRefused)
+{
+  // What a QR decoder's error correction can hand back for a symbol that mixes two frames: a well-formed payload of bytes that were
+  // never drawn. Only the CRC tells
+  std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Frame, 7u, 1'000u, FM::MarkerFlags::NoFlags, FP::TimeSpan{166'667}});
+  FM::Payload decoded{};
+  ASSERT_TRUE(FM::TryDecodePayload(bytes, decoded));
+  bytes[FM::WireFormat::OffsetFrameIndex] = 0xE9u;
+  EXPECT_FALSE(FM::TryDecodePayload(bytes, decoded));
+  PutCrc(bytes);
+  ASSERT_TRUE(FM::TryDecodePayload(bytes, decoded));
+  EXPECT_EQ(decoded.FrameIndex(), 1'001u);
 }
 
 TEST(Payload, DecodingASyncMarkerResetsTheMetadata)
@@ -429,18 +513,21 @@ TEST(Payload, TryDecodeRejectsWrongLengths)
     ASSERT_EQ(FM::EncodePayload({kind, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4},
                                  FP::TickCount64{6}, FP::TimeSpan32{7u}},
                                 {}, buffer),
-              53u);
-    EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(53), decoded));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(52), decoded));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(54), decoded));
+              57u);
+    EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(57), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(56), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(58), decoded));
+    // The header alone, as a payload was before it had a CRC
+    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(53), decoded));
   }
   ASSERT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u},
                                FP::TickCount64{4}, FP::TickCount64{6}, FP::TimeSpan32{7u}},
                               {9, {}}, buffer),
-            77u);
-  EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(77), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(76), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(78), decoded));
+            81u);
+  EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(81), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(80), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(82), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(77), decoded));
 }
 
 TEST(Payload, StartMetadataRoundTrips)
@@ -619,8 +706,10 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
                             FP::TickCount64{7},   FP::TimeSpan32{8u}};
   const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
   ASSERT_EQ(byteCount, FM::WireFormat::SyncPayloadByteCount);
-  const std::array<uint8_t, FM::WireFormat::SyncPayloadByteCount> expected{'M',   'F',   1u,    3u,    0x04u, 0x00u, 0x00u, 0x00u,
-                                                                           0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u};
+  // The header's first 16 bytes and their CRC (0xC0A3D4F2 by Python's binascii.crc32)
+  EXPECT_EQ(FM::WireFormat::SyncPayloadByteCount, 20u);
+  const std::array<uint8_t, FM::WireFormat::SyncPayloadByteCount> expected{'M',   'F',   1u,    3u,    0x04u, 0x00u, 0x00u, 0x00u, 0x08u, 0x07u,
+                                                                           0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u, 0xF2u, 0xD4u, 0xA3u, 0xC0u};
   EXPECT_TRUE(std::equal(expected.begin(), expected.end(), buffer.begin()));
 
   FM::Payload decoded{};
@@ -629,6 +718,8 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
   EXPECT_EQ(decoded.CpuStartTime().Ticks(), 0);
   EXPECT_EQ(decoded.CpuBusy().Ticks(), 0u);
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::WireFormat::SyncFieldsByteCount), decoded));
 }
 
 TEST(Symbol, EveryMarkerIsVersion6)
@@ -649,7 +740,7 @@ TEST(Symbol, EveryMarkerIsVersion6)
   EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::MainSize);
 
   // Version 6-M holds 106 bytes: the start marker leaves room for future fields
-  EXPECT_EQ(FM::Payload::MaxEncodedByteCount, 77u);
+  EXPECT_EQ(FM::Payload::MaxEncodedByteCount, 81u);
   EXPECT_LT(FM::Payload::MaxEncodedByteCount, FM::WireFormat::QrCapacityBytes);
 }
 

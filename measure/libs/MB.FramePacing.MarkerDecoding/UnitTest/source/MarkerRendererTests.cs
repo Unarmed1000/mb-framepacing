@@ -105,12 +105,12 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       Assert.That(results[0].Bounds.Y, Is.LessThan(results[1].Bounds.Y));
     }
 
-    [Test]
-    public void Decode_ForeignQrCode_IsInvalidPayload()
+    // A QR code of any content, drawn as the markers are: black on white, 6 pixels per module
+    private static GrayImage QrImage(string content)
     {
-      var image = new GrayImage(300, 300, 255);
+      var image = new GrayImage(400, 400, 255);
       var hints = new System.Collections.Generic.Dictionary<ZXing.EncodeHintType, object>();
-      var code = ZXing.QrCode.Internal.Encoder.encode("https://example.com", ZXing.QrCode.Internal.ErrorCorrectionLevel.M, hints);
+      var code = ZXing.QrCode.Internal.Encoder.encode(content, ZXing.QrCode.Internal.ErrorCorrectionLevel.M, hints);
       for (int y = 0; y < code.Matrix.Height; ++y)
       {
         for (int x = 0; x < code.Matrix.Width; ++x)
@@ -119,7 +119,30 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
             image.FillRect(new PixelRect(40 + (x * 6), 40 + (y * 6), 6, 6), 0);
         }
       }
-      Assert.That(new MarkerDecoder().Decode(image).Status, Is.EqualTo(MarkerDecodeStatus.InvalidPayload));
+      return image;
+    }
+
+    [Test]
+    public void Decode_ForeignQrCode_IsInvalidPayload()
+    {
+      Assert.That(new MarkerDecoder().Decode(QrImage("https://example.com")).Status, Is.EqualTo(MarkerDecodeStatus.InvalidPayload));
+    }
+
+    [Test]
+    public void Decode_AMarkersBytesWithOneChanged_IsInvalidPayload()
+    {
+      // A well-formed QR code of a frame marker's bytes, and of the same bytes with one bit of the frame index changed: what a
+      // decoder's error correction can hand back for a symbol that mixes two frames. The CRC is what tells them apart
+      var payload = new MarkerPayload(MarkerKind.Frame, 7, 1000, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(166_667));
+      var bytes = payload.Encode();
+      var asDrawn = new MarkerDecoder().Decode(QrImage(System.Text.Encoding.Latin1.GetString(bytes)));
+      Assert.That(asDrawn.Status, Is.EqualTo(MarkerDecodeStatus.Decoded));
+      Assert.That(asDrawn.Payload, Is.EqualTo(payload));
+
+      bytes[8] ^= 1;
+      var changed = new MarkerDecoder().Decode(QrImage(System.Text.Encoding.Latin1.GetString(bytes)));
+      Assert.That(changed.Status, Is.EqualTo(MarkerDecodeStatus.InvalidPayload));
+      Assert.That(changed.Bytes, Is.EqualTo(bytes), "the QR code itself was read");
     }
 
     [Test]

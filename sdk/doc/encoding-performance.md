@@ -14,18 +14,21 @@ in C# a port of it), and is 20 to 40 times faster.
 Release builds, one core of a 4.7 GHz desktop CPU. "Original" is qrcodegen (C++) or its module-by-module port (C#), "own" is the
 module's encoder; both encode the same payloads, a new one every iteration, as an application does every frame.
 
+The payload's own bytes, its CRC-32 included, are a small part of that: 0.17 µs for a frame marker, 0.24 µs for a start marker and
+0.06 µs for a sync marker in C++ (0.14, 0.21 and 0.03 µs in C#).
+
 | What                                     | Language, compiler | Original |     Own | Faster by |
 | ---------------------------------------- | ------------------ | -------: | ------: | --------: |
-| Main marker (frame, 53 bytes)            | C++, MSVC          |   345 µs |  9.1 µs |       38× |
-| Main marker (start, 77 bytes)            | C++, MSVC          |   341 µs |  9.3 µs |       37× |
-| Sync marker (16 bytes)                   | C++, MSVC          |   108 µs |  3.9 µs |       28× |
-| Main marker (frame, 53 bytes)            | C++, Clang         |   250 µs |  8.6 µs |       29× |
-| Main marker (start, 77 bytes)            | C++, Clang         |   248 µs |   11 µs |       23× |
-| Sync marker (16 bytes)                   | C++, Clang         |    74 µs |  4.6 µs |       16× |
+| Main marker (frame, 57 bytes)            | C++, MSVC          |   351 µs |  9.2 µs |       38× |
+| Main marker (start, 81 bytes)            | C++, MSVC          |   354 µs |  9.3 µs |       38× |
+| Sync marker (20 bytes)                   | C++, MSVC          |   109 µs |  4.0 µs |       27× |
+| Main marker (frame, 57 bytes)            | C++, Clang         |   213 µs |  8.8 µs |       24× |
+| Main marker (start, 81 bytes)            | C++, Clang         |   213 µs |  8.8 µs |       24× |
+| Sync marker (20 bytes)                   | C++, Clang         |    66 µs |  3.8 µs |       17× |
 | A whole frame: both markers, as geometry | C++, MSVC          |   492 µs |   20 µs |       25× |
-| Main marker (frame, 53 bytes)            | C#, .NET 10        |   279 µs | 11.9 µs |       24× |
-| Main marker (start, 77 bytes)            | C#, .NET 10        |   282 µs | 12.4 µs |       23× |
-| Sync marker (16 bytes)                   | C#, .NET 10        |    93 µs |  5.0 µs |       18× |
+| Main marker (frame, 57 bytes)            | C#, .NET 10        |   309 µs | 12.5 µs |       25× |
+| Main marker (start, 81 bytes)            | C#, .NET 10        |   334 µs | 13.1 µs |       26× |
+| Sync marker (20 bytes)                   | C#, .NET 10        |    98 µs |  5.6 µs |       18× |
 | A whole frame: both markers, as geometry | C#, .NET 10        |   378 µs |   23 µs |       16× |
 
 The numbers move by a few percent from run to run. The C# frame's original time is the sum of its measured parts (the two encodes
@@ -137,7 +140,8 @@ encoder) produce the same modules. The new encoder is covered completely by the 
 The tables are data in the library: about 8 KiB. An executable that uses the marker module grows by 20.4 KiB in a Release build
 (28.9 KiB with qrcodegen, whose code was larger) and by 18.1 KiB in a build optimized for size (12.8 KiB before: the tables do not
 shrink). See "What it adds to your executable" in `sdk/cpp/README.md`. The C# assembly `MB.FramePacing.Marker` grows from 25.5 to 27.0 KiB;
-its tables are made when the first encoder is created.
+its tables are made when the first encoder is created. (The CRC-32 every payload ends with came later and is not part of the
+encoder: with it the numbers are 20.8 and 18.3 KiB, and 27.5 KiB for the C# assembly.)
 
 ## What was left out
 
