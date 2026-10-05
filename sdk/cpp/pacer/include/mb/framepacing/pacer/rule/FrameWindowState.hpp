@@ -21,6 +21,11 @@ namespace MB::FramePacing::Pacer
     TimeSpan Span;
     //! The window spans more than FrameWindowLength, or holds all the frames it can: the rule may decide on it.
     bool Full{false};
+    //! The frames whose next frame began before the time the pacer gave for it (FrameSchedule::NextFrameStartTime): a check of the
+    //! application's frame loop, which the rule does not use. None in a loop that waits for that time. About half of the frames in
+    //! a loop that only a present waiting for the display holds, as its frame starts jitter around the refreshes. Nearly all of
+    //! them: nothing holds the loop to the display and it runs ahead of it, or the refresh period given is longer than the display's.
+    uint32_t EarlyStarts{0};
   };
 }
 

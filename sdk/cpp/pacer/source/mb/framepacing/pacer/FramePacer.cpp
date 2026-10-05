@@ -50,7 +50,8 @@ namespace MB::FramePacing::Pacer
     }
     else
     {
-      change = m_rule.AddFrame(previous.DisplayTime, m_work, previous.Late);
+      // This frame began before the time the previous one gave for it: the application's loop is not held to that time
+      change = m_rule.AddFrame(previous.DisplayTime, m_work, previous.Late, cpuStartTime < m_nextFrameStartTime);
     }
 
     const uint32_t swapInterval = m_rule.SwapInterval();
@@ -74,6 +75,7 @@ namespace MB::FramePacing::Pacer
     // The frame starts when the previous one is shown, at the refresh the display's clock is on: the frame is aimed its swap interval
     // of refreshes later, in the display clock's exact ticks. With present feedback the aim is counted from a display time instead
     schedule.NextFrameStartTime = cpuStartTime + TimeSpan(m_clock.DisplayTimeAfter(swapInterval).Ticks() - previous.DisplayTime.Ticks());
+    m_nextFrameStartTime = schedule.NextFrameStartTime;
     schedule.IntendedDisplayTime = useFeedback ? m_inFlight.IntendedDisplayTime() : schedule.NextFrameStartTime;
     schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(swapInterval));
     schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));

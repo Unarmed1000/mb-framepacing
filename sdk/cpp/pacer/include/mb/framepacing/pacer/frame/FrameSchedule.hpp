@@ -31,9 +31,10 @@ namespace MB::FramePacing::Pacer
     //! since, this one included: the refresh the frame reaches when none of them is late, however many presents are queued. Unknown
     //! (TickCount64(), the marker's 0) while there is no display time to count from.
     TickCount64 IntendedDisplayTime;
-    //! The frame's start plus its swap interval, on the application's steady clock: what a loop that paces by sleeping holds to
-    //! (present no earlier than one refresh before it, start the next frame no earlier than it). Not a display time: with presents
-    //! queued the frame is shown later.
+    //! The frame's start plus its swap interval, on the application's steady clock. The application begins the next frame no
+    //! earlier than this, at every swap interval: a present that waits for the display has passed it when it returns, and where the
+    //! present does not wait this is what keeps the loop from running ahead of the display. A loop that paces by sleeping also
+    //! presents no earlier than one refresh before it. Not a display time: with presents queued the frame is shown later.
     TickCount64 NextFrameStartTime;
     //! The marker's target frame time: SwapInterval refreshes, rounded to a tick.
     TimeSpan32 TargetFrameTime;

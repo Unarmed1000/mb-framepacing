@@ -61,7 +61,8 @@ namespace MB::FramePacing::Pacer
   {
   }
 
-  SwapIntervalChange SwapIntervalRule::AddFrame(const TimeSpan displayTime, const TimeSpan work, const bool late) noexcept
+  SwapIntervalChange SwapIntervalRule::AddFrame(const TimeSpan displayTime, const TimeSpan work, const bool late,
+                                                const bool nextStartedEarly) noexcept
   {
     const TimeSpan windowLength = m_settings.FrameWindowLength();
     // The frames of the last FrameWindowLength: the oldest go once the second oldest is more than FrameWindowLength older than this one (so the
@@ -71,10 +72,11 @@ namespace MB::FramePacing::Pacer
       PopFront();
     }
     const TimeSpan counted = std::clamp(work, TimeSpan(), windowLength);
-    m_entries[(m_first + m_count) % m_entries.size()] = Entry{displayTime, counted, late};
+    m_entries[(m_first + m_count) % m_entries.size()] = Entry{displayTime, counted, late, nextStartedEarly};
     ++m_count;
     m_workSum = Sum(m_workSum, counted);
     m_lateCount += late ? 1u : 0u;
+    m_earlyStartCount += nextStartedEarly ? 1u : 0u;
     while (m_count >= 2u && displayTime > Sum(At(1).DisplayTime, windowLength))
     {
       PopFront();
@@ -156,6 +158,7 @@ namespace MB::FramePacing::Pacer
     m_count = 0;
     m_workSum = TimeSpan();
     m_lateCount = 0;
+    m_earlyStartCount = 0;
   }
 
   FrameWindowState SwapIntervalRule::FrameWindow() const noexcept
@@ -165,7 +168,8 @@ namespace MB::FramePacing::Pacer
       return {};
     }
     const TimeSpan span(At(m_count - 1u).DisplayTime.Ticks() - At(0).DisplayTime.Ticks());
-    return {static_cast<uint32_t>(m_count), m_lateCount, TimeSpan(m_workSum.Ticks() / static_cast<int64_t>(m_count)), span, IsFull()};
+    return {
+      static_cast<uint32_t>(m_count), m_lateCount, TimeSpan(m_workSum.Ticks() / static_cast<int64_t>(m_count)), span, IsFull(), m_earlyStartCount};
   }
 
   const SwapIntervalRule::Entry& SwapIntervalRule::At(const std::size_t index) const noexcept
@@ -186,6 +190,7 @@ namespace MB::FramePacing::Pacer
     const Entry& oldest = At(0);
     m_workSum = TimeSpan(m_workSum.Ticks() - oldest.Work.Ticks());
     m_lateCount -= oldest.Late ? 1u : 0u;
+    m_earlyStartCount -= oldest.NextStartedEarly ? 1u : 0u;
     m_first = (m_first + 1u) % m_entries.size();
     --m_count;
   }

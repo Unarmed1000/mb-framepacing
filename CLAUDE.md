@@ -244,6 +244,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     intended display time the frame's start plus that step. A gap longer than the frame window (or two frames), or a frame before
     the previous one, starts again. The pacer keeps **no grid of refreshes of its own**: one that runs on the CPU's clock slides
     against the display and double-steps (why the earlier design went).
+  - **The application holds the next frame's start to `FrameSchedule::NextFrameStartTime` at every swap interval, one included**
+    (the guide's frame loop has the wait): the pacer never waits, and a present does not always (the first integration's Vulkan
+    FIFO swap chain never did, and its sample left the wait out at a swap interval of one, so its loop ran ahead of the display
+    through every capture of 2026-10-04 and before). The pacer counts what it can not prevent (agreed with the user):
+    `FrameWindowState::EarlyStarts`, the frames of the frame window whose next frame began before that time
+    (`SwapIntervalRule::AddFrame(..., nextStartedEarly)`, of no weight in the rule). None = the loop waits; about half = a
+    present that waits holds it (jitter); nearly all = nothing holds it. It is a share to read, not an assertion: the fault was
+    0.10 ms a frame.
   - **A frame whose work is over its frame time** (`EndFrame`'s work against the swap interval's time; agreed with the user) is late
     whatever the frame starts say, and for such frames only the time between the starts counts as real time, the rounding's
     remainder carried to the next one (`PacerRefreshClock::Measure(frameStartTime, work)`). Why: a swap chain with a buffer to
@@ -287,9 +295,17 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       local directories. **A session's numbers come from its logs through `tools/pacer_capture_report.py`** (standard library;
       reads the zip in place): `<session>/runs.csv` (a row per run, whole ticks and counts), the charts (`<session>/*.svg`, in the
       look of `SvgMarkup`) and the tables of `<session>.md` between `pacer-capture:<name>` comments (`--update-doc`; written as
-      Prettier formats them); `--check` fails when a file is not what the zip gives. Its selections are for the 2026-10-04
-      session's runs. The guide quotes such a session ("that session") with a link by GitHub URL and **never embeds a chart**:
+      Prettier formats them); `--check` fails when a file is not what the zip gives. Each session has its own charts and
+      tables there (`SESSIONS`, by the zip's name; an unknown zip gets `runs.csv` and the table of its folders). The guide quotes such a session ("that session") with a link by GitHub URL and **never embeds a chart**:
       the SDK archive ships `doc/pacer.md` without images. Driver display times are not a measurement by the tools: say so.
+    - **What the two sessions of 2026-10-04 taught** (Vulkan FIFO, Windows, one driver; the results documents have the numbers):
+      the present and the acquire never waited there, so an application must hold the frame start to `NextFrameStartTime` at
+      every swap interval, one included (the first integration's sample did not at one, so every capture of it at a swap
+      interval of one up to those sessions is of a loop that ran ahead; the hold does not empty a queue below the swap chain,
+      and the 3.1 ms from present to display of one held run was that run only); the timer sleep mostly holds a frame and now and then lands on the wrong side of a refresh for a stretch; a
+      swap chain's reported refresh is the fastest display's of the desktop, so a second display at another rate changes
+      results (the first session's 60 and 50 Hz runs had one on: **ask what displays were on, and at what rates, before reading
+      a capture**); most findings are one run each and two runs of the same settings differ by several frames.
     - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off, a busy machine; not written by `pacer-sim`):
       the tests pace it without and with feedback and pin the counts (214 frames late by their starts both ways, 2 refreshes
       lost by the display times).

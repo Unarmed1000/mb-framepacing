@@ -8,9 +8,10 @@ Each capture session is one zip file, with a document here that says what its lo
 they are assets of this repository's [`pacer-captures` release](https://github.com/Unarmed1000/mb-framepacing/releases/tag/pacer-captures). Download one and unpack it to read the logs; inside,
 `README.txt` says what was run.
 
-| File                                                                                                                                        | Runs | Unpacked | What it is                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------- | ---- | -------- | ------------------------------------------------------------------------------------ |
-| [`2026-10-04-windows-hold.zip`](https://github.com/Unarmed1000/mb-framepacing/releases/download/pacer-captures/2026-10-04-windows-hold.zip) | 247  | 113 MB   | How a frame is held for more than one refresh on plain Vulkan, Windows, 50 to 240 Hz |
+| File                                                                                                                                                | Runs | Unpacked | What it is                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| [`2026-10-04-windows-hold.zip`](https://github.com/Unarmed1000/mb-framepacing/releases/download/pacer-captures/2026-10-04-windows-hold.zip)         | 247  | 113 MB   | How a frame is held for more than one refresh on plain Vulkan, Windows, 50 to 240 Hz                                 |
+| [`2026-10-04-windows-session2.zip`](https://github.com/Unarmed1000/mb-framepacing/releases/download/pacer-captures/2026-10-04-windows-session2.zip) | 354  | 221 MB   | What the Vulkan loop waits on, the scheduled present, one display, the power plan, measuring a variable refresh rate |
 
 The files name no GPU or CPU model and no directory of the machine they were captured on: the GPU is its vendor and driver version,
 the directories are `<output>`, `<sdk>` and `<home>`. Keep it that way in anything added here.
@@ -44,6 +45,14 @@ G-SYNC was off for every folder but the four named for it, and present feedback 
 
 What they show is in [Windows hold captures, 2026-10-04](2026-10-04-windows-hold.md), with the charts and the row per run
 (`2026-10-04-windows-hold/runs.csv`) that `tools/pacer_capture_report.py` works out from the zip.
+
+## 2026-10-04-windows-session2
+
+The same sample and pacer, with three options for probing its frame loop and a measurement of the display's vertical blanks: what
+holds the loop to the display at a swap interval of one, the timer sleep against the scheduled present, the first session's hold
+captures and placement sweeps again on one display, the High performance against the Balanced power plan, and present feedback
+as statistics. What its logs show, and what of the first session it corrects, is in
+[Windows captures, second session of 2026-10-04](2026-10-04-windows-session2.md).
 
 ## Adding a capture
 

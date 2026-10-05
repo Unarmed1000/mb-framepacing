@@ -26,6 +26,7 @@ import itertools
 import statistics
 import sys
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -59,6 +60,12 @@ class Frame:
     swap_interval: int
     work: int
     window_late: int
+    # When the present was called
+    present: int
+    # The vertical blank measurement of the window system, where the log has it: the median time between the last vertical blanks in
+    # thousandths of the mode's refresh period, and the share of them more than a tenth off it, in thousandths
+    vblank_interval: int
+    vblank_off: int
 
 
 @dataclass(frozen=True)
@@ -101,6 +108,13 @@ class Run:
     feedback_refused: int
     feedback_not_shown: int
     feedback_late_refreshes: int
+    power_plan: str
+    swapchain_images: int
+    acquire_wait: int
+    hold_start: str
+    present_to_display_median: int
+    vblank_interval_median: int
+    vblank_off_median: int
     log: tuple[Frame, ...]
 
     @property
@@ -158,6 +172,13 @@ class Run:
             ("feedbackRefused", self.feedback_refused),
             ("feedbackNotShown", self.feedback_not_shown),
             ("feedbackLateRefreshes", self.feedback_late_refreshes),
+            ("powerPlan", self.power_plan),
+            ("swapchainImages", self.swapchain_images),
+            ("acquireWait", self.acquire_wait),
+            ("holdStart", self.hold_start),
+            ("presentToDisplayMedianTicks", self.present_to_display_median),
+            ("vblankIntervalMilliPeriods", self.vblank_interval_median),
+            ("vblankOffPeriodPerMille", self.vblank_off_median),
         ]
 
 
@@ -204,6 +225,9 @@ def read_frames(text: str) -> tuple[tuple[Frame, ...], int, list[str]]:
             swap_interval=number(cell(row, "swapInterval")) or 1,
             work=number(cell(row, "workCpuTicks")) + number(cell(row, "workGpuTicks")),
             window_late=number(cell(row, "pacerWindowLateFrames")),
+            present=number(cell(row, "presentCallTicks")),
+            vblank_interval=number(cell(row, "displayVBlankIntervalMilliPeriods")),
+            vblank_off=number(cell(row, "displayVBlankOffPeriodPerMille")),
         )
         for row in rows
     )
@@ -244,6 +268,9 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
     notes_name = f"{prefix}.run.txt"
     notes = read_text(archive, notes_name) if notes_name in archive.namelist() else ""
     gsync = next((line.split(":", 1)[1] for line in notes.splitlines() if line.strip().startswith("gsync:")), "")
+    plan = next((line.rsplit("(", 1)[1].rstrip(") ") for line in notes.splitlines() if line.strip().startswith("power plan:") and "(" in line), "")
+    command = next((line for line in notes.splitlines() if line.startswith("command line:")), "")
+    hold_start = command.split("--Pacer.HoldStart ", 1)[1].split()[0] if "--Pacer.HoldStart " in command else ""
 
     log, preferred, counters = read_frames(read_text(archive, f"{prefix}.csv"))
     counted = log[SKIP_FIRST : len(log) - SKIP_LAST]
@@ -282,7 +309,7 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
         gsync=gsync.split("(")[0].strip(),
         load=load if load in ("idle", "loaded") else "",
         pacer=("adaptive" if config.get("adaptive") == "1" else "fixed") if pacer_on else "off",
-        hold={"wait": "sleep", "vsync": "vsync"}.get(config.get("hold", ""), "") if pacer_on else "",
+        hold={"wait": "sleep", "vsync": "vsync", "schedule": "scheduled"}.get(config.get("hold", ""), "") if pacer_on else "",
         vsync_source=facts.get("window.vsyncSource", ""),
         vsync_phase_percent=number(config.get("vsyncPhasePercent")),
         target_swap_interval=preferred,
@@ -308,6 +335,13 @@ def read_run(archive: zipfile.ZipFile, base: str, folder: str, name: str) -> Run
         feedback_refused=number(counters[1]),
         feedback_not_shown=number(counters[2]),
         feedback_late_refreshes=number(counters[3]),
+        power_plan=plan,
+        swapchain_images=number(swapchain.get("imageCount")),
+        acquire_wait=number(swapchain.get("acquireWait")),
+        hold_start=hold_start,
+        present_to_display_median=percentile([frame.shown - frame.present for frame in counted if frame.shown is not None and frame.present], 50),
+        vblank_interval_median=percentile([frame.vblank_interval for frame in counted if frame.vblank_interval], 50),
+        vblank_off_median=percentile([frame.vblank_off for frame in counted if frame.vblank_interval], 50),
         log=log,
     )
 
@@ -334,7 +368,7 @@ def runs_csv(runs: list[Run]) -> str:
 # ----------------------------------------------------------------------------------------------------------------------------------------
 
 HOLDS = [("sleep", "idle"), ("sleep", "loaded"), ("vsync", "idle"), ("vsync", "loaded")]
-HOLD_NAMES = {"sleep": "Timer sleep", "vsync": "Vsync wait"}
+HOLD_NAMES = {"sleep": "Timer sleep", "vsync": "Vsync wait", "scheduled": "Scheduled present"}
 
 
 @dataclass(frozen=True)
@@ -500,7 +534,9 @@ def hold_chart(runs: list[Run]) -> str:
     )
     styles = {("sleep", "idle"): "green", ("sleep", "loaded"): "green-faint", ("vsync", "idle"): "blue", ("vsync", "loaded"): "blue-faint"}
     svg.key(28, 92, [(styles[hold], f"{HOLD_NAMES[hold[0]]}, {hold[1]}") for hold in HOLDS])
-    left, right, top, bottom, most = 70.0, 1150.0, 120.0, 390.0, 15
+    left, right, top, bottom = 70.0, 1150.0, 120.0, 390.0
+    peak = max(1000 * cell.off // cell.steps for _, _, cells in groups for cell in cells.values())
+    most = max(15, 5 * (peak // 5 + 1))
     for tick in range(0, most + 1, 5):
         y = bottom - (bottom - top) * tick / most
         svg.line(left, y, right, y, "zero-line" if tick == 0 else "grid")
@@ -566,14 +602,16 @@ def placement_chart(runs: list[Run]) -> str:
         "Frames not shown for exactly two refreshes, by the place of the present: percent of a refresh before the refresh aimed at.",
     )
     svg.key(28, 92, [("blue", "Idle"), ("blue-faint", "Loaded"), ("band", "The sample's default, 65 %")])
-    top, bottom, most = 130.0, 320.0, 4
+    top, bottom = 130.0, 320.0
+    peak = max(run.off for run in sweep.values())
+    most = 4 if peak <= 4 else 10 * ((peak + 9) // 10)
     width = (1180 - 28 - 28 - 3 * 24) / 4
     for panel, hz in enumerate(rates):
         left = 28 + panel * (width + 24) + 26
         right = 28 + panel * (width + 24) + width
         svg.text(left, top - 12, f"{hz} HZ, {hz // 2} FPS", "label")
         slot = (right - left) / len(phases)
-        for tick in range(most + 1):
+        for tick in range(0, most + 1, 1 if most == 4 else 10):
             y = bottom - (bottom - top) * tick / most
             svg.line(left, y, right, y, "zero-line" if tick == 0 else "grid")
             svg.text(left - 8, y + 4, str(tick), "axis", "end")
@@ -591,62 +629,6 @@ def placement_chart(runs: list[Run]) -> str:
         svg.text((left + right) / 2, bottom + 38, "% of a refresh", "sub", "middle")
     counted = sorted({run.steps for run in sweep.values()})
     svg.text(28, 384, f"Frames off, of {counted[0]} to {counted[-1]} in a run. The pacer holds every frame for two refreshes.", "sub")
-    return svg.render()
-
-
-def work_chart(runs: list[Run], folder: str) -> str:
-    panels = [
-        (
-            "ONE FRAME IN FLIGHT",
-            [
-                ("w90_idle", "line-blue", "Idle"),
-                ("w90_flight1_idle", "line-green", "Idle, again"),
-                ("w90_loaded", "line-amber", "Loaded"),
-                ("w90_flight1_loaded", "line-pink", "Loaded, again"),
-            ],
-        ),
-        ("TWO FRAMES IN FLIGHT", [("w90_flight2_idle", "line-blue", "Idle"), ("w90_flight2_loaded", "line-amber", "Loaded")]),
-    ]
-    first = find(runs, folder, "w90_idle")
-    svg = Svg(
-        1180,
-        470,
-        f"Work of {round(100 * first.work_median / first.refresh_period)} % of a refresh at {first.refresh_hz} Hz: the rule at its threshold",
-        "The late frames in the pacer's frame window (the last 2 s) over a run. It slows down when they pass the dashed line.",
-    )
-    top, bottom, most = 130.0, 400.0, 60
-    width = (1180 - 28 - 28 - 40) / 2
-    for panel, (title, lines) in enumerate(panels):
-        left = 28 + panel * (width + 40) + 30
-        right = 28 + panel * (width + 40) + width
-        frames = max(find(runs, folder, name).frames for name, _, _ in lines)
-        svg.text(left, top - 34, title, "label")
-        svg.line_key(left, top - 12, [(style, label) for _, style, label in lines])
-        for tick in range(0, most + 1, 10):
-            y = bottom - (bottom - top) * tick / most
-            svg.line(left, y, right, y, "zero-line" if tick == 0 else "grid")
-            svg.text(left - 8, y + 4, str(tick), "axis", "end")
-        for tick in range(0, frames + 1, 400):
-            x = left + (right - left) * tick / frames
-            svg.text(x, bottom + 18, str(tick), "axis", "middle")
-        svg.text((left + right) / 2, bottom + 38, "frame", "sub", "middle")
-        threshold = first.late_frames_to_slow_down - 1
-        y = bottom - (bottom - top) * threshold / most
-        svg.line(left, y, right, y, "threshold")
-        svg.text(right, y - 6, f"more than {threshold} late frames: slower", "threshold-text", "end")
-        for name, style, _ in lines:
-            run = find(runs, folder, name)
-            # The most late frames of every four frames: a point per pixel is enough
-            points = [
-                (left + (right - left) * start / frames, bottom - (bottom - top) * max(frame.window_late for frame in run.log[start : start + 4]) / most)
-                for start in range(0, len(run.log), 4)
-            ]
-            svg.polyline(points, f"line {style}")
-            if run.first_slower_frame:
-                x = left + (right - left) * run.first_slower_frame / frames
-                svg.line(x, top, x, bottom, "mark")
-                svg.text(x + 6, top + 12, f"two refreshes from frame {run.first_slower_frame}", "value")
-    svg.text(28, 456, "After a change of swap interval the frame window starts empty, so the count falls to zero.", "sub")
     return svg.render()
 
 
@@ -882,22 +864,266 @@ def summary_table(runs: list[Run]) -> str:
     return table(["Folder", "Runs", "Frames logged"], rows, frozenset({1, 2}))
 
 
-TABLES = {
-    "runs": summary_table,
-    "hold": hold_table,
-    "spread": spread_table,
-    "placement": placement_table,
-    "work-130": work_130_table,
-    "work-90": work_90_table,
-    "sources": sources_table,
-    "refresh": refresh_table,
-    "gsync": gsync_table,
+@dataclass(frozen=True)
+class Session:
+    """What is made for a capture session: its charts by file name, and the tables of its document by block name.
+
+    The charts are of runs in which the frame loop applied the pacer's times. Up to these sessions the sample did not hold the frame
+    start at a swap interval of one, so its runs there are tables in a section of their own, and no chart.
+    """
+
+    charts: dict[str, Callable[[list[Run]], str]]
+    tables: dict[str, Callable[[list[Run]], str]]
+
+
+# ----------------------------------------------------------------------------------------------------------------------------------------
+# The second session of 2026-10-04: what the loop waits on, the scheduled present, one display, the power plan
+# ----------------------------------------------------------------------------------------------------------------------------------------
+
+AUDIT = "hp-240hz-audit-probe"
+AUDIT_HEAVY = "hp-240hz-audit-probe-fixed1-w86"
+LOOP_RUNS = [
+    (AUDIT, ["w20_base", "w20_acquirewait", "w20_holdpacer", "w20_holdvsync", "w20_flight2", "w20_images3", "w20_images3_acquirewait"]),
+    (AUDIT_HEAVY, ["w94_base", "w94_acquirewait", "w94_holdpacer", "w94_holdvsync"]),
+    (AUDIT, ["fullscreen_light", "fullscreen_heavy", "fullscreen_heavy_holdvsync"]),
+    ("hp-240hz-audit-probe-fixed1", ["fullscreen_heavy", "fullscreen_heavy_holdvsync"]),
+]
+DESKTOPS = {
+    "hp-240hz-present-scheduling": "240 Hz, a second display at 120 Hz",
+    "hp-120hz-present-scheduling": "120 Hz, both displays at 120 Hz",
+    "hp-60hz-present-scheduling": "60 Hz, a second display at 120 Hz",
+    "hp-60hz-both-displays-60hz-present-scheduling": "60 Hz, both displays at 60 Hz",
+    "hp-60hz-single-present-scheduling": "60 Hz, one display",
+    "hp-50hz-single-present-scheduling": "50 Hz, one display",
 }
 
 
-def update_document(text: str, runs: list[Run]) -> str:
+def one_display(runs: list[Run]) -> list[Run]:
+    """The hold captures on one display, High performance."""
+    return [run for run in runs if run.folder.startswith("hp-") and run.folder.endswith("single-plain-vulkan")]
+
+
+def one_display_sweeps(runs: list[Run]) -> list[Run]:
+    return [run for run in runs if run.folder.startswith("hp-") and run.folder.endswith("single-phase-sweep")]
+
+
+def loop_change(run: Run) -> str:
+    """What a probe run changes in the loop."""
+    parts: list[str] = [
+        {"pacer": "frame start held to `NextFrameStartTime`", "vsync": "frame start held to the nearest vertical blank"}.get(
+            run.hold_start, "frame start not held"
+        )
+    ]
+    if run.acquire_wait:
+        parts.append("waits for a fence on the acquire")
+    if run.frames_in_flight == 2:
+        parts.append("two frames in flight")
+    if run.swapchain_images == 3:
+        parts.append("three swap chain images")
+    return ", ".join(parts)
+
+
+def loop_table(runs: list[Run]) -> str:
+    rows = [
+        [
+            "full screen" if name.startswith("fullscreen") else "window",
+            f"{round(100 * run.work_median / run.refresh_period)} %",
+            loop_change(run),
+            str(run.never_shown),
+            of(run.longer, run.steps),
+            f"{ms(run.start_step_p1, 2)} to {ms(run.start_step_p99, 2)} ms",
+            f"{ms(run.present_to_display_median, 1)} ms",
+            f"`{folder}/{name}`",
+        ]
+        for folder, names in LOOP_RUNS
+        for name in names
+        for run in [find(runs, folder, name)]
+    ]
+    header = ["Shown in", "Work", "The loop", "Never shown", "Shown longer", "Frame start to frame start", "Present to display", "Run"]
+    return table(header, rows, frozenset({1, 3, 4, 5, 6}))
+
+
+def off_cell(run: Run | None) -> str:
+    if run is None:
+        return ""
+    return of(run.off, run.steps) + (f", {run.never_shown} never shown" if run.never_shown else "")
+
+
+def scheduling_table(runs: list[Run]) -> str:
+    rows: list[list[str]] = []
+    for folder, desktop in DESKTOPS.items():
+        members = [run for run in runs if run.folder == folder]
+        kinds = sorted({run.name.split("_")[0] for run in members}, key=lambda kind: -max(run.fps for run in members if run.name.startswith(kind)))
+        for kind in kinds:
+            by = {(run.hold, run.load): run for run in members if run.name.startswith(kind + "_")}
+            any_run = next(iter(by.values()))
+            asked = "work of 130 %" if any_run.pacer == "adaptive" else f"{any_run.fps} fps ({ms(any_run.refresh_period * any_run.target_swap_interval, 1)} ms)"
+            times = [f"{ms(by[key].start_step_median, 1)} ms" if key in by else "" for key in (("sleep", "idle"), ("scheduled", "idle"))]
+            cells = [off_cell(by.get(key)) for key in (("sleep", "idle"), ("sleep", "loaded"), ("scheduled", "idle"), ("scheduled", "loaded"))]
+            rows.append([desktop, asked, *times, *cells])
+    header = [
+        "The window's display",
+        "Asked for",
+        "Frame time, sleep",
+        "Frame time, scheduled",
+        "Sleep, idle",
+        "Sleep, loaded",
+        "Scheduled, idle",
+        "Scheduled, loaded",
+    ]
+    return table(header, rows, frozenset(range(2, 8)))
+
+
+def power_table(runs: list[Run]) -> str:
+    chosen = [run for run in runs if run.folder.endswith("single-plain-vulkan") and run.pacer == "fixed" and run.present_timing == 1 and run.load]
+    rows: list[list[str]] = []
+    for hz in sorted({run.refresh_hz for run in chosen}, reverse=True):
+        plans = sorted({run.power_plan for run in chosen if run.refresh_hz == hz}, reverse=True)
+        if len(plans) < 2:
+            continue
+        for plan in plans:
+            cells: list[str] = []
+            for hold, load in HOLDS:
+                members = [run for run in chosen if (run.refresh_hz, run.power_plan, run.hold, run.load) == (hz, plan, hold, load)]
+                cells.append(of(sum(run.off for run in members), sum(run.steps for run in members)))
+            rows.append([f"{hz} Hz", plan, *cells])
+    header = ["Display", "Power plan", *(f"{HOLD_NAMES[hold]}, {load}" for hold, load in HOLDS)]
+    return table(header, rows, frozenset(range(2, 6)))
+
+
+def balanced_placement_table(runs: list[Run]) -> str:
+    return placement_table([run for run in runs if run.folder.startswith("balanced-")])
+
+
+def feedback_table(runs: list[Run]) -> str:
+    chosen = [run for run in runs if run.folder.endswith("present-feedback")]
+    chosen.sort(key=lambda run: (-run.refresh_hz, run.work_median * 100 // run.refresh_period // 30, run.load, run.present_feedback))
+    rows = [
+        [
+            f"{run.refresh_hz} Hz",
+            f"{round(100 * run.work_median / run.refresh_period)} %",
+            run.load,
+            "on" if run.present_feedback else "off",
+            str(run.first_slower_frame) if run.first_slower_frame else "never",
+            str(run.refreshes_lost),
+            str(run.feedback_late_refreshes) if run.present_feedback else "",
+            str(run.feedback_used) if run.present_feedback else "",
+            str(run.feedback_refused) if run.present_feedback else "",
+            str(run.feedback_not_shown) if run.present_feedback else "",
+        ]
+        for run in chosen
+    ]
+    header = [
+        "Display",
+        "Work",
+        "Machine",
+        "Feedback",
+        "Two refreshes from frame",
+        "Refreshes lost, by the logs",
+        "`LateRefreshes`",
+        "`Used`",
+        "`Refused`",
+        "`NotShown`",
+    ]
+    return table(header, rows, frozenset({1, 4, 5, 6, 7, 8, 9}))
+
+
+def near_refresh_table(runs: list[Run]) -> str:
+    chosen = [run for run in runs if run.name.startswith("w90") and run.refresh_hz == 240]
+    chosen.sort(key=lambda run: (run.folder, run.name))
+    rows = [
+        [
+            f"`{run.folder}`",
+            f"`{run.name}`",
+            f"{round(100 * run.work_median / run.refresh_period)} %",
+            str(run.frames_in_flight),
+            str(run.first_slower_frame) if run.first_slower_frame else "never",
+            str(run.never_shown),
+            of(run.longer, run.steps),
+        ]
+        for run in chosen
+    ]
+    header = ["Folder", "Run", "Work", "Frames in flight", "Two refreshes from frame", "Never shown", "Shown longer"]
+    return table(header, rows, frozenset({2, 3, 4, 5, 6}))
+
+
+def vertical_blank_table(runs: list[Run]) -> str:
+    chosen = [run for run in runs if "vrr-probe" in run.folder]
+    chosen.sort(key=lambda run: (run.gsync, -run.fps if run.pacer == "fixed" else -1000, run.load))
+    rows = [
+        [
+            {"off": "off", "fullscreenOnly": "on for full screen apps only"}.get(run.gsync, run.gsync),
+            f"`{run.name}`",
+            f"{run.vblank_interval_median / 1000:.3f}",
+            f"{run.vblank_off_median / 10:.1f} %",
+            of(run.exact, run.steps),
+            of(run.swapchain_reads_fixed, run.swapchain_reads),
+        ]
+        for run in chosen
+    ]
+    header = [
+        "G-SYNC setting",
+        "Run",
+        "Vertical blanks apart, in refreshes (median)",
+        "Vertical blanks off the refresh period",
+        "Shown for its swap interval",
+        "Swap chain reports saying fixed refresh",
+    ]
+    return table(header, rows, frozenset({2, 3, 4, 5}))
+
+
+SESSION_TWO = Session(
+    charts={
+        "hold-methods.svg": lambda runs: hold_chart(one_display(runs)),
+        "present-placement.svg": lambda runs: placement_chart(one_display_sweeps(runs)),
+    },
+    tables={
+        "runs": summary_table,
+        "loop": loop_table,
+        "scheduling": scheduling_table,
+        "hold": lambda runs: hold_table(one_display(runs)),
+        "spread": lambda runs: spread_table(one_display(runs)),
+        "placement": lambda runs: placement_table(one_display_sweeps(runs)),
+        "placement-balanced": balanced_placement_table,
+        "power": power_table,
+        "work-130": lambda runs: work_130_table(one_display(runs)),
+        "work-90": near_refresh_table,
+        "feedback": feedback_table,
+        "refresh": refresh_table,
+        "vertical-blank": vertical_blank_table,
+    },
+)
+
+
+SESSIONS = {
+    "2026-10-04-windows-hold": Session(
+        charts={
+            "hold-methods.svg": hold_chart,
+            "frame-start-spread.svg": spread_chart,
+            "present-placement.svg": placement_chart,
+            "gsync-hold.svg": gsync_chart,
+        },
+        tables={
+            "runs": summary_table,
+            "hold": hold_table,
+            "spread": spread_table,
+            "placement": placement_table,
+            "work-130": work_130_table,
+            "work-90": work_90_table,
+            "sources": sources_table,
+            "refresh": refresh_table,
+            "gsync": gsync_table,
+        },
+    ),
+    "2026-10-04-windows-session2": SESSION_TWO,
+}
+# A session the script does not know gets its row per run and the table of its folders
+OTHER_SESSION = Session(charts={}, tables={"runs": summary_table})
+
+
+def update_document(text: str, runs: list[Run], session: Session) -> str:
     """The document with every generated block it has rewritten."""
-    for name, make in TABLES.items():
+    for name, make in session.tables.items():
         begin = f"<!-- pacer-capture:{name}: generated by {GENERATOR} -->"
         end = f"<!-- /pacer-capture:{name} -->"
         if begin in text:
@@ -920,17 +1146,13 @@ def main() -> int:
     with zipfile.ZipFile(arguments.capture) as archive:
         runs = read_runs(archive)
     folder = arguments.capture.with_suffix("")
-    files: dict[Path, str] = {
-        folder / "runs.csv": runs_csv(runs),
-        folder / "hold-methods.svg": hold_chart(runs),
-        folder / "frame-start-spread.svg": spread_chart(runs),
-        folder / "present-placement.svg": placement_chart(runs),
-        folder / "work-90-at-240hz.svg": work_chart(runs, "240hz-plain-vulkan"),
-        folder / "gsync-hold.svg": gsync_chart(runs),
-    }
+    session = SESSIONS.get(folder.name, OTHER_SESSION)
+    files: dict[Path, str] = {folder / "runs.csv": runs_csv(runs)}
+    for name, chart in session.charts.items():
+        files[folder / name] = chart(runs)
     document = arguments.capture.with_suffix(".md")
     if (arguments.update_doc or arguments.check) and document.exists():
-        files[document] = update_document(document.read_text(encoding="utf-8"), runs)
+        files[document] = update_document(document.read_text(encoding="utf-8"), runs, session)
 
     if arguments.check:
         stale = [path for path, text in files.items() if not path.exists() or path.read_text(encoding="utf-8") != text]

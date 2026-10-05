@@ -25,9 +25,11 @@ namespace MB::FramePacing::Pacer
   //!
   //! Paces a frame loop with nothing but a steady clock and a Present that waits for vsync: the baseline that works on any platform.
   //! Every frame: BeginFrame with the time the frame starts, hold the frame for the schedule's swap interval and render it for the
-  //! schedule's animation time, EndFrame when presenting. The pacer measures on the CPU's clock when frames start, counts in whole
-  //! refreshes on the display's (PacerRefreshClock), and adapts the swap interval to how the frames do (SwapIntervalRule), from the frame
-  //! rate the application prefers down.
+  //! schedule's animation time, EndFrame when presenting, and begin the next frame no earlier than the schedule's
+  //! NextFrameStartTime (the pacer never waits: that is the application's, at every swap interval; FrameWindow() counts the
+  //! frames that began before it). The pacer measures on the CPU's clock when frames
+  //! start, counts in whole refreshes on the display's (PacerRefreshClock), and adapts the swap interval to how the frames do (SwapIntervalRule),
+  //! from the frame rate the application prefers down.
   //!
   //! Optional, where the platform has present feedback and the display a fixed refresh rate (PacerSettings::UsePresentFeedback): the
   //! application gives each frame's measured display time back (AddPresentFeedback), a few frames after the frame. The pacer paces
@@ -44,6 +46,8 @@ namespace MB::FramePacing::Pacer
     // The frame between BeginFrame and the next BeginFrame
     TickCount64 m_cpuStartTime;
     TimeSpan m_work;
+    // The time that frame's schedule gave for the start of the next one
+    TickCount64 m_nextFrameStartTime;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
 

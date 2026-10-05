@@ -25,6 +25,7 @@ namespace MB::FramePacing::Pacer
       TimeSpan DisplayTime;
       TimeSpan Work;
       bool Late{false};
+      bool NextStartedEarly{false};
     };
 
     PacerSettings m_settings;
@@ -33,6 +34,7 @@ namespace MB::FramePacing::Pacer
     std::size_t m_count{0};
     TimeSpan m_workSum;
     uint32_t m_lateCount{0};
+    uint32_t m_earlyStartCount{0};
     uint32_t m_preferredSwapInterval{1};
     uint32_t m_swapInterval{1};
 
@@ -42,7 +44,9 @@ namespace MB::FramePacing::Pacer
 
     //! A frame was shown: when (displayTime, on any clock that runs on: only the differences count), how long it worked and whether it
     //! was late. Then the rule decides: the new swap interval is SwapInterval(), and the window restarts on a change.
-    SwapIntervalChange AddFrame(TimeSpan displayTime, TimeSpan work, bool late) noexcept;
+    //! nextStartedEarly: the frame after it began before the time it was given for that. Counted (FrameWindowState::EarlyStarts),
+    //! and of no weight in the decision.
+    SwapIntervalChange AddFrame(TimeSpan displayTime, TimeSpan work, bool late, bool nextStartedEarly = false) noexcept;
 
     //! The swap interval the next frame is paced at.
     [[nodiscard]] uint32_t SwapInterval() const noexcept
