@@ -402,7 +402,7 @@ number of refresh periods from the first one, and stays due there whatever the f
 overran is known to the pacer from its own times: it ended after the time its swap interval gave it. The frame after it then
 starts at the next step of the grid, not at once and not on a new count from the late start. Presents after that are made at
 the same place in the display's refresh as before the long frame, so the frames waiting are as many as before it, and the
-animation steps over the refreshes that were lost. The grid's place against the display is whatever the loop began with, which
+animation timer does with the refreshes that were lost what "A lost refresh and game time" below says. The grid's place against the display is whatever the loop began with, which
 the pacer does not know and does not need: it only has to keep it. Two limits: the period has to be the display's real one, as
 a grid on a period that is a little off slides against the display; and it answers the misses the pacer can know of, those of
 its own frames. Today's loop does the opposite after a frame that is more than half a frame time late: it starts its count
@@ -521,14 +521,38 @@ The statistics stay.
 
 ## What each tier allows, and whether the display gets back to the animation timer
 
-**The animation timer is the same at every tier.** It advances in whole refreshes, it follows the clock, and it never needs
-catching up: after a frame of the pacer's own that ran long it steps over the refreshes that were lost, at every tier, because
-the pacer knows of that frame from its own times. A frame's animation time is the time the pacer expects it on screen.
+**The animation timer is the same at every tier.** It advances in whole refreshes of the display, at every tier, so a wait
+that wakes early or late never reaches the motion. What it does after a refresh was lost is one rule for all tiers ("A lost
+refresh and game time" below).
 
 **What can fall behind is the display.** When the display shows a frame a refresh later than it was animated for, and the
 loop goes on at one frame per refresh, every frame after it is also on screen a refresh later than its animation time, by as
 many refreshes as there are frames waiting. The motion stays even; the picture is old. "Catching up" below means: can this tier
 bring what is on screen back to the animation timer, and why or why not.
+
+### A lost refresh and game time
+
+The animation error of a step is its animation time step minus its display time step. It is about steps, so a constant
+distance between the animation time and the time on screen is in none of them: it does not show in motion. Three things follow,
+and they are not the same thing:
+
+- **Taking a waiting frame away costs nothing that shows.** While a frame start is held, the display shows the frame that
+  waited, so no frame is repeated and every display step stays what it was. This is the queue tiers' work, and it is worth
+  doing for the latency alone.
+- **Moving the animation timer to where the display is costs one visible step**, to fix a distance that did not show. The
+  pacer does not do that for its own sake.
+- **A refresh that was lost shows once, and catching game time up shows a second time.** When the display holds a frame a
+  refresh longer than it was animated for, that step has an animation error of one refresh, and nothing takes it back. After
+  it, either game time stays that refresh behind the clock, with nothing more to see, or the next step is made a refresh
+  longer to bring game time back to the clock, which is a second error of one refresh the other way. The same holds for a
+  frame of the pacer's own that ran long, by as many refreshes as it lost.
+
+Today's pacer catches up: its animation time follows the clock, and in the stored runs the errors come in such pairs (212
+steps a refresh short against 58 a refresh and 89 two refreshes long, in the run that fell behind most). Not catching up
+halves the errors that show and lets game time fall behind the clock by one refresh for each one lost. That is nothing to
+see while refreshes are lost now and then, and it is a game that runs slow while they are lost all the time (work of 130 %
+of a refresh once ran the animation at 73 % of real time, before the pacer counted such frames as late): there the swap
+interval rule has to end it by slowing down. Which of the two the pacer does is in "Decisions needed".
 
 ### What each hold tier allows
 
@@ -581,6 +605,29 @@ Two things are the same in every pair:
 - **The lost refresh itself is seen on screen once**, as a frame shown a refresh longer than it was animated for. No tier takes
   that back: the frame was already drawn when the refresh was lost. What the tiers differ in is whether it stays as latency
   afterwards.
+
+### Aligning the animation timer with the display
+
+Catching up is about the frames waiting. A second question is how well a frame's animation time can be made the time the
+frame is really shown. It has three parts, and they take different tiers:
+
+| What "aligned" means                                                                                          | What it takes                                | Tier                                                            |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| The animation time is the time of a real refresh, not a point on a grid a constant part of a refresh away     | Knowing where the refreshes are              | Hold tier 2 (vertical blank times), or display times            |
+| The whole refreshes between a frame's animation time and its time on screen can not change without being seen | The frames waiting capped, or counted        | Queue tier 1 (capped at k) or queue tier 2 (seen and corrected) |
+| The animation time is the frame's true display time                                                           | The display saying when each frame was shown | Queue tier 2 only (display times)                               |
+
+- **Only display times align it fully**, as only they say when a frame reached the screen. They come frames late (one to five
+  in what was measured), so what they correct is the frames that follow.
+- **Vertical blank times with a wait for a present** (hold tier 2, queue tier 1) come close without them: the animation time
+  is on a real refresh and the frames waiting can not grow. What is left is the constant number of refreshes the system takes
+  by itself (a compositor's, for one), which the pacer can not know. A constant whole number of refreshes does not show in
+  motion; it matters where a game needs the absolute time, for sound.
+- **At queue tier 3 it can not be done.** The animation timer is exact against the clock, and how many refreshes behind it the
+  screen is can not be known. The wait for a free image is the one thing that fixed that distance, at the image count, on the
+  system measured.
+- **Hold tier 1 by itself does not give it**: the display side holds the frame for exactly its refreshes, and the application
+  is not told where they are.
 
 ## How it is checked
 
@@ -650,7 +697,12 @@ checked. Four things are settled now, because they cost little now and a second 
 7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
 8. **The aim where two goals pull apart**: proposed is no missed refreshes first, then the frame rate asked for, then the
    lowest latency; the option above is what puts latency before the frame rate.
-9. **Names**: the capability and call names above are proposals.
+9. **After a lost refresh, does game time catch up with the clock?** Catching up (today's behaviour) shows a second error
+   of the same size and keeps game time on the clock. Not catching up shows the one error only and leaves game time behind
+   the clock by the refreshes lost, which the pacer would report as a number. Proposed: not catching up, with a setting for
+   an application that needs game time on the clock (sound, a network), and the swap interval rule as what ends a loss that
+   goes on.
+10. **Names**: the capability and call names above are proposals.
 
 ## What changes for whom
 
