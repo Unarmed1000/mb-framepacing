@@ -1,0 +1,32 @@
+#ifndef MB_FRAMEPACING_PACER_SIMULATION_FRAMELOOPSIMULATION_HPP
+#define MB_FRAMEPACING_PACER_SIMULATION_FRAMELOOPSIMULATION_HPP
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// A frame loop on a display that does what the first integration's logs show (DisplayModel): a present that never waits, frames
+// that wait to be shown behind it, a GPU that works on a frame after its present. PacerSimulation's model has none of that: there
+// a frame starts when the previous one is shown.
+//
+// The loop is the first integration's sample as it was on 2026-10-06: every frame it asks the pacer (BeginFrame, EndFrame) and
+// then works out its waits itself from the schedule's NextFrameStartTime: on which side of the present the wait goes
+// (LoopProfile), the time carried from frame to frame and started again after a frame that came more than half a frame time
+// late, that time moved onto the vertical blanks where it has them, and a frame of a longer swap interval held before its
+// present. That is the state the pacer's redesign starts from: what such a loop does when the display falls behind is what the
+// tests pin here.
+
+#include <string>
+#include <vector>
+#include "LoopFrame.hpp"
+#include "LoopSettings.hpp"
+
+namespace MB::FramePacing::Pacer::Simulation
+{
+  //! Run the loop: every frame with its stages, what the pacer said and when the display showed it.
+  std::vector<LoopFrame> SimulateLoop(const LoopSettings& settings);
+
+  //! The frames as a frame log with the column names of the first integration's logs (the ones tools/frame_stages_chart.py draws),
+  //! a row per frame, "\n" line ends. A moment a frame did not have is an empty cell. The display times are the model's own.
+  std::string ToFrameLog(const std::vector<LoopFrame>& frames, const LoopSettings& settings);
+}
+
+#endif

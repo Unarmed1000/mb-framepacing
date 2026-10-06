@@ -51,7 +51,10 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   # Test code, not part of the library: the simulation of the sister repository's frame model (a frame starts when the previous one is
   # shown, and is shown at its target or at the first refresh after it is done), shared by the tests and pacer-sim, which writes the
   # golden data (python tools/update_pacer_test_data.py)
-  add_library(mb_framepacing_pacer_simulation STATIC EXCLUDE_FROM_ALL tests/simulation/PacerSimulation.cpp)
+  # With it: a frame loop on a display that queues what a present gives it (DisplayModel, FrameLoopSimulation), for what the first
+  # integration's logs show and that model can not
+  add_library(mb_framepacing_pacer_simulation STATIC EXCLUDE_FROM_ALL tests/simulation/PacerSimulation.cpp tests/simulation/DisplayModel.cpp
+                                                                      tests/simulation/FrameLoopSimulation.cpp tests/simulation/FrameLogReplay.cpp)
   target_include_directories(mb_framepacing_pacer_simulation PUBLIC tests/simulation)
   target_link_libraries(mb_framepacing_pacer_simulation PUBLIC mb_framepacing::pacer)
   target_compile_options(mb_framepacing_pacer_simulation PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
@@ -60,8 +63,14 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   target_link_libraries(pacer-sim PRIVATE mb_framepacing_pacer_simulation)
   target_compile_options(pacer-sim PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
 
+  # A frame log's frames given to the pacer again, and its answers next to what the log shows the display did
+  add_executable(pacer-replay tests/pacer-replay/main.cpp)
+  target_link_libraries(pacer-replay PRIVATE mb_framepacing_pacer_simulation)
+  target_compile_options(pacer-replay PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
+
   add_executable(mb_framepacing_pacer_tests tests/PacerTests.cpp tests/AllocationTests.cpp tests/DiagramTests.cpp tests/GoldenTests.cpp tests/MonitorRateTests.cpp
-                                            tests/PresentFeedbackTests.cpp tests/WorkOverTimeTests.cpp tests/StartsAheadTests.cpp)
+                                            tests/PresentFeedbackTests.cpp tests/WorkOverTimeTests.cpp tests/StartsAheadTests.cpp
+                                            tests/DisplayModelTests.cpp tests/FrameLoopTests.cpp tests/FrameLogReplayTests.cpp)
   target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests

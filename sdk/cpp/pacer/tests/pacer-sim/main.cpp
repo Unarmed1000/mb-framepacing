@@ -6,13 +6,25 @@
 //
 //   pacer-sim --golden <dir>                                     every golden scenario with its rules into <dir> (sdk/test-data/pacer)
 //   pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]   one scenario to stdout (rate: Hz, numerator / denominator)
+//
+// And a frame loop on a display that queues its presents (FrameLoopSimulation.hpp), as a frame log to stdout that
+// tools/frame_stages_chart.py draws:
+//
+//   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-ticks <n>] [--timer-only]
+//             [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
+//             [--images <n>] [--hold <blank>,<blank>,...]
+#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
+#include "FrameLoopSimulation.hpp"
 #include "PacerSimulation.hpp"
 
 namespace Sim = MB::FramePacing::Pacer::Simulation;
@@ -23,8 +35,104 @@ namespace
   int Usage()
   {
     std::cerr << "pacer-sim --golden <dir>\n"
-                 "pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]\n";
+                 "pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]\n"
+                 "pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <n>] [--cpu-ticks <n>] [--timer-only]\n"
+                 "          [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
+                 "          [--images <n>] [--hold <blank>,<blank>,...]\n";
     return 2;
+  }
+
+  int64_t Number(const std::string_view text)
+  {
+    return std::stoll(std::string(text));
+  }
+
+  //! A frame loop on a queueing display, as a frame log
+  int WriteLoop(const std::vector<std::string_view>& args)
+  {
+    if (args.size() < 2 || (args[1] != "late" && args[1] != "early"))
+    {
+      return Usage();
+    }
+    Sim::LoopSettings settings;
+    settings.Profile = args[1] == "late" ? Sim::LoopProfile::RenderLate : Sim::LoopProfile::RenderEarly;
+    int64_t gpuPercent = 90;
+    int64_t latchLeadPercent = 0;
+    for (std::size_t index = 2; index < args.size(); ++index)
+    {
+      const std::string_view name = args[index];
+      if (name == "--timer-only")
+      {
+        settings.HasVBlankTimes = false;
+        continue;
+      }
+      if (name == "--fixed")
+      {
+        settings.AutoSwapInterval = false;
+        continue;
+      }
+      if (index + 1 >= args.size())
+      {
+        return Usage();
+      }
+      const std::string_view value = args[++index];
+      if (name == "--rate")
+      {
+        settings.RateNumerator = static_cast<uint32_t>(Number(value));
+      }
+      else if (name == "--frames")
+      {
+        settings.Frames = static_cast<int32_t>(Number(value));
+      }
+      else if (name == "--gpu-percent")
+      {
+        gpuPercent = Number(value);
+      }
+      else if (name == "--cpu-ticks")
+      {
+        settings.CpuWork = {Number(value), Number(value)};
+      }
+      else if (name == "--timer-late-ticks")
+      {
+        settings.TimerLate = {0, Number(value)};
+      }
+      else if (name == "--seed")
+      {
+        settings.Seed = static_cast<uint64_t>(Number(value));
+      }
+      else if (name == "--latch-lead-percent")
+      {
+        latchLeadPercent = Number(value);
+      }
+      else if (name == "--pipeline")
+      {
+        settings.Display.PipelineRefreshes = static_cast<int32_t>(Number(value));
+      }
+      else if (name == "--images")
+      {
+        settings.Display.Images = static_cast<int32_t>(Number(value));
+      }
+      else if (name == "--hold")
+      {
+        std::string list(value);
+        std::replace(list.begin(), list.end(), ',', ' ');
+        std::istringstream blanks(list);
+        for (int64_t blank = 0; blanks >> blank;)
+        {
+          settings.Display.HeldBlanks.push_back(blank);
+        }
+        std::sort(settings.Display.HeldBlanks.begin(), settings.Display.HeldBlanks.end());
+      }
+      else
+      {
+        return Usage();
+      }
+    }
+    const int64_t periodTicks = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToTimeSpan().Ticks();
+    settings.GpuWork = {(periodTicks * gpuPercent) / 100, (periodTicks * gpuPercent) / 100};
+    settings.Display.LatchLeadTicks = (periodTicks * latchLeadPercent) / 100;
+    std::cout << Sim::ToFrameLog(Sim::SimulateLoop(settings), settings);
+    return 0;
   }
 
   int WriteGolden(const std::filesystem::path& folder)
@@ -53,6 +161,10 @@ int main(const int argc, char** argv)
     if (args.size() == 2 && args[0] == "--golden")
     {
       return WriteGolden(args[1]);
+    }
+    if (!args.empty() && args[0] == "--loop")
+    {
+      return WriteLoop(args);
     }
     if (args.size() < 2)
     {
