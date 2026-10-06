@@ -1,0 +1,47 @@
+#ifndef MB_FRAMEPACING_PACER_FRAME_GPUWORKREPORT_HPP
+#define MB_FRAMEPACING_PACER_FRAME_GPUWORKREPORT_HPP
+// SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+// SPDX-License-Identifier: BSD-3-Clause
+
+#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeDuration.hpp>
+#include <cstdint>
+
+namespace MB::FramePacing::Pacer
+{
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: part of a redesign that is not built yet). The GPU's work on a frame
+  //! that was presented earlier, given frames later. Either when it began and ended (PacerCapability::GpuWorkTimes), from which the
+  //! pacer reads how the CPU's and the GPU's work lie in time, or how long it took (PacerCapability::GpuWorkDurations): how long,
+  //! not when. The time from the first to the last of the frame's GPU work is meant, gaps included, as two timestamps give it.
+  struct GpuWorkReport
+  {
+    //! The frame: its PresentPlan::FrameId.
+    uint64_t FrameId{0};
+    //! When the GPU began the frame's work, on the application's steady clock; TickCount64(): not known (a duration only)
+    TickCount64 BeginTime;
+    //! When the GPU ended the frame's work, on the same clock; TickCount64(): not known (a duration only)
+    TickCount64 EndTime;
+    //! How long the work took: the end minus the begin where both are given
+    TimeDuration Duration;
+
+    //! True when the report says when the work was done, and not only how long it took.
+    [[nodiscard]] constexpr bool HasTimes() const noexcept
+    {
+      return BeginTime != TickCount64() && EndTime != TickCount64();
+    }
+
+    //! The GPU worked on the frame from beginTime to endTime. An end before the begin is no work.
+    [[nodiscard]] static constexpr GpuWorkReport Times(const uint64_t frameId, const TickCount64 beginTime, const TickCount64 endTime) noexcept
+    {
+      return {frameId, beginTime, endTime, TimeDuration(endTime - beginTime)};
+    }
+
+    //! The GPU worked on the frame for a duration; when is not known.
+    [[nodiscard]] static constexpr GpuWorkReport OfDuration(const uint64_t frameId, const TimeDuration duration) noexcept
+    {
+      return {frameId, TickCount64(), TickCount64(), duration};
+    }
+  };
+}
+
+#endif
