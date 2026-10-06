@@ -50,10 +50,12 @@ busy with other work the frames started up to 3 ms off the refreshes, which the 
 130 % of a refresh the pacer of that time never slowed down, at 120 and 240 Hz: the frames started 1.37 refreshes apart, which
 rounds to one ([How a frame is paced](#how-a-frame-is-paced) has what changed).
 
-**Its loop did not hold the frame start at a swap interval of one.** Up to and including the two sessions below, that sample waited
-for the pacer's `NextFrameStartTime` only where it held a frame for two refreshes or more, and trusted the present at one. So what
-its logs show of frames at a swap interval of one (frames never shown with work close to a refresh) is that loop's, not the
-pacer's: [The frame loop](#the-frame-loop) says what an application must do.
+**Its loop did not hold the frame start at a swap interval of one**, up to and including the two sessions below: that sample
+waited for the pacer's `NextFrameStartTime` only where it held a frame for two refreshes or more, and trusted the present at one.
+So what its logs of that time show of frames at a swap interval of one (frames never shown with work close to a refresh) is that
+loop's, not the pacer's: [The frame loop](#the-frame-loop) says what an application must do. Since then the sample waits for the
+pacer's times at every swap interval (by default it renders a frame at once and holds its present), and logs
+`FrameWindowState::StartsAhead`. No capture of that loop is stored yet.
 
 **Two capture sessions kept with their results.** 601 runs of that sample (Vulkan FIFO on Windows, displays at 50, 60, 120 and
 240 Hz, an idle machine and one under CPU load) have the row per run, the tables and the charts worked out from their frame logs
@@ -123,8 +125,9 @@ never waits and never reads a clock. And it can not make up for a wait that was 
 as the previous frame's swap interval, never less. [Applying the schedule](#applying-the-schedule) has what a loop without it did.
 
 **The pacer shows a loop that leaves the wait out**: `pacer.FrameWindow().StartsAhead` is how far ahead of those times the frames
-of the frame window (the last 2 s) began, added up, with the late frames left out. Put it in your overlay or log. It is a check of
-the loop; the rule does not use it.
+of the frame window (the last 2 s) began, added up, with the late frames left out. Put it in your overlay or log, and read it
+while the frame window is full (`Full`): a window that is still filling holds the start of the run and little else. It is a check
+of the loop; the rule does not use it.
 
 | `StartsAhead`                   | What it says about the loop                                                                              |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------- |
