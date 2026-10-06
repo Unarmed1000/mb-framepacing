@@ -34,7 +34,7 @@ namespace MB::FramePacing::Marker::WireFormat
   inline constexpr uint8_t PayloadMagic1 = 'F';
   inline constexpr uint8_t PayloadFormatVersion = 1;
 
-  //! Every payload ends with the CRC-32 (Crc32.hpp, a u32) of all the bytes before it.
+  //! Every payload ends with the CRC-32 (the core's Crc32Util, a u32) of all the bytes before it.
   inline constexpr std::size_t CrcByteCount = 4;
 
   //! The header every kind starts with (a sync marker has its first SyncFieldsByteCount bytes: which run and frame), little endian,

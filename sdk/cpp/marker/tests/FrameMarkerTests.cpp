@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
+#include <mb/framepacing/core/Crc32Util.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
@@ -27,7 +28,6 @@
 #include <string_view>
 #include <type_traits>
 #include <vector>
-#include "mb/framepacing/marker/detail/Crc32.hpp"
 #include "mb/framepacing/marker/detail/WireFormat.hpp"
 
 namespace FP = MB::FramePacing;
@@ -94,7 +94,7 @@ namespace
   void PutCrc(std::vector<uint8_t>& rBytes)
   {
     const std::size_t fieldByteCount = rBytes.size() - FM::WireFormat::CrcByteCount;
-    const uint32_t crc = FM::Crc32::Compute(std::span<const uint8_t>(rBytes).first(fieldByteCount));
+    const uint32_t crc = FP::Crc32Util::Compute(std::span<const uint8_t>(rBytes).first(fieldByteCount));
     for (std::size_t i = 0; i < FM::WireFormat::CrcByteCount; ++i)
     {
       rBytes[fieldByteCount + i] = static_cast<uint8_t>(crc >> (8u * i));
@@ -430,23 +430,6 @@ TEST(Payload, TryDecodeRejectsBadInput)
   bytes[3] = 0u;
   PutCrc(bytes);
   EXPECT_TRUE(FM::TryDecodePayload(bytes, decoded));
-}
-
-TEST(Payload, TheCrcIsTheStandardOne)
-{
-  // The check value every description of the CRC-32 of zlib, PNG and Ethernet gives
-  const std::string_view digits = "123456789";
-  const std::vector<uint8_t> bytes(digits.begin(), digits.end());
-  EXPECT_EQ(FM::Crc32::Compute(bytes), 0xCBF43926u);
-  EXPECT_EQ(FM::Crc32::Compute({}), 0u);
-  EXPECT_EQ(FM::Crc32::Compute(std::vector<uint8_t>(32, 0x00u)), 0x190A55ADu);
-  EXPECT_EQ(FM::Crc32::Compute(std::vector<uint8_t>(32, 0xFFu)), 0xFF6CAB0Bu);
-
-  // The table made at run time is the compile time one, and the one every half byte implementation of this CRC lists
-  EXPECT_EQ(FM::Crc32::MakeTable(), FM::Crc32::Table);
-  const std::array<uint32_t, 16> listed{0x00000000u, 0x1DB71064u, 0x3B6E20C8u, 0x26D930ACu, 0x76DC4190u, 0x6B6B51F4u, 0x4DB26158u, 0x5005713Cu,
-                                        0xEDB88320u, 0xF00F9344u, 0xD6D6A3E8u, 0xCB61B38Cu, 0x9B64C2B0u, 0x86D3D2D4u, 0xA00AE278u, 0xBDBDF21Cu};
-  EXPECT_EQ(FM::Crc32::Table, listed);
 }
 
 TEST(Payload, AChangedBitIsRefused)

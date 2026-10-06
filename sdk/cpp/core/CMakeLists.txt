@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# The core module: the types every module shares (the library version, the time types, Point, Rectangle and ByteSpanUtil).
+# The core module: the types every module shares (the library version, the time types, Point, Rectangle, ByteSpanUtil and Crc32Util).
 
 add_library(mb_framepacing_core STATIC)
 add_library(mb_framepacing::core ALIAS mb_framepacing_core)
@@ -14,6 +14,7 @@ target_sources(mb_framepacing_core
     BASE_DIRS include ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}
     FILES
       include/mb/framepacing/core/ByteSpanUtil.hpp
+      include/mb/framepacing/core/Crc32Util.hpp
       include/mb/framepacing/core/GetLibraryVersion.hpp
       include/mb/framepacing/core/LibraryVersion.hpp
       include/mb/framepacing/core/Point.hpp
@@ -21,6 +22,7 @@ target_sources(mb_framepacing_core
       include/mb/framepacing/core/time/ChronoConversion.hpp
       include/mb/framepacing/core/time/TickCount32.hpp
       include/mb/framepacing/core/time/TickCount64.hpp
+      include/mb/framepacing/core/time/TimeDuration.hpp
       include/mb/framepacing/core/time/TimeSpan.hpp
       include/mb/framepacing/core/time/TimeSpan32.hpp
       ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Version.hpp)
@@ -38,9 +40,11 @@ if(MB_FRAMEPACING_BUILD_TESTS)
     tests/AllocationTests.cpp
     tests/ByteSpanUtilTests.cpp
     tests/CoreTests.cpp
+    tests/Crc32UtilTests.cpp
     tests/time/ChronoConversionTests.cpp
     tests/time/TickCount32Tests.cpp
     tests/time/TickCount64Tests.cpp
+    tests/time/TimeDurationTests.cpp
     tests/time/TimeSpan32Tests.cpp
     tests/time/TimeSpanTests.cpp)
   target_link_libraries(mb_framepacing_core_tests PRIVATE mb_framepacing::core mb_framepacing_test_support GTest::gtest_main)

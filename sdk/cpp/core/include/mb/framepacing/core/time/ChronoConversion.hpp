@@ -8,6 +8,7 @@
 
 #include <mb/framepacing/core/time/TickCount32.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <chrono>
@@ -39,6 +40,17 @@ namespace MB::FramePacing
   constexpr TickDuration ToTickDuration(const TimeSpan32 span) noexcept
   {
     return TickDuration(span.Ticks());
+  }
+
+  //! A negative duration becomes zero, as a TimeDuration made from a negative TimeSpan.
+  constexpr TimeDuration ToTimeDuration(const TickDuration duration) noexcept
+  {
+    return TimeDuration(ToTimeSpan(duration));
+  }
+
+  constexpr TickDuration ToTickDuration(const TimeDuration duration) noexcept
+  {
+    return TickDuration(duration.Ticks());
   }
 
   //! A time point of a std::chrono clock (steady_clock) as a TickCount64: its time since the clock's epoch, rounded down to the tick it is

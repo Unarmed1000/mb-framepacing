@@ -4,6 +4,7 @@
 // FrameMarker.hpp's functions: the payload's wire format (doc/marker-format.md: C# must match it byte for byte), the QR symbol and
 // every way of drawing it.
 #include <mb/framepacing/core/ByteSpanUtil.hpp>
+#include <mb/framepacing/core/Crc32Util.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
@@ -26,7 +27,6 @@
 #include <array>
 #include <bit>
 #include <cassert>
-#include "detail/Crc32.hpp"
 #include "detail/QrEncoder.hpp"
 #include "detail/QrSymbol.hpp"
 #include "detail/WireFormat.hpp"
@@ -274,7 +274,7 @@ namespace MB::FramePacing::Marker
       std::copy_n(metadata.Id.Bytes.begin(), SequenceId::ByteCount, dst.subspan(WireFormat::OffsetSequenceId).begin());
     }
     // Every kind ends with the CRC of all the bytes before it
-    ByteSpanUtil::WriteLE(dst, fieldByteCount, Crc32::Compute(dst.first(fieldByteCount)));
+    ByteSpanUtil::WriteLE(dst, fieldByteCount, Crc32Util::Compute(dst.first(fieldByteCount)));
     return byteCount;
   }
 
@@ -293,7 +293,7 @@ namespace MB::FramePacing::Marker
                                                                       : WireFormat::PayloadByteCount;
     // Exactly its kind's bytes, the last four the CRC of the ones before them
     const std::size_t fieldByteCount = byteCount - WireFormat::CrcByteCount;
-    if (bytes.size() != byteCount || ByteSpanUtil::ReadLE<uint32_t>(bytes, fieldByteCount) != Crc32::Compute(bytes.first(fieldByteCount)))
+    if (bytes.size() != byteCount || ByteSpanUtil::ReadLE<uint32_t>(bytes, fieldByteCount) != Crc32Util::Compute(bytes.first(fieldByteCount)))
     {
       return false;
     }

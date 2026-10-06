@@ -576,8 +576,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **CRC** (agreed with the user): every payload ends with the CRC-32 of zlib and Ethernet over all the bytes before it, little
     endian: a frame or end marker is 57 bytes, a start marker 81, a sync marker 20, and a field added later goes before the CRC. A
     payload whose CRC does not match is not decoded (`TryDecodePayload` false: `MarkerDecodeStatus.InvalidPayload`, the capture
-    `Undecodable`): the QR code's Reed-Solomon code repairs, the CRC refuses what it repaired into other bytes. Private in each
-    library (`detail/Crc32.hpp`, `Crc32.cs`: a 16-entry table, for the executable size; Python's `binascii.crc32`). The tests' expected
+    `Undecodable`): the QR code's Reed-Solomon code repairs, the CRC refuses what it repaired into other bytes. In C++ it is the
+    core's `Crc32Util` (`core/Crc32Util.hpp`: a 16-entry table, for the executable size; its 256-entry form with the same result is for
+    callers that want speed), in C# a private `Crc32.cs` with the 16-entry table, in Python `binascii.crc32`. The tests' expected
     CRC bytes come from Python's `binascii`, never from our own code.
   - **Pacing terms:** the intended display time is the pacer's aim; the animation time is the predicted display time the game
     animated for (`sdk/doc/vocabulary.md`). The target frame time is what the pacer aims for now, the **preferred frame time** what the

@@ -4,6 +4,7 @@
 #include <mb/framepacing/core/time/ChronoConversion.hpp>
 #include <mb/framepacing/core/time/TickCount32.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <gtest/gtest.h>
@@ -30,6 +31,12 @@ TEST(ChronoConversion, SpansConvertExactly)
   EXPECT_THROW(static_cast<void>(FP::ToTimeSpan32(FP::TickDuration{-1})), std::out_of_range);
   EXPECT_THROW(static_cast<void>(FP::ToTimeSpan32(std::chrono::minutes{8})), std::out_of_range);
   EXPECT_EQ(FP::ToTickDuration(FP::TimeSpan32::MaxValue()), FP::TickDuration{4'294'967'295});
+  // A duration is never negative: a negative std::chrono one becomes zero
+  EXPECT_EQ(FP::ToTimeDuration(FP::TickDuration{166'667}), FP::TimeDuration::FromTicks(166'667));
+  EXPECT_EQ(FP::ToTimeDuration(std::chrono::milliseconds{16}), FP::TimeDuration::FromTicks(160'000));
+  EXPECT_EQ(FP::ToTimeDuration(FP::TickDuration{-1}), FP::TimeDuration::Zero());
+  EXPECT_EQ(FP::ToTickDuration(FP::TimeDuration::FromTicks(166'667)), FP::TickDuration{166'667});
+  EXPECT_EQ(FP::ToTickDuration(FP::TimeDuration::MaxValue()), FP::TickDuration::max());
   static_assert(FP::ToTimeSpan(FP::ToTickDuration(FP::TimeSpan(42))) == FP::TimeSpan(42));
 }
 

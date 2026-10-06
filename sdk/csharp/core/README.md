@@ -15,6 +15,7 @@ copy of `source/`. **Unity:** the [Unity package](../../unity/README.md) contain
 | `TickCount32`  | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap                                                                          |
 | `TimeSpanUtil` | `FromSeconds`: seconds to a `System.TimeSpan`, truncated to a tick on every runtime (Unity's `TimeSpan.FromSeconds` rounds to a millisecond)                             |
 | `TimeSpan32`   | An unsigned 32-bit interval of 0 to 429.5 s: the form of the marker's 32-bit intervals                                                                                   |
+| `TimeDuration` | A `System.TimeSpan` that is never negative (a negative one becomes zero); two added are a duration, their difference a `TimeSpan`                                        |
 
 The time types (`source/Time/`) are the C++ core's, member for member; a signed interval is .NET's `System.TimeSpan`, whose ticks
 are the SDK's unit. Out of range throws (`OverflowException` from the `From...` factories, `ArgumentOutOfRangeException` from
