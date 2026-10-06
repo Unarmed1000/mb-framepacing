@@ -268,12 +268,12 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
 | MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      20.8 KiB |            221.3 KiB |
 | MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.3 KiB |            192.8 KiB |
-| GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.3 KiB |            214.0 KiB |
-| GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.0 KiB |            141.5 KiB |
-| Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      19.8 KiB |            186.4 KiB |
-| Clang, Linux x64        | Clang 18.1.3               | MinSizeRel | 1.8 KiB |      16.0 KiB |            152.9 KiB |
-| AppleClang, macOS arm64 | AppleClang 21.0.0.21000101 | Release    | 0.7 KiB |      15.7 KiB |            147.0 KiB |
-| AppleClang, macOS arm64 | AppleClang 21.0.0.21000101 | MinSizeRel | 1.0 KiB |      14.2 KiB |            127.8 KiB |
+| GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.4 KiB |            215.7 KiB |
+| GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.2 KiB |            139.0 KiB |
+| Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      20.0 KiB |            189.6 KiB |
+| Clang, Linux x64        | Clang 18.1.3               | MinSizeRel | 1.8 KiB |      16.1 KiB |            150.3 KiB |
+| AppleClang, macOS arm64 | AppleClang 21.0.0.21000101 | Release    | 0.7 KiB |      15.9 KiB |            149.7 KiB |
+| AppleClang, macOS arm64 | AppleClang 21.0.0.21000101 | MinSizeRel | 1.0 KiB |      14.4 KiB |            124.5 KiB |
 
 <!-- /sdk-size-table -->
 
