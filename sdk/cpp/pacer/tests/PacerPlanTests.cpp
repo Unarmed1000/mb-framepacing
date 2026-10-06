@@ -88,6 +88,17 @@ TEST(PacerPlan, AGpuWorkReportHasTheTimesOfTheWorkOrItsDurationOnly)
   EXPECT_FALSE(duration.HasTimes());
   EXPECT_EQ(duration.Duration, FP::TimeDuration::FromTicks(29'500));
 
+  // Where a platform gives the end and an elapsed time: the end is known, the begin is not, and it is not worked out
+  const PC::GpuWorkReport ended = PC::GpuWorkReport::EndAndDuration(10, At(10'031'000), FP::TimeDuration::FromTicks(29'000));
+  EXPECT_EQ(ended.FrameId, 10u);
+  EXPECT_FALSE(ended.HasTimes());
+  EXPECT_TRUE(ended.HasEndTime());
+  EXPECT_EQ(ended.BeginTime, FP::TickCount64());
+  EXPECT_EQ(ended.EndTime, At(10'031'000));
+  EXPECT_EQ(ended.Duration, FP::TimeDuration::FromTicks(29'000));
+  EXPECT_TRUE(times.HasEndTime());
+  EXPECT_FALSE(duration.HasEndTime());
+
   // An end before the begin is no work
   EXPECT_EQ(PC::GpuWorkReport::Times(9, At(10'031'000), At(10'001'000)).Duration, FP::TimeDuration::Zero());
   // One of the two times alone is not the times of the work
@@ -115,6 +126,10 @@ TEST(PacerPlan, APresentReportSaysHowLongThePresentHeldTheLoop)
   report.ReturnTime = At(10'000'000);
   EXPECT_EQ(report.Blocked(), FP::TimeDuration::Zero());
   EXPECT_EQ(PC::PresentReport().Blocked(), FP::TimeDuration::Zero());
+  // A present is taken by the system unless the report says it was not
+  EXPECT_TRUE(PC::PresentReport().Accepted);
+  report.Accepted = false;
+  EXPECT_FALSE(report.Accepted);
 }
 
 TEST(PacerPlan, AVBlankReadingWithoutAPeriodKeepsThePeriodThePacerHas)

@@ -10,8 +10,9 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: part of a redesign that is not built yet). When a frame's present was
-  //! called and when it returned, given right after it. From it the pacer learns whether the present waits on this system, whatever
-  //! the capabilities say, and it keeps that wait out of the frame's work.
+  //! called and when it returned, and whether the system took it: given after the present, before the next frame is planned. From
+  //! it the pacer learns whether the present waits on this system, whatever the capabilities say, it keeps that wait out of the
+  //! frame's work, and it does not go on waiting for the display to show a frame that was never taken.
   struct PresentReport
   {
     //! The frame: its PresentPlan::FrameId.
@@ -20,6 +21,9 @@ namespace MB::FramePacing::Pacer
     TickCount64 CallTime;
     //! When it returned, on the same clock
     TickCount64 ReturnTime;
+    //! false: the system did not take the present (a swap chain that is out of date, a surface that was lost), so the frame
+    //! will not be shown
+    bool Accepted{true};
 
     //! How long the call held the frame loop: zero for a return before the call.
     [[nodiscard]] constexpr TimeDuration Blocked() const noexcept

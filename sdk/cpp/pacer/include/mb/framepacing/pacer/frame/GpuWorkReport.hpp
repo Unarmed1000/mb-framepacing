@@ -11,29 +11,46 @@ namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: part of a redesign that is not built yet). The GPU's work on a frame
   //! that was presented earlier, given frames later. Either when it began and ended (PacerCapability::GpuWorkTimes), from which the
-  //! pacer reads how the CPU's and the GPU's work lie in time, or how long it took (PacerCapability::GpuWorkDurations): how long,
-  //! not when. The time from the first to the last of the frame's GPU work is meant, gaps included, as two timestamps give it.
+  //! pacer reads how the CPU's and the GPU's work lie in time; or when it ended and how long it took, where a platform gives an
+  //! elapsed time and one timestamp after the last command; or only how long it took (PacerCapability::GpuWorkDurations): how
+  //! long, not when. The time from the first to the last of the frame's GPU work is meant, gaps included, as two timestamps give
+  //! it.
   struct GpuWorkReport
   {
     //! The frame: its PresentPlan::FrameId.
     uint64_t FrameId{0};
-    //! When the GPU began the frame's work, on the application's steady clock; TickCount64(): not known (a duration only)
+    //! When the GPU began the frame's work, on the application's steady clock; TickCount64(): not known. It is not worked out
+    //! from an end and a duration: that only holds where the GPU did not pause inside the frame
     TickCount64 BeginTime;
-    //! When the GPU ended the frame's work, on the same clock; TickCount64(): not known (a duration only)
+    //! When the GPU ended the frame's work, on the same clock; TickCount64(): not known
     TickCount64 EndTime;
     //! How long the work took: the end minus the begin where both are given
     TimeDuration Duration;
 
-    //! True when the report says when the work was done, and not only how long it took.
+    //! True when the report says when the work began and when it ended.
     [[nodiscard]] constexpr bool HasTimes() const noexcept
     {
       return BeginTime != TickCount64() && EndTime != TickCount64();
+    }
+
+    //! True when the report says when the work ended, with or without when it began: enough to hold the frame against the
+    //! refresh it was aimed at.
+    [[nodiscard]] constexpr bool HasEndTime() const noexcept
+    {
+      return EndTime != TickCount64();
     }
 
     //! The GPU worked on the frame from beginTime to endTime. An end before the begin is no work.
     [[nodiscard]] static constexpr GpuWorkReport Times(const uint64_t frameId, const TickCount64 beginTime, const TickCount64 endTime) noexcept
     {
       return {frameId, beginTime, endTime, TimeDuration(endTime - beginTime)};
+    }
+
+    //! The GPU ended its work on the frame at endTime, after working on it for a duration; when it began is not known.
+    [[nodiscard]] static constexpr GpuWorkReport EndAndDuration(const uint64_t frameId, const TickCount64 endTime,
+                                                                const TimeDuration duration) noexcept
+    {
+      return {frameId, TickCount64(), endTime, duration};
     }
 
     //! The GPU worked on the frame for a duration; when is not known.

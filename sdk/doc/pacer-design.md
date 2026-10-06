@@ -186,7 +186,8 @@ One type, a set of capabilities, in generic terms:
 | `DisplayTimes`         | say when a present was shown, or that it has a result without a time, frames later                                                            | `VK_EXT_present_timing`, DXGI's frame statistics, `EGL_ANDROID_get_frame_timestamps` |
 
 Every application has the baseline, which is no capability: a steady clock it reads, the display's refresh period, a wait
-until a time on that clock, a present, and two places to wait (before a frame takes anything, and before its present).
+until a time on that clock, a present that shows every frame in order for at least a refresh, and two places to wait (before
+a frame takes anything, and before its present).
 
 The lowest configuration the design is made for is a little above that baseline: a graphics API without any timing extension,
 on a window system that gives its core signals only (a refresh rate and a call for a new frame). Such a call can stop or come
@@ -195,8 +196,9 @@ a timeout.
 
 The application gives the pacer two sets:
 
-- what it **has** (when the pacer is made, and again when a swap chain is made anew), and with it how many frames it lets be
-  in flight: how far its CPU may be ahead of its GPU;
+- what it **has**: when the pacer is made, and again whenever it changes (a swap chain made anew, the first vertical blank
+  time, a swap interval the system refused). With it, as far as it knows them, how many frames it lets be in flight (how far
+  its CPU may be ahead of its GPU) and how many images its swap chain has;
 - what is **active** now, a subset. This is how an application controls the pacer: a capability that is not active is not used
   and not expected. It replaces the sample's "hold method" option, and it is how a test compares two ways on one system.
 
@@ -648,6 +650,28 @@ frame is really shown. It has three parts, and they take different tiers:
 
 Nothing of this is advice yet: what a tier promises above is what it is designed to do, and it goes into the guide as checked
 only when a capture has shown it.
+
+## Reviewed against the first integration's three hosts
+
+The first integration read the calls, the capabilities and the reports against its Vulkan host and its two OpenGL ES hosts
+(2026-10-07). The four calls have a place in all three, in the order given above; in Vulkan it is: plan, the waits, the
+acquire, the frame's start. What the review found missing, and what becomes of each:
+
+| What the hosts do that the proposal did not cover                                                                                                      | What becomes of it                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| A host calls the application's update before its first place to wait, so the update's work is done before the frame's animation time is known          | The host has to plan the frame before the update. A change in a host, named here so that an integration knows                               |
+| A host waits by itself between the plan's wake and the frame's start (for the GPU to end an earlier frame, in the acquire), and nothing told the pacer | A report of the application's own waits, each with its kind, begin and end: without it the pacer has nothing to measure an acquire from     |
+| The waits for the GPU's work and for a free image have no place in a plan                                                                              | They are waits an application makes by itself at the one place it can, and reports; the plan asks for a present and for times only          |
+| The present's times are known at the start of the next loop turn, not right after the present                                                          | The present's report is given before the next frame is planned, which is early enough                                                       |
+| A frame can be planned and never begun (a swap chain out of date at the acquire), and a present can be refused                                         | Planning twice in a row is allowed, and a present's report says whether the system took it (in the type now)                                |
+| The set an application has changes during a run (the first vertical blank time comes after the first frame; a swap interval can be refused later)      | The set an application has can be given at any frame, as the active set                                                                     |
+| The number of swap chain images and of frames in flight have no place, and a host may not know the frames in flight                                    | Given beside the capabilities as information, each with "not known"                                                                         |
+| A present that shows frames out of order or drops them (a present mode without a queue) is nothing the baseline says                                   | The baseline says it: a present that shows every frame in order for at least a refresh. The pacer is not to be used on another kind         |
+| A GPU's work can be known as an end and a length, without its begin                                                                                    | The report takes that (in the type now), and the begin is not worked out from it                                                            |
+| A vertical blank time comes with how good it is, and can be of another display than the window's                                                       | A reading gets a value for how good it is, designed with the pacer that uses it (hold tier 2)                                               |
+| The frame id is not the id the present itself gets: a host numbers its presents, also the refused ones                                                 | The frame id is the key of every report, and the application maps it to its present's id                                                    |
+| A frame that needs a longer swap interval than the present takes is held partly by the loop                                                            | The tier the pacer is working at, for that frame, is the loop's                                                                             |
+| A display seen to refresh at a variable rate makes vertical blank times useless, and the application withdraws them itself today                       | The application says what it knows of variable refresh, and the front stops using the times: a rule that has to move, even before that pass |
 
 ## Variable refresh: a later pass, and what is kept open for it now
 
