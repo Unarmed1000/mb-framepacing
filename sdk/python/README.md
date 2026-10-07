@@ -18,6 +18,21 @@ subpackages. Standard library only, Python 3.12 or later.
 > trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see
 > [Photosensitivity](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md#photosensitivity).
 
+## Times in nanoseconds
+
+The package's times are whole ticks of 100 ns, as plain integers. Two types hold what a platform reports in nanoseconds
+without losing the last two digits: `NanosecondTimeSpan` (a signed interval) and `NanosecondTickCount` (a point on a clock,
+kept as an unsigned 64-bit count that compares across its wrap), both as the C++ and C# cores have them. `from_ticks` is
+exact, and `to_ticks()` gives ticks (truncated toward zero for an interval, the tick it is in for a point).
+
+```python
+from mb_framepacing import NanosecondTickCount, NanosecondTimeSpan
+
+period = NanosecondTimeSpan(4_166_389)  # a 240.016 Hz mode's refresh period
+period.to_ticks()  # 41663: the 89 ns are what ticks do not hold
+shown = NanosecondTickCount(1_000_000_000) + period
+```
+
 ## The marker
 
 ```python

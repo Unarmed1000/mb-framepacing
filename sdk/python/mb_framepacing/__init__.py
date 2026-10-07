@@ -11,10 +11,12 @@
 Standard library only, Python 3.12 or later.
 """
 
+from .nanosecond_tick_count import NanosecondTickCount
+from .nanosecond_time_span import NanosecondTimeSpan
 from .point import Point
 from .rectangle import Rectangle
 
 # The SDK's version, sdk/VERSION in mb-framepacing as PEP 440 spells it (0.2.0-beta.1 is 0.2.0b1; tests/test_version.py checks it)
 __version__ = "0.1.0"
 
-__all__ = ["Point", "Rectangle", "__version__"]
+__all__ = ["NanosecondTickCount", "NanosecondTimeSpan", "Point", "Rectangle", "__version__"]
