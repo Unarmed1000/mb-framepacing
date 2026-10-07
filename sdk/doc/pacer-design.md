@@ -218,8 +218,9 @@ What these runs show, as far as one run of each goes:
   the whole run: the ones that pile up while a window is new. Today's path has a pause for that, and sat at none. This is the
   open decision about that tier at one refresh per frame, with a number on it.
 - **With the GPU limiting the loop that pacer was the worst of the runs**: presents waiting crept up to the number of images,
-  the GPU then could not begin a frame, and the loop stalled, some forty times in the run. It is given the CPU's work only
-  and can not see a refresh the display lost; both are named limits of it, and this is what they cost.
+  the GPU then could not begin a frame, and the loop stalled: 114 of 2,272 frames started more than half a period after the
+  time they were given, in 53 stretches that came in groups. It is given the CPU's work only and can not see a refresh the
+  display lost; both are named limits of it, and this is what they cost.
 - **The wait for a present did what the simulation said**: 1.97 refreshes a frame when waiting for the last present at this
   work (the simulation: about 1.95) and 1.00 when waiting for the one before it.
 - **Waiting for the one before the last was the steadiest and had the lowest latency with light work.** Every one of its waits
