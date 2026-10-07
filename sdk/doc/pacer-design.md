@@ -391,10 +391,14 @@ Two more sets on 2026-10-07 on the same system (Vulkan in a window, 240 Hz, vari
 one frame in flight and the pacer told so, the driver's display times, 2,400 frames a run, the first 120 and the last 8 left
 out). **One run each: numbers, not conclusions.**
 
-**The refresh period.** The pacer was given 41,664.000 ticks of 100 ns in every run so far: the window system has the
-period in whole ticks. The display times of three runs give 41,664.62 to 41,664.67 ticks per refresh, 15 to 16 parts in a
-million more. That is the slow rise of the latency in the earlier runs: the grid on the clock ran that much faster than the
-display.
+**The refresh period.** The pacer was given 41,664 ticks of 100 ns in every run so far. The display's mode says 240.016 Hz,
+a period of 41,663.889 ticks, and the first integration's framework rounds that to whole ticks (2.7 parts in a million). The
+display times of five runs give 41,664.60 to 41,664.67 ticks per refresh: 14 to 16 parts in a million more than the pacer was
+given, and 17 to 19 more than the mode says. The presentation engine's own clock gives the same, and the frame starts were
+exactly on a grid of the period given, so it is neither how the times are placed on the clock nor the loop. The display
+refreshes that much slower than its mode says, by the clock the loop waits on. That is the slow rise of the latency in the
+earlier runs. No number a system reports at start-up contains it, in whatever unit: a period this exact has to be measured
+over many refreshes, from vertical blank times or display times of the display the window is on, against that clock.
 
 **Low latency, the cases that were owed** (six runs, with the rule after a late present):
 
