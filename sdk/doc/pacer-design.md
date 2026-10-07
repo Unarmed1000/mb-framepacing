@@ -423,7 +423,10 @@ display.
 
 The pacer without a wait did not pace these two runs: the swap chain did. Start-up left more frames in the swap chain than
 the pacer counts, its three images were full with two frames waiting, and the application's own wait for the frame before
-let one frame through per refresh (0.93 of a refresh per frame). A loop that is behind by no more than the reserve gets no
+let one frame through per refresh. That wait is the host's wait for the GPU to finish the frame before, as it has one frame in
+flight: it took 0.93 of a refresh per frame in these runs and 0.002 in the run with low latency, while the GPU's work itself
+is 0.20 of a refresh, which fits the earlier finding that the GPU begins a frame only when its image is free. The acquire did
+not wait (0.001). A loop that is behind by no more than the reserve gets no
 time to start at, as it is meant to make frames back to back until it is ahead again; this loop could not, and stayed
 exactly its reserve behind its grid for the whole run (the next frame's time was 0.17 of a refresh before a frame's start
 with a reserve of one and 0.80 with a reserve of two). So two frames waited with either setting, and the setting did
@@ -443,8 +446,9 @@ Long frames (10 ms more CPU work every 120 frames, 18 of them, a fixed swap inte
 With a reserve, the frames that reach the display while the loop is inside the long frame have no display time: one per
 long frame with two frames waiting, two with three. The display times on either side of them are exactly as many refreshes
 apart as there are such frames and one more, which fits each of them being on screen for one refresh, and fits a frame
-skipped as well: the log can not say which, and why they have no time is not known (how the sample collects the times is
-being asked). Read the table with that. After a long frame the loop made one frame back to back with a reserve of one and
+skipped as well: the log can not say which. The times were not lost on the way: the sample read a result for every one of
+these presents, three or four frames after the present as for the frames that have a time, and the result carried none. The
+driver reported the present and gave no time for it. Read the table with that. After a long frame the loop made one frame back to back with a reserve of one and
 two with a reserve of two, as designed. Again more frames waited than the reserve asked for.
 
 GPU work of 90 % of a refresh, a fixed swap interval of one:
@@ -459,7 +463,13 @@ With a reserve of two the pacer without a wait was not steady: the same full swa
 
 A fixed 60 frames a second, where there is no reserve: the pacer without a wait had 855 of 1,072 frames on screen for exactly
 four refreshes in one run (the present 0.89 of a refresh after a display time) and 1,072 of 1,072 in the other (0.58); the
-pacer with a wait 1,072 of 1,072 (0.60). The place of the grid, as with low latency.
+pacer with a wait 1,072 of 1,072 (0.60). The place of the grid, as with low latency, and this run shows the line it
+crossed. For its first 200 frames the present was called 0.92 of a refresh after a display time and every frame was on screen
+4.2 refreshes after its start; as the display fell behind the grid the present moved to 0.90 and then 0.87, and from frame
+322 on the latency went back and forth between 4.2 and 3.2 refreshes, 217 times. A present called 0.92 of a refresh after a
+display time was never shown at the next one, and one called 0.87 after it mostly was. At 15 parts in a million the grid moves
+a whole refresh against the display in about four and a half minutes at 240 Hz, so a present held by a timer crosses that
+line that often, for some seconds each time, wherever it started.
 
 What these runs show, as far as one run of each goes:
 
