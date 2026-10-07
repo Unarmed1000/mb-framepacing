@@ -8,11 +8,15 @@
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/capability/PacerRating.hpp>
+#include <mb/framepacing/pacer/capability/PacerTierText.hpp>
 #include <mb/framepacing/pacer/capability/PacerTierUtil.hpp>
 #include <mb/framepacing/pacer/capability/QueueTier.hpp>
 #include <gtest/gtest.h>
 #include <array>
 #include <cstdint>
+#include <cstring>
+#include <set>
+#include <string_view>
 
 namespace PC = MB::FramePacing::Pacer;
 using PC::HoldTier;
@@ -319,4 +323,82 @@ TEST(PacerTier, ALongerSwapIntervalNeverLowersARating)
   EXPECT_EQ(Rate(two).Hold, HoldTier::DisplaySide);
   EXPECT_TRUE(two.Contains(one));
   EXPECT_FALSE(one.Contains(two));
+}
+
+namespace
+{
+  namespace Text = PC::PacerTierText;
+
+  // The texts are there at compile time
+  static_assert(Text::NameOf(HoldTier::Timer) == "timer");
+  static_assert(Text::NameOf(QueueTier::WaitForPresent) == "wait for a present");
+  static_assert(Text::NameOf(PacerCapability::VBlankTimes) == "vertical blank times");
+  // The counts are the enums': the lowest tier's number, and a bit per capability
+  static_assert(Text::HoldTierCount == static_cast<uint32_t>(HoldTier::Timer));
+  static_assert(Text::QueueTierCount == static_cast<uint32_t>(QueueTier::PeriodOnly));
+  static_assert(static_cast<uint32_t>(PacerCapability::AllCapabilities) == (1u << Text::CapabilityCount) - 1u);
+
+  //! A text an application can show and hand to a C function: something, plain ASCII, and a zero after it
+  void ExpectShowable(const std::string_view text)
+  {
+    ASSERT_FALSE(text.empty());
+    // A string literal: read as a C string it ends where the view does, which is what this checks
+    // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage)
+    EXPECT_EQ(std::strlen(text.data()), text.size()) << text;
+    for (const char character : text)
+    {
+      EXPECT_TRUE(character >= ' ' && character <= '~') << text;
+    }
+  }
+}
+
+TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
+{
+  std::set<std::string_view> names;
+  for (uint32_t number = 1; number <= Text::HoldTierCount; ++number)
+  {
+    const auto tier = static_cast<HoldTier>(number);
+    ExpectShowable(Text::NameOf(tier));
+    ExpectShowable(Text::DescriptionOf(tier));
+    EXPECT_EQ(Text::DescriptionOf(tier).back(), '.');
+    EXPECT_LT(Text::NameOf(tier).size(), Text::DescriptionOf(tier).size());
+    names.insert(Text::NameOf(tier));
+  }
+  EXPECT_EQ(names.size(), Text::HoldTierCount);
+
+  names.clear();
+  for (uint32_t number = 1; number <= Text::QueueTierCount; ++number)
+  {
+    const auto tier = static_cast<QueueTier>(number);
+    ExpectShowable(Text::NameOf(tier));
+    ExpectShowable(Text::DescriptionOf(tier));
+    EXPECT_EQ(Text::DescriptionOf(tier).back(), '.');
+    names.insert(Text::NameOf(tier));
+  }
+  EXPECT_EQ(names.size(), Text::QueueTierCount);
+
+  // A number that is no tier has no text
+  EXPECT_TRUE(Text::NameOf(static_cast<HoldTier>(0)).empty());
+  EXPECT_TRUE(Text::DescriptionOf(static_cast<HoldTier>(4)).empty());
+  EXPECT_TRUE(Text::NameOf(static_cast<QueueTier>(0)).empty());
+  EXPECT_TRUE(Text::DescriptionOf(static_cast<QueueTier>(4)).empty());
+}
+
+TEST(PacerTierText, EveryCapabilityHasANameOfItsOwnAndASetOfSeveralHasNone)
+{
+  std::set<std::string_view> names;
+  for (uint32_t index = 0; index < Text::CapabilityCount; ++index)
+  {
+    const auto capability = static_cast<PacerCapability>(1u << index);
+    EXPECT_EQ(capability, Each[index]);
+    ExpectShowable(Text::NameOf(capability));
+    names.insert(Text::NameOf(capability));
+  }
+  EXPECT_EQ(names.size(), Text::CapabilityCount);
+  EXPECT_EQ(Text::NameOf(PacerCapability::NoCapabilities), "baseline");
+
+  // What would raise a rating is a set: named one capability at a time
+  EXPECT_TRUE(Text::NameOf(PacerCapability::WaitForPresent | PacerCapability::DisplayTimes).empty());
+  EXPECT_TRUE(Text::NameOf(PacerCapability::AllCapabilities).empty());
+  EXPECT_TRUE(Text::NameOf(static_cast<PacerCapability>(1u << Text::CapabilityCount)).empty());
 }

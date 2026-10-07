@@ -395,6 +395,10 @@ so it can be asked for any set, before a pacer exists: "what would I get without
 also says which capability is missing for the next tier. The pacer gives the rating of the set the application has (the
 **capability tier**) and of the active set (the **active tier**), by that same function.
 
+An application that shows the tiers takes their words from the library and writes none of its own (`PacerTierText`): a short
+name for each tier and each capability, a line for each tier that says what it uses and what that gives, and how many tiers
+of each kind there are.
+
 There are two questions, and each has its tiers. The first integration's document on what a platform offers already keeps
 them apart: "Holding a frame is one question, how many presents wait for the display is another".
 
