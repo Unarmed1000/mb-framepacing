@@ -287,6 +287,41 @@ tools judge a target frame rate by, so the pacer aims where it is measured.
 The result is the pacer's **fastest** rate: the rule only ever goes slower, and with `AutoSwapInterval` off it is a fixed, evenly paced
 frame rate.
 
+### The frame rates a display can show
+
+Not every frame rate can be hit: a display with a fixed refresh rate shows a frame for a whole number of refreshes, so its frame
+rates are its own divided by 1, 2, 3 and so on. An application that lets its user choose one lists those
+(`pacer/FrameRateStepUtil.hpp`, functions of the refresh period alone, no pacer needed):
+
+```cpp
+namespace Steps = MB::FramePacing::Pacer::FrameRateStepUtil;
+
+for (uint32_t swapInterval = 1; swapInterval <= Steps::StepCount(refresh); ++swapInterval)
+{
+  const PC::FrameRateStep step = Steps::StepAt(refresh, swapInterval);
+  AddMenuItem(step.RateMillihertz, step.SwapInterval);          // 59'940 is 59.94 frames a second
+}
+settings.SetPreferredSwapInterval(chosen.SwapInterval);         // or SetPreferredFrameTime(chosen.FrameTime)
+```
+
+| Display  | Its steps, in frames a second                             |
+| -------- | --------------------------------------------------------- |
+| 60 Hz    | 60, 30, 20                                                |
+| 59.94 Hz | 59.94, 29.97, 19.98                                       |
+| 120 Hz   | 120, 60, 40, 30, 24, 20                                   |
+| 144 Hz   | 144, 72, 48, 36, 28.8, 24, 20.57                          |
+| 240 Hz   | 240, 120, 80, 60, 48, 40, 34.29, 30, 26.67, 24, 21.82, 20 |
+
+- A `FrameRateStep` is a swap interval, its frame time to the nanosecond, and its rate in millihertz (the nearest; a number
+  to show). The list ends at 20 frames a second (`SlowestFrameTime`, 50 ms, judged with the same twentieth of a refresh of
+  slack: 19.98 is the last step of a 59.94 Hz display). A display slower than 20 Hz has its own rate and nothing else.
+- `StepFor(refresh, frameTime)` and `StepForRate(refresh, 50)` give the step a frame rate becomes: the pacer's own rounding,
+  so 50 frames a second at 60 Hz is the step of 30.
+- `IsStep` and `IsStepRate` say whether a rate is one of the display's steps: 50 is none at 60 Hz, 24 is none at 60 Hz and
+  one at 120, 144 and 240 Hz, and a rate slower than 20 frames a second is none. The pacer still paces a slower rate when
+  it is asked for one: the steps are what to offer, not a limit on the settings.
+- Fixed refresh rates only, as the pacer: on a display with a variable refresh rate any rate in its range can be shown.
+
 ## The swap interval rule
 
 The rule is the adaptive swap interval rule as [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) describes

@@ -13,6 +13,7 @@ target_sources(mb_framepacing_pacer
     source/mb/framepacing/pacer/frame/FramesInFlight.cpp
     source/mb/framepacing/pacer/frame/PresentFeedback.cpp
     source/mb/framepacing/pacer/FramePacer.cpp
+    source/mb/framepacing/pacer/FrameRateStepUtil.cpp
     source/mb/framepacing/pacer/PacerSettings.cpp
     source/mb/framepacing/pacer/RefreshPeriod.cpp
     source/mb/framepacing/pacer/RefreshTime.cpp
@@ -36,6 +37,8 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/clock/AnimationTime.hpp
       include/mb/framepacing/pacer/clock/FrameMeasurement.hpp
       include/mb/framepacing/pacer/FramePacer.hpp
+      include/mb/framepacing/pacer/FrameRateStep.hpp
+      include/mb/framepacing/pacer/FrameRateStepUtil.hpp
       include/mb/framepacing/pacer/frame/FrameSchedule.hpp
       include/mb/framepacing/pacer/frame/FrameStartPlan.hpp
       include/mb/framepacing/pacer/frame/GpuWorkReport.hpp
@@ -95,7 +98,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
                                             tests/DisplayModelTests.cpp tests/FrameLoopTests.cpp tests/FrameLogReplayTests.cpp
                                             tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp tests/FrameWorkRuleTests.cpp
                                             tests/TimerPeriodOnlyPacerTests.cpp tests/TimerWaitForPresentPacerTests.cpp
-                                            tests/VBlankPeriodOnlyPacerTests.cpp)
+                                            tests/VBlankPeriodOnlyPacerTests.cpp tests/FrameRateStepTests.cpp)
   target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests

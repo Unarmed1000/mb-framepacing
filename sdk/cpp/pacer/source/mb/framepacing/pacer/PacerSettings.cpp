@@ -43,9 +43,13 @@ namespace MB::FramePacing::Pacer
 
   uint32_t PacerSettings::PreferredSwapIntervalAt(const RefreshPeriod refresh) const noexcept
   {
-    const NanosecondTimeSpan slack(refresh.ToNanosecondTimeSpan().Nanoseconds() / RefreshesPerSlack);
-    const int64_t needed = refresh.RefreshesToFit(NanosecondTimeSpan(m_preferredFrameTime.Nanoseconds() - slack.Nanoseconds()));
+    const int64_t needed = refresh.RefreshesToFit(NanosecondTimeSpan(m_preferredFrameTime.Nanoseconds() - FrameRateSlackAt(refresh).Nanoseconds()));
     return static_cast<uint32_t>(std::clamp(needed, int64_t{m_preferredSwapInterval}, int64_t{MaxSwapInterval}));
+  }
+
+  NanosecondTimeSpan PacerSettings::FrameRateSlackAt(const RefreshPeriod refresh) noexcept
+  {
+    return NanosecondTimeSpan(refresh.ToNanosecondTimeSpan().Nanoseconds() / RefreshesPerSlack);
   }
 
   void PacerSettings::SetSlowDown(const SlowDownRule rule) noexcept

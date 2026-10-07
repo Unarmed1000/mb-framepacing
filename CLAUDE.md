@@ -330,6 +330,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
     `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.
+    **The frame rates a display can show** (the user, 2026-10-07: for a menu, "nothing lower than 20"): `FrameRateStep` (swap
+    interval, frame time, `RateMillihertz`) and `FrameRateStepUtil` (`StepCount`, `StepAt`, `StepFor`/`StepForRate`,
+    `IsStep`/`IsStepRate`; functions of the refresh period alone), a frame every 1, 2, 3, … refreshes down to 20 frames a
+    second, judged with the same slack (`PacerSettings::FrameRateSlackAt`) through the settings' own rounding, so the two
+    never disagree. The steps are what to offer: the settings still take a slower rate.
   - **Typed, in nanoseconds** (the user, 2026-10-07; the marker's payload still takes tick types, so an application converts where it
     fills one): points in time `NanosecondTickCount`, spans `NanosecondTimeSpan`, lengths that can not be negative
     `NanosecondTimeDuration` (C++ only), the marker's values `NanosecondTimeSpan32`, capped where they do not fit

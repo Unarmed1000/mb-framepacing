@@ -100,6 +100,10 @@ namespace MB::FramePacing::Pacer
     //! interval; at most MaxSwapInterval. The rounding is the one the tools judge a target frame rate by.
     [[nodiscard]] uint32_t PreferredSwapIntervalAt(RefreshPeriod refresh) const noexcept;
 
+    //! The slack a frame rate is judged with on a display with this refresh period: a twentieth of a refresh. A frame time that
+    //! is this much longer than a whole number of refreshes still is that many (PreferredSwapIntervalAt, FrameRateStepUtil).
+    [[nodiscard]] static NanosecondTimeSpan FrameRateSlackAt(RefreshPeriod refresh) noexcept;
+
     //! Adapt the swap interval to the frames (the rule). false: always the preferred one, a fixed frame rate.
     [[nodiscard]] bool AutoSwapInterval() const noexcept
     {

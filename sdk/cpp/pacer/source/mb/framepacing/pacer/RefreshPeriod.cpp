@@ -57,6 +57,18 @@ namespace MB::FramePacing::Pacer
     return NanosecondTimeSpan((count * whole) + static_cast<int64_t>(fractionNanoseconds));
   }
 
+  uint32_t RefreshPeriod::RateMillihertz(const uint32_t refreshes) const noexcept
+  {
+    assert(refreshes >= 1u && refreshes <= MaxRateRefreshes);
+    // 10^12 millihertz-nanoseconds over the frame's time, both times 2^24 so that the dividend fits 64 bits: the period keeps
+    // 24 of its 32 fraction bits, far more than a millihertz needs
+    constexpr uint64_t Dividend = uint64_t{1'000'000'000'000} << 24u;
+    const uint64_t divisor = uint64_t{std::clamp(refreshes, 1u, MaxRateRefreshes)} * (static_cast<uint64_t>(m_nanosecondsQ32) >> 8u);
+    const uint64_t whole = Dividend / divisor;
+    const uint64_t rest = Dividend % divisor;
+    return static_cast<uint32_t>(whole + (rest >= divisor - rest ? 1u : 0u));
+  }
+
   int64_t RefreshPeriod::NearestRefreshes(const NanosecondTimeSpan span) const noexcept
   {
     if (span <= NanosecondTimeSpan())

@@ -25,6 +25,9 @@ namespace MB::FramePacing::Pacer
   public:
     //! The shortest period: 100 µs (10 kHz)
     static constexpr NanosecondTimeSpan MinPeriod{NanosecondTimeSpan::NanosecondsPerMillisecond / 10};
+    //! The most refreshes RateMillihertz gives a rate for
+    static constexpr uint32_t MaxRateRefreshes = 1000;
+
     //! The longest period: 1 s (1 Hz)
     static constexpr NanosecondTimeSpan MaxPeriod{NanosecondTimeSpan::NanosecondsPerSecond};
 
@@ -41,6 +44,10 @@ namespace MB::FramePacing::Pacer
 
     //! refreshes times the period, rounded to the nearest nanosecond (half up). Exact for any refreshes from 0 to 2^31 (a month at 1000 Hz).
     [[nodiscard]] NanosecondTimeSpan TimeFor(int64_t refreshes) const noexcept;
+
+    //! The rate of a frame every so many refreshes, in millihertz, the nearest: 59'940 at 59.94 Hz, and 29'970 for every second
+    //! refresh of it. A number to show; nothing is paced by it. refreshes from 1 to MaxRateRefreshes (asserted, then clamped).
+    [[nodiscard]] uint32_t RateMillihertz(uint32_t refreshes = 1) const noexcept;
 
     //! The whole number of refreshes nearest to span (the later one on a tie; 0 for a span of 0 or less).
     [[nodiscard]] int64_t NearestRefreshes(NanosecondTimeSpan span) const noexcept;
