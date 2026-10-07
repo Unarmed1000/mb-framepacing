@@ -269,6 +269,8 @@ namespace MB::FramePacing::Pacer
     m_waitedForId = report.FrameId;
     m_waitReported = true;
     const bool heldTheLoop = report.Blocked().Nanoseconds() >= (m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / BlockedDivisor);
+    // A wait that ran out, and every answer while the waits are stopped: the window is not shown, or was not a moment ago
+    m_waitDisturbed = m_waitDisturbed || !report.Shown || PresentWaitsStopped();
     if (PresentWaitsStopped())
     {
       // The answer to what the plan asked. Answers in a row that say shown end the stop: one by itself can be a frame of a
@@ -338,6 +340,22 @@ namespace MB::FramePacing::Pacer
     // when the frame before it was shown, or whether, is not known, and this start is late by the pacer's doing
     const bool startsAgain = StartsAgainAt(cpuStartTime);
     const bool hasPrevious = !startsAgain && !m_waitRanOut;
+    // Where a frame has to be ready is learnt from a display that shows the window's frames. Around a wait that ran out and
+    // while the waits are stopped it does not: a frame shown later then is counted and teaches nothing, and a place that was
+    // moved in the frames just before is moved back
+    if (m_waitDisturbed || PresentWaitsStopped())
+    {
+      m_readyPlaceSteps -= (m_framesSincePlaceStep < ShownLaterFramesApart && m_readyPlaceSteps > 0) ? 1u : 0u;
+      m_framesSincePlaceStep = ShownLaterFramesApart;
+      m_framesSinceDisturbed = 0;
+      m_shownLaterCount = 0;
+      m_waitDisturbed = false;
+    }
+    else
+    {
+      m_framesSinceDisturbed = std::min(m_framesSinceDisturbed, ShownLaterFramesApart - 1u) + 1u;
+    }
+    m_framesSincePlaceStep = std::min(m_framesSincePlaceStep, ShownLaterFramesApart - 1u) + 1u;
     int64_t previousShown = 0;
     if (hasPrevious)
     {
@@ -349,12 +367,14 @@ namespace MB::FramePacing::Pacer
       // is moved earlier
       const int64_t shownLater = std::max(previousShown - ShownSlotByPresent(), int64_t{0});
       m_shownLaterByWaits += static_cast<uint64_t>(shownLater);
-      m_framesSinceShownLater = shownLater > 0 ? 0u : std::min(m_framesSinceShownLater + 1u, ShownLaterFramesApart);
-      m_shownLaterCount = shownLater > 0 ? m_shownLaterCount + 1u : (m_framesSinceShownLater >= ShownLaterFramesApart ? 0u : m_shownLaterCount);
+      const bool teaches = shownLater > 0 && m_framesSinceDisturbed >= ShownLaterFramesApart;
+      m_framesSinceShownLater = teaches ? 0u : std::min(m_framesSinceShownLater + 1u, ShownLaterFramesApart);
+      m_shownLaterCount = teaches ? m_shownLaterCount + 1u : (m_framesSinceShownLater >= ShownLaterFramesApart ? 0u : m_shownLaterCount);
       if (m_shownLaterCount >= ShownLaterToMovePlace && ReadyPlace() > NanosecondTimeSpan())
       {
         ++m_readyPlaceSteps;
         m_shownLaterCount = 0;
+        m_framesSincePlaceStep = 0;
       }
       const int64_t lost = previousShown - m_displaySlot;
       const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : MarkerValue::Duration(cpuStartTime - m_startTime).ToNanosecondTimeSpan();
@@ -531,6 +551,9 @@ namespace MB::FramePacing::Pacer
     m_leadCount = 0;
     m_readyPlaceSteps = 0;
     m_shownLaterCount = 0;
+    m_waitDisturbed = false;
+    m_framesSinceDisturbed = ShownLaterFramesApart;
+    m_framesSincePlaceStep = ShownLaterFramesApart;
     ForgetPresents();
   }
 }

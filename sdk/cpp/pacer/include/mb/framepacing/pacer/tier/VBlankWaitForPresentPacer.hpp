@@ -126,6 +126,11 @@ namespace MB::FramePacing::Pacer
     uint32_t m_shownLaterCount{0};
     uint32_t m_framesSinceShownLater{0};
     uint32_t m_readyPlaceSteps{0};
+    // A window that is not shown says nothing of where a display takes a frame: a wait ran out or the waits were stopped since
+    // the last frame began, the frames since one of those, and the frames since the place was last moved (each counted to a few)
+    bool m_waitDisturbed{false};
+    uint32_t m_framesSinceDisturbed{UINT32_MAX};
+    uint32_t m_framesSincePlaceStep{UINT32_MAX};
     // How long the last frames took from their start to the end of their CPU work
     std::array<NanosecondTimeSpan, LeadFrames> m_leads{};
     std::size_t m_leadCount{0};

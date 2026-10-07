@@ -578,11 +578,13 @@ what it had been as soon as the waits were back. The waits were stopped in sever
 before: a covered window's frames are shown now and then, two answers in a row then say shown, and the next two waits run
 out again. That is what the covered frame rate is short of the rate before.
 
-One thing the cover left behind in the pacer for vertical blank times: the waits that returned shown late in the covered
-stretch counted as frames shown later than worked out (12 and 21 at the end of the two runs, against 5 to 7 in runs that
-were not covered), and the place a frame is to be ready at had moved to 1.04 ms and to the start of the refresh. It is
-never moved back, so such a run goes on with a frame ready earlier than it has to be. Three readings were off in each.
-Not looked into yet: whether a covered stretch's frames are to be left out of that.
+One thing the cover left behind in the pacer for vertical blank times: frames counted as shown later than worked out (12
+and 21 at the end of the two runs, against 5 to 7 in runs that were not covered), and with them the place a frame is to be
+ready at had moved to 1.04 ms and to the start of the refresh, where it stays. Every one of those frames came within four
+frames of a wait that ran out or of the waits starting again (nine times in the two runs). **Changed for it** (unit tests;
+not measured again): a frame shown later within eight frames after a wait that ran out, or while the waits are stopped, is
+counted and does not move the place, and a place that was moved within the eight frames before a wait ran out is moved
+back. A window that is not shown says nothing of where a display takes a frame. Three readings were off in each run.
 
 **A hint from the application: left for later.** Asked: should the pacer take a hint that the focus was lost, and start
 again with an empty frame window when it is gained? Decided on 2026-10-07: the change above is what the pacer starts with,
@@ -817,6 +819,8 @@ may wait, the longest wait counted in the frame's swap intervals, and what it do
   nobody reported), and the place a frame is to be ready at is moved an eighth of a refresh period earlier
   (`ReadyPlaceNow`), down to the start of the refresh. It is never moved later again until the pacer is reset or gets other
   settings. What is still late with a frame ready when its refresh begins is late by its work, and the rule answers it.
+  A frame shown later around a wait that ran out, or while the waits are stopped, moves nothing ("A window that is not
+  shown", above).
 
 **The two aims:**
 
@@ -863,10 +867,12 @@ error over 1 ms. Two things in the numbers:
 - **The ready place moved in every run, and that is the latency over the pacer without the wait.** That pacer had a frame
   on screen 0.68 of a refresh after its start with the place at the middle. Here the place ended a quarter of a refresh
   period earlier in four runs and an eighth in one, and the frames were on screen 0.93 and 0.80 of a refresh after their
-  start: the same amounts later. The four to seven frames that the waits said were shown later are what moved it. Where in
-  a run they came, and whether the display showed those frames late or the wait only returned late, is not read yet: no
-  frame after the first 240 was on screen for more than one refresh. Until it is, the learning is not known to be right
-  on this system, and it costs up to a quarter of a refresh there.
+  start: the same amounts later.
+- **What moved it was the start of the run, in all eight runs.** Every frame that the waits said was shown later came in
+  the first 13 frames (the first at frame 2 or 3, the last at frame 10 to 13), where the display times have a frame on
+  screen for two refreshes every third frame or so. Not one came in the 1,387 frames after. So on this system the
+  learning took a swap chain's first frames for a display that takes its frames early, and paid up to a quarter of a
+  refresh for the rest of the run. What to do about it is in "Decisions needed": it is not changed yet.
 - **One present that may wait** did not give frames for one and for two refreshes in turn, as it does in the simulation:
   every frame was on screen for one. One run, light work.
 
@@ -1580,6 +1586,14 @@ checked. Four things are settled now, because they cost little now and a second 
 12. **A wait for a present that is never shown**: decided on 2026-10-07 and built: the longest a wait may take is counted in
     the frame's own swap intervals, four by default.
 13. **Names**: the capability and call names above are proposals.
+14. **Where a frame has to be ready, at the start of a run** (the pacer of tier 1). On the one system measured the
+    learning was moved by a swap chain's first frames in every run, and never by anything after them. Two ways out, and
+    they can go together. Learn nothing for a time after a start: simple, but a display that does take its frames early
+    then shows every frame late for that time, and the swap interval rule may slow down before the place has moved. Or
+    let the place go back: after a stretch without a frame shown later, move it one step later again, and if a frame is
+    then shown later, move it back at once and wait twice as long before the next try. That heals what a start or
+    anything else taught wrongly, and costs a display that does take its frames early one late frame a try, ever more
+    rarely. Proposed: the second, with the tries counted so that a log shows them. Not decided, not built.
 
 ## What changes for whom
 

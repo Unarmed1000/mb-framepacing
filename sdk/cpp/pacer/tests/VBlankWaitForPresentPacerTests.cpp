@@ -323,6 +323,56 @@ TEST(VBlankWaitForPresentPacer, WithTheAimOfSmoothnessAFrameStartsWhenTheWaitIsO
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 }
 
+TEST(VBlankWaitForPresentPacer, AWindowThatIsNotShownTeachesNothingOfWhereAFrameIsToBeReady)
+{
+  PC::VBlankWaitForPresentPacer pacer(Settings(PC::PacerAim::LowLatency));
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 1'000'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(1) + 2'000'000, true});
+  // A frame whose wait says that the frame before it was shown a vertical blank later than it was made for
+  const auto shownLate = [&pacer, &frame]()
+  {
+    const int64_t shownAt = BlankOf(frame) + 1;
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(shownAt) + 2'000'000, true});
+  };
+  // A frame whose wait is over at once: the frame before it was shown where it was made for
+  const auto shownInTime = [&pacer, &frame]() { frame = Frame(pacer, frame.PresentNanoseconds + 100'000); };
+
+  // The window is covered for a moment: one wait runs out, four periods after it began. The frames after it that are shown
+  // later than worked out are counted, and the place a frame is to be ready at stays
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {frame.PresentNanoseconds + 100'000 + (4 * Period), false});
+  EXPECT_EQ(pacer.PresentWaitTimeouts(), 1u);
+  for (int32_t count = 0; count < 6; ++count)
+  {
+    shownLate();
+  }
+  EXPECT_EQ(pacer.ShownLaterByWaits(), 6u);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+  // Eight frames after the wait that ran out the display is taken to show the window again: two more move the place
+  shownInTime();
+  shownInTime();
+  shownLate();
+  shownLate();
+  EXPECT_EQ(pacer.ShownLaterByWaits(), 8u);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  // A wait that runs out in the frames right after the place was moved: the window was going out of view, and the place is
+  // moved back
+  shownInTime();
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {frame.PresentNanoseconds + 100'000 + (4 * Period), false});
+  EXPECT_EQ(pacer.PresentWaitTimeouts(), 2u);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+
+  // While the waits are stopped nothing is learnt either
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {frame.PresentNanoseconds + 100'000 + (4 * Period), false});
+  EXPECT_TRUE(pacer.PresentWaitsStopped());
+  for (int32_t count = 0; count < 40; ++count)
+  {
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {0, false});
+  }
+  EXPECT_TRUE(pacer.PresentWaitsStopped());
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+}
+
 TEST(VBlankWaitForPresentPacer, FramesThatAreShownLaterThanWorkedOutMoveThePlaceAFrameIsToBeReadyAt)
 {
   PC::VBlankWaitForPresentPacer pacer(Settings(PC::PacerAim::LowLatency));
