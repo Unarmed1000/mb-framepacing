@@ -644,11 +644,24 @@ from the frame starts, as today.
 its present is held (the present's time does not move with the work), or the frame's start is held and it is presented when it
 is done (the frame is as fresh as it can be). The pacer gives both waits either way; one of them is absent.
 
-**Reducing latency is an option on top, not a part of every pacer.** Two numbers trade latency against the frame rate a
-loop can hold: k (the presents that may wait) and the frames in flight (whether the CPU and the GPU work side by side). In the
-design both are given to the pacer, and it paces correctly for what it is given: k is a setting, the frames in flight are the
-application's, and the pacer reads from the frames' moments whether the work runs side by side. That is all a tier pacer has
-to do, and it is all that is built first.
+**Every tier's pacer has two aims: latency optimized, and not latency optimized.** This is a rule of the design, at every
+tier, and an application chooses between the two. Not latency optimized, a pacer keeps the display supplied: frames that
+wait to be shown are a reserve, so where in a refresh a present lands matters less and a frame that runs a little long is
+covered, at the price of a frame reaching the screen that many refreshes later. A constant delay does not show in the motion.
+Latency optimized, a pacer keeps the frames that wait as few as its tier can, and pays for it with a repeated frame where the
+reserve would have covered one. What trades the one against the other belongs to an aim and never to a pacer as such: whether
+frames that wait are kept or taken away, how many presents may wait, whether a step of the grid is given up after a frame
+that ran long, where a frame's work sits in a refresh.
+
+An earlier version of this document had reducing latency as "an option on top, not a part of every pacer", and the first two
+tier pacers were built that way, with what leans towards latency as their only behaviour (the pause after start-up and the
+whole period after a late present in the pacer without a wait). That was a misreading of the rule and is being corrected: both
+pacers get the two aims.
+
+Two numbers trade latency against the frame rate a loop can hold: k (the presents that may wait) and the frames in flight
+(whether the CPU and the GPU work side by side). Both are given to the pacer, and it paces correctly for what it is given: k
+is a setting, the frames in flight are the application's, and the pacer reads from the frames' moments whether the work runs
+side by side.
 
 Choosing the two is a separate option, off unless asked for, and built only once the tier pacers are measured: with it on,
 the pacer picks k and, where the application says it can change them, the frames in flight, for the least latency that still
@@ -980,16 +993,17 @@ checked. Four things are settled now, because they cost little now and a second 
    every 100 s: three waiting frames are gone after five minutes, and a frame is repeated every 100 s from then on.
 4. **Start-up and switching the pacer on**: is anything wanted beyond the queue rule (which holds the loop until the first
    presents are shown, where it can wait or see)? Not decided.
-5. **Reducing latency as an option**: is choosing k and the frames in flight from the measured work wanted at all, and if so
-   as the option described above (off by default, built after the tier pacers)? Proposed: yes, as that option, so that no
-   tier pacer carries it.
+5. **The two aims**: decided, and wrongly proposed here before as an option that no tier pacer carries. Every tier's pacer
+   has a latency optimized and a not latency optimized form ("The rules that move into the pacer"). Still open is only the
+   further step of the pacer choosing k and the frames in flight from the measured work by itself.
 6. **Back-pressure as a tier**: a queue tier of its own for a loop that is held by the system when its queue is full (a
    wait for a free image, measured on one system: the frames waiting are capped at the number of images and steady; or a
    present that is known to wait), or a help at the lowest tier that the pacer promises nothing from, as now? If a tier, the
    image wait goes with the fewest images the swap chain allows.
 7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
-8. **The aim where two goals pull apart**: proposed is no missed refreshes first, then the frame rate asked for, then the
-   lowest latency; the option above is what puts latency before the frame rate.
+8. **The aim where two goals pull apart**: it is the application's choice between the two aims. Not latency optimized: no
+   missed refreshes first, then the frame rate asked for, and latency is what that costs. Latency optimized: the fewest
+   frames waiting first.
 9. **After a lost refresh, does game time catch up with the clock?** Catching up (today's behaviour) shows a second error
    of the same size and keeps game time on the clock. Not catching up shows the one error only and leaves game time behind
    the clock by the refreshes lost, which the pacer would report as a number. Proposed: not catching up, with a setting for
