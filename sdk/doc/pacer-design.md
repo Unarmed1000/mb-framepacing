@@ -547,6 +547,46 @@ although it was ready in time, as no pacer does that has the refresh period only
 swap chain that holds the loop are the open decision 6. Its times are in ticks of 100 ns like the other tier pacers';
 nanoseconds follow when the marker and the tools have them.
 
+### Next: vertical blank times with a wait for a present (proposed, not built)
+
+The fourth tier pacer, written down with both aims before any code, for agreement. It is the pacer above plus the wait
+that the pacer on a timer has (the frame start plan's wait, `PresentWaitReport`, the presents that may wait, the longest wait counted
+in the frame's swap intervals).
+
+**What the wait adds when the vertical blanks are known:**
+
+- **The frames that wait can not grow**, whatever the pacer believed of a frame: the loop stands until the present so many
+  back was shown. The pause after start-up is not needed, as in the pacer on a timer with a wait.
+- **Which vertical blank a frame was shown at becomes a fact, some frames later.** A wait that held the loop returns
+  shortly after the display took the frame (a median of 0.92 to 1.24 ms after its display time in the 14 measured runs at
+  240 Hz, which is 0.22 to 0.30 of a refresh, and never before it), so the vertical blank at or before the return is the
+  one the frame was shown at. A wait that returned at once says less: the frame was shown at that vertical blank or an
+  earlier one. The pacer above has to take a frame as shown where the frame margin says; this one corrects that for the
+  frames not yet started when the report comes. That closes the one gap named above: a frame that waited although it was
+  ready in time.
+- **It is not used to move where a frame is to be ready.** The returns would show at which places frames make their vertical
+  blank, and a pacer could move `ReadyPlacePercent` by that. Not proposed for the first version: one system was measured.
+
+**The two aims:**
+
+| Aim         | The wait                                                                              | The frame                                                                                |
+| ----------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Smoothness  | Before the frame starts, for the present as many back as may wait                     | Starts when the wait is over; its present is held to its place, the reserve as above     |
+| Low latency | Before the frame starts, for the present as many back as may wait: one is the default | Its start is then held as above (the plan is made again after the wait), present at once |
+
+- With **smoothness** the reserve is the presents that may wait less one, as everywhere, and the wait makes it exact: where
+  the pacer's count of vertical blanks is off by one, the wait holds the loop and the report puts the count right.
+- With **low latency** the wait for the last present returns a quarter of a refresh into the refresh the frame is made in
+  (on the one system measured), before the time the frame's start is held to in light work. Where a frame's work is long
+  enough that its start would be before the return, the frame starts when the wait is over and is for the next vertical
+  blank: that is the cost of one present allowed to wait, as with a timer (1.97 refreshes a frame at GPU work of 90 %), and
+  two allowed to wait is what keeps one refresh per frame there.
+- **The animation time** is as above, with the vertical blank the frame before was shown at taken from a wait's report when
+  it is there. What a report says of a frame after the frames behind it were made is not caught up with.
+
+**To decide before it is built:** whether the default of the presents that may wait differs by aim here (one with low
+latency, two with smoothness), where today one setting with a default of two serves both.
+
 ## What the application plugs in
 
 ### Capabilities
