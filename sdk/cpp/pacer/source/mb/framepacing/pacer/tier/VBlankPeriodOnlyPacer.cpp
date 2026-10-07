@@ -64,7 +64,7 @@ namespace MB::FramePacing::Pacer
     // The frames that are ready ahead of the display: with the aim of smoothness, and at one refresh per frame only (at more
     // the display takes a frame before the next one is made, and nothing can wait)
     const PacerSettings& settings = m_rule.Settings();
-    return settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1 ? int64_t{settings.WaitingPresents()} - 1 : 0;
+    return settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1 ? int64_t{settings.ReserveFrames()} : 0;
   }
 
   NanosecondTimeSpan VBlankPeriodOnlyPacer::ReadyPlace() const noexcept

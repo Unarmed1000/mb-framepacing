@@ -939,3 +939,45 @@ TEST(FrameLoop, WithVerticalBlankTimesAndGpuWorkReportsAHeavyGpuLoadIsHeldAndOne
     }
   }
 }
+
+TEST(FrameLoop, WhereTheSystemHoldsTheLoopASwapChainThatIsFullPacesItAndItDoesNotDrift)
+{
+  // A swap chain of three or four images, a wait for an image that holds the loop while none is free, and a display whose refresh
+  // period is 0.2 % off what the loop was told, either way: the first integration measured 17 to 19 parts in a million
+  for (const int32_t images : {3, 4})
+  {
+    for (const int64_t ppm : {int64_t{-2'000}, int64_t{0}, int64_t{2'000}})
+    {
+      Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+      settings.Frames = 2'400;
+      settings.Aim = PC::PacerAim::Smoothness;
+      settings.GpuWork = {PeriodNanoseconds(settings) / 5, PeriodNanoseconds(settings) / 5};
+      settings.Display.Images = images;
+      settings.DisplayPeriodPpm = ppm;
+      const int64_t period = PeriodNanoseconds(settings);
+
+      // The loop says that the system holds it and reports its waits: the swap chain is full from the start and stays full, every
+      // frame is on screen for one refresh, and no frame is late by the pacer's count
+      settings.SystemHoldsLoop = true;
+      const std::vector<Sim::LoopFrame> held = Sim::SimulateTimerPeriodOnlyLoop(settings);
+      EXPECT_EQ(DisplayStepsOffTheSwapInterval(held, period), 0) << images << ' ' << ppm;
+      for (std::size_t index = 30; index < held.size(); ++index)
+      {
+        ASSERT_EQ(held[index].PendingAtStart, images - 2) << images << ' ' << ppm << ' ' << index;
+        ASSERT_EQ(held[index].WindowLateFrames, 0u) << images << ' ' << ppm << ' ' << index;
+        ASSERT_EQ(held[index].SwapInterval, 1u) << images << ' ' << ppm << ' ' << index;
+      }
+
+      // Without that the pacer goes by its timer. On a display that is faster than it was told the frames that wait run out, and
+      // frames are shown twice
+      settings.SystemHoldsLoop = false;
+      const std::vector<Sim::LoopFrame> timed = Sim::SimulateTimerPeriodOnlyLoop(settings);
+      if (ppm < 0)
+      {
+        EXPECT_GT(DisplayStepsOffTheSwapInterval(timed, period), 0) << images;
+        EXPECT_GT(std::count_if(timed.begin() + 30, timed.end(), [](const Sim::LoopFrame& frame) { return frame.PendingAtStart == 0; }), 100)
+          << images;
+      }
+    }
+  }
+}

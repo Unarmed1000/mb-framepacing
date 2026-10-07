@@ -27,6 +27,8 @@
 //                       --wait-for-present number less one here too
 //   --display-ppm       the display's refresh period is that many parts per million longer than the loop was told
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
+//   --system-holds      the loop tells the pacer of the lowest pair of its own waits and that the system holds it while its
+//                       queue is full; with --images the display has that many, and the pacer is told so
 //   --smooth            a tier pacer with the aim of smoothness (a reserve of frames that wait); low latency without it.
 //                       With --tier-pacer the reserve is the --wait-for-present number less one, and the wait is not made
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -58,7 +60,7 @@ namespace
                  "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]\n"
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
                  "          [--startup-pause <refreshes>] [--smooth] [--vblank-pacer] [--ready-place <percent>]\n"
-                 "          [--display-ppm <parts per million>] [--swap-interval <refreshes>]\n";
+                 "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds]\n";
     return 2;
   }
 
@@ -107,6 +109,11 @@ namespace
       if (name == "--smooth")
       {
         settings.Aim = MB::FramePacing::Pacer::PacerAim::Smoothness;
+        continue;
+      }
+      if (name == "--system-holds")
+      {
+        settings.SystemHoldsLoop = true;
         continue;
       }
       if (name == "--gpu-reports")

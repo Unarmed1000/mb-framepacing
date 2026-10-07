@@ -35,6 +35,8 @@ namespace MB::FramePacing::Pacer
     uint32_t m_startupPauseRefreshes{4};
     NanosecondTimeSpan m_startupPauseDelay{500 * NanosecondTimeSpan::NanosecondsPerMillisecond};
     uint32_t m_readyPlacePercent{50};
+    uint32_t m_swapChainImages{0};
+    bool m_systemHoldsLoop{false};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
@@ -48,6 +50,7 @@ namespace MB::FramePacing::Pacer
     static constexpr int64_t DefaultFrameMarginDivisor = 8;
     static constexpr NanosecondTimeSpan MaxSlowestFrameTime{10 * NanosecondTimeSpan::NanosecondsPerSecond};
     static constexpr uint32_t MaxWaitingPresents = 8;
+    static constexpr uint32_t MaxSwapChainImages = 64;
     static constexpr uint32_t MaxPresentWaitSwapIntervals = 64;
     static constexpr uint32_t MaxMaxFramesInFlight = 8;
     static constexpr uint32_t MaxStartupPauseRefreshes = 64;
@@ -200,6 +203,36 @@ namespace MB::FramePacing::Pacer
     }
 
     void SetWaitingPresents(uint32_t presents) noexcept;
+
+    //! The images the application's swap chain has (0 to MaxSwapChainImages). 0, the default: not known. One of them is on
+    //! screen and one is drawn into, so the frames that can wait to be shown are that many less two: a tier pacer keeps no
+    //! larger reserve (ReserveFrames).
+    [[nodiscard]] uint32_t SwapChainImages() const noexcept
+    {
+      return m_swapChainImages;
+    }
+
+    void SetSwapChainImages(uint32_t images) noexcept;
+
+    //! True when the system holds the frame loop while its queue of frames is full (a present or a wait for an image that
+    //! waits for the display), and the application reports those waits (SystemWaitReport). Off by default. With
+    //! PacerAim::Smoothness a tier pacer then lets the system pace the loop on purpose: the reserve is what the swap chain
+    //! holds, a frame the system held is not late, and the pacer's own start time only keeps the loop from running away
+    //! where the system does not hold it after all.
+    [[nodiscard]] bool SystemHoldsLoop() const noexcept
+    {
+      return m_systemHoldsLoop;
+    }
+
+    void SetSystemHoldsLoop(const bool systemHoldsLoop) noexcept
+    {
+      m_systemHoldsLoop = systemHoldsLoop;
+    }
+
+    //! The frames a tier pacer makes ahead of the display with PacerAim::Smoothness at one refresh per frame: WaitingPresents
+    //! less one, and no more than the swap chain can hold when its images are known. Where the system holds the loop
+    //! (SystemHoldsLoop) and the images are known it is what the swap chain holds, whatever WaitingPresents says.
+    [[nodiscard]] uint32_t ReserveFrames() const noexcept;
 
     //! The longest a wait for a present may take, in swap intervals of the frame that waits (1 to MaxPresentWaitSwapIntervals;
     //! 4 by default): some presents are never shown (the first ones of a new window, those of a window that is hidden), and

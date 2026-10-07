@@ -104,6 +104,24 @@ namespace MB::FramePacing::Pacer
     m_waitingPresents = std::clamp(presents, 1u, MaxWaitingPresents);
   }
 
+  void PacerSettings::SetSwapChainImages(const uint32_t images) noexcept
+  {
+    assert(images <= MaxSwapChainImages);
+    m_swapChainImages = std::min(images, MaxSwapChainImages);
+  }
+
+  uint32_t PacerSettings::ReserveFrames() const noexcept
+  {
+    const uint32_t asked = m_waitingPresents - 1u;
+    if (m_swapChainImages == 0)
+    {
+      return asked;
+    }
+    // One image is on screen and one is drawn into: the rest can wait
+    const uint32_t held = m_swapChainImages > 2u ? m_swapChainImages - 2u : 0u;
+    return m_systemHoldsLoop ? held : std::min(asked, held);
+  }
+
   void PacerSettings::SetPresentWaitSwapIntervals(const uint32_t swapIntervals) noexcept
   {
     assert(swapIntervals >= 1 && swapIntervals <= MaxPresentWaitSwapIntervals);

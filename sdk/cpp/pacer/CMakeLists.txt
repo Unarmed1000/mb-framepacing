@@ -45,6 +45,8 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/frame/PresentPlan.hpp
       include/mb/framepacing/pacer/frame/PresentReport.hpp
       include/mb/framepacing/pacer/frame/PresentWaitReport.hpp
+      include/mb/framepacing/pacer/frame/SystemWaitKind.hpp
+      include/mb/framepacing/pacer/frame/SystemWaitReport.hpp
       include/mb/framepacing/pacer/frame/VBlankReading.hpp
       include/mb/framepacing/pacer/frame/FramesInFlight.hpp
       include/mb/framepacing/pacer/frame/PresentFeedback.hpp

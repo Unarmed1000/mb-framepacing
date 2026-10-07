@@ -59,6 +59,9 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t DisplayPeriodPpm{0};
     //! For the pacer of vertical blank times: where in a refresh a frame is to be ready (PacerSettings::ReadyPlacePercent)
     uint32_t ReadyPlacePercent{50};
+    //! The loop tells a tier pacer of its own waits (for a frame slot, for an image), says that the system holds it while its
+    //! queue is full, and gives the display's images as the swap chain's (where the display has a number of them)
+    bool SystemHoldsLoop{false};
     //! false: paced at a fixed swap interval of 1, the rule off
     bool AutoSwapInterval{true};
     DisplayModelSettings Display;

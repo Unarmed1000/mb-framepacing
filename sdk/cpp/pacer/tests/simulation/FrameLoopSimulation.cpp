@@ -12,6 +12,8 @@
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitKind.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
@@ -232,6 +234,11 @@ namespace MB::FramePacing::Pacer::Simulation
     pacerSettings.SetWaitingPresents(settings.WaitingPresents);
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
+    pacerSettings.SetSystemHoldsLoop(settings.SystemHoldsLoop);
+    if (settings.SystemHoldsLoop && settings.Display.Images > 0)
+    {
+      pacerSettings.SetSwapChainImages(static_cast<uint32_t>(settings.Display.Images));
+    }
     TimerPeriodOnlyPacer pacer(pacerSettings);
     DisplayModel display(DisplayPeriod(settings), settings.Display);
     SplitMix64 random(settings.Seed);
@@ -261,12 +268,19 @@ namespace MB::FramePacing::Pacer::Simulation
         frame.WaitTargetNanoseconds = startPlan.StartTime.Nanoseconds();
         now = WaitUntil(now, frame.WaitTargetNanoseconds, random, settings.TimerLate);
       }
-      // The application's own waits, which the pacer is not asked about
+      // The application's own waits, which the pacer did not ask for: it is told of them where the loop says so
+      const int64_t frameSlotWaitBegin = now;
       if (settings.WaitsForPreviousGpuWork)
       {
         now = std::max(now, previousGpuEndNanoseconds);
       }
+      const int64_t acquireBegin = now;
       now = display.AcquireNanoseconds(now);
+      if (settings.SystemHoldsLoop)
+      {
+        pacer.AddSystemWait({SystemWaitKind::FrameSlot, NanosecondTickCount(frameSlotWaitBegin), NanosecondTickCount(acquireBegin)});
+        pacer.AddSystemWait({SystemWaitKind::Acquire, NanosecondTickCount(acquireBegin), NanosecondTickCount(now)});
+      }
 
       frame.StartNanoseconds = now;
       frame.PendingAtStart = display.Pending(now);

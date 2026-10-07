@@ -537,6 +537,54 @@ and no hint is taken yet. What speaks against a hint as the fix, and for it as a
 
 **Today's pacer (`FramePacer`) is unchanged**: its host's wait is inside the frame it measures, and it is being replaced.
 
+## A loop the system holds
+
+Decision 6, built for the pacer on a timer with the refresh period only (`TimerPeriodOnlyPacer`). Checked on the simulation
+only: **not measured.**
+
+**What the application gives:**
+
+- **Its own waits**, the ones the pacer did not ask for, each after the wait and before the frame starts
+  (`AddSystemWait`, a `SystemWaitReport`: the kind, when it began and when it ended). There are two kinds. A wait for an
+  image (`SystemWaitKind::Acquire`) is the display's side holding the loop while its queue is full, and so is a present
+  that waited, which the present's own report has. A wait for a frame slot (`SystemWaitKind::FrameSlot`) is the GPU not being
+  done with an earlier frame.
+- **The swap chain's images** (`PacerSettings::SwapChainImages`, zero for not known). One is on screen and one is drawn
+  into, so that many less two can wait, and no tier pacer keeps a larger reserve (`ReserveFrames`).
+- **That the system holds the loop while its queue is full** (`PacerSettings::SystemHoldsLoop`). A setting for now: the
+  tier pacers take no capability set until the front is built, where it is the capabilities `PresentWaits` and
+  `AcquireWaits`.
+
+**What the pacer does with them**, with the aim of smoothness at one refresh per frame and that setting on:
+
+- The reserve is what the swap chain holds (its images less two, where they are known), whatever the presents that may
+  wait say: nothing is made ahead on top of it.
+- The loop is held to a quarter of a refresh period before a frame is due. So the loop is there first, and the system's
+  wait, not the pacer's timer, says when the frame starts. The timer is what is left when the system does not hold the loop
+  after all: the frames then start a quarter of a period early, a period apart, and nothing runs away.
+- A frame whose start the display's side held for an eighth of a refresh period or more is one the system let through when
+  it had room, which is when the display took a frame. It is not late and gives up no step, and the grid is moved to its
+  start. So the loop is paced by the display, in step with it whichever way the given refresh period is off.
+- A wait for a frame slot excuses nothing: a frame that starts late by it is late by the GPU's work, as before. It is
+  counted (`FrameSlotHeldFrames`, next to `SystemHeldFrames`).
+- Without the setting, with the aim of low latency, or at two refreshes per frame or more, the reports are counted and
+  nothing changes.
+
+**What the simulation shows** (240 Hz, light work, a swap chain whose wait for an image holds the loop while none is free,
+a display whose refresh period is 0.2 % off what the loop was told):
+
+| The display is  | Images | The pacer goes by its timer                                                                      | The system paces the loop                                  |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| As told         | 3      | Every frame for one refresh, one frame waiting                                                   | The same                                                   |
+| 0.2 % slower    | 3      | Every frame for one refresh; a frame counted late now and then                                   | Every frame for one refresh, none late                     |
+| 0.2 % faster    | 3      | The frames that wait run out: frames on screen twice, 0.2 to 1.6 refreshes from start to display | Every frame for one refresh, one frame waiting             |
+| As told, or off | 4      | As with three images: the reserve asked for is one frame                                         | Two frames waiting, steady, three refreshes to the display |
+
+**What it does not answer.** On the one system measured the wait for an image never held the loop in a window (0.002 ms),
+and what paced the loop there was the host's wait for the GPU's work on the frame before. That is a wait for a frame slot,
+which this change does not take as the display's. Whether that system has a case where the display's side holds the loop
+(full screen, where the swap chain kept to its images; a present that waits) is to be measured.
+
 ## The pacer for vertical blank times
 
 The third tier pacer (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh
@@ -1298,13 +1346,11 @@ checked. Four things are settled now, because they cost little now and a second 
    image wait goes with the fewest images the swap chain allows.
    Since the third measurements this has a case: with the aim of smoothness and no wait for a present, a full swap chain
    paced the loop by itself, steadily in one run and not in another, and the pacer neither chose it nor knew of it.
-   Decided on 2026-10-07, not built yet: where the application says the system holds the loop when its queue is full, and
-   the pacer sees those waits happen, smoothness means that on purpose (no time to start at, the reserve is what the swap
-   chain holds, no frames made ahead on top of it); and the pacer is told of the application's own waits (so a loop that
-   is held is not taken for one that is late) and of how many frames the swap chain holds (so no reserve is asked for
-   that it can not take). Where nothing holds the loop, the reserve by count stays. Still proposed, and not answered: it
-   is how smoothness behaves in the pacers that have the refresh period only, and no queue tier of its own, as it
-   promises less than a wait for a present (how many frames wait is the swap chain's number).
+   Decided on 2026-10-07 and built for the pacer on a timer with the refresh period only ("A loop the system holds",
+   above): the application reports its own waits and the swap chain's images, and where it says that the system holds the
+   loop while its queue is full, the aim of smoothness lets the system pace the loop. Still proposed, and not answered: it
+   is how smoothness behaves in that pacer and no queue tier of its own, as it promises less than a wait for a present
+   (how many frames wait is the swap chain's number).
 7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
 8. **The aim where two goals pull apart**: it is the application's choice between the two aims. Not latency optimized: no
    missed refreshes first, then the frame rate asked for, and latency is what that costs. Latency optimized: the fewest

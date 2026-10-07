@@ -17,6 +17,7 @@
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
@@ -123,6 +124,12 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
     NanosecondTimeDuration m_lastPresentBlocked;
+    // The waits since the last frame started in which the display's side held the loop (for an image, in the present) and
+    // in which the GPU did (for a frame slot): how long, and the frames each held
+    NanosecondTimeSpan m_displayHeld;
+    NanosecondTimeSpan m_frameSlotHeld;
+    uint64_t m_systemHeldFrames{0};
+    uint64_t m_frameSlotHeldFrames{0};
     // The pause after start-up: still to be made, the first frame's start since it was asked for, and whether the system
     // took a present since
     bool m_pausePending{true};
@@ -160,6 +167,15 @@ namespace MB::FramePacing::Pacer
     //! The GPU's work on an earlier frame, when the application has it: from then on a frame's work is the CPU's and the
     //! GPU's (FrameWorkRule).
     void AddGpuWork(const GpuWorkReport& report) noexcept;
+
+    //! A wait of the application's own before the frame that is about to start (for a frame slot, for an image), after the
+    //! wait and before BeginFrame. A wait for an image, like a present that waited (AddPresent), is the display's side
+    //! holding the loop while its queue is full. With PacerSettings::SystemHoldsLoop and the aim of smoothness, at one
+    //! refresh per frame, a frame whose start that held for a share of a refresh period is one the system let through when
+    //! it had room: it is not late and loses no step, and the grid is moved to its start, so the loop is paced by the
+    //! display and does not drift. A wait for a frame slot is the GPU's: it excuses nothing (a frame that is late by it is
+    //! late by the GPU's work) and is counted. Without the setting the reports are counted and change nothing.
+    void AddSystemWait(const SystemWaitReport& report) noexcept;
 
     //! The presents made so far are gone (a swap chain was made anew, for a window that is resized, say): the pause after
     //! start-up is made once more, counted from the next frame. Nothing else changes: the grid, the frame window and the swap
@@ -199,6 +215,20 @@ namespace MB::FramePacing::Pacer
     }
 
     //! How long the last present that was reported held the frame loop.
+    //! The frames whose start the display's side held (a wait for an image, a present that waited: for an eighth of a refresh
+    //! period or more), since the pacer was made.
+    [[nodiscard]] uint64_t SystemHeldFrames() const noexcept
+    {
+      return m_systemHeldFrames;
+    }
+
+    //! The frames whose start a wait for a frame slot held as long, since the pacer was made: the GPU was not done with an
+    //! earlier frame.
+    [[nodiscard]] uint64_t FrameSlotHeldFrames() const noexcept
+    {
+      return m_frameSlotHeldFrames;
+    }
+
     [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
       return m_lastPresentBlocked;
@@ -230,6 +260,9 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] int64_t SlotFor(NanosecondTickCount time) const noexcept;
     [[nodiscard]] int64_t SlotAfterPresent() const noexcept;
     [[nodiscard]] int64_t Reserve() const noexcept;
+    [[nodiscard]] bool LetsTheSystemPace() const noexcept;
+    [[nodiscard]] bool HeldByTheDisplaysSide() const noexcept;
+    [[nodiscard]] NanosecondTickCount StartTimeOf(int64_t slot) const noexcept;
     [[nodiscard]] NanosecondTickCount DueTime(int64_t slot) const noexcept;
     [[nodiscard]] int64_t SmoothSlotFor(NanosecondTickCount time) const noexcept;
     [[nodiscard]] NanosecondTickCount TimeOfSlot(int64_t slot) const noexcept;
