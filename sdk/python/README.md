@@ -20,17 +20,18 @@ subpackages. Standard library only, Python 3.12 or later.
 
 ## Times in nanoseconds
 
-Every time of the package is a plain integer whose name says its unit: whole ticks of 100 ns (`animation_ticks`), and
-nanoseconds for what a platform reports in nanoseconds (`period_nanoseconds`). The C++ and C# libraries have types for the
-second, `NanosecondTimeSpan` (an interval) and `NanosecondTickCount` (a point on a clock); here both are an `int`, and three
-functions convert as those types do: `ticks_to_nanoseconds` (exact), `nanosecond_time_span_to_ticks` (an interval, truncated
-toward zero to a tick) and `nanosecond_tick_count_to_ticks` (a point, the tick it is in).
+The package's times are whole ticks of 100 ns, as plain integers. Two types hold what a platform reports in nanoseconds
+without losing the last two digits: `NanosecondTimeSpan` (a signed interval) and `NanosecondTickCount` (a point on a clock,
+kept as an unsigned 64-bit count that compares across its wrap), both as the C++ and C# cores have them. Each holds a whole number
+of nanoseconds, an `int`: a float is refused, so nothing is rounded on the way in. `from_ticks` is
+exact, and `to_ticks()` gives ticks (truncated toward zero for an interval, the tick it is in for a point).
 
 ```python
-from mb_framepacing import nanosecond_time_span_to_ticks
+from mb_framepacing import NanosecondTickCount, NanosecondTimeSpan
 
-period_nanoseconds = 4_166_389  # a 240.016 Hz mode's refresh period
-nanosecond_time_span_to_ticks(period_nanoseconds)  # 41663: the 89 ns are what ticks do not hold
+period = NanosecondTimeSpan(4_166_389)  # a 240.016 Hz mode's refresh period
+period.to_ticks()  # 41663: the 89 ns are what ticks do not hold
+shown = NanosecondTickCount(1_000_000_000) + period
 ```
 
 ## The marker
