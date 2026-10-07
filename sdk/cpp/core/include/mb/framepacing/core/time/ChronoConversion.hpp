@@ -6,6 +6,9 @@
 // Conversions between the SDK's times and std::chrono, for an application that wants them. Optional and header only: nothing else in the
 // SDK includes it, so the SDK's types do not depend on <chrono>.
 
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/TickCount32.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
@@ -73,6 +76,46 @@ namespace MB::FramePacing
   constexpr std::chrono::time_point<TClock, TickDuration> ToTimePoint(const TickCount64 count) noexcept
   {
     return std::chrono::time_point<TClock, TickDuration>(TickDuration(count.Ticks()));
+  }
+
+  //! A std::chrono duration in nanoseconds with a 64-bit count. std::chrono::nanoseconds and every coarser duration convert into it
+  //! exactly and implicitly; a finer one needs std::chrono::floor<NanosecondDuration> first, so nothing is cut off silently.
+  using NanosecondDuration = std::chrono::duration<int64_t, std::nano>;
+
+  constexpr NanosecondTimeSpan ToNanosecondTimeSpan(const NanosecondDuration duration) noexcept
+  {
+    return NanosecondTimeSpan(duration.count());
+  }
+
+  constexpr NanosecondDuration ToNanosecondDuration(const NanosecondTimeSpan span) noexcept
+  {
+    return NanosecondDuration(span.Nanoseconds());
+  }
+
+  //! A negative duration becomes zero, as a NanosecondTimeDuration made from a negative NanosecondTimeSpan.
+  constexpr NanosecondTimeDuration ToNanosecondTimeDuration(const NanosecondDuration duration) noexcept
+  {
+    return NanosecondTimeDuration(ToNanosecondTimeSpan(duration));
+  }
+
+  constexpr NanosecondDuration ToNanosecondDuration(const NanosecondTimeDuration duration) noexcept
+  {
+    return NanosecondDuration(duration.Nanoseconds());
+  }
+
+  //! A time point of a std::chrono clock (steady_clock) as a NanosecondTickCount: its time since the clock's epoch, exactly for a clock
+  //! that counts in nanoseconds or coarser, rounded down to the nanosecond it is in for a finer one.
+  template <typename TClock, typename TDuration>
+  constexpr NanosecondTickCount ToNanosecondTickCount(const std::chrono::time_point<TClock, TDuration> timePoint) noexcept
+  {
+    return NanosecondTickCount(std::chrono::floor<NanosecondDuration>(timePoint.time_since_epoch()).count());
+  }
+
+  //! A NanosecondTickCount as a time point of the std::chrono clock TClock, when the count came from that clock.
+  template <typename TClock>
+  constexpr std::chrono::time_point<TClock, NanosecondDuration> ToTimePoint(const NanosecondTickCount count) noexcept
+  {
+    return std::chrono::time_point<TClock, NanosecondDuration>(NanosecondDuration(count.Nanoseconds()));
   }
 
   //! Convert a wall clock time to C# DateTime UTC ticks (the marker's StartMetadata::UtcTicks format), rounded down to the tick it is

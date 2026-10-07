@@ -19,8 +19,8 @@ namespace MB::FramePacing
   //!
   //! Wrap-around safe, as TickCount64: two counts compare and subtract correctly while they are less than 2^63 nanoseconds apart
   //! (about 292 years), across the wrap too. So the comparisons are not a total order: counts exactly 2^63 apart are each "less"
-  //! than the other. The From... factories throw std::overflow_error for a value outside the range; nothing else throws or
-  //! allocates.
+  //! than the other. The From... factories throw std::overflow_error for a value outside the range, FromCounter
+  //! std::out_of_range for a frequency outside its range; nothing else throws or allocates.
   class NanosecondTickCount
   {
     uint64_t m_nanoseconds{0};
@@ -40,6 +40,10 @@ namespace MB::FramePacing
     static constexpr int64_t MaxMicroseconds = std::numeric_limits<int64_t>::max() / NanosecondsPerMicrosecond;
     static constexpr int64_t MinTicks = std::numeric_limits<int64_t>::min() / NanosecondsPerTick;
     static constexpr int64_t MaxTicks = std::numeric_limits<int64_t>::max() / NanosecondsPerTick;
+
+    //! The fastest counter FromCounter takes (about 9.2 GHz, beyond any platform's clock): its rest times NanosecondsPerSecond fits
+    //! int64_t.
+    static constexpr int64_t MaxCounterFrequency = std::numeric_limits<int64_t>::max() / NanosecondsPerSecond;
 
     constexpr NanosecondTickCount() noexcept = default;
 
@@ -90,6 +94,30 @@ namespace MB::FramePacing
     static constexpr NanosecondTickCount FromTickCount64(const TickCount64 count)
     {
       return FromUnits(count.Ticks(), MinTicks, MaxTicks, NanosecondsPerTick);
+    }
+
+    //! A counter value of a clock that counts frequency times a second (QueryPerformanceCounter with QueryPerformanceFrequency, .NET's
+    //! Stopwatch), rounded down to the nanosecond it is in, as TickCount64::FromCounter is to the tick. The whole seconds and the rest
+    //! are converted apart, so it is exact for every counter value whose time fits a NanosecondTickCount (every one, from 1 GHz on); a
+    //! slower counter's time past that wraps, as the count does. Throws std::out_of_range for a frequency that is not 1 to
+    //! MaxCounterFrequency.
+    static constexpr NanosecondTickCount FromCounter(const int64_t counter, const int64_t frequency)
+    {
+      if (frequency <= 0 || frequency > MaxCounterFrequency)
+      {
+        throw std::out_of_range("NanosecondTickCount: the counter frequency must be 1 to MaxCounterFrequency");
+      }
+      int64_t seconds = counter / frequency;
+      int64_t rest = counter % frequency;
+      if (rest < 0)
+      {
+        --seconds;
+        rest += frequency;
+      }
+      // rest < frequency <= MaxCounterFrequency, so rest * NanosecondsPerSecond fits. The seconds are multiplied unsigned: they wrap
+      // when a slow counter's time is past the range, where the signed product would be undefined.
+      const uint64_t wholeSeconds = static_cast<uint64_t>(seconds) * static_cast<uint64_t>(NanosecondsPerSecond);
+      return FromUnsignedNanoseconds(wholeSeconds + static_cast<uint64_t>((rest * NanosecondsPerSecond) / frequency));
     }
 
     //! The count as a signed number of nanoseconds.

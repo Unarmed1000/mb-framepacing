@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // The optional std::chrono conversions (core/time/ChronoConversion.hpp).
 #include <mb/framepacing/core/time/ChronoConversion.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/TickCount32.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
@@ -10,6 +13,7 @@
 #include <gtest/gtest.h>
 #include <chrono>
 #include <cstdint>
+#include <ratio>
 #include <stdexcept>
 
 namespace FP = MB::FramePacing;
@@ -54,6 +58,50 @@ TEST(ChronoConversion, TimePointsBecomeCountsRoundedDown)
   // A real clock
   const FP::TickCount64 before = FP::ToTickCount64(std::chrono::steady_clock::now());
   EXPECT_GE(FP::ToTickCount64(std::chrono::steady_clock::now()), before);
+}
+
+TEST(ChronoConversion, ANanosecondDurationIsInNanoseconds)
+{
+  // std::chrono::nanoseconds and coarser durations convert exactly and implicitly
+  EXPECT_EQ(FP::NanosecondDuration{std::chrono::nanoseconds{4'166'389}}.count(), 4'166'389);
+  EXPECT_EQ(FP::NanosecondDuration{std::chrono::milliseconds{1}}.count(), FP::NanosecondTimeSpan::NanosecondsPerMillisecond);
+  EXPECT_EQ(FP::NanosecondDuration{FP::TickDuration{-2}}.count(), -200);
+}
+
+TEST(ChronoConversion, NanosecondSpansConvertExactly)
+{
+  EXPECT_EQ(FP::ToNanosecondTimeSpan(std::chrono::nanoseconds{4'166'389}), FP::NanosecondTimeSpan(4'166'389));
+  EXPECT_EQ(FP::ToNanosecondTimeSpan(std::chrono::milliseconds{-16}), FP::NanosecondTimeSpan::FromMilliseconds(-16));
+  EXPECT_EQ(FP::ToNanosecondDuration(FP::NanosecondTimeSpan(-7)), FP::NanosecondDuration{-7});
+  // A duration is never negative
+  EXPECT_EQ(FP::ToNanosecondTimeDuration(std::chrono::nanoseconds{4'166'389}), FP::NanosecondTimeDuration::FromNanoseconds(4'166'389));
+  EXPECT_EQ(FP::ToNanosecondTimeDuration(FP::NanosecondDuration{-1}), FP::NanosecondTimeDuration::Zero());
+  EXPECT_EQ(FP::ToNanosecondDuration(FP::NanosecondTimeDuration::FromNanoseconds(16'666'667)), FP::NanosecondDuration{16'666'667});
+  EXPECT_EQ(FP::ToNanosecondDuration(FP::NanosecondTimeDuration::MaxValue()), FP::NanosecondDuration::max());
+  static_assert(FP::ToNanosecondTimeSpan(FP::ToNanosecondDuration(FP::NanosecondTimeSpan(42))) == FP::NanosecondTimeSpan(42));
+}
+
+TEST(ChronoConversion, TimePointsBecomeNanosecondCountsExactly)
+{
+  using SteadyNanoseconds = std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds>;
+  EXPECT_EQ(FP::ToNanosecondTickCount(SteadyNanoseconds{std::chrono::nanoseconds{150}}), FP::NanosecondTickCount(150));
+  EXPECT_EQ(FP::ToNanosecondTickCount(SteadyNanoseconds{std::chrono::nanoseconds{-1}}), FP::NanosecondTickCount(-1));
+  // A coarser clock (steady_clock counts ticks of 100 ns with some standard libraries) converts exactly
+  using SteadyTicks = std::chrono::time_point<std::chrono::steady_clock, FP::TickDuration>;
+  EXPECT_EQ(FP::ToNanosecondTickCount(SteadyTicks{FP::TickDuration{-15}}), FP::NanosecondTickCount(-1'500));
+  // A finer one is rounded down to the nanosecond it is in
+  using Picoseconds = std::chrono::duration<int64_t, std::pico>;
+  using SteadyPicoseconds = std::chrono::time_point<std::chrono::steady_clock, Picoseconds>;
+  EXPECT_EQ(FP::ToNanosecondTickCount(SteadyPicoseconds{Picoseconds{1'999}}), FP::NanosecondTickCount(1));
+  EXPECT_EQ(FP::ToNanosecondTickCount(SteadyPicoseconds{Picoseconds{-1}}), FP::NanosecondTickCount(-1));
+  // And back: a count as a time point of the clock it came from
+  const FP::NanosecondTickCount count(123'456);
+  const auto timePoint = FP::ToTimePoint<std::chrono::steady_clock>(count);
+  EXPECT_EQ(timePoint.time_since_epoch().count(), 123'456);
+  EXPECT_EQ(FP::ToNanosecondTickCount(timePoint), count);
+  // A real clock
+  const FP::NanosecondTickCount before = FP::ToNanosecondTickCount(std::chrono::steady_clock::now());
+  EXPECT_GE(FP::ToNanosecondTickCount(std::chrono::steady_clock::now()), before);
 }
 
 TEST(ChronoConversion, ADateTimeIsTicksSinceYearOne)

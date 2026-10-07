@@ -47,6 +47,14 @@ namespace MB.FramePacing.UnitTest
         sum += now.Days + now.Milliseconds + now32.Milliseconds + now.GetHashCode() % 2 + (now.Equals(previous) ? 1 : 0);
         sum += TickCount64.FromMilliseconds(frame).Ticks + TickCount32.FromMilliseconds(frame % 1000).Ticks;
         sum += TickCount64.FromNanoseconds(frame * 150L).Ticks + TickCount64.FromCounter(frame * 3L, 3_000_000_000).Ticks;
+
+        // The same in nanoseconds: a point from a counter, seconds as a double, a duration and what its arithmetic gives
+        NanosecondTickCount nanosecondNow = NanosecondTickCount.FromCounter(frame * 3L, 3_000_000_000);
+        NanosecondTimeDuration period = NanosecondTimeDuration.FromNanoseconds(4_166_389 + (frame % 3));
+        NanosecondTimeDuration work = new NanosecondTimeDuration(NanosecondTimeSpan.FromSeconds(frame / 240_000.0)) + period;
+        NanosecondTimeSpan left = period - work;
+        sum += (nanosecondNow + period).Nanoseconds + NanosecondTimeDuration.Max(period, work).Nanoseconds + left.Nanoseconds;
+        sum += NanosecondTimeDuration.FromTimeDuration(work.ToTimeDuration()).Nanoseconds + (period < work ? 1 : 0) + work.GetHashCode() % 2;
       }
       return sum;
     }

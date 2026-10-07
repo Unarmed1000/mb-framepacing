@@ -17,6 +17,8 @@ namespace
 {
   constexpr int64_t MaxInt64 = std::numeric_limits<int64_t>::max();
   constexpr int64_t MinInt64 = std::numeric_limits<int64_t>::min();
+  constexpr double NaN = std::numeric_limits<double>::quiet_NaN();
+  constexpr double Infinity = std::numeric_limits<double>::infinity();
 }
 
 TEST(NanosecondTimeSpan, HoldsASignedCountOfNanoseconds)
@@ -48,6 +50,36 @@ TEST(NanosecondTimeSpan, IsMadeFromWholeUnitsAndThrowsOutsideItsRange)
   EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromMilliseconds(MaxInt64)), std::out_of_range);
   EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromMicroseconds(MinInt64)), std::out_of_range);
   static_assert(FP::NanosecondTimeSpan::FromMilliseconds(1) == FP::NanosecondTimeSpan(1'000'000));
+}
+
+TEST(NanosecondTimeSpan, WholeUnitsOfAnyIntegerTypeAreTaken)
+{
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(5u).Nanoseconds(), 5'000'000'000);
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromMilliseconds(int16_t{-3}).Nanoseconds(), -3'000'000);
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromMicroseconds(uint64_t{7}).Nanoseconds(), 7'000);
+  // An unsigned value above the range is not read as a negative one
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromSeconds(std::numeric_limits<uint64_t>::max())), std::out_of_range);
+}
+
+TEST(NanosecondTimeSpan, SecondsAsADoubleAreTruncatedTowardZeroToANanosecond)
+{
+  // A sixtieth of a second is 16'666'666.67 ns: the fraction of a nanosecond is cut off, toward zero on both sides
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(1.0 / 60).Nanoseconds(), 16'666'666);
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(-1.0 / 60).Nanoseconds(), -16'666'666);
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(1.5).Nanoseconds(), 1'500'000'000);
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(0.0), FP::NanosecondTimeSpan::Zero());
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(-0.0), FP::NanosecondTimeSpan::Zero());
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(0.9e-9), FP::NanosecondTimeSpan::Zero());
+  // The ends of the range: 2^63 ns, which is what the largest value rounds to as a double, is the largest value
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(9'223'372'036.854775807), FP::NanosecondTimeSpan::MaxValue());
+  EXPECT_EQ(FP::NanosecondTimeSpan::FromSeconds(-9'223'372'036.854775808), FP::NanosecondTimeSpan::MinValue());
+  EXPECT_LT(FP::NanosecondTimeSpan::FromSeconds(9'223'372'036.854), FP::NanosecondTimeSpan::MaxValue());
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromSeconds(1e10)), std::overflow_error);
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromSeconds(-1e10)), std::overflow_error);
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromSeconds(Infinity)), std::overflow_error);
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromSeconds(-Infinity)), std::overflow_error);
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTimeSpan::FromSeconds(NaN)), std::invalid_argument);
+  static_assert(FP::NanosecondTimeSpan::FromSeconds(0.5).Nanoseconds() == 500'000'000);
 }
 
 TEST(NanosecondTimeSpan, ATimeSpanIsExactInNanosecondsAndTheWayBackTruncatesToATick)

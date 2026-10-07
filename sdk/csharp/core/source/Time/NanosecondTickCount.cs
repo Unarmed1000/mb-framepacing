@@ -8,8 +8,8 @@
 //*
 //* Wrap-around safe, as TickCount64: two counts compare and subtract correctly while they are less than 2^63 nanoseconds apart (about 292
 //* years), across the wrap too. So the comparisons are not a total order, and the type is not IComparable. The From... factories throw
-//* OverflowException for a value outside the range; nothing else throws or allocates. The C++ core's NanosecondTickCount, member for
-//* member.
+//* OverflowException for a value outside the range, FromCounter ArgumentOutOfRangeException for a frequency it does not take; nothing
+//* else throws or allocates. The C++ core's NanosecondTickCount, member for member.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -36,6 +36,11 @@ namespace MB.FramePacing
     public const long MaxMicroseconds = long.MaxValue / NanosecondsPerMicrosecond;
     public const long MinTicks = long.MinValue / NanosecondsPerTick;
     public const long MaxTicks = long.MaxValue / NanosecondsPerTick;
+
+    /// <summary>
+    /// The fastest counter FromCounter takes (about 9.2 GHz, beyond any platform's clock): its rest times NanosecondsPerSecond fits a long.
+    /// </summary>
+    public const long MaxCounterFrequency = long.MaxValue / NanosecondsPerSecond;
 
     public NanosecondTickCount(long nanoseconds)
     {
@@ -75,6 +80,29 @@ namespace MB.FramePacing
     /// a hundred times as far).
     /// </summary>
     public static NanosecondTickCount FromTickCount64(TickCount64 count) => FromUnits(count.Ticks, MinTicks, MaxTicks, NanosecondsPerTick);
+
+    /// <summary>
+    /// A counter value of a clock that counts frequency times a second (Stopwatch.GetTimestamp with Stopwatch.Frequency,
+    /// QueryPerformanceCounter), rounded down to the nanosecond it is in. The whole seconds and the rest are converted apart, so it is
+    /// exact for every counter value whose time fits a NanosecondTickCount (every one, from 1 GHz on); a slower counter's time past that
+    /// wraps, as the count does. Throws ArgumentOutOfRangeException for a frequency that is not 1 to MaxCounterFrequency.
+    /// </summary>
+    public static NanosecondTickCount FromCounter(long counter, long frequency)
+    {
+      if (frequency <= 0 || frequency > MaxCounterFrequency)
+      {
+        throw new ArgumentOutOfRangeException(nameof(frequency), frequency, "The counter frequency must be 1 to MaxCounterFrequency");
+      }
+      long seconds = counter / frequency;
+      long rest = counter % frequency;
+      if (rest < 0)
+      {
+        --seconds;
+        rest += frequency;
+      }
+      // rest < frequency <= MaxCounterFrequency, so rest * NanosecondsPerSecond fits
+      return new NanosecondTickCount(unchecked((seconds * NanosecondsPerSecond) + ((rest * NanosecondsPerSecond) / frequency)));
+    }
 
     /// <summary>The count as a signed number of nanoseconds.</summary>
     public long Nanoseconds => unchecked((long)UnsignedNanoseconds);

@@ -5,8 +5,9 @@
 //* time between two display times), kept as it is given. A System.TimeSpan counts in ticks of 100 ns, so a value that goes through it
 //* loses up to 99 ns: a refresh period of 4,166,389 ns is 41,663 ticks, 21 parts in a million short. About 292 years either way.
 //*
-//* Out of range throws, as TimeSpan does: ArgumentOutOfRangeException from the factories, OverflowException from the arithmetic. Nothing
-//* here allocates. The C++ core's NanosecondTimeSpan, member for member.
+//* Out of range throws, as TimeSpan does: ArgumentOutOfRangeException from the factories, OverflowException from the arithmetic. Seconds
+//* as a double throw as TimeSpanUtil.FromSeconds does: OverflowException outside the range, ArgumentException for NaN. Nothing here
+//* allocates. The C++ core's NanosecondTimeSpan, member for member.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -23,6 +24,9 @@ namespace MB.FramePacing
     public const long NanosecondsPerMicrosecond = 1_000;
     public const long NanosecondsPerMillisecond = 1_000_000;
     public const long NanosecondsPerSecond = 1_000_000_000;
+
+    // 2^63: what MaxValue's nanoseconds round to as a double
+    private const double NanosecondLimit = 9_223_372_036_854_775_808.0;
 
     public static readonly NanosecondTimeSpan Zero = default;
 
@@ -47,6 +51,24 @@ namespace MB.FramePacing
 
     /// <summary>A whole number of seconds. Throws ArgumentOutOfRangeException if it is outside the range.</summary>
     public static NanosecondTimeSpan FromSeconds(long seconds) => FromUnits(seconds, NanosecondsPerSecond, nameof(seconds));
+
+    /// <summary>
+    /// Seconds (an animation clock's time, for example) truncated toward zero to a nanosecond: 1.0 / 60 is 16 666 666 ns. Throws
+    /// ArgumentException for NaN and OverflowException outside the range, as TimeSpanUtil.FromSeconds does.
+    /// </summary>
+    public static NanosecondTimeSpan FromSeconds(double seconds)
+    {
+      if (double.IsNaN(seconds))
+      {
+        throw new ArgumentException("The value is NaN", nameof(seconds));
+      }
+      double nanoseconds = seconds * NanosecondsPerSecond;
+      if (nanoseconds < -NanosecondLimit || nanoseconds > NanosecondLimit)
+      {
+        throw new OverflowException("The value is outside the range of a NanosecondTimeSpan");
+      }
+      return nanoseconds == NanosecondLimit ? MaxValue : new NanosecondTimeSpan((long)nanoseconds);
+    }
 
     /// <summary>
     /// A span in ticks of 100 ns, exactly. Throws ArgumentOutOfRangeException if it is outside the range (a TimeSpan reaches a hundred

@@ -3,7 +3,7 @@
 //* ----------------
 //* NanosecondTimeSpan: a signed interval in nanoseconds, kept as a platform that counts in nanoseconds gives it. To and from a TimeSpan
 //* (ticks of 100 ns) it is exact one way and truncated the other, and out of range throws as TimeSpan does. The same cases as the C++
-//* core's tests.
+//* core's tests, and seconds as a double with the cases of TimeSpanUtil.FromSeconds.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -46,6 +46,56 @@ namespace MB.FramePacing.UnitTest
       Assert.That(() => NanosecondTimeSpan.FromSeconds(-9_223_372_037), Throws.TypeOf<ArgumentOutOfRangeException>());
       Assert.That(() => NanosecondTimeSpan.FromMilliseconds(long.MaxValue), Throws.TypeOf<ArgumentOutOfRangeException>());
       Assert.That(() => NanosecondTimeSpan.FromMicroseconds(long.MinValue), Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void SecondsAsADoubleAreTruncatedTowardZeroToANanosecond()
+    {
+      Assert.That(NanosecondTimeSpan.FromSeconds(0.0).Nanoseconds, Is.EqualTo(0L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(-0.0), Is.EqualTo(NanosecondTimeSpan.Zero));
+      Assert.That(NanosecondTimeSpan.FromSeconds(1.0).Nanoseconds, Is.EqualTo(1_000_000_000L));
+      // A frame at 60 Hz: 16,666,666.67 ns, less its fraction
+      Assert.That(NanosecondTimeSpan.FromSeconds(1.0 / 60).Nanoseconds, Is.EqualTo(16_666_666L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(-1.0 / 60).Nanoseconds, Is.EqualTo(-16_666_666L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(0.016_666_667_9).Nanoseconds, Is.EqualTo(16_666_667L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(0.000_000_001_5).Nanoseconds, Is.EqualTo(1L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(-0.000_000_001_5).Nanoseconds, Is.EqualTo(-1L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(0.000_000_000_9), Is.EqualTo(NanosecondTimeSpan.Zero));
+      Assert.That(NanosecondTimeSpan.FromSeconds(3600.5).Nanoseconds, Is.EqualTo(3_600_500_000_000L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(0.5f).Nanoseconds, Is.EqualTo(500_000_000L), "a float is seconds as a double");
+    }
+
+    [Test]
+    public void SecondsAsADoubleOutsideItsRangeThrow()
+    {
+      // 2^63 ns, which is what MaxValue's nanoseconds round to as a double, is MaxValue
+      Assert.That(NanosecondTimeSpan.FromSeconds(9_223_372_036.854_775_808), Is.EqualTo(NanosecondTimeSpan.MaxValue));
+      Assert.That(NanosecondTimeSpan.FromSeconds(-9_223_372_036.854_775_808), Is.EqualTo(NanosecondTimeSpan.MinValue));
+      // The double below 2^63 ns, 1024 ns short of it, is in the range as it is
+      Assert.That(NanosecondTimeSpan.FromSeconds(9_223_372_036.854_774).Nanoseconds, Is.EqualTo(9_223_372_036_854_774_784L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(-9_223_372_036.854_774).Nanoseconds, Is.EqualTo(-9_223_372_036_854_774_784L));
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(1e10), Throws.TypeOf<OverflowException>());
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(-1e10), Throws.TypeOf<OverflowException>());
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(double.MaxValue), Throws.TypeOf<OverflowException>());
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(double.PositiveInfinity), Throws.TypeOf<OverflowException>());
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(double.NegativeInfinity), Throws.TypeOf<OverflowException>());
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(double.NaN), Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void AWholeNumberOfSecondsStillPicksTheWholeNumberFactory()
+    {
+      // An int and a long pick FromSeconds(long): exact where a double is not, and its own exception outside the range
+      const int IntSeconds = 2;
+      const long LongSeconds = 9_223_372_035;
+      Assert.That(NanosecondTimeSpan.FromSeconds(IntSeconds).Nanoseconds, Is.EqualTo(2_000_000_000L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(int.MaxValue).Nanoseconds, Is.EqualTo(2_147_483_647_000_000_000L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(int.MinValue).Nanoseconds, Is.EqualTo(-2_147_483_648_000_000_000L));
+      Assert.That(NanosecondTimeSpan.FromSeconds(LongSeconds).Nanoseconds, Is.EqualTo(9_223_372_035_000_000_000L));
+      // The same seconds as a double are 512 ns off: a double that large holds every 1024th nanosecond
+      Assert.That(NanosecondTimeSpan.FromSeconds((double)LongSeconds).Nanoseconds, Is.EqualTo(9_223_372_035_000_000_512L));
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(9_223_372_037), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => NanosecondTimeSpan.FromSeconds(9_223_372_037.0), Throws.TypeOf<OverflowException>());
     }
 
     [Test]

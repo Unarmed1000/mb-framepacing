@@ -2,7 +2,8 @@
 //* File Description
 //* ----------------
 //* NanosecondTickCount: a point on a clock that counts in nanoseconds, stored unsigned so it wraps and compares across the wrap, as
-//* TickCount64 does in ticks of 100 ns. To a TickCount64 it is the tick the point is in. The same cases as the C++ core's tests.
+//* TickCount64 does in ticks of 100 ns. To a TickCount64 it is the tick the point is in. The same cases as the C++ core's tests, and a
+//* counter with the cases of TickCount64.FromCounter.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -76,6 +77,99 @@ namespace MB.FramePacing.UnitTest
       Assert.That(new NanosecondTickCount(-1).ToTickCount64(), Is.EqualTo(new TickCount64(-1)));
       Assert.That(new NanosecondTickCount(-100).ToTickCount64(), Is.EqualTo(new TickCount64(-1)));
       Assert.That(new NanosecondTickCount(-101).ToTickCount64(), Is.EqualTo(new TickCount64(-2)));
+    }
+
+    [Test]
+    public void ACounterConvertsExactlyAtAnyValue()
+    {
+      // A 10 MHz counter (Stopwatch.Frequency on current Windows) counts in ticks of 100 ns
+      Assert.That(NanosecondTickCount.FromCounter(123_456_789, 10_000_000).Nanoseconds, Is.EqualTo(12_345_678_900L));
+      Assert.That(NanosecondTickCount.FromCounter(20_000_000, 10_000_000).Nanoseconds, Is.EqualTo(2_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(-1, 10_000_000).Nanoseconds, Is.EqualTo(-100L));
+      Assert.That(
+        NanosecondTickCount.FromCounter(123_456_789, 10_000_000),
+        Is.EqualTo(NanosecondTickCount.FromTickCount64(TickCount64.FromCounter(123_456_789, 10_000_000)))
+      );
+      // A 1 GHz counter (Stopwatch.Frequency on Linux and macOS) is in nanoseconds already, at every value
+      Assert.That(NanosecondTickCount.FromCounter(123_456_789, 1_000_000_000).Nanoseconds, Is.EqualTo(123_456_789L));
+      Assert.That(NanosecondTickCount.FromCounter(4_000_000_001, 1_000_000_000).Nanoseconds, Is.EqualTo(4_000_000_001L));
+      Assert.That(NanosecondTickCount.FromCounter(0, 1_000_000_000).Nanoseconds, Is.EqualTo(0L));
+      Assert.That(NanosecondTickCount.FromCounter(-150, 1_000_000_000).Nanoseconds, Is.EqualTo(-150L));
+      Assert.That(NanosecondTickCount.FromCounter(long.MaxValue, 1_000_000_000).Nanoseconds, Is.EqualTo(long.MaxValue));
+      Assert.That(NanosecondTickCount.FromCounter(long.MinValue, 1_000_000_000).Nanoseconds, Is.EqualTo(long.MinValue));
+      // A counter near its limit does not overflow: 2^63 - 1 at 3 GHz is about 97 years
+      const long Frequency = 3_000_000_000;
+      const long NanosecondsPerSecond = NanosecondTickCount.NanosecondsPerSecond;
+      Assert.That(
+        NanosecondTickCount.FromCounter(long.MaxValue, Frequency).Nanoseconds,
+        Is.EqualTo(((long.MaxValue / Frequency) * NanosecondsPerSecond) + (((long.MaxValue % Frequency) * NanosecondsPerSecond) / Frequency))
+      );
+      // The fastest counter it takes, at its limit too
+      const long Fastest = NanosecondTickCount.MaxCounterFrequency;
+      Assert.That(Fastest, Is.EqualTo(9_223_372_036L));
+      Assert.That(NanosecondTickCount.FromCounter(Fastest, Fastest).Nanoseconds, Is.EqualTo(NanosecondsPerSecond));
+      Assert.That(
+        NanosecondTickCount.FromCounter(long.MaxValue, Fastest).Nanoseconds,
+        Is.EqualTo(((long.MaxValue / Fastest) * NanosecondsPerSecond) + (((long.MaxValue % Fastest) * NanosecondsPerSecond) / Fastest))
+      );
+    }
+
+    [Test]
+    public void ACounterIsRoundedDownToTheNanosecondItIsIn()
+    {
+      // Three counts a second: a third of a second is 333,333,333.33 ns
+      Assert.That(NanosecondTickCount.FromCounter(1, 3).Nanoseconds, Is.EqualTo(333_333_333L));
+      Assert.That(NanosecondTickCount.FromCounter(2, 3).Nanoseconds, Is.EqualTo(666_666_666L));
+      Assert.That(NanosecondTickCount.FromCounter(3, 3).Nanoseconds, Is.EqualTo(1_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(4, 3).Nanoseconds, Is.EqualTo(1_333_333_333L));
+      // A 3 GHz counter: one second and a third of a nanosecond, then a whole one
+      Assert.That(NanosecondTickCount.FromCounter(3_000_000_001, 3_000_000_000).Nanoseconds, Is.EqualTo(1_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(3_000_000_002, 3_000_000_000).Nanoseconds, Is.EqualTo(1_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(3_000_000_003, 3_000_000_000).Nanoseconds, Is.EqualTo(1_000_000_001L));
+      // Before the epoch it is rounded down too, not toward zero
+      Assert.That(NanosecondTickCount.FromCounter(-1, 3).Nanoseconds, Is.EqualTo(-333_333_334L));
+      Assert.That(NanosecondTickCount.FromCounter(-2, 3).Nanoseconds, Is.EqualTo(-666_666_667L));
+      Assert.That(NanosecondTickCount.FromCounter(-3, 3).Nanoseconds, Is.EqualTo(-1_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(-4, 3).Nanoseconds, Is.EqualTo(-1_333_333_334L));
+      Assert.That(NanosecondTickCount.FromCounter(-1, 3_000_000_000).Nanoseconds, Is.EqualTo(-1L));
+      Assert.That(NanosecondTickCount.FromCounter(-3, 3_000_000_000).Nanoseconds, Is.EqualTo(-1L));
+      Assert.That(NanosecondTickCount.FromCounter(-4, 3_000_000_000).Nanoseconds, Is.EqualTo(-2L));
+    }
+
+    [Test]
+    public void ASlowCounterPastTheRangeWrapsAsTheCountDoes()
+    {
+      // A counter slower than the nanosecond can count more seconds than a NanosecondTickCount holds (2^63 - 1 seconds at 1 Hz): the count
+      // wraps, as every NanosecondTickCount does, and the difference of two such counts is still their distance
+      long wrapped = unchecked((long)((ulong)long.MaxValue * (ulong)NanosecondTickCount.NanosecondsPerSecond));
+      Assert.That(NanosecondTickCount.FromCounter(long.MaxValue, 1).Nanoseconds, Is.EqualTo(wrapped));
+      Assert.That(
+        NanosecondTickCount.FromCounter(long.MaxValue, 1) - NanosecondTickCount.FromCounter(long.MaxValue - 3, 1),
+        Is.EqualTo(NanosecondTimeSpan.FromSeconds(3))
+      );
+      Assert.That(
+        NanosecondTickCount.FromCounter(long.MinValue, 1000) - NanosecondTickCount.FromCounter(long.MinValue + 1, 1000),
+        Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(-1))
+      );
+      // The first counter value at 1 Hz that is past the range: 9,223,372,037 s is 2^63 ns and 145,224,192 more
+      Assert.That(NanosecondTickCount.FromCounter(9_223_372_036, 1).Nanoseconds, Is.EqualTo(9_223_372_036_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(9_223_372_037, 1).Nanoseconds, Is.EqualTo(long.MinValue + 145_224_192L));
+    }
+
+    [Test]
+    public void ACounterFrequencyOutsideItsRangeThrows()
+    {
+      Assert.That(() => NanosecondTickCount.FromCounter(123, 0), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => NanosecondTickCount.FromCounter(123, -1_000_000_000), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => NanosecondTickCount.FromCounter(123, long.MinValue), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(
+        () => NanosecondTickCount.FromCounter(123, NanosecondTickCount.MaxCounterFrequency + 1),
+        Throws.TypeOf<ArgumentOutOfRangeException>().With.Property(nameof(ArgumentOutOfRangeException.ParamName)).EqualTo("frequency")
+      );
+      Assert.That(() => NanosecondTickCount.FromCounter(123, long.MaxValue), Throws.TypeOf<ArgumentOutOfRangeException>());
+      // The ends of the range are taken
+      Assert.That(NanosecondTickCount.FromCounter(123, 1).Nanoseconds, Is.EqualTo(123_000_000_000L));
+      Assert.That(NanosecondTickCount.FromCounter(123, NanosecondTickCount.MaxCounterFrequency).Nanoseconds, Is.EqualTo(13L));
     }
 
     [Test]

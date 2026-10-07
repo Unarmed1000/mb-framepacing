@@ -25,6 +25,8 @@ without losing the last two digits: `NanosecondTimeSpan` (a signed interval) and
 kept as an unsigned 64-bit count that compares across its wrap), both as the C++ and C# cores have them. Each holds a whole number
 of nanoseconds, an `int`: a float is refused, so nothing is rounded on the way in. `from_ticks` is
 exact, and `to_ticks()` gives ticks (truncated toward zero for an interval, the tick it is in for a point).
+`NanosecondTimeDuration` is a length of time that is never negative (a negative count becomes zero): two added are a duration,
+and one less another is a `NanosecondTimeSpan`.
 
 ```python
 from mb_framepacing import NanosecondTickCount, NanosecondTimeSpan

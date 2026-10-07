@@ -5,9 +5,11 @@
 
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace MB::FramePacing
 {
@@ -16,8 +18,8 @@ namespace MB::FramePacing
   //! through it loses up to 99 ns: a refresh period of 4'166'389 ns is 41'663 ticks, 21 parts in a million short. About 292 years
   //! either way.
   //!
-  //! Out of range throws, as TimeSpan does: std::out_of_range from the factories, std::overflow_error from the arithmetic. Nothing
-  //! allocates unless it throws.
+  //! Out of range throws, as TimeSpan does: std::out_of_range from the whole-number factories, std::overflow_error from the
+  //! arithmetic and from seconds given as a double. Nothing allocates unless it throws.
   class NanosecondTimeSpan
   {
     int64_t m_nanoseconds{0};
@@ -58,22 +60,61 @@ namespace MB::FramePacing
       return NanosecondTimeSpan(nanoseconds);
     }
 
+  private:
+    // Defined before the factories that call it: a constant expression needs the template's definition at the call
+    template <std::integral T>
+    static constexpr NanosecondTimeSpan FromUnits(const T value, const int64_t nanosecondsPerUnit)
+    {
+      if (std::cmp_less(value, MinNanoseconds / nanosecondsPerUnit) || std::cmp_greater(value, MaxNanoseconds / nanosecondsPerUnit))
+      {
+        throw std::out_of_range("NanosecondTimeSpan: the value is outside the range of a NanosecondTimeSpan");
+      }
+      return NanosecondTimeSpan(static_cast<int64_t>(value) * nanosecondsPerUnit);
+    }
+
+  public:
     //! A whole number of microseconds. Throws std::out_of_range if it is outside the range.
-    static constexpr NanosecondTimeSpan FromMicroseconds(const int64_t microseconds)
+    template <std::integral T>
+      requires(!std::same_as<T, bool>)
+    static constexpr NanosecondTimeSpan FromMicroseconds(const T microseconds)
     {
       return FromUnits(microseconds, NanosecondsPerMicrosecond);
     }
 
     //! A whole number of milliseconds. Throws std::out_of_range if it is outside the range.
-    static constexpr NanosecondTimeSpan FromMilliseconds(const int64_t milliseconds)
+    template <std::integral T>
+      requires(!std::same_as<T, bool>)
+    static constexpr NanosecondTimeSpan FromMilliseconds(const T milliseconds)
     {
       return FromUnits(milliseconds, NanosecondsPerMillisecond);
     }
 
     //! A whole number of seconds. Throws std::out_of_range if it is outside the range.
-    static constexpr NanosecondTimeSpan FromSeconds(const int64_t seconds)
+    template <std::integral T>
+      requires(!std::same_as<T, bool>)
+    static constexpr NanosecondTimeSpan FromSeconds(const T seconds)
     {
       return FromUnits(seconds, NanosecondsPerSecond);
+    }
+
+    //! Seconds, truncated toward zero to a nanosecond (1.0 / 60 is 16'666'666 ns), as TimeSpan::FromSeconds truncates to a tick. Throws
+    //! std::overflow_error outside the range, std::invalid_argument for NaN.
+    static constexpr NanosecondTimeSpan FromSeconds(const double seconds)
+    {
+      // NaN is the one value that differs from itself (std::isnan is not constexpr in C++20)
+      // NOLINTNEXTLINE(misc-redundant-expression)
+      if (seconds != seconds)
+      {
+        throw std::invalid_argument("NanosecondTimeSpan: the value is NaN");
+      }
+      // 2^63, which is what MaxValue's nanoseconds round to as a double, is MaxValue
+      constexpr double Limit = 9'223'372'036'854'775'808.0;
+      const double nanoseconds = seconds * static_cast<double>(NanosecondsPerSecond);
+      if (nanoseconds < -Limit || nanoseconds > Limit)
+      {
+        throw std::overflow_error("NanosecondTimeSpan: the value is outside the range of a NanosecondTimeSpan");
+      }
+      return nanoseconds == Limit ? MaxValue() : NanosecondTimeSpan(static_cast<int64_t>(nanoseconds));
     }
 
     //! A span in ticks of 100 ns, exactly. Throws std::out_of_range if it is outside the range (a TimeSpan reaches a hundred times
@@ -172,16 +213,6 @@ namespace MB::FramePacing
 
     constexpr bool operator==(const NanosecondTimeSpan&) const noexcept = default;
     constexpr std::strong_ordering operator<=>(const NanosecondTimeSpan&) const noexcept = default;
-
-  private:
-    static constexpr NanosecondTimeSpan FromUnits(const int64_t value, const int64_t nanosecondsPerUnit)
-    {
-      if (value < MinNanoseconds / nanosecondsPerUnit || value > MaxNanoseconds / nanosecondsPerUnit)
-      {
-        throw std::out_of_range("NanosecondTimeSpan: the value is outside the range of a NanosecondTimeSpan");
-      }
-      return NanosecondTimeSpan(value * nanosecondsPerUnit);
-    }
   };
 }
 

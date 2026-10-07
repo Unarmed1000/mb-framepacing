@@ -77,6 +77,54 @@ TEST(NanosecondTickCount, ATickCountIsExactInNanosecondsAndTheWayBackIsTheTickTh
   static_assert(FP::NanosecondTickCount::FromTickCount64(FP::TickCount64(3)).ToTickCount64() == FP::TickCount64(3));
 }
 
+TEST(NanosecondTickCount, ACounterConvertsExactlyAtAnyValue)
+{
+  // A counter in nanoseconds is the count already
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(123'456'789, 1'000'000'000).Nanoseconds(), 123'456'789);
+  // A 10 MHz counter (QueryPerformanceFrequency on current Windows) counts in ticks of 100 ns
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(123'456'789, 10'000'000).Nanoseconds(), 12'345'678'900);
+  // A 3 GHz counter: one second and a third of a nanosecond, rounded down to the nanosecond it is in
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(3'000'000'001, 3'000'000'000).Nanoseconds(), 1'000'000'000);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(3'000'000'003, 3'000'000'000).Nanoseconds(), 1'000'000'001);
+  // Before the clock's epoch too: -1 of a 3 GHz counter is in the nanosecond -1, and whole seconds stay whole
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(-1, 3'000'000'000).Nanoseconds(), -1);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(-6'000'000'000, 3'000'000'000).Nanoseconds(), -2'000'000'000);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(-15, 10'000'000), FP::NanosecondTickCount::FromTickCount64(FP::TickCount64(-15)));
+  // A counter near its limit does not overflow: 2^63 - 1 at 3 GHz is about 97 years
+  constexpr int64_t Frequency = 3'000'000'000;
+  constexpr int64_t PerSecond = FP::NanosecondTickCount::NanosecondsPerSecond;
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(MaxInt64, Frequency).Nanoseconds(),
+            ((MaxInt64 / Frequency) * PerSecond) + (((MaxInt64 % Frequency) * PerSecond) / Frequency));
+  // The fastest counter it takes, at its limit too
+  constexpr int64_t Fastest = FP::NanosecondTickCount::MaxCounterFrequency;
+  static_assert(Fastest == 9'223'372'036);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(Fastest, Fastest).Nanoseconds(), PerSecond);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(MaxInt64, Fastest).Nanoseconds(),
+            ((MaxInt64 / Fastest) * PerSecond) + (((MaxInt64 % Fastest) * PerSecond) / Fastest));
+  static_assert(FP::NanosecondTickCount::FromCounter(20'000'000, 10'000'000).Nanoseconds() == 2'000'000'000);
+}
+
+TEST(NanosecondTickCount, ASlowCounterPastTheRangeWrapsAsTheCountDoes)
+{
+  // A counter slower than the nanosecond can count more seconds than a NanosecondTickCount holds (2^63 - 1 seconds at 1 Hz): the count
+  // wraps, as every NanosecondTickCount does, and the difference of two such counts is still their distance
+  constexpr auto Wrapped =
+    static_cast<int64_t>(static_cast<uint64_t>(MaxInt64) * static_cast<uint64_t>(FP::NanosecondTickCount::NanosecondsPerSecond));
+  static_assert(FP::NanosecondTickCount::FromCounter(MaxInt64, 1).Nanoseconds() == Wrapped);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(MaxInt64, 1).Nanoseconds(), Wrapped);
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(MaxInt64, 1) - FP::NanosecondTickCount::FromCounter(MaxInt64 - 3, 1),
+            FP::NanosecondTimeSpan::FromSeconds(3));
+  EXPECT_EQ(FP::NanosecondTickCount::FromCounter(MinInt64, 1000) - FP::NanosecondTickCount::FromCounter(MinInt64 + 1, 1000),
+            FP::NanosecondTimeSpan::FromMilliseconds(-1));
+}
+
+TEST(NanosecondTickCount, ACounterFrequencyOutsideItsRangeThrows)
+{
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTickCount::FromCounter(123, 0)), std::out_of_range);
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTickCount::FromCounter(123, -10'000'000)), std::out_of_range);
+  EXPECT_THROW(static_cast<void>(FP::NanosecondTickCount::FromCounter(123, FP::NanosecondTickCount::MaxCounterFrequency + 1)), std::out_of_range);
+}
+
 TEST(NanosecondTickCount, GivesItsTotalInLargerUnits)
 {
   const FP::NanosecondTickCount count(4'166'389);
