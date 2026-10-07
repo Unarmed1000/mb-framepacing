@@ -8,6 +8,7 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
@@ -44,6 +45,17 @@ namespace MB::FramePacing::Pacer::Simulation
     {
       const bool isLong = std::find(settings.LongFrames.begin(), settings.LongFrames.end(), index) != settings.LongFrames.end();
       return random.Draw(settings.CpuWork.MinTicks, settings.CpuWork.MaxTicks) + (isLong ? settings.LongFrameCpuTicks : 0);
+    }
+
+    //! The GPU's work on the frames it is done with at now, given to a tier pacer in the frames' order
+    template <typename TPacer>
+    void ReportGpuWork(TPacer& rPacer, const std::vector<LoopFrame>& frames, std::size_t& rNext, const int64_t now) noexcept
+    {
+      for (; rNext < frames.size() && frames[rNext].GpuEndTicks <= now; ++rNext)
+      {
+        const LoopFrame& frame = frames[rNext];
+        rPacer.AddGpuWork(GpuWorkReport::Times(frame.FrameId, TickCount64(frame.GpuBeginTicks), TickCount64(frame.GpuEndTicks)));
+      }
     }
 
     //! A moment as a cell: empty for one the frame did not have
@@ -191,6 +203,8 @@ namespace MB::FramePacing::Pacer::Simulation
     const RefreshPeriod period = RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
     PacerSettings pacerSettings(period);
     pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
+    pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
+    pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
     TimerPeriodOnlyPacer pacer(pacerSettings);
     DisplayModel display(period, settings.Display);
     SplitMix64 random(settings.Seed);
@@ -199,6 +213,7 @@ namespace MB::FramePacing::Pacer::Simulation
     frames.reserve(static_cast<std::size_t>(std::max(settings.Frames, 0)));
     int64_t now = settings.Display.FirstBlankTicks + settings.LoopTicks;
     int64_t previousGpuEndTicks = 0;
+    std::size_t nextGpuReport = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -206,6 +221,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (index > 0)
       {
         pacer.AddPresent(report);
+      }
+      if (settings.ReportsGpuWork)
+      {
+        ReportGpuWork(pacer, frames, nextGpuReport, now);
       }
       // Before the frame takes anything: the wait the pacer gives
       const FrameStartPlan startPlan = pacer.PlanFrame(TickCount64(now));
@@ -237,6 +256,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.WindowLateFrames = window.LateFrames;
 
       frame.WorkCpuTicks = CpuWork(settings, index, random);
+      frame.WorkGpuTicks = pacer.GpuTime().Ticks();
       now += frame.WorkCpuTicks;
       frame.WorkEndTicks = now;
       const PresentPlan presentPlan = pacer.EndFrame(TickCount64(now));
@@ -269,6 +289,7 @@ namespace MB::FramePacing::Pacer::Simulation
     PacerSettings pacerSettings(period);
     pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
     pacerSettings.SetWaitingPresents(settings.WaitingPresents);
+    pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     TimerWaitForPresentPacer pacer(pacerSettings);
     DisplayModel display(period, settings.Display);
     SplitMix64 random(settings.Seed);
@@ -277,6 +298,7 @@ namespace MB::FramePacing::Pacer::Simulation
     frames.reserve(static_cast<std::size_t>(std::max(settings.Frames, 0)));
     int64_t now = settings.Display.FirstBlankTicks + settings.LoopTicks;
     int64_t previousGpuEndTicks = 0;
+    std::size_t nextGpuReport = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -284,6 +306,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (index > 0)
       {
         pacer.AddPresent(report);
+      }
+      if (settings.ReportsGpuWork)
+      {
+        ReportGpuWork(pacer, frames, nextGpuReport, now);
       }
       // Before the frame takes anything: the waits the pacer gives, the present first
       FrameStartPlan startPlan = pacer.PlanFrame(TickCount64(now));
@@ -330,6 +356,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.WindowLateFrames = window.LateFrames;
 
       frame.WorkCpuTicks = CpuWork(settings, index, random);
+      frame.WorkGpuTicks = pacer.GpuTime().Ticks();
       now += frame.WorkCpuTicks;
       frame.WorkEndTicks = now;
       const PresentPlan presentPlan = pacer.EndFrame(TickCount64(now));

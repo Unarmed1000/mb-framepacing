@@ -206,6 +206,8 @@ TEST(FrameLoop, TheLowestPairsPacerPacesAsTodaysLoopOnATimerWhileNothingGoesWron
   Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
   settings.HasVBlankTimes = false;
   settings.Frames = 600;
+  // Without its pause after start-up, which today's loop on this display has no need of either
+  settings.StartupPauseRefreshes = 0;
   const std::vector<Sim::LoopFrame> today = Sim::SimulateLoop(settings);
   const std::vector<Sim::LoopFrame> paced = Sim::SimulateTimerPeriodOnlyLoop(settings);
 
@@ -250,6 +252,8 @@ TEST(FrameLoop, WithTheGridOnTheClockAFrameThatRanLongCostsWholeRefreshesAndNoth
   settings.Frames = 400;
   settings.LongFrames = {100};
   settings.LongFrameCpuTicks = (PeriodTicks(settings) * 16) / 10;
+  // The pause after start-up is another test's
+  settings.StartupPauseRefreshes = 0;
   const int64_t period = PeriodTicks(settings);
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
 
@@ -419,8 +423,163 @@ TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
 
   ASSERT_EQ(frames.size(), 200u);
-  // The wait runs out after a quarter of a second, and the loop goes on at that pace until the display takes frames again
-  EXPECT_GT(frames[102].StartTicks - frames[101].StartTicks, 2'000'000);
-  EXPECT_LT(frames[102].StartTicks - frames[101].StartTicks, 3'000'000);
+  // The wait runs out after four of the frame's swap intervals, and the loop goes on at that pace until the display takes
+  // frames again
+  const int64_t period = PeriodTicks(settings);
+  EXPECT_GE(frames[102].StartTicks - frames[101].StartTicks, 4 * period);
+  EXPECT_LE(frames[102].StartTicks - frames[101].StartTicks, 5 * period);
   EXPECT_GT(frames.back().StartTicks, frames[101].StartTicks);
+}
+
+// What the first measurements of the two tier pacers asked for: a pause after start-up in the lowest pair's pacer, the GPU's work
+// as its own stretch of time, and an animation step that follows a loss that repeats.
+
+TEST(FrameLoop, TheLowestPairsPauseAfterStartUpLetsTheDisplayTakeTheFramesThatPiledUp)
+{
+  // Light work, and a display that takes no frame at two of its first vertical blanks: two frames wait from then on
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 800;
+  settings.GpuWork = {PeriodTicks(settings) / 5, PeriodTicks(settings) / 5};
+  settings.Display.HeldBlanks = {5, 6};
+  const int64_t period = PeriodTicks(settings);
+
+  // Without the pause they wait for the whole run
+  settings.StartupPauseRefreshes = 0;
+  const std::vector<Sim::LoopFrame> kept = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  for (std::size_t index = 20; index < kept.size(); ++index)
+  {
+    ASSERT_EQ(kept[index].PendingAtStart, 2) << index;
+    ASSERT_EQ(HalfRefreshesToDisplay(kept[index], period), 6) << index;
+  }
+
+  // With it they wait for half a second, and no frame waits after it
+  settings.StartupPauseRefreshes = 4;
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  int32_t pauses = 0;
+  for (std::size_t index = 20; index < frames.size(); ++index)
+  {
+    const int64_t refreshes = ((frames[index].StartTicks - frames[index - 1].StartTicks) + (period / 2)) / period;
+    pauses += refreshes == 5 ? 1 : 0;
+    ASSERT_TRUE(refreshes == 1 || refreshes == 5) << index;
+    if (pauses == 0)
+    {
+      ASSERT_EQ(frames[index].PendingAtStart, 2) << index;
+    }
+    else
+    {
+      ASSERT_EQ(frames[index].PendingAtStart, 0) << index;
+      ASSERT_EQ(HalfRefreshesToDisplay(frames[index], period), 2) << index;
+    }
+    // The animation time goes on by a refresh per frame through it
+    ASSERT_NEAR(static_cast<double>(frames[index].AnimationStepTicks), static_cast<double>(period), 1.0) << index;
+  }
+  EXPECT_EQ(pauses, 1);
+  // Half a second after the first frame: the frame 120 periods in is the last before it
+  EXPECT_NEAR(static_cast<double>(frames[121].StartTicks - frames[120].StartTicks), static_cast<double>(5 * period), 2.0);
+}
+
+TEST(FrameLoop, WithoutGpuWorkReportsALoopTheGpuLimitsIsNotSlowedDownAndWithThemItIs)
+{
+  // GPU work of 130 % of a refresh and little on the CPU, two frames in flight, nothing that bounds the frames that wait
+  Sim::LoopSettings settings;
+  settings.Frames = 1'200;
+  settings.GpuWork = {(PeriodTicks(settings) * 13) / 10, (PeriodTicks(settings) * 13) / 10};
+  settings.WaitsForPreviousGpuWork = false;
+  settings.MaxFramesInFlight = 2;
+  settings.StartupPauseRefreshes = 0;
+  const int64_t period = PeriodTicks(settings);
+
+  // The CPU's work fits and every frame starts on its step: the pacer sees nothing, and the frames fall further behind
+  const std::vector<Sim::LoopFrame> blind = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  EXPECT_EQ(blind.back().SwapInterval, 1u);
+  EXPECT_GT(HalfRefreshesToDisplay(blind.back(), period), 600);
+
+  // Told of the GPU's work, a frame's work is over its time: two refreshes per frame, where it fits
+  settings.ReportsGpuWork = true;
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  EXPECT_EQ(frames.back().SwapInterval, 2u);
+  EXPECT_EQ(frames.back().WorkGpuTicks, (period * 13) / 10);
+  for (std::size_t index = frames.size() - 200; index < frames.size(); ++index)
+  {
+    ASSERT_EQ(frames[index].SwapInterval, 2u) << index;
+    ASSERT_NEAR(static_cast<double>(frames[index].StartTicks - frames[index - 1].StartTicks), static_cast<double>(2 * period), 1.0) << index;
+  }
+}
+
+TEST(FrameLoop, WorkOfThreeQuartersOfARefreshOnEachHoldsOneRefreshPerFrameSideBySideAndNeedsTwoOneAfterTheOther)
+{
+  // CPU work of 74 % and GPU work of 72 % of a refresh, as the first integration measured it, the rule on
+  Sim::LoopSettings settings;
+  settings.Frames = 1'200;
+  settings.CpuWork = {(PeriodTicks(settings) * 74) / 100, (PeriodTicks(settings) * 74) / 100};
+  settings.GpuWork = {(PeriodTicks(settings) * 72) / 100, (PeriodTicks(settings) * 72) / 100};
+  settings.ReportsGpuWork = true;
+  settings.StartupPauseRefreshes = 0;
+  const int64_t period = PeriodTicks(settings);
+
+  // Two frames in flight, which the loop does not say: the frames' times show the two side by side, the longer of them fits,
+  // and the rule stays at one refresh per frame
+  settings.WaitsForPreviousGpuWork = false;
+  const std::vector<Sim::LoopFrame> sideBySide = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  for (std::size_t index = 0; index < sideBySide.size(); ++index)
+  {
+    ASSERT_EQ(sideBySide[index].SwapInterval, 1u) << index;
+    ASSERT_EQ(sideBySide[index].WindowLateFrames, 0u) << index;
+  }
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(sideBySide, period)), 100.0, 1.0);
+
+  // One frame in flight: the two added are 146 % of a refresh, and the rule goes to two refreshes per frame
+  settings.WaitsForPreviousGpuWork = true;
+  const std::vector<Sim::LoopFrame> inSeries = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  EXPECT_EQ(inSeries.back().SwapInterval, 2u);
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(inSeries, period)), 200.0, 1.0);
+}
+
+TEST(FrameLoop, SideBySideAWaitForAPresentNeedsOnePresentMoreAllowedToWaitThanInSeries)
+{
+  // The same work with two frames in flight and a wait for a present. On this display a frame is on screen two refreshes after
+  // its start, so the present before the last is not shown yet when the next frame is due: with one present allowed to wait
+  // the wait holds the loop off its step for some frames, and each of those costs a refresh. With two allowed to wait the wait
+  // returns at once and the loop holds one refresh per frame. The simulation's finding, not a measurement
+  Sim::LoopSettings settings;
+  settings.Frames = 1'200;
+  settings.CpuWork = {(PeriodTicks(settings) * 74) / 100, (PeriodTicks(settings) * 74) / 100};
+  settings.GpuWork = {(PeriodTicks(settings) * 72) / 100, (PeriodTicks(settings) * 72) / 100};
+  settings.ReportsGpuWork = true;
+  settings.WaitsForPreviousGpuWork = false;
+  settings.MaxFramesInFlight = 2;
+  const int64_t period = PeriodTicks(settings);
+
+  settings.WaitingPresents = 2;
+  const std::vector<Sim::LoopFrame> held = Sim::SimulateTimerWaitForPresentLoop(settings);
+  int32_t lostStarts = 0;
+  for (std::size_t index = 1; index < held.size(); ++index)
+  {
+    lostStarts += (held[index].StartTicks - held[index - 1].StartTicks) > ((period * 3) / 2) ? 1 : 0;
+  }
+  EXPECT_GT(lostStarts, 30);
+
+  settings.WaitingPresents = 3;
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
+  for (std::size_t index = 0; index < frames.size(); ++index)
+  {
+    ASSERT_EQ(frames[index].SwapInterval, 1u) << index;
+    ASSERT_LE(frames[index].PendingAtStart, 2) << index;
+  }
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 1.0);
+}
+
+TEST(FrameLoop, WhenEveryFrameLosesARefreshTheAnimationKeepsUpWithTheClock)
+{
+  // GPU work of 90 % of a refresh, a wait for the last present, the rule off: a frame about every two refreshes at a swap
+  // interval of one. The first integration measured the animation at half speed in this case
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 800;
+  settings.WaitingPresents = 1;
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
+
+  const std::size_t first = frames.size() / 2;
+  const int64_t clock = frames.back().StartTicks - frames[first].StartTicks;
+  const int64_t animation = frames.back().AnimationTicks - frames[first].AnimationTicks;
+  EXPECT_NEAR(static_cast<double>(animation * 100) / static_cast<double>(clock), 100.0, 5.0);
 }

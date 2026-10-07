@@ -235,6 +235,46 @@ What these runs show, as far as one run of each goes:
   grew by one a frame (2,457 at the end). An animation time that is never moved after a lost refresh is right for a refresh
   lost now and then, and wrong when every frame loses one and nothing slows the swap interval down.
 
+### What was changed after these runs
+
+Decided on 2026-10-07 from the numbers above, built, and checked on the simulation only. **None of it is measured yet.**
+
+- **One pause after start-up in the lowest pair's pacer.** Half a second after the first frame of a start, the frame after
+  is due four refreshes later than it would be, so the display takes the frames that piled up behind the first presents.
+  Both numbers are settings (`StartupPauseDelay`, `StartupPauseRefreshes`; no refreshes is no pause) and both are a guess:
+  the values are the ones that emptied the queue for today's path on the one system measured. It is never made before the
+  system took a present, so a frame is on screen through it. It is made once per start and once per swap chain made anew (a
+  present the system did not take, or the application's word), and not at all when the pacer is at two refreshes per frame
+  or more at that moment, as the display has taken the waiting frames by then. Its cost where no frame waits: the frame
+  before the pause is on screen for five refreshes, once (21 ms at 240 Hz, 83 ms at 60 Hz). On the simulation's display
+  with two frames waiting from the start, they wait for the whole run without the pause and none waits after it.
+- **The GPU's work as its own stretch of time, in both pacers** (`AddGpuWork`, "A frame's work is two stretches of time"
+  below). A frame's work for the swap interval rule is the CPU's and the newest GPU time reported, the longer of the two
+  where they lie side by side and the two added where one follows the other. They lie side by side when the newest report
+  with an end time shows the next frame's start more than the frame margin before that end, or when the application says it
+  lets two frames or more be in flight (`MaxFramesInFlight`), which it has to say for the case the times can not show: at a
+  longer swap interval nothing overlaps. On the simulation: with GPU work of 130 % of a refresh and nothing that bounds the
+  waiting frames, the lowest pair's pacer without reports stays at one refresh per frame while the frames fall ever further
+  behind, and with reports goes to two; with CPU work of 74 % and GPU work of 72 % it stays at one refresh per frame with
+  two frames in flight and goes to two with one, which is what the first integration's runs asked for.
+- **This does not answer the run above where that pacer stalled.** That run had the swap interval fixed at one, and its GPU
+  work of 90 % fits a refresh by any reading. What grew there is the number of frames waiting, from refreshes the display
+  lost by itself, and that pacer does not learn of those: it stays what this pair can not do.
+- **A loss that repeats is in the animation step.** When the frame before took refreshes more than it was given and the one
+  before that did too, the display shows every frame for that much longer, and the step is longer by the fewer of the two
+  losses. One lost refresh is still not caught up with, and a swap interval the rule just changed is its answer to the
+  losses before it. On the simulation the case that ran at half speed (a wait for the last present, GPU work of 90 %, the
+  rule off) keeps up with the clock from the third frame on. A loss every second frame (frames 1.5 refreshes apart) is not a
+  loss that repeats by this rule, and the animation still runs slow there until the swap interval rule slows down.
+- **The longest a wait for a present may take is counted in the frame's own swap intervals** (`PresentWaitSwapIntervals`,
+  four by default) in place of 250 ms: 17 ms at 240 Hz and one refresh per frame.
+
+One thing the simulation showed on the way, **not measured**: with two frames in flight and work close to a refresh on both
+the CPU and the GPU, a frame is on screen two refreshes after its start, and a wait for the present before the last (one
+present allowed to wait) then holds the loop off its step for about 8 % of the frames. With two presents allowed to wait the
+wait returns at once and the loop holds one refresh per frame. So the presents that may wait and the frames in flight are not
+independent: see decision 1.
+
 ## What the application plugs in
 
 ### Capabilities
@@ -473,7 +513,7 @@ present  = pacer.EndFrame(now)                  // the CPU's work is done
 
 Between frames, as it has them, the application gives what its active capabilities promise, each with the id of the frame it
 is about: `AddVBlank` (a vertical blank's time, the period, and when it was read), `AddGpuWork` (begin and end, or a
-duration), `AddDisplayReport` (a display time, or "a result without a time").
+duration; built in the first two tier pacers), `AddDisplayReport` (a display time, or "a result without a time").
 
 The plan never names a graphics API, and the application never computes a time: it waits until the times it is given and
 passes on the values it is given.
@@ -806,7 +846,9 @@ checked. Four things are settled now, because they cost little now and a second 
 
 1. **k**, the presents that may be waiting: 1 is the lowest latency and leaves no slack (at work of 90 % of a refresh it
    halved the frame rate in the first measurement), 2 leaves a frame of slack for one refresh more. Proposed: a setting,
-   default 2, as that kept the frame rate in every case measured; picking it from the work is the option below.
+   default 2, as that kept the frame rate in every case measured; picking it from the work is the option below. Open
+   since: on the simulation a loop with two frames in flight and heavy work needs 3 (above). Should the pacer take at
+   least one more than the frames in flight the application names, or is that the application's to set?
 2. **The tiers**: two lists, each tier a set of capabilities, the hold tiers the first integration's four as they are, and
    a rating that is the pair. Proposed as above. If one number is wanted for a rating, the order between the two has to be
    decided: there is no order that follows from the capabilities.
@@ -837,14 +879,13 @@ checked. Four things are settled now, because they cost little now and a second 
    the clock by the refreshes lost, which the pacer would report as a number. Proposed: not catching up, with a setting for
    an application that needs game time on the clock (sound, a network), and the swap interval rule as what ends a loss that
    goes on.
-10. **When every frame loses a refresh**: the animation time is not moved after a lost refresh, and with the swap interval
-    rule off that ran the animation at half speed in a measured run. Proposed: a frame's animation step follows a loss that
-    repeats (the frames before it each took the same refreshes more), as that is what the display then shows, and stays
-    the swap interval after a loss that does not.
-11. **The lowest pair at start-up**: its pacer kept the two presents waiting that pile up while a window is new (latency
-    2.2 refreshes against 0.6 for today's path, which pauses once). A pause at start-up as a guess, or leave it?
-12. **A wait for a present that is never shown**: the timeout is 250 ms and the loop stood for it at start-up in two of four
-    runs. Proposed: the timeout in refreshes of the frame's own swap interval (a few of them), not a fixed time.
+10. **When every frame loses a refresh**: decided on 2026-10-07 and built ("What was changed after these runs"): a frame's
+    animation step follows a loss that repeats, and stays the swap interval after a loss that does not. Open: a loss
+    every second frame is not followed.
+11. **The lowest pair at start-up**: decided on 2026-10-07 and built: one pause after start-up, its length and its delay
+    settings that are named as a guess, never before a present was taken.
+12. **A wait for a present that is never shown**: decided on 2026-10-07 and built: the longest a wait may take is counted in
+    the frame's own swap intervals, four by default.
 13. **Names**: the capability and call names above are proposals.
 
 ## What changes for whom

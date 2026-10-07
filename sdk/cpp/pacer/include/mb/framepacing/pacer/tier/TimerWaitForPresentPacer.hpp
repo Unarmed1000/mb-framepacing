@@ -14,10 +14,12 @@
 #include <mb/framepacing/pacer/capability/QueueTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
+#include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
 #include <cstdint>
 
@@ -37,12 +39,14 @@ namespace MB::FramePacing::Pacer
   //!   EndFrame        the CPU's work is done: the time to wait until before the present
   //!   AddPresent      after the present, before the next frame is planned: when it was called, when it returned, and whether the
   //!                   system took it
+  //! and, where the application has it, AddGpuWork: the GPU's work on an earlier frame.
   //!
   //! The frames that wait to be shown are kept few by the display itself: before a frame the application waits until the present
   //! PacerSettings::WaitingPresents back was shown. A wait for a present that was shown already returns at once, so it costs nothing
   //! while the loop is in step with the display, and it holds the loop for exactly what is too many when the display lost a
   //! refresh, at start-up, and after a swap chain was made anew. There is no other rule for those. A present the system did not
-  //! take is not waited for, nor is any present before it.
+  //! take is not waited for, nor is any present before it. A wait may take as long as PacerSettings::PresentWaitSwapIntervals of
+  //! the frame's own swap intervals: some presents are never shown.
   //!
   //! The frame starts are on a grid of refresh periods on the clock, as TimerPeriodOnlyPacer's, and here the grid follows the
   //! display: a wait that really held the loop ended when the display took a frame, so the grid is moved towards its end, a
@@ -53,7 +57,8 @@ namespace MB::FramePacing::Pacer
   //! A frame held for more than one refresh is presented by the loop on a timer, in the period before the step the next frame is
   //! due at, PacerSettings::FrameMargin into it: still a guess, on a grid that is now close to the display's.
   //!
-  //! The animation time advances by a frame's swap interval and by nothing else, as TimerPeriodOnlyPacer's.
+  //! The animation time advances by a frame's swap interval and by a loss that repeats, and the swap interval rule takes a
+  //! frame's work as the CPU's and, with GPU work reports, the GPU's: both as TimerPeriodOnlyPacer's.
   //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
@@ -72,6 +77,9 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
+    // The steps of the grid the frame before it took more than it was given
+    int64_t m_lost{0};
+    FrameWorkRule m_frameWork;
     RefreshTime m_animationTime;
     TimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
@@ -91,7 +99,8 @@ namespace MB::FramePacing::Pacer
     explicit TimerWaitForPresentPacer(const PacerSettings& settings);
 
     //! Before a frame takes anything, at now on the application's steady clock: the present to wait for (the one
-    //! PacerSettings::WaitingPresents back, where the system took it and it can still be waited for), and after it the time
+    //! PacerSettings::WaitingPresents back, where the system took it and it can still be waited for) and the longest the
+    //! wait may take (PacerSettings::PresentWaitSwapIntervals of the swap interval the frame is paced at), and after it the time
     //! of the step the frame is due at, when that is still to come. It changes nothing, so a frame may be planned again, and
     //! after AddPresentWait it is planned again: the present that was waited for is not asked for a second time, and the
     //! time is the one that holds then.
@@ -117,6 +126,10 @@ namespace MB::FramePacing::Pacer
     //! after that, on the new swap chain, is reported again, and can be waited for.
     void AddPresent(const PresentReport& report) noexcept;
 
+    //! The GPU's work on an earlier frame, when the application has it: from then on a frame's work is the CPU's and the
+    //! GPU's (FrameWorkRule).
+    void AddGpuWork(const GpuWorkReport& report) noexcept;
+
     //! The display's refresh period changed (a mode change, the window on another display): the grid starts again on it with an
     //! empty frame window, at the swap interval the application prefers there. The animation time goes on.
     void SetRefreshPeriod(RefreshPeriod period) noexcept;
@@ -130,11 +143,12 @@ namespace MB::FramePacing::Pacer
     void ForgetPresents() noexcept;
 
     //! Start again (after a pause the application knows of): the next frame starts the grid, the frame window is empty, the
-    //! swap interval the preferred one, and no present from before is waited for. The animation time goes on.
+    //! swap interval the preferred one, the GPU's work is forgotten, and no present from before is waited for. The animation
+    //! time goes on.
     void Reset() noexcept;
 
-    //! The refreshes that were lost and that the animation time was not moved over: how far it is behind the clock, in refreshes,
-    //! since the pacer was made.
+    //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and
+    //! that it was not moved over.
     [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
     {
       return m_refreshesBehindClock;
@@ -144,6 +158,12 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] uint64_t PresentWaitTimeouts() const noexcept
     {
       return m_presentWaitTimeouts;
+    }
+
+    //! The GPU time a frame is judged with: the newest that was reported, zero without one.
+    [[nodiscard]] TimeDuration GpuTime() const noexcept
+    {
+      return m_frameWork.GpuTime();
     }
 
     //! How long the last present that was reported held the frame loop.

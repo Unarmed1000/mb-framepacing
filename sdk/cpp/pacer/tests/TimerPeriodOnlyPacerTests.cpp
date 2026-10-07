@@ -14,6 +14,7 @@
 #include <mb/framepacing/pacer/capability/QueueTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
@@ -50,6 +51,27 @@ namespace
     const int64_t startTicks = plan.WaitsForStartTime() ? plan.StartTime.Ticks() : nowTicks;
     const PC::FrameSchedule schedule = rPacer.BeginFrame(At(startTicks));
     static_cast<void>(rPacer.EndFrame(At(startTicks + workTicks)));
+    if (pSchedule != nullptr)
+    {
+      *pSchedule = schedule;
+    }
+    return startTicks;
+  }
+
+  //! A frame as Frame makes it, with CPU work of 30,000 ticks and its present reported: taken by the system or not. Returns
+  //! the frame's start.
+  int64_t PresentedFrame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t nowTicks, PC::FrameSchedule* pSchedule = nullptr, const bool accepted = true)
+  {
+    const PC::FrameStartPlan plan = rPacer.PlanFrame(At(nowTicks));
+    const int64_t startTicks = plan.WaitsForStartTime() ? plan.StartTime.Ticks() : nowTicks;
+    const PC::FrameSchedule schedule = rPacer.BeginFrame(At(startTicks));
+    const PC::PresentPlan present = rPacer.EndFrame(At(startTicks + 30'000));
+    PC::PresentReport report;
+    report.FrameId = present.FrameId;
+    report.CallTime = At(startTicks + 30'000);
+    report.ReturnTime = At(startTicks + 30'600);
+    report.Accepted = accepted;
+    rPacer.AddPresent(report);
     if (pSchedule != nullptr)
     {
       *pSchedule = schedule;
@@ -355,4 +377,282 @@ TEST(TimerPeriodOnlyPacer, AnotherRefreshPeriodOrOtherSettingsStartTheGridAgainA
   EXPECT_EQ(pacer.EndFrame(At(now + 61'000)).FrameId, 0u);
   schedule = pacer.BeginFrame(At(now + 61'000));
   EXPECT_EQ(schedule.NextFrameStartTime, At(now + 61'000 + (4 * Period)));
+}
+
+TEST(TimerPeriodOnlyPacer, HalfASecondAfterStartUpTheLoopPausesOnceAndTheFrameOnScreenStays)
+{
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  PC::FrameSchedule schedule;
+  int64_t now = Start;
+  for (int64_t frame = 0; frame < 50; ++frame)
+  {
+    const int64_t start = PresentedFrame(pacer, now, &schedule);
+    ASSERT_EQ(start, Start + (frame * Period));
+    ASSERT_EQ(schedule.NextFrameStartTime, At(start + Period));
+    now = start + 30'600;
+  }
+  EXPECT_EQ(pacer.StartupPauses(), 0u);
+
+  // The frame that starts half a second after the first is presented as any other, and the frame after it is due four
+  // refreshes later than it would be
+  int64_t start = PresentedFrame(pacer, now, &schedule);
+  EXPECT_EQ(start, Start + (50 * Period));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + (51 * Period)));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (55 * Period)));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(Period));
+  EXPECT_EQ(pacer.StartupPauses(), 1u);
+  EXPECT_EQ(pacer.PlanFrame(At(start + 30'600)).StartTime, At(Start + (55 * Period)));
+
+  // The frame after the pause is on time, its animation time a swap interval on: the pause is not caught up with
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  EXPECT_EQ(start, Start + (55 * Period));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  EXPECT_EQ(schedule.AnimationTime, Span(51 * Period));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (56 * Period)));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 4u);
+
+  // Once: never again in this run
+  for (int64_t frame = 0; frame < 300; ++frame)
+  {
+    const int64_t next = PresentedFrame(pacer, start + 30'600, &schedule);
+    ASSERT_EQ(next, start + Period);
+    start = next;
+  }
+  EXPECT_EQ(pacer.StartupPauses(), 1u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 4u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+}
+
+TEST(TimerPeriodOnlyPacer, ThereIsNoPauseBeforeAPresentWasTaken)
+{
+  PC::PacerSettings settings(g_hz100);
+  settings.SetStartupPauseDelay(Span(0));
+  PC::TimerPeriodOnlyPacer pacer(settings);
+
+  // No present is reported: nothing is on its way to the screen, however long it takes
+  int64_t now = Start;
+  for (int32_t frame = 0; frame < 80; ++frame)
+  {
+    now = Frame(pacer, now, 30'000) + 30'600;
+  }
+  EXPECT_EQ(pacer.StartupPauses(), 0u);
+
+  // A frame whose present is taken: the pause is made at the frame after it, also with no delay at all
+  PC::FrameSchedule schedule;
+  int64_t start = PresentedFrame(pacer, now, &schedule);
+  EXPECT_EQ(schedule.NextFrameStartTime, At(start + Period));
+  EXPECT_EQ(pacer.StartupPauses(), 0u);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  EXPECT_EQ(schedule.NextFrameStartTime, At(start + (5 * Period)));
+  EXPECT_EQ(pacer.StartupPauses(), 1u);
+}
+
+TEST(TimerPeriodOnlyPacer, ASwapChainMadeAnewAndAResetGetThePauseOfAStart)
+{
+  PC::PacerSettings settings(g_hz100);
+  settings.SetStartupPauseDelay(Span(2 * Period));
+  settings.SetStartupPauseRefreshes(3);
+  PC::TimerPeriodOnlyPacer pacer(settings);
+  PC::FrameSchedule schedule;
+
+  // Frames at 0, 1 and 2 periods: the third is two periods after the first
+  int64_t start = PresentedFrame(pacer, Start);
+  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (6 * Period)));
+  EXPECT_EQ(pacer.StartupPauses(), 1u);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  ASSERT_EQ(start, Start + (6 * Period));
+
+  // The application made its swap chain anew: counted from the next frame, with a present of the new one taken
+  pacer.ForgetPresents();
+  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 30'600);
+  EXPECT_EQ(pacer.StartupPauses(), 1u);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  ASSERT_EQ(start, Start + (9 * Period));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (13 * Period)));
+  EXPECT_EQ(pacer.StartupPauses(), 2u);
+
+  // A present the system did not take says the same
+  start = PresentedFrame(pacer, start + 30'600, &schedule, false);
+  ASSERT_EQ(start, Start + (13 * Period));
+  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 30'600);
+  EXPECT_EQ(pacer.StartupPauses(), 2u);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  ASSERT_EQ(start, Start + (16 * Period));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (20 * Period)));
+  EXPECT_EQ(pacer.StartupPauses(), 3u);
+
+  // And so does a reset
+  pacer.Reset();
+  start = PresentedFrame(pacer, Start + (30 * Period));
+  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  ASSERT_EQ(start, Start + (32 * Period));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (36 * Period)));
+  EXPECT_EQ(pacer.StartupPauses(), 4u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 12u);
+}
+
+TEST(TimerPeriodOnlyPacer, AtTwoRefreshesPerFrameOrWithAPauseOfNoRefreshesThereIsNone)
+{
+  // Two refreshes per frame when the pause is due: the display took what waited, and the pause is not made later either
+  PC::PacerSettings settings(g_hz100);
+  settings.SetStartupPauseDelay(Span(2 * Period));
+  settings.SetPreferredSwapInterval(2);
+  PC::TimerPeriodOnlyPacer slow(settings);
+  PC::FrameSchedule schedule;
+  int64_t start = Start;
+  for (int64_t frame = 0; frame < 20; ++frame)
+  {
+    start = PresentedFrame(slow, start + (frame == 0 ? 0 : Period + 10'600), &schedule);
+    ASSERT_EQ(start, Start + (frame * 2 * Period));
+    ASSERT_EQ(schedule.NextFrameStartTime, At(start + (2 * Period)));
+  }
+  EXPECT_EQ(slow.StartupPauses(), 0u);
+  EXPECT_EQ(slow.RefreshesBehindClock(), 0u);
+
+  // A pause of no refreshes is no pause
+  PC::PacerSettings none(g_hz100);
+  none.SetStartupPauseDelay(Span(0));
+  none.SetStartupPauseRefreshes(0);
+  PC::TimerPeriodOnlyPacer pacer(none);
+  start = Start;
+  for (int64_t frame = 0; frame < 20; ++frame)
+  {
+    start = PresentedFrame(pacer, start + (frame == 0 ? 0 : 30'600), &schedule);
+    ASSERT_EQ(schedule.NextFrameStartTime, At(Start + ((frame + 1) * Period)));
+  }
+  EXPECT_EQ(pacer.StartupPauses(), 0u);
+}
+
+TEST(TimerPeriodOnlyPacer, ThePauseIsNoGapThatStartsTheGridAgain)
+{
+  // The shortest frame window there is: a gap of more than two frames starts the grid again, and the pause is five
+  PC::PacerSettings settings(g_hz100);
+  settings.SetFrameWindowLength(PC::PacerSettings::MinFrameWindowLength);
+  settings.SetStartupPauseDelay(Span(0));
+  PC::TimerPeriodOnlyPacer pacer(settings);
+  PC::FrameSchedule schedule;
+  int64_t start = PresentedFrame(pacer, Start);
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  ASSERT_EQ(schedule.NextFrameStartTime, At(Start + (6 * Period)));
+  const PC::FrameStartPlan plan = pacer.PlanFrame(At(start + 30'600));
+  EXPECT_EQ(plan.StartTime, At(Start + (6 * Period)));
+  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  EXPECT_EQ(start, Start + (6 * Period));
+  // The frame before it was judged, on time: a grid that started again would have an empty frame window
+  EXPECT_GT(pacer.FrameWindow().Frames, 0u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+  // Without the pause the same gap does start it again
+  static_cast<void>(pacer.BeginFrame(At(start + (5 * Period))));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
+}
+
+TEST(TimerPeriodOnlyPacer, WithGpuWorkReportsAFramesWorkIsTheCpusAndTheGpus)
+{
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::Zero());
+  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(30'000));
+
+  // The GPU was done with frame 1 before frame 2 began: one after the other, the two added, and they fit
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(1, At(Start + 30'000), At(Start + 95'000)));
+  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::FromTicks(65'000));
+  static_cast<void>(Frame(pacer, Start + Period + 30'600, 30'000));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((30'000 + 95'000) / 2));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+
+  // GPU work of 0.8 periods that ends within the margin of the next frame's start: added to the CPU's it is over the frame's
+  // time, and the frame is late although it kept its step
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(2, At(Start + Period + 30'000), At(Start + (2 * Period) + 10'000)));
+  static_cast<void>(Frame(pacer, Start + (2 * Period) + 30'600, 30'000));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+
+  // The same GPU work beside the CPU's work on the frame after it: the longer of the two, and it fits
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(3, At(Start + (2 * Period) + 50'000), At(Start + (3 * Period) + 30'000)));
+  static_cast<void>(Frame(pacer, Start + (3 * Period) + 30'600, 30'000));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((30'000 + 95'000 + 110'000 + 80'000) / 4));
+
+  // A reset forgets the GPU's work
+  pacer.Reset();
+  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::Zero());
+}
+
+TEST(TimerPeriodOnlyPacer, AnApplicationThatSaysItHasTwoFramesInFlightIsJudgedByTheLongerOfTheTwo)
+{
+  PC::PacerSettings settings(g_hz100);
+  settings.SetMaxFramesInFlight(2);
+  PC::TimerPeriodOnlyPacer pacer(settings);
+  static_cast<void>(Frame(pacer, Start, 60'000));
+  // How long, not when: 0.7 periods beside CPU work of 0.6
+  pacer.AddGpuWork(PC::GpuWorkReport::OfDuration(1, FP::TimeDuration::FromTicks(70'000)));
+  static_cast<void>(Frame(pacer, Start + 60'600, 60'000));
+  static_cast<void>(Frame(pacer, Start + Period + 60'600, 60'000));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 2u);
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(70'000));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+}
+
+TEST(TimerPeriodOnlyPacer, ALossThatRepeatsIsInTheAnimationStepAndALossThatDoesNotIsNot)
+{
+  PC::PacerSettings settings(g_hz100);
+  settings.SetAutoSwapInterval(false);
+  PC::TimerPeriodOnlyPacer pacer(settings);
+  static_cast<void>(pacer.BeginFrame(At(Start)));
+
+  // Every frame takes two steps of the grid at one refresh per frame. The first loss is not in the step
+  PC::FrameSchedule schedule = pacer.BeginFrame(At(Start + (2 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
+  // The second in a row is: the display shows every frame for two refreshes
+  schedule = pacer.BeginFrame(At(Start + (4 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
+  schedule = pacer.BeginFrame(At(Start + (6 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
+
+  // A frame on time ends it at once
+  schedule = pacer.BeginFrame(At(Start + (7 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  // One loss after a frame on time is one loss
+  schedule = pacer.BeginFrame(At(Start + (9 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 2u);
+  // Two refreshes lost after one lost: the fewer of the two is in the step
+  schedule = pacer.BeginFrame(At(Start + (12 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 3u);
+  EXPECT_EQ(schedule.AnimationTime, Span(9 * Period));
+}
+
+TEST(TimerPeriodOnlyPacer, ASwapIntervalTheRuleChangesIsItsAnswerToTheLossesBeforeIt)
+{
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  PC::FrameSchedule schedule = pacer.BeginFrame(At(Start));
+  int64_t start = Start;
+  // Every frame takes two steps of the grid until the rule slows down
+  while (schedule.Change != PC::SwapIntervalChange::Slower && start < Start + (1'000 * Period))
+  {
+    static_cast<void>(pacer.EndFrame(At(start + 30'000)));
+    start += 2 * Period;
+    schedule = pacer.BeginFrame(At(start));
+  }
+  ASSERT_EQ(schedule.Change, PC::SwapIntervalChange::Slower);
+  ASSERT_EQ(schedule.SwapInterval, 2u);
+  // The step is the new swap interval, with nothing of the losses in it, and the frame after it is on time
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  static_cast<void>(pacer.EndFrame(At(start + 30'000)));
+  schedule = pacer.BeginFrame(At(start + (2 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 }

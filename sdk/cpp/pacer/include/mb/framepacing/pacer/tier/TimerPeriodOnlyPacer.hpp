@@ -14,9 +14,11 @@
 #include <mb/framepacing/pacer/capability/QueueTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
+#include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
 #include <cstdint>
 
@@ -32,7 +34,9 @@ namespace MB::FramePacing::Pacer
   //!   PlanFrame   before the frame takes anything: the time to wait until
   //!   BeginFrame  the frame starts: its swap interval, its animation time and the marker's values
   //!   EndFrame    the CPU's work is done: the time to wait until before the present
-  //!   AddPresent  after the present, before the next frame is planned: when it was called and returned
+  //!   AddPresent  after the present, before the next frame is planned: when it was called and returned, and whether the
+  //!               system took it
+  //! and, where the application has it, AddGpuWork: the GPU's work on an earlier frame.
   //!
   //! It can not see the display. What it has is a count: the clock says how many refresh periods have passed, and it knows how
   //! many it gave its frames. So it keeps the frame starts on one grid of refresh periods on the clock. Step 0 is the first frame's
@@ -46,14 +50,22 @@ namespace MB::FramePacing::Pacer
   //!     is due at, a margin into it (PacerSettings::FrameMargin). A guess: the grid's place against the display's refreshes is
   //!     not known.
   //! The swap interval rule (SwapIntervalRule) decides each frame's swap interval from how the frames did: a frame is late when
-  //! it took more steps of the grid than its swap interval, or when its work was longer than its swap interval's time.
+  //! it took more steps of the grid than its swap interval, or when its work was longer than its swap interval's time. A
+  //! frame's work is the CPU's, from BeginFrame to EndFrame, and with GPU work reports the GPU's too, put together by how the
+  //! two lie in time (FrameWorkRule).
   //!
-  //! The animation time advances by a frame's swap interval and by nothing else. It is not moved to catch up with the clock after
-  //! refreshes were lost: that would be a second step that does not match the display's, and RefreshesBehindClock() says how many
-  //! refreshes that is.
+  //! The animation time advances by a frame's swap interval. It is not moved to catch up with the clock after a refresh was
+  //! lost: that would be a second step that does not match the display's. One thing more is added to a step, a loss that
+  //! repeats: when the frame before took refreshes more than it was given and the one before that did too, the display shows
+  //! every frame for that much longer, and the step is longer by the fewer of the two. RefreshesBehindClock() says how far
+  //! the animation time is behind the clock.
   //!
   //! What it does not do: take a frame away that waits to be shown although its frame was ready in time. It does not learn of
-  //! one. At two refreshes per frame or more such a frame is gone by itself; at one it stays.
+  //! one. At two refreshes per frame or more such a frame is gone by itself; at one it stays. For the frames that pile up
+  //! behind the first presents of a new swap chain it pauses once: PacerSettings::StartupPauseDelay after the first frame of
+  //! a start, and never before a present was taken, the frame after is due PacerSettings::StartupPauseRefreshes later. The
+  //! frame on screen stays there through the pause. A guess, made once per start and once per swap chain made anew, and
+  //! not at all when the pacer is at two refreshes per frame or more then.
   //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
@@ -72,10 +84,20 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
+    // The steps of the grid the frame before it took more than it was given
+    int64_t m_lost{0};
+    FrameWorkRule m_frameWork;
     RefreshTime m_animationTime;
     TimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
     TimeDuration m_lastPresentBlocked;
+    // The pause after start-up: still to be made, the first frame's start since it was asked for, and whether the system
+    // took a present since
+    bool m_pausePending{true};
+    bool m_pauseHasFirstFrame{false};
+    TickCount64 m_pauseFirstFrameTime;
+    bool m_presentTaken{false};
+    uint64_t m_startupPauses{0};
 
   public:
     //! The tiers this pacer is for.
@@ -98,8 +120,18 @@ namespace MB::FramePacing::Pacer
     //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
     [[nodiscard]] TimeSpan32 CpuBusyAt(TickCount64 now) const noexcept;
 
-    //! After the present, before the next frame is planned.
+    //! After the present, before the next frame is planned. A present the system did not take says the swap chain is gone:
+    //! the one made after it gets the pause of a start (ForgetPresents).
     void AddPresent(const PresentReport& report) noexcept;
+
+    //! The GPU's work on an earlier frame, when the application has it: from then on a frame's work is the CPU's and the
+    //! GPU's (FrameWorkRule).
+    void AddGpuWork(const GpuWorkReport& report) noexcept;
+
+    //! The presents made so far are gone (a swap chain was made anew, for a window that is resized, say): the pause after
+    //! start-up is made once more, counted from the next frame. Nothing else changes: the grid, the frame window and the swap
+    //! interval go on.
+    void ForgetPresents() noexcept;
 
     //! The display's refresh period changed (a mode change, the window on another display): the grid starts again on it with an
     //! empty frame window, at the swap interval the application prefers there. The animation time goes on.
@@ -110,14 +142,27 @@ namespace MB::FramePacing::Pacer
     void SetSettings(const PacerSettings& settings);
 
     //! Start again (after a pause the application knows of): the next frame starts the grid, the frame window is empty, the swap
-    //! interval the preferred one. The animation time goes on.
+    //! interval the preferred one, the GPU's work is forgotten, and the pause after start-up is made once more. The animation
+    //! time goes on.
     void Reset() noexcept;
 
-    //! The refreshes that were lost and that the animation time was not moved over: how far it is behind the clock, in refreshes,
-    //! since the pacer was made.
+    //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and
+    //! that it was not moved over, and the pauses after start-up.
     [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
     {
       return m_refreshesBehindClock;
+    }
+
+    //! The pauses after start-up that were made, since the pacer was made.
+    [[nodiscard]] uint64_t StartupPauses() const noexcept
+    {
+      return m_startupPauses;
+    }
+
+    //! The GPU time a frame is judged with: the newest that was reported, zero without one.
+    [[nodiscard]] TimeDuration GpuTime() const noexcept
+    {
+      return m_frameWork.GpuTime();
     }
 
     //! How long the last present that was reported held the frame loop.
@@ -151,6 +196,8 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] bool StartsAgainAt(TickCount64 time) const noexcept;
     [[nodiscard]] int64_t SlotFor(TickCount64 time) const noexcept;
     [[nodiscard]] TickCount64 TimeOfSlot(int64_t slot) const noexcept;
+    void ArmStartupPause() noexcept;
+    [[nodiscard]] uint32_t StartupPauseAt(TickCount64 cpuStartTime) noexcept;
   };
 }
 

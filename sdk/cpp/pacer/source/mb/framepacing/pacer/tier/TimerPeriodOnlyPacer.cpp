@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // EXPERIMENTAL. The pacer of the lowest pair of tiers (sdk/doc/pacer-design.md "A grid on the clock"): frame starts on one grid of
-// refresh periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval alone.
+// refresh periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval and by a loss
+// that repeats, and one pause after start-up.
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
@@ -32,9 +33,9 @@ namespace MB::FramePacing::Pacer
     {
       return true;
     }
-    // A pause, or a clock that went back: nothing is measured across it
+    // A pause the pacer did not ask for, or a clock that went back: nothing is measured across it
     const TimeSpan gap = time - m_startTime;
-    const TimeSpan reach = std::max(m_rule.Settings().FrameWindowLength(), m_rule.Refresh().TimeFor(int64_t{2} * m_swapInterval));
+    const TimeSpan reach = std::max(m_rule.Settings().FrameWindowLength(), m_rule.Refresh().TimeFor(int64_t{2} * (m_nextSlot - m_slot)));
     return gap < TimeSpan() || gap > reach;
   }
 
@@ -47,6 +48,40 @@ namespace MB::FramePacing::Pacer
   TickCount64 TimerPeriodOnlyPacer::TimeOfSlot(const int64_t slot) const noexcept
   {
     return m_origin + m_rule.Refresh().TimeFor(slot);
+  }
+
+  void TimerPeriodOnlyPacer::ArmStartupPause() noexcept
+  {
+    m_pausePending = true;
+    m_pauseHasFirstFrame = false;
+    m_presentTaken = false;
+  }
+
+  uint32_t TimerPeriodOnlyPacer::StartupPauseAt(const TickCount64 cpuStartTime) noexcept
+  {
+    if (!m_pausePending)
+    {
+      return 0;
+    }
+    if (!m_pauseHasFirstFrame)
+    {
+      m_pauseFirstFrameTime = cpuStartTime;
+      m_pauseHasFirstFrame = true;
+    }
+    // Not before a frame is on its way to the screen, and not before the presents that pile up were made
+    if (!m_presentTaken || (cpuStartTime - m_pauseFirstFrameTime) < m_rule.Settings().StartupPauseDelay())
+    {
+      return 0;
+    }
+    m_pausePending = false;
+    // At two refreshes per frame or more the display took the frames that waited by now: nothing to pause for
+    if (m_swapInterval > 1)
+    {
+      return 0;
+    }
+    const uint32_t refreshes = m_rule.Settings().StartupPauseRefreshes();
+    m_startupPauses += refreshes > 0 ? 1u : 0u;
+    return refreshes;
   }
 
   FrameStartPlan TimerPeriodOnlyPacer::PlanFrame(const TickCount64 now) const noexcept
@@ -68,6 +103,9 @@ namespace MB::FramePacing::Pacer
     const RefreshPeriod period = m_rule.Refresh();
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
     const bool isFirstFrame = m_frameId == 0;
+    // The steps of the grid the previous frame took more than it was given, and the frame before it
+    int64_t lost = 0;
+    int64_t lostBefore = 0;
     if (StartsAgainAt(cpuStartTime))
     {
       // The grid starts at this frame: nothing was measured, the frame window starts empty and the swap interval stays
@@ -78,43 +116,56 @@ namespace MB::FramePacing::Pacer
     }
     else
     {
-      // The previous frame: the steps of the grid from its start to this one against its swap interval, and its work against its
+      // The previous frame: the steps of the grid from the one it was due to leave at to this start, and its work against its
       // swap interval's time. Without an EndFrame its work is not known, and the time to this start says nothing about it
       const int64_t slot = SlotFor(cpuStartTime);
-      const int64_t lost = (slot - m_slot) - int64_t{m_swapInterval};
-      const TimeSpan knownWork = m_frameEnded ? m_work : TimeSpan();
-      const bool late = lost > 0 || knownWork > period.TimeFor(m_swapInterval);
-      const TimeSpan work = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
+      lost = slot - m_nextSlot;
+      lostBefore = m_lost;
+      const TimeSpan cpuWork = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
+      const TimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
+      const bool late = lost > 0 || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       change = m_rule.AddFrame(period.TimeFor(slot), work, late, TimeOfSlot(m_nextSlot) - cpuStartTime);
-      m_refreshesBehindClock += static_cast<uint64_t>(lost);
       m_slot = slot;
     }
+    // A loss that repeats: the frame before this one took refreshes more than it was given, and so did the one before that. A
+    // swap interval the rule just changed is its answer to the losses before it
+    const int64_t repeated = change == SwapIntervalChange::Unchanged ? std::min(lost, lostBefore) : 0;
+    const auto repeatedLoss = static_cast<uint32_t>(std::min(repeated, int64_t{PacerSettings::MaxSwapInterval}));
+    m_lost = change == SwapIntervalChange::Unchanged ? lost : 0;
 
     m_swapInterval = m_rule.SwapInterval();
-    m_nextSlot = m_slot + int64_t{m_swapInterval};
     m_startTime = cpuStartTime;
     m_work = TimeSpan();
     m_frameOpen = true;
     m_frameEnded = false;
     ++m_frameId;
+    m_frameWork.AddFrameStart(m_frameId, cpuStartTime);
+
+    // The one pause after start-up: the frame after this one is due that many refreshes later
+    const uint32_t pause = StartupPauseAt(cpuStartTime);
+    const int64_t dueSlot = m_slot + int64_t{m_swapInterval};
+    m_nextSlot = dueSlot + int64_t{pause};
 
     // The animation time: the first frame's is where the pacer starts, every other frame's is its swap interval after the one
-    // before it, whatever the grid lost in between
+    // before it. A refresh that was lost is not caught up with. With a loss that repeats the display shows every frame for that
+    // much longer, and the step is longer by it: by the fewer of the two frames' losses
     if (!isFirstFrame)
     {
-      m_animationTime.Add(m_swapInterval, period);
+      m_animationTime.Add(m_swapInterval + repeatedLoss, period);
     }
     const TimeSpan animationTime = m_animationTime.ToTimeSpan();
+    // How far the animation time is behind the clock: what was lost and what is paused for, less what the step is longer by
+    m_refreshesBehindClock += (static_cast<uint64_t>(lost) - repeatedLoss) + pause;
 
     FrameSchedule schedule;
     schedule.FrameId = m_frameId;
     schedule.SwapInterval = m_swapInterval;
     schedule.AnimationTime = animationTime;
     schedule.AnimationStep = TimeSpan(animationTime.Ticks() - m_lastAnimationTime.Ticks());
-    // The step the next frame is due at is where this frame is expected to leave the grid's refresh for the screen: without a
-    // display to ask, it is the pacer's aim for the frame
+    // The step this frame is due to leave the grid at is where it is expected to reach the screen: without a display to ask, it
+    // is the pacer's aim for the frame. The next frame starts there, or a pause later
     schedule.NextFrameStartTime = TimeOfSlot(m_nextSlot);
-    schedule.IntendedDisplayTime = schedule.NextFrameStartTime;
+    schedule.IntendedDisplayTime = TimeOfSlot(dueSlot);
     schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(m_swapInterval));
     schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
@@ -155,6 +206,25 @@ namespace MB::FramePacing::Pacer
   void TimerPeriodOnlyPacer::AddPresent(const PresentReport& report) noexcept
   {
     m_lastPresentBlocked = report.Blocked();
+    if (report.Accepted)
+    {
+      m_presentTaken = true;
+    }
+    else
+    {
+      // The swap chain the present was made for is gone, and a new one starts as a new window does
+      ArmStartupPause();
+    }
+  }
+
+  void TimerPeriodOnlyPacer::AddGpuWork(const GpuWorkReport& report) noexcept
+  {
+    m_frameWork.AddGpuWork(report, m_rule.Settings().FrameMargin());
+  }
+
+  void TimerPeriodOnlyPacer::ForgetPresents() noexcept
+  {
+    ArmStartupPause();
   }
 
   void TimerPeriodOnlyPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
@@ -178,8 +248,10 @@ namespace MB::FramePacing::Pacer
   void TimerPeriodOnlyPacer::Reset() noexcept
   {
     m_rule.Reset(m_rule.PreferredSwapInterval());
+    m_frameWork.Clear();
     m_hasGrid = false;
     m_frameOpen = false;
     m_frameEnded = false;
+    ArmStartupPause();
   }
 }

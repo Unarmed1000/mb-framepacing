@@ -13,11 +13,15 @@
 //   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-ticks <n>] [--timer-only]
 //             [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
 //             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]
-//             [--wait-for-present <presents that may wait>]
+//             [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>] [--startup-pause <refreshes>]
 //
 //   --tier-pacer  the application carries out what the pacer of the lowest pair of tiers gives it, in place of today's pacer and
 //                 the first integration's own calculations
 //   --wait-for-present  the same with the pacer of a timer and a wait for a present
+//   --gpu-reports       the loop gives a tier pacer each frame's GPU work, begin and end
+//   --frames-in-flight  1: a frame starts when the GPU is done with the one before it; 2: the CPU works on a frame while the GPU
+//                       works on the one before it. The loop does it and says so to a tier pacer
+//   --startup-pause     the refreshes of the lowest pair's pause after start-up; 0 for none
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <algorithm>
@@ -44,7 +48,8 @@ namespace
                  "pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <n>] [--cpu-ticks <n>] [--timer-only]\n"
                  "          [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
                  "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]\n"
-                 "          [--wait-for-present <presents that may wait>]\n";
+                 "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
+                 "          [--startup-pause <refreshes>]\n";
     return 2;
   }
 
@@ -82,6 +87,11 @@ namespace
       if (name == "--tier-pacer")
       {
         tierPacer = true;
+        continue;
+      }
+      if (name == "--gpu-reports")
+      {
+        settings.ReportsGpuWork = true;
         continue;
       }
       if (index + 1 >= args.size())
@@ -124,6 +134,16 @@ namespace
       else if (name == "--images")
       {
         settings.Display.Images = static_cast<int32_t>(Number(value));
+      }
+      else if (name == "--frames-in-flight")
+      {
+        // What the loop does, and what it tells the pacer
+        settings.MaxFramesInFlight = static_cast<uint32_t>(Number(value));
+        settings.WaitsForPreviousGpuWork = settings.MaxFramesInFlight < 2;
+      }
+      else if (name == "--startup-pause")
+      {
+        settings.StartupPauseRefreshes = static_cast<uint32_t>(Number(value));
       }
       else if (name == "--wait-for-present")
       {

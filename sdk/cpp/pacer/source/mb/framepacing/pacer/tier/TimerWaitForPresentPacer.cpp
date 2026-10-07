@@ -3,7 +3,8 @@
 //
 // EXPERIMENTAL. The pacer of a timer with a wait for a present (sdk/doc/pacer-design.md): TimerPeriodOnlyPacer's grid on the
 // clock, a wait before each frame until the display took an earlier one, and a grid that follows the display through the ends of
-// the waits that held the loop.
+// the waits that held the loop. What the two pacers share is still a copy in each: it is folded when the third pacer shows what
+// all of them share.
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
@@ -63,7 +64,9 @@ namespace MB::FramePacing::Pacer
     if (m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId && (m_lastAcceptedId - back) != m_waitedForId)
     {
       plan.WaitForPresentFrameId = m_lastAcceptedId - back;
-      plan.WaitForPresentTimeout = TimeDuration(m_rule.Settings().PresentWaitTimeout());
+      // As long as a few of the frame's own swap intervals: a present that is never shown holds the loop no longer
+      const int64_t refreshes = int64_t{m_rule.Settings().PresentWaitSwapIntervals()} * m_rule.SwapInterval();
+      plan.WaitForPresentTimeout = TimeDuration(m_rule.Refresh().TimeFor(refreshes));
     }
     if (!StartsAgainAt(now))
     {
@@ -101,6 +104,9 @@ namespace MB::FramePacing::Pacer
     const RefreshPeriod period = m_rule.Refresh();
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
     const bool isFirstFrame = m_frameId == 0;
+    // The steps of the grid the previous frame took more than it was given, and the frame before it
+    int64_t lost = 0;
+    int64_t lostBefore = 0;
     if (StartsAgainAt(cpuStartTime))
     {
       // The grid starts at this frame: nothing was measured, the frame window starts empty and the swap interval stays
@@ -114,14 +120,19 @@ namespace MB::FramePacing::Pacer
       // The previous frame: the steps of the grid from its start to this one against its swap interval, and its work against its
       // swap interval's time. Without an EndFrame its work is not known, and the time to this start says nothing about it
       const int64_t slot = SlotFor(cpuStartTime);
-      const int64_t lost = (slot - m_slot) - int64_t{m_swapInterval};
-      const TimeSpan knownWork = m_frameEnded ? m_work : TimeSpan();
-      const bool late = lost > 0 || knownWork > period.TimeFor(m_swapInterval);
-      const TimeSpan work = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
+      lost = slot - m_nextSlot;
+      lostBefore = m_lost;
+      const TimeSpan cpuWork = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
+      const TimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
+      const bool late = lost > 0 || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       change = m_rule.AddFrame(period.TimeFor(slot), work, late, TimeOfSlot(m_nextSlot) - cpuStartTime);
-      m_refreshesBehindClock += static_cast<uint64_t>(lost);
       m_slot = slot;
     }
+    // A loss that repeats: the frame before this one took refreshes more than it was given, and so did the one before that. A
+    // swap interval the rule just changed is its answer to the losses before it
+    const int64_t repeated = change == SwapIntervalChange::Unchanged ? std::min(lost, lostBefore) : 0;
+    const auto repeatedLoss = static_cast<uint32_t>(std::min(repeated, int64_t{PacerSettings::MaxSwapInterval}));
+    m_lost = change == SwapIntervalChange::Unchanged ? lost : 0;
 
     m_swapInterval = m_rule.SwapInterval();
     m_nextSlot = m_slot + int64_t{m_swapInterval};
@@ -130,14 +141,18 @@ namespace MB::FramePacing::Pacer
     m_frameOpen = true;
     m_frameEnded = false;
     ++m_frameId;
+    m_frameWork.AddFrameStart(m_frameId, cpuStartTime);
 
     // The animation time: the first frame's is where the pacer starts, every other frame's is its swap interval after the one
-    // before it, whatever the grid lost in between
+    // before it. A refresh that was lost is not caught up with. With a loss that repeats the display shows every frame for that
+    // much longer, and the step is longer by it: by the fewer of the two frames' losses
     if (!isFirstFrame)
     {
-      m_animationTime.Add(m_swapInterval, period);
+      m_animationTime.Add(m_swapInterval + repeatedLoss, period);
     }
     const TimeSpan animationTime = m_animationTime.ToTimeSpan();
+    // How far the animation time is behind the clock: what was lost, less what the step is longer by
+    m_refreshesBehindClock += static_cast<uint64_t>(lost) - repeatedLoss;
 
     FrameSchedule schedule;
     schedule.FrameId = m_frameId;
@@ -201,6 +216,11 @@ namespace MB::FramePacing::Pacer
     }
   }
 
+  void TimerWaitForPresentPacer::AddGpuWork(const GpuWorkReport& report) noexcept
+  {
+    m_frameWork.AddGpuWork(report, m_rule.Settings().FrameMargin());
+  }
+
   void TimerWaitForPresentPacer::ForgetPresents() noexcept
   {
     m_oldestWaitableId = m_lastAcceptedId + 1u;
@@ -227,6 +247,7 @@ namespace MB::FramePacing::Pacer
   void TimerWaitForPresentPacer::Reset() noexcept
   {
     m_rule.Reset(m_rule.PreferredSwapInterval());
+    m_frameWork.Clear();
     m_hasGrid = false;
     ForgetPresents();
     m_frameOpen = false;

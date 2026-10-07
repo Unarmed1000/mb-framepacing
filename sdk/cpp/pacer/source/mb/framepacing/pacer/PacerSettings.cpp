@@ -91,9 +91,27 @@ namespace MB::FramePacing::Pacer
     m_waitingPresents = std::clamp(presents, 1u, MaxWaitingPresents);
   }
 
-  void PacerSettings::SetPresentWaitTimeout(const TimeSpan timeout) noexcept
+  void PacerSettings::SetPresentWaitSwapIntervals(const uint32_t swapIntervals) noexcept
   {
-    assert(timeout >= MinPresentWaitTimeout && timeout <= MaxPresentWaitTimeout);
-    m_presentWaitTimeout = std::clamp(timeout, MinPresentWaitTimeout, MaxPresentWaitTimeout);
+    assert(swapIntervals >= 1 && swapIntervals <= MaxPresentWaitSwapIntervals);
+    m_presentWaitSwapIntervals = std::clamp(swapIntervals, 1u, MaxPresentWaitSwapIntervals);
+  }
+
+  void PacerSettings::SetMaxFramesInFlight(const uint32_t frames) noexcept
+  {
+    assert(frames >= 1 && frames <= MaxMaxFramesInFlight);
+    m_maxFramesInFlight = std::clamp(frames, 1u, MaxMaxFramesInFlight);
+  }
+
+  void PacerSettings::SetStartupPauseRefreshes(const uint32_t refreshes) noexcept
+  {
+    assert(refreshes <= MaxStartupPauseRefreshes);
+    m_startupPauseRefreshes = std::min(refreshes, MaxStartupPauseRefreshes);
+  }
+
+  void PacerSettings::SetStartupPauseDelay(const TimeSpan delay) noexcept
+  {
+    assert(delay >= TimeSpan() && delay <= MaxStartupPauseDelay);
+    m_startupPauseDelay = std::clamp(delay, TimeSpan(), MaxStartupPauseDelay);
   }
 }

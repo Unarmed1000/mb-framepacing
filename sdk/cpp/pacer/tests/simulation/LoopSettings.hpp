@@ -42,6 +42,12 @@ namespace MB::FramePacing::Pacer::Simulation
     //! display took a frame a wait for it returns
     uint32_t WaitingPresents{2};
     TickRange PresentWaitReturn{600, 24'000};
+    //! For the tier pacers. true: the loop gives the pacer each frame's GPU work, begin and end, once it is done
+    bool ReportsGpuWork{false};
+    //! What the loop tells the pacer of the frames it lets be in flight (PacerSettings::MaxFramesInFlight)
+    uint32_t MaxFramesInFlight{1};
+    //! The pause after start-up of the pacer that has the refresh period only (PacerSettings::StartupPauseRefreshes)
+    uint32_t StartupPauseRefreshes{4};
     //! false: paced at a fixed swap interval of 1, the rule off
     bool AutoSwapInterval{true};
     DisplayModelSettings Display;

@@ -28,7 +28,10 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
     bool m_usePresentFeedback{false};
     uint32_t m_waitingPresents{2};
-    TimeSpan m_presentWaitTimeout{250 * TimeSpan::TicksPerMillisecond};
+    uint32_t m_presentWaitSwapIntervals{4};
+    uint32_t m_maxFramesInFlight{1};
+    uint32_t m_startupPauseRefreshes{4};
+    TimeSpan m_startupPauseDelay{500 * TimeSpan::TicksPerMillisecond};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
@@ -42,8 +45,10 @@ namespace MB::FramePacing::Pacer
     static constexpr int64_t DefaultFrameMarginDivisor = 8;
     static constexpr TimeSpan MaxSlowestFrameTime{10 * TimeSpan::TicksPerSecond};
     static constexpr uint32_t MaxWaitingPresents = 8;
-    static constexpr TimeSpan MinPresentWaitTimeout{TimeSpan::TicksPerMillisecond};
-    static constexpr TimeSpan MaxPresentWaitTimeout{10 * TimeSpan::TicksPerSecond};
+    static constexpr uint32_t MaxPresentWaitSwapIntervals = 64;
+    static constexpr uint32_t MaxMaxFramesInFlight = 8;
+    static constexpr uint32_t MaxStartupPauseRefreshes = 64;
+    static constexpr TimeSpan MaxStartupPauseDelay{10 * TimeSpan::TicksPerSecond};
 
     //! The display's refresh period, from its display mode (a DXGI output mode, Display.getRefreshRate, wl_output's mode).
     explicit PacerSettings(const RefreshPeriod refresh) noexcept
@@ -176,14 +181,51 @@ namespace MB::FramePacing::Pacer
 
     void SetWaitingPresents(uint32_t presents) noexcept;
 
-    //! The longest a wait for a present may take (MinPresentWaitTimeout to MaxPresentWaitTimeout): a present of a window that
-    //! is not shown may never be shown. 250 ms by default.
-    [[nodiscard]] TimeSpan PresentWaitTimeout() const noexcept
+    //! The longest a wait for a present may take, in swap intervals of the frame that waits (1 to MaxPresentWaitSwapIntervals;
+    //! 4 by default): some presents are never shown (the first ones of a new window, those of a window that is hidden), and
+    //! the loop stands for this long when it waits for one. Counted in the frame's own time, so a slow loop is given as
+    //! many of its frames as a fast one.
+    [[nodiscard]] uint32_t PresentWaitSwapIntervals() const noexcept
     {
-      return m_presentWaitTimeout;
+      return m_presentWaitSwapIntervals;
     }
 
-    void SetPresentWaitTimeout(TimeSpan timeout) noexcept;
+    void SetPresentWaitSwapIntervals(uint32_t swapIntervals) noexcept;
+
+    //! The frames the application lets be in flight at once (1 to MaxMaxFramesInFlight; 1 by default). 1: a frame starts
+    //! when the GPU is done with the one before it, so the CPU's and the GPU's work on a frame come one after the other and
+    //! a frame needs the two added. 2 or more: the CPU works on a frame while the GPU works on the one before it, and a
+    //! frame needs the longer of the two. It is the application's word for what the frames' times can not always show (at
+    //! a longer swap interval nothing overlaps); where GPU work reports with an end time show the two side by side, that
+    //! counts too. Without GPU work reports it is not used.
+    [[nodiscard]] uint32_t MaxFramesInFlight() const noexcept
+    {
+      return m_maxFramesInFlight;
+    }
+
+    void SetMaxFramesInFlight(uint32_t frames) noexcept;
+
+    //! For a pacer that can neither wait for a present nor see what the display shows (QueueTier::PeriodOnly): the length of
+    //! the one pause it makes after start-up, in refreshes (0 to MaxStartupPauseRefreshes; 0: no pause; 4 by default). The
+    //! first presents of a new swap chain can take longer to reach the display than the later ones, and the frames that
+    //! pile up behind them then wait for as long as the loop runs at one refresh per frame. The pause lets the display
+    //! take them. A guess, as that pacer does not learn whether any frame waits: the default is what emptied the queue on
+    //! the one system measured.
+    [[nodiscard]] uint32_t StartupPauseRefreshes() const noexcept
+    {
+      return m_startupPauseRefreshes;
+    }
+
+    void SetStartupPauseRefreshes(uint32_t refreshes) noexcept;
+
+    //! How long after the first frame of a start (or of a new swap chain) that pause is made (0 to MaxStartupPauseDelay;
+    //! half a second by default): after the presents that pile up were made. A guess as well.
+    [[nodiscard]] TimeSpan StartupPauseDelay() const noexcept
+    {
+      return m_startupPauseDelay;
+    }
+
+    void SetStartupPauseDelay(TimeSpan delay) noexcept;
 
     constexpr bool operator==(const PacerSettings&) const noexcept = default;
   };

@@ -15,6 +15,7 @@
 #include <mb/framepacing/pacer/capability/QueueTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
@@ -81,17 +82,17 @@ namespace
 TEST(TimerWaitForPresentPacer, BeforeAFrameItAsksForTheLastPresentWhenNoneMayWait)
 {
   PC::PacerSettings settings = Settings(1);
-  settings.SetPresentWaitTimeout(Span(1'500'000));
+  settings.SetPresentWaitSwapIntervals(3);
   PC::TimerWaitForPresentPacer pacer(settings);
 
   // Nothing was presented yet
   EXPECT_FALSE(pacer.PlanFrame(At(Start)).WaitsForPresent());
   EXPECT_EQ(Frame(pacer, Start), 1u);
-  // The present of frame 1, with the settings' timeout, and after it the step the frame is due at
+  // The present of frame 1, for at most the settings' three swap intervals, and after it the step the frame is due at
   PC::FrameStartPlan plan = pacer.PlanFrame(At(Start + 31'000));
   EXPECT_TRUE(plan.WaitsForPresent());
   EXPECT_EQ(plan.WaitForPresentFrameId, 1u);
-  EXPECT_EQ(plan.WaitForPresentTimeout, FP::TimeDuration::FromTicks(1'500'000));
+  EXPECT_EQ(plan.WaitForPresentTimeout, FP::TimeDuration::FromTicks(3 * Period));
   EXPECT_EQ(plan.StartTime, At(Start + Period));
   // Planned again it is the same
   EXPECT_EQ(pacer.PlanFrame(At(Start + 32'000)).WaitForPresentFrameId, 1u);
@@ -112,8 +113,8 @@ TEST(TimerWaitForPresentPacer, WithOnePresentAllowedToWaitItAsksForThePresentBef
   EXPECT_EQ(pacer.PlanFrame(At(Start + Period + 31'000)).WaitForPresentFrameId, 1u);
   static_cast<void>(Frame(pacer, Start + (2 * Period)));
   EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 31'000)).WaitForPresentFrameId, 2u);
-  // The timeout is the default
-  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 31'000)).WaitForPresentTimeout, FP::TimeDuration::FromTicks(2'500'000));
+  // The longest the wait may take is the default: four of the frame's swap intervals
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 31'000)).WaitForPresentTimeout, FP::TimeDuration::FromTicks(4 * Period));
 }
 
 TEST(TimerWaitForPresentPacer, APresentTheSystemDidNotTakeIsNotWaitedForNorAnyBeforeIt)
@@ -357,35 +358,144 @@ TEST(TimerWaitForPresentPacer, AFrameWithoutAnEndIsNotJudgedByItsWorkAndAStartTh
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
 }
 
-TEST(PacerSettings, TheSettingsOfAWaitForAPresentKeepToTheirRange)
+TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
 {
   PC::PacerSettings settings(g_hz100);
   EXPECT_EQ(settings.WaitingPresents(), 2u);
-  EXPECT_EQ(settings.PresentWaitTimeout(), Span(2'500'000));
+  EXPECT_EQ(settings.PresentWaitSwapIntervals(), 4u);
+  EXPECT_EQ(settings.MaxFramesInFlight(), 1u);
+  EXPECT_EQ(settings.StartupPauseRefreshes(), 4u);
+  EXPECT_EQ(settings.StartupPauseDelay(), Span(5'000'000));
   settings.SetWaitingPresents(1);
-  settings.SetPresentWaitTimeout(PC::PacerSettings::MaxPresentWaitTimeout);
+  settings.SetPresentWaitSwapIntervals(1);
+  settings.SetMaxFramesInFlight(2);
+  settings.SetStartupPauseRefreshes(0);
+  settings.SetStartupPauseDelay(Span(0));
   EXPECT_EQ(settings.WaitingPresents(), 1u);
-  EXPECT_EQ(settings.PresentWaitTimeout(), Span(100'000'000));
+  EXPECT_EQ(settings.PresentWaitSwapIntervals(), 1u);
+  EXPECT_EQ(settings.MaxFramesInFlight(), 2u);
+  EXPECT_EQ(settings.StartupPauseRefreshes(), 0u);
+  EXPECT_EQ(settings.StartupPauseDelay(), Span(0));
   settings.SetWaitingPresents(PC::PacerSettings::MaxWaitingPresents);
-  settings.SetPresentWaitTimeout(PC::PacerSettings::MinPresentWaitTimeout);
+  settings.SetPresentWaitSwapIntervals(PC::PacerSettings::MaxPresentWaitSwapIntervals);
+  settings.SetMaxFramesInFlight(PC::PacerSettings::MaxMaxFramesInFlight);
+  settings.SetStartupPauseRefreshes(PC::PacerSettings::MaxStartupPauseRefreshes);
+  settings.SetStartupPauseDelay(PC::PacerSettings::MaxStartupPauseDelay);
   EXPECT_EQ(settings.WaitingPresents(), 8u);
-  EXPECT_EQ(settings.PresentWaitTimeout(), Span(10'000));
+  EXPECT_EQ(settings.PresentWaitSwapIntervals(), 64u);
+  EXPECT_EQ(settings.MaxFramesInFlight(), 8u);
+  EXPECT_EQ(settings.StartupPauseRefreshes(), 64u);
+  EXPECT_EQ(settings.StartupPauseDelay(), Span(100'000'000));
   EXPECT_NE(settings, PC::PacerSettings(g_hz100));
 #ifdef NDEBUG
   settings.SetWaitingPresents(0);
   EXPECT_EQ(settings.WaitingPresents(), 1u);
   settings.SetWaitingPresents(9);
   EXPECT_EQ(settings.WaitingPresents(), 8u);
-  settings.SetPresentWaitTimeout(Span(0));
-  EXPECT_EQ(settings.PresentWaitTimeout(), PC::PacerSettings::MinPresentWaitTimeout);
-  settings.SetPresentWaitTimeout(Span(200'000'000));
-  EXPECT_EQ(settings.PresentWaitTimeout(), PC::PacerSettings::MaxPresentWaitTimeout);
+  settings.SetPresentWaitSwapIntervals(0);
+  EXPECT_EQ(settings.PresentWaitSwapIntervals(), 1u);
+  settings.SetPresentWaitSwapIntervals(65);
+  EXPECT_EQ(settings.PresentWaitSwapIntervals(), 64u);
+  settings.SetMaxFramesInFlight(0);
+  EXPECT_EQ(settings.MaxFramesInFlight(), 1u);
+  settings.SetMaxFramesInFlight(9);
+  EXPECT_EQ(settings.MaxFramesInFlight(), 8u);
+  settings.SetStartupPauseRefreshes(65);
+  EXPECT_EQ(settings.StartupPauseRefreshes(), 64u);
+  settings.SetStartupPauseDelay(Span(-1));
+  EXPECT_EQ(settings.StartupPauseDelay(), Span(0));
+  settings.SetStartupPauseDelay(Span(200'000'000));
+  EXPECT_EQ(settings.StartupPauseDelay(), PC::PacerSettings::MaxStartupPauseDelay);
 #elif GTEST_HAS_DEATH_TEST
   EXPECT_DEATH(settings.SetWaitingPresents(0), "");
   EXPECT_DEATH(settings.SetWaitingPresents(9), "");
-  EXPECT_DEATH(settings.SetPresentWaitTimeout(Span(0)), "");
-  EXPECT_DEATH(settings.SetPresentWaitTimeout(Span(200'000'000)), "");
+  EXPECT_DEATH(settings.SetPresentWaitSwapIntervals(0), "");
+  EXPECT_DEATH(settings.SetPresentWaitSwapIntervals(65), "");
+  EXPECT_DEATH(settings.SetMaxFramesInFlight(0), "");
+  EXPECT_DEATH(settings.SetMaxFramesInFlight(9), "");
+  EXPECT_DEATH(settings.SetStartupPauseRefreshes(65), "");
+  EXPECT_DEATH(settings.SetStartupPauseDelay(Span(-1)), "");
+  EXPECT_DEATH(settings.SetStartupPauseDelay(Span(200'000'000)), "");
 #else
   GTEST_SKIP() << "asserts are on and death tests are not available";
 #endif
+}
+
+TEST(TimerWaitForPresentPacer, TheLongestAWaitMayTakeIsCountedInTheFramesOwnSwapIntervals)
+{
+  // 25 frames a second at 100 Hz: four refreshes per frame, and four of those
+  PC::PacerSettings settings = Settings(1);
+  settings.SetPreferredFrameRate(25);
+  PC::TimerWaitForPresentPacer pacer(settings);
+  static_cast<void>(Frame(pacer, Start));
+  const PC::FrameStartPlan plan = pacer.PlanFrame(At(Start + 31'000));
+  EXPECT_EQ(plan.WaitForPresentFrameId, 1u);
+  EXPECT_EQ(plan.WaitForPresentTimeout, FP::TimeDuration::FromTicks(16 * Period));
+}
+
+TEST(TimerWaitForPresentPacer, WithGpuWorkReportsAFramesWorkIsTheCpusAndTheGpus)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(2));
+  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::Zero());
+  static_cast<void>(Frame(pacer, Start));
+  static_cast<void>(Frame(pacer, Start + Period));
+  // GPU work of 0.8 periods that ends within the margin of the next frame's start: one after the other, the two added
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(1, At(Start + 30'000), At(Start + Period + 10'000)));
+  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::FromTicks(80'000));
+  static_cast<void>(Frame(pacer, Start + (2 * Period)));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((30'000 + 110'000) / 2));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+
+  // Beside the CPU's work on the frame after it: the longer of the two
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(2, At(Start + Period + 50'000), At(Start + (2 * Period) + 30'000)));
+  static_cast<void>(Frame(pacer, Start + (3 * Period)));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((30'000 + 110'000 + 80'000) / 3));
+
+  pacer.Reset();
+  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::Zero());
+}
+
+TEST(TimerWaitForPresentPacer, ALossThatRepeatsIsInTheAnimationStepAndALossThatDoesNotIsNot)
+{
+  PC::PacerSettings settings = Settings(1);
+  settings.SetAutoSwapInterval(false);
+  PC::TimerWaitForPresentPacer pacer(settings);
+  static_cast<void>(pacer.BeginFrame(At(Start)));
+
+  // Every frame takes two steps of the grid at one refresh per frame: from the second loss in a row on it is in the step
+  PC::FrameSchedule schedule = pacer.BeginFrame(At(Start + (2 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  schedule = pacer.BeginFrame(At(Start + (4 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  schedule = pacer.BeginFrame(At(Start + (6 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
+  // A frame on time ends it, and one loss after it is one loss
+  schedule = pacer.BeginFrame(At(Start + (7 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  schedule = pacer.BeginFrame(At(Start + (9 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(Period));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 2u);
+}
+
+TEST(TimerWaitForPresentPacer, ASwapIntervalTheRuleChangesIsItsAnswerToTheLossesBeforeIt)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  PC::FrameSchedule schedule = pacer.BeginFrame(At(Start));
+  int64_t start = Start;
+  while (schedule.Change != PC::SwapIntervalChange::Slower && start < Start + (1'000 * Period))
+  {
+    static_cast<void>(pacer.EndFrame(At(start + 30'000)));
+    start += 2 * Period;
+    schedule = pacer.BeginFrame(At(start));
+  }
+  ASSERT_EQ(schedule.Change, PC::SwapIntervalChange::Slower);
+  ASSERT_EQ(schedule.SwapInterval, 2u);
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  static_cast<void>(pacer.EndFrame(At(start + 30'000)));
+  schedule = pacer.BeginFrame(At(start + (2 * Period)));
+  EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 }

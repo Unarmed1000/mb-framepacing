@@ -12,6 +12,7 @@
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentFeedback.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
@@ -159,6 +160,9 @@ TEST(Allocations, TheLowestPairsPacerPacesFramesWithoutAllocating)
       report.CallTime = FP::TickCount64(now);
       report.ReturnTime = FP::TickCount64(now + 600);
       pacer.AddPresent(report);
+      // The GPU's work on the frame, given a frame later: beside the next frame's work for a stretch, after it for another
+      pacer.AddGpuWork(
+        PC::GpuWorkReport::Times(present.FrameId - 1u, FP::TickCount64(now - 60'000), FP::TickCount64(now - ((frame % 200) < 100 ? 35'000 : 5'000))));
       now += 600;
       checked += static_cast<int64_t>(schedule.SwapInterval);
     }
@@ -208,6 +212,9 @@ TEST(Allocations, ThePacerOfATimerWithAWaitForAPresentPacesFramesWithoutAllocati
       report.ReturnTime = FP::TickCount64(now + 600);
       report.Accepted = (frame % 211) != 0;
       pacer.AddPresent(report);
+      // The GPU's work on the frame, given a frame later: beside the next frame's work for a stretch, after it for another
+      pacer.AddGpuWork(
+        PC::GpuWorkReport::Times(present.FrameId - 1u, FP::TickCount64(now - 60'000), FP::TickCount64(now - ((frame % 200) < 100 ? 35'000 : 5'000))));
       now += 600;
       checked += static_cast<int64_t>(schedule.SwapInterval);
     }
