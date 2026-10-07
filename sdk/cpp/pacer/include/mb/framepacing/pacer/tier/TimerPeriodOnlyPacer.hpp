@@ -39,21 +39,48 @@ namespace MB::FramePacing::Pacer
   //! and, where the application has it, AddGpuWork: the GPU's work on an earlier frame.
   //!
   //! It can not see the display. What it has is a count: the clock says how many refresh periods have passed, and it knows how
-  //! many it gave its frames. So it keeps the frame starts on one grid of refresh periods on the clock. Step 0 is the first frame's
-  //! start, and a frame is due at a whole number of steps from it, whatever the frames before it did:
-  //!   - a frame that starts less than half a period late keeps its step and starts at once: that frame is late, no frame after
-  //!     it is;
-  //!   - a frame that would start later than that takes the step nearest to where the loop is, and waits for it when it is still
+  //! many it gave its frames. So it keeps the frames on one grid of refresh periods on the clock. Step 0 is the first frame's
+  //! start, and every frame is for a step a whole number of periods from it. A frame held for more than one refresh is presented
+  //! by the loop on a timer, in the period before the step the next frame is due at, a margin into it
+  //! (PacerSettings::FrameMargin). A guess: the grid's place against the display's refreshes is not known.
+  //!
+  //! What it does with the frames that wait to be shown is its aim (PacerSettings::Aim), and it has both.
+  //!
+  //! PacerAim::Smoothness, the default: at one refresh per frame it keeps a reserve. PacerSettings::WaitingPresents less one
+  //! frames are made ahead of the display: a frame starts that many periods before its step, so the first ones of a start are
+  //! made back to back, and from then on the display has that many frames in hand. Where in a refresh a present lands then
+  //! matters less, and a frame that runs long is covered for as many refreshes.
+  //!   - A frame that is late within the reserve gives up no step: the frames after it are made back to back until the loop is
+  //!     where it was, so the reserve is there again and the animation time stays with the clock.
+  //!   - What is beyond the reserve is given up: the display showed a frame again for those refreshes. How late a frame was
+  //!     is read from its present (the whole periods it came after the time its swap interval gave it) and from the next
+  //!     frame's start. This pacer gives up the steps it is sure of and no more, so after a long frame the frames that wait
+  //!     are the reserve or one more.
+  //!   - There is no pause after start-up, which would take the reserve away.
+  //! At two refreshes per frame or more nothing can wait (the display takes a frame before the next is made), and there is no
+  //! reserve.
+  //!
+  //! PacerAim::LowLatency: the frames that wait are kept as few as this tier can.
+  //!   - A frame that starts less than half a period late keeps its step and starts at once: that frame is late, no frame after
+  //!     it is.
+  //!   - A frame that would start later than that takes the step nearest to where the loop is, and waits for it when it is still
   //!     to come: the frame before it ran long, the steps in between are lost, and the loop is back where it was against the
-  //!     display, whatever that place is;
-  //!   - after a frame whose present was made later than the step the next frame was due at, the next present comes a whole
+  //!     display, whatever that place is.
+  //!   - After a frame whose present was made later than the step the next frame was due at, the next present comes a whole
   //!     period after it: the next step when the late present was made no later in its step than the last present that was
   //!     on time, and else the step after. Two presents less than a period apart can reach the display between the same two
   //!     refreshes, and one of them then waits to be shown for as long as the loop runs. The price is a refresh more after
-  //!     most long frames, on a display where the next step would have done;
-  //!   - a frame held for more than one refresh is presented by the loop on a timer, in the period before the step the next frame
-  //!     is due at, a margin into it (PacerSettings::FrameMargin). A guess: the grid's place against the display's refreshes is
-  //!     not known.
+  //!     most long frames, on a display where the next step would have done.
+  //!   - For the frames that pile up behind the first presents of a new swap chain it pauses once:
+  //!     PacerSettings::StartupPauseDelay after the first frame of a start, and never before a present was taken, the frame
+  //!     after is due PacerSettings::StartupPauseRefreshes later. The frame on screen stays there through the pause. A guess,
+  //!     made once per start and once per swap chain made anew, and not at all when the pacer is at two refreshes per frame or
+  //!     more then.
+  //!
+  //! With either aim it does not learn of a frame that waits although it was ready in time, and the reserve is a count, not
+  //! something it sees: a refresh period that is a little off the display's makes the frames that wait one more or one fewer
+  //! over time.
+  //!
   //! The swap interval rule (SwapIntervalRule) decides each frame's swap interval from how the frames did: a frame is late when
   //! it took more steps of the grid than its swap interval, or when its work was longer than its swap interval's time. A
   //! frame's work is the CPU's, from BeginFrame to EndFrame, and with GPU work reports the GPU's too, put together by how the
@@ -64,13 +91,6 @@ namespace MB::FramePacing::Pacer
   //! repeats: when the frame before took refreshes more than it was given and the one before that did too, the display shows
   //! every frame for that much longer, and the step is longer by the fewer of the two. RefreshesBehindClock() says how far
   //! the animation time is behind the clock.
-  //!
-  //! What it does not do: take a frame away that waits to be shown although its frame was ready in time. It does not learn of
-  //! one. At two refreshes per frame or more such a frame is gone by itself; at one it stays. For the frames that pile up
-  //! behind the first presents of a new swap chain it pauses once: PacerSettings::StartupPauseDelay after the first frame of
-  //! a start, and never before a present was taken, the frame after is due PacerSettings::StartupPauseRefreshes later. The
-  //! frame on screen stays there through the pause. A guess, made once per start and once per swap chain made anew, and
-  //! not at all when the pacer is at two refreshes per frame or more then.
   //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
@@ -95,8 +115,9 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
-    // The steps of the grid the frame before it took more than it was given
+    // The steps of the grid the frame before it took more than it was given, and the steps the frame is behind its own
     int64_t m_lost{0};
+    int64_t m_behind{0};
     FrameWorkRule m_frameWork;
     RefreshTime m_animationTime;
     TimeSpan m_lastAnimationTime;
@@ -208,6 +229,9 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] bool StartsAgainAt(TickCount64 time) const noexcept;
     [[nodiscard]] int64_t SlotFor(TickCount64 time) const noexcept;
     [[nodiscard]] int64_t SlotAfterPresent() const noexcept;
+    [[nodiscard]] int64_t Reserve() const noexcept;
+    [[nodiscard]] TickCount64 DueTime(int64_t slot) const noexcept;
+    [[nodiscard]] int64_t SmoothSlotFor(TickCount64 time) const noexcept;
     [[nodiscard]] TickCount64 TimeOfSlot(int64_t slot) const noexcept;
     void ArmStartupPause() noexcept;
     [[nodiscard]] uint32_t StartupPauseAt(TickCount64 cpuStartTime) noexcept;

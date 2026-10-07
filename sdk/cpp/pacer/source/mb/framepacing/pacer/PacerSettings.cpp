@@ -85,6 +85,13 @@ namespace MB::FramePacing::Pacer
     m_slowestFrameTime = std::clamp(frameTime, TimeSpan(), MaxSlowestFrameTime);
   }
 
+  void PacerSettings::SetAim(const PacerAim aim) noexcept
+  {
+    const bool known = aim == PacerAim::Smoothness || aim == PacerAim::LowLatency;
+    assert(known);
+    m_aim = known ? aim : PacerAim::Smoothness;
+  }
+
   void PacerSettings::SetWaitingPresents(const uint32_t presents) noexcept
   {
     assert(presents >= 1 && presents <= MaxWaitingPresents);

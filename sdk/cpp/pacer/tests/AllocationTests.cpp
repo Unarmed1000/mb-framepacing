@@ -7,6 +7,7 @@
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
@@ -181,6 +182,7 @@ TEST(Allocations, ThePacerOfATimerWithAWaitForAPresentPacesFramesWithoutAllocati
 {
   PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
   settings.SetWaitingPresents(1);
+  settings.SetAim(PC::PacerAim::LowLatency);
   PC::TimerWaitForPresentPacer pacer(settings);
 
   int64_t checked = 0;

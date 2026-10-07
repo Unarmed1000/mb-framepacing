@@ -9,6 +9,7 @@
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/HoldTier.hpp>
@@ -44,9 +45,17 @@ namespace
     return FP::TimeSpan(ticks);
   }
 
-  PC::PacerSettings Settings(const uint32_t waitingPresents)
+  //! The settings of the tests that are about the aim of low latency: the default aim is smoothness
+  PC::PacerSettings LowLatencySettings()
   {
     PC::PacerSettings settings(g_hz100);
+    settings.SetAim(PC::PacerAim::LowLatency);
+    return settings;
+  }
+
+  PC::PacerSettings Settings(const uint32_t waitingPresents)
+  {
+    PC::PacerSettings settings = LowLatencySettings();
     settings.SetWaitingPresents(waitingPresents);
     return settings;
   }
@@ -361,6 +370,10 @@ TEST(TimerWaitForPresentPacer, AFrameWithoutAnEndIsNotJudgedByItsWorkAndAStartTh
 TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
 {
   PC::PacerSettings settings(g_hz100);
+  EXPECT_EQ(settings.Aim(), PC::PacerAim::Smoothness);
+  settings.SetAim(PC::PacerAim::LowLatency);
+  EXPECT_EQ(settings.Aim(), PC::PacerAim::LowLatency);
+  settings.SetAim(PC::PacerAim::Smoothness);
   EXPECT_EQ(settings.WaitingPresents(), 2u);
   EXPECT_EQ(settings.PresentWaitSwapIntervals(), 4u);
   EXPECT_EQ(settings.MaxFramesInFlight(), 1u);
@@ -388,6 +401,8 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   EXPECT_EQ(settings.StartupPauseDelay(), Span(100'000'000));
   EXPECT_NE(settings, PC::PacerSettings(g_hz100));
 #ifdef NDEBUG
+  settings.SetAim(static_cast<PC::PacerAim>(7));
+  EXPECT_EQ(settings.Aim(), PC::PacerAim::Smoothness);
   settings.SetWaitingPresents(0);
   EXPECT_EQ(settings.WaitingPresents(), 1u);
   settings.SetWaitingPresents(9);
@@ -407,6 +422,7 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   settings.SetStartupPauseDelay(Span(200'000'000));
   EXPECT_EQ(settings.StartupPauseDelay(), PC::PacerSettings::MaxStartupPauseDelay);
 #elif GTEST_HAS_DEATH_TEST
+  EXPECT_DEATH(settings.SetAim(static_cast<PC::PacerAim>(7)), "");
   EXPECT_DEATH(settings.SetWaitingPresents(0), "");
   EXPECT_DEATH(settings.SetWaitingPresents(9), "");
   EXPECT_DEATH(settings.SetPresentWaitSwapIntervals(0), "");
@@ -498,4 +514,67 @@ TEST(TimerWaitForPresentPacer, ASwapIntervalTheRuleChangesIsItsAnswerToTheLosses
   schedule = pacer.BeginFrame(At(start + (2 * Period)));
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+}
+
+// The aim of smoothness, which is the default: frames are made ahead of the display, and the wait keeps them to the reserve.
+
+TEST(TimerWaitForPresentPacer, WithTheAimOfSmoothnessAFrameIsMadeAheadAndTheWaitKeepsItToThat)
+{
+  PC::TimerWaitForPresentPacer pacer{PC::PacerSettings(g_hz100)};
+  ASSERT_EQ(pacer.Settings().Aim(), PC::PacerAim::Smoothness);
+  ASSERT_EQ(pacer.Settings().WaitingPresents(), 2u);
+
+  // The second frame starts at once, with nothing to wait for: it is the one made ahead
+  static_cast<void>(Frame(pacer, Start));
+  PC::FrameStartPlan plan = pacer.PlanFrame(At(Start + 30'600));
+  EXPECT_FALSE(plan.WaitsForPresent());
+  EXPECT_FALSE(plan.WaitsForStartTime());
+  const PC::FrameSchedule second = pacer.BeginFrame(At(Start + 30'600));
+  EXPECT_EQ(second.NextFrameStartTime, At(Start + Period));
+  EXPECT_EQ(second.IntendedDisplayTime, At(Start + (2 * Period)));
+  const PC::PresentPlan present = pacer.EndFrame(At(Start + 60'600));
+  PC::PresentReport report;
+  report.FrameId = present.FrameId;
+  report.CallTime = At(Start + 60'600);
+  report.ReturnTime = At(Start + 61'200);
+  pacer.AddPresent(report);
+
+  // The third waits until the first was shown, and then for its time, a period before the step it is for
+  plan = pacer.PlanFrame(At(Start + 61'200));
+  EXPECT_EQ(plan.WaitForPresentFrameId, 1u);
+  EXPECT_EQ(plan.StartTime, At(Start + Period));
+}
+
+TEST(TimerWaitForPresentPacer, WithTheAimOfSmoothnessALongFrameIsMadeUpForWithinTheReserveAndGivenUpBeyondIt)
+{
+  PC::TimerWaitForPresentPacer pacer{PC::PacerSettings(g_hz100)};
+  static_cast<void>(Frame(pacer, Start));
+  static_cast<void>(Frame(pacer, Start + 30'600));
+  static_cast<void>(Frame(pacer, Start + Period));
+
+  // A frame of 1.6 periods, begun a period before its step: within the frame made ahead
+  static_cast<void>(pacer.BeginFrame(At(Start + (2 * Period))));
+  PC::PresentPlan present = pacer.EndFrame(At(Start + (2 * Period) + 160'000));
+  PC::PresentReport report;
+  report.FrameId = present.FrameId;
+  report.CallTime = At(Start + (2 * Period) + 160'000);
+  report.ReturnTime = report.CallTime;
+  pacer.AddPresent(report);
+  int64_t now = Start + (2 * Period) + 160'600;
+  EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
+  static_cast<void>(Frame(pacer, now));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+  EXPECT_EQ(pacer.PlanFrame(At(now + 30'600)).StartTime, At(Start + (4 * Period)));
+
+  // A frame of 2.4 periods: a step beyond it, which is given up
+  static_cast<void>(pacer.BeginFrame(At(Start + (4 * Period))));
+  present = pacer.EndFrame(At(Start + (4 * Period) + 240'000));
+  // A report of another frame says nothing of this one's present
+  report.FrameId = present.FrameId - 1u;
+  report.CallTime = At(Start + (20 * Period));
+  pacer.AddPresent(report);
+  now = Start + (4 * Period) + 240'600;
+  static_cast<void>(Frame(pacer, now));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
+  EXPECT_EQ(pacer.PlanFrame(At(now + 30'600)).StartTime, At(Start + (7 * Period)));
 }

@@ -46,6 +46,7 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/frame/PresentFeedback.hpp
       include/mb/framepacing/pacer/frame/PresentFeedbackState.hpp
       include/mb/framepacing/pacer/frame/PresentResult.hpp
+      include/mb/framepacing/pacer/PacerAim.hpp
       include/mb/framepacing/pacer/PacerSettings.hpp
       include/mb/framepacing/pacer/RefreshPeriod.hpp
       include/mb/framepacing/pacer/RefreshTime.hpp

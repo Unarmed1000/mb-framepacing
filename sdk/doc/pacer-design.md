@@ -654,9 +654,34 @@ frames that wait are kept or taken away, how many presents may wait, whether a s
 that ran long, where a frame's work sits in a refresh.
 
 An earlier version of this document had reducing latency as "an option on top, not a part of every pacer", and the first two
-tier pacers were built that way, with what leans towards latency as their only behaviour (the pause after start-up and the
-whole period after a late present in the pacer without a wait). That was a misreading of the rule and is being corrected: both
-pacers get the two aims.
+tier pacers were first built that way, with what leans towards latency as their only behaviour. That was a misreading of the
+rule. Both now have the two aims as one setting (`PacerSettings::Aim`: `Smoothness`, which is the default, and
+`LowLatency`), checked on the simulation only and **not measured**:
+
+| Pacer                            | Smoothness                                                                                                                                                                                                    | Low latency                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| A timer, the refresh period only | A reserve at one refresh per frame: the presents that may wait, less one, are made ahead of the display. A frame late within it gives up no step and is made up for; what is beyond it is given up. No pause. | One pause after start-up; a whole period after a late present; a frame half a period late or more takes the step where the loop is. |
+| A timer, a wait for a present    | The same reserve, and the wait keeps it to what may wait.                                                                                                                                                     | No frame made ahead; the wait keeps the frames that wait to what may wait.                                                          |
+
+The reserve is the setting for the presents that may wait (two by default, so one frame is made ahead). At two refreshes per
+frame or more there is none: the display takes a frame before the next one is made.
+
+What the simulation shows of the pacer without a wait, at every one of ten places the display can take its frame in a
+refresh: with a frame made ahead, CPU work of 0.9 of a refresh more in one frame is not seen at all (every frame is on screen
+for one refresh), and with the aim of low latency it is a repeated frame at eight of the ten places or more. After a frame
+that runs 2.4 refreshes long, one frame is on screen longer and the frames that wait are the reserve again or one more: that
+pacer does not see the display, so it gives up the steps it is sure the display repeated a frame for and no more. With a wait
+for a present they are exactly what may wait, after a long frame and after refreshes the display lost by itself.
+
+The nearest thing to a measurement of the aim of smoothness so far is the first measurements' runs of the pacer without a
+wait, made before its pause existed (one run each): with two presents waiting at one refresh per frame, 2,270 of 2,270 frames
+were on screen for exactly one refresh, 2.21 refreshes after their start (1 % to 99 %: 2.18 to 2.23); at 60 frames a second
+1,072 of 1,072 were on screen for exactly four. In both runs the time from a frame's start to its display rose slowly and
+evenly: between the first and the last quarter of the run its median rose by 0.025 of a refresh in the one (about 1,700
+refreshes apart) and by 0.049 in the other (about 3,200 apart). That is about fifteen parts in a million, so the grid on the
+clock ran that much faster than the display, and at that rate the frames that wait become one more about every five minutes
+at 240 Hz. Its cause has not been looked into. If it is the refresh period, it is the limit of a grid on a period that is
+given and not measured, with either aim, and what a reserve that is only counted can not hold against.
 
 Two numbers trade latency against the frame rate a loop can hold: k (the presents that may wait) and the frames in flight
 (whether the CPU and the GPU work side by side). Both are given to the pacer, and it paces correctly for what it is given: k

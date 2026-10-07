@@ -22,7 +22,10 @@
 //   --frames-in-flight  1: a frame starts when the GPU is done with the one before it; 2: the CPU works on a frame while the GPU
 //                       works on the one before it. The loop does it and says so to a tier pacer
 //   --startup-pause     the refreshes of the lowest pair's pause after start-up; 0 for none
+//   --smooth            a tier pacer with the aim of smoothness (a reserve of frames that wait); low latency without it.
+//                       With --tier-pacer the reserve is the --wait-for-present number less one, and the wait is not made
 #include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <algorithm>
 #include <exception>
@@ -49,7 +52,7 @@ namespace
                  "          [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
                  "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]\n"
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
-                 "          [--startup-pause <refreshes>]\n";
+                 "          [--startup-pause <refreshes>] [--smooth]\n";
     return 2;
   }
 
@@ -87,6 +90,11 @@ namespace
       if (name == "--tier-pacer")
       {
         tierPacer = true;
+        continue;
+      }
+      if (name == "--smooth")
+      {
+        settings.Aim = MB::FramePacing::Pacer::PacerAim::Smoothness;
         continue;
       }
       if (name == "--gpu-reports")
@@ -179,7 +187,7 @@ namespace
     const int64_t periodTicks = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToTimeSpan().Ticks();
     settings.GpuWork = {(periodTicks * gpuPercent) / 100, (periodTicks * gpuPercent) / 100};
     settings.Display.LatchLeadTicks = (periodTicks * latchLeadPercent) / 100;
-    if (waitForPresent)
+    if (waitForPresent && !tierPacer)
     {
       std::cout << Sim::ToFrameLog(Sim::SimulateTimerWaitForPresentLoop(settings), settings);
       return 0;

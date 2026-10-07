@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/pacer/PacerAim.hpp>
 #include <cstdint>
 #include <vector>
 #include "DisplayModelSettings.hpp"
@@ -42,6 +43,8 @@ namespace MB::FramePacing::Pacer::Simulation
     //! display took a frame a wait for it returns
     uint32_t WaitingPresents{2};
     TickRange PresentWaitReturn{600, 24'000};
+    //! For the tier pacers: what they optimize for (PacerSettings::Aim). Low latency unless a run asks for the other
+    PacerAim Aim{PacerAim::LowLatency};
     //! For the tier pacers. true: the loop gives the pacer each frame's GPU work, begin and end, once it is done
     bool ReportsGpuWork{false};
     //! What the loop tells the pacer of the frames it lets be in flight (PacerSettings::MaxFramesInFlight)

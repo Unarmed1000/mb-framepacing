@@ -39,8 +39,44 @@ namespace MB::FramePacing::Pacer
     return gap < TimeSpan() || gap > reach;
   }
 
+  int64_t TimerPeriodOnlyPacer::Reserve() const noexcept
+  {
+    // The frames made ahead of the display: with the aim of smoothness, and at one refresh per frame only (at more the display
+    // takes a frame before the next one is made, and nothing can wait)
+    const PacerSettings& settings = m_rule.Settings();
+    return settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1 ? int64_t{settings.WaitingPresents()} - 1 : 0;
+  }
+
+  TickCount64 TimerPeriodOnlyPacer::DueTime(const int64_t slot) const noexcept
+  {
+    // A frame starts the reserve's refreshes before its step of the grid
+    return TimeOfSlot(slot - Reserve());
+  }
+
+  int64_t TimerPeriodOnlyPacer::SmoothSlotFor(const TickCount64 time) const noexcept
+  {
+    const RefreshPeriod period = m_rule.Refresh();
+    // How late the loop is for the step the frame is due at, in whole steps
+    const int64_t startLate = period.NearestRefreshes(time - DueTime(m_nextSlot));
+    // How late the frame before it was with its present: the steps it was behind when it started, and the whole periods its
+    // present came after the time its swap interval gave it. That is one more than its start shows, as the late present took the
+    // place of the next frame's in its step
+    int64_t presentLate = 0;
+    if (m_hasPresentTime)
+    {
+      presentLate = m_behind + std::max(period.FloorRefreshes(m_presentTime - m_startTime) - (int64_t{m_swapInterval} - 1), int64_t{0});
+    }
+    // The reserve covers that many steps: those the frames are made up for, back to back. What is beyond it the display has
+    // shown a frame again for, and those steps are given up
+    return m_nextSlot + std::max(std::max(startLate, presentLate) - Reserve(), int64_t{0});
+  }
+
   int64_t TimerPeriodOnlyPacer::SlotFor(const TickCount64 time) const noexcept
   {
+    if (m_rule.Settings().Aim() == PacerAim::Smoothness)
+    {
+      return SmoothSlotFor(time);
+    }
     // The step nearest to the time, never one before the step the frame is due at (early is waited for, not taken), and never
     // one that comes too soon after a present that was made late
     return std::max({m_nextSlot, m_rule.Refresh().NearestRefreshes(time - m_origin), SlotAfterPresent()});
@@ -75,7 +111,8 @@ namespace MB::FramePacing::Pacer
 
   uint32_t TimerPeriodOnlyPacer::StartupPauseAt(const TickCount64 cpuStartTime) noexcept
   {
-    if (!m_pausePending)
+    // The pause takes the frames that wait away: it belongs to the aim of low latency
+    if (!m_pausePending || m_rule.Settings().Aim() != PacerAim::LowLatency)
     {
       return 0;
     }
@@ -105,7 +142,7 @@ namespace MB::FramePacing::Pacer
     FrameStartPlan plan;
     if (!StartsAgainAt(now))
     {
-      const TickCount64 due = TimeOfSlot(SlotFor(now));
+      const TickCount64 due = DueTime(SlotFor(now));
       if (due > now)
       {
         plan.StartTime = due;
@@ -128,6 +165,7 @@ namespace MB::FramePacing::Pacer
       m_rule.Clear();
       m_origin = cpuStartTime;
       m_slot = 0;
+      m_behind = 0;
       m_hasGrid = true;
     }
     else
@@ -145,7 +183,9 @@ namespace MB::FramePacing::Pacer
       const TimeSpan cpuWork = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
       const TimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
       const bool late = lost > 0 || (m_frameEnded && work > period.TimeFor(m_swapInterval));
-      change = m_rule.AddFrame(period.TimeFor(slot), work, late, TimeOfSlot(m_nextSlot) - cpuStartTime);
+      change = m_rule.AddFrame(period.TimeFor(slot), work, late, DueTime(m_nextSlot) - cpuStartTime);
+      // The steps the frame is behind the one it takes: within the reserve, and made up for by the frames after it
+      m_behind = std::max(period.NearestRefreshes(cpuStartTime - DueTime(slot)), int64_t{0});
       m_slot = slot;
     }
     // A loss that repeats: the frame before this one took refreshes more than it was given, and so did the one before that. A
@@ -186,7 +226,7 @@ namespace MB::FramePacing::Pacer
     schedule.AnimationStep = TimeSpan(animationTime.Ticks() - m_lastAnimationTime.Ticks());
     // The step this frame is due to leave the grid at is where it is expected to reach the screen: without a display to ask, it
     // is the pacer's aim for the frame. The next frame starts there, or a pause later
-    schedule.NextFrameStartTime = TimeOfSlot(m_nextSlot);
+    schedule.NextFrameStartTime = DueTime(m_nextSlot);
     schedule.IntendedDisplayTime = TimeOfSlot(m_dueSlot);
     schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(m_swapInterval));
     schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));

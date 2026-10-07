@@ -615,3 +615,121 @@ TEST(FrameLoop, WhereverTheGridSitsAgainstTheDisplayAFrameThatRanLongLeavesNoFra
     }
   }
 }
+
+// The two aims. The aim of low latency is what the tests above are about; these are about the aim of smoothness, where frames
+// are made ahead of the display and wait to be shown as a reserve.
+
+namespace
+{
+  //! The frames from the 30th on that were not on screen for exactly one refresh
+  int32_t DisplayStepsOff(const std::vector<Sim::LoopFrame>& frames, const int64_t periodTicks)
+  {
+    int32_t off = 0;
+    for (std::size_t index = 30; index < frames.size(); ++index)
+    {
+      off += ((frames[index].ShownTicks - frames[index - 1].ShownTicks) + (periodTicks / 2)) / periodTicks != 1 ? 1 : 0;
+    }
+    return off;
+  }
+
+  //! Light work at 240 Hz with the lowest pair's pacer, a display that takes a frame so many tenths of a refresh before its
+  //! vertical blank, and one frame that runs long
+  Sim::LoopSettings LoopWithALongFrame(const int64_t tenth, const int64_t longPercent, const PC::PacerAim aim)
+  {
+    Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+    settings.Frames = 600;
+    settings.Aim = aim;
+    settings.StartupPauseRefreshes = 0;
+    const int64_t period = PeriodTicks(settings);
+    settings.GpuWork = {period / 5, period / 5};
+    settings.Display.LatchLeadTicks = (period * tenth) / 10;
+    settings.LongFrames = {100};
+    settings.LongFrameCpuTicks = (period * longPercent) / 100;
+    return settings;
+  }
+}
+
+TEST(FrameLoop, WithTheAimOfSmoothnessAFrameWaitsAndEveryFrameIsShownForOneRefresh)
+{
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 600;
+  settings.Aim = PC::PacerAim::Smoothness;
+  const int64_t period = PeriodTicks(settings);
+  settings.GpuWork = {period / 5, period / 5};
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+  // One present may wait beside the frame that is made, and one does: a frame is on screen two refreshes after its start
+  for (std::size_t index = 5; index < frames.size(); ++index)
+  {
+    ASSERT_EQ(frames[index].PendingAtStart, 1) << index;
+    ASSERT_EQ(HalfRefreshesToDisplay(frames[index], period), 4) << index;
+    ASSERT_NEAR(static_cast<double>(frames[index].AnimationStepTicks), static_cast<double>(period), 1.0) << index;
+  }
+  EXPECT_EQ(DisplayStepsOff(frames, period), 0);
+
+  // With two that may wait, two do
+  settings.WaitingPresents = 3;
+  const std::vector<Sim::LoopFrame> deeper = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  EXPECT_EQ(deeper.back().PendingAtStart, 2);
+  EXPECT_EQ(HalfRefreshesToDisplay(deeper.back(), period), 6);
+  EXPECT_EQ(DisplayStepsOff(deeper, period), 0);
+}
+
+TEST(FrameLoop, AFrameThatRunsLongWithinTheReserveIsNotSeenWithTheAimOfSmoothnessAndIsARepeatedFrameWithLowLatency)
+{
+  // CPU work of 0.9 of a refresh more, once. Wherever the display takes its frame in the refresh
+  int32_t placesWithARepeat = 0;
+  for (int64_t tenth = 0; tenth < 10; ++tenth)
+  {
+    const Sim::LoopSettings smooth = LoopWithALongFrame(tenth, 90, PC::PacerAim::Smoothness);
+    EXPECT_EQ(DisplayStepsOff(Sim::SimulateTimerPeriodOnlyLoop(smooth), PeriodTicks(smooth)), 0) << tenth;
+
+    const Sim::LoopSettings lowLatency = LoopWithALongFrame(tenth, 90, PC::PacerAim::LowLatency);
+    placesWithARepeat += DisplayStepsOff(Sim::SimulateTimerPeriodOnlyLoop(lowLatency), PeriodTicks(lowLatency)) > 0 ? 1 : 0;
+  }
+  EXPECT_GE(placesWithARepeat, 8);
+}
+
+TEST(FrameLoop, WithTheAimOfSmoothnessTheReserveIsThereAgainAfterAFrameThatRanLongerThanItCovers)
+{
+  // CPU work of 2.4 refreshes more, once: more than the one frame made ahead covers. One frame is on screen longer, and after
+  // it the frames that wait are the reserve again, or one more: this pacer does not see the display, so it gives up the steps
+  // it is sure the display repeated a frame for and no more
+  for (int64_t tenth = 0; tenth < 10; ++tenth)
+  {
+    const Sim::LoopSettings settings = LoopWithALongFrame(tenth, 240, PC::PacerAim::Smoothness);
+    const int64_t period = PeriodTicks(settings);
+    const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+    EXPECT_EQ(DisplayStepsOff(frames, period), 1) << tenth;
+    for (std::size_t index = 110; index < frames.size(); ++index)
+    {
+      ASSERT_GE(frames[index].PendingAtStart, frames[90].PendingAtStart) << tenth << ' ' << index;
+      ASSERT_LE(frames[index].PendingAtStart, frames[90].PendingAtStart + 1) << tenth << ' ' << index;
+    }
+  }
+}
+
+TEST(FrameLoop, WithTheAimOfSmoothnessAndAWaitForAPresentTheReserveIsExactlyWhatMayWait)
+{
+  // The wait is what this pacer has over the one without: after a long frame, and after vertical blanks at which the display
+  // took no frame, the frames that wait are the one that may, not more
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 900;
+  settings.Aim = PC::PacerAim::Smoothness;
+  const int64_t period = PeriodTicks(settings);
+  settings.GpuWork = {period / 5, period / 5};
+  settings.LongFrames = {100};
+  settings.LongFrameCpuTicks = (period * 24) / 10;
+  settings.Display.HeldBlanks = {300, 450, 600};
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
+
+  for (std::size_t index = 5; index < frames.size(); ++index)
+  {
+    ASSERT_LE(frames[index].PendingAtStart, 1) << index;
+  }
+  for (const std::size_t index : {std::size_t{90}, std::size_t{250}, std::size_t{400}, std::size_t{550}, frames.size() - 1})
+  {
+    EXPECT_EQ(frames[index].PendingAtStart, 1) << index;
+  }
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 2.0);
+}

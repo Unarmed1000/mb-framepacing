@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <cstdint>
@@ -27,6 +28,7 @@ namespace MB::FramePacing::Pacer
     bool m_frameMarginSet{false};
     TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
     bool m_usePresentFeedback{false};
+    PacerAim m_aim{PacerAim::Smoothness};
     uint32_t m_waitingPresents{2};
     uint32_t m_presentWaitSwapIntervals{4};
     uint32_t m_maxFramesInFlight{1};
@@ -169,11 +171,23 @@ namespace MB::FramePacing::Pacer
       m_usePresentFeedback = usePresentFeedback;
     }
 
-    //! For a pacer that waits for a present (QueueTier::WaitForPresent): the presents that may be waiting to be shown while a
-    //! frame is made (1 to MaxWaitingPresents). Before a frame the pacer asks for a wait until the present that many back was
-    //! shown. 1: no present waits while the next frame is made, the lowest latency, and no slack: work that does not fit in a
-    //! refresh beside the wait halves the frame rate. 2, the default: one may wait, a refresh more of latency, and the frame
-    //! rate holds.
+    //! What the tier pacers optimize for (PacerAim): PacerAim::Smoothness, the default, or PacerAim::LowLatency. FramePacer has
+    //! no aims and does not read it.
+    [[nodiscard]] PacerAim Aim() const noexcept
+    {
+      return m_aim;
+    }
+
+    void SetAim(PacerAim aim) noexcept;
+
+    //! The presents that may be waiting to be shown while a frame is made, the frame itself counted (1 to MaxWaitingPresents;
+    //! 2 by default, so one may wait).
+    //! A pacer that waits for a present (QueueTier::WaitForPresent) asks before a frame for a wait until the present that
+    //! many back was shown. 1: no present waits while the next frame is made, the lowest latency, and no slack: work that
+    //! does not fit in a refresh beside the wait halves the frame rate. 2: one may wait, a refresh more of latency, and the
+    //! frame rate holds.
+    //! With PacerAim::Smoothness it is also the reserve a tier pacer keeps at one refresh per frame: that many less one frames
+    //! are made ahead of the display and wait to be shown, and a frame that ran long is forgiven that many steps.
     [[nodiscard]] uint32_t WaitingPresents() const noexcept
     {
       return m_waitingPresents;

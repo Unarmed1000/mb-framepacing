@@ -48,6 +48,12 @@ namespace MB::FramePacing::Pacer
   //! take is not waited for, nor is any present before it. A wait may take as long as PacerSettings::PresentWaitSwapIntervals of
   //! the frame's own swap intervals: some presents are never shown.
   //!
+  //! It has both aims (PacerSettings::Aim). PacerAim::Smoothness, the default: at one refresh per frame
+  //! PacerSettings::WaitingPresents less one frames are made ahead of the display as a reserve, a frame that is late within it
+  //! gives up no step, and what is beyond it is given up, all as TimerPeriodOnlyPacer does. Here the wait is what keeps the
+  //! reserve to what may wait: the frames that are made up for can not make it more. PacerAim::LowLatency: no frame is made
+  //! ahead, and a frame that would start half a period late or more takes the step nearest to where the loop is.
+  //!
   //! The frame starts are on a grid of refresh periods on the clock, as TimerPeriodOnlyPacer's, and here the grid follows the
   //! display: a wait that really held the loop ended when the display took a frame, so the grid is moved towards its end, a
   //! quarter of the way each time. One return is not exact (it was measured 0.06 to 2.4 ms after the display took the frame on one
@@ -77,8 +83,12 @@ namespace MB::FramePacing::Pacer
     TimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
-    // The steps of the grid the frame before it took more than it was given
+    // The steps of the grid the frame before it took more than it was given, and the steps the frame is behind its own
     int64_t m_lost{0};
+    int64_t m_behind{0};
+    // When the frame's present was made, when that is known
+    TickCount64 m_presentTime;
+    bool m_hasPresentTime{false};
     FrameWorkRule m_frameWork;
     RefreshTime m_animationTime;
     TimeSpan m_lastAnimationTime;
@@ -197,6 +207,9 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] bool StartsAgainAt(TickCount64 time) const noexcept;
     [[nodiscard]] int64_t SlotFor(TickCount64 time) const noexcept;
     [[nodiscard]] TickCount64 TimeOfSlot(int64_t slot) const noexcept;
+    [[nodiscard]] int64_t Reserve() const noexcept;
+    [[nodiscard]] TickCount64 DueTime(int64_t slot) const noexcept;
+    [[nodiscard]] int64_t SmoothSlotFor(TickCount64 time) const noexcept;
   };
 }
 

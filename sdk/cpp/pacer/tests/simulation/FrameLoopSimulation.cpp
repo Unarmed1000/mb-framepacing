@@ -203,6 +203,8 @@ namespace MB::FramePacing::Pacer::Simulation
     const RefreshPeriod period = RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
     PacerSettings pacerSettings(period);
     pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
+    pacerSettings.SetAim(settings.Aim);
+    pacerSettings.SetWaitingPresents(settings.WaitingPresents);
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
     TimerPeriodOnlyPacer pacer(pacerSettings);
@@ -288,6 +290,7 @@ namespace MB::FramePacing::Pacer::Simulation
     const RefreshPeriod period = RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
     PacerSettings pacerSettings(period);
     pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
+    pacerSettings.SetAim(settings.Aim);
     pacerSettings.SetWaitingPresents(settings.WaitingPresents);
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     TimerWaitForPresentPacer pacer(pacerSettings);
