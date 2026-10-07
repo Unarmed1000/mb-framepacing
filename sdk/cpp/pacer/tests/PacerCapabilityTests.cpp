@@ -361,7 +361,10 @@ TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
     ExpectShowable(Text::NameOf(tier));
     ExpectShowable(Text::DescriptionOf(tier));
     EXPECT_EQ(Text::DescriptionOf(tier).back(), '.');
-    EXPECT_LT(Text::NameOf(tier).size(), Text::DescriptionOf(tier).size());
+    ExpectShowable(Text::ShortDescriptionOf(tier));
+    EXPECT_LE(Text::ShortDescriptionOf(tier).size(), Text::ShortDescriptionMaxLength);
+    EXPECT_LT(Text::NameOf(tier).size(), Text::ShortDescriptionOf(tier).size());
+    EXPECT_LT(Text::ShortDescriptionOf(tier).size(), Text::DescriptionOf(tier).size());
     names.insert(Text::NameOf(tier));
   }
   EXPECT_EQ(names.size(), Text::HoldTierCount);
@@ -373,6 +376,9 @@ TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
     ExpectShowable(Text::NameOf(tier));
     ExpectShowable(Text::DescriptionOf(tier));
     EXPECT_EQ(Text::DescriptionOf(tier).back(), '.');
+    ExpectShowable(Text::ShortDescriptionOf(tier));
+    EXPECT_LE(Text::ShortDescriptionOf(tier).size(), Text::ShortDescriptionMaxLength);
+    EXPECT_LT(Text::ShortDescriptionOf(tier).size(), Text::DescriptionOf(tier).size());
     names.insert(Text::NameOf(tier));
   }
   EXPECT_EQ(names.size(), Text::QueueTierCount);
@@ -382,6 +388,8 @@ TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
   EXPECT_TRUE(Text::DescriptionOf(static_cast<HoldTier>(4)).empty());
   EXPECT_TRUE(Text::NameOf(static_cast<QueueTier>(0)).empty());
   EXPECT_TRUE(Text::DescriptionOf(static_cast<QueueTier>(4)).empty());
+  EXPECT_TRUE(Text::ShortDescriptionOf(static_cast<HoldTier>(0)).empty());
+  EXPECT_TRUE(Text::ShortDescriptionOf(static_cast<QueueTier>(4)).empty());
 }
 
 TEST(PacerTierText, EveryCapabilityHasANameOfItsOwnAndASetOfSeveralHasNone)

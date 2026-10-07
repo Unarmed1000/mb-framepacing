@@ -275,6 +275,116 @@ present allowed to wait) then holds the loop off its step for about 8 % of the f
 wait returns at once and the loop holds one refresh per frame. So the presents that may wait and the frames in flight are not
 independent: see decision 1.
 
+## Second measurements of the two tier pacers
+
+The same cases again on 2026-10-07 with the changes above, on the same system: Vulkan in a window, 240 Hz, variable refresh
+off, three swap chain images, the driver's display times, 2,400 frames a run (1,200 at 60 frames a second), the first 120 and
+the last 8 left out, the GPU's work reported to the pacer. **One run each: numbers, not conclusions.** "Waiting" and "latency"
+as before; "first" is the same case in the first measurements.
+
+A fault of the sample in these runs: it told the pacer that two frames may be in flight in every run, and its host had one
+in 24 of the 27. That changes only the work the swap interval rule judges. The two runs it decides (CPU work of 74 % and GPU
+work of 72 % with one frame in flight, the rule on) are left out below until they are run again; in them the rule went back
+and forth between one and two refreshes per frame (about 1,660 frames at two and 610 at one), which is what a wrong word
+for the frames in flight costs.
+
+Light work, the rule on (it stayed at one refresh per frame in every run):
+
+| Run                                   | Waiting            | Latency (1 % to 99 %) | Frame start to frame start (1 % to 99 %) | First   |
+| ------------------------------------- | ------------------ | --------------------- | ---------------------------------------- | ------- |
+| Today's path, the frame's start held  | 0                  | 0.68 (0.66 to 0.70)   | 0.99 to 1.02                             | 0, 0.59 |
+| A timer, the refresh period only      | 1                  | 1.07 (1.04 to 1.09)   | 0.98 to 1.02                             | 2, 2.21 |
+| A timer, a wait for the last present  | 0                  | 0.74 (0.49 to 0.89)   | 0.76 to 1.36                             | 0, 0.74 |
+| A timer, a wait for the one before it | 0 (2,035), 1 (237) | 0.85 (0.82 to 1.83)   | 0.93 to 1.10                             | 0, 0.52 |
+
+The lowest pair's pacer made its pause once (the frame after it started 4.63 refreshes after the one before). The one present
+it counts as waiting is not a frame behind another: by the medians its frames started 0.93 of a refresh after a display time
+and were presented 0.95 after one, were not shown at the display time 0.05 of a refresh later, and were shown at the one
+after it. So each frame was still on its way when the next one started. Where the grid sits against the display is chance at
+this tier, and in this run it sat at the worst place.
+
+A fixed 60 frames a second (four refreshes per frame, 1,071 frames):
+
+| Run                                   | Shown for exactly four refreshes | Where in the refresh the present was made | First                  |
+| ------------------------------------- | -------------------------------- | ----------------------------------------- | ---------------------- |
+| Today's path, held by a timer         | 1,052 (3 for three, 16 for five) | Anywhere: it slid through the refresh     | The same               |
+| A timer, the refresh period only      | 888 (92 for three, 91 for five)  | 0.88 to 0.95 after a display time         | 1,071, at 0.03 to 0.10 |
+| A timer, a wait for the last present  | 1,071                            | 0.28 to 0.53                              | 1,071, at 0.29 to 0.54 |
+| A timer, a wait for the one before it | 1,071                            | 0.44 to 0.51                              | 1,071, at 0.62 to 0.69 |
+
+The grid of the pacer without a wait landed right before a display time this time, and its presents fell on either side of
+it. No pause was made, as designed at two refreshes per frame or more.
+
+A frame that runs long (10 ms more CPU work every 120 frames, 18 of them, a swap interval fixed at 1):
+
+| Run                                   | Waiting            | Latency (1 % to 99 %) | The frame before, the long frame and the frame after were shown for |
+| ------------------------------------- | ------------------ | --------------------- | ------------------------------------------------------------------- |
+| Today's path, the frame's start held  | 1 (2,152), 0 (120) | 1.54 (0.65 to 1.96)   | 3, 1, 1 (11 times); 2, 1, 1 (6); 4, 1, 1 (1)                        |
+| A timer, the refresh period only      | 0                  | 0.93 (0.91 to 0.95)   | 3, 1, 1 once; 17 times the long frame has no display time           |
+| A timer, a wait for the last present  | 0                  | 0.74 (0.49 to 0.96)   | 3, 1, 1 (9); 4, 1, 1 (9)                                            |
+| A timer, a wait for the one before it | 0 (1,778), 1 (494) | 0.79 (0.72 to 1.89)   | 3, 1, 1 (15); 2, 1, 1 (2); 4, 1, 1 (1)                              |
+
+In 17 of the 18 cases of the pacer without a wait the long frame's present was reported without a display time, and the
+display times before and after it are four refreshes apart. The log shows why: in each of the 17 the frame after the long one
+started 0.24 to 0.27 of a refresh after the long frame's present and was presented 0.26 to 0.32 of a refresh after it, both
+before the same display time. The pacer had let that frame start at once, as less than half a period late for its step.
+Whether the long frame was shown is not known without a capture. In the one other case the pacer waited for the next step,
+the next present came 0.58 of a refresh after the long frame's, and all three frames have display times. The latency was 1.27
+for the frame after a long one and 0.93 from the second on, every time. This is a fault of the rule, changed below.
+
+GPU work of 90 % of a refresh, a swap interval fixed at 1:
+
+| Run                                   | Frame start to frame start | Waiting           | Latency (1 % to 99 %) | First                    |
+| ------------------------------------- | -------------------------- | ----------------- | --------------------- | ------------------------ |
+| Today's path, the frame's start held  | 1.00                       | 3 mostly          | 3.73 (2.06 to 3.75)   | 2 mostly, 2.52           |
+| A timer, the refresh period only      | 1.00 (0.96 to 1.05)        | 2 (2,215), 1 (57) | 2.15 (1.80 to 2.17)   | 1 to 3, 1.91, 113 stalls |
+| A timer, a wait for the last present  | 1.97                       | 0                 | 1.73 (1.45 to 1.87)   | The same                 |
+| A timer, a wait for the one before it | 0.97 (0.93 to 1.35)        | 1                 | 1.70 (1.36 to 1.88)   | The same                 |
+
+The pacer without a wait did not stall in this run: no frame started more than 1.50 refreshes after the one before it,
+outside the pause. Nothing that was changed explains that by itself (the swap interval is fixed and the work fits), and
+today's path at the same settings sat at three frames waiting this time and at two in the first run. With a wait for the last
+present the animation kept up with the clock: the refreshes behind it were 6 at the end of the run, 5 of them from before
+frame 120 (2,457 in the first run).
+
+CPU work of 74 % and GPU work of 69 to 75 % of a refresh, the rule on, two frames in flight:
+
+| Run                                           | Swap interval | Frame start to frame start (1 % to 99 %) | Waiting  | Latency (1 % to 99 %) |
+| --------------------------------------------- | ------------- | ---------------------------------------- | -------- | --------------------- |
+| A timer, the refresh period only              | 1 throughout  | 1.00 (0.98 to 1.02)                      | 2 mostly | 2.76 (1.74 to 2.78)   |
+| A timer, a wait, one present allowed to wait  | 1 throughout  | 1.00 (0.98 to 1.02)                      | 1        | 1.71 (1.69 to 1.74)   |
+| A timer, a wait, two presents allowed to wait | 1 throughout  | 1.00 (0.98 to 1.02)                      | 2        | 2.46 (2.44 to 2.48)   |
+
+Both pacers held one refresh per frame at this work with the rule on, where today's rule goes to two. What the simulation
+showed for a wait with one present allowed to wait (the loop held off its step for about 8 % of the frames) did not show:
+2,270 of the 2,272 waits returned in under an eighth of a refresh. A frame was on screen 1.7 refreshes after its start
+here and two in the simulation's display, so the present waited for had been shown.
+
+The wait for a present, over the 14 runs with one: no wait returned before the display time of its present. Where every wait
+held the loop it returned a median of 0.92 to 1.24 ms after it (1 %: 0.08 to 0.09 ms, 99 %: 2.10 to 2.28 ms). A wait that ran
+out took 4.03 to 4.44 refreshes at one refresh per frame and 16.0 at 60 frames a second, and the loop no longer stood for a
+quarter of a second (the host's own wait on today's path stood for 60 refreshes once). It now runs out with two or three
+presents allowed to wait as well, once at start-up in five of the seven such runs and in none in the first measurements: each
+time the present waited for was one of two or more in a row without a display time, within the first 15 frames.
+
+### What was changed after the second runs
+
+Built and checked on the simulation only. **Not measured.**
+
+- **After a present that was made late, the next present comes a whole period later** (the pacer without a wait). A frame
+  that ran long is presented somewhere in a later step of the grid. The next frame takes the next step only when that present
+  was made no later in its step than the last present that was on time, and else the step after. Two presents less than a
+  period apart can reach the display between the same two refreshes, and one of them then waits for as long as the loop runs
+  at one refresh per frame: that is the frame waiting for good that the grid was meant to prevent, and the rule "a start
+  less than half a period late keeps its step" let it through after a long frame. On the simulation a frame that ran long
+  now leaves as many frames waiting as before it wherever the grid sits against the display (ten places, six lengths). The
+  price: after most long frames the next frame starts a refresh later than the next step, so the long frame is on screen
+  for two refreshes where one would have done on that display. A late start after a present that was on time keeps its step
+  as before. A frame that is presented in time and ready too late for its refresh stays what this pair does not learn of.
+- **A later GPU work report for the same frame takes the place of the first**, for an application that learns how long the
+  GPU worked before it learns when.
+- **A short form of each tier's description**, one line of 44 characters or less.
+
 ## What the application plugs in
 
 ### Capabilities
@@ -851,8 +961,10 @@ checked. Four things are settled now, because they cost little now and a second 
 1. **k**, the presents that may be waiting: 1 is the lowest latency and leaves no slack (at work of 90 % of a refresh it
    halved the frame rate in the first measurement), 2 leaves a frame of slack for one refresh more. Proposed: a setting,
    default 2, as that kept the frame rate in every case measured; picking it from the work is the option below. Open
-   since: on the simulation a loop with two frames in flight and heavy work needs 3 (above). Should the pacer take at
-   least one more than the frames in flight the application names, or is that the application's to set?
+   since: on the simulation a loop with two frames in flight and heavy work needs 3 (above). It did not show on the first
+   integration's system in the second measurements, where a frame reached the screen sooner than in the simulation's
+   display. Should the pacer take at least one more than the frames in flight the application names, or is that the
+   application's to set?
 2. **The tiers**: two lists, each tier a set of capabilities, the hold tiers the first integration's four as they are, and
    a rating that is the pair. Proposed as above. If one number is wanted for a rating, the order between the two has to be
    decided: there is no order that follows from the capabilities.

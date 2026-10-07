@@ -23,8 +23,10 @@ namespace MB::FramePacing::Pacer
 
   void FrameWorkRule::AddGpuWork(const GpuWorkReport& report, const TimeSpan margin) noexcept
   {
-    // Of a frame that started, newer than the one the rule has, and not so old that the start of the frame after it is gone
-    if (report.FrameId > m_newestFrameId || report.FrameId <= m_gpuFrameId || (m_newestFrameId - report.FrameId) >= FrameCapacity)
+    // Of a frame that started, not older than the one the rule has (a later report for the same frame takes the place of the
+    // first), and not so old that the start of the frame after it is gone
+    if (report.FrameId == 0 || report.FrameId > m_newestFrameId || report.FrameId < m_gpuFrameId ||
+        (m_newestFrameId - report.FrameId) >= FrameCapacity)
     {
       return;
     }
@@ -52,7 +54,7 @@ namespace MB::FramePacing::Pacer
 
   void FrameWorkRule::Clear() noexcept
   {
-    m_gpuFrameId = m_newestFrameId;
+    m_gpuFrameId = m_newestFrameId + 1u;
     m_hasGpuTime = false;
     m_overlapSeen = false;
   }

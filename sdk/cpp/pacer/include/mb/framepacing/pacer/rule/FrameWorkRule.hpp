@@ -36,8 +36,8 @@ namespace MB::FramePacing::Pacer
     // The starts of the newest frames, by frame id
     std::array<TickCount64, FrameCapacity> m_startTimes{};
     uint64_t m_newestFrameId{0};
-    // The newest GPU work: the frame it is of (reports of frames up to it are not taken), how long, and whether the frame after
-    // it began before it ended
+    // The newest GPU work: the frame it is of (reports of frames before it are not taken), how long, and whether the frame
+    // after it began before it ended
     uint64_t m_gpuFrameId{0};
     TimeSpan m_gpuTime;
     bool m_hasGpuTime{false};
@@ -47,9 +47,10 @@ namespace MB::FramePacing::Pacer
     //! A frame started: frames are given in the order of their ids, one after the other.
     void AddFrameStart(uint64_t frameId, TickCount64 cpuStartTime) noexcept;
 
-    //! The GPU's work on a frame. Taken when it is of one of the newest FrameCapacity frames that started and is newer than the
-    //! one the rule has. margin: a frame began before the GPU's work ended when it began more than this before it (the two are
-    //! measured on clocks that are placed against each other, which is not exact).
+    //! The GPU's work on a frame. Taken when it is of one of the newest FrameCapacity frames that started and not of an older
+    //! frame than the one the rule has: a later report for the same frame takes the place of the first, for an application that
+    //! learns how long the work took before it learns when. margin: a frame began before the GPU's work ended when it began
+    //! more than this before it (the two are measured on clocks that are placed against each other, which is not exact).
     void AddGpuWork(const GpuWorkReport& report, TimeSpan margin) noexcept;
 
     //! The frame time the loop needs for a frame whose CPU work took cpuWork.

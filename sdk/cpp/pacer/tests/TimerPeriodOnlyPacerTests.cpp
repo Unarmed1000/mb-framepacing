@@ -163,11 +163,12 @@ TEST(TimerPeriodOnlyPacer, AFrameThatRanLongCostsWholeStepsAndTheLoopIsBackOnThe
   PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
   static_cast<void>(Frame(pacer, Start, 30'000));
 
-  // The second frame works for 2.6 periods: it is done 3.6 periods after the grid's start
-  const int64_t secondStart = Frame(pacer, Start + 30'600, 260'000);
+  // The second frame works for 2.25 periods: it is done 3.25 periods after the grid's start, no later in its step than the
+  // frame before it was (0.3 of a period)
+  const int64_t secondStart = Frame(pacer, Start + 30'600, 225'000);
   ASSERT_EQ(secondStart, Start + Period);
-  const int64_t now = secondStart + 260'600;
-  // The next frame takes the step nearest to where the loop is, the fourth, and waits for it: not the moment the work was done
+  const int64_t now = secondStart + 225'600;
+  // The next frame takes the next step, the fourth, and waits for it: not the moment the work was done
   const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
   EXPECT_EQ(plan.StartTime, At(Start + (4 * Period)));
 
@@ -189,17 +190,87 @@ TEST(TimerPeriodOnlyPacer, AFrameThatRanLongCostsWholeStepsAndTheLoopIsBackOnThe
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
 }
 
-TEST(TimerPeriodOnlyPacer, AFrameWhoseWorkIsOverItsTimeIsLateAlthoughItKeepsItsStep)
+TEST(TimerPeriodOnlyPacer, AfterALatePresentTheNextPresentComesAWholePeriodLater)
+{
+  // Frames are presented 0.3 of a period into their step. A frame of 2.6 periods on step 1 is done 3.6 periods after the
+  // grid's start: later in its step than a present is
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
+  static_cast<void>(Frame(pacer, Start + Period + 30'600, 260'000));
+  // The next step would put the next present 0.7 of a period after this one, and the two could reach the display between
+  // the same two refreshes: the step after it, the sixth
+  const int64_t now = Start + (2 * Period) + 260'600;
+  const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+  EXPECT_EQ(plan.StartTime, At(Start + (6 * Period)));
+  // Begun without the wait, it is on that step all the same
+  const PC::FrameSchedule next = pacer.BeginFrame(At(now));
+  EXPECT_EQ(next.NextFrameStartTime, At(Start + (7 * Period)));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 3u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+}
+
+TEST(TimerPeriodOnlyPacer, WhenThePresentWasMadeIsThePresentReportsWordAndWithoutItEndFrames)
+{
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
+
+  // Work of 1.3 periods on step 2, and no present report: made when the work was done, 0.3 into step 3, where a present is.
+  // The next step
+  static_cast<void>(pacer.BeginFrame(At(Start + (2 * Period))));
+  const PC::PresentPlan present = pacer.EndFrame(At(Start + (2 * Period) + 130'000));
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 136'000)).StartTime, At(Start + (4 * Period)));
+
+  // A report of another frame changes nothing
+  PC::PresentReport report;
+  report.FrameId = present.FrameId - 1u;
+  report.CallTime = At(Start + (2 * Period) + 180'000);
+  report.ReturnTime = report.CallTime;
+  pacer.AddPresent(report);
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 136'000)).StartTime, At(Start + (4 * Period)));
+  // The report of this frame says the present was called 0.8 into step 3 (the application did something in between): the
+  // step after the next
+  report.FrameId = present.FrameId;
+  pacer.AddPresent(report);
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 181'000)).StartTime, At(Start + (5 * Period)));
+
+  // A report before the frame's work is done is of no frame
+  static_cast<void>(pacer.BeginFrame(At(Start + (5 * Period))));
+  report.FrameId = present.FrameId + 1u;
+  report.CallTime = At(Start + (9 * Period));
+  pacer.AddPresent(report);
+  static_cast<void>(pacer.EndFrame(At(Start + (5 * Period) + 30'000)));
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (5 * Period) + 31'000)).StartTime, At(Start + (6 * Period)));
+}
+
+TEST(TimerPeriodOnlyPacer, ALoopThatComesBackLateAfterAPresentOnTimeKeepsItsStep)
+{
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
+
+  // The frame was presented on time and the loop is back 0.3 of a period after the next frame was due: it starts at once, on
+  // its step, and the frame after it is due a period after that step
+  const int64_t now = Start + (2 * Period) + 30'000;
+  EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
+  const PC::FrameSchedule schedule = pacer.BeginFrame(At(now));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (3 * Period)));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+}
+
+TEST(TimerPeriodOnlyPacer, AFrameWhoseWorkIsOverItsTimeIsLateAndCostsAStep)
 {
   PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
   static_cast<void>(Frame(pacer, Start, 30'000));
 
-  // Work of 1.3 periods: the next frame starts 0.3 of a period after it was due, which keeps its step
+  // Work of 1.3 periods: its present is made in the step the next frame was due at, and the next frame takes the step after
   static_cast<void>(Frame(pacer, Start + 30'600, 130'000));
   const int64_t now = Start + Period + 130'600;
-  EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
-  static_cast<void>(pacer.BeginFrame(At(now)));
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+  EXPECT_EQ(pacer.PlanFrame(At(now)).StartTime, At(Start + (3 * Period)));
+  static_cast<void>(pacer.BeginFrame(At(Start + (3 * Period))));
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
 }
 

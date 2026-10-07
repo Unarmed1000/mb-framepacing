@@ -583,3 +583,35 @@ TEST(FrameLoop, WhenEveryFrameLosesARefreshTheAnimationKeepsUpWithTheClock)
   const int64_t animation = frames.back().AnimationTicks - frames[first].AnimationTicks;
   EXPECT_NEAR(static_cast<double>(animation * 100) / static_cast<double>(clock), 100.0, 5.0);
 }
+
+TEST(FrameLoop, WhereverTheGridSitsAgainstTheDisplayAFrameThatRanLongLeavesNoFrameWaiting)
+{
+  // The lowest pair's pacer does not know where in its step the display takes a frame, so every place is tried (how long
+  // before a vertical blank a frame has to be ready, in tenths of a refresh), with long frames of several lengths. Each is
+  // presented after the step the next frame was due at, which the pacer knows of. A frame that is presented in time and
+  // ready too late for its refresh is another matter: this pacer does not learn of it
+  for (int64_t tenth = 0; tenth < 10; ++tenth)
+  {
+    for (const int64_t longPercent : {110, 135, 160, 190, 240, 265})
+    {
+      Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+      settings.Frames = 300;
+      settings.StartupPauseRefreshes = 0;
+      const int64_t period = PeriodTicks(settings);
+      settings.GpuWork = {period / 5, period / 5};
+      settings.Display.LatchLeadTicks = (period * tenth) / 10;
+      settings.LongFrames = {100};
+      settings.LongFrameCpuTicks = (period * longPercent) / 100;
+      const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+      // Ten frames after the long one and for the rest of the run: as many frames wait as before it, and a frame is on
+      // screen as long after its start
+      for (std::size_t index = 110; index < frames.size(); ++index)
+      {
+        ASSERT_EQ(frames[index].PendingAtStart, frames[90].PendingAtStart) << tenth << ' ' << longPercent << ' ' << index;
+        ASSERT_EQ(HalfRefreshesToDisplay(frames[index], period), HalfRefreshesToDisplay(frames[90], period))
+          << tenth << ' ' << longPercent << ' ' << index;
+      }
+    }
+  }
+}

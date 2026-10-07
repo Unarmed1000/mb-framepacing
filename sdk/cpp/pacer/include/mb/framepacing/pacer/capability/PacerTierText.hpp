@@ -10,7 +10,8 @@
 #include <string_view>
 
 //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md). The tiers and the capabilities in words, for an application that shows
-//! them: a short name for a label, and for a tier a line that says what it uses and what that gives. English, plain ASCII. Every
+//! them: a short name for a label, and for a tier what it uses and what that gives, as a sentence or two (DescriptionOf) and as one
+//! short line (ShortDescriptionOf, at most ShortDescriptionMaxLength characters). English, plain ASCII. Every
 //! text is a string literal: it is there for the life of the program, nothing is allocated, and its data() ends with a zero, so it
 //! can be given to a function that takes a C string. A value that is not one of the type's has no text: empty.
 //!
@@ -23,6 +24,9 @@ namespace MB::FramePacing::Pacer::PacerTierText
   inline constexpr uint32_t QueueTierCount = 3;
   //! The capabilities there are: capability number index is PacerCapability(1 << index), index from 0 to this less one.
   inline constexpr uint32_t CapabilityCount = 15;
+
+  //! The longest a short description is, in characters: one line of a narrow panel.
+  inline constexpr uint32_t ShortDescriptionMaxLength = 44;
 
   //! A hold tier's name.
   [[nodiscard]] constexpr std::string_view NameOf(const HoldTier tier) noexcept
@@ -57,6 +61,21 @@ namespace MB::FramePacing::Pacer::PacerTierText
     return {};
   }
 
+  //! The same in one short line.
+  [[nodiscard]] constexpr std::string_view ShortDescriptionOf(const HoldTier tier) noexcept
+  {
+    switch (tier)
+    {
+    case HoldTier::DisplaySide:
+      return "The present holds the frame on screen.";
+    case HoldTier::VBlank:
+      return "The loop holds it, on vertical blank times.";
+    case HoldTier::Timer:
+      return "The loop holds it on a timer: a guess.";
+    }
+    return {};
+  }
+
   //! A queue tier's name.
   [[nodiscard]] constexpr std::string_view NameOf(const QueueTier tier) noexcept
   {
@@ -86,6 +105,21 @@ namespace MB::FramePacing::Pacer::PacerTierText
     case QueueTier::PeriodOnly:
       return "Never more frames than the display takes, from the refresh period alone: a frame that waits to be shown is not "
              "seen, and stays.";
+    }
+    return {};
+  }
+
+  //! The same in one short line.
+  [[nodiscard]] constexpr std::string_view ShortDescriptionOf(const QueueTier tier) noexcept
+  {
+    switch (tier)
+    {
+    case QueueTier::WaitForPresent:
+      return "The loop waits until a present was shown.";
+    case QueueTier::DisplayTimes:
+      return "Waiting presents are counted and taken back.";
+    case QueueTier::PeriodOnly:
+      return "A frame per refresh; one that waits stays.";
     }
     return {};
   }

@@ -41,8 +41,24 @@ namespace MB::FramePacing::Pacer
 
   int64_t TimerPeriodOnlyPacer::SlotFor(const TickCount64 time) const noexcept
   {
-    // The step nearest to the time, and never one before the step the frame is due at: early is waited for, not taken
-    return std::max(m_nextSlot, m_rule.Refresh().NearestRefreshes(time - m_origin));
+    // The step nearest to the time, never one before the step the frame is due at (early is waited for, not taken), and never
+    // one that comes too soon after a present that was made late
+    return std::max({m_nextSlot, m_rule.Refresh().NearestRefreshes(time - m_origin), SlotAfterPresent()});
+  }
+
+  int64_t TimerPeriodOnlyPacer::SlotAfterPresent() const noexcept
+  {
+    // A present made before the step the next frame is due at is where it always is: nothing to keep away from
+    if (!m_hasPresentTime || m_presentTime <= TimeOfSlot(m_dueSlot))
+    {
+      return m_nextSlot;
+    }
+    // The frame ran long, and its present was made somewhere in a later step. The display takes one frame per refresh, so the
+    // next present has to come a whole period after this one, or the two can reach the display between the same two refreshes
+    // and one of them waits from then on. A frame is presented at its own place in its step: the next step will do when this
+    // present was made no later in its step than the last one that was on time, and else it is the step after
+    const int64_t slot = m_rule.Refresh().FloorRefreshes(m_presentTime - m_origin);
+    return slot + ((m_presentTime - TimeOfSlot(slot)) <= m_presentPlace ? 1 : 2);
   }
 
   TickCount64 TimerPeriodOnlyPacer::TimeOfSlot(const int64_t slot) const noexcept
@@ -121,6 +137,11 @@ namespace MB::FramePacing::Pacer
       const int64_t slot = SlotFor(cpuStartTime);
       lost = slot - m_nextSlot;
       lostBefore = m_lost;
+      // Where in its step a present is made when it is on time
+      if (m_hasPresentTime && m_presentTime <= TimeOfSlot(m_dueSlot))
+      {
+        m_presentPlace = m_presentTime - TimeOfSlot(period.FloorRefreshes(m_presentTime - m_origin));
+      }
       const TimeSpan cpuWork = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
       const TimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
       const bool late = lost > 0 || (m_frameEnded && work > period.TimeFor(m_swapInterval));
@@ -143,8 +164,9 @@ namespace MB::FramePacing::Pacer
 
     // The one pause after start-up: the frame after this one is due that many refreshes later
     const uint32_t pause = StartupPauseAt(cpuStartTime);
-    const int64_t dueSlot = m_slot + int64_t{m_swapInterval};
-    m_nextSlot = dueSlot + int64_t{pause};
+    m_dueSlot = m_slot + int64_t{m_swapInterval};
+    m_nextSlot = m_dueSlot + int64_t{pause};
+    m_hasPresentTime = false;
 
     // The animation time: the first frame's is where the pacer starts, every other frame's is its swap interval after the one
     // before it. A refresh that was lost is not caught up with. With a loss that repeats the display shows every frame for that
@@ -165,7 +187,7 @@ namespace MB::FramePacing::Pacer
     // The step this frame is due to leave the grid at is where it is expected to reach the screen: without a display to ask, it
     // is the pacer's aim for the frame. The next frame starts there, or a pause later
     schedule.NextFrameStartTime = TimeOfSlot(m_nextSlot);
-    schedule.IntendedDisplayTime = TimeOfSlot(dueSlot);
+    schedule.IntendedDisplayTime = TimeOfSlot(m_dueSlot);
     schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(m_swapInterval));
     schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
@@ -195,6 +217,9 @@ namespace MB::FramePacing::Pacer
         plan.PresentTime = presentTime;
       }
     }
+    // When the present is made, as far as it is known here: AddPresent says when it was
+    m_presentTime = plan.WaitsForPresentTime() ? plan.PresentTime : workDoneTime;
+    m_hasPresentTime = true;
     return plan;
   }
 
@@ -206,6 +231,10 @@ namespace MB::FramePacing::Pacer
   void TimerPeriodOnlyPacer::AddPresent(const PresentReport& report) noexcept
   {
     m_lastPresentBlocked = report.Blocked();
+    if (m_frameEnded && report.FrameId == m_frameId)
+    {
+      m_presentTime = report.CallTime;
+    }
     if (report.Accepted)
     {
       m_presentTaken = true;
@@ -252,6 +281,7 @@ namespace MB::FramePacing::Pacer
     m_hasGrid = false;
     m_frameOpen = false;
     m_frameEnded = false;
+    m_hasPresentTime = false;
     ArmStartupPause();
   }
 }

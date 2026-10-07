@@ -112,7 +112,7 @@ TEST(FrameWorkRule, AReportOfTheNewestFrameIsOneAfterTheOtherAsTheNextFrameStart
   EXPECT_EQ(rule.WorkOf(Span(30'000), 1), Span(80'000));
 }
 
-TEST(FrameWorkRule, OnlyAReportOfAFrameThatStartedAndIsNewerThanTheLastIsTaken)
+TEST(FrameWorkRule, OnlyAReportOfAFrameThatStartedAndIsNotOlderThanTheLastIsTaken)
 {
   PC::FrameWorkRule rule;
   AddFrames(rule, 4);
@@ -121,10 +121,22 @@ TEST(FrameWorkRule, OnlyAReportOfAFrameThatStartedAndIsNewerThanTheLastIsTaken)
   rule.AddGpuWork(PC::GpuWorkReport::OfDuration(5, FP::TimeDuration::FromTicks(60'000)), Margin);
   EXPECT_FALSE(rule.HasGpuTime());
   rule.AddGpuWork(PC::GpuWorkReport::OfDuration(3, FP::TimeDuration::FromTicks(60'000)), Margin);
-  // The same frame again, and an older one
-  rule.AddGpuWork(PC::GpuWorkReport::OfDuration(3, FP::TimeDuration::FromTicks(10'000)), Margin);
+  // An older frame
   rule.AddGpuWork(PC::GpuWorkReport::OfDuration(2, FP::TimeDuration::FromTicks(10'000)), Margin);
   EXPECT_EQ(rule.GpuTime(), FP::TimeDuration::FromTicks(60'000));
+}
+
+TEST(FrameWorkRule, ALaterReportForTheSameFrameTakesThePlaceOfTheFirst)
+{
+  // An application that learns how long the GPU worked before it learns when
+  PC::FrameWorkRule rule;
+  AddFrames(rule, 3);
+  rule.AddGpuWork(PC::GpuWorkReport::OfDuration(1, FP::TimeDuration::FromTicks(70'000)), Margin);
+  EXPECT_FALSE(rule.OverlapSeen());
+  EXPECT_EQ(rule.WorkOf(Span(30'000), 1), Span(100'000));
+  rule.AddGpuWork(PC::GpuWorkReport::Times(1, At(Start + 70'000), At(Start + 140'000)), Margin);
+  EXPECT_TRUE(rule.OverlapSeen());
+  EXPECT_EQ(rule.WorkOf(Span(30'000), 1), Span(70'000));
 }
 
 TEST(FrameWorkRule, AGpuTimeOfAFrameLongAgoIsNeitherTakenNorUsed)

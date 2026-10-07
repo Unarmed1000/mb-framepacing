@@ -46,6 +46,11 @@ namespace MB::FramePacing::Pacer
   //!   - a frame that would start later than that takes the step nearest to where the loop is, and waits for it when it is still
   //!     to come: the frame before it ran long, the steps in between are lost, and the loop is back where it was against the
   //!     display, whatever that place is;
+  //!   - after a frame whose present was made later than the step the next frame was due at, the next present comes a whole
+  //!     period after it: the next step when the late present was made no later in its step than the last present that was
+  //!     on time, and else the step after. Two presents less than a period apart can reach the display between the same two
+  //!     refreshes, and one of them then waits to be shown for as long as the loop runs. The price is a refresh more after
+  //!     most long frames, on a display where the next step would have done;
   //!   - a frame held for more than one refresh is presented by the loop on a timer, in the period before the step the next frame
   //!     is due at, a margin into it (PacerSettings::FrameMargin). A guess: the grid's place against the display's refreshes is
   //!     not known.
@@ -77,6 +82,12 @@ namespace MB::FramePacing::Pacer
     int64_t m_slot{0};
     int64_t m_nextSlot{0};
     bool m_hasGrid{false};
+    // The step the frame is due to leave the grid at (the next frame's step, but for a pause), when its present was made, and
+    // where in its step a present is made that is on time
+    int64_t m_dueSlot{0};
+    TickCount64 m_presentTime;
+    bool m_hasPresentTime{false};
+    TimeSpan m_presentPlace;
     // The frame between BeginFrame and the next BeginFrame
     uint64_t m_frameId{0};
     TickCount64 m_startTime;
@@ -120,8 +131,9 @@ namespace MB::FramePacing::Pacer
     //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
     [[nodiscard]] TimeSpan32 CpuBusyAt(TickCount64 now) const noexcept;
 
-    //! After the present, before the next frame is planned. A present the system did not take says the swap chain is gone:
-    //! the one made after it gets the pause of a start (ForgetPresents).
+    //! After the present, before the next frame is planned: when it was called is what the next frame's step is kept away
+    //! from when the frame ran long (without the report it is taken as made when EndFrame said). A present the system did not
+    //! take says the swap chain is gone: the one made after it gets the pause of a start (ForgetPresents).
     void AddPresent(const PresentReport& report) noexcept;
 
     //! The GPU's work on an earlier frame, when the application has it: from then on a frame's work is the CPU's and the
@@ -195,6 +207,7 @@ namespace MB::FramePacing::Pacer
   private:
     [[nodiscard]] bool StartsAgainAt(TickCount64 time) const noexcept;
     [[nodiscard]] int64_t SlotFor(TickCount64 time) const noexcept;
+    [[nodiscard]] int64_t SlotAfterPresent() const noexcept;
     [[nodiscard]] TickCount64 TimeOfSlot(int64_t slot) const noexcept;
     void ArmStartupPause() noexcept;
     [[nodiscard]] uint32_t StartupPauseAt(TickCount64 cpuStartTime) noexcept;
