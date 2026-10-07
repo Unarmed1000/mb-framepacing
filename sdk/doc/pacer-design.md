@@ -542,9 +542,22 @@ What it showed of the system, covered:
   again. The frames after the waits that returned shown late are late by the pacer's count, rightly, and 34 of them in
   the light run were what took the swap interval from 1 to 2.
 
-**What was changed after the rerun** (the two bullets above have it; not measured again): the pacer asks once in sixteen
-frames and not every frame; it takes two answers in a row that say shown before it waits again, as one can be a covered
-window's frame shown in passing; and a frame that an answer held is not judged, as a frame that a wait held is not.
+**What was changed after the rerun** (the two bullets above have it): the pacer asks once in sixteen frames and not every
+frame; it takes two answers in a row that say shown before it waits again, as one can be a covered window's frame shown in
+passing; and a frame that an answer held is not judged, as a frame that a wait held is not.
+
+**Measured with that** (the same system, one run each; the window put under another application's window for 15 s, the
+focus not touched):
+
+| Work  | Before the cover           | Covered                                         | After the window was back                        |
+| ----- | -------------------------- | ----------------------------------------------- | ------------------------------------------------ |
+| Light | 240 frames a second        | 228 to 241 in every second, the swap interval 1 | The waits back after 0.15 s, 240 frames a second |
+| Heavy | 120 (a swap interval of 2) | 113 to 115, the swap interval 2                 | The waits back after 0.25 s, 120 frames a second |
+
+The waits were stopped in every covered frame, in one stretch. An answer took 3.8 ms at one refresh per frame and 8.2 ms at
+two (10.7 and 8.3 ms in the run before): not a fixed cost, it looks like the time to the next refresh the loop is paced to.
+A window of the application's own laid over it did nothing: the system held the frames back only under another
+application's window.
 
 **A hint from the application: left for later.** Asked: should the pacer take a hint that the focus was lost, and start
 again with an empty frame window when it is gained? Decided on 2026-10-07: the change above is what the pacer starts with,
@@ -608,6 +621,11 @@ and what paced the loop there was the host's wait for the GPU's work on the fram
 which this change does not take as the display's. Whether that system has a case where the display's side holds the loop
 (full screen, where the swap chain kept to its images; a present that waits) is to be measured.
 
+**First runs with the waits reported** (the first integration, Windows, 240 Hz, a window, three images, light work, the
+setting off; two runs of 1,400 frames): with smoothness a wait for a frame slot held 1,393 frames and the display's side 3;
+with low latency each held 2. So in a window it is the frame slot that paces a loop that is not held to a time, as the
+earlier runs said, and the setting has nothing to work with there.
+
 ## The pacer for vertical blank times
 
 The third tier pacer (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh
@@ -661,17 +679,23 @@ the vertical blank):
 | GPU work of 90 % of a refresh, reported                         |                                          | Every frame for one refresh                | Every frame for one refresh                         |
 | GPU work of 130 % of a refresh, reported, the rule on           |                                          | Two refreshes per frame                    | Two refreshes per frame                             |
 
+**First runs** (the first integration, Windows, 240 Hz, light work, the vertical blank of the display the window is on read
+in every frame, driver display times; two runs of 1,160 frames, not the measurement list): with low latency a frame was on
+screen 2.82 ms after its start at the median, 0.68 of a refresh where the simulation has 0.65, with one frame of 1,158 not on
+screen for exactly one refresh and one pause after start-up. With smoothness and two presents that may wait it was 11.77 ms,
+2.83 refreshes where the simulation has 2.5, every frame on screen for one refresh. No reading was off the ones before it.
+
 **Not in it yet.** The refresh period is the settings': a reading's own period is not used, and the pacer does not measure
 the period from the readings (it does not need to, for where its frames are; the animation time still advances by the
 period it was given, 17 to 19 parts in a million off on the one system measured). It does not learn of a frame that waits
 although it was ready in time, as no pacer does that has the refresh period only for that. The application's own waits and a
 swap chain that holds the loop are decision 6.
 
-### Next: vertical blank times with a wait for a present (proposed, not built)
+### Vertical blank times with a wait for a present
 
-The fourth tier pacer, written down with both aims before any code, for agreement. It is the pacer above plus the wait
-that the pacer on a timer has (the frame start plan's wait, `PresentWaitReport`, the presents that may wait, the longest wait counted
-in the frame's swap intervals).
+The fourth tier pacer (`VBlankWaitForPresentPacer`). Built, and checked on the simulation only: **not measured.** It is the
+pacer above plus the wait that the pacer on a timer has (the frame start plan's wait, `PresentWaitReport`, the presents that
+may wait, the longest wait counted in the frame's swap intervals, and what it does while a window is not shown).
 
 **What the wait adds when the vertical blanks are known:**
 
@@ -680,32 +704,47 @@ in the frame's swap intervals).
 - **Which vertical blank a frame was shown at becomes a fact, some frames later.** A wait that held the loop returns
   shortly after the display took the frame (a median of 0.92 to 1.24 ms after its display time in the 14 measured runs at
   240 Hz, which is 0.22 to 0.30 of a refresh, and never before it), so the vertical blank at or before the return is the
-  one the frame was shown at. A wait that returned at once says less: the frame was shown at that vertical blank or an
-  earlier one. The pacer above has to take a frame as shown where the frame margin says; this one corrects that for the
-  frames not yet started when the report comes. That closes the one gap named above: a frame that waited although it was
-  ready in time.
-- **It is not used to move where a frame is to be ready.** The returns would show at which places frames make their vertical
-  blank, and a pacer could move `ReadyPlacePercent` by that. Not proposed for the first version: one system was measured.
+  one the frame was shown at. The display takes one frame per refresh, so the frame that was last made is shown as many
+  blanks later as it was made frames later, at the soonest. Where that is later than the pacer had worked out, that frame
+  is late and the next one is for a blank that much later (`ShownLaterByWaits`). A wait that returned at once for the frame
+  last made says that it was shown by then, which the aim of low latency does not count on by itself. This closes the gap
+  named above: a frame that waited although it was ready in time.
+- **Where a frame has to be ready is learnt from it.** The first version of this text left that out, and the simulation
+  showed that it can not be left out: a display that takes a frame sooner before a vertical blank than the pacer has it
+  ready shows every frame a blank late, the wait says so every time, and a pacer that only counts those frames as late
+  slows down without end (a swap interval of 13 in the simulation). So: one frame shown later than worked out is a refresh
+  the display lost. A second one within eight frames is a display that takes a frame sooner than that (or a GPU whose time
+  nobody reported), and the place a frame is to be ready at is moved an eighth of a refresh period earlier
+  (`ReadyPlaceNow`), down to the start of the refresh. It is never moved later again until the pacer is reset or gets other
+  settings. What is still late with a frame ready when its refresh begins is late by its work, and the rule answers it.
 
 **The two aims:**
 
-| Aim         | The wait                                                                              | The frame                                                                                |
-| ----------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Smoothness  | Before the frame starts, for the present as many back as may wait                     | Starts when the wait is over; its present is held to its place, the reserve as above     |
-| Low latency | Before the frame starts, for the present as many back as may wait: one is the default | Its start is then held as above (the plan is made again after the wait), present at once |
+| Aim         | The wait                                                          | The frame                                                                                |
+| ----------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Smoothness  | Before the frame starts, for the present as many back as may wait | Starts when the wait is over; its present is held to its place, the reserve as above     |
+| Low latency | The same                                                          | Its start is then held as above (the plan is made again after the wait), present at once |
 
-- With **smoothness** the reserve is the presents that may wait less one, as everywhere, and the wait makes it exact: where
-  the pacer's count of vertical blanks is off by one, the wait holds the loop and the report puts the count right.
-- With **low latency** the wait for the last present returns a quarter of a refresh into the refresh the frame is made in
-  (on the one system measured), before the time the frame's start is held to in light work. Where a frame's work is long
-  enough that its start would be before the return, the frame starts when the wait is over and is for the next vertical
-  blank: that is the cost of one present allowed to wait, as with a timer (1.97 refreshes a frame at GPU work of 90 %), and
-  two allowed to wait is what keeps one refresh per frame there.
-- **The animation time** is as above, with the vertical blank the frame before was shown at taken from a wait's report when
-  it is there. What a report says of a frame after the frames behind it were made is not caught up with.
+One setting for the presents that may wait, two by default, for both aims: whether it should differ by aim is left to
+what the measurements show.
 
-**To decide before it is built:** whether the default of the presents that may wait differs by aim here (one with low
-latency, two with smoothness), where today one setting with a default of two serves both.
+**What the simulation shows** (240 Hz, light work, two presents that may wait unless said):
+
+| Case                                                                  | Vertical blank times alone                            | With the wait, low latency                                                               | With the wait, smoothness       |
+| --------------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------- |
+| A display that takes a frame up to 0.4 of a refresh before the blank  | Every frame for one refresh, none waiting             | The same                                                                                 | The same, one frame in reserve  |
+| The display loses three refreshes by itself                           | Three frames wait from then on, three refreshes later | As before, a few frames after each                                                       | The reserve as it was           |
+| A display that takes a frame 0.5 to 0.8 of a refresh before the blank | Every frame misses its blank and waits a refresh      | A few frames late, the place moves, then one refresh from start to display, none waiting | One frame in reserve throughout |
+| GPU work of 60 % of a refresh that nobody reports                     | A frame waits                                         | The same finding out, none waiting                                                       | One frame in reserve            |
+| One present that may wait, a display that takes a frame 0.4 before    |                                                       | Frames on screen for one and for two refreshes in turn                                   | The same                        |
+| One present that may wait, GPU work of 90 % reported                  |                                                       | Two refreshes per frame, as with a timer                                                 |                                 |
+
+The last two rows are the cost of one present that may wait, as with a timer: the wait for the last present returns a share
+of a refresh into the refresh the frame is made in, and what is left of it has to hold the frame's work.
+
+**What it does not do.** The vertical blank a wait's return falls after is taken as the one the frame was shown at. That
+holds while the return comes within a refresh period of the display taking the frame, which it did at 240 Hz; at a much
+higher refresh rate a return that late would read as a blank more. The refresh period is the settings', as above.
 
 ## Every time is in nanoseconds
 

@@ -19,6 +19,7 @@
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
 #include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
 #include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
+#include <mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -469,6 +470,121 @@ namespace MB::FramePacing::Pacer::Simulation
       if (startPlan.WaitsForStartTime())
       {
         frame.WaitBeginNanoseconds = now;
+        frame.WaitTargetNanoseconds = startPlan.StartTime.Nanoseconds();
+        now = WaitUntil(now, frame.WaitTargetNanoseconds, random, settings.TimerLate);
+      }
+      // The application's own waits, which the pacer is not asked about
+      if (settings.WaitsForPreviousGpuWork)
+      {
+        now = std::max(now, previousGpuEndNanoseconds);
+      }
+      now = display.AcquireNanoseconds(now);
+
+      frame.StartNanoseconds = now;
+      frame.PendingAtStart = display.Pending(now);
+      const FrameSchedule schedule = pacer.BeginFrame(NanosecondTickCount(now));
+      const FrameWindowState window = pacer.FrameWindow();
+      frame.FrameId = schedule.FrameId;
+      frame.SwapInterval = schedule.SwapInterval;
+      frame.AnimationNanoseconds = schedule.AnimationTime.Nanoseconds();
+      frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
+      frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
+      frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
+      frame.TargetFrameTimeNanoseconds = static_cast<int64_t>(schedule.TargetFrameTime.Nanoseconds());
+      frame.WindowFrames = window.Frames;
+      frame.WindowLateFrames = window.LateFrames;
+
+      frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
+      frame.WorkGpuNanoseconds = pacer.GpuTime().Nanoseconds();
+      now += frame.WorkCpuNanoseconds;
+      frame.WorkEndNanoseconds = now;
+      const PresentPlan presentPlan = pacer.EndFrame(NanosecondTickCount(now));
+      const int64_t gpuWorkNanoseconds = random.Draw(settings.GpuWork.MinNanoseconds, settings.GpuWork.MaxNanoseconds);
+      frame.GpuBeginNanoseconds = std::max(now, previousGpuEndNanoseconds);
+      frame.GpuEndNanoseconds = frame.GpuBeginNanoseconds + gpuWorkNanoseconds;
+      previousGpuEndNanoseconds = frame.GpuEndNanoseconds;
+
+      // Before the present: the wait the pacer gives
+      if (presentPlan.WaitsForPresentTime())
+      {
+        frame.PresentWaitBeginNanoseconds = now;
+        frame.PresentWaitTargetNanoseconds = presentPlan.PresentTime.Nanoseconds();
+        now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
+      }
+      frame.PresentNanoseconds = now;
+      frame.ShownNanoseconds = display.Present(now, frame.GpuEndNanoseconds);
+      report.FrameId = presentPlan.FrameId;
+      report.CallTime = NanosecondTickCount(now);
+      report.ReturnTime = NanosecondTickCount(now);
+      frames.push_back(frame);
+      now += settings.LoopNanoseconds;
+    }
+    return frames;
+  }
+
+  std::vector<LoopFrame> SimulateVBlankWaitForPresentLoop(const LoopSettings& settings)
+  {
+    const RefreshPeriod period = RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
+    PacerSettings pacerSettings(period);
+    pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
+    pacerSettings.SetAim(settings.Aim);
+    pacerSettings.SetPreferredSwapInterval(settings.PreferredSwapInterval);
+    pacerSettings.SetWaitingPresents(settings.WaitingPresents);
+    pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
+    pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
+    pacerSettings.SetReadyPlacePercent(settings.ReadyPlacePercent);
+    VBlankWaitForPresentPacer pacer(pacerSettings);
+    DisplayModel display(DisplayPeriod(settings), settings.Display);
+    SplitMix64 random(settings.Seed);
+
+    std::vector<LoopFrame> frames;
+    frames.reserve(static_cast<std::size_t>(std::max(settings.Frames, 0)));
+    int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
+    int64_t previousGpuEndNanoseconds = 0;
+    std::size_t nextGpuReport = 0;
+    PresentReport report;
+    for (int32_t index = 0; index < settings.Frames; ++index)
+    {
+      LoopFrame frame;
+      if (index > 0)
+      {
+        pacer.AddPresent(report);
+      }
+      if (settings.ReportsGpuWork)
+      {
+        ReportGpuWork(pacer, frames, nextGpuReport, now);
+      }
+      // What the window system says of the display: its last vertical blank
+      VBlankReading reading;
+      reading.VBlankTime = NanosecondTickCount(display.BlankNanoseconds(display.BlankAtOrBefore(now)));
+      reading.ReadTime = NanosecondTickCount(now);
+      pacer.AddVBlank(reading);
+
+      // Before the frame takes anything: the waits the pacer gives, the present first
+      FrameStartPlan startPlan = pacer.PlanFrame(NanosecondTickCount(now));
+      frame.WaitBeginNanoseconds = now;
+      if (startPlan.WaitsForPresent())
+      {
+        // The wait returns a little after the display took the frame, at once when that has passed, or when its time runs out
+        const int64_t shownNanoseconds = frames[static_cast<std::size_t>(startPlan.WaitForPresentFrameId) - 1].ShownNanoseconds;
+        const int64_t returnNanoseconds =
+          shownNanoseconds + random.Draw(settings.PresentWaitReturn.MinNanoseconds, settings.PresentWaitReturn.MaxNanoseconds);
+        const int64_t timeoutNanoseconds = now + startPlan.WaitForPresentTimeout.Nanoseconds();
+        PresentWaitReport waitReport;
+        waitReport.FrameId = startPlan.WaitForPresentFrameId;
+        waitReport.BeginTime = NanosecondTickCount(now);
+        waitReport.Shown = returnNanoseconds <= timeoutNanoseconds;
+        now = std::max(now, std::min(returnNanoseconds, timeoutNanoseconds));
+        waitReport.EndTime = NanosecondTickCount(now);
+        pacer.AddPresentWait(waitReport);
+        // The vertical blank the window system has by now, and the frame planned again
+        reading.VBlankTime = NanosecondTickCount(display.BlankNanoseconds(display.BlankAtOrBefore(now)));
+        reading.ReadTime = NanosecondTickCount(now);
+        pacer.AddVBlank(reading);
+        startPlan = pacer.PlanFrame(NanosecondTickCount(now));
+      }
+      if (startPlan.WaitsForStartTime())
+      {
         frame.WaitTargetNanoseconds = startPlan.StartTime.Nanoseconds();
         now = WaitUntil(now, frame.WaitTargetNanoseconds, random, settings.TimerLate);
       }

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include "FrameLoopSimulation.hpp"
@@ -979,5 +980,112 @@ TEST(FrameLoop, WhereTheSystemHoldsTheLoopASwapChainThatIsFullPacesItAndItDoesNo
           << images;
       }
     }
+  }
+}
+
+namespace
+{
+  //! The display's refresh between the frames index - 1 and index, when both were shown one refresh apart: the time between two
+  //! of its vertical blanks there (a period that is no whole number of nanoseconds is a nanosecond longer now and then)
+  int64_t DisplayPeriodOf(const std::vector<Sim::LoopFrame>& frames, const std::size_t index)
+  {
+    const int64_t step = frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds;
+    const int64_t period = frames[index].TargetFrameTimeNanoseconds / static_cast<int64_t>(frames[index].SwapInterval);
+    return step >= period - 1 && step <= period + 1 ? step : period;
+  }
+}
+
+// The pacer of vertical blank times with a wait for a present (VBlankWaitForPresentPacer): the wait keeps the frames that wait to
+// what may wait, says which vertical blank a frame was shown at, and teaches the pacer where a frame has to be ready.
+
+TEST(FrameLoop, WithVerticalBlankTimesAndAWaitARefreshTheDisplayLosesLeavesNoFrameWaiting)
+{
+  // The display takes no frame at three of its vertical blanks, by itself
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    Sim::LoopSettings settings = LightLoop(2, aim);
+    settings.Frames = 1'000;
+    settings.Display.HeldBlanks = {300, 301, 600};
+    const int64_t period = PeriodNanoseconds(settings);
+
+    // Without the wait the pacer does not learn of it: every frame it lost waits from then on, and a frame is on screen three
+    // refreshes later than before
+    const std::vector<Sim::LoopFrame> blind = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+    EXPECT_EQ(blind.back().PendingAtStart, blind[100].PendingAtStart + 3);
+    EXPECT_EQ(HalfRefreshesToDisplay(blind.back(), period), HalfRefreshesToDisplay(blind[100], period) + 6);
+
+    // With it the frames that wait are what they were, a few frames after each
+    const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankWaitForPresentLoop(settings);
+    for (const std::size_t index : {std::size_t{280}, std::size_t{340}, std::size_t{580}, std::size_t{640}, frames.size() - 1})
+    {
+      EXPECT_EQ(frames[index].PendingAtStart, frames[100].PendingAtStart) << index;
+      // With the aim of smoothness a frame starts when the wait is over, which is not at one place in a refresh: half a refresh
+      // either way
+      EXPECT_LE(std::abs(HalfRefreshesToDisplay(frames[index], period) - HalfRefreshesToDisplay(frames[100], period)),
+                aim == PC::PacerAim::Smoothness ? 1 : 0)
+        << index;
+      EXPECT_EQ(frames[index].SwapInterval, 1u) << index;
+    }
+  }
+}
+
+TEST(FrameLoop, WithVerticalBlankTimesAndAWaitThePacerFindsWhereAFrameHasToBeReady)
+{
+  // Displays that take a frame half a refresh or more before the vertical blank: sooner than the pacer has a frame ready
+  for (int64_t tenth = 5; tenth <= 8; ++tenth)
+  {
+    const Sim::LoopSettings settings = LightLoop(tenth, PC::PacerAim::LowLatency);
+    const int64_t period = PeriodNanoseconds(settings);
+
+    // Without the wait every frame misses its vertical blank and waits a refresh, for good
+    const std::vector<Sim::LoopFrame> blind = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+    EXPECT_GE(blind.back().PendingAtStart, 1) << tenth;
+    EXPECT_EQ(HalfRefreshesToDisplay(blind.back(), period), 3) << tenth;
+
+    // With it the first frames are shown late, the place moves, and from then on every frame is on screen for one refresh a
+    // refresh after its start, at the swap interval it had
+    const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankWaitForPresentLoop(settings);
+    for (std::size_t index = 100; index < frames.size(); ++index)
+    {
+      ASSERT_EQ(frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds, DisplayPeriodOf(frames, index)) << tenth << ' ' << index;
+      ASSERT_EQ(HalfRefreshesToDisplay(frames[index], period), 2) << tenth << ' ' << index;
+      ASSERT_EQ(frames[index].SwapInterval, 1u) << tenth << ' ' << index;
+    }
+    EXPECT_LE(frames.back().WindowLateFrames, 12u) << tenth;
+  }
+}
+
+TEST(FrameLoop, WithVerticalBlankTimesAndAWaitGpuWorkNobodyReportsIsFoundOut)
+{
+  // GPU work of 60 % of a refresh, not reported: the pacer takes a frame as ready when it is presented
+  Sim::LoopSettings settings = LightLoop(2, PC::PacerAim::LowLatency);
+  const int64_t period = PeriodNanoseconds(settings);
+  settings.GpuWork = {(period * 6) / 10, (period * 6) / 10};
+
+  const std::vector<Sim::LoopFrame> blind = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+  EXPECT_GE(blind.back().PendingAtStart, 1);
+
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankWaitForPresentLoop(settings);
+  for (std::size_t index = 100; index < frames.size(); ++index)
+  {
+    ASSERT_EQ(frames[index].PendingAtStart, 0) << index;
+    ASSERT_EQ(frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds, DisplayPeriodOf(frames, index)) << index;
+    ASSERT_EQ(frames[index].SwapInterval, 1u) << index;
+  }
+}
+
+TEST(FrameLoop, WithVerticalBlankTimesAndAWaitSmoothnessKeepsItsReserveWhereverTheDisplayTakesAFrame)
+{
+  for (int64_t tenth = 0; tenth <= 8; tenth += 2)
+  {
+    const Sim::LoopSettings settings = LightLoop(tenth, PC::PacerAim::Smoothness);
+    const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankWaitForPresentLoop(settings);
+    for (std::size_t index = 60; index < frames.size(); ++index)
+    {
+      // One frame waits, as asked for with two presents that may wait, and every frame is on screen for one refresh
+      ASSERT_EQ(frames[index].PendingAtStart, 1) << tenth << ' ' << index;
+      ASSERT_EQ(frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds, DisplayPeriodOf(frames, index)) << tenth << ' ' << index;
+    }
+    EXPECT_LE(frames.back().WindowLateFrames, 2u) << tenth;
   }
 }

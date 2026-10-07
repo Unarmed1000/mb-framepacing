@@ -23,6 +23,7 @@
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
 #include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
 #include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
+#include <mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.hpp>
 #include <mb/framepacing/testing/AllocationCounter.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -280,5 +281,67 @@ TEST(Allocations, ThePacerOfVerticalBlankTimesPacesFramesWithoutAllocating)
       EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
     }
     EXPECT_GT(checked, 2'000);
+  }
+}
+
+TEST(Allocations, ThePacerOfVerticalBlankTimesWithAWaitPacesFramesWithoutAllocating)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::Smoothness, PC::PacerAim::LowLatency})
+  {
+    PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
+    settings.SetAim(aim);
+    PC::VBlankWaitForPresentPacer pacer(settings);
+
+    int64_t checked = 0;
+    {
+      const FT::AllocationCounter counter;
+      const int64_t period = settings.Refresh().ToNanosecondTimeSpan().Nanoseconds();
+      int64_t now = 10 * FP::NanosecondTimeSpan::NanosecondsPerSecond;
+      PC::PresentReport report;
+      PC::PresentWaitReport waitReport;
+      PC::VBlankReading reading;
+      for (int32_t frame = 0; frame < 2'000; ++frame)
+      {
+        reading.VBlankTime = FP::NanosecondTickCount(now - (now % period));
+        reading.ReadTime = FP::NanosecondTickCount(now);
+        pacer.AddVBlank(reading);
+        PC::FrameStartPlan plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
+        if (plan.WaitsForPresent())
+        {
+          // A wait that returns at once, one that holds the loop, and a stretch in which the waits run out
+          const bool covered = (frame % 500) > 400;
+          waitReport.FrameId = plan.WaitForPresentFrameId;
+          waitReport.BeginTime = FP::NanosecondTickCount(now);
+          now += covered ? plan.WaitForPresentTimeout.Nanoseconds() : ((frame % 3) == 0 ? 50'000 : 2'000'000);
+          waitReport.EndTime = FP::NanosecondTickCount(now);
+          waitReport.Shown = !covered;
+          pacer.AddPresentWait(waitReport);
+          plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
+        }
+        now = plan.WaitsForStartTime() ? plan.StartTime.Nanoseconds() : now;
+        const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(now));
+        // Work that runs long now and then
+        now += (frame % 300) < 80 ? 12'000'000 : 2'000'000;
+        const PC::PresentPlan present = pacer.EndFrame(FP::NanosecondTickCount(now));
+        now = present.WaitsForPresentTime() ? present.PresentTime.Nanoseconds() : now;
+        report.FrameId = present.FrameId;
+        report.CallTime = FP::NanosecondTickCount(now);
+        report.ReturnTime = FP::NanosecondTickCount(now + 60'000);
+        report.Accepted = (frame % 211) != 0;
+        pacer.AddPresent(report);
+        pacer.AddGpuWork(
+          PC::GpuWorkReport::Times(present.FrameId - 1u, FP::NanosecondTickCount(now - 6'000'000), FP::NanosecondTickCount(now - 500'000)));
+        now += 60'000;
+        checked += static_cast<int64_t>(schedule.SwapInterval);
+      }
+      // A pause, another refresh period and a reset are frames like any other
+      static_cast<void>(pacer.BeginFrame(FP::NanosecondTickCount(now + (120 * FP::NanosecondTimeSpan::NanosecondsPerSecond))));
+      pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(120));
+      static_cast<void>(pacer.BeginFrame(FP::NanosecondTickCount(now + (121 * FP::NanosecondTimeSpan::NanosecondsPerSecond))));
+      pacer.Reset();
+      static_cast<void>(pacer.BeginFrame(FP::NanosecondTickCount(now + (122 * FP::NanosecondTimeSpan::NanosecondsPerSecond))));
+      EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
+    }
+    EXPECT_GE(checked, 2'000);
   }
 }

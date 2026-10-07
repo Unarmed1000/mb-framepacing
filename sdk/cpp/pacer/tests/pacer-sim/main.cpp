@@ -25,6 +25,8 @@
 //   --vblank-pacer      the pacer of vertical blank times, given the display's last vertical blank before every frame;
 //                       --ready-place <percent>: where in a refresh a frame is to be ready. The reserve of --smooth is the
 //                       --wait-for-present number less one here too
+//   --vblank-wait-pacer the pacer of vertical blank times that waits for a present: --wait-for-present is the presents that
+//                       may wait
 //   --display-ppm       the display's refresh period is that many parts per million longer than the loop was told
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
 //   --system-holds      the loop tells the pacer of the lowest pair of its own waits and that the system holds it while its
@@ -60,7 +62,7 @@ namespace
                  "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]\n"
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
                  "          [--startup-pause <refreshes>] [--smooth] [--vblank-pacer] [--ready-place <percent>]\n"
-                 "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds]\n";
+                 "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds] [--vblank-wait-pacer]\n";
     return 2;
   }
 
@@ -83,6 +85,7 @@ namespace
     bool tierPacer = false;
     bool waitForPresent = false;
     bool vblankPacer = false;
+    bool vblankWaitPacer = false;
     for (std::size_t index = 2; index < args.size(); ++index)
     {
       const std::string_view name = args[index];
@@ -99,6 +102,11 @@ namespace
       if (name == "--tier-pacer")
       {
         tierPacer = true;
+        continue;
+      }
+      if (name == "--vblank-wait-pacer")
+      {
+        vblankWaitPacer = true;
         continue;
       }
       if (name == "--vblank-pacer")
@@ -218,6 +226,11 @@ namespace
     const int64_t periodNanoseconds = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToNanosecondTimeSpan().Nanoseconds();
     settings.GpuWork = {(periodNanoseconds * gpuPercent) / 100, (periodNanoseconds * gpuPercent) / 100};
     settings.Display.LatchLeadNanoseconds = (periodNanoseconds * latchLeadPercent) / 100;
+    if (vblankWaitPacer)
+    {
+      std::cout << Sim::ToFrameLog(Sim::SimulateVBlankWaitForPresentLoop(settings), settings);
+      return 0;
+    }
     if (vblankPacer)
     {
       std::cout << Sim::ToFrameLog(Sim::SimulateVBlankPeriodOnlyLoop(settings), settings);
