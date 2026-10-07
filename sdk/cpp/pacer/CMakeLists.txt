@@ -17,6 +17,7 @@ target_sources(mb_framepacing_pacer
     source/mb/framepacing/pacer/RefreshPeriod.cpp
     source/mb/framepacing/pacer/RefreshTime.cpp
     source/mb/framepacing/pacer/rule/SwapIntervalRule.cpp
+    source/mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
@@ -47,7 +48,8 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/rule/SlowDownRule.hpp
       include/mb/framepacing/pacer/rule/SwapIntervalChange.hpp
       include/mb/framepacing/pacer/rule/SwapIntervalRule.hpp
-      include/mb/framepacing/pacer/rule/FrameWindowState.hpp)
+      include/mb/framepacing/pacer/rule/FrameWindowState.hpp
+      include/mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp)
 target_compile_features(mb_framepacing_pacer PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_pacer PUBLIC mb_framepacing::core)
 target_compile_options(mb_framepacing_pacer PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
@@ -82,7 +84,8 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   add_executable(mb_framepacing_pacer_tests tests/PacerTests.cpp tests/AllocationTests.cpp tests/DiagramTests.cpp tests/GoldenTests.cpp tests/MonitorRateTests.cpp
                                             tests/PresentFeedbackTests.cpp tests/WorkOverTimeTests.cpp tests/StartsAheadTests.cpp
                                             tests/DisplayModelTests.cpp tests/FrameLoopTests.cpp tests/FrameLogReplayTests.cpp
-                                            tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp)
+                                            tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp
+                                            tests/TimerPeriodOnlyPacerTests.cpp)
   target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests

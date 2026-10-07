@@ -12,7 +12,10 @@
 //
 //   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-ticks <n>] [--timer-only]
 //             [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
-//             [--images <n>] [--hold <blank>,<blank>,...]
+//             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]
+//
+//   --tier-pacer  the application carries out what the pacer of the lowest pair of tiers gives it, in place of today's pacer and
+//                 the first integration's own calculations
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <algorithm>
@@ -38,7 +41,7 @@ namespace
                  "pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]\n"
                  "pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <n>] [--cpu-ticks <n>] [--timer-only]\n"
                  "          [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
-                 "          [--images <n>] [--hold <blank>,<blank>,...]\n";
+                 "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]\n";
     return 2;
   }
 
@@ -58,6 +61,7 @@ namespace
     settings.Profile = args[1] == "late" ? Sim::LoopProfile::RenderLate : Sim::LoopProfile::RenderEarly;
     int64_t gpuPercent = 90;
     int64_t latchLeadPercent = 0;
+    bool tierPacer = false;
     for (std::size_t index = 2; index < args.size(); ++index)
     {
       const std::string_view name = args[index];
@@ -69,6 +73,11 @@ namespace
       if (name == "--fixed")
       {
         settings.AutoSwapInterval = false;
+        continue;
+      }
+      if (name == "--tier-pacer")
+      {
+        tierPacer = true;
         continue;
       }
       if (index + 1 >= args.size())
@@ -112,6 +121,16 @@ namespace
       {
         settings.Display.Images = static_cast<int32_t>(Number(value));
       }
+      else if (name == "--long-frame")
+      {
+        const std::size_t comma = value.find(',');
+        if (comma == std::string_view::npos)
+        {
+          return Usage();
+        }
+        settings.LongFrames.push_back(static_cast<int32_t>(Number(value.substr(0, comma))));
+        settings.LongFrameCpuTicks = Number(value.substr(comma + 1));
+      }
       else if (name == "--hold")
       {
         std::string list(value);
@@ -131,7 +150,7 @@ namespace
     const int64_t periodTicks = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToTimeSpan().Ticks();
     settings.GpuWork = {(periodTicks * gpuPercent) / 100, (periodTicks * gpuPercent) / 100};
     settings.Display.LatchLeadTicks = (periodTicks * latchLeadPercent) / 100;
-    std::cout << Sim::ToFrameLog(Sim::SimulateLoop(settings), settings);
+    std::cout << Sim::ToFrameLog(tierPacer ? Sim::SimulateTimerPeriodOnlyLoop(settings) : Sim::SimulateLoop(settings), settings);
     return 0;
   }
 

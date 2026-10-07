@@ -149,6 +149,22 @@ TEST(PacerCapabilities, TakingACapabilityOutGivesTheActiveSet)
   EXPECT_EQ(PacerCapabilities().Without(PacerCapability::VBlankTimes), PacerCapabilities());
 }
 
+TEST(PacerCapabilities, WhatTwoSetsBothHaveIsASet)
+{
+  const PacerCapabilities has(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes | PacerCapability::DisplayTimes, 3);
+  const PacerCapabilities active(PacerCapability::PresentSwapInterval | PacerCapability::DisplayTimes | PacerCapability::WaitForPresent, 5);
+
+  const PacerCapabilities both = has.IntersectedWith(active);
+  EXPECT_EQ(both, PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::DisplayTimes, 3));
+  EXPECT_EQ(active.IntersectedWith(has), both);
+  EXPECT_TRUE(has.Contains(both));
+  EXPECT_TRUE(active.Contains(both));
+  // Nothing in common is the baseline, and a set with itself is itself
+  EXPECT_EQ(has.IntersectedWith(PacerCapabilities(PacerCapability::WaitForPresent)), PacerCapabilities());
+  EXPECT_EQ(has.IntersectedWith(has), has);
+  EXPECT_EQ(has.IntersectedWith(PacerCapabilities()), PacerCapabilities());
+}
+
 TEST(PacerCapabilities, ASetThatCanNotBeIsAssertedAndMadeValidWithoutAsserts)
 {
   const auto unknownBit = static_cast<PacerCapability>(1u << 20u);

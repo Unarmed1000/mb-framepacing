@@ -197,3 +197,120 @@ TEST(FrameLoop, ARunIsTheSameEveryTimeAndItsFrameLogHasARowPerFrame)
   EXPECT_TRUE(first.substr(row).starts_with("0,1,1,1,1,41667,41667,"));
   EXPECT_NE(first.substr(row, first.find('\n', row) - row).find(",,,"), std::string::npos);
 }
+
+// The pacer of the lowest pair of tiers (TimerPeriodOnlyPacer) in place of today's pacer and the loop's own calculations: the
+// application only carries out what it is given.
+
+TEST(FrameLoop, TheLowestPairsPacerPacesAsTodaysLoopOnATimerWhileNothingGoesWrong)
+{
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.HasVBlankTimes = false;
+  settings.Frames = 600;
+  const std::vector<Sim::LoopFrame> today = Sim::SimulateLoop(settings);
+  const std::vector<Sim::LoopFrame> paced = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+  ASSERT_EQ(today.size(), paced.size());
+  for (std::size_t index = 0; index < today.size(); ++index)
+  {
+    // The frame starts drift apart by a third of a tick a frame: today's loop adds the period's rounded ticks up, the grid
+    // counts in the period itself
+    EXPECT_NEAR(static_cast<double>(paced[index].StartTicks), static_cast<double>(today[index].StartTicks), 1.0 + (static_cast<double>(index) / 3.0))
+      << index;
+    EXPECT_EQ(paced[index].ShownTicks, today[index].ShownTicks) << index;
+    EXPECT_EQ(paced[index].PendingAtStart, 0) << index;
+    EXPECT_EQ(paced[index].SwapInterval, 1u) << index;
+  }
+}
+
+TEST(FrameLoop, TodayAFrameThatRanLongLeavesAFrameWaitingForGoodOnATimer)
+{
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.HasVBlankTimes = false;
+  settings.Frames = 400;
+  // Frame 100 works 1.6 refreshes longer on the CPU
+  settings.LongFrames = {100};
+  settings.LongFrameCpuTicks = (PeriodTicks(settings) * 16) / 10;
+  const int64_t period = PeriodTicks(settings);
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateLoop(settings);
+
+  EXPECT_EQ(frames[99].PendingAtStart, 0);
+  EXPECT_EQ(HalfRefreshesToDisplay(frames[99], period), 2);
+  // The loop starts its count again from the late start, half a refresh off where it was: from then on every frame starts
+  // while the frame before it still waits, and is shown half a refresh later after its start
+  for (std::size_t index = 102; index < frames.size(); ++index)
+  {
+    EXPECT_EQ(frames[index].PendingAtStart, 1) << index;
+    EXPECT_EQ(HalfRefreshesToDisplay(frames[index], period), 3) << index;
+  }
+}
+
+TEST(FrameLoop, WithTheGridOnTheClockAFrameThatRanLongCostsWholeRefreshesAndNothingAfterIt)
+{
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 400;
+  settings.LongFrames = {100};
+  settings.LongFrameCpuTicks = (PeriodTicks(settings) * 16) / 10;
+  const int64_t period = PeriodTicks(settings);
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+  EXPECT_EQ(frames[99].PendingAtStart, 0);
+  EXPECT_EQ(HalfRefreshesToDisplay(frames[99], period), 2);
+  // Two frames after the long one the loop is where it was against the display: no frame waits, and a frame is shown a
+  // refresh after its start, for the rest of the run
+  for (std::size_t index = 103; index < frames.size(); ++index)
+  {
+    EXPECT_EQ(frames[index].PendingAtStart, 0) << index;
+    EXPECT_EQ(HalfRefreshesToDisplay(frames[index], period), 2) << index;
+    EXPECT_NEAR(static_cast<double>(frames[index].StartTicks - frames[index - 1].StartTicks), static_cast<double>(period), 1.0) << index;
+  }
+  // The animation time went on by a refresh per frame throughout: the refreshes the long frame took are not stepped over
+  for (std::size_t index = 1; index < frames.size(); ++index)
+  {
+    EXPECT_NEAR(static_cast<double>(frames[index].AnimationStepTicks), static_cast<double>(period), 1.0) << index;
+  }
+}
+
+TEST(FrameLoop, TheLowestPairsPacerDoesNotSeeARefreshTheDisplayLostByItself)
+{
+  // What this tier can not do, pinned: the frames are ready in time, the display takes none at three vertical blanks, and each
+  // costs a refresh of latency for the rest of the run, as with today's pacer
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 800;
+  settings.Display.HeldBlanks = {150, 300, 450};
+  const int64_t period = PeriodTicks(settings);
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+  EXPECT_EQ(HalfRefreshesToDisplay(frames[100], period), 2);
+  for (std::size_t index = 460; index < frames.size(); ++index)
+  {
+    EXPECT_EQ(HalfRefreshesToDisplay(frames[index], period), 8) << index;
+    EXPECT_EQ(frames[index].PendingAtStart, 3) << index;
+  }
+}
+
+TEST(FrameLoop, TheLowestPairsPacerHoldsAFrameOfTwoRefreshesAndAQueueThenEmptiesByItself)
+{
+  Sim::LoopSettings settings;
+  settings.AutoSwapInterval = true;
+  settings.Frames = 1'200;
+  // CPU work of 1.3 refreshes: the rule goes to two refreshes per frame
+  settings.CpuWork = {(PeriodTicks(settings) * 13) / 10, (PeriodTicks(settings) * 13) / 10};
+  settings.GpuWork = {PeriodTicks(settings) / 5, PeriodTicks(settings) / 5};
+  settings.Display.HeldBlanks = {1'500};
+  const int64_t period = PeriodTicks(settings);
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+  EXPECT_EQ(frames.back().SwapInterval, 2u);
+  // The frames at two refreshes per frame start two refreshes apart, wait before their present, and are shown two apart
+  std::size_t checked = 0;
+  for (std::size_t index = frames.size() - 100; index < frames.size(); ++index)
+  {
+    ASSERT_EQ(frames[index].SwapInterval, 2u) << index;
+    EXPECT_NEAR(static_cast<double>(frames[index].StartTicks - frames[index - 1].StartTicks), static_cast<double>(2 * period), 1.0) << index;
+    EXPECT_NEAR(static_cast<double>(frames[index].ShownTicks - frames[index - 1].ShownTicks), static_cast<double>(2 * period), 1.0) << index;
+    // The blank the display lost is long gone: no frame waits
+    EXPECT_EQ(frames[index].PendingAtStart, 0) << index;
+    ++checked;
+  }
+  EXPECT_EQ(checked, 100u);
+}

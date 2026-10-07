@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <cstdint>
+#include <vector>
 #include "DisplayModelSettings.hpp"
 #include "LoopProfile.hpp"
 #include "TickRange.hpp"
@@ -26,6 +27,9 @@ namespace MB::FramePacing::Pacer::Simulation
     int32_t VBlankPhasePercent{65};
     //! A frame's work on the CPU, from its start to its submit
     TickRange CpuWork{1'000, 1'000};
+    //! The frames (by their number from 0) whose CPU work is LongFrameCpuTicks longer: frames that run long
+    std::vector<int32_t> LongFrames;
+    int64_t LongFrameCpuTicks{0};
     //! A frame's work on the GPU, which works on one frame at a time
     TickRange GpuWork{37'500, 37'500};
     //! How long after its time a timer wakes

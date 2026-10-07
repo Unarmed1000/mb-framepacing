@@ -78,6 +78,14 @@ namespace MB::FramePacing::Pacer
       return PacerCapabilities(Pacer::Without(m_capabilities, capabilities), std::max(m_maxPresentSwapInterval, 1u));
     }
 
+    //! What both sets have: the capabilities of both, and the shorter of the two swap intervals. What is left of an active set
+    //! when the set an application has gets smaller.
+    [[nodiscard]] constexpr PacerCapabilities IntersectedWith(const PacerCapabilities& other) const noexcept
+    {
+      return PacerCapabilities(m_capabilities & other.m_capabilities,
+                               std::max(std::min(m_maxPresentSwapInterval, other.m_maxPresentSwapInterval), 1u));
+    }
+
     constexpr bool operator==(const PacerCapabilities& other) const noexcept = default;
   };
 }
