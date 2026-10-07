@@ -226,9 +226,10 @@ What these runs show, as far as one run of each goes:
 - **Waiting for the one before the last was the steadiest and had the lowest latency with light work.** Every one of its waits
   returned at once after start-up, so it capped the frames waiting at start-up and then did not disturb the loop. Waiting for
   the last one held the loop every frame and made the frame starts uneven.
-- **A wait for a present that is never shown runs into its timeout.** In the first frames of a window one to three presents
-  get no display time. Where the pacer waited for such a one directly (waiting for the last present), the loop stood for the
-  250 ms of the timeout, once each in two of four runs.
+- **A wait for a present that is never shown runs into its timeout.** In the first 18 frames of a window some presents get no
+  display time (1 to 3 in the eleven runs with a wait for a present, 2 to 8 in the eleven without). Where the pacer waited
+  for such a one directly (waiting for the last present), the loop stood for the 250 ms of the timeout, once each in two of
+  four runs.
 - **With every frame a refresh late and the rule off, the animation ran at half speed.** Waiting for the last present at
   this work, each frame took two refreshes and its animation time advanced by one: the count of refreshes behind the clock
   grew by one a frame (2,457 at the end). An animation time that is never moved after a lost refresh is right for a refresh
