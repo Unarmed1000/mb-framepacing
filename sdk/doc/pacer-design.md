@@ -523,8 +523,9 @@ as that is counted in the frame's swap intervals.
 - So a window that is covered costs two waits (eight refreshes at one refresh per frame) and then runs at its frame rate,
   and when it is back the pacer is where it was: the frame window and the swap interval are what they were before.
 
-**A hint from the application: open.** Asked: should the pacer take a hint that the focus was lost, and start again with
-an empty frame window when it is gained? What speaks against that as the fix, and for it as a help:
+**A hint from the application: left for later.** Asked: should the pacer take a hint that the focus was lost, and start
+again with an empty frame window when it is gained? Decided on 2026-10-07: the change above is what the pacer starts with,
+and no hint is taken yet. What speaks against a hint as the fix, and for it as a help later:
 
 - Focus is not what was measured to matter: the window lost it in view and nothing changed, and a window that stays on top
   covers another one without taking its focus.
