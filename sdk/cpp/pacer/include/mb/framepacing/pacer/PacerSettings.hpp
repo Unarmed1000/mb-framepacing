@@ -196,7 +196,7 @@ namespace MB::FramePacing::Pacer
 
     //! The presents that may be waiting to be shown while a frame is made, the frame itself counted. The pacer picks the
     //! number (PickedWaitingPresents): an application says what it aims for (Aim) and nothing of this.
-    //! A pacer that waits for a present (QueueTier::WaitForPresent) asks before a frame for a wait until the present that
+    //! A pacer that waits for a present (the tiers with WaitForPresent) asks before a frame for a wait until the present that
     //! many back was shown. With PacerAim::Smoothness it is also the reserve a tier pacer keeps at one refresh per frame: that
     //! many less one frames are made ahead of the display and wait to be shown, and a frame that ran long is forgiven that many
     //! steps.
@@ -270,7 +270,7 @@ namespace MB::FramePacing::Pacer
 
     void SetMaxFramesInFlight(uint32_t frames) noexcept;
 
-    //! For a pacer that can neither wait for a present nor see what the display shows (QueueTier::PeriodOnly): the length of
+    //! For a pacer that can neither wait for a present nor see what the display shows (PacerTier::TimerPeriodOnly): the length of
     //! the one pause it makes after start-up, in refreshes (0 to MaxStartupPauseRefreshes; 0: no pause; 4 by default). The
     //! first presents of a new swap chain can take longer to reach the display than the later ones, and the frames that
     //! pile up behind them then wait for as long as the loop runs at one refresh per frame. The pause lets the display
@@ -292,7 +292,7 @@ namespace MB::FramePacing::Pacer
 
     void SetStartupPauseDelay(NanosecondTimeSpan delay) noexcept;
 
-    //! For a pacer that knows where the display's refreshes are (HoldTier::VBlank): where in a refresh a frame is to be ready,
+    //! For a pacer that knows where the display's refreshes are (the tiers with VBlankTimes): where in a refresh a frame is to be ready,
     //! in percent of the refresh period after its vertical blank (0 to MaxReadyPlacePercent; 50 by default). Ready is
     //! presented, and with GPU work reports the GPU done with it. A frame that is ready there is shown at the next vertical
     //! blank. The middle is as far from either vertical blank as a frame can be, so it is the default without knowing a

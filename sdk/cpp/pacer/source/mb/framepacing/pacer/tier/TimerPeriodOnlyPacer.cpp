@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The pacer of the lowest pair of tiers (sdk/doc/pacer-design.md "A grid on the clock"): frame starts on one grid of
+// EXPERIMENTAL. The pacer of the lowest tier (sdk/doc/pacer-design.md "A grid on the clock"): frame starts on one grid of
 // refresh periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval and by a loss
 // that repeats, and one pause after start-up.
 #include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>

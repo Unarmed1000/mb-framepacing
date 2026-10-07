@@ -10,8 +10,7 @@
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -26,8 +25,8 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built one tier's pacer at a time; FramePacer is
-  //! the pacer the library has until they replace it). The pacer of the lowest pair of tiers, HoldTier::Timer with
-  //! QueueTier::PeriodOnly: a whole pacer by itself, for an application with a steady clock, the refresh period of the display its
+  //! the pacer the library has until they replace it). The pacer of the lowest tier, PacerTier::TimerPeriodOnly, the
+  //! baseline: a whole pacer by itself, for an application with a steady clock, the refresh period of the display its
   //! window is on, a wait until a time, and a present that shows every frame in order for at least a refresh. Every application has
   //! that, so every capability set reaches this pacer.
   //!
@@ -139,9 +138,8 @@ namespace MB::FramePacing::Pacer
     uint64_t m_startupPauses{0};
 
   public:
-    //! The tiers this pacer is for.
-    static constexpr HoldTier Hold = HoldTier::Timer;
-    static constexpr QueueTier Queue = QueueTier::PeriodOnly;
+    //! The tier this pacer is for.
+    static constexpr PacerTier Tier = PacerTier::TimerPeriodOnly;
 
     explicit TimerPeriodOnlyPacer(const PacerSettings& settings);
 

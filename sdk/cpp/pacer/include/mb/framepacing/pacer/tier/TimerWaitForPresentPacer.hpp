@@ -10,8 +10,7 @@
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -26,7 +25,7 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built one tier's pacer at a time; FramePacer is
-  //! the pacer the library has until they replace it). The pacer of HoldTier::Timer with QueueTier::WaitForPresent: a whole pacer by
+  //! the pacer the library has until they replace it). The pacer of PacerTier::TimerWaitForPresent: a whole pacer by
   //! itself, for an application that has the baseline (a steady clock, the refresh period of the display its window is on, a wait
   //! until a time, a present that shows every frame in order for at least a refresh) and can wait until a present it names was
   //! shown (PacerCapability::WaitForPresent).
@@ -114,7 +113,7 @@ namespace MB::FramePacing::Pacer
     bool m_waitReported{false};
 
   public:
-    //! The tiers this pacer is for.
+    //! The tier this pacer is for.
     //! The waits in a row that run out before the pacer stops waiting. One by itself happens (a present at the start of a
     //! window that is never shown); two in a row is a display that does not take this window's frames.
     static constexpr uint32_t WaitsRunOutToStop = 2;
@@ -127,8 +126,7 @@ namespace MB::FramePacing::Pacer
     //! The answers in a row that say shown before the pacer waits again: one can be a covered window's frame shown in passing.
     static constexpr uint32_t AsksShownToWait = 2;
 
-    static constexpr HoldTier Hold = HoldTier::Timer;
-    static constexpr QueueTier Queue = QueueTier::WaitForPresent;
+    static constexpr PacerTier Tier = PacerTier::TimerWaitForPresent;
 
     explicit TimerWaitForPresentPacer(const PacerSettings& settings);
 

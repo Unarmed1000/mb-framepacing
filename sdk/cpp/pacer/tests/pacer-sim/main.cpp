@@ -15,13 +15,13 @@
 //             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]
 //             [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>] [--startup-pause <refreshes>]
 //
-//   --tier-pacer  the application carries out what the pacer of the lowest pair of tiers gives it, in place of today's pacer and
+//   --tier-pacer  the application carries out what the pacer of the lowest tier gives it, in place of today's pacer and
 //                 the first integration's own calculations
 //   --wait-for-present  the same with the pacer of a timer and a wait for a present
 //   --gpu-reports       the loop gives a tier pacer each frame's GPU work, begin and end
 //   --frames-in-flight  1: a frame starts when the GPU is done with the one before it; 2: the CPU works on a frame while the GPU
 //                       works on the one before it. The loop does it and says so to a tier pacer
-//   --startup-pause     the refreshes of the lowest pair's pause after start-up; 0 for none
+//   --startup-pause     the refreshes of the lowest tier's pause after start-up; 0 for none
 //   --vblank-pacer      the pacer of vertical blank times, given the display's last vertical blank before every frame;
 //                       --ready-place <percent>: where in a refresh a frame is to be ready. The reserve of --smooth is the
 //                       --wait-for-present number less one here too
@@ -29,7 +29,7 @@
 //                       may wait
 //   --display-ppm       the display's refresh period is that many parts per million longer than the loop was told
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
-//   --system-holds      the loop tells the pacer of the lowest pair of its own waits and that the system holds it while its
+//   --system-holds      the loop tells the pacer of the lowest tier of its own waits and that the system holds it while its
 //                       queue is full; with --images the display has that many, and the pacer is told so
 //   --smooth            a tier pacer with the aim of smoothness (a reserve of frames that wait); low latency without it.
 //                       With --tier-pacer the reserve is the --wait-for-present number less one, and the wait is not made

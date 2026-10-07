@@ -11,8 +11,7 @@
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -134,8 +133,7 @@ namespace
     return (frame.Schedule.IntendedDisplayTime.Nanoseconds() - Start) / Period;
   }
 
-  static_assert(PC::VBlankWaitForPresentPacer::Hold == PC::HoldTier::VBlank);
-  static_assert(PC::VBlankWaitForPresentPacer::Queue == PC::QueueTier::WaitForPresent);
+  static_assert(PC::VBlankWaitForPresentPacer::Tier == PC::PacerTier::VBlankWaitForPresent);
 }
 
 TEST(VBlankWaitForPresentPacer, BeforeAFrameItAsksForAPresentAndThenForTheTimeTheFrameStarts)

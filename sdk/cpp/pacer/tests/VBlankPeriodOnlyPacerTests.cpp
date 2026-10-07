@@ -11,8 +11,7 @@
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -101,8 +100,7 @@ namespace
     return result;
   }
 
-  static_assert(PC::VBlankPeriodOnlyPacer::Hold == PC::HoldTier::VBlank);
-  static_assert(PC::VBlankPeriodOnlyPacer::Queue == PC::QueueTier::PeriodOnly);
+  static_assert(PC::VBlankPeriodOnlyPacer::Tier == PC::PacerTier::VBlankPeriodOnly);
 }
 
 TEST(VBlankPeriodOnlyPacer, UntilAReadingTheFirstFramesStartIsTakenAsAVerticalBlank)

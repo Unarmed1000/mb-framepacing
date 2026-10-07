@@ -3,123 +3,80 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <cstdint>
 #include <string_view>
 
 //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md). The tiers and the capabilities in words, for an application that shows
-//! them: a short name for a label, and for a tier what it uses and what that gives, as a sentence or two (DescriptionOf) and as one
-//! short line (ShortDescriptionOf, at most ShortDescriptionMaxLength characters). English, plain ASCII. Every
+//! them: a short name for a label, and for a tier what its pacer uses and what that gives, as a sentence or two (DescriptionOf)
+//! and as one short line (ShortDescriptionOf, at most ShortDescriptionMaxLength characters). English, plain ASCII. Every
 //! text is a string literal: it is there for the life of the program, nothing is allocated, and its data() ends with a zero, so it
 //! can be given to a function that takes a C string. A value that is not one of the type's has no text: empty.
 //!
-//! A tier's number is its enumerator's value, 1 the best: "hold tier 3 of 3" is the value of HoldTier::Timer of HoldTierCount.
+//! A tier's number is its enumerator's value, 1 the best: "tier 4 of 4" is the value of PacerTier::TimerPeriodOnly of TierCount.
 namespace MB::FramePacing::Pacer::PacerTierText
 {
-  //! The hold tiers there are: their numbers are 1 to this.
-  inline constexpr uint32_t HoldTierCount = 3;
-  //! The queue tiers there are: their numbers are 1 to this.
-  inline constexpr uint32_t QueueTierCount = 3;
+  //! The tiers there are: their numbers are 1 to this.
+  inline constexpr uint32_t TierCount = 4;
   //! The capabilities there are: capability number index is PacerCapability(1 << index), index from 0 to this less one.
   inline constexpr uint32_t CapabilityCount = 15;
 
   //! The longest a short description is, in characters: one line of a narrow panel.
   inline constexpr uint32_t ShortDescriptionMaxLength = 44;
 
-  //! A hold tier's name.
-  [[nodiscard]] constexpr std::string_view NameOf(const HoldTier tier) noexcept
+  //! A tier's name.
+  [[nodiscard]] constexpr std::string_view NameOf(const PacerTier tier) noexcept
   {
     switch (tier)
     {
-    case HoldTier::DisplaySide:
-      return "display side";
-    case HoldTier::VBlank:
+    case PacerTier::VBlankWaitForPresent:
+      return "vertical blank times, wait for a present";
+    case PacerTier::VBlankPeriodOnly:
       return "vertical blank times";
-    case HoldTier::Timer:
+    case PacerTier::TimerWaitForPresent:
+      return "timer, wait for a present";
+    case PacerTier::TimerPeriodOnly:
       return "timer";
     }
     return {};
   }
 
-  //! What a hold tier uses to hold a frame for its swap interval, and what that gives.
-  [[nodiscard]] constexpr std::string_view DescriptionOf(const HoldTier tier) noexcept
+  //! What a tier's pacer uses, and what that gives.
+  [[nodiscard]] constexpr std::string_view DescriptionOf(const PacerTier tier) noexcept
   {
     switch (tier)
     {
-    case HoldTier::DisplaySide:
-      return "The present holds the frame: it is given a time, a minimum duration or a swap interval, and the display side keeps "
-             "the frame on screen for its refreshes.";
-    case HoldTier::VBlank:
-      return "The frame loop holds the frame and knows where the refreshes are from vertical blank times: it presents in the "
-             "refresh before the one the frame is aimed at.";
-    case HoldTier::Timer:
-      return "The frame loop holds the frame on a timer and the refresh period alone: where the refreshes are is not known, so "
-             "the moment of the present is a guess.";
+    case PacerTier::VBlankWaitForPresent:
+      return "The pacer knows where the display's refreshes are from vertical blank times, and before a frame the loop waits "
+             "until the display took an earlier present: every frame is for one refresh, the frames that wait to be shown stay "
+             "as few as asked for, and the pacer learns which refresh a frame was shown at.";
+    case PacerTier::VBlankPeriodOnly:
+      return "The pacer knows where the display's refreshes are from vertical blank times: every frame is for one refresh and "
+             "nothing drifts. A frame that waits to be shown although it was ready in time is not seen, and stays.";
+    case PacerTier::TimerWaitForPresent:
+      return "The frame loop is paced on a timer and the refresh period, and before a frame it waits until the display took an "
+             "earlier present: the frames that wait to be shown stay as few as asked for, and the timer follows the waits.";
+    case PacerTier::TimerPeriodOnly:
+      return "The frame loop is paced on a timer and the refresh period alone: where the refreshes are is not known, so the "
+             "moment of a present is a guess, and a frame that waits to be shown is not seen, and stays.";
     }
     return {};
   }
 
   //! The same in one short line.
-  [[nodiscard]] constexpr std::string_view ShortDescriptionOf(const HoldTier tier) noexcept
+  [[nodiscard]] constexpr std::string_view ShortDescriptionOf(const PacerTier tier) noexcept
   {
     switch (tier)
     {
-    case HoldTier::DisplaySide:
-      return "The present holds the frame on screen.";
-    case HoldTier::VBlank:
-      return "The loop holds it, on vertical blank times.";
-    case HoldTier::Timer:
-      return "The loop holds it on a timer: a guess.";
-    }
-    return {};
-  }
-
-  //! A queue tier's name.
-  [[nodiscard]] constexpr std::string_view NameOf(const QueueTier tier) noexcept
-  {
-    switch (tier)
-    {
-    case QueueTier::WaitForPresent:
-      return "wait for a present";
-    case QueueTier::DisplayTimes:
-      return "display times";
-    case QueueTier::PeriodOnly:
-      return "refresh period only";
-    }
-    return {};
-  }
-
-  //! What a queue tier uses to keep the frames that wait to be shown few, and what that gives.
-  [[nodiscard]] constexpr std::string_view DescriptionOf(const QueueTier tier) noexcept
-  {
-    switch (tier)
-    {
-    case QueueTier::WaitForPresent:
-      return "Before a frame the loop waits until the display took an earlier present: the frames that wait to be shown stay as "
-             "few as asked for, whatever happens.";
-    case QueueTier::DisplayTimes:
-      return "The presents not yet shown are counted from the display times reported frames later, and a frame start is taken "
-             "back for each one too many.";
-    case QueueTier::PeriodOnly:
-      return "Never more frames than the display takes, from the refresh period alone: a frame that waits to be shown is not "
-             "seen, and stays.";
-    }
-    return {};
-  }
-
-  //! The same in one short line.
-  [[nodiscard]] constexpr std::string_view ShortDescriptionOf(const QueueTier tier) noexcept
-  {
-    switch (tier)
-    {
-    case QueueTier::WaitForPresent:
-      return "The loop waits until a present was shown.";
-    case QueueTier::DisplayTimes:
-      return "Waiting presents are counted and taken back.";
-    case QueueTier::PeriodOnly:
-      return "A frame per refresh; one that waits stays.";
+    case PacerTier::VBlankWaitForPresent:
+      return "On the refreshes; knows what was shown.";
+    case PacerTier::VBlankPeriodOnly:
+      return "On the display's refreshes; no drift.";
+    case PacerTier::TimerWaitForPresent:
+      return "A timer; waits until a present was shown.";
+    case PacerTier::TimerPeriodOnly:
+      return "A timer and the refresh period: a guess.";
     }
     return {};
   }

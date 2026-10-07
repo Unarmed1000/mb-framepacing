@@ -27,13 +27,12 @@ target_sources(mb_framepacing_pacer
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/pacer/capability/HoldTier.hpp
       include/mb/framepacing/pacer/capability/PacerCapabilities.hpp
       include/mb/framepacing/pacer/capability/PacerCapability.hpp
       include/mb/framepacing/pacer/capability/PacerRating.hpp
+      include/mb/framepacing/pacer/capability/PacerTier.hpp
       include/mb/framepacing/pacer/capability/PacerTierText.hpp
       include/mb/framepacing/pacer/capability/PacerTierUtil.hpp
-      include/mb/framepacing/pacer/capability/QueueTier.hpp
       include/mb/framepacing/pacer/clock/PacerRefreshClock.hpp
       include/mb/framepacing/pacer/clock/AnimationTime.hpp
       include/mb/framepacing/pacer/clock/FrameMeasurement.hpp

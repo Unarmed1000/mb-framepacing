@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// The pacer of the lowest pair of tiers (a timer, and the refresh period only): frame starts on one grid of refresh periods on the
+// The pacer of the lowest tier (a timer, and the refresh period only): frame starts on one grid of refresh periods on the
 // clock, an animation time that advances by the swap interval alone, and a frame of more than one refresh held by a wait before
 // its present. What it is given is a clock's times; what it gives back the application carries out.
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
@@ -11,8 +11,7 @@
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -91,8 +90,7 @@ namespace
     return startNanoseconds;
   }
 
-  static_assert(PC::TimerPeriodOnlyPacer::Hold == PC::HoldTier::Timer);
-  static_assert(PC::TimerPeriodOnlyPacer::Queue == PC::QueueTier::PeriodOnly);
+  static_assert(PC::TimerPeriodOnlyPacer::Tier == PC::PacerTier::TimerPeriodOnly);
 }
 
 TEST(TimerPeriodOnlyPacer, TheFirstFrameStartsAtOnceAndStartsTheGrid)

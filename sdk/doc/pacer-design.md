@@ -214,7 +214,7 @@ What these runs show, as far as one run of each goes:
 
 - **The grid does what it is for.** Frames held for four refreshes were shown for exactly four, and a frame that ran long cost
   whole refreshes and nothing after it.
-- **The lowest pair's pacer keeps the place it began at, whatever that is.** With light work it kept two presents waiting for
+- **The lowest tier's pacer keeps the place it began at, whatever that is.** With light work it kept two presents waiting for
   the whole run: the ones that pile up while a window is new. Today's path has a pause for that, and sat at none. This is the
   open decision about that tier at one refresh per frame, with a number on it.
 - **With the GPU limiting the loop that pacer was the worst of the runs**: presents waiting crept up to the number of images,
@@ -239,7 +239,7 @@ What these runs show, as far as one run of each goes:
 
 Decided on 2026-10-07 from the numbers above, built, and checked on the simulation only. **None of it is measured yet.**
 
-- **One pause after start-up in the lowest pair's pacer.** Half a second after the first frame of a start, the frame after
+- **One pause after start-up in the lowest tier's pacer.** Half a second after the first frame of a start, the frame after
   is due four refreshes later than it would be, so the display takes the frames that piled up behind the first presents.
   Both numbers are settings (`StartupPauseDelay`, `StartupPauseRefreshes`; no refreshes is no pause) and both are a guess:
   the values are the ones that emptied the queue for today's path on the one system measured. It is never made before the
@@ -254,12 +254,12 @@ Decided on 2026-10-07 from the numbers above, built, and checked on the simulati
   with an end time shows the next frame's start more than the frame margin before that end, or when the application says it
   lets two frames or more be in flight (`MaxFramesInFlight`), which it has to say for the case the times can not show: at a
   longer swap interval nothing overlaps. On the simulation: with GPU work of 130 % of a refresh and nothing that bounds the
-  waiting frames, the lowest pair's pacer without reports stays at one refresh per frame while the frames fall ever further
+  waiting frames, the lowest tier's pacer without reports stays at one refresh per frame while the frames fall ever further
   behind, and with reports goes to two; with CPU work of 74 % and GPU work of 72 % it stays at one refresh per frame with
   two frames in flight and goes to two with one, which is what the first integration's runs asked for.
 - **This does not answer the run above where that pacer stalled.** That run had the swap interval fixed at one, and its GPU
   work of 90 % fits a refresh by any reading. What grew there is the number of frames waiting, from refreshes the display
-  lost by itself, and that pacer does not learn of those: it stays what this pair can not do.
+  lost by itself, and that pacer does not learn of those: it stays what this tier can not do.
 - **A loss that repeats is in the animation step.** When the frame before took refreshes more than it was given and the one
   before that did too, the display shows every frame for that much longer, and the step is longer by the fewer of the two
   losses. One lost refresh is still not caught up with, and a swap interval the rule just changed is its answer to the
@@ -297,7 +297,7 @@ Light work, the rule on (it stayed at one refresh per frame in every run):
 | A timer, a wait for the last present  | 0                  | 0.74 (0.49 to 0.89)   | 0.76 to 1.36                             | 0, 0.74 |
 | A timer, a wait for the one before it | 0 (2,035), 1 (237) | 0.85 (0.82 to 1.83)   | 0.93 to 1.10                             | 0, 0.52 |
 
-The lowest pair's pacer made its pause once (the frame after it started 4.63 refreshes after the one before). The one present
+The lowest tier's pacer made its pause once (the frame after it started 4.63 refreshes after the one before). The one present
 it counts as waiting is not a frame behind another: by the medians its frames started 0.93 of a refresh after a display time
 and were presented 0.95 after one, were not shown at the display time 0.05 of a refresh later, and were shown at the one
 after it. So each frame was still on its way when the next one started. Where the grid sits against the display is chance at
@@ -380,7 +380,7 @@ Built and checked on the simulation only. **Not measured.**
   now leaves as many frames waiting as before it wherever the grid sits against the display (ten places, six lengths). The
   price: after most long frames the next frame starts a refresh later than the next step, so the long frame is on screen
   for two refreshes where one would have done on that display. A late start after a present that was on time keeps its step
-  as before. A frame that is presented in time and ready too late for its refresh stays what this pair does not learn of.
+  as before. A frame that is presented in time and ready too late for its refresh stays what this tier does not learn of.
 - **A later GPU work report for the same frame takes the place of the first**, for an application that learns how long the
   GPU worked before it learns when.
 - **A short form of each tier's description**, one line of 44 characters or less.
@@ -895,7 +895,7 @@ It is a property of the present, as a swap interval or a target time is, and it 
 the same sets. It is another side of the present than those, though. A swap interval or a target time says when the
 presentation side shows the frame; this says when the call gives the loop back. One present has both: DXGI's present with a
 sync interval holds the frame for its refreshes and blocks the caller, and the timed present that was measured holds the frame
-and returns at once. So it is no hold tier, and it sits beside whichever of them the set has. There are two capabilities, and
+and returns at once. So it makes no tier either, and it sits beside whichever of them the set has. There are two capabilities, and
 a set has one of them or neither:
 
 | The present …                            | When an application can say so                                                                    | Examples                                                                                                                                                                          |
@@ -924,85 +924,87 @@ went wrong: it was written for a present that waits for the display, and on the 
 
 ### Tiers
 
-**A tier is a set of capabilities: the ones a configuration needs to reach it.** Where more than one way reaches the same
-tier, the tier has more than one set. A capability set **reaches** a tier when it holds all of one of the tier's sets, and its
-**rating** is the best tier it reaches. The rating is a function of the set alone and changes nothing (`Rate(capabilities)`),
-so it can be asked for any set, before a pacer exists: "what would I get without the timed present". From the tiers' sets it
-also says which capability is missing for the next tier. The pacer gives the rating of the set the application has (the
-**capability tier**) and of the active set (the **active tier**), by that same function.
+**A tier is a set of capabilities, and it names one pacer.** A capability set **reaches** a tier when it holds what the tier
+needs, and its **rating** is the best tier it reaches. The rating is a function of the set alone and changes nothing
+(`Rate(capabilities)`), so it can be asked for any set, before a pacer exists: "what would I get without the wait for a
+present". It also says which capabilities would raise the tier. The pacer gives the rating of the set the application has
+(the **capability tier**) and of the active set (the **active tier**), by that same function.
 
 An application that shows the tiers takes their words from the library and writes none of its own (`PacerTierText`): a short
-name for each tier and each capability, a line for each tier that says what it uses and what that gives, and how many tiers
-of each kind there are.
+name for each tier and each capability, a line for each tier that says what it uses and what that gives, a shorter line of
+44 characters or less, and how many tiers there are.
 
-There are two questions, and each has its tiers. The first integration's document on what a platform offers already keeps
-them apart: "Holding a frame is one question, how many presents wait for the display is another".
+**There is one list of tiers, and each tier has one pacer** (decided on 2026-10-08; what it replaced is below):
 
-**How a frame is held for its swap interval.** These are the first integration's four tiers, unchanged in number and meaning,
-now written as capability sets:
+| Tier | Needs                           | Its pacer                   | What it paces by                                                                            | Status                                            |
+| ---- | ------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 1    | `VBlankTimes`, `WaitForPresent` | `VBlankWaitForPresentPacer` | The display's vertical blanks, and the loop held until an earlier present was shown         | Built; the simulation only                        |
+| 2    | `VBlankTimes`                   | `VBlankPeriodOnlyPacer`     | The display's vertical blanks; the refresh period only for the frames that wait             | Built; first runs on two systems, to be confirmed |
+| 3    | `WaitForPresent`                | `TimerWaitForPresentPacer`  | A grid of refreshes on the clock, and the loop held until an earlier present was shown      | Built; measured on one system, one run a case     |
+| 4    | nothing (the baseline)          | `TimerPeriodOnlyPacer`      | A grid of refreshes on the clock and the refresh period: where the refreshes are is a guess | Built; measured on two systems, one run a case    |
 
-| Tier | Needs one of                                                   | Who holds the frame                                      |
-| ---- | -------------------------------------------------------------- | -------------------------------------------------------- |
-| 1    | `PresentAtTime`; `PresentAfterDuration`; `PresentSwapInterval` | The display side: the presentation engine or the driver  |
-| 2    | `VBlankTimes`                                                  | The loop, which knows where the refreshes are            |
-| 3    | nothing (the baseline)                                         | The loop, on a timer: a guess                            |
-| 4    | (the pacer is off)                                             | Nothing. It is what a run uses, never what a set reaches |
+- **The order of tiers 2 and 3 is open.** Each has what the other lacks: tier 2 knows where the refreshes are and does not
+  learn of a frame that waits, tier 3 keeps the frames that wait to a number and has its refreshes as a grid on the clock.
+  It is built with vertical blank times as the better of the two, and it is decided when both are measured on a quiet
+  machine. Until then nothing is to rely on which of the two has the lower number.
+- **Every tier's pacer has both aims** ("The rules that move into the pacer"). How few frames wait is the aim's, at every
+  tier, and it makes no tier.
+- **A rating is three values**: the tier; the capabilities any one of which would raise it (`WaitForPresent` at tier 2,
+  `VBlankTimes` at tier 3, either at tier 4, none at tier 1); and whether the display's side holds a frame, which is next.
 
-**How the frames waiting to be shown are kept few.** These tiers are new:
+**The display's side holding a frame is a mechanism, and no tier.** A present that takes a time (`PresentAtTime`), a
+minimum duration (`PresentAfterDuration`) or a swap interval of two or more (`PresentSwapInterval`) lets the presentation
+engine or the driver hold a frame of more than one refresh for exactly its refreshes, whenever the loop presents it. It says
+nothing of where the refreshes are and nothing of the frames that wait, and at one refresh per frame it does nothing that a
+FIFO present does not, so it leaves a set's tier where it is. A rating has it as a fact beside the tier
+(`DisplaySideHolds`), and each of the four pacers is to use it for a frame of a longer swap interval when it is there, in
+place of the loop's own hold. **That is not built in any of them**: all four hold such a frame by the loop today. One thing
+is known of it beforehand: a frame the display's side holds is held for its swap interval while it waits too, so waiting
+frames do not go away by themselves at a longer swap interval, as they do where the loop holds the frame. In the first
+integration's own loop a present with a minimum duration is measured on one system, and a swap interval on the present is
+built.
 
-| Tier | Needs one of           | What the pacer can do                                                                               |
-| ---- | ---------------------- | --------------------------------------------------------------------------------------------------- |
-| 1    | `WaitForPresent`       | Hold the loop until the display took an earlier frame: no more than k frames ever wait              |
-| 2    | `DisplayTimes`         | Count the presents not yet shown, frames later, and take one frame start back for each one too many |
-| 3    | nothing (the baseline) | Never plan frames faster than the display takes them. A display that fell behind stays behind       |
+**What reaches no tier.**
 
-Queue tier 1 is measured on one system, one run a case. Queue tier 2 is a rule of this proposal: nothing of it is built,
-and it has to be shown in the simulation and then on a run. `WaitForImage` and `FrameCallback` reach no tier: the first fills
-the queue where it works, the second is not built anywhere and can stop or come late.
+- `DisplayTimes`: pacing by them is a rule of this proposal that no pacer was designed for, so they make no tier until one
+  is ("A later tier: display times", below). Until then they are statistics, as in today's pacer.
+- `WaitForImage` fills the queue where it works, and `FrameCallback` is not built anywhere and can stop or come late.
+- `GpuWorkTimes` and what a present does to the loop (`PresentWaits` and the others, above) are information every tier's
+  pacer takes.
+- A wait for a present is not taken as a way to know where the refreshes are. The first measurement speaks against it: the
+  wait returned 0.06 to 2.4 ms after the display took the frame (1 % to 99 % of 11,460 waits), which is over half a refresh
+  at 240 Hz. Tier 1 uses it for less: with the vertical blanks known, a wait's return says which of them a frame was shown
+  at.
 
-Where the handling at each queue tier comes from:
+Where the handling comes from:
 
-- **Tier 1** is DXGI's waitable swap chain and Vulkan's present wait, as documented. Microsoft: "For every frame it renders,
-  the app should wait on this handle before starting any rendering operations", with a maximum frame latency that is the
-  number of frames that may be queued
+- **A wait for a present (tiers 1 and 3)** is DXGI's waitable swap chain and Vulkan's present wait, as documented.
+  Microsoft: "For every frame it renders, the app should wait on this handle before starting any rendering operations",
+  with a maximum frame latency that is the number of frames that may be queued
   ([Reduce latency with DXGI 1.3 swap chains](https://learn.microsoft.com/en-us/windows/uwp/gaming/reduce-latency-with-dxgi-1-3-swap-chains)).
   Khronos: an application can use the wait "to monitor and control the pacing of the application by managing the number of
   outstanding images yet to be presented"
-  ([VK_KHR_present_wait](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_present_wait.html)). The pacer's k is
-  their frame latency. What is this proposal's own: that the pacer, not the application, says which present to wait for and
-  where in the frame.
-- **Tier 2** takes how a miss is seen from Microsoft and how it is answered from Android. Seeing it: keep each present's
-  expected refresh, and "If the actual PresentRefreshCount is later than the expected PresentRefreshCount, a glitch has
-  occurred" ([DXGI flip model](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-flip-model)). Answering
-  it: Microsoft's page discards the queued frames; this proposal holds a frame start instead, which is the idea of Android's
-  frame pacing library, to "inject waits into the application that allow the display pipeline to catch up, rather than
-  allowing back pressure to build up" ([Frame Pacing library](https://developer.android.com/games/sdk/frame-pacing)). That
-  library waits on the GPU's work with fences; waiting by the count of presents not yet shown is this proposal's own, and
-  not built.
-- **Tier 3** has no documented model: what is documented for a loop without any signal is the full queue and its
-  back-pressure. Never planning faster than the display is what today's pacer does. The grid on the clock is this project's
-  own (the clock carries how many refreshes should have passed). Pacing a little slower than the display, one of the options
-  in "Decisions needed", comes from the first integration and rests on no vendor's documentation.
+  ([VK_KHR_present_wait](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_present_wait.html)). The presents
+  that may wait are their frame latency. What is this proposal's own: that the pacer, not the application, says which
+  present to wait for, where in the frame, and how many may wait.
+- **The refresh period only for the frames that wait (tiers 2 and 4)** has no documented model: what is documented for a
+  loop without any signal is the full queue and its back-pressure. Never planning faster than the display is what today's
+  pacer does. The grid on the clock is this project's own (the clock carries how many refreshes should have passed). Pacing
+  a little slower than the display, one of the options in "Decisions needed", comes from the first integration and rests on
+  no vendor's documentation.
 
-A rating is the pair: "hold 2, queue 1". The two are not put into one number, because neither orders the other: a present with
-a swap interval and nothing else holds its frames exactly (hold 1) and can not see its display (queue 3), and a loop that waits
-on the vertical blank with a wait for presents is the other way round.
+**What this replaced.** Up to 2026-10-08 this proposal had two lists of tiers: how a frame is held for its swap interval
+(the display's side; the loop on the vertical blank; the loop on a timer) and how the frames that wait are kept few (a wait
+for a present; display times; the refresh period only). A rating was the pair, and there were to be nine pacers. It went
+for three reasons:
 
-**What the new capabilities change in the four hold tiers: nothing in their number or meaning, and two things around them.**
+- The second list was the aim of low latency written as tiers, from before the rule that every tier's pacer has both aims.
+- The first list's best tier, the display's side holding a frame, says nothing of how a loop at one refresh per frame is
+  paced, where every FIFO present holds the frame.
+- An application that shows what it is paced by needs one answer, and a pair of numbers with no order between them is none.
 
-- None of the new capabilities (`WaitForPresent`, `WaitForImage`, `DisplayTimes`, `GpuWorkTimes`, `FrameCallback`) is a new way
-  to hold a frame for its refreshes, so none of them makes a hold tier or moves a configuration between them as they stand.
-  Two could become further sets of tier 2, as other ways to know where the refreshes are: `DisplayTimes` (every shown frame's
-  time is a refresh) and `WaitForPresent`. Neither is built. For the present wait the first measurement speaks against it as
-  it is: the wait returned 0.06 to 2.4 ms after the display took the frame (1 % to 99 % of 11,460 waits), which is over half a
-  refresh at 240 Hz, so it would take a filter over many waits before it could place a present.
-- The first integration's sentence "At one refresh per frame every tier is the same: a FIFO present holds the frame and nothing
-  else is needed" was true of the hold only, and that document now says so. At one refresh per frame the queue tier is what tells
-  configurations apart.
-
-And how the two meet: at a longer swap interval held by the loop (hold 2 and 3), a queue empties by itself, so the queue tier
-matters at one refresh per frame. At a longer swap interval held by the display side (hold 1), waiting frames are held for
-their swap interval too and stay, so there it matters at every swap interval.
+Four of the nine pairs had a pacer when the lists became one, and those are the four tiers: no pacer was taken away or
+changed.
 
 **It is not one pacer, it is one per tier.** A tier is what a capability set reaches, and each tier has a pacer of its own that
 was designed for it: its rules, its time calculations and what it asks the application to carry out. The application talks
@@ -1011,20 +1013,18 @@ Nothing else decides how a frame is paced: the active capabilities give the tier
 pacer that tries a mechanism and falls back inside its own rules, and "which pacer is this run on" has one answer, which is
 in the log.
 
-With two tier lists a tier is a pair, so there are nine of them: three ways to hold a frame (the display side holds; the
-loop waits on the vertical blank; the loop waits on a timer) times three ways to keep the queue (a wait for a present; a
-correction from what was seen; the refresh period alone). Each of the nine is a pacer from the outside, with its
-own tests, its own golden data, and its own statement of what it promises and what it can not do. Inside they are not nine
-copies: each is one hold part and one queue part, and all of them share what does not depend on the tier (the frames in
-flight, the work as two stretches of time, the animation time), and the nine for a fixed refresh rate share the timeline of
-refreshes and the swap interval rule. The shared parts hold no rule of a tier.
+Each of the four is a pacer from the outside, with its own tests and its own statement of what it promises and what it can
+not do. Inside they are to share what does not depend on the tier (the frames in flight, the work as two stretches of time,
+the animation time, the swap interval rule), and in twos what two of them have alike: the vertical blanks, the grid on the
+clock, the wait for a present. The shared parts hold no rule of a tier. **As built, each of the four holds its own copy of
+those parts**, and they take no capability set: folding the copies and the front are the work that follows.
 
 Going from one to another (the active set changed, a signal stopped) is a handover the front makes at a frame's start: the
 animation time and the frames in flight go on, and the new pacer starts from what the shared parts know.
 
-A third value is the tier the pacer is **working at** this frame, again a pair: the pacer that is really pacing. It is lower than the active tier while
-something a capability promised is missing: no vertical blank time has come yet, display times have stopped, a wait timed
-out.
+A third value is the tier the pacer is **working at** this frame: the pacer that is really pacing. It is lower than the
+active tier while something a capability promised is missing: no vertical blank time has come yet, the readings turned out
+to be no vertical blank times, the waits for a present stopped because none is shown.
 
 ### Per frame
 
@@ -1268,7 +1268,7 @@ distance between the animation time and the time on screen is in none of them: i
 and they are not the same thing:
 
 - **Taking a waiting frame away costs nothing that shows.** While a frame start is held, the display shows the frame that
-  waited, so no frame is repeated and every display step stays what it was. This is the queue tiers' work, and it is worth
+  waited, so no frame is repeated and every display step stays what it was. This is the work of a wait for a present, and it is worth
   doing for the latency alone.
 - **Moving the animation timer to where the display is costs one visible step**, to fix a distance that did not show. The
   pacer does not do that for its own sake.
@@ -1285,28 +1285,48 @@ see while refreshes are lost now and then, and it is a game that runs slow while
 of a refresh once ran the animation at 73 % of real time, before the pacer counted such frames as late): there the swap
 interval rule has to end it by slowing down. Which of the two the pacer does is in "Decisions needed".
 
-### What each hold tier allows
+### What each tier allows
 
-| Hold tier | A frame of swap interval 1                                  | A frame of a longer swap interval                                                  | Does it know where the refreshes are?                             | Status                                                                                              |
-| --------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 1         | As tier 2 or 3, by what else the set has                    | Held by the display side for exactly its refreshes, whenever the loop presents it  | Not from this capability                                          | A present with a minimum duration: measured on one system. A swap interval on the present: built    |
-| 2         | Starts and is presented at a place in the display's refresh | Presented by the loop in the refresh before the one it is aimed at                 | Yes: an animation time is the time of a real refresh              | Measured on one system at 50 to 240 Hz; built and not measured on three other window systems        |
-| 3         | Starts a refresh after the one before, on the clock         | Held by the loop on a timer: a guess, as it does not know where in a refresh it is | No: its refreshes are a grid on the clock, a constant offset away | Measured on one system: next to no frame a refresh off at 50 to 120 Hz, 1 to 35 % of them at 240 Hz |
+| Tier                                          | Does it know where the refreshes are?                             | The frames that wait                                                               | After a refresh the display lost by itself                                                                                                         |
+| --------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1, vertical blank times, a wait for a present | Yes: an animation time is the time of a real refresh              | Never more than may wait, from the first frame on                                  | It learns of it from the wait, a few frames later: that frame is late and the next is for a later vertical blank. Nothing more waits               |
+| 2, vertical blank times                       | Yes                                                               | Not known. A frame that was ready in time and still shown late waits from then on  | It does not learn of it. At one refresh per frame the frame stays waiting; at two or more the display takes it before the next is made             |
+| 3, a timer, a wait for a present              | No: its refreshes are a grid on the clock, a constant offset away | Never more than may wait, from the first frame on                                  | It need not learn of it: the wait is for the display itself, and it costs one frame start                                                          |
+| 4, a timer                                    | No                                                                | Not known. Never more frames than the display takes; frame starts kept on one grid | As tier 2. Where the grid is faster than the display the frames that wait grow (by two runs' numbers, one more about every five minutes at 240 Hz) |
 
-### What each queue tier allows
+What the two aims are at each tier, as built:
 
-| Queue tier | What it allows                                                                    | Does it learn that the display lost a refresh?     | Can the display catch up?                                                       | Why                                                                                                            |
-| ---------- | --------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 1          | A set number of frames waiting (k), from the first frame on                       | It need not: the wait is for the display itself    | Yes, at once: it costs one frame start, and the frames waiting never go above k | The loop is held until the display took an earlier frame, so it can not present more than the display takes    |
-| 2          | The frames waiting, counted a few frames late; the real time of every shown frame | Yes, one to five frames later (as far as measured) | Yes, after those frames: one frame start is taken back for each frame too many  | The pacer knows how many presents are not shown yet, and a loop that presents one frame less lets one be taken |
-| 3          | Never more frames than the display takes; frame starts kept on one grid           | No                                                 | Only where the swap interval does it (below). At one refresh per frame: no      | Nothing tells the pacer that a frame waits, and at one frame per refresh nothing takes a waiting frame away    |
+| Tier | Smoothness (the default)                                                                                                                    | Low latency                                                                                                                               |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | The wait, then the frame starts at once and its present is held to its place in the refresh; one frame in reserve at one refresh per frame  | The wait, then the frame's start is held so that it is ready at its place and no sooner; presented when it is done                        |
+| 2    | The frame starts at once and its present is held to its place; one frame in reserve at one refresh per frame                                | The frame's start is held, presented when done; a frame of more than one refresh is started in the refresh before its blank. One pause    |
+| 3    | One frame made ahead of the display, and the wait keeps the frames that wait to what may wait                                               | No frame made ahead; the wait keeps the frames that wait to what may wait                                                                 |
+| 4    | One frame made ahead; a frame late within the reserve gives up no step. Where the application says the system holds the loop, that paces it | One pause after start-up (a guess); a whole period after a late present; a frame half a period late or more takes the step the loop is at |
 
-Status: queue tier 1 is measured on one system, one run a case, with the wait made by the first integration and not yet
-driven by a pacer. Queue tier 2 is a rule of this proposal and not built. Queue tier 3 is today's pacer plus the grid.
+A frame of more than one refresh, by who holds it. The status is of the first integration's own loop, from before the tier
+pacers:
 
-**The wait for a free swap chain image, at queue tier 3.** It is core to a swap chain, so a configuration at queue tier 3
-can have it, and on the one system measured it worked as a cap and not as a way down (one run a case, GPU work of 90 % of a
-refresh, a swap interval fixed at 1):
+| Who holds it                                        | How                                                               | Status                                                                                              |
+| --------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| The display's side (a mechanism, at any tier)       | For exactly its refreshes, whenever the loop presents it          | A present with a minimum duration: measured on one system. A swap interval on the present: built    |
+| The loop, with vertical blank times (tiers 1 and 2) | Ready in the refresh before the vertical blank it is for          | Measured on one system at 50 to 240 Hz; built and not measured on three other window systems        |
+| The loop, on a timer (tiers 3 and 4)                | On a timer: a guess, as it does not know where in a refresh it is | Measured on one system: next to no frame a refresh off at 50 to 120 Hz, 1 to 35 % of them at 240 Hz |
+
+Two things are the same at every tier:
+
+- **After the pacer's own long frame** the loop is back where it was against the display: on the display's vertical blanks
+  at tiers 1 and 2, on the grid on the clock at tiers 3 and 4. The pacer needs nothing from the display for that.
+- **The lost refresh itself is seen on screen once**, as a frame shown a refresh longer than it was animated for. No tier takes
+  that back: the frame was already drawn when the refresh was lost. What the tiers differ in is whether it stays as latency
+  afterwards.
+
+Status: tiers 3 and 4 are measured on the first integration's first system, one run a case, and tier 4 in a few runs on a
+second. Tier 2 has first runs on both, and tier 1 the simulation only. The runs of tiers 1 and 2 on the first system were
+made while another program used that machine, and are to be confirmed.
+
+**The wait for a free swap chain image, without a wait for a present.** It is core to a swap chain, so a configuration at
+tier 2 or 4 can have it, and on the one system measured it worked as a cap and not as a way down (one run a case, GPU work
+of 90 % of a refresh, a swap interval fixed at 1):
 
 | Run                                | Frames waiting   | Frame start to display, median (99 %) | Presents without a display time | GPU work that began late |
 | ---------------------------------- | ---------------- | ------------------------------------- | ------------------------------- | ------------------------ |
@@ -1316,49 +1336,52 @@ refresh, a swap interval fixed at 1):
 
 So it does three things there: the frames waiting can not go above the number of images, they sit at that number, and the
 run is steady. It does not bring the display back towards the animation timer: it fixes how far behind it is. That distance
-is then known (as many refreshes as there are images), which nothing else at this tier gives, and with the fewest images the
-swap chain allows it is no further than without the wait. Whether another driver keeps an image as long is not known, which
-is why the pacer does not count on it. Whether it should be a queue tier of its own, between display times and the refresh
-period alone, is in "Decisions needed".
-
-### The nine pairs: after a refresh the display lost by itself
-
-| Hold tier, queue tier                   | 1, a wait for a present | 2, display times         | 3, the refresh period only                                                                                                                     |
-| --------------------------------------- | ----------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1, the display side holds               | Catches up at once      | Catches up, frames later | Does not catch up, at any swap interval: the display side holds the waiting frames for their swap interval too                                 |
-| 2, the loop waits on the vertical blank | Catches up at once      | Catches up, frames later | Catches up by itself at two refreshes per frame or more, as the display then takes frames faster than the loop presents them. At one: does not |
-| 3, the loop waits on a timer            | Catches up at once      | Catches up, frames later | As hold tier 2                                                                                                                                 |
-
-Two things are the same in every pair:
-
-- **After the pacer's own long frame** the loop is back where it was against the display: on the display's refreshes at hold
-  tier 2, on the grid on the clock elsewhere. The pacer needs nothing from the display for that.
-- **The lost refresh itself is seen on screen once**, as a frame shown a refresh longer than it was animated for. No tier takes
-  that back: the frame was already drawn when the refresh was lost. What the tiers differ in is whether it stays as latency
-  afterwards.
+is then known (as many refreshes as there are images), which nothing else at these tiers gives, and with the fewest images
+the swap chain allows it is no further than without the wait. Whether another driver keeps an image as long is not known,
+which is why the pacer does not count on it. It makes no tier: what the pacer does where a system holds the loop is in "A
+loop the system holds".
 
 ### Aligning the animation timer with the display
 
 Catching up is about the frames waiting. A second question is how well a frame's animation time can be made the time the
-frame is really shown. It has three parts, and they take different tiers:
+frame is really shown. It has three parts, and they take different things:
 
-| What "aligned" means                                                                                          | What it takes                                | Tier                                                            |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------- |
-| The animation time is the time of a real refresh, not a point on a grid a constant part of a refresh away     | Knowing where the refreshes are              | Hold tier 2 (vertical blank times), or display times            |
-| The whole refreshes between a frame's animation time and its time on screen can not change without being seen | The frames waiting capped, or counted        | Queue tier 1 (capped at k) or queue tier 2 (seen and corrected) |
-| The animation time is the frame's true display time                                                           | The display saying when each frame was shown | Queue tier 2 only (display times)                               |
+| What "aligned" means                                                                                          | What it takes                                | Where                                                     |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
+| The animation time is the time of a real refresh, not a point on a grid a constant part of a refresh away     | Knowing where the refreshes are              | Tiers 1 and 2 (vertical blank times), or display times    |
+| The whole refreshes between a frame's animation time and its time on screen can not change without being seen | The frames waiting capped, or counted        | Tiers 1 and 3 (capped at what may wait), or display times |
+| The animation time is the frame's true display time                                                           | The display saying when each frame was shown | Display times only, which make no tier yet                |
 
 - **Only display times align it fully**, as only they say when a frame reached the screen. They come frames late (one to five
   in what was measured), so what they correct is the frames that follow.
-- **Vertical blank times with a wait for a present** (hold tier 2, queue tier 1) come close without them: the animation time
-  is on a real refresh and the frames waiting can not grow. What is left is the constant number of refreshes the system takes
-  by itself (a compositor's, for one), which the pacer can not know. A constant whole number of refreshes does not show in
-  motion; it matters where a game needs the absolute time, for sound.
-- **At queue tier 3 it can not be done.** The animation timer is exact against the clock, and how many refreshes behind it the
-  screen is can not be known. The wait for a free image is the one thing that fixed that distance, at the image count, on the
-  system measured.
-- **Hold tier 1 by itself does not give it**: the display side holds the frame for exactly its refreshes, and the application
-  is not told where they are.
+- **Tier 1** comes close without them: the animation time is on a real refresh and the frames waiting can not grow. What is
+  left is the constant number of refreshes the system takes by itself (a compositor's, for one), which the pacer can not
+  know. A constant whole number of refreshes does not show in motion; it matters where a game needs the absolute time, for
+  sound.
+- **At tiers 2 and 4 the second part can not be had.** How many refreshes behind the animation timer the screen is can not
+  be known. The wait for a free image is the one thing that fixed that distance, at the image count, on the system measured.
+- **The display's side holding a frame gives none of the three**: it holds the frame for exactly its refreshes, and the
+  application is not told where they are.
+
+### A later tier: display times
+
+A proposed rule, with no pacer designed for it and nothing of it built. It becomes a tier of the one list when a pacer is
+designed for it, with both aims, and where in the list is decided then.
+
+- **What display times give**: the real time of every shown frame, one to five frames after it (as far as measured), and so
+  the count of presents that are not shown yet.
+- **The rule proposed**: keep each present's expected refresh, and when a frame was shown later than expected, take one
+  frame start back for each frame too many. The display then catches up, those frames later.
+- **Where it comes from**: seeing a miss is Microsoft's: "If the actual PresentRefreshCount is later than the expected
+  PresentRefreshCount, a glitch has occurred"
+  ([DXGI flip model](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-flip-model)). Answering it:
+  Microsoft's page discards the queued frames; this proposal holds a frame start instead, which is the idea of Android's
+  frame pacing library, to "inject waits into the application that allow the display pipeline to catch up, rather than
+  allowing back pressure to build up" ([Frame Pacing library](https://developer.android.com/games/sdk/frame-pacing)). That
+  library waits on the GPU's work with fences; waiting by the count of presents not yet shown is this proposal's own.
+- **What was tried**: today's pacer measured its frames by their display times before they became statistics only. It
+  reacted two to four frames later, and at work of 90 % of a refresh it counted about 40 % more late frames than the
+  display had events (one machine, one capture session).
 
 ## How it is checked
 
@@ -1370,7 +1393,7 @@ frame is really shown. It has three parts, and they take different tiers:
   queued behind it, an optional bound, and vertical blanks at which no frame is taken. It gets a wait for a present, display
   times that come late and a timer that wakes late, and each tier is run on it: the queue that today stays for the rest of the
   run has to be gone within a number of frames stated per tier.
-- **Each of the nine tier pacers** in that simulation, held to what its tier promises. Leaving a capability out of the
+- **Each of the four tier pacers** in that simulation, held to what its tier promises. Leaving a capability out of the
   active set is how a test runs a lower tier's pacer on the same model.
 - **Golden data, monitor rates 50 to 540 Hz, 100 % coverage, no allocation per frame**, as today. With a clock only the new
   pacer does at least what today's does.
@@ -1409,7 +1432,7 @@ stored run has variable refresh off, and the tools measure a display at a fixed 
 checked. Four things are settled now, because they cost little now and a second redesign later:
 
 - **It is more tier pacers, not a change to these.** One pacer per tier means a display that shows a frame when it is
-  presented gets pacers of its own behind the same front, and the nine for a fixed refresh rate stay as they are.
+  presented gets pacers of its own behind the same front, and the four for a fixed refresh rate stay as they are.
 - **The application says so.** Whether variable refresh is active for its window, and the range, is information it gives with
   its capabilities. Until those pacers exist, the front does not pace such a display with a pacer for a fixed one: the tier it
   is working at says that it is not pacing.
@@ -1418,7 +1441,7 @@ checked. Four things are settled now, because they cost little now and a second 
   reads assumes that a display time is a whole number of refreshes after another.
 - **The timeline of refreshes belongs to the pacers for a fixed refresh rate**, not to the shared parts. What is shared has no
   refresh grid in it: the frames in flight, the work as two stretches of time, the animation time. The wait for a present
-  (queue tier 1) asks nothing about the refresh rate and is expected to carry over as it is.
+  asks nothing about the refresh rate and is expected to carry over as it is.
 
 ## Decisions needed
 
@@ -1429,9 +1452,9 @@ checked. Four things are settled now, because they cost little now and a second 
    integration's system in the second measurements, where a frame reached the screen sooner than in the simulation's
    display. Should the pacer take at least one more than the frames in flight the application names, or is that the
    application's to set?
-2. **The tiers**: two lists, each tier a set of capabilities, the hold tiers the first integration's four as they are, and
-   a rating that is the pair. Proposed as above. If one number is wanted for a rating, the order between the two has to be
-   decided: there is no order that follows from the capabilities.
+2. **The tiers**: decided on 2026-10-08 and built: one list of four tiers, each a set of capabilities with one pacer; the
+   display's side holding a frame a mechanism beside the tier; display times no tier until a pacer is designed for them
+   ("Tiers"). Open: the order of tiers 2 and 3, until both are measured on a quiet machine.
 3. **With the refresh period only, at a swap interval of one, a refresh the display lost by itself**: the grid on the clock
    answers the pacer's own long frames. For a frame that was ready in time and still shown a refresh late, which the pacer
    can not learn of: accept that it stays waiting, pause once after start-up as a guess, or pace a little slower than the
@@ -1447,17 +1470,15 @@ checked. Four things are settled now, because they cost little now and a second 
 5. **The two aims**: decided, and wrongly proposed here before as an option that no tier pacer carries. Every tier's pacer
    has a latency optimized and a not latency optimized form ("The rules that move into the pacer"). Still open is only the
    further step of the pacer choosing k and the frames in flight from the measured work by itself.
-6. **Back-pressure as a tier**: a queue tier of its own for a loop that is held by the system when its queue is full (a
-   wait for a free image, measured on one system: the frames waiting are capped at the number of images and steady; or a
-   present that is known to wait), or a help at the lowest tier that the pacer promises nothing from, as now? If a tier, the
-   image wait goes with the fewest images the swap chain allows.
-   Since the third measurements this has a case: with the aim of smoothness and no wait for a present, a full swap chain
-   paced the loop by itself, steadily in one run and not in another, and the pacer neither chose it nor knew of it.
+6. **A loop the system holds when its queue is full** (a wait for a free image, measured on one system: the frames
+   waiting are capped at the number of images and steady; or a present that is known to wait). It had a case since the third
+   measurements: with the aim of smoothness and no wait for a present, a full swap chain paced the loop by itself, steadily
+   in one run and not in another, and the pacer neither chose it nor knew of it.
    Decided on 2026-10-07 and built for the pacer on a timer with the refresh period only ("A loop the system holds",
    above): the application reports its own waits and the swap chain's images, and where it says that the system holds the
-   loop while its queue is full, the aim of smoothness lets the system pace the loop. Still proposed, and not answered: it
-   is how smoothness behaves in that pacer and no queue tier of its own, as it promises less than a wait for a present
-   (how many frames wait is the swap chain's number).
+   loop while its queue is full, the aim of smoothness lets the system pace the loop. It is how smoothness behaves in that
+   pacer and makes no tier, as it promises less than a wait for a present (how many frames wait is the swap chain's
+   number): settled with the one list of tiers (decision 2).
 7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
 8. **The aim where two goals pull apart**: it is the application's choice between the two aims. Not latency optimized: no
    missed refreshes first, then the frame rate asked for, and latency is what that costs. Latency optimized: the fewest
@@ -1470,7 +1491,7 @@ checked. Four things are settled now, because they cost little now and a second 
 10. **When every frame loses a refresh**: decided on 2026-10-07 and built ("What was changed after these runs"): a frame's
     animation step follows a loss that repeats, and stays the swap interval after a loss that does not. Open: a loss
     every second frame is not followed.
-11. **The lowest pair at start-up**: decided on 2026-10-07 and built: one pause after start-up, its length and its delay
+11. **The lowest tier at start-up**: decided on 2026-10-07 and built: one pause after start-up, its length and its delay
     settings that are named as a guess, never before a present was taken.
 12. **A wait for a present that is never shown**: decided on 2026-10-07 and built: the longest a wait may take is counted in
     the frame's own swap intervals, four by default.

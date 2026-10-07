@@ -12,8 +12,7 @@
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -84,8 +83,7 @@ namespace
     return report;
   }
 
-  static_assert(PC::TimerWaitForPresentPacer::Hold == PC::HoldTier::Timer);
-  static_assert(PC::TimerWaitForPresentPacer::Queue == PC::QueueTier::WaitForPresent);
+  static_assert(PC::TimerWaitForPresentPacer::Tier == PC::PacerTier::TimerWaitForPresent);
 }
 
 TEST(TimerWaitForPresentPacer, BeforeAFrameItAsksForTheLastPresentWhenNoneMayWait)

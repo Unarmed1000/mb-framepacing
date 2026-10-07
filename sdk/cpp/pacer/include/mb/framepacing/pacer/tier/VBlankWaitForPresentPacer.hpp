@@ -10,8 +10,7 @@
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -29,7 +28,7 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built one tier's pacer at a time; FramePacer is
-  //! the pacer the library has until they replace it). The pacer of HoldTier::VBlank with QueueTier::WaitForPresent: a whole pacer
+  //! the pacer the library has until they replace it). The pacer of PacerTier::VBlankWaitForPresent, the best tier: a whole pacer
   //! by itself, for an application that has the baseline (a steady clock, the refresh period of the display its window is on, a
   //! wait until a time, a present that shows every frame in order for at least a refresh), is told when that display's vertical
   //! blanks are (PacerCapability::VBlankTimes) and can wait until a present it made was shown (PacerCapability::WaitForPresent).
@@ -160,9 +159,8 @@ namespace MB::FramePacing::Pacer
     static constexpr uint32_t FramesBetweenAsks = 16;
     static constexpr uint32_t AsksShownToWait = 2;
 
-    //! The tiers this pacer is for.
-    static constexpr HoldTier Hold = HoldTier::VBlank;
-    static constexpr QueueTier Queue = QueueTier::WaitForPresent;
+    //! The tier this pacer is for.
+    static constexpr PacerTier Tier = PacerTier::VBlankWaitForPresent;
 
     explicit VBlankWaitForPresentPacer(const PacerSettings& settings);
 

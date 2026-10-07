@@ -201,7 +201,7 @@ TEST(FrameLoop, ARunIsTheSameEveryTimeAndItsFrameLogHasARowPerFrame)
   EXPECT_NE(first.substr(row, first.find('\n', row) - row).find(",,,"), std::string::npos);
 }
 
-// The pacer of the lowest pair of tiers (TimerPeriodOnlyPacer) in place of today's pacer and the loop's own calculations: the
+// The pacer of the lowest tier (TimerPeriodOnlyPacer) in place of today's pacer and the loop's own calculations: the
 // application only carries out what it is given.
 
 TEST(FrameLoop, TheLowestPairsPacerPacesAsTodaysLoopOnATimerWhileNothingGoesWrong)
@@ -351,7 +351,7 @@ TEST(FrameLoop, WithAWaitForTheLastPresentNoFrameWaitsAndALostRefreshCostsOneFra
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
 
   // From the second frame on no earlier frame waits when a frame starts, held blanks or not, and a frame is on screen within
-  // a refresh and a half of its start (the lowest pair's pacer ends this run four refreshes behind).
+  // a refresh and a half of its start (the lowest tier's pacer ends this run four refreshes behind).
   // The frame the display holds a blank against is itself on screen a refresh later: that one, and no frame after it
   int32_t heldFrames = 0;
   for (std::size_t index = 1; index < frames.size(); ++index)
@@ -392,7 +392,7 @@ TEST(FrameLoop, WithOnePresentAllowedToWaitOneWaitsAndNoMore)
 
 TEST(FrameLoop, WorkThatDoesNotFitBesideTheWaitHalvesTheFrameRateWithNoPresentWaitingAndKeepsItWithOne)
 {
-  // GPU work of 90 % of a refresh. The first integration measured this pair on a real swap chain: a frame every 1.94 refreshes
+  // GPU work of 90 % of a refresh. The first integration measured this tier on a real swap chain: a frame every 1.94 refreshes
   // when waiting for the last present, every 0.96 when waiting for the one before it
   Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
   settings.Frames = 800;
@@ -455,7 +455,7 @@ TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
   }
 }
 
-// What the first measurements of the two tier pacers asked for: a pause after start-up in the lowest pair's pacer, the GPU's work
+// What the first measurements of the two tier pacers asked for: a pause after start-up in the lowest tier's pacer, the GPU's work
 // as its own stretch of time, and an animation step that follows a loss that repeats.
 
 TEST(FrameLoop, TheLowestPairsPauseAfterStartUpLetsTheDisplayTakeTheFramesThatPiledUp)
@@ -611,7 +611,7 @@ TEST(FrameLoop, WhenEveryFrameLosesARefreshTheAnimationKeepsUpWithTheClock)
 
 TEST(FrameLoop, WhereverTheGridSitsAgainstTheDisplayAFrameThatRanLongLeavesNoFrameWaiting)
 {
-  // The lowest pair's pacer does not know where in its step the display takes a frame, so every place is tried (how long
+  // The lowest tier's pacer does not know where in its step the display takes a frame, so every place is tried (how long
   // before a vertical blank a frame has to be ready, in tenths of a refresh), with long frames of several lengths. Each is
   // presented after the step the next frame was due at, which the pacer knows of. A frame that is presented in time and
   // ready too late for its refresh is another matter: this pacer does not learn of it
@@ -657,7 +657,7 @@ namespace
     return off;
   }
 
-  //! Light work at 240 Hz with the lowest pair's pacer, a display that takes a frame so many tenths of a refresh before its
+  //! Light work at 240 Hz with the lowest tier's pacer, a display that takes a frame so many tenths of a refresh before its
   //! vertical blank, and one frame that runs long
   Sim::LoopSettings LoopWithALongFrame(const int64_t tenth, const int64_t longPercent, const PC::PacerAim aim)
   {

@@ -3,24 +3,22 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/pacer/capability/HoldTier.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
-#include <mb/framepacing/pacer/capability/QueueTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: part of a redesign that is not built yet). What a set of capabilities
-  //! is worth (PacerTierUtil::Rate): the best tier it reaches for each of the two questions, and what would raise each. The two
-  //! tiers are not one number, as neither orders the other.
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built). What a set of capabilities is worth
+  //! (PacerTierUtil::Rate): the best tier it reaches, which names its pacer, what would raise it, and whether the display's side
+  //! can hold a frame of two refreshes or more. As made, it is the rating of a set without capabilities.
   struct PacerRating
   {
-    HoldTier Hold{HoldTier::Timer};
-    QueueTier Queue{QueueTier::PeriodOnly};
-    //! The capabilities any one of which, added to the set, raises its hold tier; none at the best tier. PresentSwapInterval is
-    //! one of them only with a longest swap interval of 2 or more.
-    PacerCapability RaisesHold{PacerCapability::NoCapabilities};
-    //! The capabilities any one of which, added to the set, raises its queue tier; none at the best tier.
-    PacerCapability RaisesQueue{PacerCapability::NoCapabilities};
+    PacerTier Tier{PacerTier::TimerPeriodOnly};
+    //! The capabilities any one of which, added to the set, raises its tier; none at the best tier.
+    PacerCapability RaisesTier{PacerCapability::VBlankTimes | PacerCapability::WaitForPresent};
+    //! The present can hold a frame for two refreshes or more (a time, a minimum duration, or a swap interval of 2 or more): a
+    //! mechanism every pacer uses when it is there, and no tier. Without it the frame loop holds such a frame.
+    bool DisplaySideHolds{false};
 
     constexpr bool operator==(const PacerRating& other) const noexcept = default;
   };

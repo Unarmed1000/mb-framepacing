@@ -24,7 +24,7 @@ namespace MB::FramePacing::Pacer::Simulation
   //! Run the loop: every frame with its stages, what the pacer said and when the display showed it.
   std::vector<LoopFrame> SimulateLoop(const LoopSettings& settings);
 
-  //! The same display and the same work with an application that carries out what the pacer of the lowest pair of tiers gives
+  //! The same display and the same work with an application that carries out what the pacer of the lowest tier gives
   //! it (TimerPeriodOnlyPacer) and works out nothing itself: it waits until the times it is given, and reports its present.
   //! The loop's own settings for where it waits and what it knows of the display (Profile, HasVBlankTimes) have no part in it.
   std::vector<LoopFrame> SimulateTimerPeriodOnlyLoop(const LoopSettings& settings);
