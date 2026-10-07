@@ -21,6 +21,7 @@ target_sources(mb_framepacing_core
       include/mb/framepacing/core/Rectangle.hpp
       include/mb/framepacing/core/time/ChronoConversion.hpp
       include/mb/framepacing/core/time/NanosecondTickCount.hpp
+      include/mb/framepacing/core/time/NanosecondTimeDuration.hpp
       include/mb/framepacing/core/time/NanosecondTimeSpan.hpp
       include/mb/framepacing/core/time/NanosecondTimeSpan32.hpp
       include/mb/framepacing/core/time/TickCount32.hpp
@@ -46,6 +47,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
     tests/Crc32UtilTests.cpp
     tests/time/ChronoConversionTests.cpp
     tests/time/NanosecondTickCountTests.cpp
+    tests/time/NanosecondTimeDurationTests.cpp
     tests/time/NanosecondTimeSpan32Tests.cpp
     tests/time/NanosecondTimeSpanTests.cpp
     tests/time/TickCount32Tests.cpp
