@@ -12,8 +12,8 @@ namespace MB::FramePacing::Pacer
   //! (PacerTierUtil::Reaches): what the application can give the pacer decides which pacer it gets. Every pacer has both aims
   //! (PacerAim), so a tier says nothing of latency.
   //!
-  //! The order of the two in the middle is open until the pacer of vertical blank times has been measured: for now knowing where
-  //! the display's refreshes are ranks above a wait for a present.
+  //! Knowing where the display's refreshes are ranks above a wait for a present: decided from the first runs of both on one
+  //! system (the proposal has the numbers), and looked at again if later measurements say otherwise.
   enum class PacerTier : uint8_t
   {
     //! Vertical blank times and a wait for a present (VBlankWaitForPresentPacer)

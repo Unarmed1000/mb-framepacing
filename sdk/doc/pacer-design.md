@@ -1032,10 +1032,21 @@ name for each tier and each capability, a line for each tier that says what it u
 | 3    | `WaitForPresent`                | `TimerWaitForPresentPacer`  | A grid of refreshes on the clock, and the loop held until an earlier present was shown      | Built; measured on one system, one run a case  |
 | 4    | nothing (the baseline)          | `TimerPeriodOnlyPacer`      | A grid of refreshes on the clock and the refresh period: where the refreshes are is a guess | Built; measured on two systems, one run a case |
 
-- **The order of tiers 2 and 3 is open.** Each has what the other lacks: tier 2 knows where the refreshes are and does not
-  learn of a frame that waits, tier 3 keeps the frames that wait to a number and has its refreshes as a grid on the clock.
-  It is built with vertical blank times as the better of the two, and it is decided when both are measured on a quiet
-  machine. Until then nothing is to rely on which of the two has the lower number.
+- **Vertical blank times rank above a wait for a present** (tiers 2 and 3; decided on 2026-10-08 from the runs on a quiet
+  machine, one system, driver display times). Each has what the other lacks: tier 2 knows where the refreshes are and does
+  not learn of a frame that waits, tier 3 keeps the frames that wait to a number and has its refreshes as a grid on the
+  clock. What the runs say:
+  - Both had every frame on screen for its swap interval (tier 2 at one refresh per frame; tier 3 at one, and at two in
+    the 941 frames before the cover of one run).
+  - With the aim of low latency a frame was on screen 0.68 of a refresh after its start at tier 2 and 0.95 at tier 3.
+    With smoothness it was 2.82 refreshes at tier 2 and 1.75 at tier 3: tier 2 keeps a frame more in reserve there, which
+    is how its aim is built and not what the tier can do.
+  - What tier 2 lacks did not show: in 62,577 frames the time from a frame's start to its display did not rise, so no
+    frame came to wait. What tier 3 lacks is where a timer's grid lands in a refresh, which is chance for each run, and
+    at a longer swap interval it has shown as frames a refresh off (the first integration's own loop on a timer: 1 to
+    35 % of the frames at 240 Hz).
+  - Not measured: tier 2 at a longer swap interval, tier 3 over minutes, either one captured with the tools. The order
+    is looked at again if those say otherwise.
 - **Every tier's pacer has both aims** ("The rules that move into the pacer"). How few frames wait is the aim's, at every
   tier, and it makes no tier.
 - **A rating is three values**: the tier; the capabilities any one of which would raise it (`WaitForPresent` at tier 2,
@@ -1544,7 +1555,8 @@ checked. Four things are settled now, because they cost little now and a second 
    application's to set?
 2. **The tiers**: decided on 2026-10-08 and built: one list of four tiers, each a set of capabilities with one pacer; the
    display's side holding a frame a mechanism beside the tier; display times no tier until a pacer is designed for them
-   ("Tiers"). Open: the order of tiers 2 and 3, until both are measured on a quiet machine.
+   ("Tiers"). The order of tiers 2 and 3 was decided the same day from the runs on a quiet machine: vertical blank times
+   rank above a wait for a present.
 3. **With the refresh period only, at a swap interval of one, a refresh the display lost by itself**: the grid on the clock
    answers the pacer's own long frames. For a frame that was ready in time and still shown a refresh late, which the pacer
    can not learn of: accept that it stays waiting, pause once after start-up as a guess, or pace a little slower than the
