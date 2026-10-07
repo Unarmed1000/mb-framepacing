@@ -385,6 +385,94 @@ Built and checked on the simulation only. **Not measured.**
   GPU worked before it learns when.
 - **A short form of each tier's description**, one line of 44 characters or less.
 
+## Third measurements: the two aims
+
+Two more sets on 2026-10-07 on the same system (Vulkan in a window, 240 Hz, variable refresh off, three swap chain images,
+one frame in flight and the pacer told so, the driver's display times, 2,400 frames a run, the first 120 and the last 8 left
+out). **One run each: numbers, not conclusions.**
+
+**The refresh period.** The pacer was given 41,664.000 ticks of 100 ns in every run so far: the window system has the
+period in whole ticks. The display times of three runs give 41,664.62 to 41,664.67 ticks per refresh, 15 to 16 parts in a
+million more. That is the slow rise of the latency in the earlier runs: the grid on the clock ran that much faster than the
+display.
+
+**Low latency, the cases that were owed** (six runs, with the rule after a late present):
+
+- CPU work of 74 % and GPU work of 72 % of a refresh, one frame in flight, the rule on: both pacers went to two refreshes per
+  frame within the first 50 frames and stayed, 2,268 of 2,272 frames on screen for exactly two refreshes.
+- Long frames, the pacer without a wait: all 18 long frames have a display time (1 of 18 before the change), and the frame
+  before, the long frame and the frame after were on screen for 3, 2 and 1 refreshes, 18 of 18, with a fixed swap interval
+  and with the rule on. The latency after a long frame is what it was before it (1.01). The price is as said: the frame
+  after a long one started 4.0 refreshes after the long one began, and the animation time fell behind the clock by three
+  refreshes per long frame where it was two.
+- In the same two runs the grid sat with the presents at a display time (0.98 and 0.02 of a refresh after one), and apart
+  from the long frames 18 or 19 frames have no display time and 37 or 38 display times are two refreshes apart. The place of
+  the grid again.
+- Light work, three starts of the pacer without a wait: a frame was on screen 1.07, 1.80 and 1.11 refreshes after its start,
+  steady within each run. In the run with 1.80 the pause was made and a present still waited for nearly the whole run. Not
+  looked into. The pause is a guess, and one start of three shows it.
+
+**Smoothness** (14 runs). Light work, the rule on:
+
+| Run                                                 | Waiting | Latency (1 % to 99 %) | On screen for one refresh | Frames given a time to start at |
+| --------------------------------------------------- | ------- | --------------------- | ------------------------- | ------------------------------- |
+| A timer, the period only, low latency (same commit) | 0       | 0.65 (0.63 to 0.67)   |                           | 2,272 of 2,272                  |
+| A timer, the period only, a reserve of one          | 2       | 2.67 (2.57 to 2.70)   | 2,272 of 2,272            | 0 of 2,272                      |
+| A timer, the period only, a reserve of two          | 2       | 2.67 (2.57 to 2.70)   | 2,272 of 2,272            | 0 of 2,272                      |
+| A timer, a wait for a present, a reserve of one     | 1       | 1.74 (1.48 to 1.92)   | 2,272 of 2,272            | 927 of 2,272                    |
+
+The pacer without a wait did not pace these two runs: the swap chain did. Start-up left more frames in the swap chain than
+the pacer counts, its three images were full with two frames waiting, and the application's own wait for the frame before
+let one frame through per refresh (0.93 of a refresh per frame). A loop that is behind by no more than the reserve gets no
+time to start at, as it is meant to make frames back to back until it is ahead again; this loop could not, and stayed
+exactly its reserve behind its grid for the whole run (the next frame's time was 0.17 of a refresh before a frame's start
+with a reserve of one and 0.80 with a reserve of two). So two frames waited with either setting, and the setting did
+nothing. The result of the run is a full queue's: every frame on screen for one refresh, and no slow rise of the latency
+(the medians of the run's quarters are 2.669, 2.675, 2.669, 2.672), as a loop held by the swap chain runs at the display's
+own rate. With the wait for a present one frame waited, as asked.
+
+Long frames (10 ms more CPU work every 120 frames, 18 of them, a fixed swap interval):
+
+| Run                                             | Waiting  | Latency | Refreshes a frame was repeated for at a long frame                                  |
+| ----------------------------------------------- | -------- | ------- | ----------------------------------------------------------------------------------- |
+| A timer, the period only, low latency           | 0 or 1   | 1.19    | 3 (the frame before for 3 refreshes, the long frame for 2), 18 of 18                |
+| A timer, the period only, a reserve of one      | 2 mostly | 2.47    | 1 (the frame before for 2), 18 of 18, if the frame without a display time was shown |
+| A timer, the period only, a reserve of two      | 3 mostly | 3.30    | 0, 18 of 18, if the two frames without a display time were shown                    |
+| A timer, a wait for a present, a reserve of one | 1        | 1.74    | 2 in 9 cases, 1 in 9                                                                |
+
+With a reserve, the frames that reach the display while the loop is inside the long frame have no display time: one per
+long frame with two frames waiting, two with three. The display times on either side of them are exactly as many refreshes
+apart as there are such frames and one more, which fits each of them being on screen for one refresh, and fits a frame
+skipped as well: the log can not say which, and why they have no time is not known (how the sample collects the times is
+being asked). Read the table with that. After a long frame the loop made one frame back to back with a reserve of one and
+two with a reserve of two, as designed. Again more frames waited than the reserve asked for.
+
+GPU work of 90 % of a refresh, a fixed swap interval of one:
+
+| Run                                             | Waiting             | Latency (1 % to 99 %) | On screen for one refresh                                  |
+| ----------------------------------------------- | ------------------- | --------------------- | ---------------------------------------------------------- |
+| A timer, the period only, a reserve of one      | 3 mostly            | 3.71 (2.22 to 3.73)   | 2,268 of 2,272                                             |
+| A timer, the period only, a reserve of two      | 3, 2 and 1 by turns | 3.06 (1.77 to 4.98)   | 2,090 of 2,124 that can be compared; 86 presents not timed |
+| A timer, a wait for a present, a reserve of one | 1                   | 1.69 (1.26 to 1.94)   | 2,263 of 2,272                                             |
+
+With a reserve of two the pacer without a wait was not steady: the same full swap chain, without a clean hold.
+
+A fixed 60 frames a second, where there is no reserve: the pacer without a wait had 855 of 1,072 frames on screen for exactly
+four refreshes in one run (the present 0.89 of a refresh after a display time) and 1,072 of 1,072 in the other (0.58); the
+pacer with a wait 1,072 of 1,072 (0.60). The place of the grid, as with low latency.
+
+What these runs show, as far as one run of each goes:
+
+- **Frames that wait do cover a long frame**, by about as many refreshes as wait, if the frames without a display time were
+  shown.
+- **Without a wait for a present the number that wait is not the pacer's.** It asked for one and two, and two and three
+  waited: what start-up leaves comes on top, and the swap chain's size is the limit. With the wait it was what was asked for
+  in every run.
+- **A loop held by a full swap chain is paced by the display** and does not drift, which a grid on a given period does.
+- **The pacer does not know when the system holds the loop.** It is not told of the application's own waits, nor how many
+  frames the swap chain holds, so it can not tell a loop that is held from one that is late, and can ask for a reserve the
+  swap chain can not take. Both are in "Decisions needed".
+
 ## What the application plugs in
 
 ### Capabilities
@@ -1025,6 +1113,12 @@ checked. Four things are settled now, because they cost little now and a second 
    wait for a free image, measured on one system: the frames waiting are capped at the number of images and steady; or a
    present that is known to wait), or a help at the lowest tier that the pacer promises nothing from, as now? If a tier, the
    image wait goes with the fewest images the swap chain allows.
+   Since the third measurements this has a case: with the aim of smoothness and no wait for a present, a full swap chain
+   paced the loop by itself, steadily in one run and not in another, and the pacer neither chose it nor knew of it.
+   Proposed: where the application says the system holds the loop when its queue is full, smoothness means that on
+   purpose (no time to start at, the reserve is what the swap chain holds, no frames made ahead on top of it), and for
+   that the pacer is told of the application's own waits and of how many frames the swap chain holds. Where nothing holds
+   the loop, the reserve by count stays.
 7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
 8. **The aim where two goals pull apart**: it is the application's choice between the two aims. Not latency optimized: no
    missed refreshes first, then the frame rate asked for, and latency is what that costs. Latency optimized: the fewest
