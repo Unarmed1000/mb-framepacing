@@ -88,14 +88,17 @@ namespace MB::FramePacing::Pacer
   FrameStartPlan TimerWaitForPresentPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
     FrameStartPlan plan;
-    // The present to wait for: the one WaitingPresents back from the frame that is about to be made
-    const uint64_t back = uint64_t{m_rule.Settings().WaitingPresents()} - 1u;
-    if (m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId && (m_lastAcceptedId - back) != m_waitedForId)
+    // The present to wait for: the one WaitingPresents back from the frame that is about to be made. While the waits run out
+    // nothing is waited for: the plan asks after a present that many frames older, which has had the time a wait would give
+    const bool stopped = PresentWaitsStopped();
+    const uint64_t back = (uint64_t{m_rule.Settings().WaitingPresents()} - 1u) + (stopped ? m_rule.Settings().PresentWaitSwapIntervals() : 0u);
+    if (!m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId && (m_lastAcceptedId - back) != m_waitedForId &&
+        (!stopped || (m_lastAcceptedId - back) >= m_runOutFromId))
     {
       plan.WaitForPresentFrameId = m_lastAcceptedId - back;
       // As long as a few of the frame's own swap intervals: a present that is never shown holds the loop no longer
       const int64_t refreshes = int64_t{m_rule.Settings().PresentWaitSwapIntervals()} * m_rule.SwapInterval();
-      plan.WaitForPresentTimeout = NanosecondTimeDuration(m_rule.Refresh().TimeFor(refreshes));
+      plan.WaitForPresentTimeout = stopped ? NanosecondTimeDuration() : NanosecondTimeDuration(m_rule.Refresh().TimeFor(refreshes));
     }
     if (!StartsAgainAt(now))
     {
@@ -111,16 +114,22 @@ namespace MB::FramePacing::Pacer
   void TimerWaitForPresentPacer::AddPresentWait(const PresentWaitReport& report) noexcept
   {
     m_waitedForId = report.FrameId;
+    m_waitReported = true;
+    const RefreshPeriod period = m_rule.Refresh();
+    const bool heldTheLoop = report.Blocked().Nanoseconds() >= (period.ToNanosecondTimeSpan().Nanoseconds() / BlockedDivisor);
     if (!report.Shown)
     {
       ++m_presentWaitTimeouts;
+      m_runOutFromId = m_waitsRunOut == 0 ? report.FrameId : m_runOutFromId;
+      m_waitsRunOut = std::min(m_waitsRunOut + 1u, WaitsRunOutToStop);
+      // The frame that starts after a wait that held the loop until it ran out starts late because the pacer asked for the wait
+      m_waitRanOut = m_waitRanOut || heldTheLoop;
       return;
     }
+    m_waitsRunOut = 0;
     // A wait that returned at once says nothing: the present was shown some time before. One that held the loop ended when the
     // display took a frame: the grid's step nearest to its end is moved a quarter of the way towards it
-    const RefreshPeriod period = m_rule.Refresh();
-    if (!m_hasGrid || StartsAgainAt(report.EndTime) ||
-        report.Blocked().Nanoseconds() < (period.ToNanosecondTimeSpan().Nanoseconds() / BlockedDivisor))
+    if (!m_hasGrid || StartsAgainAt(report.EndTime) || !heldTheLoop)
     {
       return;
     }
@@ -146,6 +155,15 @@ namespace MB::FramePacing::Pacer
       m_behind = 0;
       m_hasGrid = true;
     }
+    else if (m_waitRanOut)
+    {
+      // The pacer's own wait held this frame's start until it ran out: the display is not taking the window's frames, so when
+      // the previous frame was shown, or whether, is not known, and this start is late by the pacer's doing. Nothing is
+      // judged and the frame window stays as it is; the grid goes on from this frame
+      m_origin = cpuStartTime;
+      m_slot = 0;
+      m_behind = 0;
+    }
     else
     {
       // The previous frame: the steps of the grid from its start to this one against its swap interval, and its work against its
@@ -167,6 +185,8 @@ namespace MB::FramePacing::Pacer
     const auto repeatedLoss = static_cast<uint32_t>(std::min(repeated, int64_t{PacerSettings::MaxSwapInterval}));
     m_lost = change == SwapIntervalChange::Unchanged ? lost : 0;
 
+    m_waitRanOut = false;
+    m_waitReported = false;
     m_swapInterval = m_rule.SwapInterval();
     m_nextSlot = m_slot + int64_t{m_swapInterval};
     m_startTime = cpuStartTime;
@@ -265,6 +285,8 @@ namespace MB::FramePacing::Pacer
   void TimerWaitForPresentPacer::ForgetPresents() noexcept
   {
     m_oldestWaitableId = m_lastAcceptedId + 1u;
+    // And with them the waits that ran out: a new swap chain's presents are waited for again
+    m_waitsRunOut = 0;
   }
 
   void TimerWaitForPresentPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept

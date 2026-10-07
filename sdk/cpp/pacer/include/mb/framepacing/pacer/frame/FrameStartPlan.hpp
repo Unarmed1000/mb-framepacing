@@ -17,8 +17,8 @@ namespace MB::FramePacing::Pacer
     //! The present to wait for until it was shown, by the frame id it was presented with; 0: none. Only with
     //! PacerCapability::WaitForPresent active.
     uint64_t WaitForPresentFrameId{0};
-    //! The longest that wait may take: a present of a window that is not shown may never be shown. Zero without a present to wait
-    //! for.
+    //! The longest that wait may take: a present of a window that is not shown may never be shown. Zero with a present to wait
+    //! for: do not wait, only ask whether the present was shown, and report that (a pacer asks so while its waits run out).
     NanosecondTimeDuration WaitForPresentTimeout;
     //! The time to wait until after that, on the application's steady clock; NanosecondTickCount(): none, the frame starts at once.
     NanosecondTickCount StartTime;

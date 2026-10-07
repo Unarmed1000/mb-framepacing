@@ -428,12 +428,30 @@ TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
 
   ASSERT_EQ(frames.size(), 200u);
-  // The wait runs out after four of the frame's swap intervals, and the loop goes on at that pace until the display takes
-  // frames again
+  // Two waits run out, each after four of the frame's swap intervals. Then the pacer stops waiting: the loop goes on at a
+  // refresh per frame, at the swap interval it had, and no frame of it is late by the pacer's count
   const int64_t period = PeriodNanoseconds(settings);
-  EXPECT_GE(frames[102].StartNanoseconds - frames[101].StartNanoseconds, 4 * period);
-  EXPECT_LE(frames[102].StartNanoseconds - frames[101].StartNanoseconds, 5 * period);
-  EXPECT_GT(frames.back().StartNanoseconds, frames[101].StartNanoseconds);
+  int32_t held = 0;
+  std::size_t lastHeld = 0;
+  for (std::size_t index = 1; index < frames.size(); ++index)
+  {
+    const int64_t step = frames[index].StartNanoseconds - frames[index - 1].StartNanoseconds;
+    if (step >= 4 * period)
+    {
+      EXPECT_LE(step, 5 * period) << index;
+      ++held;
+      lastHeld = index;
+    }
+    ASSERT_EQ(frames[index].SwapInterval, 1u) << index;
+    ASSERT_EQ(frames[index].WindowLateFrames, 0u) << index;
+  }
+  EXPECT_EQ(held, 2);
+  ASSERT_GT(lastHeld, 95u);
+  ASSERT_LT(lastHeld, 110u);
+  for (std::size_t index = lastHeld + 2; index < frames.size(); ++index)
+  {
+    ASSERT_NEAR(static_cast<double>(frames[index].StartNanoseconds - frames[index - 1].StartNanoseconds), static_cast<double>(period), 1.0) << index;
+  }
 }
 
 // What the first measurements of the two tier pacers asked for: a pause after start-up in the lowest pair's pacer, the GPU's work

@@ -579,3 +579,163 @@ TEST(TimerWaitForPresentPacer, WithTheAimOfSmoothnessALongFrameIsMadeUpForWithin
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   EXPECT_EQ(pacer.PlanFrame(At(now + 3'060'000)).StartTime, At(Start + (7 * Period)));
 }
+
+// A window that is not shown (another one covers it, or it is minimised): the system takes its presents and shows none, so every
+// wait for one runs out. Seen on the first integration: the pacer counted the frames its own wait had held as late and slowed
+// down, to a swap interval of 13 in 15 s, and stayed slow for 2 s after the window was back.
+
+namespace
+{
+  //! What a frame of a loop did: where it started, and what its plan asked for
+  struct LoopStep
+  {
+    int64_t StartNanoseconds{0};
+    uint64_t AskedForId{0};
+    int64_t TimeoutNanoseconds{0};
+  };
+
+  //! A frame as an application makes it at now: it waits for the present the plan asks for (shown at once, or never, so the wait
+  //! takes all the time it was given), plans again, waits for the start time and makes the frame.
+  LoopStep LoopFrame(PC::TimerWaitForPresentPacer& rPacer, const int64_t nowNanoseconds, const bool presentsAreShown)
+  {
+    LoopStep step;
+    int64_t now = nowNanoseconds;
+    PC::FrameStartPlan plan = rPacer.PlanFrame(At(now));
+    if (plan.WaitsForPresent())
+    {
+      step.AskedForId = plan.WaitForPresentFrameId;
+      step.TimeoutNanoseconds = plan.WaitForPresentTimeout.Nanoseconds();
+      const int64_t end = presentsAreShown ? now + 50'000 : now + step.TimeoutNanoseconds;
+      rPacer.AddPresentWait(Wait(plan.WaitForPresentFrameId, now, end, presentsAreShown));
+      now = end;
+      plan = rPacer.PlanFrame(At(now));
+      EXPECT_FALSE(plan.WaitsForPresent());
+    }
+    step.StartNanoseconds = plan.WaitsForStartTime() ? plan.StartTime.Nanoseconds() : now;
+    static_cast<void>(Frame(rPacer, step.StartNanoseconds));
+    return step;
+  }
+}
+
+TEST(TimerWaitForPresentPacer, AWindowThatIsNotShownDoesNotSlowThePacerDown)
+{
+  for (const uint32_t waitingPresents : {1u, 2u})
+  {
+    PC::TimerWaitForPresentPacer pacer(Settings(waitingPresents));
+    ASSERT_TRUE(pacer.Settings().AutoSwapInterval());
+    const int64_t timeout = int64_t{pacer.Settings().PresentWaitSwapIntervals()} * Period;
+
+    // In view: a frame every period, from the first one's start
+    LoopStep step{Start - 3'100'000, 0, 0};
+    for (int32_t frame = 0; frame < 100; ++frame)
+    {
+      step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+    }
+    const int64_t lastInView = step.StartNanoseconds;
+    const uint32_t framesInView = pacer.FrameWindow().Frames;
+    EXPECT_EQ(lastInView, Start + (99 * Period));
+    EXPECT_FALSE(pacer.PresentWaitsStopped());
+
+    // Covered for 15 s. The first two waits run out, each after the time it was given: those two frames start that much late, and
+    // neither is judged
+    step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, false);
+    EXPECT_EQ(step.TimeoutNanoseconds, timeout);
+    EXPECT_EQ(step.StartNanoseconds, lastInView + 3'100'000 + timeout);
+    EXPECT_FALSE(pacer.PresentWaitsStopped());
+    step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, false);
+    EXPECT_EQ(step.TimeoutNanoseconds, timeout);
+    EXPECT_TRUE(pacer.PresentWaitsStopped());
+    EXPECT_EQ(pacer.PresentWaitTimeouts(), 2u);
+    EXPECT_EQ(pacer.SwapInterval(), 1u);
+    EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+    EXPECT_EQ(pacer.FrameWindow().Frames, framesInView);
+
+    // From then on nothing is waited for: the plan only asks, with no time to wait, after a present that has had the time a wait
+    // would have given it (the first few frames it asks nothing: the presents that old were made while the window was in view,
+    // and were shown), and the frames go on a period apart at the swap interval they had
+    for (int32_t frame = 0; frame < 1'500; ++frame)
+    {
+      const int64_t before = step.StartNanoseconds;
+      step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, false);
+      ASSERT_EQ(step.TimeoutNanoseconds, 0) << frame;
+      ASSERT_EQ(step.AskedForId != 0u, frame >= 2) << frame;
+      ASSERT_EQ(step.StartNanoseconds, before + Period) << frame;
+      ASSERT_EQ(pacer.SwapInterval(), 1u) << frame;
+      ASSERT_TRUE(pacer.PresentWaitsStopped()) << frame;
+    }
+    EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+    EXPECT_EQ(pacer.PresentWaitTimeouts(), 1'500u);
+
+    // The present asked after is the settings' swap intervals of a wait older than the one a wait would be for
+    const uint64_t newest = 100u + 2u + 1'500u;
+    EXPECT_EQ(step.AskedForId, newest - 1u - (uint64_t{waitingPresents} - 1u) - pacer.Settings().PresentWaitSwapIntervals());
+
+    // In view again: the first present that was shown ends it, and the next frame waits as before
+    const int64_t before = step.StartNanoseconds;
+    step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+    EXPECT_EQ(step.TimeoutNanoseconds, 0);
+    EXPECT_EQ(step.StartNanoseconds, before + Period);
+    EXPECT_FALSE(pacer.PresentWaitsStopped());
+    step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+    EXPECT_EQ(step.TimeoutNanoseconds, timeout);
+    EXPECT_EQ(step.AskedForId, newest + 2u - uint64_t{waitingPresents});
+    EXPECT_EQ(step.StartNanoseconds, before + (2 * Period));
+    EXPECT_EQ(pacer.SwapInterval(), 1u);
+    EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+  }
+}
+
+TEST(TimerWaitForPresentPacer, OneWaitThatRunsOutIsNotALateFrameAndDoesNotStopTheWaits)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  LoopStep step{Start, 0, 0};
+  for (int32_t frame = 0; frame < 10; ++frame)
+  {
+    step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+  }
+  const uint32_t frames = pacer.FrameWindow().Frames;
+  const uint64_t behind = pacer.RefreshesBehindClock();
+
+  // A present that is never shown, as at the start of a window: the wait for it runs out after four periods
+  step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, false);
+  EXPECT_EQ(pacer.PresentWaitTimeouts(), 1u);
+  EXPECT_FALSE(pacer.PresentWaitsStopped());
+  // The frame it held is not judged: not late, not in the frame window, and no refresh is counted as lost
+  EXPECT_EQ(pacer.FrameWindow().Frames, frames);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), behind);
+
+  // The grid goes on from that frame, and the next wait is a wait again
+  const int64_t held = step.StartNanoseconds;
+  step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+  EXPECT_EQ(step.TimeoutNanoseconds, 4 * Period);
+  EXPECT_EQ(step.StartNanoseconds, held + Period);
+  EXPECT_EQ(pacer.FrameWindow().Frames, frames + 1u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+
+  // A wait that ran out without holding the loop (it was only asked) is no reason not to judge the frame: one that starts late
+  // after it is late
+  pacer.AddPresentWait(Wait(11, step.StartNanoseconds + 3'100'000, step.StartNanoseconds + 3'100'000, false));
+  static_cast<void>(Frame(pacer, step.StartNanoseconds + (3 * Period)));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
+}
+
+TEST(TimerWaitForPresentPacer, ANewSwapChainsPresentsAreWaitedForAgain)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  LoopStep step{Start, 0, 0};
+  for (int32_t frame = 0; frame < 10; ++frame)
+  {
+    step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, frame < 5);
+  }
+  ASSERT_TRUE(pacer.PresentWaitsStopped());
+
+  // The presents so far are gone with their swap chain, and the waits that ran out with them
+  pacer.ForgetPresents();
+  EXPECT_FALSE(pacer.PresentWaitsStopped());
+  step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+  EXPECT_EQ(step.AskedForId, 0u);
+  step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
+  EXPECT_EQ(step.AskedForId, 11u);
+  EXPECT_EQ(step.TimeoutNanoseconds, 4 * Period);
+}

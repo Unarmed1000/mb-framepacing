@@ -487,6 +487,55 @@ What these runs show, as far as one run of each goes:
   frames the swap chain holds, so it can not tell a loop that is held from one that is late, and can ask for a reserve the
   swap chain can not take. Both are in "Decisions needed".
 
+## A window that is not shown
+
+Found on the first integration (Windows, 240 Hz at a fixed refresh rate, Vulkan FIFO with `VK_KHR_present_wait2`, light
+work, one run of each case; the loop's own times, no display times).
+
+**What the system does.** While another window lies over the application's, a wait for a present does not return before its
+time runs out. The present and the acquire return at once and report success, and nothing tells the application: there is no
+event for "covered". Losing the focus with the window still in view changed nothing (240 frames in every second, a swap
+interval of one), so it is the cover and not the focus.
+
+**What the pacers did**, the window covered for 15 s:
+
+| Pacer                              | While covered                                                                                           | After the window was back                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| A timer, the refresh period only   | Not affected: 240 frames in every second                                                                | Nothing to recover from                           |
+| A timer, a wait for a present      | 129 waits ran out; the swap interval went from 1 to 13, a frame every 46 ms at first, 280 ms at the end | A frame every 54 ms for about 2 s, then back to 1 |
+| Today's pacer, the host's own wait | 55 waits ran out; the swap interval went from 1 to 8, a frame every 265 to 281 ms                       | A frame every 33 ms for about 2 s, then back to 1 |
+
+**The fault** was the pacer's: it asked for the wait, the wait ran out, the frame started late because of it, and the pacer
+counted that frame as late. Enough of those and the rule slowed down, which made the longest time of the next wait longer,
+as that is counted in the frame's swap intervals.
+
+**What was changed** (built, checked by unit tests and the simulation, not measured):
+
+- **A frame that the pacer's own wait held until it ran out is not judged**: it is not late and not in the frame window,
+  and the grid goes on from where that frame starts. A wait is not work, and a wait the pacer asked for least of all. The
+  swap interval then does not change in such a stretch, and the wait's longest time with it.
+- **After two waits in a row that ran out the pacer stops waiting** (`PresentWaitsStopped`): one by itself happens, at the
+  start of a window, and two in a row is a display that does not take this window's frames. The frames are then paced on the
+  timer at the swap interval they had. Each frame's plan still names a present, with a longest time of zero: the application
+  does not wait, it only asks whether that present was shown and reports the answer. The present asked after is one that has
+  had the time a wait would have given it, and none from before the first wait that ran out. The first one that was shown
+  ends it, and the next frame waits as before.
+- So a window that is covered costs two waits (eight refreshes at one refresh per frame) and then runs at its frame rate,
+  and when it is back the pacer is where it was: the frame window and the swap interval are what they were before.
+
+**A hint from the application: open.** Asked: should the pacer take a hint that the focus was lost, and start again with
+an empty frame window when it is gained? What speaks against that as the fix, and for it as a help:
+
+- Focus is not what was measured to matter: the window lost it in view and nothing changed, and a window that stays on top
+  covers another one without taking its focus.
+- Starting again has a cost: the frame window holds what the rule learnt (a game that needs two refreshes per frame), and
+  an application that started again at every gain of focus would be late for the frame window's length each time.
+- With the change above there is nothing wrong left to clear: no frame of the covered stretch was judged.
+- As a help it is worth taking where a platform has it (hidden, shown, minimised, focus): it would save the two waits.
+  `Reset` is there today for an application that wants to start again.
+
+**Today's pacer (`FramePacer`) is unchanged**: its host's wait is inside the frame it measures, and it is being replaced.
+
 ## The pacer for vertical blank times
 
 The third tier pacer (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh

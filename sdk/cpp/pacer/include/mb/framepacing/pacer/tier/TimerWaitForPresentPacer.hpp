@@ -100,9 +100,21 @@ namespace MB::FramePacing::Pacer
     uint64_t m_presentWaitTimeouts{0};
     // The present the wait before the next frame was made for: it is not asked for again
     uint64_t m_waitedForId{0};
+    // The waits in a row that ran out (no more than it takes to stop waiting), and whether one held the loop before the frame
+    // that is about to start
+    uint32_t m_waitsRunOut{0};
+    bool m_waitRanOut{false};
+    // The present the first of those waits was for: one made before it was shown, and says nothing of the display now
+    uint64_t m_runOutFromId{0};
+    // A wait was reported since the last frame started: a frame has one wait for a present, not two
+    bool m_waitReported{false};
 
   public:
     //! The tiers this pacer is for.
+    //! The waits in a row that run out before the pacer stops waiting. One by itself happens (a present at the start of a
+    //! window that is never shown); two in a row is a display that does not take this window's frames.
+    static constexpr uint32_t WaitsRunOutToStop = 2;
+
     static constexpr HoldTier Hold = HoldTier::Timer;
     static constexpr QueueTier Queue = QueueTier::WaitForPresent;
 
@@ -118,7 +130,10 @@ namespace MB::FramePacing::Pacer
 
     //! What became of the wait for a present the plan asked for. A wait that held the loop for a share of a refresh period and
     //! ended with the present shown moves the grid towards its end. One that ended without it is counted
-    //! (PresentWaitTimeouts).
+    //! (PresentWaitTimeouts), and the frame it held is not judged: the pacer asked for the wait, so the frame is not late, and
+    //! the grid goes on from where that frame starts. After WaitsRunOutToStop of them in a row the display is not taking the
+    //! window's frames (a window that is covered or minimised): the pacer stops waiting (PresentWaitsStopped) until a present
+    //! is shown again.
     void AddPresentWait(const PresentWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
@@ -162,6 +177,14 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
     {
       return m_refreshesBehindClock;
+    }
+
+    //! True while the pacer does not wait for presents, because its waits ran out: the frames are paced on the timer, and the
+    //! plan only asks, with no time to wait, whether an older present was shown (one that has had the time a wait would have
+    //! given it, and no older than the first whose wait ran out). The first that was ends it.
+    [[nodiscard]] bool PresentWaitsStopped() const noexcept
+    {
+      return m_waitsRunOut >= WaitsRunOutToStop;
     }
 
     //! The waits for a present that ended without the present being shown, since the pacer was made.
