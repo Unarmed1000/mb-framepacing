@@ -286,7 +286,7 @@ namespace MB::FramePacing::Pacer::Simulation
         pacer.AddPresent(report);
       }
       // Before the frame takes anything: the waits the pacer gives, the present first
-      const FrameStartPlan startPlan = pacer.PlanFrame(TickCount64(now));
+      FrameStartPlan startPlan = pacer.PlanFrame(TickCount64(now));
       frame.WaitBeginTicks = now;
       if (startPlan.WaitsForPresent())
       {
@@ -301,6 +301,8 @@ namespace MB::FramePacing::Pacer::Simulation
         now = std::max(now, std::min(returnTicks, timeoutTicks));
         waitReport.EndTime = TickCount64(now);
         pacer.AddPresentWait(waitReport);
+        // Planned again: the wait may have taken long, and the grid may have moved
+        startPlan = pacer.PlanFrame(TickCount64(now));
       }
       if (startPlan.WaitsForStartTime())
       {

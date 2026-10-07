@@ -8,6 +8,7 @@
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/HoldTier.hpp>
@@ -153,6 +154,80 @@ TEST(TimerWaitForPresentPacer, AfterAResetNoPresentFromBeforeIsWaitedFor)
   // The frames after it are waited for as before
   EXPECT_EQ(Frame(pacer, Start + (2 * Period)), 3u);
   EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 31'000)).WaitForPresentFrameId, 3u);
+}
+
+TEST(TimerWaitForPresentPacer, AfterTheWaitTheFrameIsPlannedAgainAndThePresentIsNotAskedForTwice)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  static_cast<void>(Frame(pacer, Start));
+  const PC::FrameStartPlan first = pacer.PlanFrame(At(Start + 31'000));
+  ASSERT_EQ(first.WaitForPresentFrameId, 1u);
+  ASSERT_EQ(first.StartTime, At(Start + Period));
+
+  // The wait held the loop until 0.7 of a period after the step the frame was due at
+  const int64_t end = Start + Period + 70'000;
+  pacer.AddPresentWait(Wait(1, Start + 31'000, end));
+  // Planned again: no present to wait for, and the time is the next step's, where the grid is now, not the one that has passed
+  const PC::FrameStartPlan again = pacer.PlanFrame(At(end));
+  EXPECT_FALSE(again.WaitsForPresent());
+  EXPECT_TRUE(again.WaitsForStartTime());
+  EXPECT_GT(again.StartTime, At(end));
+  EXPECT_LT(again.StartTime, At(Start + (2 * Period) + 1));
+  // The frame after it is waited for as usual
+  static_cast<void>(Frame(pacer, again.StartTime.Ticks()));
+  EXPECT_EQ(pacer.PlanFrame(At(again.StartTime.Ticks() + 31'000)).WaitForPresentFrameId, 2u);
+}
+
+TEST(TimerWaitForPresentPacer, AFramePresentedAgainOnANewSwapChainCanBeWaitedFor)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  static_cast<void>(Frame(pacer, Start));
+  // Frame 2's present is not taken, the swap chain is made anew, and the same frame is ended and presented again
+  ASSERT_EQ(Frame(pacer, Start + Period, false), 2u);
+  EXPECT_FALSE(pacer.PlanFrame(At(Start + Period + 31'000)).WaitsForPresent());
+  const PC::PresentPlan again = pacer.EndFrame(At(Start + Period + 50'000));
+  EXPECT_EQ(again.FrameId, 2u);
+  EXPECT_EQ(again.CpuBusy, FP::TimeSpan32(50'000));
+  PC::PresentReport report;
+  report.FrameId = 2;
+  report.CallTime = At(Start + Period + 50'000);
+  report.ReturnTime = At(Start + Period + 50'600);
+  pacer.AddPresent(report);
+  EXPECT_EQ(pacer.PlanFrame(At(Start + Period + 51'000)).WaitForPresentFrameId, 2u);
+}
+
+TEST(TimerWaitForPresentPacer, ForgettingThePresentsLeavesTheGridTheFrameWindowAndTheSwapIntervalAsTheyAre)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  for (int64_t frame = 0; frame < 10; ++frame)
+  {
+    static_cast<void>(Frame(pacer, Start + (frame * Period)));
+  }
+  const int64_t now = Start + (9 * Period) + 31'000;
+  ASSERT_EQ(pacer.PlanFrame(At(now)).WaitForPresentFrameId, 10u);
+  ASSERT_EQ(pacer.FrameWindow().Frames, 9u);
+
+  // A swap chain made anew: nothing from before to wait for, and the frame is still due on the grid
+  pacer.ForgetPresents();
+  const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+  EXPECT_FALSE(plan.WaitsForPresent());
+  EXPECT_EQ(plan.StartTime, At(Start + (10 * Period)));
+  EXPECT_EQ(pacer.FrameWindow().Frames, 9u);
+  // The first present on the new swap chain is waited for
+  EXPECT_EQ(Frame(pacer, Start + (10 * Period)), 11u);
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (10 * Period) + 31'000)).WaitForPresentFrameId, 11u);
+}
+
+TEST(TimerWaitForPresentPacer, TheCpuBusyTimeCanBeAskedForWhileTheFrameIsOpen)
+{
+  PC::TimerWaitForPresentPacer pacer(Settings(1));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::TimeSpan32());
+  static_cast<void>(pacer.BeginFrame(At(Start)));
+  // Where a marker is drawn before the frame's work is done
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 12'000)), FP::TimeSpan32(12'000));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::TimeSpan32());
+  pacer.Reset();
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 12'000)), FP::TimeSpan32());
 }
 
 TEST(TimerWaitForPresentPacer, AWaitThatHeldTheLoopMovesTheGridAQuarterOfTheWayToItsEnd)

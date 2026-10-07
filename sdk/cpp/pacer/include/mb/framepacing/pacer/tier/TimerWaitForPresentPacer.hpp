@@ -6,6 +6,7 @@
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
@@ -28,9 +29,10 @@ namespace MB::FramePacing::Pacer
   //! until a time, a present that shows every frame in order for at least a refresh) and can wait until a present it names was
   //! shown (PacerCapability::WaitForPresent).
   //!
-  //! It holds every rule and every time calculation, and the application carries out what it is given. Five calls a frame:
+  //! It holds every rule and every time calculation, and the application carries out what it is given. Its calls a frame:
   //!   PlanFrame       before the frame takes anything: a present to wait for, then a time to wait until
-  //!   AddPresentWait  what became of that wait, before the frame begins
+  //!   AddPresentWait  what became of that wait, and then PlanFrame again: the wait may have taken long, and what it told
+  //!                   about the display may have moved the time to wait until
   //!   BeginFrame      the frame starts: its swap interval, its animation time and the marker's values
   //!   EndFrame        the CPU's work is done: the time to wait until before the present
   //!   AddPresent      after the present, before the next frame is planned: when it was called, when it returned, and whether the
@@ -78,6 +80,8 @@ namespace MB::FramePacing::Pacer
     uint64_t m_lastAcceptedId{0};
     uint64_t m_oldestWaitableId{1};
     uint64_t m_presentWaitTimeouts{0};
+    // The present the wait before the next frame was made for: it is not asked for again
+    uint64_t m_waitedForId{0};
 
   public:
     //! The tiers this pacer is for.
@@ -88,7 +92,9 @@ namespace MB::FramePacing::Pacer
 
     //! Before a frame takes anything, at now on the application's steady clock: the present to wait for (the one
     //! PacerSettings::WaitingPresents back, where the system took it and it can still be waited for), and after it the time
-    //! of the step the frame is due at, when that is still to come. It changes nothing, so a frame may be planned again.
+    //! of the step the frame is due at, when that is still to come. It changes nothing, so a frame may be planned again, and
+    //! after AddPresentWait it is planned again: the present that was waited for is not asked for a second time, and the
+    //! time is the one that holds then.
     [[nodiscard]] FrameStartPlan PlanFrame(TickCount64 now) const noexcept;
 
     //! What became of the wait for a present the plan asked for. A wait that held the loop for a share of a refresh period and
@@ -102,8 +108,13 @@ namespace MB::FramePacing::Pacer
     //! The frame's CPU work is done, at workDoneTime: how to present it.
     PresentPlan EndFrame(TickCount64 workDoneTime) noexcept;
 
+    //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
+    //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
+    [[nodiscard]] TimeSpan32 CpuBusyAt(TickCount64 now) const noexcept;
+
     //! After the present, before the next frame is planned. A present the system did not take is not waited for, nor is any
-    //! present before it (a swap chain that is made anew starts with nothing to wait for).
+    //! present before it (a swap chain that is made anew starts with nothing to wait for). A frame that is presented again
+    //! after that, on the new swap chain, is reported again, and can be waited for.
     void AddPresent(const PresentReport& report) noexcept;
 
     //! The display's refresh period changed (a mode change, the window on another display): the grid starts again on it with an
@@ -114,9 +125,12 @@ namespace MB::FramePacing::Pacer
     //! nothing. Allocates when the frame window needs more room than it has, and only then.
     void SetSettings(const PacerSettings& settings);
 
-    //! Start again (after a pause the application knows of, a swap chain made anew): the next frame starts the grid, the frame
-    //! window is empty, the swap interval the preferred one, and no present from before is waited for. The animation time
-    //! goes on.
+    //! The presents made so far can no longer be waited for (a swap chain was made anew, for a window that is resized, say).
+    //! Nothing else changes: the grid, the frame window and the swap interval go on.
+    void ForgetPresents() noexcept;
+
+    //! Start again (after a pause the application knows of): the next frame starts the grid, the frame window is empty, the
+    //! swap interval the preferred one, and no present from before is waited for. The animation time goes on.
     void Reset() noexcept;
 
     //! The refreshes that were lost and that the animation time was not moved over: how far it is behind the clock, in refreshes,

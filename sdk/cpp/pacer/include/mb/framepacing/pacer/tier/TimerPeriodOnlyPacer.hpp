@@ -6,6 +6,7 @@
 #include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
@@ -92,6 +93,10 @@ namespace MB::FramePacing::Pacer
 
     //! The frame's CPU work is done, at workDoneTime: how to present it.
     PresentPlan EndFrame(TickCount64 workDoneTime) noexcept;
+
+    //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
+    //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
+    [[nodiscard]] TimeSpan32 CpuBusyAt(TickCount64 now) const noexcept;
 
     //! After the present, before the next frame is planned.
     void AddPresent(const PresentReport& report) noexcept;

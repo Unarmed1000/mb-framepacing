@@ -60,7 +60,7 @@ namespace MB::FramePacing::Pacer
     FrameStartPlan plan;
     // The present to wait for: the one WaitingPresents back from the frame that is about to be made
     const uint64_t back = uint64_t{m_rule.Settings().WaitingPresents()} - 1u;
-    if (m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId)
+    if (m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId && (m_lastAcceptedId - back) != m_waitedForId)
     {
       plan.WaitForPresentFrameId = m_lastAcceptedId - back;
       plan.WaitForPresentTimeout = TimeDuration(m_rule.Settings().PresentWaitTimeout());
@@ -78,6 +78,7 @@ namespace MB::FramePacing::Pacer
 
   void TimerWaitForPresentPacer::AddPresentWait(const PresentWaitReport& report) noexcept
   {
+    m_waitedForId = report.FrameId;
     if (!report.Shown)
     {
       ++m_presentWaitTimeouts;
@@ -179,18 +180,30 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
+  TimeSpan32 TimerWaitForPresentPacer::CpuBusyAt(const TickCount64 now) const noexcept
+  {
+    return m_frameOpen ? ToTimeSpan32(now - m_startTime) : TimeSpan32();
+  }
+
   void TimerWaitForPresentPacer::AddPresent(const PresentReport& report) noexcept
   {
     m_lastPresentBlocked = report.Blocked();
     if (report.Accepted)
     {
       m_lastAcceptedId = report.FrameId;
+      // A frame presented again after its first present was not taken: this present is one to wait for
+      m_oldestWaitableId = std::min(m_oldestWaitableId, report.FrameId);
     }
     else
     {
       // The present will not be shown, and the swap chain it was made for is gone with the presents before it
       m_oldestWaitableId = report.FrameId + 1u;
     }
+  }
+
+  void TimerWaitForPresentPacer::ForgetPresents() noexcept
+  {
+    m_oldestWaitableId = m_lastAcceptedId + 1u;
   }
 
   void TimerWaitForPresentPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
@@ -215,7 +228,7 @@ namespace MB::FramePacing::Pacer
   {
     m_rule.Reset(m_rule.PreferredSwapInterval());
     m_hasGrid = false;
-    m_oldestWaitableId = m_frameId + 1u;
+    ForgetPresents();
     m_frameOpen = false;
     m_frameEnded = false;
   }

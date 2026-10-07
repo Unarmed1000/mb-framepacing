@@ -147,6 +147,11 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
+  TimeSpan32 TimerPeriodOnlyPacer::CpuBusyAt(const TickCount64 now) const noexcept
+  {
+    return m_frameOpen ? ToTimeSpan32(now - m_startTime) : TimeSpan32();
+  }
+
   void TimerPeriodOnlyPacer::AddPresent(const PresentReport& report) noexcept
   {
     m_lastPresentBlocked = report.Blocked();

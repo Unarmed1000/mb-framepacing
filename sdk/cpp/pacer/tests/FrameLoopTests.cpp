@@ -341,12 +341,16 @@ TEST(FrameLoop, WithAWaitForTheLastPresentNoFrameWaitsAndALostRefreshCostsOneFra
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
 
   // From the second frame on no earlier frame waits when a frame starts, held blanks or not, and a frame is on screen within
-  // a refresh and a half of its start (the lowest pair's pacer ends this run four refreshes behind)
+  // a refresh and a half of its start (the lowest pair's pacer ends this run four refreshes behind).
+  // The frame the display holds a blank against is itself on screen a refresh later: that one, and no frame after it
+  int32_t heldFrames = 0;
   for (std::size_t index = 1; index < frames.size(); ++index)
   {
     EXPECT_EQ(frames[index].PendingAtStart, 0) << index;
-    EXPECT_LE(HalfRefreshesToDisplay(frames[index], period), 3) << index;
+    EXPECT_LE(HalfRefreshesToDisplay(frames[index], period), 4) << index;
+    heldFrames += HalfRefreshesToDisplay(frames[index], period) > 3 ? 1 : 0;
   }
+  EXPECT_LE(heldFrames, 3);
   // The three blanks cost three frame starts and nothing else: one refresh per frame otherwise
   EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 2.0);
   const std::vector<Sim::LoopFrame> blind = Sim::SimulateTimerPeriodOnlyLoop(settings);

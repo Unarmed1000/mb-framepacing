@@ -298,6 +298,18 @@ TEST(TimerPeriodOnlyPacer, EndFrameWithoutAFrameIsNothingAndAPresentReportIsKept
   EXPECT_EQ(pacer.LastPresentBlocked(), FP::TimeDuration::FromTicks(600));
 }
 
+TEST(TimerPeriodOnlyPacer, TheCpuBusyTimeCanBeAskedForWhileTheFrameIsOpen)
+{
+  PC::TimerPeriodOnlyPacer pacer{PC::PacerSettings(g_hz100)};
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::TimeSpan32());
+  static_cast<void>(pacer.BeginFrame(At(Start)));
+  // Where a marker is drawn before the frame's work is done
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 12'000)), FP::TimeSpan32(12'000));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::TimeSpan32());
+  pacer.Reset();
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 12'000)), FP::TimeSpan32());
+}
+
 TEST(TimerPeriodOnlyPacer, AnotherRefreshPeriodOrOtherSettingsStartTheGridAgainAndTheAnimationTimeGoesOn)
 {
   PC::PacerSettings settings(g_hz100);
