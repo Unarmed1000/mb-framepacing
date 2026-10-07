@@ -516,12 +516,35 @@ as that is counted in the frame's swap intervals.
   swap interval then does not change in such a stretch, and the wait's longest time with it.
 - **After two waits in a row that ran out the pacer stops waiting** (`PresentWaitsStopped`): one by itself happens, at the
   start of a window, and two in a row is a display that does not take this window's frames. The frames are then paced on the
-  timer at the swap interval they had. Each frame's plan still names a present, with a longest time of zero: the application
-  does not wait, it only asks whether that present was shown and reports the answer. The present asked after is one that has
-  had the time a wait would have given it, and none from before the first wait that ran out. The first one that was shown
-  ends it, and the next frame waits as before.
-- So a window that is covered costs two waits (eight refreshes at one refresh per frame) and then runs at its frame rate,
-  and when it is back the pacer is where it was: the frame window and the swap interval are what they were before.
+  timer at the swap interval they had. Once in sixteen frames the plan still names a present, with a longest time of zero:
+  the application does not wait, it only asks whether that present was shown and reports the answer. The present asked after
+  is one that has had the time a wait would have given it, and none from before the first wait that ran out. Two answers in
+  a row that say shown end it, and the next frame waits as before. A frame that the asking held is not judged either.
+- So a window that is covered costs two waits (eight refreshes at one refresh per frame) and then runs at its frame rate
+  less what the asking costs, and when it is back the pacer is where it was: the frame window and the swap interval are
+  what they were before.
+
+**The rerun**, with the first version of this change, which asked every frame and took one answer (the same system, one run
+of light work and one of work that has the swap interval at two; the window covered for 15 s):
+
+| Work  | Before the cover           | Covered, the old pacer       | Covered, the change                           | After the window was back                   |
+| ----- | -------------------------- | ---------------------------- | --------------------------------------------- | ------------------------------------------- |
+| Light | 240 frames a second        | 44 down to 3 frames a second | 54 to 81; the swap interval 1 for 6 s, then 2 | 120 frames a second for about 2 s, then 240 |
+| Heavy | 120 (a swap interval of 2) | Not run                      | 62 or 63, the swap interval 2 throughout      | 120 from the first full second              |
+
+What it showed of the system, covered:
+
+- **Asking is not free.** A wait with a longest time of zero returned after 10.7 ms (light, 784 frames) and 8.3 ms (heavy,
+  834 frames), not at once, and a wait that ran out took about 10 ms more than the time it was given. That is what held the
+  frame rate down: with the asking every frame a frame took 15.6 ms.
+- **A covered window's frames are shown now and then.** About once a second an answer said shown (the stop ended 21 times
+  in the 15 s of the light run), a few waits then returned at once, one returned shown after about 14 ms, and two ran out
+  again. The frames after the waits that returned shown late are late by the pacer's count, rightly, and 34 of them in
+  the light run were what took the swap interval from 1 to 2.
+
+**What was changed after the rerun** (the two bullets above have it; not measured again): the pacer asks once in sixteen
+frames and not every frame; it takes two answers in a row that say shown before it waits again, as one can be a covered
+window's frame shown in passing; and a frame that an answer held is not judged, as a frame that a wait held is not.
 
 **A hint from the application: left for later.** Asked: should the pacer take a hint that the focus was lost, and start
 again with an empty frame window when it is gained? Decided on 2026-10-07: the change above is what the pacer starts with,

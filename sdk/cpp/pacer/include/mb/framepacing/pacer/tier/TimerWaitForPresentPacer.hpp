@@ -106,6 +106,10 @@ namespace MB::FramePacing::Pacer
     bool m_waitRanOut{false};
     // The present the first of those waits was for: one made before it was shown, and says nothing of the display now
     uint64_t m_runOutFromId{0};
+    // While the waits are stopped: the frames since the pacer last asked after a present, and the answers in a row that said
+    // shown
+    uint32_t m_framesSinceAsk{0};
+    uint32_t m_shownAsks{0};
     // A wait was reported since the last frame started: a frame has one wait for a present, not two
     bool m_waitReported{false};
 
@@ -114,6 +118,14 @@ namespace MB::FramePacing::Pacer
     //! The waits in a row that run out before the pacer stops waiting. One by itself happens (a present at the start of a
     //! window that is never shown); two in a row is a display that does not take this window's frames.
     static constexpr uint32_t WaitsRunOutToStop = 2;
+
+    //! While the waits are stopped the pacer asks after a present once in this many frames. Asking is not free everywhere (on
+    //! the first integration's system it took 10 ms while the window was covered), and a covered window's frames are shown
+    //! now and then, a few in a row.
+    static constexpr uint32_t FramesBetweenAsks = 16;
+
+    //! The answers in a row that say shown before the pacer waits again: one can be a covered window's frame shown in passing.
+    static constexpr uint32_t AsksShownToWait = 2;
 
     static constexpr HoldTier Hold = HoldTier::Timer;
     static constexpr QueueTier Queue = QueueTier::WaitForPresent;
@@ -132,8 +144,9 @@ namespace MB::FramePacing::Pacer
     //! ended with the present shown moves the grid towards its end. One that ended without it is counted
     //! (PresentWaitTimeouts), and the frame it held is not judged: the pacer asked for the wait, so the frame is not late, and
     //! the grid goes on from where that frame starts. After WaitsRunOutToStop of them in a row the display is not taking the
-    //! window's frames (a window that is covered or minimised): the pacer stops waiting (PresentWaitsStopped) until a present
-    //! is shown again.
+    //! window's frames (a window that is covered or minimised): the pacer stops waiting (PresentWaitsStopped) until presents
+    //! are shown again. While it is stopped the report is the answer to what the plan asked, and a frame the asking held is
+    //! not judged either.
     void AddPresentWait(const PresentWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
@@ -179,9 +192,10 @@ namespace MB::FramePacing::Pacer
       return m_refreshesBehindClock;
     }
 
-    //! True while the pacer does not wait for presents, because its waits ran out: the frames are paced on the timer, and the
-    //! plan only asks, with no time to wait, whether an older present was shown (one that has had the time a wait would have
-    //! given it, and no older than the first whose wait ran out). The first that was ends it.
+    //! True while the pacer does not wait for presents, because its waits ran out: the frames are paced on the timer, and
+    //! every FramesBetweenAsks frames the plan asks, with no time to wait, whether an older present was shown (one that has
+    //! had the time a wait would have given it, and no older than the first whose wait ran out). AsksShownToWait answers in
+    //! a row that say shown end it.
     [[nodiscard]] bool PresentWaitsStopped() const noexcept
     {
       return m_waitsRunOut >= WaitsRunOutToStop;

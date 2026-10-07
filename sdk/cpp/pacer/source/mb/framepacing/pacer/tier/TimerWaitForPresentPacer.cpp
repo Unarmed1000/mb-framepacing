@@ -92,8 +92,10 @@ namespace MB::FramePacing::Pacer
     // nothing is waited for: the plan asks after a present that many frames older, which has had the time a wait would give
     const bool stopped = PresentWaitsStopped();
     const uint64_t back = (uint64_t{m_rule.Settings().WaitingPresents()} - 1u) + (stopped ? m_rule.Settings().PresentWaitSwapIntervals() : 0u);
-    if (!m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId && (m_lastAcceptedId - back) != m_waitedForId &&
-        (!stopped || (m_lastAcceptedId - back) >= m_runOutFromId))
+    // Asking is not free everywhere: while stopped it is done once in a number of frames
+    const bool asks = !stopped || m_framesSinceAsk >= FramesBetweenAsks;
+    if (asks && !m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId &&
+        (m_lastAcceptedId - back) != m_waitedForId && (!stopped || (m_lastAcceptedId - back) >= m_runOutFromId))
     {
       plan.WaitForPresentFrameId = m_lastAcceptedId - back;
       // As long as a few of the frame's own swap intervals: a present that is never shown holds the loop no longer
@@ -117,11 +119,27 @@ namespace MB::FramePacing::Pacer
     m_waitReported = true;
     const RefreshPeriod period = m_rule.Refresh();
     const bool heldTheLoop = report.Blocked().Nanoseconds() >= (period.ToNanosecondTimeSpan().Nanoseconds() / BlockedDivisor);
+    if (PresentWaitsStopped())
+    {
+      // The answer to what the plan asked. Answers in a row that say shown end the stop: one by itself can be a frame of a
+      // window that is still covered, shown in passing. An ask that held the loop is the pacer's doing as a wait is
+      m_framesSinceAsk = 0;
+      m_presentWaitTimeouts += report.Shown ? 0u : 1u;
+      m_shownAsks = report.Shown ? m_shownAsks + 1u : 0u;
+      m_waitRanOut = m_waitRanOut || heldTheLoop;
+      if (m_shownAsks >= AsksShownToWait)
+      {
+        m_waitsRunOut = 0;
+      }
+      return;
+    }
     if (!report.Shown)
     {
       ++m_presentWaitTimeouts;
       m_runOutFromId = m_waitsRunOut == 0 ? report.FrameId : m_runOutFromId;
       m_waitsRunOut = std::min(m_waitsRunOut + 1u, WaitsRunOutToStop);
+      m_framesSinceAsk = 0;
+      m_shownAsks = 0;
       // The frame that starts after a wait that held the loop until it ran out starts late because the pacer asked for the wait
       m_waitRanOut = m_waitRanOut || heldTheLoop;
       return;
@@ -187,6 +205,7 @@ namespace MB::FramePacing::Pacer
 
     m_waitRanOut = false;
     m_waitReported = false;
+    m_framesSinceAsk = PresentWaitsStopped() ? std::min(m_framesSinceAsk + 1u, FramesBetweenAsks) : 0u;
     m_swapInterval = m_rule.SwapInterval();
     m_nextSlot = m_slot + int64_t{m_swapInterval};
     m_startTime = cpuStartTime;
