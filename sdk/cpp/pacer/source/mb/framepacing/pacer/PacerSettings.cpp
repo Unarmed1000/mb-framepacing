@@ -84,4 +84,16 @@ namespace MB::FramePacing::Pacer
     assert(frameTime >= TimeSpan() && frameTime <= MaxSlowestFrameTime);
     m_slowestFrameTime = std::clamp(frameTime, TimeSpan(), MaxSlowestFrameTime);
   }
+
+  void PacerSettings::SetWaitingPresents(const uint32_t presents) noexcept
+  {
+    assert(presents >= 1 && presents <= MaxWaitingPresents);
+    m_waitingPresents = std::clamp(presents, 1u, MaxWaitingPresents);
+  }
+
+  void PacerSettings::SetPresentWaitTimeout(const TimeSpan timeout) noexcept
+  {
+    assert(timeout >= MinPresentWaitTimeout && timeout <= MaxPresentWaitTimeout);
+    m_presentWaitTimeout = std::clamp(timeout, MinPresentWaitTimeout, MaxPresentWaitTimeout);
+  }
 }

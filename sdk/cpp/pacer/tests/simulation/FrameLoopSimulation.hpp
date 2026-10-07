@@ -29,6 +29,11 @@ namespace MB::FramePacing::Pacer::Simulation
   //! The loop's own settings for where it waits and what it knows of the display (Profile, HasVBlankTimes) have no part in it.
   std::vector<LoopFrame> SimulateTimerPeriodOnlyLoop(const LoopSettings& settings);
 
+  //! The same with the pacer of a timer and a wait for a present (TimerWaitForPresentPacer): before a frame the application
+  //! waits until the present it is told was shown, which on the model returns PresentWaitReturn after the display took it (at
+  //! once when that has passed), and reports the wait.
+  std::vector<LoopFrame> SimulateTimerWaitForPresentLoop(const LoopSettings& settings);
+
   //! The frames as a frame log with the column names of the first integration's logs (the ones tools/frame_stages_chart.py draws),
   //! a row per frame, "\n" line ends. A moment a frame did not have is an empty cell. The display times are the model's own.
   std::string ToFrameLog(const std::vector<LoopFrame>& frames, const LoopSettings& settings);

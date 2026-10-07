@@ -13,9 +13,11 @@
 //   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-ticks <n>] [--timer-only]
 //             [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
 //             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]
+//             [--wait-for-present <presents that may wait>]
 //
 //   --tier-pacer  the application carries out what the pacer of the lowest pair of tiers gives it, in place of today's pacer and
 //                 the first integration's own calculations
+//   --wait-for-present  the same with the pacer of a timer and a wait for a present
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <algorithm>
@@ -41,7 +43,8 @@ namespace
                  "pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]\n"
                  "pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <n>] [--cpu-ticks <n>] [--timer-only]\n"
                  "          [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
-                 "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]\n";
+                 "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]\n"
+                 "          [--wait-for-present <presents that may wait>]\n";
     return 2;
   }
 
@@ -62,6 +65,7 @@ namespace
     int64_t gpuPercent = 90;
     int64_t latchLeadPercent = 0;
     bool tierPacer = false;
+    bool waitForPresent = false;
     for (std::size_t index = 2; index < args.size(); ++index)
     {
       const std::string_view name = args[index];
@@ -121,6 +125,11 @@ namespace
       {
         settings.Display.Images = static_cast<int32_t>(Number(value));
       }
+      else if (name == "--wait-for-present")
+      {
+        waitForPresent = true;
+        settings.WaitingPresents = static_cast<uint32_t>(Number(value));
+      }
       else if (name == "--long-frame")
       {
         const std::size_t comma = value.find(',');
@@ -150,6 +159,11 @@ namespace
     const int64_t periodTicks = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToTimeSpan().Ticks();
     settings.GpuWork = {(periodTicks * gpuPercent) / 100, (periodTicks * gpuPercent) / 100};
     settings.Display.LatchLeadTicks = (periodTicks * latchLeadPercent) / 100;
+    if (waitForPresent)
+    {
+      std::cout << Sim::ToFrameLog(Sim::SimulateTimerWaitForPresentLoop(settings), settings);
+      return 0;
+    }
     std::cout << Sim::ToFrameLog(tierPacer ? Sim::SimulateTimerPeriodOnlyLoop(settings) : Sim::SimulateLoop(settings), settings);
     return 0;
   }

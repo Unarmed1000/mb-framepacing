@@ -27,6 +27,8 @@ namespace MB::FramePacing::Pacer
     bool m_frameMarginSet{false};
     TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
     bool m_usePresentFeedback{false};
+    uint32_t m_waitingPresents{2};
+    TimeSpan m_presentWaitTimeout{250 * TimeSpan::TicksPerMillisecond};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
@@ -39,6 +41,9 @@ namespace MB::FramePacing::Pacer
     static constexpr TimeSpan DefaultFrameMargin{TimeSpan::TicksPerMillisecond};
     static constexpr int64_t DefaultFrameMarginDivisor = 8;
     static constexpr TimeSpan MaxSlowestFrameTime{10 * TimeSpan::TicksPerSecond};
+    static constexpr uint32_t MaxWaitingPresents = 8;
+    static constexpr TimeSpan MinPresentWaitTimeout{TimeSpan::TicksPerMillisecond};
+    static constexpr TimeSpan MaxPresentWaitTimeout{10 * TimeSpan::TicksPerSecond};
 
     //! The display's refresh period, from its display mode (a DXGI output mode, Display.getRefreshRate, wl_output's mode).
     explicit PacerSettings(const RefreshPeriod refresh) noexcept
@@ -158,6 +163,27 @@ namespace MB::FramePacing::Pacer
     {
       m_usePresentFeedback = usePresentFeedback;
     }
+
+    //! For a pacer that waits for a present (QueueTier::WaitForPresent): the presents that may be waiting to be shown while a
+    //! frame is made (1 to MaxWaitingPresents). Before a frame the pacer asks for a wait until the present that many back was
+    //! shown. 1: no present waits while the next frame is made, the lowest latency, and no slack: work that does not fit in a
+    //! refresh beside the wait halves the frame rate. 2, the default: one may wait, a refresh more of latency, and the frame
+    //! rate holds.
+    [[nodiscard]] uint32_t WaitingPresents() const noexcept
+    {
+      return m_waitingPresents;
+    }
+
+    void SetWaitingPresents(uint32_t presents) noexcept;
+
+    //! The longest a wait for a present may take (MinPresentWaitTimeout to MaxPresentWaitTimeout): a present of a window that
+    //! is not shown may never be shown. 250 ms by default.
+    [[nodiscard]] TimeSpan PresentWaitTimeout() const noexcept
+    {
+      return m_presentWaitTimeout;
+    }
+
+    void SetPresentWaitTimeout(TimeSpan timeout) noexcept;
 
     constexpr bool operator==(const PacerSettings&) const noexcept = default;
   };

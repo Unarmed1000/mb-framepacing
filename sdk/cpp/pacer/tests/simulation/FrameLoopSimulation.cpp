@@ -10,8 +10,10 @@
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
+#include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
+#include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -244,6 +246,96 @@ namespace MB::FramePacing::Pacer::Simulation
       previousGpuEndTicks = frame.GpuEndTicks;
 
       // Before the present: the wait the pacer gives
+      if (presentPlan.WaitsForPresentTime())
+      {
+        frame.PresentWaitBeginTicks = now;
+        frame.PresentWaitTargetTicks = presentPlan.PresentTime.Ticks();
+        now = WaitUntil(now, frame.PresentWaitTargetTicks, random, settings.TimerLate);
+      }
+      frame.PresentTicks = now;
+      frame.ShownTicks = display.Present(now, frame.GpuEndTicks);
+      report.FrameId = presentPlan.FrameId;
+      report.CallTime = TickCount64(now);
+      report.ReturnTime = TickCount64(now);
+      frames.push_back(frame);
+      now += settings.LoopTicks;
+    }
+    return frames;
+  }
+
+  std::vector<LoopFrame> SimulateTimerWaitForPresentLoop(const LoopSettings& settings)
+  {
+    const RefreshPeriod period = RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
+    PacerSettings pacerSettings(period);
+    pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
+    pacerSettings.SetWaitingPresents(settings.WaitingPresents);
+    TimerWaitForPresentPacer pacer(pacerSettings);
+    DisplayModel display(period, settings.Display);
+    SplitMix64 random(settings.Seed);
+
+    std::vector<LoopFrame> frames;
+    frames.reserve(static_cast<std::size_t>(std::max(settings.Frames, 0)));
+    int64_t now = settings.Display.FirstBlankTicks + settings.LoopTicks;
+    int64_t previousGpuEndTicks = 0;
+    PresentReport report;
+    for (int32_t index = 0; index < settings.Frames; ++index)
+    {
+      LoopFrame frame;
+      if (index > 0)
+      {
+        pacer.AddPresent(report);
+      }
+      // Before the frame takes anything: the waits the pacer gives, the present first
+      const FrameStartPlan startPlan = pacer.PlanFrame(TickCount64(now));
+      frame.WaitBeginTicks = now;
+      if (startPlan.WaitsForPresent())
+      {
+        // The wait returns a little after the display took the frame, at once when that has passed, or when its time runs out
+        const int64_t shownTicks = frames[static_cast<std::size_t>(startPlan.WaitForPresentFrameId) - 1].ShownTicks;
+        const int64_t returnTicks = shownTicks + random.Draw(settings.PresentWaitReturn.MinTicks, settings.PresentWaitReturn.MaxTicks);
+        const int64_t timeoutTicks = now + startPlan.WaitForPresentTimeout.Ticks();
+        PresentWaitReport waitReport;
+        waitReport.FrameId = startPlan.WaitForPresentFrameId;
+        waitReport.BeginTime = TickCount64(now);
+        waitReport.Shown = returnTicks <= timeoutTicks;
+        now = std::max(now, std::min(returnTicks, timeoutTicks));
+        waitReport.EndTime = TickCount64(now);
+        pacer.AddPresentWait(waitReport);
+      }
+      if (startPlan.WaitsForStartTime())
+      {
+        frame.WaitTargetTicks = startPlan.StartTime.Ticks();
+        now = WaitUntil(now, frame.WaitTargetTicks, random, settings.TimerLate);
+      }
+      if (settings.WaitsForPreviousGpuWork)
+      {
+        now = std::max(now, previousGpuEndTicks);
+      }
+      now = display.AcquireTicks(now);
+
+      frame.StartTicks = now;
+      frame.PendingAtStart = display.Pending(now);
+      const FrameSchedule schedule = pacer.BeginFrame(TickCount64(now));
+      const FrameWindowState window = pacer.FrameWindow();
+      frame.FrameId = schedule.FrameId;
+      frame.SwapInterval = schedule.SwapInterval;
+      frame.AnimationTicks = schedule.AnimationTime.Ticks();
+      frame.AnimationStepTicks = schedule.AnimationStep.Ticks();
+      frame.IntendedDisplayTicks = schedule.IntendedDisplayTime.Ticks();
+      frame.NextFrameStartTicks = schedule.NextFrameStartTime.Ticks();
+      frame.TargetFrameTimeTicks = static_cast<int64_t>(schedule.TargetFrameTime.Ticks());
+      frame.WindowFrames = window.Frames;
+      frame.WindowLateFrames = window.LateFrames;
+
+      frame.WorkCpuTicks = CpuWork(settings, index, random);
+      now += frame.WorkCpuTicks;
+      frame.WorkEndTicks = now;
+      const PresentPlan presentPlan = pacer.EndFrame(TickCount64(now));
+      const int64_t gpuWorkTicks = random.Draw(settings.GpuWork.MinTicks, settings.GpuWork.MaxTicks);
+      frame.GpuBeginTicks = std::max(now, previousGpuEndTicks);
+      frame.GpuEndTicks = frame.GpuBeginTicks + gpuWorkTicks;
+      previousGpuEndTicks = frame.GpuEndTicks;
+
       if (presentPlan.WaitsForPresentTime())
       {
         frame.PresentWaitBeginTicks = now;

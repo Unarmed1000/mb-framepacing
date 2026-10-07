@@ -38,6 +38,10 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t LoopTicks{600};
     //! true: one frame in flight, so a frame's start waits for the GPU's work on the frame before it
     bool WaitsForPreviousGpuWork{true};
+    //! For a loop that waits for a present: the presents that may be waiting while a frame is made, and how long after the
+    //! display took a frame a wait for it returns
+    uint32_t WaitingPresents{2};
+    TickRange PresentWaitReturn{600, 24'000};
     //! false: paced at a fixed swap interval of 1, the rule off
     bool AutoSwapInterval{true};
     DisplayModelSettings Display;

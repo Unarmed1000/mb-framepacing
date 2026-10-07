@@ -314,3 +314,109 @@ TEST(FrameLoop, TheLowestPairsPacerHoldsAFrameOfTwoRefreshesAndAQueueThenEmpties
   }
   EXPECT_EQ(checked, 100u);
 }
+
+// The pacer of a timer with a wait for a present (TimerWaitForPresentPacer): the display itself keeps the frames that wait few.
+// The model's wait returns 0.06 to 2.4 ms after the display took the frame, as the first integration measured it on one system.
+
+namespace
+{
+  //! The frame starts of the run's second half, in refreshes per frame (times 100)
+  int64_t RefreshesPerFrameTimes100(const std::vector<Sim::LoopFrame>& frames, const int64_t periodTicks)
+  {
+    const std::size_t first = frames.size() / 2;
+    const int64_t span = frames.back().StartTicks - frames[first].StartTicks;
+    return (span * 100) / (periodTicks * static_cast<int64_t>(frames.size() - 1 - first));
+  }
+}
+
+TEST(FrameLoop, WithAWaitForTheLastPresentNoFrameWaitsAndALostRefreshCostsOneFrameStart)
+{
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 800;
+  settings.WaitingPresents = 1;
+  // Light work: a fifth of a refresh on the GPU
+  settings.GpuWork = {PeriodTicks(settings) / 5, PeriodTicks(settings) / 5};
+  settings.Display.HeldBlanks = {150, 300, 450};
+  const int64_t period = PeriodTicks(settings);
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
+
+  // From the second frame on no earlier frame waits when a frame starts, held blanks or not, and a frame is on screen within
+  // a refresh and a half of its start (the lowest pair's pacer ends this run four refreshes behind)
+  for (std::size_t index = 1; index < frames.size(); ++index)
+  {
+    EXPECT_EQ(frames[index].PendingAtStart, 0) << index;
+    EXPECT_LE(HalfRefreshesToDisplay(frames[index], period), 3) << index;
+  }
+  // The three blanks cost three frame starts and nothing else: one refresh per frame otherwise
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 2.0);
+  const std::vector<Sim::LoopFrame> blind = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  EXPECT_EQ(HalfRefreshesToDisplay(blind.back(), period), 8);
+}
+
+TEST(FrameLoop, WithOnePresentAllowedToWaitOneWaitsAndNoMore)
+{
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 800;
+  settings.WaitingPresents = 2;
+  settings.GpuWork = {PeriodTicks(settings) / 5, PeriodTicks(settings) / 5};
+  settings.Display.HeldBlanks = {150, 300, 450};
+  const int64_t period = PeriodTicks(settings);
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
+
+  for (std::size_t index = 0; index < frames.size(); ++index)
+  {
+    EXPECT_LE(frames[index].PendingAtStart, 1) << index;
+    EXPECT_LE(HalfRefreshesToDisplay(frames[index], period), 6) << index;
+  }
+  // After the first held blank the one that may wait does, for the rest of the run: a refresh more of latency, and no more
+  for (std::size_t index = 200; index < frames.size(); ++index)
+  {
+    EXPECT_EQ(frames[index].PendingAtStart, 1) << index;
+  }
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 2.0);
+}
+
+TEST(FrameLoop, WorkThatDoesNotFitBesideTheWaitHalvesTheFrameRateWithNoPresentWaitingAndKeepsItWithOne)
+{
+  // GPU work of 90 % of a refresh. The first integration measured this pair on a real swap chain: a frame every 1.94 refreshes
+  // when waiting for the last present, every 0.96 when waiting for the one before it
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 800;
+  const int64_t period = PeriodTicks(settings);
+
+  settings.WaitingPresents = 1;
+  const std::vector<Sim::LoopFrame> none = Sim::SimulateTimerWaitForPresentLoop(settings);
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(none, period)), 195.0, 10.0);
+  for (std::size_t index = 1; index < none.size(); ++index)
+  {
+    EXPECT_EQ(none[index].PendingAtStart, 0) << index;
+  }
+
+  settings.WaitingPresents = 2;
+  const std::vector<Sim::LoopFrame> one = Sim::SimulateTimerWaitForPresentLoop(settings);
+  EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(one, period)), 100.0, 3.0);
+  for (std::size_t index = 0; index < one.size(); ++index)
+  {
+    EXPECT_LE(one[index].PendingAtStart, 1) << index;
+  }
+}
+
+TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
+{
+  // A display that shows nothing for a long stretch (a window that is hidden): every blank from 100 to 400 takes no frame
+  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  settings.Frames = 200;
+  settings.WaitingPresents = 1;
+  settings.GpuWork = {PeriodTicks(settings) / 5, PeriodTicks(settings) / 5};
+  for (int64_t blank = 100; blank < 400; ++blank)
+  {
+    settings.Display.HeldBlanks.push_back(blank);
+  }
+  const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
+
+  ASSERT_EQ(frames.size(), 200u);
+  // The wait runs out after a quarter of a second, and the loop goes on at that pace until the display takes frames again
+  EXPECT_GT(frames[102].StartTicks - frames[101].StartTicks, 2'000'000);
+  EXPECT_LT(frames[102].StartTicks - frames[101].StartTicks, 3'000'000);
+  EXPECT_GT(frames.back().StartTicks, frames[101].StartTicks);
+}
