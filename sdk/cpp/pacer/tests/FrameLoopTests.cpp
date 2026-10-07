@@ -1089,3 +1089,30 @@ TEST(FrameLoop, WithVerticalBlankTimesAndAWaitSmoothnessKeepsItsReserveWhereverT
     EXPECT_LE(frames.back().WindowLateFrames, 2u) << tenth;
   }
 }
+
+TEST(FrameLoop, VerticalBlankTimesThatAreNotExactDoNotMoveTheFrames)
+{
+  // A source that is no vertical blank time: every reading is up to 0.3 of a refresh off, either way. The first integration saw
+  // one (the display times of an application's own frames on one compositor, milliseconds off a grid of refreshes)
+  for (const bool waits : {false, true})
+  {
+    Sim::LoopSettings settings = LightLoop(2, PC::PacerAim::LowLatency);
+    settings.Frames = 1'200;
+    const int64_t period = PeriodNanoseconds(settings);
+    settings.VBlankReadingError = {-(period * 3) / 10, (period * 3) / 10};
+    const std::vector<Sim::LoopFrame> frames = waits ? Sim::SimulateVBlankWaitForPresentLoop(settings) : Sim::SimulateVBlankPeriodOnlyLoop(settings);
+
+    // The pacer takes the readings that are near where it has the vertical blanks and no others, so the frames start a refresh
+    // apart, to the eighth of a refresh a reading may be off and still be taken, and none of them is shown twice or skipped by
+    // more than now and then
+    int32_t uneven = 0;
+    for (std::size_t index = 60; index < frames.size(); ++index)
+    {
+      const int64_t step = frames[index].StartNanoseconds - frames[index - 1].StartNanoseconds;
+      uneven += std::abs(step - period) > (period / 4) ? 1 : 0;
+      ASSERT_EQ(frames[index].SwapInterval, 1u) << waits << ' ' << index;
+    }
+    EXPECT_LE(uneven, 12) << waits;
+    EXPECT_LE(DisplayStepsOffTheSwapInterval(frames, period), 24) << waits;
+  }
+}

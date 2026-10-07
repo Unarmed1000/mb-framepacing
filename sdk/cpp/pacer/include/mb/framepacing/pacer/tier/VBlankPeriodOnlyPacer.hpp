@@ -90,7 +90,11 @@ namespace MB::FramePacing::Pacer
     bool m_hasAnchor{false};
     bool m_hasReading{false};
     NanosecondTickCount m_lastReadTime;
+    bool m_hasReadTime{false};
     uint64_t m_vblankJumps{0};
+    // The readings in a row that were off the grid and on one of their own, and the last of them
+    uint32_t m_offGridReadings{0};
+    NanosecondTickCount m_offGridTime;
     // The frame between BeginFrame and the next BeginFrame: the vertical blank it is for, and the one it is shown at as far as
     // that is known (later than the one it is for once its present says so)
     bool m_hasFrame{false};
@@ -129,7 +133,9 @@ namespace MB::FramePacing::Pacer
     explicit VBlankPeriodOnlyPacer(const PacerSettings& settings);
 
     //! Where the display's refreshes are: the time of a vertical blank of the display the window is on, a recent one or the next.
-    //! Given whenever the application has one; the newest by its ReadTime counts. The frames go on from where they are.
+    //! Given whenever the application has one; the newest by its ReadTime counts. The frames go on from where they are. The
+    //! first reading is taken whole. One after it moves the vertical blanks a quarter of the way to it (one reading is not
+    //! exact), and one that is off where the readings before it put them is not taken by itself (VBlankJumps).
     void AddVBlank(const VBlankReading& reading) noexcept;
 
     //! Before a frame takes anything, at now on the application's steady clock: the time to wait until before the frame starts,
@@ -180,7 +186,10 @@ namespace MB::FramePacing::Pacer
     }
 
     //! The readings that were more than an eighth of a refresh period off where the readings before them put the vertical
-    //! blanks, since the pacer was made: a display that changed, or readings that are not exact.
+    //! blanks, since the pacer was made: a display that changed, or readings that are not exact. Such a reading is not
+    //! taken by itself (the frames go on by the refresh period from the last reading that was taken); eight in a row
+    //! that are on one grid of their own move the pacer to it. A count that rises with nearly every reading says the
+    //! source is no vertical blank time, and the pacer is then a pacer on a timer.
     [[nodiscard]] uint64_t VBlankJumps() const noexcept
     {
       return m_vblankJumps;

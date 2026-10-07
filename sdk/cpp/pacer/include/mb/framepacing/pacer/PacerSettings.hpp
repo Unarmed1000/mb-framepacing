@@ -29,7 +29,7 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_slowestFrameTime{50 * NanosecondTimeSpan::NanosecondsPerMillisecond};
     bool m_usePresentFeedback{false};
     PacerAim m_aim{PacerAim::Smoothness};
-    uint32_t m_waitingPresents{2};
+    uint32_t m_waitingPresents{0};
     uint32_t m_presentWaitSwapIntervals{4};
     uint32_t m_maxFramesInFlight{1};
     uint32_t m_startupPauseRefreshes{4};
@@ -50,6 +50,11 @@ namespace MB::FramePacing::Pacer
     static constexpr int64_t DefaultFrameMarginDivisor = 8;
     static constexpr NanosecondTimeSpan MaxSlowestFrameTime{10 * NanosecondTimeSpan::NanosecondsPerSecond};
     static constexpr uint32_t MaxWaitingPresents = 8;
+    //! The presents that may wait when the pacer picks the number, which it does unless it was set: two, the frame itself
+    //! counted, so one may wait. With one a frame's work has to fit in what the wait for the last present leaves of a
+    //! refresh: on the first integration that halved the frame rate at heavy work, and in the simulation it shows frames
+    //! for one and for two refreshes in turn on displays that take a frame early.
+    static constexpr uint32_t PickedWaitingPresents = 2;
     static constexpr uint32_t MaxSwapChainImages = 64;
     static constexpr uint32_t MaxPresentWaitSwapIntervals = 64;
     static constexpr uint32_t MaxMaxFramesInFlight = 8;
@@ -189,19 +194,26 @@ namespace MB::FramePacing::Pacer
 
     void SetAim(PacerAim aim) noexcept;
 
-    //! The presents that may be waiting to be shown while a frame is made, the frame itself counted (1 to MaxWaitingPresents;
-    //! 2 by default, so one may wait).
+    //! The presents that may be waiting to be shown while a frame is made, the frame itself counted. The pacer picks the
+    //! number (PickedWaitingPresents): an application says what it aims for (Aim) and nothing of this.
     //! A pacer that waits for a present (QueueTier::WaitForPresent) asks before a frame for a wait until the present that
-    //! many back was shown. 1: no present waits while the next frame is made, the lowest latency, and no slack: work that
-    //! does not fit in a refresh beside the wait halves the frame rate. 2: one may wait, a refresh more of latency, and the
-    //! frame rate holds.
-    //! With PacerAim::Smoothness it is also the reserve a tier pacer keeps at one refresh per frame: that many less one frames
-    //! are made ahead of the display and wait to be shown, and a frame that ran long is forgiven that many steps.
+    //! many back was shown. With PacerAim::Smoothness it is also the reserve a tier pacer keeps at one refresh per frame: that
+    //! many less one frames are made ahead of the display and wait to be shown, and a frame that ran long is forgiven that many
+    //! steps.
     [[nodiscard]] uint32_t WaitingPresents() const noexcept
     {
-      return m_waitingPresents;
+      return m_waitingPresents != 0 ? m_waitingPresents : PickedWaitingPresents;
     }
 
+    //! True while the pacer picks the presents that may wait: the default.
+    [[nodiscard]] bool PicksWaitingPresents() const noexcept
+    {
+      return m_waitingPresents == 0;
+    }
+
+    //! For measuring and for tests, not for an application: the presents that may wait, 1 to MaxWaitingPresents, in place of
+    //! the number the pacer picks. 0: the pacer picks again. 1: no present waits while the next frame is made, the lowest
+    //! latency, and no slack.
     void SetWaitingPresents(uint32_t presents) noexcept;
 
     //! The images the application's swap chain has (0 to MaxSwapChainImages). 0, the default: not known. One of them is on

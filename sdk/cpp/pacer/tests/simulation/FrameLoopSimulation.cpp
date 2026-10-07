@@ -61,6 +61,18 @@ namespace MB::FramePacing::Pacer::Simulation
                : RefreshPeriod::FromNanosecondTimeSpan(NanosecondTimeSpan(nominal + ((nominal * settings.DisplayPeriodPpm) / 1'000'000)));
     }
 
+    //! What the window system says of the display at now: its last vertical blank, as exact as the loop's source is
+    VBlankReading ReadVBlank(const DisplayModel& display, const int64_t now, SplitMix64& random, const LoopSettings& settings) noexcept
+    {
+      const NanosecondRange error = settings.VBlankReadingError;
+      const int64_t off =
+        error.MinNanoseconds == error.MaxNanoseconds ? error.MinNanoseconds : random.Draw(error.MinNanoseconds, error.MaxNanoseconds);
+      VBlankReading reading;
+      reading.VBlankTime = NanosecondTickCount(display.BlankNanoseconds(display.BlankAtOrBefore(now)) + off);
+      reading.ReadTime = NanosecondTickCount(now);
+      return reading;
+    }
+
     //! The GPU's work on the frames it is done with at now, given to a tier pacer in the frames' order
     template <typename TPacer>
     void ReportGpuWork(TPacer& rPacer, const std::vector<LoopFrame>& frames, std::size_t& rNext, const int64_t now) noexcept
@@ -461,8 +473,7 @@ namespace MB::FramePacing::Pacer::Simulation
       }
       // What the window system says of the display: its last vertical blank
       VBlankReading reading;
-      reading.VBlankTime = NanosecondTickCount(display.BlankNanoseconds(display.BlankAtOrBefore(now)));
-      reading.ReadTime = NanosecondTickCount(now);
+      reading = ReadVBlank(display, now, random, settings);
       pacer.AddVBlank(reading);
 
       // Before the frame takes anything: the wait the pacer gives
@@ -556,8 +567,7 @@ namespace MB::FramePacing::Pacer::Simulation
       }
       // What the window system says of the display: its last vertical blank
       VBlankReading reading;
-      reading.VBlankTime = NanosecondTickCount(display.BlankNanoseconds(display.BlankAtOrBefore(now)));
-      reading.ReadTime = NanosecondTickCount(now);
+      reading = ReadVBlank(display, now, random, settings);
       pacer.AddVBlank(reading);
 
       // Before the frame takes anything: the waits the pacer gives, the present first
@@ -578,8 +588,7 @@ namespace MB::FramePacing::Pacer::Simulation
         waitReport.EndTime = NanosecondTickCount(now);
         pacer.AddPresentWait(waitReport);
         // The vertical blank the window system has by now, and the frame planned again
-        reading.VBlankTime = NanosecondTickCount(display.BlankNanoseconds(display.BlankAtOrBefore(now)));
-        reading.ReadTime = NanosecondTickCount(now);
+        reading = ReadVBlank(display, now, random, settings);
         pacer.AddVBlank(reading);
         startPlan = pacer.PlanFrame(NanosecondTickCount(now));
       }

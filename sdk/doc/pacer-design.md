@@ -559,6 +559,9 @@ two (10.7 and 8.3 ms in the run before): not a fixed cost, it looks like the tim
 A window of the application's own laid over it did nothing: the system held the frames back only under another
 application's window.
 
+> Learnt afterwards: another program was using this machine's GPU and CPU while these runs were made, from a time that is
+> not known yet. The figures are to be confirmed by a rerun on a quiet machine before anything is read from them.
+
 **A hint from the application: left for later.** Asked: should the pacer take a hint that the focus was lost, and start
 again with an empty frame window when it is gained? Decided on 2026-10-07: the change above is what the pacer starts with,
 and no hint is taken yet. What speaks against a hint as the fix, and for it as a help later:
@@ -626,6 +629,13 @@ setting off; two runs of 1,400 frames): with smoothness a wait for a frame slot 
 with low latency each held 2. So in a window it is the frame slot that paces a loop that is not held to a time, as the
 earlier runs said, and the setting has nothing to work with there.
 
+> Learnt afterwards: another program was using this machine's GPU and CPU while these runs were made, from a time that is
+> not known yet. The figures are to be confirmed by a rerun on a quiet machine before anything is read from them.
+
+On the second system (Linux, a Wayland compositor, 60 Hz, 600 frames) it is the other way round: with smoothness the
+display's side held 599 frames and a wait for a frame slot none, with the setting on and off. So there the case exists.
+What the setting changes there (the frames' starts, the frames late, the time to the display) is not measured yet.
+
 ## The pacer for vertical blank times
 
 The third tier pacer (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh
@@ -685,6 +695,37 @@ screen 2.82 ms after its start at the median, 0.68 of a refresh where the simula
 screen for exactly one refresh and one pause after start-up. With smoothness and two presents that may wait it was 11.77 ms,
 2.83 refreshes where the simulation has 2.5, every frame on screen for one refresh. No reading was off the ones before it.
 
+> Learnt afterwards: another program was using this machine's GPU and CPU while these runs were made, from a time that is
+> not known yet. The figures are to be confirmed by a rerun on a quiet machine before anything is read from them.
+
+**Readings that are no vertical blank times** (the first integration on a second system: Linux, a Wayland compositor, a
+60 Hz mode, one run of 600 frames a pacer; the readings there are the display times of the application's own earlier frames,
+which the compositor reports as in sync and from the hardware's clock):
+
+- A new display time came for every other frame only, and the time between two of them was 33.3 ms at the median but 27.4
+  to 38.2 ms: up to 5 ms off two refreshes. As vertical blanks they fit no grid: 231 of the 239 steps were more than an
+  eighth of a refresh off a whole number of refreshes.
+- The pacer took every one of them, as it did then, and its loop followed them: a frame every 15.5 ms at the median, 8.7 ms
+  at the shortest and 31.9 ms at the longest. The pacer on a timer had 13.8 to 19.5 ms on the same system, and today's pacer
+  15.5 to 17.7 ms. On the first system, with the vertical blank of the display the window is on, no reading in 1,160 was
+  off.
+
+What was changed for it, in both pacers of vertical blank times (unit tests and the simulation; not measured again):
+
+- **A reading that is off is not taken by itself.** More than an eighth of a refresh period from where the readings before
+  it put the vertical blanks, it is counted (`VBlankJumps`) and the frames go on by the refresh period from the last
+  reading that was taken. Eight in a row that are on one grid of their own are the display's, which has changed, and the
+  last of them moves the pacer's grid to it. A count that rises with nearly every reading says that the source is no
+  vertical blank time; the pacer is then a pacer on a timer, which is what such a system has.
+- **A reading that is taken moves the vertical blanks a quarter of the way to it**, the first one whole. One reading is not
+  exact, and the readings after it move them the rest of the way, so a display that is a little off its period is followed
+  as before.
+- In the simulation, with every reading up to 0.3 of a refresh off either way, the frames start a refresh apart and the
+  swap interval stays; before the change the loop followed the readings.
+
+The application does not have to judge its source: it gives what the window system gives, and the pacer says what it made
+of it.
+
 **Not in it yet.** The refresh period is the settings': a reading's own period is not used, and the pacer does not measure
 the period from the readings (it does not need to, for where its frames are; the animation time still advances by the
 period it was given, 17 to 19 parts in a million off on the one system measured). It does not learn of a frame that waits
@@ -725,8 +766,12 @@ may wait, the longest wait counted in the frame's swap intervals, and what it do
 | Smoothness  | Before the frame starts, for the present as many back as may wait | Starts when the wait is over; its present is held to its place, the reserve as above     |
 | Low latency | The same                                                          | Its start is then held as above (the plan is made again after the wait), present at once |
 
-One setting for the presents that may wait, two by default, for both aims: whether it should differ by aim is left to
-what the measurements show.
+**The pacer picks the presents that may wait** (decided on 2026-10-08): an application says what it aims for and nothing
+of this. The pick is two at every tier and with either aim, so one may wait: one gave half the frame rate at heavy work on
+the first integration, and frames for one and for two refreshes in turn in the simulation. With vertical blank times and
+the aim of low latency two costs nothing, as a frame's start is held and nothing waits. The number can still be set
+(`SetWaitingPresents`), for measuring and for tests; whether the pick should differ by tier or by aim is left to what the
+measurements show.
 
 **What the simulation shows** (240 Hz, light work, two presents that may wait unless said):
 

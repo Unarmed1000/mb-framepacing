@@ -23,6 +23,7 @@
 #include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
+#include <cstdlib>
 
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;
@@ -337,7 +338,7 @@ TEST(VBlankPeriodOnlyPacer, AFrameThatStartsTooLateForItsVerticalBlankIsForTheFi
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
 }
 
-TEST(VBlankPeriodOnlyPacer, TheFramesFollowEveryReadingAndKeepTheVerticalBlanksTheyAreFor)
+TEST(VBlankPeriodOnlyPacer, TheFramesFollowTheReadingsAndKeepTheVerticalBlanksTheyAreFor)
 {
   PC::VBlankPeriodOnlyPacer pacer(Settings(PC::PacerAim::LowLatency));
   AddBlank(pacer, Blank(0));
@@ -345,37 +346,80 @@ TEST(VBlankPeriodOnlyPacer, TheFramesFollowEveryReadingAndKeepTheVerticalBlanksT
   frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
   ASSERT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(2)));
 
-  // The display is a little slower than its period: vertical blank 2 was 30 µs later than the pacer had it
-  AddBlank(pacer, Blank(2) + 30'000);
+  // The display is a little slower than its period: vertical blank 2 was 40 us later than the pacer had it. One reading is
+  // not exact, so the vertical blanks are moved a quarter of the way to it
+  AddBlank(pacer, Blank(2) + 40'000);
   EXPECT_EQ(pacer.VBlankJumps(), 0u);
   frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
-  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(3) + 30'000));
-  EXPECT_EQ(frame.StartNanoseconds, Blank(2) + 30'000 + Place - Margin - Work);
+  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(3) + 10'000));
+  EXPECT_EQ(frame.StartNanoseconds, Blank(2) + 10'000 + Place - Margin - Work);
   EXPECT_EQ(frame.Schedule.AnimationStep, Span(Period));
-
-  // A reading of a vertical blank that is still to come is the same to it
-  AddBlank(pacer, Blank(5) + 70'000);
+  // The readings after it move them the rest of the way, to a few nanoseconds: a display that is off its period is followed
+  for (int64_t number = 3; number < 40; ++number)
+  {
+    AddBlank(pacer, Blank(number) + 40'000);
+  }
   frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
-  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(4) + 70'000));
+  EXPECT_LE(std::abs(frame.Schedule.IntendedDisplayTime.Nanoseconds() - (Blank(4) + 40'000)), 3);
 
-  // One that was read before the reading the pacer has is not taken
+  // A reading of a vertical blank that is still to come is the same to it, and one that was read before the reading the pacer
+  // has is not taken
+  AddBlank(pacer, Blank(45) + 40'000);
   PC::VBlankReading old;
-  old.VBlankTime = At(Blank(3) + 4'000'000);
+  old.VBlankTime = At(Blank(3) + 1'000'000);
   old.ReadTime = At(Blank(3));
   pacer.AddVBlank(old);
   frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
-  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(5) + 70'000));
+  EXPECT_LE(std::abs(frame.Schedule.IntendedDisplayTime.Nanoseconds() - (Blank(5) + 40'000)), 3);
   EXPECT_EQ(pacer.VBlankJumps(), 0u);
+}
 
-  // A reading far off where the ones before it put the vertical blanks is taken, and counted: 0.3 of a period early here,
-  // and then 0.4 late (which is the vertical blank before, 0.6 early)
-  AddBlank(pacer, Blank(6) + 70'000 - 3'000'000);
+TEST(VBlankPeriodOnlyPacer, AReadingThatIsOffTheGridIsNotTakenByItself)
+{
+  PC::VBlankPeriodOnlyPacer pacer(Settings(PC::PacerAim::LowLatency));
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 100'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
+  ASSERT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(2)));
+
+  // A reading far off where the ones before it put the vertical blanks is counted and not taken: 0.3 of a period early here.
+  // The frames go on where they were
+  AddBlank(pacer, Blank(3) - 3'000'000);
   EXPECT_EQ(pacer.VBlankJumps(), 1u);
   frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
-  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(6) + 70'000 - 3'000'000));
-  AddBlank(pacer, Blank(7) + 70'000 - 3'000'000 + 6'000'000);
-  EXPECT_EQ(pacer.VBlankJumps(), 2u);
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(3)));
+  // Nor are readings that are off every time and on no grid of their own, as many as there are: a source that is no vertical
+  // blank time. The frames go on by the refresh period from the last reading that was taken
+  for (int64_t number = 4; number < 60; ++number)
+  {
+    AddBlank(pacer, Blank(number) + ((number % 3) == 0 ? 4'000'000 : ((number % 3) == 1 ? -2'000'000 : 3'500'000)));
+  }
+  // The same reading again is no second one
+  AddBlank(pacer, Blank(59) + 3'500'000);
+  EXPECT_EQ(pacer.VBlankJumps(), 58u);
+  frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
+  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(4)));
+  // A reading on the grid again is taken as before
+  AddBlank(pacer, Blank(60) + 40'000);
+  EXPECT_EQ(pacer.VBlankJumps(), 58u);
+  frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
+  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(5) + 10'000));
+
+  // Eight readings in a row that are off the pacer's grid and on one of their own are the display's, which has changed: the
+  // eighth moves the frames to it, whole
+  for (int64_t number = 61; number < 68; ++number)
+  {
+    AddBlank(pacer, Blank(number) - 3'000'000);
+  }
+  EXPECT_EQ(pacer.VBlankJumps(), 65u);
+  frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
+  EXPECT_EQ(frame.Schedule.IntendedDisplayTime, At(Blank(6) + 10'000));
+  AddBlank(pacer, Blank(69) - 3'000'000);
+  EXPECT_EQ(pacer.VBlankJumps(), 66u);
+  frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
+  EXPECT_EQ((frame.Schedule.IntendedDisplayTime.Nanoseconds() - (Start - 3'000'000)) % Period, 0);
+  AddBlank(pacer, Blank(70) - 3'000'000);
+  EXPECT_EQ(pacer.VBlankJumps(), 66u);
 }
 
 TEST(VBlankPeriodOnlyPacer, AReadingAfterTheFirstFramesMovesTheGuessOntoTheDisplay)

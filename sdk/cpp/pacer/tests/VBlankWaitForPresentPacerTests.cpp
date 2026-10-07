@@ -503,13 +503,28 @@ TEST(VBlankWaitForPresentPacer, TheRestIsThePacerOfVerticalBlankTimes)
   pacer.AddPresent(report);
   EXPECT_EQ(pacer.LastPresentBlocked(), FP::NanosecondTimeDuration::FromNanoseconds(700'000));
 
-  // A reading puts the vertical blanks where the display has them, an older one is not taken, and one that is off counts
+  // A reading puts the vertical blanks where the display has them, an older one is not taken, and one that is off is counted
+  // and not taken by itself; eight in a row on a grid of their own are, the same one twice counting once
   AddBlank(pacer, Blank(1) + 300'000);
   AddBlank(pacer, Blank(0));
   AddBlank(pacer, Blank(2) + 300'000 + 4'000'000);
   EXPECT_EQ(pacer.VBlankJumps(), 1u);
   AddBlank(pacer, Blank(3) + 300'000);
-  EXPECT_EQ(pacer.VBlankJumps(), 2u);
+  EXPECT_EQ(pacer.VBlankJumps(), 1u);
+  AddBlank(pacer, Blank(4) + 4'300'000);
+  AddBlank(pacer, Blank(4) + 4'300'000);
+  for (int64_t number = 5; number < 12; ++number)
+  {
+    AddBlank(pacer, Blank(number) + 4'300'000);
+  }
+  EXPECT_EQ(pacer.VBlankJumps(), 10u);
+  AddBlank(pacer, Blank(12) + 4'300'000);
+  EXPECT_EQ(pacer.VBlankJumps(), 10u);
+  for (int64_t number = 13; number < 21; ++number)
+  {
+    AddBlank(pacer, Blank(number) + 300'000);
+  }
+  EXPECT_EQ(pacer.VBlankJumps(), 18u);
 
   // GPU work reports: a frame is ready when the GPU is done with it
   pacer.AddGpuWork(PC::GpuWorkReport::OfDuration(1, FP::NanosecondTimeDuration::FromNanoseconds(2'000'000)));
@@ -535,7 +550,7 @@ TEST(VBlankWaitForPresentPacer, TheRestIsThePacerOfVerticalBlankTimes)
   EXPECT_EQ(schedule.AnimationTime, animationTime + Span(2 * Period));
   EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(static_cast<uint32_t>(2 * Period)));
   // The same settings change nothing; others on the same period keep the readings
-  AddBlank(pacer, Blank(8));
+  AddBlank(pacer, Blank(30));
   pacer.SetSettings(pacer.Settings());
   PC::PacerSettings other = pacer.Settings();
   other.SetAim(PC::PacerAim::Smoothness);

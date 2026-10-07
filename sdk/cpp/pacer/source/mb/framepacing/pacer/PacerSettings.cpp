@@ -100,8 +100,8 @@ namespace MB::FramePacing::Pacer
 
   void PacerSettings::SetWaitingPresents(const uint32_t presents) noexcept
   {
-    assert(presents >= 1 && presents <= MaxWaitingPresents);
-    m_waitingPresents = std::clamp(presents, 1u, MaxWaitingPresents);
+    assert(presents <= MaxWaitingPresents);
+    m_waitingPresents = std::min(presents, MaxWaitingPresents);
   }
 
   void PacerSettings::SetSwapChainImages(const uint32_t images) noexcept
@@ -112,7 +112,7 @@ namespace MB::FramePacing::Pacer
 
   uint32_t PacerSettings::ReserveFrames() const noexcept
   {
-    const uint32_t asked = m_waitingPresents - 1u;
+    const uint32_t asked = WaitingPresents() - 1u;
     if (m_swapChainImages == 0)
     {
       return asked;

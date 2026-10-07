@@ -404,8 +404,6 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
 #ifdef NDEBUG
   settings.SetAim(static_cast<PC::PacerAim>(7));
   EXPECT_EQ(settings.Aim(), PC::PacerAim::Smoothness);
-  settings.SetWaitingPresents(0);
-  EXPECT_EQ(settings.WaitingPresents(), 1u);
   settings.SetWaitingPresents(9);
   EXPECT_EQ(settings.WaitingPresents(), 8u);
   settings.SetPresentWaitSwapIntervals(0);
@@ -424,7 +422,6 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   EXPECT_EQ(settings.StartupPauseDelay(), PC::PacerSettings::MaxStartupPauseDelay);
 #elif GTEST_HAS_DEATH_TEST
   EXPECT_DEATH(settings.SetAim(static_cast<PC::PacerAim>(7)), "");
-  EXPECT_DEATH(settings.SetWaitingPresents(0), "");
   EXPECT_DEATH(settings.SetWaitingPresents(9), "");
   EXPECT_DEATH(settings.SetPresentWaitSwapIntervals(0), "");
   EXPECT_DEATH(settings.SetPresentWaitSwapIntervals(65), "");
@@ -762,4 +759,30 @@ TEST(TimerWaitForPresentPacer, ANewSwapChainsPresentsAreWaitedForAgain)
   step = LoopFrame(pacer, step.StartNanoseconds + 3'100'000, true);
   EXPECT_EQ(step.AskedForId, 11u);
   EXPECT_EQ(step.TimeoutNanoseconds, 4 * Period);
+}
+
+TEST(PacerSettings, ThePacerPicksThePresentsThatMayWaitUnlessTheyAreSetForMeasuring)
+{
+  PC::PacerSettings settings(g_hz100);
+  // An application says its aim; how many presents may wait is the pacer's: two, so one may wait, with either aim
+  EXPECT_TRUE(settings.PicksWaitingPresents());
+  EXPECT_EQ(settings.WaitingPresents(), PC::PacerSettings::PickedWaitingPresents);
+  EXPECT_EQ(settings.WaitingPresents(), 2u);
+  settings.SetAim(PC::PacerAim::LowLatency);
+  EXPECT_EQ(settings.WaitingPresents(), 2u);
+  EXPECT_EQ(settings.ReserveFrames(), 1u);
+
+  // Set for a measurement it is what was set, and it is not the same settings as the pacer's pick of that number
+  settings.SetWaitingPresents(1);
+  EXPECT_FALSE(settings.PicksWaitingPresents());
+  EXPECT_EQ(settings.WaitingPresents(), 1u);
+  EXPECT_EQ(settings.ReserveFrames(), 0u);
+  PC::PacerSettings picked(g_hz100);
+  picked.SetAim(PC::PacerAim::LowLatency);
+  settings.SetWaitingPresents(2);
+  EXPECT_NE(settings, picked);
+  // And zero gives it back to the pacer
+  settings.SetWaitingPresents(0);
+  EXPECT_TRUE(settings.PicksWaitingPresents());
+  EXPECT_EQ(settings, picked);
 }
