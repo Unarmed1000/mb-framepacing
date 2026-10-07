@@ -165,6 +165,74 @@ What these runs show, as far as one run of each goes:
 - With the wait, frame starts are uneven while the display times are a refresh apart, as the wait returns at a varying time
   after the display took the frame.
 
+## First measurements of the first two tier pacers
+
+The first two tier pacers (a timer with the refresh period only, `TimerPeriodOnlyPacer`; a timer with a wait for a present,
+`TimerWaitForPresentPacer`) were put into the first integration's samples behind an option and run on 2026-10-07 next to
+today's path: Vulkan in a window, 240 Hz, variable refresh off, three swap chain images, the driver's display times, 2,400
+frames a run. **One run each: numbers, not conclusions.** "Waiting" is the earlier presents not yet shown when a frame starts;
+"latency" is from a frame's start to its display, in refreshes, at the median.
+
+A fixed 60 frames a second (four refreshes per frame, 1,071 frames):
+
+| Run                                   | Shown for exactly four refreshes | Where in the refresh the present was made |
+| ------------------------------------- | -------------------------------- | ----------------------------------------- |
+| Today's path, held by a timer         | 1,052 (3 for three, 16 for five) | Anywhere: it slid through the refresh     |
+| A timer, the refresh period only      | 1,071                            | 0.03 to 0.10 after a display time         |
+| A timer, a wait for the last present  | 1,071                            | 0.29 to 0.54                              |
+| A timer, a wait for the one before it | 1,071                            | 0.62 to 0.69                              |
+
+Today's path ran 0.26 % slow, so its present slid through the refresh; the grid did not slide in any of the three. Where the
+grid of the pacer without a wait sat was chance, as designed for that tier, and it sat close to a display time.
+
+A frame that runs long (10 ms more CPU work every 120 frames, 18 of them, a swap interval fixed at 1):
+
+| Run                              | What a long frame cost          | Latency in the frames after it                              |
+| -------------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| Today's path                     | Two or three refreshes, varying | Another value after each one (1.1 to 2.2 over the run)      |
+| A timer, the refresh period only | Exactly two refreshes, 18 of 18 | Back at the value from before, two frames later, every time |
+
+Light work at one refresh per frame:
+
+| Run                                   | Waiting | Latency | Frame start to frame start (1 % to 99 %) |
+| ------------------------------------- | ------- | ------- | ---------------------------------------- |
+| Today's path, the frame's start held  | 0       | 0.59    | 0.98 to 1.02                             |
+| A timer, the refresh period only      | 2       | 2.21    | 0.98 to 1.03                             |
+| A timer, a wait for the last present  | 0       | 0.74    | 0.76 to 1.36                             |
+| A timer, a wait for the one before it | 0       | 0.52    | 0.99 to 1.02                             |
+
+GPU work of 90 % of a refresh, a swap interval fixed at 1:
+
+| Run                                   | Frame start to frame start                      | Waiting  | Latency (1 % to 99 %) |
+| ------------------------------------- | ----------------------------------------------- | -------- | --------------------- |
+| Today's path, the frame's start held  | 1.00                                            | 2 mostly | 2.52 (1.49 to 2.88)   |
+| A timer, the refresh period only      | 1.00, with stalls of 2 to 4 refreshes 113 times | 1 to 3   | 1.91 (1.68 to 4.97)   |
+| A timer, a wait for the last present  | 1.97                                            | 0        | 1.73 (1.45 to 1.86)   |
+| A timer, a wait for the one before it | 1.00                                            | 1        | 1.68 (1.28 to 1.86)   |
+
+What these runs show, as far as one run of each goes:
+
+- **The grid does what it is for.** Frames held for four refreshes were shown for exactly four, and a frame that ran long cost
+  whole refreshes and nothing after it.
+- **The lowest pair's pacer keeps the place it began at, whatever that is.** With light work it kept two presents waiting for
+  the whole run: the ones that pile up while a window is new. Today's path has a pause for that, and sat at none. This is the
+  open decision about that tier at one refresh per frame, with a number on it.
+- **With the GPU limiting the loop that pacer was the worst of the runs**: presents waiting crept up to the number of images,
+  the GPU then could not begin a frame, and the loop stalled, some forty times in the run. It is given the CPU's work only
+  and can not see a refresh the display lost; both are named limits of it, and this is what they cost.
+- **The wait for a present did what the simulation said**: 1.97 refreshes a frame when waiting for the last present at this
+  work (the simulation: about 1.95) and 1.00 when waiting for the one before it.
+- **Waiting for the one before the last was the steadiest and had the lowest latency with light work.** Every one of its waits
+  returned at once after start-up, so it capped the frames waiting at start-up and then did not disturb the loop. Waiting for
+  the last one held the loop every frame and made the frame starts uneven.
+- **A wait for a present that is never shown runs into its timeout.** In the first frames of a window one to three presents
+  get no display time. Where the pacer waited for such a one directly (waiting for the last present), the loop stood for the
+  250 ms of the timeout, once each in two of four runs.
+- **With every frame a refresh late and the rule off, the animation ran at half speed.** Waiting for the last present at
+  this work, each frame took two refreshes and its animation time advanced by one: the count of refreshes behind the clock
+  grew by one a frame (2,457 at the end). An animation time that is never moved after a lost refresh is right for a refresh
+  lost now and then, and wrong when every frame loses one and nothing slows the swap interval down.
+
 ## What the application plugs in
 
 ### Capabilities
@@ -767,7 +835,15 @@ checked. Four things are settled now, because they cost little now and a second 
    the clock by the refreshes lost, which the pacer would report as a number. Proposed: not catching up, with a setting for
    an application that needs game time on the clock (sound, a network), and the swap interval rule as what ends a loss that
    goes on.
-10. **Names**: the capability and call names above are proposals.
+10. **When every frame loses a refresh**: the animation time is not moved after a lost refresh, and with the swap interval
+    rule off that ran the animation at half speed in a measured run. Proposed: a frame's animation step follows a loss that
+    repeats (the frames before it each took the same refreshes more), as that is what the display then shows, and stays
+    the swap interval after a loss that does not.
+11. **The lowest pair at start-up**: its pacer kept the two presents waiting that pile up while a window is new (latency
+    2.2 refreshes against 0.6 for today's path, which pauses once). A pause at start-up as a guess, or leave it?
+12. **A wait for a present that is never shown**: the timeout is 250 ms and the loop stood for it at start-up in two of four
+    runs. Proposed: the timeout in refreshes of the frame's own swap interval (a few of them), not a fixed time.
+13. **Names**: the capability and call names above are proposals.
 
 ## What changes for whom
 
