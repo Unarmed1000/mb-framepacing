@@ -559,8 +559,30 @@ two (10.7 and 8.3 ms in the run before): not a fixed cost, it looks like the tim
 A window of the application's own laid over it did nothing: the system held the frames back only under another
 application's window.
 
-> Learnt afterwards: another program was using this machine's GPU and CPU while these runs were made, from a time that is
-> not known yet. The figures are to be confirmed by a rerun on a quiet machine before anything is read from them.
+Another program was using this machine's GPU and CPU while these runs were made, so they were made again.
+
+**Measured again on a quiet machine** (the first integration at 431960c, Windows, one display on, 240 Hz at a fixed refresh rate, Vulkan FIFO with a wait for a
+present, the vertical blank of the display the window is on, a window, light work unless said, the presents that may wait
+left to the pacer, 1,400 frames a run with the first 240 left out, driver display times; the program that had used the
+machine closed; one run each, the window covered for 15 s):
+
+| Pacer and work                                          | Before | Covered, frames a second | Swap interval | Waits that ran out | Stretches the waits were stopped in | The waits back after |
+| ------------------------------------------------------- | ------ | ------------------------ | ------------- | ------------------ | ----------------------------------- | -------------------- |
+| A timer, a wait for a present, light                    | 240    | 229 to 241               | 1 throughout  | 200                | 2 (3,572 of 3,574 frames)           | 0.159 s              |
+| A timer, a wait for a present, heavy                    | 120    | 91 to 118                | 2 throughout  | 88                 | 10 (1,619 of 1,648 frames)          | 0.251 s              |
+| Vertical blank times, a wait for a present, low latency | 240    | 210 to 232               | 1 throughout  | 165                | 6 (3,321 of 3,335 frames)           | 0.161 s              |
+| Vertical blank times, a wait for a present, smoothness  | 240    | 216 to 239               | 1 throughout  | 191                | 7 (3,465 of 3,486 frames)           | 0.159 s              |
+
+So it holds for both pacers that wait: the swap interval did not change in any covered stretch, and the frame rate was
+what it had been as soon as the waits were back. The waits were stopped in several stretches and not in one as in the run
+before: a covered window's frames are shown now and then, two answers in a row then say shown, and the next two waits run
+out again. That is what the covered frame rate is short of the rate before.
+
+One thing the cover left behind in the pacer for vertical blank times: the waits that returned shown late in the covered
+stretch counted as frames shown later than worked out (12 and 21 at the end of the two runs, against 5 to 7 in runs that
+were not covered), and the place a frame is to be ready at had moved to 1.04 ms and to the start of the refresh. It is
+never moved back, so such a run goes on with a frame ready earlier than it has to be. Three readings were off in each.
+Not looked into yet: whether a covered stretch's frames are to be left out of that.
 
 **A hint from the application: left for later.** Asked: should the pacer take a hint that the focus was lost, and start
 again with an empty frame window when it is gained? Decided on 2026-10-07: the change above is what the pacer starts with,
@@ -601,9 +623,10 @@ only: **not measured.**
 - The loop is held to a quarter of a refresh period before a frame is due. So the loop is there first, and the system's
   wait, not the pacer's timer, says when the frame starts. The timer is what is left when the system does not hold the loop
   after all: the frames then start a quarter of a period early, a period apart, and nothing runs away.
-- A frame whose start the display's side held for an eighth of a refresh period or more is one the system let through when
-  it had room, which is when the display took a frame. It is not late and gives up no step, and the grid is moved to its
-  start. So the loop is paced by the display, in step with it whichever way the given refresh period is off.
+- A frame whose start the display's side held for an eighth of a refresh period or more **past the time the loop is held
+  to** is one the system let through when it had room, which is when the display took a frame. It is not late and gives up
+  no step, and the grid is moved to its start. So the loop is paced by the display, in step with it whichever way the given
+  refresh period is off. A wait that was over before that time paced nothing, however long it was: the timer did.
 - A wait for a frame slot excuses nothing: a frame that starts late by it is late by the GPU's work, as before. It is
   counted (`FrameSlotHeldFrames`, next to `SystemHeldFrames`).
 - Without the setting, with the aim of low latency, or at two refreshes per frame or more, the reports are counted and
@@ -629,17 +652,36 @@ setting off; two runs of 1,400 frames): with smoothness a wait for a frame slot 
 with low latency each held 2. So in a window it is the frame slot that paces a loop that is not held to a time, as the
 earlier runs said, and the setting has nothing to work with there.
 
-> Learnt afterwards: another program was using this machine's GPU and CPU while these runs were made, from a time that is
-> not known yet. The figures are to be confirmed by a rerun on a quiet machine before anything is read from them.
+Another program was using this machine's GPU and CPU while these runs were made. Made again on a quiet machine (one run
+each, 1,400 frames): with smoothness a wait for a frame slot held 1,384 frames and the display's side 1, a frame on screen
+11.77 ms after its start (2.83 refreshes), every frame for one refresh; with low latency they held 2 and none, 1.41 ms
+(0.34 of a refresh), every frame for one refresh. So it stands.
 
-On the second system (Linux, a Wayland compositor, 60 Hz, 600 frames) it is the other way round: with smoothness the
-display's side held 599 frames and a wait for a frame slot none, with the setting on and off. So there the case exists.
-What the setting changes there (the frames' starts, the frames late, the time to the display) is not measured yet.
+**A second system, where the present waits for a share of a refresh** (the first integration on Linux with a Wayland
+compositor, a 60 Hz mode, four images, smoothness, 600 frames a run with the first 120 left out; a virtual machine, as
+was learnt afterwards, so its display is the virtual machine's and it has no display times):
+
+| The setting | A frame every             | The present waited      | The wait for an image                       | Held by the display's side | Late frames |
+| ----------- | ------------------------- | ----------------------- | ------------------------------------------- | -------------------------- | ----------- |
+| Off         | 16.66 ms (13.82 to 19.50) | 6.07 ms (5.11 to 10.62) | 0.03 ms; none an eighth of a period or more | 599 of 600 frames          | 0           |
+| On          | 7.13 ms (5.36 to 29.32)   | 6.00 ms (5.03 to 12.71) | 0.007 ms; 121 of 480 an eighth or more      | 599 of 600 frames          | 0           |
+
+With the setting on the loop ran at more than twice the rate of its mode. The present waits there in every frame, for
+about a third of a refresh period, and that is more than the eighth that counted as the display's side holding the loop:
+so every frame was taken as let through by the display, no start time was given, and the present's 6 ms was all that paced
+most frames. What was on screen is not known. So the timer was not what was left where the system does not hold the loop
+to the display after all: not on a system that holds it for a share of a refresh.
+
+**What was changed for it** (unit tests and the simulation; not measured again): only the part of a wait that comes after
+the time the loop is held to counts for letting a frame through, as the list above now says. A present that waits a third
+of a refresh in every frame is over before that time: the frames then start where the timer holds them, a period apart,
+and the grid stays. The count of frames the display's side held (`SystemHeldFrames`) is still of the waits as reported.
 
 ## The pacer for vertical blank times
 
-The third tier pacer (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh
-period only for the frames that wait). Built, and checked on the simulation only: **not measured.**
+The pacer of tier 2 (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh
+period only for the frames that wait). Built, checked on the simulation, and run on one system with driver display times
+("First runs" below): no capture of it has been analysed with the tools.
 
 **What knowing the refreshes changes.** The application gives the pacer a vertical blank's time whenever it has one
 (`AddVBlank`), and the pacer keeps the display's vertical blanks from the newest reading. Every frame is then for one
@@ -695,12 +737,28 @@ screen 2.82 ms after its start at the median, 0.68 of a refresh where the simula
 screen for exactly one refresh and one pause after start-up. With smoothness and two presents that may wait it was 11.77 ms,
 2.83 refreshes where the simulation has 2.5, every frame on screen for one refresh. No reading was off the ones before it.
 
-> Learnt afterwards: another program was using this machine's GPU and CPU while these runs were made, from a time that is
-> not known yet. The figures are to be confirmed by a rerun on a quiet machine before anything is read from them.
+Another program was using this machine's GPU and CPU while these runs were made. **Made again on a quiet machine**
+(the first integration at 431960c, Windows, one display on, 240 Hz at a fixed refresh rate, Vulkan FIFO with a wait for a
+present, the vertical blank of the display the window is on, a window, light work unless said, the presents that may wait
+left to the pacer, 1,400 frames a run with the first 240 left out, driver display times; the program that had used the
+machine closed):
+
+| Run                     | Frames not on screen for one refresh | A frame's start to its display   | Start-up pause | Readings that were off |
+| ----------------------- | ------------------------------------ | -------------------------------- | -------------- | ---------------------- |
+| Low latency             | 0 of 1,158                           | 2.81 ms, 0.68 of a refresh       | One            | None                   |
+| Smoothness              | 0 of 1,156                           | 11.75 ms, 2.82 refreshes         | None           | None                   |
+| Low latency, 4 min 22 s | 4 of 62,577                          | 2.845 to 2.849 ms in each minute | One            | None                   |
+
+The long run is the one that asks whether anything slides: the time from a frame's start to its display was 2.849, 2.845,
+2.845, 2.846 and 2.848 ms in its five minutes (the last one 22 s), where the pacer on a timer rose by about fifteen parts
+in a million of the time passed. The swap interval was 1 throughout and the animation was no refresh behind the clock at
+the end. One run, closed by hand.
 
 **Readings that are no vertical blank times** (the first integration on a second system: Linux, a Wayland compositor, a
 60 Hz mode, one run of 600 frames a pacer; the readings there are the display times of the application's own earlier frames,
-which the compositor reports as in sync and from the hardware's clock):
+which the compositor reports as in sync and from the hardware's clock. Learnt afterwards: that system is a virtual
+machine and its display the virtual machine's, so this is a system whose display times are poor, and says nothing of that
+window system in general):
 
 - A new display time came for every other frame only, and the time between two of them was 33.3 ms at the median but 27.4
   to 38.2 ms: up to 5 ms off two refreshes. As vertical blanks they fit no grid: 231 of the 239 steps were more than an
@@ -734,7 +792,8 @@ swap chain that holds the loop are decision 6.
 
 ### Vertical blank times with a wait for a present
 
-The fourth tier pacer (`VBlankWaitForPresentPacer`). Built, and checked on the simulation only: **not measured.** It is the
+The pacer of tier 1 (`VBlankWaitForPresentPacer`). Built, checked on the simulation, and run on one system with driver
+display times ("First runs" below): no capture of it has been analysed with the tools. It is the
 pacer above plus the wait that the pacer on a timer has (the frame start plan's wait, `PresentWaitReport`, the presents that
 may wait, the longest wait counted in the frame's swap intervals, and what it does while a window is not shown).
 
@@ -786,6 +845,30 @@ measurements show.
 
 The last two rows are the cost of one present that may wait, as with a timer: the wait for the last present returns a share
 of a refresh into the refresh the frame is made in, and what is left of it has to hold the frame's work.
+
+**First runs** (the first integration at 431960c, Windows, one display on, 240 Hz at a fixed refresh rate, Vulkan FIFO with a wait for a
+present, the vertical blank of the display the window is on, a window, light work unless said, the presents that may wait
+left to the pacer, 1,400 frames a run with the first 240 left out, driver display times; the program that had used the
+machine closed):
+
+| Run                                    | Frames not on screen for one refresh | A frame's start to its display, median            | Shown later by the waits | The ready place at the end (from 2.08 ms) | Waits that ran out |
+| -------------------------------------- | ------------------------------------ | ------------------------------------------------- | ------------------------ | ----------------------------------------- | ------------------ |
+| Low latency, five runs                 | 0 of 1,158 in every run              | 3.88, 3.88, 3.35, 3.88, 3.87 ms (0.93, once 0.80) | 6, 6, 5, 6, 7            | 1.04 ms in four, 1.56 ms in one           | 1, 1, 1, 1, 0      |
+| Smoothness, two runs                   | 0 of 1,157 in both                   | 7.21 and 7.20 ms (1.73 refreshes)                 | 5, 5                     | 1.56 ms in both                           | 1, 0               |
+| Low latency, one present that may wait | 0 of 1,158                           | 3.20 ms (0.77 of a refresh)                       | 4                        | 1.56 ms                                   | not read           |
+
+The swap interval was 1 in every frame of every run, no reading was off, and with low latency no step had an animation
+error over 1 ms. Two things in the numbers:
+
+- **The ready place moved in every run, and that is the latency over the pacer without the wait.** That pacer had a frame
+  on screen 0.68 of a refresh after its start with the place at the middle. Here the place ended a quarter of a refresh
+  period earlier in four runs and an eighth in one, and the frames were on screen 0.93 and 0.80 of a refresh after their
+  start: the same amounts later. The four to seven frames that the waits said were shown later are what moved it. Where in
+  a run they came, and whether the display showed those frames late or the wait only returned late, is not read yet: no
+  frame after the first 240 was on screen for more than one refresh. Until it is, the learning is not known to be right
+  on this system, and it costs up to a quarter of a refresh there.
+- **One present that may wait** did not give frames for one and for two refreshes in turn, as it does in the simulation:
+  every frame was on screen for one. One run, light work.
 
 **What it does not do.** The vertical blank a wait's return falls after is taken as the one the frame was shown at. That
 holds while the return comes within a refresh period of the display taking the frame, which it did at 240 Hz; at a much
@@ -936,12 +1019,12 @@ name for each tier and each capability, a line for each tier that says what it u
 
 **There is one list of tiers, and each tier has one pacer** (decided on 2026-10-08; what it replaced is below):
 
-| Tier | Needs                           | Its pacer                   | What it paces by                                                                            | Status                                            |
-| ---- | ------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| 1    | `VBlankTimes`, `WaitForPresent` | `VBlankWaitForPresentPacer` | The display's vertical blanks, and the loop held until an earlier present was shown         | Built; the simulation only                        |
-| 2    | `VBlankTimes`                   | `VBlankPeriodOnlyPacer`     | The display's vertical blanks; the refresh period only for the frames that wait             | Built; first runs on two systems, to be confirmed |
-| 3    | `WaitForPresent`                | `TimerWaitForPresentPacer`  | A grid of refreshes on the clock, and the loop held until an earlier present was shown      | Built; measured on one system, one run a case     |
-| 4    | nothing (the baseline)          | `TimerPeriodOnlyPacer`      | A grid of refreshes on the clock and the refresh period: where the refreshes are is a guess | Built; measured on two systems, one run a case    |
+| Tier | Needs                           | Its pacer                   | What it paces by                                                                            | Status                                         |
+| ---- | ------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1    | `VBlankTimes`, `WaitForPresent` | `VBlankWaitForPresentPacer` | The display's vertical blanks, and the loop held until an earlier present was shown         | Built; first runs on one system                |
+| 2    | `VBlankTimes`                   | `VBlankPeriodOnlyPacer`     | The display's vertical blanks; the refresh period only for the frames that wait             | Built; first runs on one system                |
+| 3    | `WaitForPresent`                | `TimerWaitForPresentPacer`  | A grid of refreshes on the clock, and the loop held until an earlier present was shown      | Built; measured on one system, one run a case  |
+| 4    | nothing (the baseline)          | `TimerPeriodOnlyPacer`      | A grid of refreshes on the clock and the refresh period: where the refreshes are is a guess | Built; measured on two systems, one run a case |
 
 - **The order of tiers 2 and 3 is open.** Each has what the other lacks: tier 2 knows where the refreshes are and does not
   learn of a frame that waits, tier 3 keeps the frames that wait to a number and has its refreshes as a grid on the clock.
@@ -1320,9 +1403,10 @@ Two things are the same at every tier:
   that back: the frame was already drawn when the refresh was lost. What the tiers differ in is whether it stays as latency
   afterwards.
 
-Status: tiers 3 and 4 are measured on the first integration's first system, one run a case, and tier 4 in a few runs on a
-second. Tier 2 has first runs on both, and tier 1 the simulation only. The runs of tiers 1 and 2 on the first system were
-made while another program used that machine, and are to be confirmed.
+Status: tiers 3 and 4 are measured on the first integration's first system, one run a case, and tiers 1 and 2 have their
+first runs there on a quiet machine (their sections above). The second system is a virtual machine whose display times are
+poor: what it showed is in "A loop the system holds" and "Readings that are no vertical blank times". All of it is driver
+display times, and no run of a tier pacer has been captured and analysed with the tools.
 
 **The wait for a free swap chain image, without a wait for a present.** It is core to a swap chain, so a configuration at
 tier 2 or 4 can have it, and on the one system measured it worked as a cap and not as a way down (one run a case, GPU work

@@ -67,6 +67,21 @@ namespace MB::FramePacing::Pacer
     return m_displayHeld.Nanoseconds() >= (m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / HeldDivisor);
   }
 
+  bool TimerPeriodOnlyPacer::LetThroughByTheDisplay() const noexcept
+  {
+    // The display's side let the loop through when its wait held the loop past the time the pacer holds it to, for a share of a
+    // refresh period. A wait that was over before that time paced nothing: the timer did (a present that waits a third of a
+    // refresh in every frame is such a wait)
+    return m_displayHeldPastTimer.Nanoseconds() >= (m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / HeldDivisor);
+  }
+
+  NanosecondTimeDuration TimerPeriodOnlyPacer::HeldPastTheTimer(const NanosecondTickCount beginTime, const NanosecondTickCount endTime) const noexcept
+  {
+    // Before there is a grid the pacer holds the loop to no time, and the whole wait counts
+    const int64_t from = m_hasGrid ? std::max(beginTime.Nanoseconds(), StartTimeOf(m_nextSlot).Nanoseconds()) : beginTime.Nanoseconds();
+    return NanosecondTimeDuration::FromNanoseconds(std::max(endTime.Nanoseconds() - from, int64_t{0}));
+  }
+
   NanosecondTickCount TimerPeriodOnlyPacer::StartTimeOf(const int64_t slot) const noexcept
   {
     // The time the loop is held to before a frame. Where the system is to pace the loop it is a share of a period before the
@@ -169,8 +184,8 @@ namespace MB::FramePacing::Pacer
   FrameStartPlan TimerPeriodOnlyPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
     FrameStartPlan plan;
-    // A present that waited for the display has let the loop through already: the frame starts now
-    if (!StartsAgainAt(now) && !(LetsTheSystemPace() && HeldByTheDisplaysSide()))
+    // A present that waited for the display past the time the loop is held to has let the loop through: the frame starts now
+    if (!StartsAgainAt(now) && !(LetsTheSystemPace() && LetThroughByTheDisplay()))
     {
       const NanosecondTickCount start = StartTimeOf(SlotFor(now));
       if (start > now)
@@ -192,6 +207,7 @@ namespace MB::FramePacing::Pacer
     else
     {
       m_displayHeld = AddHeld(m_displayHeld, report.Blocked());
+      m_displayHeldPastTimer = AddHeld(m_displayHeldPastTimer, HeldPastTheTimer(report.BeginTime, report.EndTime));
     }
   }
 
@@ -221,7 +237,7 @@ namespace MB::FramePacing::Pacer
     {
       // The previous frame: the steps of the grid from the one it was due to leave at to this start, and its work against its
       // swap interval's time. Without an EndFrame its work is not known, and the time to this start says nothing about it
-      const bool letThrough = heldBySystem && LetsTheSystemPace();
+      const bool letThrough = LetsTheSystemPace() && LetThroughByTheDisplay();
       if (letThrough)
       {
         // The system let the frame through when its queue had room, which is when the display took a frame: the grid is moved
@@ -251,6 +267,7 @@ namespace MB::FramePacing::Pacer
     m_lost = change == SwapIntervalChange::Unchanged ? lost : 0;
 
     m_displayHeld = NanosecondTimeSpan();
+    m_displayHeldPastTimer = NanosecondTimeSpan();
     m_frameSlotHeld = NanosecondTimeSpan();
     m_swapInterval = m_rule.SwapInterval();
     m_startTime = cpuStartTime;
@@ -331,6 +348,7 @@ namespace MB::FramePacing::Pacer
     m_lastPresentBlocked = report.Blocked();
     // A present that waited for the display held the loop before the next frame
     m_displayHeld = AddHeld(m_displayHeld, report.Blocked());
+    m_displayHeldPastTimer = AddHeld(m_displayHeldPastTimer, HeldPastTheTimer(report.CallTime, report.ReturnTime));
     if (m_frameEnded && report.FrameId == m_frameId)
     {
       m_presentTime = report.CallTime;

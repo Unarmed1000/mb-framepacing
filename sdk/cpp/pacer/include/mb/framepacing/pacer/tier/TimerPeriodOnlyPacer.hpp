@@ -127,6 +127,8 @@ namespace MB::FramePacing::Pacer
     // in which the GPU did (for a frame slot): how long, and the frames each held
     NanosecondTimeSpan m_displayHeld;
     NanosecondTimeSpan m_frameSlotHeld;
+    // The part of the display's side's waits that came after the time the pacer holds the loop to before the next frame
+    NanosecondTimeSpan m_displayHeldPastTimer;
     uint64_t m_systemHeldFrames{0};
     uint64_t m_frameSlotHeldFrames{0};
     // The pause after start-up: still to be made, the first frame's start since it was asked for, and whether the system
@@ -260,6 +262,8 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] int64_t Reserve() const noexcept;
     [[nodiscard]] bool LetsTheSystemPace() const noexcept;
     [[nodiscard]] bool HeldByTheDisplaysSide() const noexcept;
+    [[nodiscard]] bool LetThroughByTheDisplay() const noexcept;
+    [[nodiscard]] NanosecondTimeDuration HeldPastTheTimer(NanosecondTickCount beginTime, NanosecondTickCount endTime) const noexcept;
     [[nodiscard]] NanosecondTickCount StartTimeOf(int64_t slot) const noexcept;
     [[nodiscard]] NanosecondTickCount DueTime(int64_t slot) const noexcept;
     [[nodiscard]] int64_t SmoothSlotFor(NanosecondTickCount time) const noexcept;

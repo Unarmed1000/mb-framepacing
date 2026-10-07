@@ -1057,6 +1057,63 @@ TEST(TimerPeriodOnlyPacer, WhereTheSystemDoesNotHoldTheLoopAfterAllTheTimerKeeps
   EXPECT_LE(pacer.FrameWindow().StartsAhead.Duration(), Span(2'000 * int64_t{pacer.FrameWindow().Frames}));
 }
 
+TEST(TimerPeriodOnlyPacer, APresentThatWaitsForAShareOfARefreshDoesNotPaceTheLoop)
+{
+  // Measured on a system whose present waits for about a third of a refresh period in every frame. That wait is over before the
+  // time the loop is held to, so it paces nothing: the timer does, a period apart, and the grid stays where it is
+  PC::TimerPeriodOnlyPacer pacer(HeldLoopSettings());
+  const auto present = [&pacer](const int64_t startNanoseconds, const int64_t returnNanoseconds)
+  {
+    PC::PresentReport report;
+    report.FrameId = pacer.EndFrame(At(startNanoseconds + 3'000'000)).FrameId;
+    report.CallTime = At(startNanoseconds + 3'000'000);
+    report.ReturnTime = At(returnNanoseconds);
+    pacer.AddPresent(report);
+  };
+  // A wait before the first frame: there is no grid yet, and nothing to hold it against
+  pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, Start - Period, Start));
+  int64_t start = Start;
+  static_cast<void>(pacer.BeginFrame(At(start)));
+  for (int32_t frame = 1; frame <= 300; ++frame)
+  {
+    const int64_t returned = start + 3'000'000 + (36 * Period / 100);
+    present(start, returned);
+    const PC::FrameStartPlan plan = pacer.PlanFrame(At(returned));
+    ASSERT_EQ(plan.StartTime, At(Start + (frame * Period) - (Period / 4))) << frame;
+    // The wait for an image returns at once, after the loop was held
+    start = plan.StartTime.Nanoseconds() + 7'000;
+    pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, start - 7'000, start));
+    static_cast<void>(pacer.BeginFrame(At(start)));
+  }
+  // The reports say that the display's side held the loop in every frame, and it is counted; it let none of them through
+  EXPECT_EQ(pacer.SystemHeldFrames(), 301u);
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+  EXPECT_EQ(pacer.SwapInterval(), 1u);
+
+  // A present that returns an eighth of a period after the time the loop is held to, less a nanosecond: still the timer's frame
+  int64_t heldTo = Start + (301 * Period) - (Period / 4);
+  present(start, heldTo + (Period / 8) - 1);
+  EXPECT_FALSE(pacer.PlanFrame(At(heldTo + (Period / 8) - 1)).WaitsForStartTime());
+  start = heldTo + (Period / 8) - 1;
+  EXPECT_EQ(pacer.BeginFrame(At(start)).NextFrameStartTime, At(heldTo + Period));
+  // An eighth of a period: the display's side let the loop through, and the grid goes to where the frame starts
+  heldTo += Period;
+  present(start, heldTo + (Period / 8));
+  EXPECT_FALSE(pacer.PlanFrame(At(heldTo + (Period / 8))).WaitsForStartTime());
+  start = heldTo + (Period / 8);
+  EXPECT_EQ(pacer.BeginFrame(At(start)).NextFrameStartTime, At(start + Period - (Period / 4)));
+  // A wait for an image that begins when the loop was held and takes that long is the same
+  heldTo = start + Period - (Period / 4);
+  present(start, start + 3'060'000);
+  EXPECT_EQ(pacer.PlanFrame(At(start + 3'100'000)).StartTime, At(heldTo));
+  pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, heldTo, heldTo + (3 * Period / 10)));
+  start = heldTo + (3 * Period / 10);
+  EXPECT_EQ(pacer.BeginFrame(At(start)).NextFrameStartTime, At(start + Period - (Period / 4)));
+  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
+}
+
 TEST(TimerPeriodOnlyPacer, TheSystemPacesTheLoopOnlyWithTheAimOfSmoothnessAtOneRefreshPerFrame)
 {
   // Low latency keeps no frames waiting, so the system has nothing to hold the loop with: the loop is held to the time the frame
