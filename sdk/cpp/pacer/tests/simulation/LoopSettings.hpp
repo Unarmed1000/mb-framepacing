@@ -51,6 +51,14 @@ namespace MB::FramePacing::Pacer::Simulation
     uint32_t MaxFramesInFlight{1};
     //! The pause after start-up of the pacer that has the refresh period only (PacerSettings::StartupPauseRefreshes)
     uint32_t StartupPauseRefreshes{4};
+    //! For the tier pacers: the swap interval the application prefers (PacerSettings::PreferredSwapInterval): 4 is 60 frames
+    //! a second at 240 Hz
+    uint32_t PreferredSwapInterval{1};
+    //! How much longer the display's refresh period really is than the one the loop was given, in parts per million (below
+    //! zero: shorter). The tier pacers' loops only
+    int64_t DisplayPeriodPpm{0};
+    //! For the pacer of vertical blank times: where in a refresh a frame is to be ready (PacerSettings::ReadyPlacePercent)
+    uint32_t ReadyPlacePercent{50};
     //! false: paced at a fixed swap interval of 1, the rule off
     bool AutoSwapInterval{true};
     DisplayModelSettings Display;

@@ -487,6 +487,66 @@ What these runs show, as far as one run of each goes:
   frames the swap chain holds, so it can not tell a loop that is held from one that is late, and can ask for a reserve the
   swap chain can not take. Both are in "Decisions needed".
 
+## The pacer for vertical blank times
+
+The third tier pacer (`VBlankPeriodOnlyPacer`: the frame loop holds a frame and knows where the refreshes are; the refresh
+period only for the frames that wait). Built, and checked on the simulation only: **not measured.**
+
+**What knowing the refreshes changes.** The application gives the pacer a vertical blank's time whenever it has one
+(`AddVBlank`), and the pacer keeps the display's vertical blanks from the newest reading. Every frame is then for one
+vertical blank, the one it is to be shown at, and that blank is the one of the frame before it plus its swap interval.
+Nothing slides: each reading puts the frames back on the display, so a refresh period that is a little off does not add up.
+A frame is shown at a vertical blank when it is ready the frame margin before it; ready is presented, and with GPU work
+reports the GPU done with it. The pacer aims a frame to be ready at one place in the refresh before its blank
+(`ReadyPlacePercent`, 50 by default: the middle is as far from either vertical blank as a frame can be, which is the only
+default that does not come from one system). The one thing that stays a guess is how long before a vertical blank a display
+takes a frame.
+
+**The two aims are when the frame is made.** That is what the first integration's two profiles were, and here it is the aim
+and no setting of its own:
+
+| Aim         | When a frame is made                                                                                  | What it gives                                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Smoothness  | It starts at once, and its present is held until the time that has it ready at its place              | Work that runs longer than usual uses up the time the frame would have waited; the frame shown is older      |
+| Low latency | Its start is held so that it is ready at its place and no sooner, and it is presented when it is done | The frame shown is as new as it can be; a frame that takes longer than the ones before it can miss its blank |
+
+- **Smoothness** also keeps the reserve at one refresh per frame, as the other pacers do: the presents that may wait less
+  one are ready that many refreshes before they are shown. Here the reserve is exact, because the pacer knows which vertical
+  blank a frame was ready for.
+- **Low latency** holds a frame's start by how long the frames before it took: the longest of the last eight, but no
+  longer than the swap interval's time, and the GPU time where it is reported. A frame that is done sooner than that is
+  presented no sooner than has it ready when its refresh begins. A frame that missed its blank and was ready late in a
+  refresh is not counted on to have made the next one. It makes the one pause after start-up, as the pacer on a timer does.
+- **A frame of more than one refresh** is for every nth vertical blank. With low latency it is started in the refresh
+  before its vertical blank and presented at once, so it is on screen about as soon after its start as a frame of one
+  refresh is, where a pacer that holds the present has made it that many refreshes ahead. With smoothness it is made at once
+  and its present held; there is no reserve, as the display takes a frame before the next one is made.
+
+**The animation time is the time a frame is shown, as far as that is known before the frame is made.** A frame that starts
+too late for its vertical blank is for the first one it can make, and its animation step is the refreshes from the frame
+before it to that blank: nothing is behind, and the same holds for the pause after start-up. What is only known after a
+frame (its own work ran long, and it missed its blank) is not caught up with, as at every tier.
+
+**What the simulation shows** (240 Hz, light work unless said, displays that take a frame up to 0.4 of a refresh before
+the vertical blank):
+
+| Case                                                            | A timer, the period only                 | Vertical blank times, low latency          | Vertical blank times, smoothness                    |
+| --------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------ | --------------------------------------------------- |
+| A frame's start to its display                                  | 1.0 refresh, or 2.0, by where it started | 0.65                                       | 1.5 without a reserve, 2.5 with one frame           |
+| A display 0.2 % slower than its mode                            | The frames waiting grow without end      | Steady                                     | Steady                                              |
+| 60 frames a second, a display 0.05 % slower, timers 0.1 ms late | Frames on screen for three or five       | Every frame for four, 0.65 after its start | Every frame for four, 4.5 after its start           |
+| One frame 0.9 of a refresh longer                               | A repeated frame at most places          | A repeated frame, then as before           | Not seen with a frame in reserve                    |
+| One frame 2.4 refreshes longer                                  | Repeated frames, then as before          | Repeated frames, then as before            | One frame on screen longer, then the reserve as was |
+| GPU work of 90 % of a refresh, reported                         |                                          | Every frame for one refresh                | Every frame for one refresh                         |
+| GPU work of 130 % of a refresh, reported, the rule on           |                                          | Two refreshes per frame                    | Two refreshes per frame                             |
+
+**Not in it yet.** The refresh period is the settings': a reading's own period is not used, and the pacer does not measure
+the period from the readings (it does not need to, for where its frames are; the animation time still advances by the
+period it was given, 17 to 19 parts in a million off on the one system measured). It does not learn of a frame that waits
+although it was ready in time, as no pacer does that has the refresh period only for that. The application's own waits and a
+swap chain that holds the loop are the open decision 6. Its times are in ticks of 100 ns like the other tier pacers';
+nanoseconds follow when the marker and the tools have them.
+
 ## What the application plugs in
 
 ### Capabilities

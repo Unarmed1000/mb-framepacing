@@ -34,6 +34,7 @@ namespace MB::FramePacing::Pacer
     uint32_t m_maxFramesInFlight{1};
     uint32_t m_startupPauseRefreshes{4};
     TimeSpan m_startupPauseDelay{500 * TimeSpan::TicksPerMillisecond};
+    uint32_t m_readyPlacePercent{50};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
@@ -51,6 +52,7 @@ namespace MB::FramePacing::Pacer
     static constexpr uint32_t MaxMaxFramesInFlight = 8;
     static constexpr uint32_t MaxStartupPauseRefreshes = 64;
     static constexpr TimeSpan MaxStartupPauseDelay{10 * TimeSpan::TicksPerSecond};
+    static constexpr uint32_t MaxReadyPlacePercent = 100;
 
     //! The display's refresh period, from its display mode (a DXGI output mode, Display.getRefreshRate, wl_output's mode).
     explicit PacerSettings(const RefreshPeriod refresh) noexcept
@@ -240,6 +242,18 @@ namespace MB::FramePacing::Pacer
     }
 
     void SetStartupPauseDelay(TimeSpan delay) noexcept;
+
+    //! For a pacer that knows where the display's refreshes are (HoldTier::VBlank): where in a refresh a frame is to be ready,
+    //! in percent of the refresh period after its vertical blank (0 to MaxReadyPlacePercent; 50 by default). Ready is
+    //! presented, and with GPU work reports the GPU done with it. A frame that is ready there is shown at the next vertical
+    //! blank. The middle is as far from either vertical blank as a frame can be, so it is the default without knowing a
+    //! system: earlier leaves more room for a frame that runs long, later shows a newer frame.
+    [[nodiscard]] uint32_t ReadyPlacePercent() const noexcept
+    {
+      return m_readyPlacePercent;
+    }
+
+    void SetReadyPlacePercent(uint32_t percent) noexcept;
 
     constexpr bool operator==(const PacerSettings&) const noexcept = default;
   };

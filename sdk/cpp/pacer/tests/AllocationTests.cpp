@@ -18,9 +18,11 @@
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
+#include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
 #include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
+#include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
 #include <mb/framepacing/testing/AllocationCounter.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -227,4 +229,53 @@ TEST(Allocations, ThePacerOfATimerWithAWaitForAPresentPacesFramesWithoutAllocati
     EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }
   EXPECT_GT(checked, 2'000);
+}
+
+TEST(Allocations, ThePacerOfVerticalBlankTimesPacesFramesWithoutAllocating)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::Smoothness, PC::PacerAim::LowLatency})
+  {
+    PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
+    settings.SetAim(aim);
+    PC::VBlankPeriodOnlyPacer pacer(settings);
+
+    int64_t checked = 0;
+    {
+      const FT::AllocationCounter counter;
+      const int64_t period = settings.Refresh().ToTimeSpan().Ticks();
+      int64_t now = 10 * FP::TimeSpan::TicksPerSecond;
+      PC::PresentReport report;
+      PC::VBlankReading reading;
+      for (int32_t frame = 0; frame < 2'000; ++frame)
+      {
+        // A vertical blank a little before now, as a window system gives one
+        reading.VBlankTime = FP::TickCount64(now - (now % period));
+        reading.ReadTime = FP::TickCount64(now);
+        pacer.AddVBlank(reading);
+        const PC::FrameStartPlan plan = pacer.PlanFrame(FP::TickCount64(now));
+        now = plan.WaitsForStartTime() ? plan.StartTime.Ticks() : now;
+        const PC::FrameSchedule schedule = pacer.BeginFrame(FP::TickCount64(now));
+        // Work that runs long now and then, so frames miss their vertical blank and the rule changes the swap interval both ways
+        now += (frame % 300) < 80 ? 120'000 : 20'000;
+        const PC::PresentPlan present = pacer.EndFrame(FP::TickCount64(now));
+        now = present.WaitsForPresentTime() ? present.PresentTime.Ticks() : now;
+        report.FrameId = present.FrameId;
+        report.CallTime = FP::TickCount64(now);
+        report.ReturnTime = FP::TickCount64(now + 600);
+        report.Accepted = (frame % 211) != 0;
+        pacer.AddPresent(report);
+        pacer.AddGpuWork(PC::GpuWorkReport::Times(present.FrameId - 1u, FP::TickCount64(now - 60'000), FP::TickCount64(now - 5'000)));
+        now += 600;
+        checked += static_cast<int64_t>(schedule.SwapInterval);
+      }
+      // A pause, another refresh period and a reset are frames like any other
+      static_cast<void>(pacer.BeginFrame(FP::TickCount64(now + (120 * FP::TimeSpan::TicksPerSecond))));
+      pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(120));
+      static_cast<void>(pacer.BeginFrame(FP::TickCount64(now + (121 * FP::TimeSpan::TicksPerSecond))));
+      pacer.Reset();
+      static_cast<void>(pacer.BeginFrame(FP::TickCount64(now + (122 * FP::TimeSpan::TicksPerSecond))));
+      EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
+    }
+    EXPECT_GT(checked, 2'000);
+  }
 }

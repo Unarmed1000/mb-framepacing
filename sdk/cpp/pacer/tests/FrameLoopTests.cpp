@@ -733,3 +733,184 @@ TEST(FrameLoop, WithTheAimOfSmoothnessAndAWaitForAPresentTheReserveIsExactlyWhat
   }
   EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 2.0);
 }
+
+// The pacer of vertical blank times (VBlankPeriodOnlyPacer): the application gives it the display's last vertical blank before
+// every frame, so every frame is for one vertical blank and nothing is a guess but how long before a vertical blank the display
+// takes a frame. The model's displays here take one up to 0.4 of a refresh before it.
+
+namespace
+{
+  //! The frames from the 30th on that were not on screen for their swap interval
+  int32_t DisplayStepsOffTheSwapInterval(const std::vector<Sim::LoopFrame>& frames, const int64_t periodTicks)
+  {
+    int32_t off = 0;
+    for (std::size_t index = 30; index < frames.size(); ++index)
+    {
+      const int64_t refreshes = ((frames[index].ShownTicks - frames[index - 1].ShownTicks) + (periodTicks / 2)) / periodTicks;
+      off += refreshes != int64_t{frames[index - 1].SwapInterval} ? 1 : 0;
+    }
+    return off;
+  }
+
+  //! Light work at 240 Hz, a display that takes a frame so many tenths of a refresh before its vertical blank
+  Sim::LoopSettings LightLoop(const int64_t tenth, const PC::PacerAim aim, const uint32_t waitingPresents = 2)
+  {
+    Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+    settings.Frames = 600;
+    settings.Aim = aim;
+    settings.WaitingPresents = waitingPresents;
+    settings.StartupPauseRefreshes = 0;
+    const int64_t period = PeriodTicks(settings);
+    settings.GpuWork = {period / 5, period / 5};
+    settings.Display.LatchLeadTicks = (period * tenth) / 10;
+    return settings;
+  }
+}
+
+TEST(FrameLoop, WithVerticalBlankTimesLowLatencyShowsANewerFrameAndSmoothnessMakesItEarlier)
+{
+  for (int64_t tenth = 0; tenth < 5; ++tenth)
+  {
+    // Low latency: a frame is on screen about 0.65 of a refresh after its start (the pacer on a timer: a whole one or more)
+    const Sim::LoopSettings lowLatency = LightLoop(tenth, PC::PacerAim::LowLatency);
+    const int64_t period = PeriodTicks(lowLatency);
+    const std::vector<Sim::LoopFrame> fresh = Sim::SimulateVBlankPeriodOnlyLoop(lowLatency);
+    // Smoothness without a reserve: made a refresh earlier. With a frame in reserve: one more
+    const std::vector<Sim::LoopFrame> early = Sim::SimulateVBlankPeriodOnlyLoop(LightLoop(tenth, PC::PacerAim::Smoothness, 1));
+    const std::vector<Sim::LoopFrame> reserve = Sim::SimulateVBlankPeriodOnlyLoop(LightLoop(tenth, PC::PacerAim::Smoothness, 2));
+    for (std::size_t index = 30; index < fresh.size(); ++index)
+    {
+      ASSERT_EQ(HalfRefreshesToDisplay(fresh[index], period), 1) << tenth << ' ' << index;
+      ASSERT_EQ(fresh[index].PendingAtStart, 0) << tenth << ' ' << index;
+      ASSERT_EQ(HalfRefreshesToDisplay(early[index], period), 3) << tenth << ' ' << index;
+      ASSERT_EQ(HalfRefreshesToDisplay(reserve[index], period), 5) << tenth << ' ' << index;
+    }
+    EXPECT_EQ(DisplayStepsOffTheSwapInterval(fresh, period), 0) << tenth;
+    EXPECT_EQ(DisplayStepsOffTheSwapInterval(early, period), 0) << tenth;
+    EXPECT_EQ(DisplayStepsOffTheSwapInterval(reserve, period), 0) << tenth;
+  }
+}
+
+TEST(FrameLoop, ADisplayThatIsSlowerThanItsModeSaysLeavesAPacerOnATimerBehindAndNotOneWithVerticalBlankTimes)
+{
+  // The display's refresh period is 0.2 % longer than the loop was told: the first integration measured 17 to 19 parts in a
+  // million, which is the same thing a hundred times slower
+  Sim::LoopSettings settings = LightLoop(2, PC::PacerAim::LowLatency);
+  settings.Frames = 1'200;
+  settings.DisplayPeriodPpm = 2'000;
+  const int64_t period = PeriodTicks(settings);
+
+  // On a timer the loop makes frames faster than the display shows them, and they pile up
+  const std::vector<Sim::LoopFrame> timer = Sim::SimulateTimerPeriodOnlyLoop(settings);
+  EXPECT_GE(timer.back().PendingAtStart, timer[60].PendingAtStart + 2);
+
+  // With vertical blank times every reading puts the frames back on the display, with either aim
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    settings.Aim = aim;
+    const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+    for (std::size_t index = 60; index < frames.size(); ++index)
+    {
+      ASSERT_EQ(frames[index].PendingAtStart, frames[60].PendingAtStart) << index;
+    }
+    EXPECT_EQ(DisplayStepsOffTheSwapInterval(frames, period), 0);
+  }
+}
+
+TEST(FrameLoop, AtFourRefreshesPerFrameAPacerOnATimerDriftsAcrossTheVerticalBlankAndOneWithVerticalBlankTimesDoesNot)
+{
+  // 60 frames a second at 240 Hz on a display 0.05 % slower than its mode, timers that wake up to 0.1 ms late
+  Sim::LoopSettings settings = LightLoop(2, PC::PacerAim::LowLatency);
+  settings.Frames = 1'200;
+  settings.PreferredSwapInterval = 4;
+  settings.DisplayPeriodPpm = 500;
+  settings.TimerLate = {0, 1'000};
+  const int64_t period = PeriodTicks(settings);
+
+  // On a timer the present is held to a moment that slides against the display, and while it is near a vertical blank frames
+  // fall on either side of it: on screen for three or five refreshes
+  EXPECT_GT(DisplayStepsOffTheSwapInterval(Sim::SimulateTimerPeriodOnlyLoop(settings), period), 5);
+
+  // With vertical blank times every frame is on screen for four, and with the aim of low latency it is on screen 0.65 of a
+  // refresh after its start: it is started in the refresh before its vertical blank, not four refreshes ahead
+  const std::vector<Sim::LoopFrame> fresh = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+  EXPECT_EQ(DisplayStepsOffTheSwapInterval(fresh, period), 0);
+  settings.Aim = PC::PacerAim::Smoothness;
+  const std::vector<Sim::LoopFrame> early = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+  EXPECT_EQ(DisplayStepsOffTheSwapInterval(early, period), 0);
+  for (std::size_t index = 30; index < fresh.size(); ++index)
+  {
+    ASSERT_EQ(fresh[index].SwapInterval, 4u) << index;
+    ASSERT_EQ(HalfRefreshesToDisplay(fresh[index], period), 1) << index;
+    // Made early, a frame is on screen four and a half refreshes after its start
+    ASSERT_EQ(HalfRefreshesToDisplay(early[index], period), 9) << index;
+  }
+}
+
+TEST(FrameLoop, WithVerticalBlankTimesAFrameThatRunsLongLeavesTheLoopWhereItWas)
+{
+  for (int64_t tenth = 0; tenth < 5; ++tenth)
+  {
+    for (const int64_t longPercent : {90, 240})
+    {
+      Sim::LoopSettings settings = LightLoop(tenth, PC::PacerAim::LowLatency);
+      const int64_t period = PeriodTicks(settings);
+      settings.LongFrames = {100};
+      settings.LongFrameCpuTicks = (period * longPercent) / 100;
+
+      // Low latency: the long frame misses its vertical blank, and some refreshes later the loop is exactly where it was
+      const std::vector<Sim::LoopFrame> fresh = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+      EXPECT_GE(DisplayStepsOffTheSwapInterval(fresh, period), 1) << tenth << ' ' << longPercent;
+      EXPECT_LE(DisplayStepsOffTheSwapInterval(fresh, period), 2) << tenth << ' ' << longPercent;
+      for (std::size_t index = 130; index < fresh.size(); ++index)
+      {
+        ASSERT_EQ(fresh[index].PendingAtStart, fresh[90].PendingAtStart) << tenth << ' ' << longPercent << ' ' << index;
+        ASSERT_EQ(HalfRefreshesToDisplay(fresh[index], period), HalfRefreshesToDisplay(fresh[90], period))
+          << tenth << ' ' << longPercent << ' ' << index;
+      }
+
+      // Smoothness with a frame in reserve: 0.9 of a refresh more is not seen at all, and after 2.4 more one frame is on screen
+      // longer and the reserve is what it was, exactly: this pacer knows which vertical blank a frame was ready for
+      settings.Aim = PC::PacerAim::Smoothness;
+      const std::vector<Sim::LoopFrame> reserve = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+      EXPECT_EQ(DisplayStepsOffTheSwapInterval(reserve, period), longPercent == 90 ? 0 : 1) << tenth << ' ' << longPercent;
+      for (std::size_t index = 130; index < reserve.size(); ++index)
+      {
+        ASSERT_EQ(reserve[index].PendingAtStart, reserve[90].PendingAtStart) << tenth << ' ' << longPercent << ' ' << index;
+      }
+    }
+  }
+}
+
+TEST(FrameLoop, WithVerticalBlankTimesAndGpuWorkReportsAHeavyGpuLoadIsHeldAndOneThatDoesNotFitSlowsTheLoopDown)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    // GPU work of 90 % of a refresh at a fixed swap interval of one: a frame is started, or presented, that much sooner, and
+    // every frame is on screen for one refresh
+    Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+    settings.Frames = 800;
+    settings.Aim = aim;
+    settings.ReportsGpuWork = true;
+    settings.StartupPauseRefreshes = 0;
+    settings.Display.LatchLeadTicks = PeriodTicks(settings) / 5;
+    const int64_t period = PeriodTicks(settings);
+    const std::vector<Sim::LoopFrame> held = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+    EXPECT_EQ(DisplayStepsOffTheSwapInterval(held, period), 0);
+    EXPECT_EQ(held.back().WorkGpuTicks, (period * 9) / 10);
+
+    // GPU work of 130 % with the rule on: two refreshes per frame
+    settings.AutoSwapInterval = true;
+    settings.Frames = 1'200;
+    settings.GpuWork = {(period * 13) / 10, (period * 13) / 10};
+    settings.WaitsForPreviousGpuWork = false;
+    settings.MaxFramesInFlight = 2;
+    const std::vector<Sim::LoopFrame> slowed = Sim::SimulateVBlankPeriodOnlyLoop(settings);
+    EXPECT_EQ(slowed.back().SwapInterval, 2u);
+    for (std::size_t index = slowed.size() - 200; index < slowed.size(); ++index)
+    {
+      ASSERT_EQ(slowed[index].SwapInterval, 2u) << index;
+      ASSERT_NEAR(static_cast<double>(slowed[index].ShownTicks - slowed[index - 1].ShownTicks), static_cast<double>(2 * period), 2.0) << index;
+    }
+  }
+}

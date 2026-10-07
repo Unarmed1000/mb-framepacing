@@ -116,6 +116,12 @@ namespace MB::FramePacing::Pacer
     m_startupPauseRefreshes = std::min(refreshes, MaxStartupPauseRefreshes);
   }
 
+  void PacerSettings::SetReadyPlacePercent(const uint32_t percent) noexcept
+  {
+    assert(percent <= MaxReadyPlacePercent);
+    m_readyPlacePercent = std::min(percent, MaxReadyPlacePercent);
+  }
+
   void PacerSettings::SetStartupPauseDelay(const TimeSpan delay) noexcept
   {
     assert(delay >= TimeSpan() && delay <= MaxStartupPauseDelay);
