@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include "FrameLogReplay.hpp"
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
@@ -21,6 +21,15 @@ namespace MB::FramePacing::Pacer::Simulation
 {
   namespace
   {
+    //! A frame log is the first integration's, which counts in ticks of 100 ns: its times are made nanoseconds where they are read
+    constexpr int64_t NanosecondsPerTick = NanosecondTimeSpan::NanosecondsPerTick;
+
+    //! True when two times are no further apart than within
+    constexpr bool Near(const int64_t first, const int64_t second, const int64_t within) noexcept
+    {
+      return (first >= second ? first - second : second - first) <= within;
+    }
+
     //! A line's cells, the empty ones kept
     std::vector<std::string_view> Cells(const std::string_view line)
     {
@@ -74,9 +83,9 @@ namespace MB::FramePacing::Pacer::Simulation
     };
 
     //! A span in whole refreshes, rounded, with its sign
-    int64_t Refreshes(const RefreshPeriod period, const int64_t ticks) noexcept
+    int64_t Refreshes(const RefreshPeriod period, const int64_t nanoseconds) noexcept
     {
-      return ticks >= 0 ? period.NearestRefreshes(TimeSpan(ticks)) : -period.NearestRefreshes(TimeSpan(-ticks));
+      return nanoseconds >= 0 ? period.NearestRefreshes(NanosecondTimeSpan(nanoseconds)) : -period.NearestRefreshes(NanosecondTimeSpan(-nanoseconds));
     }
   }
 
@@ -121,20 +130,20 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.FrameIndex = columns.At(row, "frameIndex");
       // A log without the column is of a run with the pacer on
       frame.PacerOn = !columns.Has("pacerOn") || columns.At(row, "pacerOn") != 0;
-      frame.StartTicks = columns.At(row, "frameStartTicks");
-      frame.EndFrameTicks = columns.At(row, "endFrameTicks");
-      frame.WorkTicks = columns.At(row, "workCpuTicks") + columns.At(row, "workGpuTicks");
-      frame.PresentTicks = columns.At(row, "presentCallTicks");
-      frame.ShownTicks = columns.At(row, "firstPixelOutTicks");
-      if (frame.ShownTicks == 0)
+      frame.StartNanoseconds = (columns.At(row, "frameStartTicks") * NanosecondsPerTick);
+      frame.EndFrameNanoseconds = (columns.At(row, "endFrameTicks") * NanosecondsPerTick);
+      frame.WorkNanoseconds = (columns.At(row, "workCpuTicks") * NanosecondsPerTick) + (columns.At(row, "workGpuTicks") * NanosecondsPerTick);
+      frame.PresentNanoseconds = (columns.At(row, "presentCallTicks") * NanosecondsPerTick);
+      frame.ShownNanoseconds = (columns.At(row, "firstPixelOutTicks") * NanosecondsPerTick);
+      if (frame.ShownNanoseconds == 0)
       {
-        frame.ShownTicks = columns.At(row, "feedbackDisplayTicks");
+        frame.ShownNanoseconds = (columns.At(row, "feedbackDisplayTicks") * NanosecondsPerTick);
       }
       frame.SwapInterval = static_cast<uint32_t>(std::max<int64_t>(columns.At(row, "swapInterval"), 0));
-      frame.AnimationStepTicks = columns.At(row, "animationStepTicks");
-      frame.IntendedDisplayTicks = columns.At(row, "intendedDisplayTicks");
-      frame.NextFrameStartTicks = columns.At(row, "nextFrameStartTicks");
-      frame.TargetFrameTimeTicks = columns.At(row, "targetFrameTimeTicks");
+      frame.AnimationStepNanoseconds = (columns.At(row, "animationStepTicks") * NanosecondsPerTick);
+      frame.IntendedDisplayNanoseconds = (columns.At(row, "intendedDisplayTicks") * NanosecondsPerTick);
+      frame.NextFrameStartNanoseconds = (columns.At(row, "nextFrameStartTicks") * NanosecondsPerTick);
+      frame.TargetFrameTimeNanoseconds = (columns.At(row, "targetFrameTimeTicks") * NanosecondsPerTick);
       if (const int64_t frameId = columns.At(row, "pacerFrameId"); frameId != 0)
       {
         idsAhead.push_back(frameId - frame.FrameIndex);
@@ -169,9 +178,9 @@ namespace MB::FramePacing::Pacer::Simulation
     std::map<int64_t, int64_t> counts;
     for (const LoggedFrame& frame : frames)
     {
-      if (frame.TargetFrameTimeTicks > 0 && frame.SwapInterval > 0)
+      if (frame.TargetFrameTimeNanoseconds > 0 && frame.SwapInterval > 0)
       {
-        ++counts[frame.TargetFrameTimeTicks / static_cast<int64_t>(frame.SwapInterval)];
+        ++counts[frame.TargetFrameTimeNanoseconds / static_cast<int64_t>(frame.SwapInterval)];
       }
     }
     if (counts.empty())
@@ -179,7 +188,7 @@ namespace MB::FramePacing::Pacer::Simulation
       throw std::runtime_error("the frame log has no target frame time to take its refresh period from");
     }
     const auto most = std::max_element(counts.begin(), counts.end(), [](const auto& left, const auto& right) { return left.second < right.second; });
-    return RefreshPeriod::FromTimeSpan(TimeSpan(most->first));
+    return RefreshPeriod::FromNanosecondTimeSpan(NanosecondTimeSpan(most->first));
   }
 
   ReplayResult ReplayLog(const std::vector<LoggedFrame>& frames, const RefreshPeriod period, const bool autoSwapInterval)
@@ -194,23 +203,26 @@ namespace MB::FramePacing::Pacer::Simulation
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
       const LoggedFrame& frame = frames[index];
-      if (!frame.PacerOn || frame.StartTicks == 0)
+      if (!frame.PacerOn || frame.StartNanoseconds == 0)
       {
         continue;
       }
-      const FrameSchedule schedule = pacer.BeginFrame(TickCount64(frame.StartTicks));
-      if (frame.EndFrameTicks != 0)
+      const FrameSchedule schedule = pacer.BeginFrame(NanosecondTickCount(frame.StartNanoseconds));
+      if (frame.EndFrameNanoseconds != 0)
       {
-        static_cast<void>(pacer.EndFrame(TickCount64(frame.EndFrameTicks), TimeSpan(frame.WorkTicks)));
+        static_cast<void>(pacer.EndFrame(NanosecondTickCount(frame.EndFrameNanoseconds), NanosecondTimeSpan(frame.WorkNanoseconds)));
       }
       ++result.Frames;
 
-      const int64_t nextFrameStartTicks = schedule.NextFrameStartTime.Ticks();
+      const int64_t nextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
       if (frame.SwapInterval != 0)
       {
         ++result.Compared;
-        if (schedule.SwapInterval == frame.SwapInterval && schedule.AnimationStep.Ticks() == frame.AnimationStepTicks &&
-            (frame.NextFrameStartTicks == 0 || nextFrameStartTicks == frame.NextFrameStartTicks))
+        // The log holds ticks: its frame start, its refresh period and its answers are each rounded to one, the period once for
+        // every refresh of the swap interval
+        const int64_t within = NanosecondsPerTick * (2 + int64_t{schedule.SwapInterval});
+        if (schedule.SwapInterval == frame.SwapInterval && Near(schedule.AnimationStep.Nanoseconds(), frame.AnimationStepNanoseconds, within) &&
+            (frame.NextFrameStartNanoseconds == 0 || Near(nextFrameStartNanoseconds, frame.NextFrameStartNanoseconds, within)))
         {
           ++result.Agreeing;
         }
@@ -221,27 +233,27 @@ namespace MB::FramePacing::Pacer::Simulation
       for (std::size_t earlier = index; earlier > 0 && index - earlier < 64; --earlier)
       {
         const LoggedFrame& before = frames[earlier - 1];
-        if (before.PresentTicks != 0 && before.PresentTicks <= frame.StartTicks && before.ShownTicks > frame.StartTicks)
+        if (before.PresentNanoseconds != 0 && before.PresentNanoseconds <= frame.StartNanoseconds && before.ShownNanoseconds > frame.StartNanoseconds)
         {
           ++pending;
         }
       }
       ++result.PendingAtStart[pending];
 
-      const int64_t intendedTicks = schedule.IntendedDisplayTime.Ticks();
-      out << frame.FrameIndex << ',' << frame.StartTicks << ',' << schedule.SwapInterval << ',' << frame.SwapInterval << ','
-          << schedule.AnimationStep.Ticks() << ',' << frame.AnimationStepTicks << ',' << nextFrameStartTicks << ',' << frame.NextFrameStartTicks
-          << ',' << intendedTicks << ',';
-      if (frame.ShownTicks != 0)
+      const int64_t intendedNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
+      out << frame.FrameIndex << ',' << frame.StartNanoseconds << ',' << schedule.SwapInterval << ',' << frame.SwapInterval << ','
+          << schedule.AnimationStep.Nanoseconds() << ',' << frame.AnimationStepNanoseconds << ',' << nextFrameStartNanoseconds << ','
+          << frame.NextFrameStartNanoseconds << ',' << intendedNanoseconds << ',';
+      if (frame.ShownNanoseconds != 0)
       {
         ++result.Shown;
-        const int64_t toDisplay = Refreshes(period, frame.ShownTicks - frame.StartTicks);
+        const int64_t toDisplay = Refreshes(period, frame.ShownNanoseconds - frame.StartNanoseconds);
         ++result.RefreshesToDisplay[toDisplay];
-        out << frame.ShownTicks << ',';
-        if (intendedTicks != 0)
+        out << frame.ShownNanoseconds << ',';
+        if (intendedNanoseconds != 0)
         {
-          ++result.RefreshesAfterIntended[Refreshes(period, frame.ShownTicks - intendedTicks)];
-          out << (frame.ShownTicks - intendedTicks);
+          ++result.RefreshesAfterIntended[Refreshes(period, frame.ShownNanoseconds - intendedNanoseconds)];
+          out << (frame.ShownNanoseconds - intendedNanoseconds);
         }
         out << ',' << toDisplay;
       }

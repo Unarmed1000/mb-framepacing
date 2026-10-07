@@ -20,7 +20,7 @@ namespace MB::FramePacing::Pacer
   {
   }
 
-  uint64_t FramesInFlight::Begin(const uint32_t swapInterval, const TickCount64 startTime) noexcept
+  uint64_t FramesInFlight::Begin(const uint32_t swapInterval, const NanosecondTickCount startTime) noexcept
   {
     ++m_newestId;
     if (m_newestId - m_oldestId >= Capacity)
@@ -41,7 +41,7 @@ namespace MB::FramePacing::Pacer
     return m_newestId;
   }
 
-  void FramesInFlight::End(const TickCount64 presentTime) noexcept
+  void FramesInFlight::End(const NanosecondTickCount presentTime) noexcept
   {
     if (m_newestId >= m_oldestId)
     {
@@ -74,7 +74,7 @@ namespace MB::FramePacing::Pacer
     }
     if (m_hasAnchor)
     {
-      const TimeSpan step = feedback.DisplayTime - m_anchorTime;
+      const NanosecondTimeSpan step = feedback.DisplayTime - m_anchorTime;
       if (IsWholeRefreshes(step))
       {
         // The refreshes since the display time used before, against the swap intervals of the frames from that one to this one. What
@@ -106,11 +106,11 @@ namespace MB::FramePacing::Pacer
     ++m_state.Used;
   }
 
-  TickCount64 FramesInFlight::IntendedDisplayTime() const noexcept
+  NanosecondTickCount FramesInFlight::IntendedDisplayTime() const noexcept
   {
     // From the display time alone, without the lead: a frame shown a refresh early (a loop paced by sleeping does that now and then)
     // is followed by frames a swap interval after it, not a refresh later still
-    return m_hasAnchor ? m_anchorTime + m_period.TimeFor(static_cast<int64_t>(m_swapSum - m_anchorSwapSum)) : TickCount64();
+    return m_hasAnchor ? m_anchorTime + m_period.TimeFor(static_cast<int64_t>(m_swapSum - m_anchorSwapSum)) : NanosecondTickCount();
   }
 
   void FramesInFlight::Restart() noexcept
@@ -133,11 +133,11 @@ namespace MB::FramePacing::Pacer
     return m_entries[frameId % Capacity];
   }
 
-  bool FramesInFlight::IsWholeRefreshes(const TimeSpan step) const noexcept
+  bool FramesInFlight::IsWholeRefreshes(const NanosecondTimeSpan step) const noexcept
   {
     // A step back counts as none: the same refresh, when it is within the tolerance
-    const int64_t off = step.Ticks() - m_period.TimeFor(m_period.NearestRefreshes(step)).Ticks();
-    const int64_t tolerance = m_period.ToTimeSpan().Ticks() / GridToleranceDivisor;
+    const int64_t off = step.Nanoseconds() - m_period.TimeFor(m_period.NearestRefreshes(step)).Nanoseconds();
+    const int64_t tolerance = m_period.ToNanosecondTimeSpan().Nanoseconds() / GridToleranceDivisor;
     return off >= -tolerance && off <= tolerance;
   }
 }

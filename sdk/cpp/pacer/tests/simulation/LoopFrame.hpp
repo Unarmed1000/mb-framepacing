@@ -13,29 +13,29 @@ namespace MB::FramePacing::Pacer::Simulation
   {
     uint64_t FrameId{0};
     //! The wait for the frame's start: where it began and the time it waited for
-    int64_t WaitBeginTicks{0};
-    int64_t WaitTargetTicks{0};
-    int64_t StartTicks{0};
+    int64_t WaitBeginNanoseconds{0};
+    int64_t WaitTargetNanoseconds{0};
+    int64_t StartNanoseconds{0};
     //! The CPU's work done: the submit, and where the pacer's EndFrame is called
-    int64_t WorkEndTicks{0};
-    int64_t GpuBeginTicks{0};
-    int64_t GpuEndTicks{0};
+    int64_t WorkEndNanoseconds{0};
+    int64_t GpuBeginNanoseconds{0};
+    int64_t GpuEndNanoseconds{0};
     //! The wait before the present: where it began and the time it waited for
-    int64_t PresentWaitBeginTicks{0};
-    int64_t PresentWaitTargetTicks{0};
-    int64_t PresentTicks{0};
-    int64_t ShownTicks{0};
+    int64_t PresentWaitBeginNanoseconds{0};
+    int64_t PresentWaitTargetNanoseconds{0};
+    int64_t PresentNanoseconds{0};
+    int64_t ShownNanoseconds{0};
     //! The frames presented and not yet shown when this frame started
     int32_t PendingAtStart{0};
     //! The work the pacer was given: the CPU's, and the GPU's of the frame before
-    int64_t WorkCpuTicks{0};
-    int64_t WorkGpuTicks{0};
+    int64_t WorkCpuNanoseconds{0};
+    int64_t WorkGpuNanoseconds{0};
     uint32_t SwapInterval{1};
-    int64_t AnimationTicks{0};
-    int64_t AnimationStepTicks{0};
-    int64_t IntendedDisplayTicks{0};
-    int64_t NextFrameStartTicks{0};
-    int64_t TargetFrameTimeTicks{0};
+    int64_t AnimationNanoseconds{0};
+    int64_t AnimationStepNanoseconds{0};
+    int64_t IntendedDisplayNanoseconds{0};
+    int64_t NextFrameStartNanoseconds{0};
+    int64_t TargetFrameTimeNanoseconds{0};
     uint32_t WindowFrames{0};
     uint32_t WindowLateFrames{0};
   };

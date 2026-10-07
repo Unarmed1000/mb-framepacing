@@ -14,10 +14,10 @@ namespace MB::FramePacing::Pacer
     constexpr int64_t RefreshesPerSlack = 20;
   }
 
-  void PacerSettings::SetPreferredFrameTime(const TimeSpan frameTime) noexcept
+  void PacerSettings::SetPreferredFrameTime(const NanosecondTimeSpan frameTime) noexcept
   {
-    assert(frameTime >= TimeSpan() && frameTime <= MaxPreferredFrameTime);
-    m_preferredFrameTime = std::clamp(frameTime, TimeSpan(), MaxPreferredFrameTime);
+    assert(frameTime >= NanosecondTimeSpan() && frameTime <= MaxPreferredFrameTime);
+    m_preferredFrameTime = std::clamp(frameTime, NanosecondTimeSpan(), MaxPreferredFrameTime);
   }
 
   void PacerSettings::SetPreferredFrameRate(const uint32_t numerator, const uint32_t denominator) noexcept
@@ -25,14 +25,14 @@ namespace MB::FramePacing::Pacer
     assert(numerator > 0 && denominator > 0);
     if (numerator == 0 || denominator == 0)
     {
-      m_preferredFrameTime = TimeSpan();
+      m_preferredFrameTime = NanosecondTimeSpan();
       return;
     }
-    // TicksPerSecond * denominator / numerator, rounded to the nearest tick, at least a tick
-    const uint64_t dividend = static_cast<uint64_t>(TimeSpan::TicksPerSecond) * denominator;
-    const uint64_t ticks =
-      std::clamp((dividend + (numerator / 2u)) / numerator, uint64_t{1}, static_cast<uint64_t>(MaxPreferredFrameTime.Ticks()) + 1u);
-    SetPreferredFrameTime(TimeSpan(static_cast<int64_t>(ticks)));
+    // NanosecondsPerSecond * denominator / numerator, rounded to the nearest nanosecond, at least a nanosecond
+    const uint64_t dividend = static_cast<uint64_t>(NanosecondTimeSpan::NanosecondsPerSecond) * denominator;
+    const uint64_t nanoseconds =
+      std::clamp((dividend + (numerator / 2u)) / numerator, uint64_t{1}, static_cast<uint64_t>(MaxPreferredFrameTime.Nanoseconds()) + 1u);
+    SetPreferredFrameTime(NanosecondTimeSpan(static_cast<int64_t>(nanoseconds)));
   }
 
   void PacerSettings::SetPreferredSwapInterval(const uint32_t swapInterval) noexcept
@@ -43,8 +43,8 @@ namespace MB::FramePacing::Pacer
 
   uint32_t PacerSettings::PreferredSwapIntervalAt(const RefreshPeriod refresh) const noexcept
   {
-    const TimeSpan slack(refresh.ToTimeSpan().Ticks() / RefreshesPerSlack);
-    const int64_t needed = refresh.RefreshesToFit(TimeSpan(m_preferredFrameTime.Ticks() - slack.Ticks()));
+    const NanosecondTimeSpan slack(refresh.ToNanosecondTimeSpan().Nanoseconds() / RefreshesPerSlack);
+    const int64_t needed = refresh.RefreshesToFit(NanosecondTimeSpan(m_preferredFrameTime.Nanoseconds() - slack.Nanoseconds()));
     return static_cast<uint32_t>(std::clamp(needed, int64_t{m_preferredSwapInterval}, int64_t{MaxSwapInterval}));
   }
 
@@ -55,7 +55,7 @@ namespace MB::FramePacing::Pacer
     m_slowDown = known ? rule : SlowDownRule::LateCount;
   }
 
-  void PacerSettings::SetFrameWindowLength(const TimeSpan length) noexcept
+  void PacerSettings::SetFrameWindowLength(const NanosecondTimeSpan length) noexcept
   {
     assert(length >= MinFrameWindowLength && length <= MaxFrameWindowLength);
     m_frameWindowLength = std::clamp(length, MinFrameWindowLength, MaxFrameWindowLength);
@@ -67,22 +67,24 @@ namespace MB::FramePacing::Pacer
     m_slowDownLatePercent = std::min(percent, MaxSlowDownLatePercent);
   }
 
-  TimeSpan PacerSettings::FrameMarginAt(const RefreshPeriod refresh) const noexcept
+  NanosecondTimeSpan PacerSettings::FrameMarginAt(const RefreshPeriod refresh) const noexcept
   {
-    return m_frameMarginSet ? m_frameMargin : std::min(DefaultFrameMargin, TimeSpan(refresh.ToTimeSpan().Ticks() / DefaultFrameMarginDivisor));
+    return m_frameMarginSet
+             ? m_frameMargin
+             : std::min(DefaultFrameMargin, NanosecondTimeSpan(refresh.ToNanosecondTimeSpan().Nanoseconds() / DefaultFrameMarginDivisor));
   }
 
-  void PacerSettings::SetFrameMargin(const TimeSpan margin) noexcept
+  void PacerSettings::SetFrameMargin(const NanosecondTimeSpan margin) noexcept
   {
-    assert(margin >= TimeSpan() && margin <= MaxFrameMargin);
-    m_frameMargin = std::clamp(margin, TimeSpan(), MaxFrameMargin);
+    assert(margin >= NanosecondTimeSpan() && margin <= MaxFrameMargin);
+    m_frameMargin = std::clamp(margin, NanosecondTimeSpan(), MaxFrameMargin);
     m_frameMarginSet = true;
   }
 
-  void PacerSettings::SetSlowestFrameTime(const TimeSpan frameTime) noexcept
+  void PacerSettings::SetSlowestFrameTime(const NanosecondTimeSpan frameTime) noexcept
   {
-    assert(frameTime >= TimeSpan() && frameTime <= MaxSlowestFrameTime);
-    m_slowestFrameTime = std::clamp(frameTime, TimeSpan(), MaxSlowestFrameTime);
+    assert(frameTime >= NanosecondTimeSpan() && frameTime <= MaxSlowestFrameTime);
+    m_slowestFrameTime = std::clamp(frameTime, NanosecondTimeSpan(), MaxSlowestFrameTime);
   }
 
   void PacerSettings::SetAim(const PacerAim aim) noexcept
@@ -122,9 +124,9 @@ namespace MB::FramePacing::Pacer
     m_readyPlacePercent = std::min(percent, MaxReadyPlacePercent);
   }
 
-  void PacerSettings::SetStartupPauseDelay(const TimeSpan delay) noexcept
+  void PacerSettings::SetStartupPauseDelay(const NanosecondTimeSpan delay) noexcept
   {
-    assert(delay >= TimeSpan() && delay <= MaxStartupPauseDelay);
-    m_startupPauseDelay = std::clamp(delay, TimeSpan(), MaxStartupPauseDelay);
+    assert(delay >= NanosecondTimeSpan() && delay <= MaxStartupPauseDelay);
+    m_startupPauseDelay = std::clamp(delay, NanosecondTimeSpan(), MaxStartupPauseDelay);
   }
 }

@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -13,9 +13,9 @@ namespace MB::FramePacing::Pacer
   {
     //! The animation time: the frame's predicted display time on the display's clock. Render the frame for it; it is the marker's
     //! animation time.
-    TimeSpan Time;
+    NanosecondTimeSpan Time;
     //! The step from the previous frame's animation time.
-    TimeSpan Step;
+    NanosecondTimeSpan Step;
     //! The step in whole refreshes.
     uint32_t StepRefreshes{0};
   };

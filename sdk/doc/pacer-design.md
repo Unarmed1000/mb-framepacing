@@ -544,8 +544,7 @@ the vertical blank):
 the period from the readings (it does not need to, for where its frames are; the animation time still advances by the
 period it was given, 17 to 19 parts in a million off on the one system measured). It does not learn of a frame that waits
 although it was ready in time, as no pacer does that has the refresh period only for that. The application's own waits and a
-swap chain that holds the loop are the open decision 6. Its times are in ticks of 100 ns like the other tier pacers';
-nanoseconds follow when the marker and the tools have them.
+swap chain that holds the loop are decision 6.
 
 ### Next: vertical blank times with a wait for a present (proposed, not built)
 
@@ -586,6 +585,26 @@ in the frame's swap intervals).
 
 **To decide before it is built:** whether the default of the presents that may wait differs by aim here (one with low
 latency, two with smoothness), where today one setting with a default of two serves both.
+
+## Every time is in nanoseconds
+
+Decided on 2026-10-07 and built: the whole pacer module counts in nanoseconds, the unit in which no platform loses
+anything (a platform that counts in ticks of 100 ns multiplies by 100; one that counts in nanoseconds lost up to 99 ns on
+every value it put into ticks, and for a refresh period that is a rate error: 21 parts in a million for the measured
+display's 4,166,389 ns when cut to a tick).
+
+- A point on the application's steady clock is a `NanosecondTickCount`, a span a `NanosecondTimeSpan`, a length of time
+  that can not be negative a `NanosecondTimeDuration`, and a value for one of the marker's 32-bit fields a
+  `NanosecondTimeSpan32`.
+- `RefreshPeriod` is exact to 2^-32 of a nanosecond: from a rate (`FromRate`), or from a period in whole nanoseconds as a
+  platform gives one (`FromNanosecondTimeSpan`).
+- A value that does not fit a 32-bit field of the marker (4.29 s) is capped, never cut and never an error: the CPU busy
+  time at the field's largest value, a frame time one below it, as the largest says "on demand" there.
+- The pacer's own golden files are in nanoseconds, and row for row what they were in ticks: every decision the same, every
+  time within 33 ns of the tick it was. The first integration's frame logs, and the two real logs kept as test data, stay in
+  ticks as they were recorded, and are made nanoseconds where they are read.
+- The marker's payload still takes tick types until the marker itself counts in nanoseconds; until then an application
+  converts where it fills the payload (`ToTimeSpan`, `ToTickCount64`).
 
 ## What the application plugs in
 
@@ -1229,10 +1248,13 @@ checked. Four things are settled now, because they cost little now and a second 
    image wait goes with the fewest images the swap chain allows.
    Since the third measurements this has a case: with the aim of smoothness and no wait for a present, a full swap chain
    paced the loop by itself, steadily in one run and not in another, and the pacer neither chose it nor knew of it.
-   Proposed: where the application says the system holds the loop when its queue is full, smoothness means that on
-   purpose (no time to start at, the reserve is what the swap chain holds, no frames made ahead on top of it), and for
-   that the pacer is told of the application's own waits and of how many frames the swap chain holds. Where nothing holds
-   the loop, the reserve by count stays.
+   Decided on 2026-10-07, not built yet: where the application says the system holds the loop when its queue is full, and
+   the pacer sees those waits happen, smoothness means that on purpose (no time to start at, the reserve is what the swap
+   chain holds, no frames made ahead on top of it); and the pacer is told of the application's own waits (so a loop that
+   is held is not taken for one that is late) and of how many frames the swap chain holds (so no reserve is asked for
+   that it can not take). Where nothing holds the loop, the reserve by count stays. Still proposed, and not answered: it
+   is how smoothness behaves in the pacers that have the refresh period only, and no queue tier of its own, as it
+   promises less than a wait for a present (how many frames wait is the swap chain's number).
 7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
 8. **The aim where two goals pull apart**: it is the application's choice between the two aims. Not latency optimized: no
    missed refreshes first, then the frame rate asked for, and latency is what that costs. Latency optimized: the fewest
@@ -1254,7 +1276,7 @@ checked. Four things are settled now, because they cost little now and a second 
 ## What changes for whom
 
 - The pacer's public types change throughout (the SDK is at 0.1.0 with no release): `FramePacer`'s calls, `FrameSchedule`, the
-  settings, present feedback. Durations become `TimeDuration`.
+  settings, present feedback. Every time is in nanoseconds (below).
 - The first integration's sample loses its hold methods, profiles and due times, and keeps the waits, the present and the
   measurements.
 - The frame log's pacer chunks follow the new calls, and get the capability sets and the ratings.

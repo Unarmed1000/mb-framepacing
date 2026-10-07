@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/frame/PresentFeedback.hpp>
 #include <mb/framepacing/pacer/frame/PresentFeedbackState.hpp>
@@ -40,7 +40,7 @@ namespace MB::FramePacing::Pacer
     {
       // The swap intervals of every frame begun up to this one, added up
       uint64_t SwapSum{0};
-      TickCount64 PresentTime;
+      NanosecondTickCount PresentTime;
     };
 
     RefreshPeriod m_period;
@@ -52,14 +52,14 @@ namespace MB::FramePacing::Pacer
     uint64_t m_swapSum{0};
     // The display time used last: the count's anchor
     bool m_hasAnchor{false};
-    TickCount64 m_anchorTime;
+    NanosecondTickCount m_anchorTime;
     uint64_t m_anchorId{0};
     uint64_t m_anchorSwapSum{0};
     // Refreshes the count is ahead of the display
     uint64_t m_lead{0};
     // A display time that was refused as off the anchor's grid
     bool m_hasCandidate{false};
-    TickCount64 m_candidateTime;
+    NanosecondTickCount m_candidateTime;
     PresentFeedbackState m_state;
 
   public:
@@ -67,17 +67,17 @@ namespace MB::FramePacing::Pacer
 
     //! A frame begins, at startTime on the application's steady clock, paced at swapInterval: its id (the first is 1, each one more).
     //! The oldest frame leaves when Capacity frames are kept.
-    uint64_t Begin(uint32_t swapInterval, TickCount64 startTime) noexcept;
+    uint64_t Begin(uint32_t swapInterval, NanosecondTickCount startTime) noexcept;
 
     //! The time the newest frame is presented at (the frame's start until this is called). Nothing without a frame.
-    void End(TickCount64 presentTime) noexcept;
+    void End(NanosecondTickCount presentTime) noexcept;
 
     //! Present feedback for a frame that was begun: oldest first, at most once a frame.
     void Add(const PresentFeedback& feedback) noexcept;
 
     //! When the newest frame is shown if no frame from the newest display time used to it is late, on the application's steady clock:
-    //! that display time plus the swap intervals since. TickCount64() (unknown) while no display time is in use.
-    [[nodiscard]] TickCount64 IntendedDisplayTime() const noexcept;
+    //! that display time plus the swap intervals since. NanosecondTickCount() (unknown) while no display time is in use.
+    [[nodiscard]] NanosecondTickCount IntendedDisplayTime() const noexcept;
 
     //! The id of the newest frame begun, 0 before the first.
     [[nodiscard]] uint64_t NewestFrameId() const noexcept
@@ -104,7 +104,7 @@ namespace MB::FramePacing::Pacer
 
   private:
     [[nodiscard]] Entry& At(uint64_t frameId) noexcept;
-    [[nodiscard]] bool IsWholeRefreshes(TimeSpan step) const noexcept;
+    [[nodiscard]] bool IsWholeRefreshes(NanosecondTimeSpan step) const noexcept;
   };
 }
 

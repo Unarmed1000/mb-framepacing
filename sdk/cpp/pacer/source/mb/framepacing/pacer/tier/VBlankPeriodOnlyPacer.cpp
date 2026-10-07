@@ -3,12 +3,12 @@
 //
 // EXPERIMENTAL. The pacer of vertical blank times (sdk/doc/pacer-design.md): every frame is for one vertical blank of the display,
 // made early and its present held (smoothness) or its start held so that it is ready just in time (low latency).
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
 #include <algorithm>
-#include <limits>
+#include "../detail/MarkerValue.hpp"
 
 namespace MB::FramePacing::Pacer
 {
@@ -18,13 +18,6 @@ namespace MB::FramePacing::Pacer
     constexpr int64_t JumpDivisor = 8;
     //! The most refreshes an animation step is counted in: far more than a frame window holds
     constexpr int64_t MaxStepRefreshes = int64_t{1} << 20;
-
-    //! A span that the marker's 32-bit fields hold: zero (unknown) when it is negative or too long for them.
-    TimeSpan32 ToTimeSpan32(const TimeSpan span) noexcept
-    {
-      const int64_t ticks = span.Ticks();
-      return ticks >= 0 && ticks <= int64_t{std::numeric_limits<uint32_t>::max()} ? TimeSpan32(static_cast<uint32_t>(ticks)) : TimeSpan32();
-    }
   }
 
   VBlankPeriodOnlyPacer::VBlankPeriodOnlyPacer(const PacerSettings& settings)
@@ -32,36 +25,36 @@ namespace MB::FramePacing::Pacer
   {
   }
 
-  bool VBlankPeriodOnlyPacer::StartsAgainAt(const TickCount64 time) const noexcept
+  bool VBlankPeriodOnlyPacer::StartsAgainAt(const NanosecondTickCount time) const noexcept
   {
     if (!m_hasFrame)
     {
       return true;
     }
     // A pause the pacer did not ask for, or a clock that went back: nothing is measured across it
-    const TimeSpan gap = time - m_startTime;
-    const TimeSpan reach =
+    const NanosecondTimeSpan gap = time - m_startTime;
+    const NanosecondTimeSpan reach =
       std::max(m_rule.Settings().FrameWindowLength(), m_rule.Refresh().TimeFor(int64_t{2} * (int64_t{m_swapInterval} + m_pauseSlots)));
-    return gap < TimeSpan() || gap > reach;
+    return gap < NanosecondTimeSpan() || gap > reach;
   }
 
-  TickCount64 VBlankPeriodOnlyPacer::TimeOfBlank(const int64_t slot) const noexcept
+  NanosecondTickCount VBlankPeriodOnlyPacer::TimeOfBlank(const int64_t slot) const noexcept
   {
     const int64_t steps = slot - m_anchorSlot;
     return steps >= 0 ? m_anchorTime + m_rule.Refresh().TimeFor(steps) : m_anchorTime - m_rule.Refresh().TimeFor(-steps);
   }
 
-  int64_t VBlankPeriodOnlyPacer::BlankAtOrBefore(const TickCount64 time) const noexcept
+  int64_t VBlankPeriodOnlyPacer::BlankAtOrBefore(const NanosecondTickCount time) const noexcept
   {
-    const int64_t ticks = (time - m_anchorTime).Ticks();
-    return ticks >= 0 ? m_anchorSlot + m_rule.Refresh().FloorRefreshes(TimeSpan(ticks))
-                      : m_anchorSlot - m_rule.Refresh().RefreshesToFit(TimeSpan(-ticks));
+    const int64_t nanoseconds = (time - m_anchorTime).Nanoseconds();
+    return nanoseconds >= 0 ? m_anchorSlot + m_rule.Refresh().FloorRefreshes(NanosecondTimeSpan(nanoseconds))
+                            : m_anchorSlot - m_rule.Refresh().RefreshesToFit(NanosecondTimeSpan(-nanoseconds));
   }
 
-  int64_t VBlankPeriodOnlyPacer::FirstBlankAfterReadyAt(const TickCount64 readyTime) const noexcept
+  int64_t VBlankPeriodOnlyPacer::FirstBlankAfterReadyAt(const NanosecondTickCount readyTime) const noexcept
   {
     // A frame is shown at a vertical blank when it is ready the frame margin before it
-    const TickCount64 time = readyTime + m_rule.Settings().FrameMargin();
+    const NanosecondTickCount time = readyTime + m_rule.Settings().FrameMargin();
     const int64_t slot = BlankAtOrBefore(time);
     return TimeOfBlank(slot) < time ? slot + 1 : slot;
   }
@@ -74,27 +67,27 @@ namespace MB::FramePacing::Pacer
     return settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1 ? int64_t{settings.WaitingPresents()} - 1 : 0;
   }
 
-  TimeSpan VBlankPeriodOnlyPacer::ReadyPlace() const noexcept
+  NanosecondTimeSpan VBlankPeriodOnlyPacer::ReadyPlace() const noexcept
   {
-    return TimeSpan((m_rule.Refresh().ToTimeSpan().Ticks() * int64_t{m_rule.Settings().ReadyPlacePercent()}) / 100);
+    return NanosecondTimeSpan((m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() * int64_t{m_rule.Settings().ReadyPlacePercent()}) / 100);
   }
 
-  TimeSpan VBlankPeriodOnlyPacer::GpuLead() const noexcept
+  NanosecondTimeSpan VBlankPeriodOnlyPacer::GpuLead() const noexcept
   {
     // From the present to the GPU done with the frame: its time on the frame, as far as it is reported
     return m_frameWork.GpuTime().Value();
   }
 
-  TimeSpan VBlankPeriodOnlyPacer::ShortestLead() const noexcept
+  NanosecondTimeSpan VBlankPeriodOnlyPacer::ShortestLead() const noexcept
   {
     // From a frame's start to the end of its CPU work, at least: the shortest of the last frames, the one that just ended
     // among them, and nothing without one
     const std::size_t count = std::min(m_leadCount, LeadFrames);
     if (count == 0)
     {
-      return m_frameEnded ? m_work : TimeSpan();
+      return m_frameEnded ? m_work : NanosecondTimeSpan();
     }
-    TimeSpan lead = m_frameEnded ? std::min(m_work, m_leads[0]) : m_leads[0];
+    NanosecondTimeSpan lead = m_frameEnded ? std::min(m_work, m_leads[0]) : m_leads[0];
     for (std::size_t index = 1; index < count; ++index)
     {
       lead = std::min(lead, m_leads[index]);
@@ -102,11 +95,11 @@ namespace MB::FramePacing::Pacer
     return lead;
   }
 
-  TimeSpan VBlankPeriodOnlyPacer::LongestLead() const noexcept
+  NanosecondTimeSpan VBlankPeriodOnlyPacer::LongestLead() const noexcept
   {
     // The same at most: the longest of the last frames, and no longer than the swap interval's time. A frame that takes longer
     // than that is late whenever it starts, and one such frame is not to make the frames after it start a refresh sooner
-    TimeSpan lead = m_frameEnded ? m_work : TimeSpan();
+    NanosecondTimeSpan lead = m_frameEnded ? m_work : NanosecondTimeSpan();
     for (std::size_t index = 0; index < std::min(m_leadCount, LeadFrames); ++index)
     {
       lead = std::max(lead, m_leads[index]);
@@ -122,7 +115,7 @@ namespace MB::FramePacing::Pacer
     {
       return m_displaySlot;
     }
-    const TickCount64 readyTime = m_presentTime + GpuLead();
+    const NanosecondTickCount readyTime = m_presentTime + GpuLead();
     int64_t shown = FirstBlankAfterReadyAt(readyTime);
     if (shown > m_displaySlot && m_rule.Settings().Aim() == PacerAim::LowLatency)
     {
@@ -136,7 +129,7 @@ namespace MB::FramePacing::Pacer
     return std::max(m_displaySlot, shown);
   }
 
-  int64_t VBlankPeriodOnlyPacer::DisplaySlotFor(const TickCount64 startTime) const noexcept
+  int64_t VBlankPeriodOnlyPacer::DisplaySlotFor(const NanosecondTickCount startTime) const noexcept
   {
     // The first vertical blank a frame that starts now can be ready for, if it takes no longer than the shortest of the
     // last frames. One that takes longer and misses it is found out after its present
@@ -149,13 +142,13 @@ namespace MB::FramePacing::Pacer
     return std::max(ShownSlot() + m_pauseSlots + int64_t{m_rule.SwapInterval()}, earliest);
   }
 
-  TickCount64 VBlankPeriodOnlyPacer::StartTimeFor(const int64_t displaySlot) const noexcept
+  NanosecondTickCount VBlankPeriodOnlyPacer::StartTimeFor(const int64_t displaySlot) const noexcept
   {
     // Low latency: ready at its place in the refresh before its vertical blank, and started no sooner than that takes
     return TimeOfBlank(displaySlot - 1) + ReadyPlace() - LongestLead() - GpuLead() - m_rule.Settings().FrameMargin();
   }
 
-  TickCount64 VBlankPeriodOnlyPacer::PresentTimeFor(const int64_t displaySlot) const noexcept
+  NanosecondTickCount VBlankPeriodOnlyPacer::PresentTimeFor(const int64_t displaySlot) const noexcept
   {
     if (m_rule.Settings().Aim() == PacerAim::LowLatency)
     {
@@ -175,7 +168,7 @@ namespace MB::FramePacing::Pacer
     m_presentTaken = false;
   }
 
-  int64_t VBlankPeriodOnlyPacer::StartupPauseAt(const TickCount64 cpuStartTime) noexcept
+  int64_t VBlankPeriodOnlyPacer::StartupPauseAt(const NanosecondTickCount cpuStartTime) noexcept
   {
     // The pause takes the frames that wait away: it belongs to the aim of low latency
     if (!m_pausePending || m_rule.Settings().Aim() != PacerAim::LowLatency)
@@ -214,14 +207,14 @@ namespace MB::FramePacing::Pacer
     {
       // The vertical blank it is, by where the pacer has them: the frames keep the blanks they are for
       int64_t slot = BlankAtOrBefore(reading.VBlankTime);
-      const int64_t periodTicks = m_rule.Refresh().ToTimeSpan().Ticks();
-      int64_t offTicks = (reading.VBlankTime - TimeOfBlank(slot)).Ticks();
-      if ((offTicks * 2) >= periodTicks)
+      const int64_t periodNanoseconds = m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds();
+      int64_t offNanoseconds = (reading.VBlankTime - TimeOfBlank(slot)).Nanoseconds();
+      if ((offNanoseconds * 2) >= periodNanoseconds)
       {
         ++slot;
-        offTicks = (TimeOfBlank(slot) - reading.VBlankTime).Ticks();
+        offNanoseconds = (TimeOfBlank(slot) - reading.VBlankTime).Nanoseconds();
       }
-      m_vblankJumps += m_hasReading && offTicks > (periodTicks / JumpDivisor) ? 1u : 0u;
+      m_vblankJumps += m_hasReading && offNanoseconds > (periodNanoseconds / JumpDivisor) ? 1u : 0u;
       m_anchorSlot = slot;
     }
     m_anchorTime = reading.VBlankTime;
@@ -230,13 +223,13 @@ namespace MB::FramePacing::Pacer
     m_lastReadTime = reading.ReadTime;
   }
 
-  FrameStartPlan VBlankPeriodOnlyPacer::PlanFrame(const TickCount64 now) const noexcept
+  FrameStartPlan VBlankPeriodOnlyPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
     FrameStartPlan plan;
     // With the aim of smoothness a frame starts at once and its present is held
     if (m_rule.Settings().Aim() == PacerAim::LowLatency && !StartsAgainAt(now))
     {
-      const TickCount64 start = StartTimeFor(DisplaySlotFor(now));
+      const NanosecondTickCount start = StartTimeFor(DisplaySlotFor(now));
       if (start > now)
       {
         plan.StartTime = start;
@@ -245,7 +238,7 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  FrameSchedule VBlankPeriodOnlyPacer::BeginFrame(const TickCount64 cpuStartTime) noexcept
+  FrameSchedule VBlankPeriodOnlyPacer::BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
   {
     const RefreshPeriod period = m_rule.Refresh();
     const bool isLowLatency = m_rule.Settings().Aim() == PacerAim::LowLatency;
@@ -267,13 +260,13 @@ namespace MB::FramePacing::Pacer
       // interval's time. Without an EndFrame its work is not known, and the time to this start says nothing about it
       previousShown = ShownSlot();
       const int64_t lost = previousShown - m_displaySlot;
-      const TimeSpan cpuWork = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
-      const TimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
+      const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : MarkerValue::Duration(cpuStartTime - m_startTime).ToNanosecondTimeSpan();
+      const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
       const bool late = lost > 0 || m_startedLate || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       // How long before the time it was given this frame began (low latency: it is given none with the aim of smoothness)
-      const TimeSpan startAhead =
-        isLowLatency ? StartTimeFor(previousShown + m_pauseSlots + int64_t{m_rule.SwapInterval()}) - cpuStartTime : TimeSpan();
-      change = m_rule.AddFrame(TimeOfBlank(previousShown) - TickCount64(), work, late, startAhead);
+      const NanosecondTimeSpan startAhead =
+        isLowLatency ? StartTimeFor(previousShown + m_pauseSlots + int64_t{m_rule.SwapInterval()}) - cpuStartTime : NanosecondTimeSpan();
+      change = m_rule.AddFrame(TimeOfBlank(previousShown) - NanosecondTickCount(), work, late, startAhead);
       m_refreshesBehindClock += static_cast<uint64_t>(lost);
       if (m_frameEnded)
       {
@@ -303,12 +296,12 @@ namespace MB::FramePacing::Pacer
       const int64_t refreshes = hasPrevious ? displaySlot - previousShown : int64_t{swapInterval};
       m_animationTime.Add(static_cast<uint32_t>(std::clamp(refreshes, int64_t{1}, MaxStepRefreshes)), period);
     }
-    const TimeSpan animationTime = m_animationTime.ToTimeSpan();
+    const NanosecondTimeSpan animationTime = m_animationTime.ToNanosecondTimeSpan();
 
     m_swapInterval = swapInterval;
     m_displaySlot = displaySlot;
     m_startTime = cpuStartTime;
-    m_work = TimeSpan();
+    m_work = NanosecondTimeSpan();
     m_frameOpen = true;
     m_frameEnded = false;
     m_hasPresentTime = false;
@@ -322,33 +315,33 @@ namespace MB::FramePacing::Pacer
     schedule.FrameId = m_frameId;
     schedule.SwapInterval = swapInterval;
     schedule.AnimationTime = animationTime;
-    schedule.AnimationStep = TimeSpan(animationTime.Ticks() - m_lastAnimationTime.Ticks());
+    schedule.AnimationStep = NanosecondTimeSpan(animationTime.Nanoseconds() - m_lastAnimationTime.Nanoseconds());
     schedule.IntendedDisplayTime = TimeOfBlank(displaySlot);
     // When the frame after this one starts: at its time with the aim of low latency, and when this frame's present is made
     // with the aim of smoothness, as it starts at once then
     schedule.NextFrameStartTime = isLowLatency ? StartTimeFor(displaySlot + m_pauseSlots + int64_t{swapInterval}) : PresentTimeFor(displaySlot);
-    schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(swapInterval));
-    schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));
+    schedule.TargetFrameTime = MarkerValue::FrameTime(period.TimeFor(swapInterval));
+    schedule.PreferredFrameTime = MarkerValue::FrameTime(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
     return schedule;
   }
 
-  PresentPlan VBlankPeriodOnlyPacer::EndFrame(const TickCount64 workDoneTime) noexcept
+  PresentPlan VBlankPeriodOnlyPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
   {
     PresentPlan plan;
     if (!m_frameOpen)
     {
       return plan;
     }
-    const TimeSpan32 busy = ToTimeSpan32(workDoneTime - m_startTime);
-    m_work = busy.ToTimeSpan();
+    const NanosecondTimeSpan32 busy = MarkerValue::Duration(workDoneTime - m_startTime);
+    m_work = busy.ToNanosecondTimeSpan();
     m_frameEnded = true;
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
     // Smoothness: made early, and the present waits for the time that has the frame ready at its place. Low latency: presented
     // at once, unless it is done before its refresh begins
-    const TickCount64 presentTime = PresentTimeFor(m_displaySlot);
+    const NanosecondTickCount presentTime = PresentTimeFor(m_displaySlot);
     if (presentTime > workDoneTime)
     {
       plan.PresentTime = presentTime;
@@ -359,9 +352,9 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  TimeSpan32 VBlankPeriodOnlyPacer::CpuBusyAt(const TickCount64 now) const noexcept
+  NanosecondTimeSpan32 VBlankPeriodOnlyPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
   {
-    return m_frameOpen ? ToTimeSpan32(now - m_startTime) : TimeSpan32();
+    return m_frameOpen ? MarkerValue::Duration(now - m_startTime) : NanosecondTimeSpan32();
   }
 
   void VBlankPeriodOnlyPacer::AddPresent(const PresentReport& report) noexcept

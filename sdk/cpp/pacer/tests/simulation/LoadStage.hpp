@@ -7,14 +7,14 @@
 
 namespace MB::FramePacing::Pacer::Simulation
 {
-  //! A stretch of a scenario's time in which every frame's work is drawn from [MinWorkTicks, MaxWorkTicks].
+  //! A stretch of a scenario's time in which every frame's work is drawn from [MinWorkNanoseconds, MaxWorkNanoseconds].
   struct LoadStage
   {
     //! From and to (excluded) the simulation's start
-    int64_t FromTicks{0};
-    int64_t ToTicks{0};
-    int64_t MinWorkTicks{0};
-    int64_t MaxWorkTicks{0};
+    int64_t FromNanoseconds{0};
+    int64_t ToNanoseconds{0};
+    int64_t MinWorkNanoseconds{0};
+    int64_t MaxWorkNanoseconds{0};
   };
 }
 

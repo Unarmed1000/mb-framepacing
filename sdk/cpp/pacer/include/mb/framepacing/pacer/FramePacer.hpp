@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
@@ -44,10 +44,10 @@ namespace MB::FramePacing::Pacer
     PacerRefreshClock m_clock;
     FramesInFlight m_inFlight;
     // The frame between BeginFrame and the next BeginFrame
-    TickCount64 m_cpuStartTime;
-    TimeSpan m_work;
+    NanosecondTickCount m_cpuStartTime;
+    NanosecondTimeSpan m_work;
     // The time that frame's schedule gave for the start of the next one
-    TickCount64 m_nextFrameStartTime;
+    NanosecondTickCount m_nextFrameStartTime;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
 
@@ -56,7 +56,7 @@ namespace MB::FramePacing::Pacer
 
     //! Start a frame, at cpuStartTime on the application's steady clock: the previous frame is measured (how many refreshes after the
     //! frame before it it was shown, so whether it was late), the rule decides, and this frame is planned.
-    FrameSchedule BeginFrame(TickCount64 cpuStartTime) noexcept;
+    FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
 
     //! The frame's work is done and it is about to be presented, at presentTime on the same clock: call it as the marker is drawn,
     //! before the present and before any wait for the frame's time (a wait inside it would count as work). work: how long the frame
@@ -65,7 +65,7 @@ namespace MB::FramePacing::Pacer
     //! application the GPU limits must put the GPU's time in (the last frame's that was measured will do): without it the pacer does
     //! not see that, and the rule speeds up again after every frame window without a late frame. Returns the CPU busy time
     //! (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
-    TimeSpan32 EndFrame(TickCount64 presentTime, TimeSpan work = {}) noexcept;
+    NanosecondTimeSpan32 EndFrame(NanosecondTickCount presentTime, NanosecondTimeSpan work = {}) noexcept;
 
     //! What the platform measured for an earlier frame (its FrameSchedule::FrameId): any number of calls between two BeginFrames,
     //! oldest frame first. Nothing while PacerSettings::UsePresentFeedback is off. It changes no swap interval and no animation

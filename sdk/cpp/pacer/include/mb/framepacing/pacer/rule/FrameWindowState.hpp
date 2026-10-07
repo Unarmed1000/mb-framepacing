@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -16,9 +16,9 @@ namespace MB::FramePacing::Pacer
     uint32_t Frames{0};
     uint32_t LateFrames{0};
     //! The frames' average work time, zero without frames.
-    TimeSpan AverageWork;
+    NanosecondTimeSpan AverageWork;
     //! From the oldest frame's display time to the newest's.
-    TimeSpan Span;
+    NanosecondTimeSpan Span;
     //! The window spans more than FrameWindowLength, or holds all the frames it can: the rule may decide on it.
     bool Full{false};
     //! How far ahead of the pacer's times the frames of the window began, added up: for every frame that was not late, the time
@@ -27,7 +27,7 @@ namespace MB::FramePacing::Pacer
     //! jitter of the frame starts cancels in the sum. A refresh or more: the loop runs ahead of the display (nothing holds it, or
     //! the refresh period given is longer than the display's). Below zero by as much: the loop falls behind its times (a wait that
     //! wakes late every frame adds up).
-    TimeSpan StartsAhead;
+    NanosecondTimeSpan StartsAhead;
   };
 }
 

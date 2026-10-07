@@ -8,7 +8,7 @@
 #include <vector>
 #include "DisplayModelSettings.hpp"
 #include "LoopProfile.hpp"
-#include "TickRange.hpp"
+#include "NanosecondRange.hpp"
 
 namespace MB::FramePacing::Pacer::Simulation
 {
@@ -27,22 +27,22 @@ namespace MB::FramePacing::Pacer::Simulation
     //! Where in a refresh the loop presents when it has the vertical blank times, in percent of the refresh
     int32_t VBlankPhasePercent{65};
     //! A frame's work on the CPU, from its start to its submit
-    TickRange CpuWork{1'000, 1'000};
-    //! The frames (by their number from 0) whose CPU work is LongFrameCpuTicks longer: frames that run long
+    NanosecondRange CpuWork{100'000, 100'000};
+    //! The frames (by their number from 0) whose CPU work is LongFrameCpuNanoseconds longer: frames that run long
     std::vector<int32_t> LongFrames;
-    int64_t LongFrameCpuTicks{0};
+    int64_t LongFrameCpuNanoseconds{0};
     //! A frame's work on the GPU, which works on one frame at a time
-    TickRange GpuWork{37'500, 37'500};
+    NanosecondRange GpuWork{3'750'000, 3'750'000};
     //! How long after its time a timer wakes
-    TickRange TimerLate{0, 0};
+    NanosecondRange TimerLate{0, 0};
     //! From a present to where the loop is ready for the next frame (the present never waits)
-    int64_t LoopTicks{600};
+    int64_t LoopNanoseconds{60'000};
     //! true: one frame in flight, so a frame's start waits for the GPU's work on the frame before it
     bool WaitsForPreviousGpuWork{true};
     //! For a loop that waits for a present: the presents that may be waiting while a frame is made, and how long after the
     //! display took a frame a wait for it returns
     uint32_t WaitingPresents{2};
-    TickRange PresentWaitReturn{600, 24'000};
+    NanosecondRange PresentWaitReturn{60'000, 2'400'000};
     //! For the tier pacers: what they optimize for (PacerSettings::Aim). Low latency unless a run asks for the other
     PacerAim Aim{PacerAim::LowLatency};
     //! For the tier pacers. true: the loop gives the pacer each frame's GPU work, begin and end, once it is done

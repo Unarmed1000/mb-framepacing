@@ -7,20 +7,10 @@
 #include <mb/framepacing/pacer/clock/AnimationTime.hpp>
 #include <mb/framepacing/pacer/clock/FrameMeasurement.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
-#include <limits>
+#include "detail/MarkerValue.hpp"
 
 namespace MB::FramePacing::Pacer
 {
-  namespace
-  {
-    //! A span that the marker's 32-bit fields hold: zero (unknown) when it is negative or too long for them.
-    TimeSpan32 ToTimeSpan32(const TimeSpan span) noexcept
-    {
-      const int64_t ticks = span.Ticks();
-      return ticks >= 0 && ticks <= int64_t{std::numeric_limits<uint32_t>::max()} ? TimeSpan32(static_cast<uint32_t>(ticks)) : TimeSpan32();
-    }
-  }
-
   FramePacer::FramePacer(const PacerSettings& settings)
     : m_rule(settings)
     , m_clock(settings.Refresh(), settings.FrameWindowLength())
@@ -28,15 +18,15 @@ namespace MB::FramePacing::Pacer
   {
   }
 
-  FrameSchedule FramePacer::BeginFrame(const TickCount64 cpuStartTime) noexcept
+  FrameSchedule FramePacer::BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
   {
     // The work EndFrame was given says whether the previous frame fitted its swap interval. Without an EndFrame the work is the time
     // to this frame's start, which says nothing about that
-    const TimeSpan knownWork = m_frameOpen && m_frameEnded ? m_work : TimeSpan();
+    const NanosecondTimeSpan knownWork = m_frameOpen && m_frameEnded ? m_work : NanosecondTimeSpan();
     if (m_frameOpen && !m_frameEnded)
     {
       // No EndFrame: the frame is taken as presented now
-      m_work = ToTimeSpan32(cpuStartTime - m_cpuStartTime).ToTimeSpan();
+      m_work = MarkerValue::Duration(cpuStartTime - m_cpuStartTime).ToNanosecondTimeSpan();
     }
     // The previous frame: how it did goes to the rule. After a pause (and on the first frame) nothing was measured: the window starts
     // empty, and the swap interval stays. Present feedback changes none of this: it gives statistics and the intended display time
@@ -59,7 +49,7 @@ namespace MB::FramePacing::Pacer
     m_frameOpen = true;
     m_frameEnded = false;
     m_cpuStartTime = cpuStartTime;
-    m_work = TimeSpan();
+    m_work = NanosecondTimeSpan();
 
     const bool useFeedback = m_rule.Settings().UsePresentFeedback();
     FrameSchedule schedule;
@@ -73,24 +63,25 @@ namespace MB::FramePacing::Pacer
     schedule.AnimationTime = animation.Time;
     schedule.AnimationStep = animation.Step;
     // The frame starts when the previous one is shown, at the refresh the display's clock is on: the frame is aimed its swap interval
-    // of refreshes later, in the display clock's exact ticks. With present feedback the aim is counted from a display time instead
-    schedule.NextFrameStartTime = cpuStartTime + TimeSpan(m_clock.DisplayTimeAfter(swapInterval).Ticks() - previous.DisplayTime.Ticks());
+    // of refreshes later, in the display clock's exact nanoseconds. With present feedback the aim is counted from a display time instead
+    schedule.NextFrameStartTime =
+      cpuStartTime + NanosecondTimeSpan(m_clock.DisplayTimeAfter(swapInterval).Nanoseconds() - previous.DisplayTime.Nanoseconds());
     m_nextFrameStartTime = schedule.NextFrameStartTime;
     schedule.IntendedDisplayTime = useFeedback ? m_inFlight.IntendedDisplayTime() : schedule.NextFrameStartTime;
-    schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(swapInterval));
-    schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));
+    schedule.TargetFrameTime = MarkerValue::FrameTime(period.TimeFor(swapInterval));
+    schedule.PreferredFrameTime = MarkerValue::FrameTime(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     return schedule;
   }
 
-  TimeSpan32 FramePacer::EndFrame(const TickCount64 presentTime, const TimeSpan work) noexcept
+  NanosecondTimeSpan32 FramePacer::EndFrame(const NanosecondTickCount presentTime, const NanosecondTimeSpan work) noexcept
   {
     if (!m_frameOpen)
     {
       return {};
     }
-    const TimeSpan32 busy = ToTimeSpan32(presentTime - m_cpuStartTime);
-    m_work = work > TimeSpan() ? work : busy.ToTimeSpan();
+    const NanosecondTimeSpan32 busy = MarkerValue::Duration(presentTime - m_cpuStartTime);
+    m_work = work > NanosecondTimeSpan() ? work : busy.ToNanosecondTimeSpan();
     m_frameEnded = true;
     m_inFlight.End(presentTime);
     return busy;

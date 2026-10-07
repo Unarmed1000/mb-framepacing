@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -18,16 +18,16 @@ namespace MB::FramePacing::Pacer
     //! The frame whose present was waited for: FrameStartPlan::WaitForPresentFrameId.
     uint64_t FrameId{0};
     //! When the wait began, on the application's steady clock
-    TickCount64 BeginTime;
+    NanosecondTickCount BeginTime;
     //! When it ended, on the same clock
-    TickCount64 EndTime;
+    NanosecondTickCount EndTime;
     //! true: the present was shown. false: the wait ended without it (the timeout, or the system gave the wait up)
     bool Shown{true};
 
     //! How long the wait held the frame loop: zero for an end before the begin.
-    [[nodiscard]] constexpr TimeDuration Blocked() const noexcept
+    [[nodiscard]] constexpr NanosecondTimeDuration Blocked() const noexcept
     {
-      return TimeDuration(EndTime - BeginTime);
+      return NanosecondTimeDuration(EndTime - BeginTime);
     }
   };
 }

@@ -4,39 +4,29 @@
 // EXPERIMENTAL. The pacer of the lowest pair of tiers (sdk/doc/pacer-design.md "A grid on the clock"): frame starts on one grid of
 // refresh periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval and by a loss
 // that repeats, and one pause after start-up.
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
 #include <algorithm>
-#include <limits>
+#include "../detail/MarkerValue.hpp"
 
 namespace MB::FramePacing::Pacer
 {
-  namespace
-  {
-    //! A span that the marker's 32-bit fields hold: zero (unknown) when it is negative or too long for them.
-    TimeSpan32 ToTimeSpan32(const TimeSpan span) noexcept
-    {
-      const int64_t ticks = span.Ticks();
-      return ticks >= 0 && ticks <= int64_t{std::numeric_limits<uint32_t>::max()} ? TimeSpan32(static_cast<uint32_t>(ticks)) : TimeSpan32();
-    }
-  }
-
   TimerPeriodOnlyPacer::TimerPeriodOnlyPacer(const PacerSettings& settings)
     : m_rule(settings)
   {
   }
 
-  bool TimerPeriodOnlyPacer::StartsAgainAt(const TickCount64 time) const noexcept
+  bool TimerPeriodOnlyPacer::StartsAgainAt(const NanosecondTickCount time) const noexcept
   {
     if (!m_hasGrid)
     {
       return true;
     }
     // A pause the pacer did not ask for, or a clock that went back: nothing is measured across it
-    const TimeSpan gap = time - m_startTime;
-    const TimeSpan reach = std::max(m_rule.Settings().FrameWindowLength(), m_rule.Refresh().TimeFor(int64_t{2} * (m_nextSlot - m_slot)));
-    return gap < TimeSpan() || gap > reach;
+    const NanosecondTimeSpan gap = time - m_startTime;
+    const NanosecondTimeSpan reach = std::max(m_rule.Settings().FrameWindowLength(), m_rule.Refresh().TimeFor(int64_t{2} * (m_nextSlot - m_slot)));
+    return gap < NanosecondTimeSpan() || gap > reach;
   }
 
   int64_t TimerPeriodOnlyPacer::Reserve() const noexcept
@@ -47,13 +37,13 @@ namespace MB::FramePacing::Pacer
     return settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1 ? int64_t{settings.WaitingPresents()} - 1 : 0;
   }
 
-  TickCount64 TimerPeriodOnlyPacer::DueTime(const int64_t slot) const noexcept
+  NanosecondTickCount TimerPeriodOnlyPacer::DueTime(const int64_t slot) const noexcept
   {
     // A frame starts the reserve's refreshes before its step of the grid
     return TimeOfSlot(slot - Reserve());
   }
 
-  int64_t TimerPeriodOnlyPacer::SmoothSlotFor(const TickCount64 time) const noexcept
+  int64_t TimerPeriodOnlyPacer::SmoothSlotFor(const NanosecondTickCount time) const noexcept
   {
     const RefreshPeriod period = m_rule.Refresh();
     // How late the loop is for the step the frame is due at, in whole steps
@@ -71,7 +61,7 @@ namespace MB::FramePacing::Pacer
     return m_nextSlot + std::max(std::max(startLate, presentLate) - Reserve(), int64_t{0});
   }
 
-  int64_t TimerPeriodOnlyPacer::SlotFor(const TickCount64 time) const noexcept
+  int64_t TimerPeriodOnlyPacer::SlotFor(const NanosecondTickCount time) const noexcept
   {
     if (m_rule.Settings().Aim() == PacerAim::Smoothness)
     {
@@ -97,7 +87,7 @@ namespace MB::FramePacing::Pacer
     return slot + ((m_presentTime - TimeOfSlot(slot)) <= m_presentPlace ? 1 : 2);
   }
 
-  TickCount64 TimerPeriodOnlyPacer::TimeOfSlot(const int64_t slot) const noexcept
+  NanosecondTickCount TimerPeriodOnlyPacer::TimeOfSlot(const int64_t slot) const noexcept
   {
     return m_origin + m_rule.Refresh().TimeFor(slot);
   }
@@ -109,7 +99,7 @@ namespace MB::FramePacing::Pacer
     m_presentTaken = false;
   }
 
-  uint32_t TimerPeriodOnlyPacer::StartupPauseAt(const TickCount64 cpuStartTime) noexcept
+  uint32_t TimerPeriodOnlyPacer::StartupPauseAt(const NanosecondTickCount cpuStartTime) noexcept
   {
     // The pause takes the frames that wait away: it belongs to the aim of low latency
     if (!m_pausePending || m_rule.Settings().Aim() != PacerAim::LowLatency)
@@ -137,12 +127,12 @@ namespace MB::FramePacing::Pacer
     return refreshes;
   }
 
-  FrameStartPlan TimerPeriodOnlyPacer::PlanFrame(const TickCount64 now) const noexcept
+  FrameStartPlan TimerPeriodOnlyPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
     FrameStartPlan plan;
     if (!StartsAgainAt(now))
     {
-      const TickCount64 due = DueTime(SlotFor(now));
+      const NanosecondTickCount due = DueTime(SlotFor(now));
       if (due > now)
       {
         plan.StartTime = due;
@@ -151,7 +141,7 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  FrameSchedule TimerPeriodOnlyPacer::BeginFrame(const TickCount64 cpuStartTime) noexcept
+  FrameSchedule TimerPeriodOnlyPacer::BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
   {
     const RefreshPeriod period = m_rule.Refresh();
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
@@ -180,8 +170,8 @@ namespace MB::FramePacing::Pacer
       {
         m_presentPlace = m_presentTime - TimeOfSlot(period.FloorRefreshes(m_presentTime - m_origin));
       }
-      const TimeSpan cpuWork = m_frameEnded ? m_work : ToTimeSpan32(cpuStartTime - m_startTime).ToTimeSpan();
-      const TimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
+      const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : MarkerValue::Duration(cpuStartTime - m_startTime).ToNanosecondTimeSpan();
+      const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
       const bool late = lost > 0 || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       change = m_rule.AddFrame(period.TimeFor(slot), work, late, DueTime(m_nextSlot) - cpuStartTime);
       // The steps the frame is behind the one it takes: within the reserve, and made up for by the frames after it
@@ -196,7 +186,7 @@ namespace MB::FramePacing::Pacer
 
     m_swapInterval = m_rule.SwapInterval();
     m_startTime = cpuStartTime;
-    m_work = TimeSpan();
+    m_work = NanosecondTimeSpan();
     m_frameOpen = true;
     m_frameEnded = false;
     ++m_frameId;
@@ -215,7 +205,7 @@ namespace MB::FramePacing::Pacer
     {
       m_animationTime.Add(m_swapInterval + repeatedLoss, period);
     }
-    const TimeSpan animationTime = m_animationTime.ToTimeSpan();
+    const NanosecondTimeSpan animationTime = m_animationTime.ToNanosecondTimeSpan();
     // How far the animation time is behind the clock: what was lost and what is paused for, less what the step is longer by
     m_refreshesBehindClock += (static_cast<uint64_t>(lost) - repeatedLoss) + pause;
 
@@ -223,27 +213,27 @@ namespace MB::FramePacing::Pacer
     schedule.FrameId = m_frameId;
     schedule.SwapInterval = m_swapInterval;
     schedule.AnimationTime = animationTime;
-    schedule.AnimationStep = TimeSpan(animationTime.Ticks() - m_lastAnimationTime.Ticks());
+    schedule.AnimationStep = NanosecondTimeSpan(animationTime.Nanoseconds() - m_lastAnimationTime.Nanoseconds());
     // The step this frame is due to leave the grid at is where it is expected to reach the screen: without a display to ask, it
     // is the pacer's aim for the frame. The next frame starts there, or a pause later
     schedule.NextFrameStartTime = DueTime(m_nextSlot);
     schedule.IntendedDisplayTime = TimeOfSlot(m_dueSlot);
-    schedule.TargetFrameTime = ToTimeSpan32(period.TimeFor(m_swapInterval));
-    schedule.PreferredFrameTime = ToTimeSpan32(period.TimeFor(m_rule.PreferredSwapInterval()));
+    schedule.TargetFrameTime = MarkerValue::FrameTime(period.TimeFor(m_swapInterval));
+    schedule.PreferredFrameTime = MarkerValue::FrameTime(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
     return schedule;
   }
 
-  PresentPlan TimerPeriodOnlyPacer::EndFrame(const TickCount64 workDoneTime) noexcept
+  PresentPlan TimerPeriodOnlyPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
   {
     PresentPlan plan;
     if (!m_frameOpen)
     {
       return plan;
     }
-    const TimeSpan32 busy = ToTimeSpan32(workDoneTime - m_startTime);
-    m_work = busy.ToTimeSpan();
+    const NanosecondTimeSpan32 busy = MarkerValue::Duration(workDoneTime - m_startTime);
+    m_work = busy.ToNanosecondTimeSpan();
     m_frameEnded = true;
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
@@ -251,7 +241,7 @@ namespace MB::FramePacing::Pacer
     {
       // The present holds a frame for one refresh. A frame of more is held by the loop: presented in the period before the step
       // the next frame is due at, the margin into it
-      const TickCount64 presentTime = TimeOfSlot(m_nextSlot - 1) + m_rule.Settings().FrameMargin();
+      const NanosecondTickCount presentTime = TimeOfSlot(m_nextSlot - 1) + m_rule.Settings().FrameMargin();
       if (presentTime > workDoneTime)
       {
         plan.PresentTime = presentTime;
@@ -263,9 +253,9 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  TimeSpan32 TimerPeriodOnlyPacer::CpuBusyAt(const TickCount64 now) const noexcept
+  NanosecondTimeSpan32 TimerPeriodOnlyPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
   {
-    return m_frameOpen ? ToTimeSpan32(now - m_startTime) : TimeSpan32();
+    return m_frameOpen ? MarkerValue::Duration(now - m_startTime) : NanosecondTimeSpan32();
   }
 
   void TimerPeriodOnlyPacer::AddPresent(const PresentReport& report) noexcept

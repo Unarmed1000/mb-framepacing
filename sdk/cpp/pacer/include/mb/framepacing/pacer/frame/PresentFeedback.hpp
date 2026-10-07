@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/pacer/frame/PresentResult.hpp>
 #include <cstdint>
 
@@ -19,19 +19,19 @@ namespace MB::FramePacing::Pacer
     uint64_t FrameId{0};
     PresentResult Result{PresentResult::Shown};
     //! When the frame was first shown (the start of its first refresh), on the steady clock BeginFrame gets. For Shown only.
-    TickCount64 DisplayTime;
+    NanosecondTickCount DisplayTime;
     //! PresentTime was given.
     bool HasPresentTime{false};
     //! When the frame was presented (the present call, or the time the platform took it over), on the same clock. A display time
     //! before it is refused. Without it the time EndFrame was given counts, so an application that waits between EndFrame and its
     //! present must give it.
-    TickCount64 PresentTime;
+    NanosecondTickCount PresentTime;
 
     //! The frame was shown at displayTime.
-    [[nodiscard]] static PresentFeedback Shown(uint64_t frameId, TickCount64 displayTime) noexcept;
+    [[nodiscard]] static PresentFeedback Shown(uint64_t frameId, NanosecondTickCount displayTime) noexcept;
 
     //! The frame was presented at presentTime and shown at displayTime.
-    [[nodiscard]] static PresentFeedback Shown(uint64_t frameId, TickCount64 displayTime, TickCount64 presentTime) noexcept;
+    [[nodiscard]] static PresentFeedback Shown(uint64_t frameId, NanosecondTickCount displayTime, NanosecondTickCount presentTime) noexcept;
 
     //! The platform says the frame was never shown.
     [[nodiscard]] static PresentFeedback NotShown(uint64_t frameId) noexcept;

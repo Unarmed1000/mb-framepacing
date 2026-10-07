@@ -7,7 +7,7 @@
 // answers is held against what the log shows the display did. It is an open loop: a log can show what a pacer would have seen and
 // said, never what a different answer would have caused (FrameLoopSimulation is for that).
 //
-// The logs are frame logs with the column names of the first integration's sample (a CSV, a row per frame, times in ticks on the
+// The logs are frame logs with the column names of the first integration's sample (a CSV, a row per frame, times in nanoseconds on the
 // application's CPU clock), which FrameLoopSimulation's ToFrameLog writes too.
 
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -22,11 +22,11 @@ namespace MB::FramePacing::Pacer::Simulation
 {
   //! The columns of a replay's rows
   inline constexpr std::string_view ReplayHeader =
-    "frameIndex,startTicks,swapInterval,loggedSwapInterval,animationStepTicks,loggedAnimationStepTicks,nextFrameStartTicks,"
-    "loggedNextFrameStartTicks,intendedDisplayTicks,shownTicks,shownMinusIntendedTicks,refreshesToDisplay,pendingAtStart";
+    "frameIndex,startNanoseconds,swapInterval,loggedSwapInterval,animationStepNanoseconds,loggedAnimationStepNanoseconds,nextFrameStartNanoseconds,"
+    "loggedNextFrameStartNanoseconds,intendedDisplayNanoseconds,shownNanoseconds,shownMinusIntendedNanoseconds,refreshesToDisplay,pendingAtStart";
 
   //! The rows of a frame log, from its text: the columns are found by name, and one the log does not have is 0 in every frame.
-  //! Throws std::runtime_error for a text without the frameIndex and frameStartTicks columns, and for a log with a frame's start
+  //! Throws std::runtime_error for a text without the frameIndex and frameStartNanoseconds columns, and for a log with a frame's start
   //! one row early (the sample's OpenGL ES logs before 2026-10-06, known by a pacer frame id two ahead of the frame index).
   std::vector<LoggedFrame> ReadFrameLog(std::string_view text);
 
@@ -34,7 +34,8 @@ namespace MB::FramePacing::Pacer::Simulation
   std::vector<LoggedFrame> ReadFrameLogFile(const std::filesystem::path& path);
 
   //! The refresh period the log's pacer paced at: its target frame time over its swap interval, the value most frames have.
-  //! To the tick only: a replay that has to agree with the log to the tick needs the period the application gave its pacer.
+  //! To the tick of 100 ns the log counts in only: a replay that has to agree with the log needs the period the application gave
+  //! its pacer.
   //! Throws std::runtime_error for a log without a target frame time.
   RefreshPeriod LoggedRefreshPeriod(const std::vector<LoggedFrame>& frames);
 

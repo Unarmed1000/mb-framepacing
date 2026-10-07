@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -23,7 +23,7 @@ namespace MB::FramePacing::Pacer
     bool Late{false};
     //! The display's clock: when the previous frame was shown, in the refreshes counted since the clock was made (exact: the
     //! refresh period's fraction is carried). Only differences mean anything.
-    TimeSpan DisplayTime;
+    NanosecondTimeSpan DisplayTime;
   };
 }
 

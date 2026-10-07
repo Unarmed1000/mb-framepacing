@@ -6,8 +6,8 @@
 // the first frame starts 0.2 refresh into the refresh before it is shown, every other frame when the previous one is shown; a frame is
 // shown at the first refresh after it is done, and no sooner than its swap interval after the previous one. The vsync timer (the
 // refresh clock) animates it for the previous frame's display plus its swap interval.
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -34,15 +34,15 @@ namespace
   constexpr int64_t Period = 100;
   constexpr int64_t FirstStart = 20;
   //! Refresh 0 on the steady clock
-  constexpr int64_t Origin = 10 * FP::TimeSpan::TicksPerSecond;
+  constexpr int64_t Origin = 10 * FP::NanosecondTimeSpan::NanosecondsPerSecond;
 
-  //! A diagram's frame: its render time (units), its swap interval, and its clock reading's error (vsync timer diagrams, ticks)
+  //! A diagram's frame: its render time (units), its swap interval, and its clock reading's error (vsync timer diagrams, nanoseconds)
   struct DiagramFrame
   {
     char Name{'A'};
     int64_t Render{75};
     int64_t SwapInterval{1};
-    int64_t TimerErrorTicks{0};
+    int64_t TimerErrorNanoseconds{0};
   };
 
   //! A diagram frame's times: when it starts, when it is shown (whole refreshes), and the vsync timer's animation time (refreshes)
@@ -53,10 +53,10 @@ namespace
     int64_t Animation{0};
   };
 
-  //! A time in units as ticks on the steady clock
-  int64_t Ticks(const int64_t units) noexcept
+  //! A time in units as nanoseconds on the steady clock
+  int64_t Nanoseconds(const int64_t units) noexcept
   {
-    return units >= 0 ? Origin + g_unit.TimeFor(units).Ticks() : Origin - g_unit.TimeFor(-units).Ticks();
+    return units >= 0 ? Origin + g_unit.TimeFor(units).Nanoseconds() : Origin - g_unit.TimeFor(-units).Nanoseconds();
   }
 
   //! a / b rounded up (b > 0)
@@ -96,12 +96,12 @@ namespace
   //! The vsync timer without a pacer: every frame's measured start (when it starts, or its clock reading) and swap interval
   std::vector<int64_t> MeasuredAnimation(const std::vector<DiagramFrame>& frames, const std::vector<FrameTimes>& times)
   {
-    PC::PacerRefreshClock clock(g_hz60, FP::TimeSpan(2 * FP::TimeSpan::TicksPerSecond));
+    PC::PacerRefreshClock clock(g_hz60, FP::NanosecondTimeSpan(2 * FP::NanosecondTimeSpan::NanosecondsPerSecond));
     std::vector<int64_t> animation;
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
-      const int64_t start = Ticks(times[index].Start) + frames[index].TimerErrorTicks;
-      const PC::AnimationTime time = clock.Advance(FP::TickCount64(start), static_cast<uint32_t>(frames[index].SwapInterval));
+      const int64_t start = Nanoseconds(times[index].Start) + frames[index].TimerErrorNanoseconds;
+      const PC::AnimationTime time = clock.Advance(FP::NanosecondTickCount(start), static_cast<uint32_t>(frames[index].SwapInterval));
       animation.push_back(g_hz60.NearestRefreshes(time.Time));
     }
     return animation;
@@ -139,7 +139,7 @@ TEST(Diagrams, TheVsyncTimerRemovesTheClocksJitter)
   const std::vector<int64_t> errorsMicroseconds{0, 200, 2'400, -1'000, 800, -1'000, 600, 200};
   for (std::size_t index = 0; index < frames.size(); ++index)
   {
-    frames[index].TimerErrorTicks = errorsMicroseconds[index] * 10;
+    frames[index].TimerErrorNanoseconds = errorsMicroseconds[index] * 1'000;
   }
   const auto times = Simulate(frames);
   EXPECT_EQ(MeasuredAnimation(frames, times), (std::vector<int64_t>{0, 1, 2, 3, 4, 5, 6, 7}));
@@ -210,15 +210,15 @@ TEST(Diagrams, ThePacerPlansTheDiagramsFramesAtAFixedSwapInterval)
     uint32_t lateFrames = 0;
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
-      const int64_t start = Ticks(times[index].Start);
-      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::TickCount64(start));
-      const int64_t work = Ticks(frames[index].Render) - Origin;
-      static_cast<void>(pacer.EndFrame(FP::TickCount64(start + work), FP::TimeSpan(work)));
-      // Every frame but the first starts when the previous one is shown, so it is aimed at the refresh the diagram aims it at, to the tick
+      const int64_t start = Nanoseconds(times[index].Start);
+      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(start));
+      const int64_t work = Nanoseconds(frames[index].Render) - Origin;
+      static_cast<void>(pacer.EndFrame(FP::NanosecondTickCount(start + work), FP::NanosecondTimeSpan(work)));
+      // Every frame but the first starts when the previous one is shown, so it is aimed at the refresh the diagram aims it at, to the nanosecond
       // the two roundings allow. The first starts 0.2 refresh into its refresh: without a vsync time the pacer cannot know that
       if (index > 0)
       {
-        EXPECT_LE(std::abs(schedule.IntendedDisplayTime.Ticks() - Ticks(times[index].Animation * Period)), 1) << frames[index].Name;
+        EXPECT_LE(std::abs(schedule.IntendedDisplayTime.Nanoseconds() - Nanoseconds(times[index].Animation * Period)), 1) << frames[index].Name;
         lateFrames += times[index - 1].Shown > times[index - 1].Animation ? 1u : 0u;
       }
       EXPECT_EQ(g_hz60.NearestRefreshes(schedule.AnimationTime), times[index].Animation - times[0].Animation) << frames[index].Name;

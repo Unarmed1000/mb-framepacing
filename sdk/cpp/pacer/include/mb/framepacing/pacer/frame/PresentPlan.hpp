@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -17,24 +17,24 @@ namespace MB::FramePacing::Pacer
   {
     //! The frame: the id to present it with where the present takes one, and to give back with its reports.
     uint64_t FrameId{0};
-    //! The time to wait until before the present, on the application's steady clock; TickCount64(): none, present at once.
-    TickCount64 PresentTime;
+    //! The time to wait until before the present, on the application's steady clock; NanosecondTickCount(): none, present at once.
+    NanosecondTickCount PresentTime;
     //! The swap interval for a present that takes one (PacerCapability::PresentSwapInterval active); 1 otherwise.
     uint32_t SwapInterval{1};
     //! The time before which the frame is not to be shown, for a present that takes one (PacerCapability::PresentAtTime
-    //! active); TickCount64(): none.
-    TickCount64 NotBeforeTime;
+    //! active); NanosecondTickCount(): none.
+    NanosecondTickCount NotBeforeTime;
     //! The time the frame before this one is to stay on screen at least, for a present that takes one
     //! (PacerCapability::PresentAfterDuration active); zero: none.
-    TimeDuration MinimumDuration;
+    NanosecondTimeDuration MinimumDuration;
     //! The marker's CPU busy time: from the frame's start to the end of its CPU work, waits the plans asked for left out. Zero:
     //! not known, or it does not fit the marker's field.
-    TimeSpan32 CpuBusy;
+    NanosecondTimeSpan32 CpuBusy;
 
     //! True when there is a time to wait until before the present.
     [[nodiscard]] constexpr bool WaitsForPresentTime() const noexcept
     {
-      return PresentTime != TickCount64();
+      return PresentTime != NanosecondTickCount();
     }
   };
 }

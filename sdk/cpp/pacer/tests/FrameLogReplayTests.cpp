@@ -46,17 +46,17 @@ TEST(FrameLogReplay, ALogIsReadByItsColumnNames)
   ASSERT_EQ(frames.size(), 2u);
   EXPECT_EQ(frames[0].FrameIndex, 7);
   EXPECT_EQ(frames[0].SwapInterval, 1u);
-  EXPECT_EQ(frames[0].StartTicks, 1000);
-  EXPECT_EQ(frames[0].ShownTicks, 0);
-  EXPECT_EQ(frames[0].WorkTicks, 430);
-  EXPECT_EQ(frames[0].EndFrameTicks, 1030);
+  EXPECT_EQ(frames[0].StartNanoseconds, 100'000);
+  EXPECT_EQ(frames[0].ShownNanoseconds, 0);
+  EXPECT_EQ(frames[0].WorkNanoseconds, 43'000);
+  EXPECT_EQ(frames[0].EndFrameNanoseconds, 103'000);
   EXPECT_TRUE(frames[0].PacerOn);
   EXPECT_EQ(frames[1].FrameIndex, 8);
-  EXPECT_EQ(frames[1].ShownTicks, 2500);
-  EXPECT_EQ(frames[1].EndFrameTicks, 0);
+  EXPECT_EQ(frames[1].ShownNanoseconds, 250'000);
+  EXPECT_EQ(frames[1].EndFrameNanoseconds, 0);
   EXPECT_FALSE(frames[1].PacerOn);
   // A column the log does not have
-  EXPECT_EQ(frames[1].NextFrameStartTicks, 0);
+  EXPECT_EQ(frames[1].NextFrameStartNanoseconds, 0);
 }
 
 TEST(FrameLogReplay, ADisplayTimeIsTheDriversElseTheOneGivenAsFeedbackAndALogWithoutAPacerColumnIsOfAPacedRun)
@@ -66,8 +66,8 @@ TEST(FrameLogReplay, ADisplayTimeIsTheDriversElseTheOneGivenAsFeedbackAndALogWit
     "0,1000,1500,1600\n"
     "1,2000,,2600\n");
   ASSERT_EQ(frames.size(), 2u);
-  EXPECT_EQ(frames[0].ShownTicks, 1500);
-  EXPECT_EQ(frames[1].ShownTicks, 2600);
+  EXPECT_EQ(frames[0].ShownNanoseconds, 150'000);
+  EXPECT_EQ(frames[1].ShownNanoseconds, 260'000);
   EXPECT_TRUE(frames[0].PacerOn);
 }
 
@@ -89,7 +89,7 @@ TEST(FrameLogReplay, TheLogsRefreshPeriodIsItsTargetFrameTimeOverItsSwapInterval
     "1,2000,2,83328\n"
     "2,3000,1,41664\n"
     "3,4000,1,41700\n");
-  EXPECT_EQ(Sim::LoggedRefreshPeriod(frames).ToTimeSpan().Ticks(), 41664);
+  EXPECT_EQ(Sim::LoggedRefreshPeriod(frames).ToNanosecondTimeSpan().Nanoseconds(), 4'166'400);
   EXPECT_THROW(static_cast<void>(Sim::LoggedRefreshPeriod(Sim::ReadFrameLog("frameIndex,frameStartTicks\n0,1000\n"))), std::runtime_error);
 }
 
@@ -100,7 +100,7 @@ TEST(FrameLogReplay, ASimulatedLoopsLogReplaysToThePacersAnswersOnEveryFrame)
     Sim::LoopSettings settings;
     settings.Profile = profile;
     settings.Frames = 800;
-    settings.TimerLate = {0, 2'000};
+    settings.TimerLate = {0, 200'000};
     settings.Display.HeldBlanks = {150, 300, 450};
     const std::vector<Sim::LoggedFrame> frames = Sim::ReadFrameLog(Sim::ToFrameLog(Sim::SimulateLoop(settings), settings));
     const PC::RefreshPeriod period = PC::RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
@@ -156,7 +156,7 @@ TEST(FrameLogReplay, FramesWithThePacerOffOrWithoutAStartAreNotReplayed)
   EXPECT_EQ(result.Compared, 0);
   EXPECT_EQ(result.Shown, 1);
   // Frame 2 has no display time: its row's display cells are empty. Frame 0 was presented before frame 2 started and shown after
-  EXPECT_NE(result.Csv.find("\n2,10041667,1,0,"), std::string::npos);
+  EXPECT_NE(result.Csv.find("\n2,1004166700,1,0,"), std::string::npos);
   EXPECT_NE(result.Csv.find(",,,1\n"), std::string::npos);
   EXPECT_EQ(CountOf(result.RefreshesToDisplay, 4), 1);
 }

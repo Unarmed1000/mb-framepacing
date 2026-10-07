@@ -5,8 +5,8 @@
 // paces the same with them. FramesInFlight on its own, the pacer on a display that queues presents (frame starts that wobble, late
 // frames, feedback that is late, missing, refused or stops), and a present log of a real swap chain
 // (test-data/pacer/240-vulkan-present-log.csv).
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -33,43 +33,43 @@ namespace PC = MB::FramePacing::Pacer;
 
 namespace
 {
-  constexpr int64_t Ms = FP::TimeSpan::TicksPerMillisecond;
-  constexpr int64_t Second = FP::TimeSpan::TicksPerSecond;
-  constexpr int64_t StartTicks = 100 * Second;
+  constexpr int64_t Ms = FP::NanosecondTimeSpan::NanosecondsPerMillisecond;
+  constexpr int64_t Second = FP::NanosecondTimeSpan::NanosecondsPerSecond;
+  constexpr int64_t StartNanoseconds = 100 * Second;
 
   const PC::RefreshPeriod g_hz60 = PC::RefreshPeriod::FromRate(60);
   const PC::RefreshPeriod g_hz240 = PC::RefreshPeriod::FromRate(240);
 
-  FP::TimeSpan Span(const int64_t ticks) noexcept
+  FP::NanosecondTimeSpan Span(const int64_t nanoseconds) noexcept
   {
-    return FP::TimeSpan(ticks);
+    return FP::NanosecondTimeSpan(nanoseconds);
   }
 
-  FP::TickCount64 At(const int64_t ticks) noexcept
+  FP::NanosecondTickCount At(const int64_t nanoseconds) noexcept
   {
-    return FP::TickCount64(ticks);
+    return FP::NanosecondTickCount(nanoseconds);
   }
 
-  //! The time of a refresh of a display whose refresh 0 is at StartTicks
-  FP::TickCount64 Refresh(const PC::RefreshPeriod period, const int64_t refresh) noexcept
+  //! The time of a refresh of a display whose refresh 0 is at StartNanoseconds
+  FP::NanosecondTickCount Refresh(const PC::RefreshPeriod period, const int64_t refresh) noexcept
   {
-    return At(StartTicks + period.TimeFor(refresh).Ticks());
+    return At(StartNanoseconds + period.TimeFor(refresh).Nanoseconds());
   }
 
-  //! Within a tick: a display time plus whole refreshes is rounded once more than the refresh itself
-  ::testing::AssertionResult WithinATick(const FP::TickCount64 actual, const FP::TickCount64 expected)
+  //! Within a nanosecond: a display time plus whole refreshes is rounded once more than the refresh itself
+  ::testing::AssertionResult WithinANanosecond(const FP::NanosecondTickCount actual, const FP::NanosecondTickCount expected)
   {
-    const int64_t off = (actual - expected).Ticks();
-    return std::abs(off) <= 1 ? ::testing::AssertionSuccess() : (::testing::AssertionFailure() << off << " ticks off");
+    const int64_t off = (actual - expected).Nanoseconds();
+    return std::abs(off) <= 1 ? ::testing::AssertionSuccess() : (::testing::AssertionFailure() << off << " nanoseconds off");
   }
 
-  //! Frames begun one refresh apart from StartTicks, each presented a millisecond after its start
+  //! Frames begun one refresh apart from StartNanoseconds, each presented a millisecond after its start
   void BeginFrames(PC::FramesInFlight& rFrames, const PC::RefreshPeriod period, const int64_t count, const uint32_t swapInterval = 1)
   {
     for (int64_t index = 0; index < count; ++index)
     {
       const auto frame = static_cast<int64_t>(rFrames.NewestFrameId());
-      const FP::TickCount64 start = Refresh(period, frame * swapInterval);
+      const FP::NanosecondTickCount start = Refresh(period, frame * swapInterval);
       static_cast<void>(rFrames.Begin(swapInterval, start));
       rFrames.End(start + Span(Ms));
     }
@@ -79,8 +79,8 @@ namespace
   struct LoopFrame
   {
     //! The frame starts this long after the refresh it would start on
-    FP::TimeSpan Wobble;
-    FP::TimeSpan Work{Ms};
+    FP::NanosecondTimeSpan Wobble;
+    FP::NanosecondTimeSpan Work{Ms};
     //! The display shows it this many refreshes later than its place in the queue
     int64_t LateRefreshes{0};
     //! The platform reports its display time
@@ -96,7 +96,7 @@ namespace
     {
       uint64_t FrameId{0};
       int64_t Frame{0};
-      FP::TickCount64 PresentTime;
+      FP::NanosecondTickCount PresentTime;
       int64_t Refresh{0};
     };
 
@@ -125,9 +125,9 @@ namespace
         m_pacer.AddPresentFeedback(PC::PresentFeedback::Shown(shown.FrameId, Refresh(m_display, shown.Refresh), shown.PresentTime));
         m_results.pop_front();
       }
-      const FP::TickCount64 start = Refresh(m_display, m_startRefresh) + frame.Wobble;
+      const FP::NanosecondTickCount start = Refresh(m_display, m_startRefresh) + frame.Wobble;
       const PC::FrameSchedule schedule = m_pacer.BeginFrame(start);
-      const FP::TickCount64 presentTime = start + frame.Work;
+      const FP::NanosecondTickCount presentTime = start + frame.Work;
       static_cast<void>(m_pacer.EndFrame(presentTime, frame.Work));
       const int64_t queued = m_display.RefreshesToFit(presentTime - Refresh(m_display, 0)) + QueueRefreshes - 1;
       m_shownOnRefresh = std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, queued) + frame.LateRefreshes;
@@ -157,9 +157,9 @@ namespace
 
   //! The long and short frame starts of a busy machine (the real log's pattern): every fourth frame starts 0.7 refresh late, and the
   //! one after it on its refresh again
-  FP::TimeSpan Wobble(const PC::RefreshPeriod period, const int64_t frame) noexcept
+  FP::NanosecondTimeSpan Wobble(const PC::RefreshPeriod period, const int64_t frame) noexcept
   {
-    return frame % 4 == 3 ? Span(period.ToTimeSpan().Ticks() * 7 / 10) : Span(0);
+    return frame % 4 == 3 ? Span(period.ToNanosecondTimeSpan().Nanoseconds() * 7 / 10) : Span(0);
   }
 
   PC::PacerSettings FeedbackSettings(const PC::RefreshPeriod period)
@@ -186,13 +186,14 @@ namespace
     return std::nullopt;
   }
 
-  //! A row of the present log: a frame of a real swap chain. Times in ticks; -1 where the platform gave none
+  //! A row of the present log: a frame of a real swap chain. Times in nanoseconds (the file has ticks); -1 where the platform
+  //! gave none
   struct LogFrame
   {
     int64_t Frame{0};
-    int64_t StartTicks{0};
-    int64_t PresentTicks{0};
-    int64_t DisplayTicks{-1};
+    int64_t StartNanoseconds{0};
+    int64_t PresentNanoseconds{0};
+    int64_t DisplayNanoseconds{-1};
     int64_t FeedbackFrame{-1};
   };
 
@@ -212,7 +213,10 @@ namespace
         fields.push_back(field);
       }
       const auto number = [&fields](const std::size_t index) { return fields[index].empty() ? int64_t{-1} : std::stoll(fields[index]); };
-      frames.push_back({number(0), number(1), number(2), number(3), number(4)});
+      // The log is in ticks of 100 ns, as it was recorded
+      const auto time = [&number](const std::size_t index)
+      { return number(index) < 0 ? int64_t{-1} : number(index) * FP::NanosecondTimeSpan::NanosecondsPerTick; };
+      frames.push_back({number(0), time(1), time(2), time(3), number(4)});
     }
     return frames;
   }
@@ -240,14 +244,14 @@ namespace
       // The results the application read at this frame's start. The log's frame numbers are the pacer's ids: both count from 1
       for (; next < log.size() && log[next].FeedbackFrame <= frame.Frame; ++next)
       {
-        if (log[next].DisplayTicks >= 0)
+        if (log[next].DisplayNanoseconds >= 0)
         {
           pacer.AddPresentFeedback(
-            PC::PresentFeedback::Shown(static_cast<uint64_t>(log[next].Frame), At(log[next].DisplayTicks), At(log[next].PresentTicks)));
+            PC::PresentFeedback::Shown(static_cast<uint64_t>(log[next].Frame), At(log[next].DisplayNanoseconds), At(log[next].PresentNanoseconds)));
         }
       }
-      const PC::FrameSchedule schedule = pacer.BeginFrame(At(frame.StartTicks));
-      static_cast<void>(pacer.EndFrame(At(frame.PresentTicks)));
+      const PC::FrameSchedule schedule = pacer.BeginFrame(At(frame.StartNanoseconds));
+      static_cast<void>(pacer.EndFrame(At(frame.PresentNanoseconds)));
       EXPECT_EQ(schedule.FrameId, static_cast<uint64_t>(frame.Frame));
       result.CatchUps += period.NearestRefreshes(schedule.AnimationStep) > int64_t{schedule.SwapInterval} ? 1 : 0;
       result.Slower += schedule.Change == PC::SwapIntervalChange::Slower ? 1 : 0;
@@ -276,18 +280,18 @@ TEST(PresentFeedbackSettings, FeedbackIsOffUnlessAsked)
 
 TEST(PresentFeedbackSettings, TheFactoriesFillTheFeedback)
 {
-  const PC::PresentFeedback shown = PC::PresentFeedback::Shown(7, At(500));
+  const PC::PresentFeedback shown = PC::PresentFeedback::Shown(7, At(50'000));
   EXPECT_EQ(shown.FrameId, 7u);
   EXPECT_EQ(shown.Result, PC::PresentResult::Shown);
-  EXPECT_EQ(shown.DisplayTime, At(500));
+  EXPECT_EQ(shown.DisplayTime, At(50'000));
   EXPECT_FALSE(shown.HasPresentTime);
 
-  const PC::PresentFeedback presented = PC::PresentFeedback::Shown(8, At(500), At(400));
+  const PC::PresentFeedback presented = PC::PresentFeedback::Shown(8, At(50'000), At(40'000));
   EXPECT_EQ(presented.FrameId, 8u);
   EXPECT_EQ(presented.Result, PC::PresentResult::Shown);
-  EXPECT_EQ(presented.DisplayTime, At(500));
+  EXPECT_EQ(presented.DisplayTime, At(50'000));
   EXPECT_TRUE(presented.HasPresentTime);
-  EXPECT_EQ(presented.PresentTime, At(400));
+  EXPECT_EQ(presented.PresentTime, At(40'000));
 
   const PC::PresentFeedback notShown = PC::PresentFeedback::NotShown(9);
   EXPECT_EQ(notShown.FrameId, 9u);
@@ -305,15 +309,15 @@ TEST(FramesInFlight, FramesCountFromOneAndNothingIsKnownWithoutFeedback)
   EXPECT_EQ(frames.NewestFrameId(), 0u);
   EXPECT_EQ(frames.Refresh(), g_hz60);
   // Before any frame: nothing to end, or to give feedback for
-  frames.End(At(StartTicks));
-  frames.Add(PC::PresentFeedback::Shown(0, At(StartTicks)));
-  frames.Add(PC::PresentFeedback::Shown(1, At(StartTicks)));
+  frames.End(At(StartNanoseconds));
+  frames.Add(PC::PresentFeedback::Shown(0, At(StartNanoseconds)));
+  frames.Add(PC::PresentFeedback::Shown(1, At(StartNanoseconds)));
   EXPECT_EQ(frames.State().Refused, 2u);
 
-  EXPECT_EQ(frames.Begin(1, At(StartTicks)), 1u);
-  EXPECT_EQ(frames.Begin(1, At(StartTicks + 166'667)), 2u);
+  EXPECT_EQ(frames.Begin(1, At(StartNanoseconds)), 1u);
+  EXPECT_EQ(frames.Begin(1, At(StartNanoseconds + 16'666'667)), 2u);
   EXPECT_EQ(frames.NewestFrameId(), 2u);
-  EXPECT_EQ(frames.IntendedDisplayTime(), FP::TickCount64());
+  EXPECT_EQ(frames.IntendedDisplayTime(), FP::NanosecondTickCount());
   EXPECT_EQ(frames.State().Used, 0u);
   EXPECT_EQ(frames.State().Missing, 0u);
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
@@ -328,7 +332,7 @@ TEST(FramesInFlight, TheRefreshesTheDisplayFellBehindAreCountedBetweenItsDisplay
   EXPECT_EQ(frames.State().Used, 1u);
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
   // The newest frame is two frames after it: two refreshes later when nothing is late
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 5)));
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 5)));
 
   // One refresh later: on time. Two refreshes after that: a refresh late
   frames.Add(PC::PresentFeedback::Shown(2, Refresh(g_hz60, 4)));
@@ -336,9 +340,9 @@ TEST(FramesInFlight, TheRefreshesTheDisplayFellBehindAreCountedBetweenItsDisplay
   frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 6)));
   EXPECT_EQ(frames.State().LateRefreshes, 1u);
   // The newest frame is the one just counted: its own display time, and the next frame's is a swap interval later
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 6)));
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 6)));
   BeginFrames(frames, g_hz60, 1);
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 7)));
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 7)));
   EXPECT_EQ(frames.State().Used, 3u);
   EXPECT_EQ(frames.State().Refused, 0u);
   EXPECT_EQ(frames.State().Missing, 0u);
@@ -354,7 +358,7 @@ TEST(FramesInFlight, FramesAtASlowerSwapIntervalAreDueThatManyRefreshesApart)
   // Five refreshes for a swap interval of two: three late, all of them counted
   frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 11)));
   EXPECT_EQ(frames.State().LateRefreshes, 3u);
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 13)));
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 13)));
 }
 
 TEST(FramesInFlight, AFrameWithoutFeedbackIsMissingAndOneNeverShownIsCounted)
@@ -387,12 +391,12 @@ TEST(FramesInFlight, TwoFramesInOneRefreshPutTheCountAheadAndTheNextRefreshLostI
   // Frame 2 has frame 1's display time: frame 1 was not seen, and the count is a refresh ahead of the display
   frames.Add(PC::PresentFeedback::Shown(2, Refresh(g_hz60, 3)));
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 6))) << "frame 5, three swap intervals after that display time";
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 6))) << "frame 5, three swap intervals after that display time";
   // Frame 3 two refreshes later: held a refresh longer than its swap interval, and where it was due all along. No refresh was lost
   // over the two
   frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 5)));
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 7)));
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 7)));
   // With the lead used up the next late refresh counts
   frames.Add(PC::PresentFeedback::Shown(4, Refresh(g_hz60, 7)));
   EXPECT_EQ(frames.State().LateRefreshes, 1u);
@@ -412,10 +416,10 @@ TEST(FramesInFlight, AFrameShownEarlyDoesNotMoveWhereTheNextOnesAreAimed)
   BeginFrames(frames, g_hz60, 5, 2);
   frames.Add(PC::PresentFeedback::Shown(1, Refresh(g_hz60, 4)));
   frames.Add(PC::PresentFeedback::Shown(2, Refresh(g_hz60, 5)));
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 11))) << "frame 5, three frames of two refreshes after frame 2";
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 11))) << "frame 5, three frames of two refreshes after frame 2";
   frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 7)));
   frames.Add(PC::PresentFeedback::Shown(4, Refresh(g_hz60, 9)));
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 11)));
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 11)));
   // The count is still a refresh ahead of the display: a frame held a refresh longer lost none
   frames.Add(PC::PresentFeedback::Shown(5, Refresh(g_hz60, 12)));
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
@@ -455,20 +459,20 @@ TEST(FramesInFlight, FeedbackThatCanNotBeRightIsRefused)
 TEST(FramesInFlight, ADisplayTimeOffTheGridIsRefusedUntilTheNextOneAgreesWithIt)
 {
   PC::FramesInFlight frames(g_hz60);
-  const FP::TimeSpan half(g_hz60.ToTimeSpan().Ticks() / 2);
+  const FP::NanosecondTimeSpan half(g_hz60.ToNanosecondTimeSpan().Nanoseconds() / 2);
   BeginFrames(frames, g_hz60, 9);
   frames.Add(PC::PresentFeedback::Shown(1, Refresh(g_hz60, 3)));
   // Half a refresh off: not a refresh of this display. An eighth is the limit
   frames.Add(PC::PresentFeedback::Shown(2, Refresh(g_hz60, 4) + half));
   EXPECT_EQ(frames.State().Refused, 1u);
   // The next one on the old grid: used, counted across the refused one
-  frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 5) + Span(g_hz60.ToTimeSpan().Ticks() / 8)));
+  frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 5) + Span(g_hz60.ToNanosecondTimeSpan().Nanoseconds() / 8)));
   EXPECT_EQ(frames.State().Used, 2u);
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
 
   // Off the grid twice, each on a grid of its own: both refused
   frames.Add(PC::PresentFeedback::Shown(4, Refresh(g_hz60, 6) + half));
-  frames.Add(PC::PresentFeedback::Shown(5, Refresh(g_hz60, 7) + Span(half.Ticks() / 2)));
+  frames.Add(PC::PresentFeedback::Shown(5, Refresh(g_hz60, 7) + Span(half.Nanoseconds() / 2)));
   EXPECT_EQ(frames.State().Refused, 3u);
   // A step back of a whole refresh is no refresh either
   frames.Add(PC::PresentFeedback::Shown(6, Refresh(g_hz60, 4)));
@@ -480,7 +484,7 @@ TEST(FramesInFlight, ADisplayTimeOffTheGridIsRefusedUntilTheNextOneAgreesWithIt)
   frames.Add(PC::PresentFeedback::Shown(8, Refresh(g_hz60, 14) + half));
   EXPECT_EQ(frames.State().Used, 3u);
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
-  EXPECT_TRUE(WithinATick(frames.IntendedDisplayTime(), Refresh(g_hz60, 15) + half)) << "frame 9, counted from frame 8";
+  EXPECT_TRUE(WithinANanosecond(frames.IntendedDisplayTime(), Refresh(g_hz60, 15) + half)) << "frame 9, counted from frame 8";
   EXPECT_EQ(frames.State().Missing, 0u);
 }
 
@@ -515,14 +519,14 @@ TEST(FramesInFlight, ADisplayTimeWhoseFrameHasLeftIsNotCountedFrom)
   PC::FramesInFlight frames(g_hz60);
   BeginFrames(frames, g_hz60, 2);
   frames.Add(PC::PresentFeedback::Shown(1, Refresh(g_hz60, 3)));
-  frames.Add(PC::PresentFeedback::Shown(2, Refresh(g_hz60, 4) + Span(g_hz60.ToTimeSpan().Ticks() / 2)));
+  frames.Add(PC::PresentFeedback::Shown(2, Refresh(g_hz60, 4) + Span(g_hz60.ToNanosecondTimeSpan().Nanoseconds() / 2)));
   EXPECT_EQ(frames.State().Refused, 1u);
   BeginFrames(frames, g_hz60, PC::FramesInFlight::Capacity - 2);
-  EXPECT_NE(frames.IntendedDisplayTime(), FP::TickCount64()) << "frame 1 is the oldest kept";
+  EXPECT_NE(frames.IntendedDisplayTime(), FP::NanosecondTickCount()) << "frame 1 is the oldest kept";
   BeginFrames(frames, g_hz60, 1);
-  EXPECT_EQ(frames.IntendedDisplayTime(), FP::TickCount64());
+  EXPECT_EQ(frames.IntendedDisplayTime(), FP::NanosecondTickCount());
   // The next display time starts the count again: nothing is late, wherever it is, and the refused one of before is forgotten
-  frames.Add(PC::PresentFeedback::Shown(60, Refresh(g_hz60, 200) + Span(g_hz60.ToTimeSpan().Ticks() / 2)));
+  frames.Add(PC::PresentFeedback::Shown(60, Refresh(g_hz60, 200) + Span(g_hz60.ToNanosecondTimeSpan().Nanoseconds() / 2)));
   EXPECT_EQ(frames.State().Used, 2u);
   EXPECT_EQ(frames.State().LateRefreshes, 0u);
   frames.Add(PC::PresentFeedback::Shown(61, Refresh(g_hz60, 201)));
@@ -538,11 +542,11 @@ TEST(FramesInFlight, RestartForgetsTheFramesAndKeepsTheStatistics)
   EXPECT_EQ(frames.State().LateRefreshes, 2u);
   frames.Restart();
   EXPECT_EQ(frames.State().LateRefreshes, 2u) << "counted since it was made";
-  EXPECT_EQ(frames.IntendedDisplayTime(), FP::TickCount64());
+  EXPECT_EQ(frames.IntendedDisplayTime(), FP::NanosecondTickCount());
   frames.Add(PC::PresentFeedback::Shown(3, Refresh(g_hz60, 7)));
   EXPECT_EQ(frames.State().Refused, 1u);
   // No frame is kept: nothing to end
-  frames.End(At(StartTicks));
+  frames.End(At(StartNanoseconds));
   EXPECT_EQ(frames.Begin(1, Refresh(g_hz60, 10)), 5u) << "the ids go on";
   // Nothing is counted across the restart, and the frames it forgot are not missing. A frame that was not ended is presented at
   // its start
@@ -557,7 +561,7 @@ TEST(FramesInFlight, RestartForgetsTheFramesAndKeepsTheStatistics)
   // Another refresh period: the same, on the new period
   frames.SetRefreshPeriod(g_hz240);
   EXPECT_EQ(frames.Refresh(), g_hz240);
-  EXPECT_EQ(frames.IntendedDisplayTime(), FP::TickCount64());
+  EXPECT_EQ(frames.IntendedDisplayTime(), FP::NanosecondTickCount());
   BeginFrames(frames, g_hz240, 2);
   frames.Add(PC::PresentFeedback::Shown(7, Refresh(g_hz240, 30)));
   frames.Add(PC::PresentFeedback::Shown(8, Refresh(g_hz240, 32)));
@@ -613,19 +617,19 @@ TEST(PacerFeedback, TheIntendedDisplayTimeIsTheRefreshTheFrameReaches)
   QueuedLoop loop(pacer, g_hz240);
   for (int64_t frame = 0; frame < 200; ++frame)
   {
-    const FP::TimeSpan wobble = Wobble(g_hz240, frame);
+    const FP::NanosecondTimeSpan wobble = Wobble(g_hz240, frame);
     const PC::FrameSchedule schedule = loop.Frame({wobble});
-    const FP::TickCount64 start = Refresh(g_hz240, frame) + wobble;
+    const FP::NanosecondTickCount start = Refresh(g_hz240, frame) + wobble;
     // What a loop that sleeps holds to is counted from the frame's start, whatever the display does
-    EXPECT_LE(std::abs((schedule.NextFrameStartTime - (start + g_hz240.TimeFor(1))).Ticks()), 1) << frame;
+    EXPECT_LE(std::abs((schedule.NextFrameStartTime - (start + g_hz240.TimeFor(1))).Nanoseconds()), 1) << frame;
     if (frame < QueuedLoop::FeedbackDelay)
     {
-      EXPECT_EQ(schedule.IntendedDisplayTime, FP::TickCount64()) << frame << ": no display time to count from yet";
+      EXPECT_EQ(schedule.IntendedDisplayTime, FP::NanosecondTickCount()) << frame << ": no display time to count from yet";
     }
     else
     {
       // The queue's three refreshes are in it, and the start's wobble is not
-      EXPECT_TRUE(WithinATick(schedule.IntendedDisplayTime, Refresh(g_hz240, loop.ShownOnRefresh()))) << frame;
+      EXPECT_TRUE(WithinANanosecond(schedule.IntendedDisplayTime, Refresh(g_hz240, loop.ShownOnRefresh()))) << frame;
       EXPECT_EQ(loop.ShownOnRefresh(), frame + QueuedLoop::QueueRefreshes) << frame;
     }
   }
@@ -650,7 +654,7 @@ TEST(PacerFeedback, ALateFrameIsCaughtUpByTheFrameStartsAndCountedByTheDisplay)
     if (frame >= QueuedLoop::FeedbackDelay)
     {
       const int64_t early = frame >= lateFrame && frame < feedbackFrame ? 2 : 0;
-      EXPECT_TRUE(WithinATick(schedule.IntendedDisplayTime, Refresh(g_hz60, loop.ShownOnRefresh() - early))) << frame;
+      EXPECT_TRUE(WithinANanosecond(schedule.IntendedDisplayTime, Refresh(g_hz60, loop.ShownOnRefresh() - early))) << frame;
     }
   }
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
@@ -673,10 +677,10 @@ TEST(PacerFeedback, WhenFeedbackStopsTheIntendedDisplayTimeGetsUnknownAndTheFram
     {
       // Counted from the last display time while its frame is kept, the newest Capacity frames
       const bool known = schedule.FrameId < static_cast<uint64_t>(withFeedback) + PC::FramesInFlight::Capacity;
-      EXPECT_EQ(schedule.IntendedDisplayTime != FP::TickCount64(), known) << frame;
+      EXPECT_EQ(schedule.IntendedDisplayTime != FP::NanosecondTickCount(), known) << frame;
       if (known)
       {
-        EXPECT_TRUE(WithinATick(schedule.IntendedDisplayTime, Refresh(g_hz60, loop.ShownOnRefresh()))) << frame;
+        EXPECT_TRUE(WithinANanosecond(schedule.IntendedDisplayTime, Refresh(g_hz60, loop.ShownOnRefresh()))) << frame;
       }
     }
   }
@@ -700,7 +704,7 @@ TEST(PacerFeedback, FramesTheDisplayNeverShowedAreCountedAndPacedAsTheOthers)
       pacer.AddPresentFeedback(results.front());
       results.pop_front();
     }
-    const FP::TickCount64 start = Refresh(g_hz60, frame);
+    const FP::NanosecondTickCount start = Refresh(g_hz60, frame);
     const PC::FrameSchedule schedule = pacer.BeginFrame(start);
     EXPECT_EQ(schedule.SwapInterval, 1u) << frame;
     EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged) << frame;
@@ -721,7 +725,7 @@ TEST(PacerFeedback, WithFeedbackOffThePacerIsAsItWas)
 {
   PC::FramePacer plain{PC::PacerSettings(g_hz60)};
   PC::FramePacer given{PC::PacerSettings(g_hz60)};
-  int64_t now = StartTicks;
+  int64_t now = StartNanoseconds;
   int64_t changes = 0;
   for (int64_t frame = 0; frame < 300; ++frame)
   {
@@ -740,7 +744,7 @@ TEST(PacerFeedback, WithFeedbackOffThePacerIsAsItWas)
     EXPECT_EQ(schedule.Change, expected.Change) << frame;
     EXPECT_EQ(plain.EndFrame(At(now + work)), given.EndFrame(At(now + work)));
     changes += schedule.Change != PC::SwapIntervalChange::Unchanged ? 1 : 0;
-    now = std::max(schedule.NextFrameStartTime.Ticks(), now + work);
+    now = std::max(schedule.NextFrameStartTime.Nanoseconds(), now + work);
   }
   EXPECT_GT(changes, 0) << "the frames over a refresh slowed it down: the comparison covered a change";
   const PC::PresentFeedbackState state = given.FeedbackState();
@@ -756,14 +760,14 @@ TEST(PacerFeedback, APauseAndEveryRestartForgetTheFramesInFlight)
   {
     schedule = loop.Frame();
   }
-  EXPECT_NE(schedule.IntendedDisplayTime, FP::TickCount64());
+  EXPECT_NE(schedule.IntendedDisplayTime, FP::NanosecondTickCount());
   const uint64_t beforeThePause = schedule.FrameId;
 
   // A pause longer than the frame window: the pacer starts again, and feedback for a frame from before it is refused
   loop.Pause(5 * 60);
   schedule = loop.Frame();
   EXPECT_EQ(schedule.FrameId, beforeThePause + 1u) << "the ids go on";
-  EXPECT_EQ(schedule.IntendedDisplayTime, FP::TickCount64());
+  EXPECT_EQ(schedule.IntendedDisplayTime, FP::NanosecondTickCount());
   EXPECT_EQ(g_hz60.NearestRefreshes(schedule.AnimationStep), 1);
   uint64_t refused = pacer.FeedbackState().Refused;
   pacer.AddPresentFeedback(PC::PresentFeedback::Shown(beforeThePause, schedule.NextFrameStartTime));
@@ -776,7 +780,7 @@ TEST(PacerFeedback, APauseAndEveryRestartForgetTheFramesInFlight)
     {
       schedule = loop.Frame();
     }
-    EXPECT_NE(schedule.IntendedDisplayTime, FP::TickCount64()) << kind;
+    EXPECT_NE(schedule.IntendedDisplayTime, FP::NanosecondTickCount()) << kind;
     if (kind == 0)
     {
       pacer.Reset();
@@ -798,7 +802,7 @@ TEST(PacerFeedback, APauseAndEveryRestartForgetTheFramesInFlight)
     pacer.AddPresentFeedback(PC::PresentFeedback::Shown(schedule.FrameId, schedule.IntendedDisplayTime));
     EXPECT_EQ(pacer.FeedbackState().Refused, refused + 1u) << kind;
     loop.Pause(0);
-    EXPECT_EQ(loop.Frame().IntendedDisplayTime, FP::TickCount64()) << kind;
+    EXPECT_EQ(loop.Frame().IntendedDisplayTime, FP::NanosecondTickCount()) << kind;
   }
   EXPECT_EQ(pacer.FeedbackState().LateRefreshes, 0u) << "nothing is counted across a restart";
 }
@@ -824,7 +828,7 @@ TEST(PacerFeedback, FeedbackIsSwitchedOnAndOffOnALivePacer)
   }
   EXPECT_EQ(schedule.FrameId, 40u);
   EXPECT_GT(pacer.FeedbackState().Used, 0u);
-  EXPECT_TRUE(WithinATick(schedule.IntendedDisplayTime, Refresh(g_hz60, loop.ShownOnRefresh())));
+  EXPECT_TRUE(WithinANanosecond(schedule.IntendedDisplayTime, Refresh(g_hz60, loop.ShownOnRefresh())));
 
   // Off again: the intended display time is the frame start's, and feedback is not looked at
   const PC::PresentFeedbackState before = pacer.FeedbackState();
@@ -853,9 +857,9 @@ TEST(PacerFeedback, AFrameWithoutEndFrameIsPresentedAtItsStart)
   EXPECT_EQ(pacer.FeedbackState().Used, 1u);
   // The frame without EndFrame worked until the next one began, as without feedback
   const PC::FrameSchedule fourth = pacer.BeginFrame(Refresh(g_hz60, 3));
-  EXPECT_TRUE(WithinATick(fourth.IntendedDisplayTime, Refresh(g_hz60, 3)));
+  EXPECT_TRUE(WithinANanosecond(fourth.IntendedDisplayTime, Refresh(g_hz60, 3)));
   EXPECT_EQ(pacer.FrameWindow().Frames, 3u);
-  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((g_hz60.TimeFor(1).Ticks() + (4 * Ms) + g_hz60.TimeFor(1).Ticks()) / 3));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((g_hz60.TimeFor(1).Nanoseconds() + (4 * Ms) + g_hz60.TimeFor(1).Nanoseconds()) / 3));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -875,17 +879,17 @@ TEST(PacerFeedback, ARealSwapChainsFrameStartsReadAsLateAndItsDisplayTimesSayWha
   const std::vector<LogFrame> log = ReadLog(*path);
   ASSERT_EQ(log.size(), 1999u);
   // The refresh duration the swap chain reports
-  const PC::RefreshPeriod period = PC::RefreshPeriod::FromNanoseconds(4'166'500);
+  const PC::RefreshPeriod period = PC::RefreshPeriod::FromNanosecondTimeSpan(Span(4'166'500));
 
   // What the display did: the refreshes between the display times of frames next to each other
   int64_t heldLonger = 0;
   int64_t steps = 0;
   for (std::size_t index = 1; index < log.size(); ++index)
   {
-    if (log[index].DisplayTicks >= 0 && log[index - 1].DisplayTicks >= 0)
+    if (log[index].DisplayNanoseconds >= 0 && log[index - 1].DisplayNanoseconds >= 0)
     {
       ++steps;
-      heldLonger += period.NearestRefreshes(Span(log[index].DisplayTicks - log[index - 1].DisplayTicks)) > 1 ? 1 : 0;
+      heldLonger += period.NearestRefreshes(Span(log[index].DisplayNanoseconds - log[index - 1].DisplayNanoseconds)) > 1 ? 1 : 0;
     }
   }
   EXPECT_EQ(steps, 1955);

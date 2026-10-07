@@ -15,9 +15,9 @@ namespace Sim = MB::FramePacing::Pacer::Simulation;
 
 namespace
 {
-  // 100 Hz: a refresh of exactly 100,000 ticks
-  constexpr int64_t Period = 100'000;
-  constexpr int64_t Blank0 = 10'000'000;
+  // 100 Hz: a refresh of exactly 10,000,000 ns
+  constexpr int64_t Period = 10'000'000;
+  constexpr int64_t Blank0 = 1'000'000'000;
 
   const PC::RefreshPeriod g_hz100 = PC::RefreshPeriod::FromRate(100);
 
@@ -31,8 +31,8 @@ TEST(DisplayModel, ItsVerticalBlanksAreAPeriodApartFromTheFirst)
 {
   const Sim::DisplayModel display(g_hz100, {});
 
-  EXPECT_EQ(display.BlankTicks(0), Blank0);
-  EXPECT_EQ(display.BlankTicks(7), Blank(7));
+  EXPECT_EQ(display.BlankNanoseconds(0), Blank0);
+  EXPECT_EQ(display.BlankNanoseconds(7), Blank(7));
   EXPECT_EQ(display.BlankAtOrBefore(Blank0 - 1), 0);
   EXPECT_EQ(display.BlankAtOrBefore(Blank(3)), 3);
   EXPECT_EQ(display.BlankAtOrBefore(Blank(4) - 1), 3);
@@ -43,9 +43,9 @@ TEST(DisplayModel, AFrameIsShownAtTheFirstVerticalBlankItIsReadyFor)
   Sim::DisplayModel display(g_hz100, {});
 
   // Presented with its GPU work done: the next blank
-  EXPECT_EQ(display.Present(Blank0 + 10'000, Blank0 + 5'000), Blank(1));
+  EXPECT_EQ(display.Present(Blank0 + 1'000'000, Blank0 + 500'000), Blank(1));
   // Presented before its GPU work is done: the first blank after the work, however early the present was
-  EXPECT_EQ(display.Present(Blank(1) + 10'000, Blank(2) + 50'000), Blank(3));
+  EXPECT_EQ(display.Present(Blank(1) + 1'000'000, Blank(2) + 5'000'000), Blank(3));
   // Ready exactly at a blank is in time for it
   EXPECT_EQ(display.Present(Blank(4), Blank(4)), Blank(4));
 }
@@ -53,18 +53,18 @@ TEST(DisplayModel, AFrameIsShownAtTheFirstVerticalBlankItIsReadyFor)
 TEST(DisplayModel, AFrameHasToBeReadyTheLatchLeadBeforeAVerticalBlank)
 {
   Sim::DisplayModelSettings settings;
-  settings.LatchLeadTicks = 10'000;
+  settings.LatchLeadNanoseconds = 1'000'000;
   Sim::DisplayModel display(g_hz100, settings);
 
-  EXPECT_EQ(display.Present(Blank0 + 1'000, Blank0 + 90'000), Blank(1));
-  // 5,000 ticks before the blank is too late for it
-  EXPECT_EQ(display.Present(Blank(1) + 1'000, Blank(1) + 95'000), Blank(3));
+  EXPECT_EQ(display.Present(Blank0 + 100'000, Blank0 + 9'000'000), Blank(1));
+  // 0.5 ms before the blank is too late for it
+  EXPECT_EQ(display.Present(Blank(1) + 100'000, Blank(1) + 9'500'000), Blank(3));
 }
 
 TEST(DisplayModel, OneFrameIsTakenPerVerticalBlankInTheOrderOfThePresents)
 {
   Sim::DisplayModel display(g_hz100, {});
-  const int64_t now = Blank0 + 10'000;
+  const int64_t now = Blank0 + 1'000'000;
 
   EXPECT_EQ(display.Present(now, now), Blank(1));
   EXPECT_EQ(display.Present(now, now), Blank(2));
@@ -81,7 +81,7 @@ TEST(DisplayModel, OneFrameIsTakenPerVerticalBlankInTheOrderOfThePresents)
 TEST(DisplayModel, AFrameStaysItsSwapIntervalBehindTheFrameBeforeIt)
 {
   Sim::DisplayModel display(g_hz100, {});
-  const int64_t now = Blank0 + 10'000;
+  const int64_t now = Blank0 + 1'000'000;
 
   EXPECT_EQ(display.Present(now, now), Blank(1));
   EXPECT_EQ(display.Present(now, now, 2), Blank(3));
@@ -100,7 +100,7 @@ TEST(DisplayModel, AVerticalBlankThatTakesNoFramePutsEveryFramePresentedAtTheDis
   // One present per refresh, a tenth of a refresh after each blank
   for (int64_t frame = 0; frame < 12; ++frame)
   {
-    const int64_t now = Blank(frame) + 10'000;
+    const int64_t now = Blank(frame) + 1'000'000;
     const int32_t waiting = display.Pending(now);
     const int64_t shown = display.Present(now, now);
     if (frame < 4)
@@ -124,10 +124,10 @@ TEST(DisplayModel, AHeldVerticalBlankWithNoFrameWaitingChangesNothing)
   settings.HeldBlanks = {2};
   Sim::DisplayModel display(g_hz100, settings);
 
-  EXPECT_EQ(display.Present(Blank0 + 10'000, Blank0 + 10'000), Blank(1));
+  EXPECT_EQ(display.Present(Blank0 + 1'000'000, Blank0 + 1'000'000), Blank(1));
   // Nothing was presented for blank 2
-  EXPECT_EQ(display.Present(Blank(2) + 10'000, Blank(2) + 10'000), Blank(3));
-  EXPECT_EQ(display.Present(Blank(3) + 10'000, Blank(3) + 10'000), Blank(4));
+  EXPECT_EQ(display.Present(Blank(2) + 1'000'000, Blank(2) + 1'000'000), Blank(3));
+  EXPECT_EQ(display.Present(Blank(3) + 1'000'000, Blank(3) + 1'000'000), Blank(4));
 }
 
 TEST(DisplayModel, APipelineRefreshShowsEveryFrameOneRefreshAfterItIsTaken)
@@ -135,7 +135,7 @@ TEST(DisplayModel, APipelineRefreshShowsEveryFrameOneRefreshAfterItIsTaken)
   Sim::DisplayModelSettings settings;
   settings.PipelineRefreshes = 1;
   Sim::DisplayModel display(g_hz100, settings);
-  const int64_t now = Blank0 + 10'000;
+  const int64_t now = Blank0 + 1'000'000;
 
   EXPECT_EQ(display.Present(now, now), Blank(2));
   EXPECT_EQ(display.Present(now, now), Blank(3));
@@ -145,10 +145,10 @@ TEST(DisplayModel, APipelineRefreshShowsEveryFrameOneRefreshAfterItIsTaken)
 TEST(DisplayModel, NothingBoundsTheWaitingFramesWithoutImages)
 {
   Sim::DisplayModel display(g_hz100, {});
-  const int64_t now = Blank0 + 10'000;
+  const int64_t now = Blank0 + 1'000'000;
   for (int32_t frame = 0; frame < 8; ++frame)
   {
-    EXPECT_EQ(display.AcquireTicks(now), now);
+    EXPECT_EQ(display.AcquireNanoseconds(now), now);
     static_cast<void>(display.Present(now, now));
   }
   EXPECT_EQ(display.Pending(now), 8);
@@ -159,13 +159,13 @@ TEST(DisplayModel, WithTwoImagesAnAcquireWaitsUntilTheFramePresentedBeforeIsShow
   Sim::DisplayModelSettings settings;
   settings.Images = 2;
   Sim::DisplayModel display(g_hz100, settings);
-  const int64_t now = Blank0 + 10'000;
+  const int64_t now = Blank0 + 1'000'000;
 
-  EXPECT_EQ(display.AcquireTicks(now), now);
+  EXPECT_EQ(display.AcquireNanoseconds(now), now);
   EXPECT_EQ(display.Present(now, now), Blank(1));
-  EXPECT_EQ(display.AcquireTicks(now + 1'000), Blank(1));
+  EXPECT_EQ(display.AcquireNanoseconds(now + 100'000), Blank(1));
   // After it is shown an acquire returns at once
-  EXPECT_EQ(display.AcquireTicks(Blank(1) + 1'000), Blank(1) + 1'000);
+  EXPECT_EQ(display.AcquireNanoseconds(Blank(1) + 100'000), Blank(1) + 100'000);
 }
 
 TEST(DisplayModel, WithThreeImagesOneFrameMayWaitWhileTheNextIsDrawn)
@@ -173,16 +173,16 @@ TEST(DisplayModel, WithThreeImagesOneFrameMayWaitWhileTheNextIsDrawn)
   Sim::DisplayModelSettings settings;
   settings.Images = 3;
   Sim::DisplayModel display(g_hz100, settings);
-  const int64_t now = Blank0 + 10'000;
+  const int64_t now = Blank0 + 1'000'000;
 
   static_cast<void>(display.Present(now, now));
-  EXPECT_EQ(display.AcquireTicks(now), now);
+  EXPECT_EQ(display.AcquireNanoseconds(now), now);
   static_cast<void>(display.Present(now, now));
   // Two wait: the acquire returns when the first of them is shown
-  EXPECT_EQ(display.AcquireTicks(now), Blank(1));
+  EXPECT_EQ(display.AcquireNanoseconds(now), Blank(1));
   static_cast<void>(display.Present(Blank(1), Blank(1)));
   static_cast<void>(display.Present(Blank(1), Blank(1)));
   // Three wait at blank 1 (shown at 2, 3 and 4): the acquire returns when two of them are shown
   EXPECT_EQ(display.Pending(Blank(1)), 3);
-  EXPECT_EQ(display.AcquireTicks(Blank(1)), Blank(3));
+  EXPECT_EQ(display.AcquireNanoseconds(Blank(1)), Blank(3));
 }

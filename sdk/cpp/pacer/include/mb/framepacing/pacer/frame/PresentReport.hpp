@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -18,17 +18,17 @@ namespace MB::FramePacing::Pacer
     //! The frame: its PresentPlan::FrameId.
     uint64_t FrameId{0};
     //! When the present was called, on the application's steady clock
-    TickCount64 CallTime;
+    NanosecondTickCount CallTime;
     //! When it returned, on the same clock
-    TickCount64 ReturnTime;
+    NanosecondTickCount ReturnTime;
     //! false: the system did not take the present (a swap chain that is out of date, a surface that was lost), so the frame
     //! will not be shown
     bool Accepted{true};
 
     //! How long the call held the frame loop: zero for a return before the call.
-    [[nodiscard]] constexpr TimeDuration Blocked() const noexcept
+    [[nodiscard]] constexpr NanosecondTimeDuration Blocked() const noexcept
     {
-      return TimeDuration(ReturnTime - CallTime);
+      return NanosecondTimeDuration(ReturnTime - CallTime);
     }
   };
 }

@@ -65,8 +65,10 @@ and "the second session". They are the display times a driver reports on one mac
 
 ## What it needs
 
-- **A steady clock**, read by the application and passed in as a `TickCount64` (the core's time types: `TickCount64::FromNanoseconds`,
-  `TickCount64::FromCounter(counter, frequency)`, or a `std::chrono` clock through `core/time/ChronoConversion.hpp`).
+- **A steady clock**, read by the application and passed in as a `NanosecondTickCount` (the core's time types: nanoseconds as
+  the platform gives them with `NanosecondTickCount::FromNanoseconds`, a clock that counts in ticks of 100 ns through
+  `NanosecondTickCount::FromTickCount64`). Every time the pacer takes and gives is in nanoseconds: `NanosecondTickCount` for a
+  point on the clock, `NanosecondTimeSpan` for a span, `NanosecondTimeSpan32` for the marker's 32-bit values.
 - **A loop paced by vsync**: vsync on, a fixed refresh rate, and frames that start a swap interval apart, on a refresh or close
   to one. A `Present` (or a wait for a free buffer) that waits for the display gives that by itself. Not every one does: on the
   first integration's Vulkan FIFO swap chain neither the present nor the acquire ever waited. So the application holds the next
@@ -74,8 +76,8 @@ and "the second session". They are the display times a driver reports on one mac
   the frames less evenly: fine while they stay within half a refresh. Beyond it a
   frame on time reads as late; the statistics of [present feedback](#present-feedback-optional) show when that happens.
 - **The display's refresh period**: from the display mode, or a hard-coded value to start with (not every window system reports
-  it). Give it with its fraction: `RefreshPeriod::FromRate(24002, 100)` for 240.02 Hz, or `FromNanoseconds`; whole ticks
-  (`FromTimeSpan`) lose it. Not from a swap chain's present timing without a check: on the first integration's machine the
+  it). Give it as exactly as the platform has it: `RefreshPeriod::FromRate(24002, 100)` for 240.02 Hz keeps the fraction of a
+  nanosecond, and `FromNanosecondTimeSpan` takes a period in whole nanoseconds. Not from a swap chain's present timing without a check: on the first integration's machine the
   swap chain's refresh duration was that of the fastest display of the desktop (8.33 ms for a window on a 60 Hz or a 50 Hz
   display next to a 120 Hz one), while the window system gave the rate of the display the window was on. A present scheduled by
   that refresh was held twice as long.
@@ -110,9 +112,9 @@ settings.SetPreferredFrameRate(30);                             // optional: a t
 PC::FramePacer pacer(settings);
 
 // Every frame
-const PC::FrameSchedule schedule = pacer.BeginFrame(Now());     // your steady clock, as an FP::TickCount64
+const PC::FrameSchedule schedule = pacer.BeginFrame(Now());     // your steady clock, as an FP::NanosecondTickCount
 UpdateAndDraw(schedule.AnimationTime);                          // render the frame for this time
-const FP::TimeSpan32 cpuBusy = pacer.EndFrame(Now());           // as you draw the marker, last, just before Present
+const FP::NanosecondTimeSpan32 cpuBusy = pacer.EndFrame(Now()); // as you draw the marker, last, just before Present
 DrawMarker(schedule, cpuBusy);
 Present(schedule.SwapInterval);                                 // hold the frame for that many refreshes
 WaitUntil(schedule.NextFrameStartTime);                         // yours: the next frame begins no earlier, at any swap interval
@@ -289,7 +291,7 @@ frame rate.
 
 The rule is the adaptive swap interval rule as [mb-framepacing-explained](https://github.com/Unarmed1000/mb-framepacing-explained) describes
 and simulates it (`tools/frame_pacing_video/adaptive_rate.py`), with that repository's proposed fix as the default. Integer arithmetic on
-whole ticks only, so every port decides alike.
+whole nanoseconds only, so every port decides alike.
 
 - **The frame window** holds the frames of the last `FrameWindowLength` since the last change of swap interval, and one frame beyond it.
   It is **full** when its oldest frame is more than `FrameWindowLength` older than its newest (or when it holds all the frames it has
@@ -469,7 +471,7 @@ settings, not properties of frame pacing in general.
 
 | Setting                 | Default                              | Range                     | What it is                                                                                    |
 | ----------------------- | ------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------------- |
-| `Refresh`               | required                             | 100 µs to 1 s             | The display's refresh period (`RefreshPeriod::FromRate`, `FromNanoseconds`, `FromTimeSpan`)   |
+| `Refresh`               | required                             | 100 µs to 1 s             | The display's refresh period (`RefreshPeriod::FromRate`, `FromNanosecondTimeSpan`)            |
 | `PreferredFrameTime`    | none                                 | 0 (none) to 10 s          | The target frame rate as a frame time (`SetPreferredFrameRate` takes a rate)                  |
 | `PreferredSwapInterval` | 1                                    | 1 to 100                  | The swap interval the application wants; the pacer never goes faster                          |
 | `AutoSwapInterval`      | on                                   |                           | Adapt the swap interval with the rule                                                         |
@@ -566,7 +568,7 @@ jitter on every frame start, the clock's wrap.
 
 `240-vulkan-present-log.csv` is not written by `pacer-sim`: it is a present log of the first integration's Vulkan sample, not paced,
 on a 240 Hz display with a fixed refresh rate and a machine busy with other work (1999 frames: when each frame started, was
-presented and was shown, and the frame in which the application read that, all in ticks). The [present feedback](#present-feedback-optional) tests pace it without and
+presented and was shown, and the frame in which the application read that, all in ticks of 100 ns as it was recorded; the tests make nanoseconds of them). The [present feedback](#present-feedback-optional) tests pace it without and
 with the display times and pin that the pacing is the same (214 frames late by their starts) and that the statistics count the two
 refreshes the display lost.
 

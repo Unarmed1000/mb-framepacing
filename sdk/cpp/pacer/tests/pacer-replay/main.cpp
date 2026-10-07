@@ -7,10 +7,11 @@
 //   pacer-replay <log.csv> [--period-ns <n> | --rate <numerator> <denominator>] [--fixed] [--summary]
 //
 //   --period-ns   the refresh period the log's application gave its pacer, in nanoseconds; without it the log's target frame time
-//                 (to the tick, which a replay that has to agree with the log to the tick may not be exact enough for)
+//                 (to the tick of 100 ns the log counts in, which a replay that has to agree with the log may not be exact enough for)
 //   --rate        the same as a refresh rate in Hz, numerator / denominator (a simulated loop's: pacer-sim --loop --rate)
 //   --fixed       a fixed swap interval, the rule off
 //   --summary     the summary only
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -91,15 +92,15 @@ int main(const int argc, char** argv)
     RefreshPeriod period = rateNumerator > 0 ? RefreshPeriod::FromRate(rateNumerator, rateDenominator) : Sim::LoggedRefreshPeriod(frames);
     if (rateNumerator == 0 && periodNanoseconds > 0)
     {
-      period = RefreshPeriod::FromNanoseconds(periodNanoseconds);
+      period = RefreshPeriod::FromNanosecondTimeSpan(MB::FramePacing::NanosecondTimeSpan(periodNanoseconds));
     }
     const Sim::ReplayResult result = Sim::ReplayLog(frames, period, autoSwapInterval);
     if (!summaryOnly)
     {
       std::cout << result.Csv;
     }
-    std::cerr << "frames replayed: " << result.Frames << " of " << frames.size() << " rows, at a refresh of " << period.ToTimeSpan().Ticks()
-              << " ticks\n"
+    std::cerr << "frames replayed: " << result.Frames << " of " << frames.size() << " rows, at a refresh of "
+              << period.ToNanosecondTimeSpan().Nanoseconds() << " nanoseconds\n"
               << "the pacer's answers are the log's for " << result.Agreeing << " of " << result.Compared << " frames\n"
               << "frames with a display time: " << result.Shown << '\n';
     Counts("refreshes from a frame's start to its display (refreshes: frames):", result.RefreshesToDisplay);

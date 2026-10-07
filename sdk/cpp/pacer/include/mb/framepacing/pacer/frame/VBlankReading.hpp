@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 
 namespace MB::FramePacing::Pacer
 {
@@ -14,12 +14,12 @@ namespace MB::FramePacing::Pacer
   struct VBlankReading
   {
     //! The time of a vertical blank: a recent one, or the next
-    TickCount64 VBlankTime;
+    NanosecondTickCount VBlankTime;
     //! The time from one vertical blank to the next, as the window system gives it; zero: it gave none, and the pacer keeps the
     //! period it has
-    TimeDuration Period;
+    NanosecondTimeDuration Period;
     //! When the application read the two: a reading ages, as the clock and the display drift apart
-    TickCount64 ReadTime;
+    NanosecondTickCount ReadTime;
   };
 }
 

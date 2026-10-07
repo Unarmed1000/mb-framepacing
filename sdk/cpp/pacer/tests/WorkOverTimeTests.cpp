@@ -5,8 +5,8 @@
 // so the next frame starts when the work is done and not on a refresh. Such a frame is late whatever the frame starts say, and the
 // time between the starts counts as real time. The refresh clock on its own, the pacer, and a frame log of a real swap chain
 // (test-data/pacer/120-vulkan-work-130-log.csv).
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -29,26 +29,26 @@ namespace PC = MB::FramePacing::Pacer;
 
 namespace
 {
-  constexpr int64_t Second = FP::TimeSpan::TicksPerSecond;
-  constexpr int64_t StartTicks = 100 * Second;
+  constexpr int64_t Second = FP::NanosecondTimeSpan::NanosecondsPerSecond;
+  constexpr int64_t StartNanoseconds = 100 * Second;
 
   const PC::RefreshPeriod g_hz60 = PC::RefreshPeriod::FromRate(60);
   const PC::RefreshPeriod g_hz120 = PC::RefreshPeriod::FromRate(120);
 
-  FP::TimeSpan Span(const int64_t ticks) noexcept
+  FP::NanosecondTimeSpan Span(const int64_t nanoseconds) noexcept
   {
-    return FP::TimeSpan(ticks);
+    return FP::NanosecondTimeSpan(nanoseconds);
   }
 
-  FP::TickCount64 At(const int64_t ticks) noexcept
+  FP::NanosecondTickCount At(const int64_t nanoseconds) noexcept
   {
-    return FP::TickCount64(ticks);
+    return FP::NanosecondTickCount(nanoseconds);
   }
 
   //! A share of a refresh period, in hundredths
-  FP::TimeSpan Share(const PC::RefreshPeriod period, const int64_t hundredths) noexcept
+  FP::NanosecondTimeSpan Share(const PC::RefreshPeriod period, const int64_t hundredths) noexcept
   {
-    return Span(period.ToTimeSpan().Ticks() * hundredths / 100);
+    return Span(period.ToNanosecondTimeSpan().Nanoseconds() * hundredths / 100);
   }
 
   //! What a loop that no vsync holds gave: the pacer's count against the time that passed
@@ -63,7 +63,7 @@ namespace
     uint32_t WindowFrames{0};
     uint32_t LateFrames{0};
     uint32_t SwapInterval{0};
-    FP::TimeSpan Passed;
+    FP::NanosecondTimeSpan Passed;
   };
 
   //! Frames that start when the work of the one before is done, each working workPercent of a refresh: no present waits for the
@@ -73,9 +73,9 @@ namespace
                            const bool endFrame = true, const int64_t gpuPercent = 0)
   {
     LoopResult result;
-    const FP::TimeSpan work = Share(period, workPercent);
-    FP::TickCount64 start = At(StartTicks);
-    const FP::TickCount64 first = start;
+    const FP::NanosecondTimeSpan work = Share(period, workPercent);
+    FP::NanosecondTickCount start = At(StartNanoseconds);
+    const FP::NanosecondTickCount first = start;
     for (int64_t frame = 0; frame < frames; ++frame)
     {
       const PC::FrameSchedule schedule = rPacer.BeginFrame(start);
@@ -115,13 +115,13 @@ namespace
     return std::nullopt;
   }
 
-  //! A row of the frame log. Times in ticks; -1 where the platform gave none
+  //! A row of the frame log. Times in nanoseconds (the file has ticks); -1 where the platform gave none
   struct LogFrame
   {
-    int64_t StartTicks{0};
-    int64_t EndFrameTicks{0};
-    int64_t WorkTicks{0};
-    int64_t DisplayTicks{-1};
+    int64_t StartNanoseconds{0};
+    int64_t EndFrameNanoseconds{0};
+    int64_t WorkNanoseconds{0};
+    int64_t DisplayNanoseconds{-1};
   };
 
   std::vector<LogFrame> ReadLog(const std::filesystem::path& path)
@@ -140,7 +140,10 @@ namespace
         fields.push_back(field);
       }
       const auto number = [&fields](const std::size_t index) { return fields[index].empty() ? int64_t{-1} : std::stoll(fields[index]); };
-      frames.push_back({number(1), number(2), number(3), number(4)});
+      // The log is in ticks of 100 ns, as it was recorded
+      const auto time = [&number](const std::size_t index)
+      { return number(index) < 0 ? int64_t{-1} : number(index) * FP::NanosecondTimeSpan::NanosecondsPerTick; };
+      frames.push_back({time(1), time(2), time(3), time(4)});
     }
     return frames;
   }
@@ -153,31 +156,31 @@ namespace
 TEST(WorkOverTime, AFrameThatWorkedLongerThanItsSwapIntervalIsLate)
 {
   PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
-  int64_t start = StartTicks;
+  int64_t start = StartNanoseconds;
   static_cast<void>(clock.Measure(At(start)));
   static_cast<void>(clock.Step(1));
 
   // Work that fits: late only by the frame starts, as without the work
-  start += g_hz60.TimeFor(1).Ticks();
+  start += g_hz60.TimeFor(1).Nanoseconds();
   PC::FrameMeasurement measured = clock.Measure(At(start), Share(g_hz60, 90));
   EXPECT_EQ(measured.Refreshes, 1u);
   EXPECT_FALSE(measured.Late);
   static_cast<void>(clock.Step(1));
   // Exactly the swap interval's time still fits
-  start += g_hz60.TimeFor(1).Ticks();
+  start += g_hz60.TimeFor(1).Nanoseconds();
   measured = clock.Measure(At(start), g_hz60.TimeFor(1));
   EXPECT_FALSE(measured.Late);
   static_cast<void>(clock.Step(1));
 
   // 1.3 refreshes of work, and the next frame starts when it is done: one refresh by the frame starts, and late all the same
-  start += Share(g_hz60, 130).Ticks();
+  start += Share(g_hz60, 130).Nanoseconds();
   measured = clock.Measure(At(start), Share(g_hz60, 130));
   EXPECT_FALSE(measured.Restarted);
   EXPECT_EQ(measured.Refreshes, 1u);
   EXPECT_TRUE(measured.Late);
   // At a swap interval of two the same work fits
   static_cast<void>(clock.Step(2));
-  start += g_hz60.TimeFor(2).Ticks();
+  start += g_hz60.TimeFor(2).Nanoseconds();
   measured = clock.Measure(At(start), Share(g_hz60, 130));
   EXPECT_EQ(measured.Refreshes, 2u);
   EXPECT_FALSE(measured.Late);
@@ -186,8 +189,8 @@ TEST(WorkOverTime, AFrameThatWorkedLongerThanItsSwapIntervalIsLate)
 TEST(WorkOverTime, TheRefreshesOfFramesOverTheirTimeAddUpToTheTimeThatPassed)
 {
   PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
-  const FP::TimeSpan work = Share(g_hz60, 137);
-  FP::TickCount64 start = At(StartTicks);
+  const FP::NanosecondTimeSpan work = Share(g_hz60, 137);
+  FP::NanosecondTickCount start = At(StartNanoseconds);
   static_cast<void>(clock.Measure(start));
   static_cast<void>(clock.Step(1));
   // 1.37 refreshes a frame: one refresh, two, one, one, two, ... and never more than half a refresh from the time that passed
@@ -202,14 +205,14 @@ TEST(WorkOverTime, TheRefreshesOfFramesOverTheirTimeAddUpToTheTimeThatPassed)
     ASSERT_TRUE(measured.Refreshes == 1u || measured.Refreshes == 2u) << frame;
     refreshes += measured.Refreshes;
     twos += measured.Refreshes == 2u ? 1 : 0;
-    ASSERT_EQ(refreshes, g_hz60.NearestRefreshes(Span(work.Ticks() * frame))) << frame;
+    ASSERT_EQ(refreshes, g_hz60.NearestRefreshes(Span(work.Nanoseconds() * frame))) << frame;
   }
   EXPECT_EQ(refreshes, 1'370);
   EXPECT_EQ(twos, 370);
 
   // Without the work the same starts are one refresh each: the frames' own rounding, as for a loop that vsync holds
   PC::PacerRefreshClock unaware(g_hz60, Span(2 * Second));
-  start = At(StartTicks);
+  start = At(StartNanoseconds);
   static_cast<void>(unaware.Measure(start));
   static_cast<void>(unaware.Step(1));
   for (int64_t frame = 0; frame < 100; ++frame)
@@ -223,8 +226,8 @@ TEST(WorkOverTime, TheRefreshesOfFramesOverTheirTimeAddUpToTheTimeThatPassed)
 TEST(WorkOverTime, WhatRoundingLeftIsDroppedByAFrameThatFitsAndByARestart)
 {
   PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
-  const FP::TimeSpan over = Share(g_hz60, 140);
-  FP::TickCount64 start = At(StartTicks);
+  const FP::NanosecondTimeSpan over = Share(g_hz60, 140);
+  FP::NanosecondTickCount start = At(StartNanoseconds);
   static_cast<void>(clock.Measure(start));
   static_cast<void>(clock.Step(1));
   // 1.4 refreshes: one counted, 0.4 left over. Another would be two (1.8)
@@ -262,7 +265,7 @@ TEST(WorkOverTime, WorkLongerThanTheTimeBetweenTheStartsLeavesNoMoreThanARefresh
   // An application that gives more work than the frame took (the GPU's time of an older frame): the frame counts its swap interval,
   // and what is left over stays within a refresh however long that goes on
   PC::PacerRefreshClock clock(g_hz60, Span(2 * Second));
-  FP::TickCount64 start = At(StartTicks);
+  FP::NanosecondTickCount start = At(StartNanoseconds);
   static_cast<void>(clock.Measure(start));
   static_cast<void>(clock.Step(1));
   for (int64_t frame = 0; frame < 100; ++frame)
@@ -309,7 +312,7 @@ TEST(WorkOverTime, AtAFixedSwapIntervalTheAnimationKeepsToTheTimeThatPassed)
     const LoopResult result = RunUnheldLoop(pacer, g_hz60, workPercent, 2'000);
     EXPECT_EQ(result.SwapInterval, 1u);
     // The animation time of the last frame is the time to its start: within a refresh of the frames before it
-    const int64_t passed = g_hz60.NearestRefreshes(Span(result.Passed.Ticks() * (result.Frames - 1) / result.Frames));
+    const int64_t passed = g_hz60.NearestRefreshes(Span(result.Passed.Nanoseconds() * (result.Frames - 1) / result.Frames));
     EXPECT_LE(std::abs(result.AnimationRefreshes - passed), 1);
     EXPECT_GT(result.WindowFrames, 40u);
     EXPECT_EQ(result.LateFrames, result.WindowFrames) << "every frame of the window";
@@ -321,10 +324,10 @@ TEST(WorkOverTime, AFrameWithoutEndFrameIsNotJudgedByItsWork)
   // Without EndFrame a frame's work is the time to the next frame's start: a refresh, give or take the wake-up. That must not read
   // as work over the frame time
   PC::FramePacer pacer{PC::PacerSettings(g_hz60)};
-  FP::TickCount64 start = At(StartTicks);
+  FP::NanosecondTickCount start = At(StartNanoseconds);
   for (int64_t frame = 0; frame < 600; ++frame)
   {
-    const PC::FrameSchedule schedule = pacer.BeginFrame(start + Span(frame % 2 == 0 ? 0 : 3'000));
+    const PC::FrameSchedule schedule = pacer.BeginFrame(start + Span(frame % 2 == 0 ? 0 : 300'000));
     EXPECT_EQ(schedule.SwapInterval, 1u);
     EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
     start += g_hz60.TimeFor(frame + 1) - g_hz60.TimeFor(frame);
@@ -359,10 +362,10 @@ TEST(WorkOverTime, ARealLoopWithWorkOverARefreshIsLateAndItsAnimationKeepsTime)
   int64_t shownSteps = 0;
   for (std::size_t index = 1; index < log.size(); ++index)
   {
-    if (log[index].DisplayTicks >= 0 && log[index - 1].DisplayTicks >= 0)
+    if (log[index].DisplayNanoseconds >= 0 && log[index - 1].DisplayNanoseconds >= 0)
     {
       ++shownSteps;
-      shownTwice += g_hz120.NearestRefreshes(Span(log[index].DisplayTicks - log[index - 1].DisplayTicks)) == 2 ? 1 : 0;
+      shownTwice += g_hz120.NearestRefreshes(Span(log[index].DisplayNanoseconds - log[index - 1].DisplayNanoseconds)) == 2 ? 1 : 0;
     }
   }
   EXPECT_EQ(shownSteps, 1'495);
@@ -375,10 +378,10 @@ TEST(WorkOverTime, ARealLoopWithWorkOverARefreshIsLateAndItsAnimationKeepsTime)
   int64_t animationRefreshes = 0;
   for (const LogFrame& frame : log)
   {
-    animationRefreshes += g_hz120.NearestRefreshes(fixed.BeginFrame(At(frame.StartTicks)).AnimationStep);
-    static_cast<void>(fixed.EndFrame(At(frame.EndFrameTicks), Span(frame.WorkTicks)));
+    animationRefreshes += g_hz120.NearestRefreshes(fixed.BeginFrame(At(frame.StartNanoseconds)).AnimationStep);
+    static_cast<void>(fixed.EndFrame(At(frame.EndFrameNanoseconds), Span(frame.WorkNanoseconds)));
   }
-  const int64_t passed = g_hz120.NearestRefreshes(Span(log.back().StartTicks - log.front().StartTicks));
+  const int64_t passed = g_hz120.NearestRefreshes(Span(log.back().StartNanoseconds - log.front().StartNanoseconds));
   EXPECT_EQ(passed, 2'052);
   EXPECT_LE(std::abs(animationRefreshes - passed), 1);
   EXPECT_EQ(fixed.FrameWindow().LateFrames, fixed.FrameWindow().Frames) << "every frame's work is over a refresh";
@@ -388,8 +391,8 @@ TEST(WorkOverTime, ARealLoopWithWorkOverARefreshIsLateAndItsAnimationKeepsTime)
   int64_t slowerAtFrame = -1;
   for (std::size_t index = 0; index < log.size() && slowerAtFrame < 0; ++index)
   {
-    const PC::FrameSchedule schedule = adaptive.BeginFrame(At(log[index].StartTicks));
-    static_cast<void>(adaptive.EndFrame(At(log[index].EndFrameTicks), Span(log[index].WorkTicks)));
+    const PC::FrameSchedule schedule = adaptive.BeginFrame(At(log[index].StartNanoseconds));
+    static_cast<void>(adaptive.EndFrame(At(log[index].EndFrameNanoseconds), Span(log[index].WorkNanoseconds)));
     slowerAtFrame = schedule.Change == PC::SwapIntervalChange::Slower ? static_cast<int64_t>(index) : -1;
   }
   EXPECT_EQ(slowerAtFrame, 25);

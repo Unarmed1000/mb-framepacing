@@ -13,20 +13,20 @@ namespace MB::FramePacing::Pacer::Simulation
   {
     int64_t FrameIndex{0};
     bool PacerOn{false};
-    int64_t StartTicks{0};
+    int64_t StartNanoseconds{0};
     //! Where the pacer's EndFrame was called, and the work it was given (the CPU's and the GPU's, added)
-    int64_t EndFrameTicks{0};
-    int64_t WorkTicks{0};
-    int64_t PresentTicks{0};
+    int64_t EndFrameNanoseconds{0};
+    int64_t WorkNanoseconds{0};
+    int64_t PresentNanoseconds{0};
     //! The frame's display time as the log has it (a driver's report, or a simulation's own)
-    int64_t ShownTicks{0};
+    int64_t ShownNanoseconds{0};
     //! What the log says the pacer answered
     uint32_t SwapInterval{0};
-    int64_t AnimationStepTicks{0};
-    int64_t IntendedDisplayTicks{0};
-    int64_t NextFrameStartTicks{0};
-    //! The frame time the log's pacer aimed for, over its swap interval: its refresh period to the tick
-    int64_t TargetFrameTimeTicks{0};
+    int64_t AnimationStepNanoseconds{0};
+    int64_t IntendedDisplayNanoseconds{0};
+    int64_t NextFrameStartNanoseconds{0};
+    //! The frame time the log's pacer aimed for, over its swap interval: its refresh period to the log's tick of 100 ns
+    int64_t TargetFrameTimeNanoseconds{0};
   };
 }
 

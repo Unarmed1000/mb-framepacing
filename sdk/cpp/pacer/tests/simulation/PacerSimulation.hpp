@@ -8,7 +8,7 @@
 // late. The pacer paces it through its public API (BeginFrame, EndFrame: it measures the display from the frame starts, as the model
 // shows it). pacer-sim writes the golden results with it (sdk/test-data/pacer); the tests compare with them.
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <filesystem>
 #include <string>
@@ -19,14 +19,14 @@
 namespace MB::FramePacing::Pacer::Simulation
 {
   //! The first frame starts at 1 s on the steady clock, on a refresh (refresh 0 of the results)
-  inline constexpr int64_t StartTicks = TimeSpan::TicksPerSecond;
+  inline constexpr int64_t StartNanoseconds = NanosecondTimeSpan::NanosecondsPerSecond;
 
   //! The columns of a result: one row per frame
   inline constexpr std::string_view ResultHeader =
-    "frame,workTicks,targetRefresh,shownRefresh,late,swapInterval,change,intendedDisplayTicks,"
-    "animationTicks,windowFrames,windowLateFrames,referenceSwapInterval,referenceShownRefresh";
+    "frame,workNanoseconds,targetRefresh,shownRefresh,late,swapInterval,change,intendedDisplayNanoseconds,"
+    "animationNanoseconds,windowFrames,windowLateFrames,referenceSwapInterval,referenceShownRefresh";
 
-  //! A scenario's frames from a CSV file with the columns workTicks, referenceSwapInterval and referenceShownRefresh.
+  //! A scenario's frames from a CSV file with the columns workNanoseconds, referenceSwapInterval and referenceShownRefresh.
   std::vector<ScenarioFrame> ReadFrames(const std::filesystem::path& path);
 
   //! The golden scenarios: 60-busy (test-data/pacer/60-busy-frames.csv, twice), 60-busy-full-rate (its frames file, at a fixed swap

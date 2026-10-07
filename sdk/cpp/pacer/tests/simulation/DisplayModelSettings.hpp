@@ -14,9 +14,9 @@ namespace MB::FramePacing::Pacer::Simulation
   struct DisplayModelSettings
   {
     //! Vertical blank 0 on the steady clock: at 1 s unless set
-    int64_t FirstBlankTicks{10'000'000};
+    int64_t FirstBlankNanoseconds{1'000'000'000};
     //! How long before a vertical blank a frame has to be ready (presented, and its GPU work done) to be taken for that blank
-    int64_t LatchLeadTicks{0};
+    int64_t LatchLeadNanoseconds{0};
     //! Whole refreshes from the vertical blank a frame is taken for to the one it is shown at: 0 shows it at that blank, 1 is a
     //! compositor that takes a refresh of its own
     int32_t PipelineRefreshes{0};

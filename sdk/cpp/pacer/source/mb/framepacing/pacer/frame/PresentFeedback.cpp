@@ -6,12 +6,13 @@
 
 namespace MB::FramePacing::Pacer
 {
-  PresentFeedback PresentFeedback::Shown(const uint64_t frameId, const TickCount64 displayTime) noexcept
+  PresentFeedback PresentFeedback::Shown(const uint64_t frameId, const NanosecondTickCount displayTime) noexcept
   {
     return {frameId, PresentResult::Shown, displayTime, false, {}};
   }
 
-  PresentFeedback PresentFeedback::Shown(const uint64_t frameId, const TickCount64 displayTime, const TickCount64 presentTime) noexcept
+  PresentFeedback PresentFeedback::Shown(const uint64_t frameId, const NanosecondTickCount displayTime,
+                                         const NanosecondTickCount presentTime) noexcept
   {
     return {frameId, PresentResult::Shown, displayTime, true, presentTime};
   }

@@ -330,8 +330,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
     `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.
-  - **Typed, no raw ticks:** points in time `TickCount64`, spans `TimeSpan`, the marker's values `TimeSpan32`. `RefreshPeriod`'s 2⁻³²
-    ticks are private (`TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`). **Always valid:** `RefreshPeriod` (100 µs
+  - **Typed, in nanoseconds** (the user, 2026-10-07; the marker's payload still takes tick types, so an application converts where it
+    fills one): points in time `NanosecondTickCount`, spans `NanosecondTimeSpan`, lengths that can not be negative
+    `NanosecondTimeDuration` (C++ only), the marker's values `NanosecondTimeSpan32`, capped where they do not fit
+    (`source/.../detail/MarkerValue.hpp`: the CPU busy time at the largest value, a frame time one below it). `RefreshPeriod`'s 2⁻³²
+    nanoseconds are private (`FromRate`, `FromNanosecondTimeSpan`, `TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`).
+    The pacer's own golden files are in nanoseconds (`workNanoseconds`, …); the first integration's frame logs (the simulation's
+    `ToFrameLog`, `ReadFrameLog`, the two real logs in `sdk/test-data/pacer`) stay in ticks and are converted where they are read or written. **Always valid:** `RefreshPeriod` (100 µs
     to 1 s, no default: the application gives its display's period) and `PacerSettings` (constructed from the period; setters
     assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer, and so does `SetSettings` with other settings
     (the same ones change nothing; it allocates only when the frame window needs more room); both keep the animation time, and

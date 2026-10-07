@@ -4,9 +4,9 @@
 // The pacer on the refresh rates monitors have, from 50 to 540 Hz (59.94 and 119.88 Hz as the display modes state them): a frame loop
 // paced by vsync, with frames on time, a display a little off its nominal rate, target frame rates, a load that comes and goes (with
 // the default frame margin, which follows the refresh period, and with one set to 1 ms), and a loop the GPU limits.
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -47,7 +47,7 @@ namespace
   //! The frame rates applications ask for
   constexpr std::array<uint32_t, 11> TargetFrameRates{24, 25, 30, 48, 50, 60, 72, 90, 100, 120, 144};
 
-  constexpr int64_t StartTicks = 100 * FP::TimeSpan::TicksPerSecond;
+  constexpr int64_t StartNanoseconds = 100 * FP::NanosecondTimeSpan::NanosecondsPerSecond;
 
   //! A frame loop paced by vsync on a display: a frame is shown on the first refresh after it is done, no earlier than its swap
   //! interval after the previous frame, and the next frame starts when it is shown (plus the time the thread takes to wake up)
@@ -64,37 +64,38 @@ namespace
     {
     }
 
-    PC::FrameSchedule Frame(const FP::TimeSpan work, const FP::TimeSpan wakeUp = {})
+    PC::FrameSchedule Frame(const FP::NanosecondTimeSpan work, const FP::NanosecondTimeSpan wakeUp = {})
     {
-      const int64_t start = m_display.TimeFor(m_shownOnRefresh).Ticks() + wakeUp.Ticks();
-      const PC::FrameSchedule schedule = m_pacer.BeginFrame(FP::TickCount64(StartTicks + start));
-      static_cast<void>(m_pacer.EndFrame(FP::TickCount64(StartTicks + start + work.Ticks())));
-      m_shownOnRefresh = std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, m_display.RefreshesToFit(FP::TimeSpan(start + work.Ticks())));
+      const int64_t start = m_display.TimeFor(m_shownOnRefresh).Nanoseconds() + wakeUp.Nanoseconds();
+      const PC::FrameSchedule schedule = m_pacer.BeginFrame(FP::NanosecondTickCount(StartNanoseconds + start));
+      static_cast<void>(m_pacer.EndFrame(FP::NanosecondTickCount(StartNanoseconds + start + work.Nanoseconds())));
+      m_shownOnRefresh =
+        std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, m_display.RefreshesToFit(FP::NanosecondTimeSpan(start + work.Nanoseconds())));
       return schedule;
     }
 
     //! A frame the GPU finishes after the CPU is done with it: EndFrame comes when the CPU is done, with the GPU's time in the work
     //! the rule counts or without it
-    PC::FrameSchedule GpuFrame(const FP::TimeSpan cpu, const FP::TimeSpan gpu, const bool gpuInWork)
+    PC::FrameSchedule GpuFrame(const FP::NanosecondTimeSpan cpu, const FP::NanosecondTimeSpan gpu, const bool gpuInWork)
     {
-      const int64_t start = m_display.TimeFor(m_shownOnRefresh).Ticks();
-      const PC::FrameSchedule schedule = m_pacer.BeginFrame(FP::TickCount64(StartTicks + start));
-      const FP::TimeSpan work = gpuInWork ? FP::TimeSpan(cpu.Ticks() + gpu.Ticks()) : FP::TimeSpan();
-      static_cast<void>(m_pacer.EndFrame(FP::TickCount64(StartTicks + start + cpu.Ticks()), work));
-      const int64_t done = start + cpu.Ticks() + gpu.Ticks();
-      m_shownOnRefresh = std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, m_display.RefreshesToFit(FP::TimeSpan(done)));
+      const int64_t start = m_display.TimeFor(m_shownOnRefresh).Nanoseconds();
+      const PC::FrameSchedule schedule = m_pacer.BeginFrame(FP::NanosecondTickCount(StartNanoseconds + start));
+      const FP::NanosecondTimeSpan work = gpuInWork ? FP::NanosecondTimeSpan(cpu.Nanoseconds() + gpu.Nanoseconds()) : FP::NanosecondTimeSpan();
+      static_cast<void>(m_pacer.EndFrame(FP::NanosecondTickCount(StartNanoseconds + start + cpu.Nanoseconds()), work));
+      const int64_t done = start + cpu.Nanoseconds() + gpu.Nanoseconds();
+      m_shownOnRefresh = std::max(m_shownOnRefresh + int64_t{schedule.SwapInterval}, m_display.RefreshesToFit(FP::NanosecondTimeSpan(done)));
       return schedule;
     }
   };
 
   //! A share of a refresh period, in thousandths
-  FP::TimeSpan Share(const PC::RefreshPeriod period, const int64_t thousandths) noexcept
+  FP::NanosecondTimeSpan Share(const PC::RefreshPeriod period, const int64_t thousandths) noexcept
   {
-    return FP::TimeSpan(period.ToTimeSpan().Ticks() * thousandths / 1'000);
+    return FP::NanosecondTimeSpan(period.ToNanosecondTimeSpan().Nanoseconds() * thousandths / 1'000);
   }
 
   //! The time a thread takes to wake up after vsync, different every frame: up to a fifth of a refresh
-  FP::TimeSpan WakeUp(const PC::RefreshPeriod period, const int64_t frame) noexcept
+  FP::NanosecondTimeSpan WakeUp(const PC::RefreshPeriod period, const int64_t frame) noexcept
   {
     return Share(period, (frame * 7'919) % 200);
   }
@@ -114,10 +115,11 @@ TEST(MonitorRates, FramesOnTimeAreOneRefreshEachAndTheAnimationDoesNotDrift)
     for (int64_t frame = 0; frame < frames; ++frame)
     {
       schedule = loop.Frame(Share(period, 300), WakeUp(period, frame));
-      const int64_t aimedAfter = schedule.IntendedDisplayTime.Ticks() - (StartTicks + period.TimeFor(frame).Ticks() + WakeUp(period, frame).Ticks());
+      const int64_t aimedAfter =
+        schedule.IntendedDisplayTime.Nanoseconds() - (StartNanoseconds + period.TimeFor(frame).Nanoseconds() + WakeUp(period, frame).Nanoseconds());
       const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::Unchanged &&
-                         schedule.AnimationTime == period.TimeFor(frame) && std::abs(aimedAfter - period.ToTimeSpan().Ticks()) <= 1 &&
-                         schedule.TargetFrameTime == FP::TimeSpan32::FromTimeSpan(period.ToTimeSpan());
+                         schedule.AnimationTime == period.TimeFor(frame) && std::abs(aimedAfter - period.ToNanosecondTimeSpan().Nanoseconds()) <= 1 &&
+                         schedule.TargetFrameTime == FP::NanosecondTimeSpan32::FromNanosecondTimeSpan(period.ToNanosecondTimeSpan());
       wrongFrames += right ? 0 : 1;
     }
     EXPECT_EQ(wrongFrames, 0);
@@ -141,13 +143,14 @@ TEST(MonitorRates, ADisplayATenthOfAPercentOffItsRateNeverHitches)
       PC::FramePacer pacer{PC::PacerSettings(period)};
       VsyncLoop loop(pacer, display);
       int64_t wrongFrames = 0;
-      FP::TimeSpan previous;
+      FP::NanosecondTimeSpan previous;
       for (int64_t frame = 0; frame < 20'000; ++frame)
       {
         const PC::FrameSchedule schedule = loop.Frame(Share(period, 300), WakeUp(period, frame));
         // Every step is one refresh of the rate the pacer was told: the display's drift never adds up to a double step
         const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::Unchanged &&
-                           (frame == 0 || std::abs((schedule.AnimationTime.Ticks() - previous.Ticks()) - period.ToTimeSpan().Ticks()) <= 1);
+                           (frame == 0 || std::abs((schedule.AnimationTime.Nanoseconds() - previous.Nanoseconds()) -
+                                                   period.ToNanosecondTimeSpan().Nanoseconds()) <= 1);
         wrongFrames += right ? 0 : 1;
         previous = schedule.AnimationTime;
       }
@@ -171,13 +174,13 @@ TEST(MonitorRates, ATargetFrameRateIsTheSmallestSwapIntervalThatReachesIt)
       const uint32_t swapInterval = settings.PreferredSwapIntervalAt(period);
 
       // The rule the tools judge a target frame rate by: the frame time in whole refreshes, rounded up, with a twentieth of a
-      // refresh of slack, at least one. A tick either way is the rounding of the times
-      const int64_t wanted = (FP::TimeSpan::TicksPerSecond / target) - (period.ToTimeSpan().Ticks() / 20);
+      // refresh of slack, at least one. A nanosecond either way is the rounding of the times
+      const int64_t wanted = (FP::NanosecondTimeSpan::NanosecondsPerSecond / target) - (period.ToNanosecondTimeSpan().Nanoseconds() / 20);
       EXPECT_GE(swapInterval, 1u);
-      EXPECT_GE(period.TimeFor(swapInterval).Ticks() + 1, wanted) << "it reaches the frame time";
+      EXPECT_GE(period.TimeFor(swapInterval).Nanoseconds() + 1, wanted) << "it reaches the frame time";
       if (swapInterval > 1u)
       {
-        EXPECT_LT(period.TimeFor(swapInterval - 1u).Ticks() - 1, wanted) << "and one refresh less would not";
+        EXPECT_LT(period.TimeFor(swapInterval - 1u).Nanoseconds() - 1, wanted) << "and one refresh less would not";
       }
 
       // The pacer holds it: every frame for that many refreshes, none late, the marker's frame times that swap interval
@@ -190,7 +193,7 @@ TEST(MonitorRates, ATargetFrameRateIsTheSmallestSwapIntervalThatReachesIt)
       {
         schedule = loop.Frame(Share(period, 300), WakeUp(period, frame));
         const bool right = schedule.SwapInterval == swapInterval && schedule.AnimationTime == period.TimeFor(frame * swapInterval) &&
-                           schedule.TargetFrameTime == FP::TimeSpan32::FromTimeSpan(period.TimeFor(swapInterval)) &&
+                           schedule.TargetFrameTime == FP::NanosecondTimeSpan32::FromNanosecondTimeSpan(period.TimeFor(swapInterval)) &&
                            schedule.PreferredFrameTime == schedule.TargetFrameTime;
         wrongFrames += right ? 0 : 1;
       }
@@ -218,7 +221,7 @@ TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBack)
       const int64_t framesPerWindow = period.RefreshesToFit(settings.FrameWindowLength());
 
       // Frames that need a refresh and a half: every one is late, and the pacer goes to every second refresh, where they fit
-      const FP::TimeSpan heavy = Share(period, 1'400);
+      const FP::NanosecondTimeSpan heavy = Share(period, 1'400);
       for (int64_t frame = 0; frame < 2 * framesPerWindow; ++frame)
       {
         static_cast<void>(loop.Frame(heavy));
@@ -230,16 +233,16 @@ TEST(MonitorRates, AHeavyLoadSlowsDownAndALightOneComesBack)
       // the margin fit a refresh. The default margin is at most an eighth of a refresh, so it does on every display. A margin set
       // to 1 ms stays 1 ms: twice that and this work of a tenth of a refresh fit a refresh up to 450 Hz, so from 480 Hz on the
       // pacer stays at half rate
-      const FP::TimeSpan light = Share(period, 100);
+      const FP::NanosecondTimeSpan light = Share(period, 100);
       for (int64_t frame = 0; frame < 3 * framesPerWindow; ++frame)
       {
         static_cast<void>(loop.Frame(light));
       }
-      const bool room = light.Ticks() + (2 * settings.FrameMargin().Ticks()) < period.ToTimeSpan().Ticks();
+      const bool room = light.Nanoseconds() + (2 * settings.FrameMargin().Nanoseconds()) < period.ToNanosecondTimeSpan().Nanoseconds();
       EXPECT_EQ(pacer.SwapInterval(), room ? 1u : 2u);
       if (marginOfAMillisecond)
       {
-        EXPECT_EQ(room, period.ToTimeSpan() > FP::TimeSpan(22'200)) << "a margin of 1 ms: displays up to 450 Hz";
+        EXPECT_EQ(room, period.ToNanosecondTimeSpan() > FP::NanosecondTimeSpan(2'220'000)) << "a margin of 1 ms: displays up to 450 Hz";
       }
       else
       {

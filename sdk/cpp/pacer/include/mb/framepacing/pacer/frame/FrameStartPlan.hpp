@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -19,9 +19,9 @@ namespace MB::FramePacing::Pacer
     uint64_t WaitForPresentFrameId{0};
     //! The longest that wait may take: a present of a window that is not shown may never be shown. Zero without a present to wait
     //! for.
-    TimeDuration WaitForPresentTimeout;
-    //! The time to wait until after that, on the application's steady clock; TickCount64(): none, the frame starts at once.
-    TickCount64 StartTime;
+    NanosecondTimeDuration WaitForPresentTimeout;
+    //! The time to wait until after that, on the application's steady clock; NanosecondTickCount(): none, the frame starts at once.
+    NanosecondTickCount StartTime;
 
     //! True when there is a present to wait for.
     [[nodiscard]] constexpr bool WaitsForPresent() const noexcept
@@ -32,7 +32,7 @@ namespace MB::FramePacing::Pacer
     //! True when there is a time to wait until.
     [[nodiscard]] constexpr bool WaitsForStartTime() const noexcept
     {
-      return StartTime != TickCount64();
+      return StartTime != NanosecondTickCount();
     }
   };
 }

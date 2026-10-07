@@ -225,9 +225,9 @@ PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));   // required: the 
 settings.SetPreferredFrameRate(30);                            // optional: a target frame rate
 PC::FramePacer pacer(settings);                                // allocates its frame window, once
 
-// Every frame: the time it starts on your steady clock (an FP::TickCount64) in, the plan out
+// Every frame: the time it starts on your steady clock (an FP::NanosecondTickCount) in, the plan out
 const PC::FrameSchedule schedule = pacer.BeginFrame(now);      // SwapInterval, AnimationTime, IntendedDisplayTime, ...
-const FP::TimeSpan32 cpuBusy = pacer.EndFrame(presentTime);    // as you draw the marker, just before Present
+const FP::NanosecondTimeSpan32 cpuBusy = pacer.EndFrame(presentTime);    // as you draw the marker, just before Present
 ```
 
 The pacer needs a steady clock and a `Present` that waits for vsync, nothing else: a baseline for any platform. Where the platform

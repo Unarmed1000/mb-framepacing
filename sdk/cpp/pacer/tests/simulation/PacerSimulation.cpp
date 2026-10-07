@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include "PacerSimulation.hpp"
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -22,19 +22,21 @@ namespace MB::FramePacing::Pacer::Simulation
   {
     constexpr int64_t Milliseconds(const int64_t milliseconds) noexcept
     {
-      return milliseconds * TimeSpan::TicksPerMillisecond;
+      return milliseconds * NanosecondTimeSpan::NanosecondsPerMillisecond;
     }
 
     int64_t Draw(SplitMix64& random, const LoadStage& stage) noexcept
     {
-      return random.Draw(stage.MinWorkTicks, stage.MaxWorkTicks);
+      // In steps of 100 ns, the steps the golden scenarios were first drawn in: they stay the frames they were
+      constexpr int64_t Step = 100;
+      return random.Draw(stage.MinWorkNanoseconds / Step, stage.MaxWorkNanoseconds / Step) * Step;
     }
 
-    //! The first refresh at or after ticks (from refresh 0 at 0)
-    int64_t FirstRefreshAtOrAfter(const RefreshPeriod period, const int64_t ticks) noexcept
+    //! The first refresh at or after nanoseconds (from refresh 0 at 0)
+    int64_t FirstRefreshAtOrAfter(const RefreshPeriod period, const int64_t nanoseconds) noexcept
     {
-      const int64_t refresh = period.FloorRefreshes(TimeSpan(ticks));
-      return period.TimeFor(refresh).Ticks() < ticks ? refresh + 1 : refresh;
+      const int64_t refresh = period.FloorRefreshes(NanosecondTimeSpan(nanoseconds));
+      return period.TimeFor(refresh).Nanoseconds() < nanoseconds ? refresh + 1 : refresh;
     }
 
     std::string_view ChangeName(const SwapIntervalChange change) noexcept
@@ -84,7 +86,7 @@ namespace MB::FramePacing::Pacer::Simulation
     {
       line.erase(0, 3);
     }
-    if (line != "workTicks,referenceSwapInterval,referenceShownRefresh")
+    if (line != "workNanoseconds,referenceSwapInterval,referenceShownRefresh")
     {
       throw std::runtime_error(path.string() + ": not a scenario frames file");
     }
@@ -131,7 +133,7 @@ namespace MB::FramePacing::Pacer::Simulation
     Scenario stages;
     stages.Name = "100-stages";
     stages.RateNumerator = 100;
-    stages.DurationTicks = Milliseconds(24'000);
+    stages.DurationNanoseconds = Milliseconds(24'000);
     stages.Seed = 20'260'930;
     stages.Calm = {0, 0, Milliseconds(5), Milliseconds(8)};
     stages.Stages = {
@@ -147,7 +149,7 @@ namespace MB::FramePacing::Pacer::Simulation
     Scenario relapse;
     relapse.Name = "60-relapse";
     relapse.RateNumerator = 60;
-    relapse.DurationTicks = Milliseconds(13'000);
+    relapse.DurationNanoseconds = Milliseconds(13'000);
     relapse.Seed = 20'261'001;
     relapse.Calm = {0, 0, Milliseconds(9), Milliseconds(13)};
     relapse.Stages = {
@@ -184,7 +186,7 @@ namespace MB::FramePacing::Pacer::Simulation
     const std::size_t listFrames = passFrames * static_cast<std::size_t>(std::max(scenario.Passes, 1));
     std::ostringstream out;
     out << ResultHeader << '\n';
-    int64_t now = StartTicks;
+    int64_t now = StartNanoseconds;
     for (std::size_t frame = 0;; ++frame)
     {
       ScenarioFrame source;
@@ -204,29 +206,30 @@ namespace MB::FramePacing::Pacer::Simulation
       }
       else
       {
-        const int64_t elapsed = now - StartTicks;
-        if (elapsed >= scenario.DurationTicks)
+        const int64_t elapsed = now - StartNanoseconds;
+        if (elapsed >= scenario.DurationNanoseconds)
         {
           break;
         }
         const auto stage = std::find_if(scenario.Stages.begin(), scenario.Stages.end(), [elapsed](const LoadStage& candidate)
-                                        { return candidate.FromTicks <= elapsed && elapsed < candidate.ToTicks; });
-        source.WorkTicks = Draw(random, stage != scenario.Stages.end() ? *stage : scenario.Calm);
+                                        { return candidate.FromNanoseconds <= elapsed && elapsed < candidate.ToNanoseconds; });
+        source.WorkNanoseconds = Draw(random, stage != scenario.Stages.end() ? *stage : scenario.Calm);
       }
 
-      const FrameSchedule schedule = pacer.BeginFrame(TickCount64(now));
+      const FrameSchedule schedule = pacer.BeginFrame(NanosecondTickCount(now));
       const FrameWindowState window = pacer.FrameWindow();
-      const int64_t intendedDisplayTicks = schedule.IntendedDisplayTime.Ticks();
-      const int64_t target = period.NearestRefreshes(TimeSpan(intendedDisplayTicks - StartTicks));
-      const int64_t done = now + source.WorkTicks;
-      const int64_t shown = std::max(target, FirstRefreshAtOrAfter(period, done - StartTicks));
-      static_cast<void>(pacer.EndFrame(TickCount64(done), TimeSpan(source.WorkTicks)));
+      const int64_t intendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
+      const int64_t target = period.NearestRefreshes(NanosecondTimeSpan(intendedDisplayNanoseconds - StartNanoseconds));
+      const int64_t done = now + source.WorkNanoseconds;
+      const int64_t shown = std::max(target, FirstRefreshAtOrAfter(period, done - StartNanoseconds));
+      static_cast<void>(pacer.EndFrame(NanosecondTickCount(done), NanosecondTimeSpan(source.WorkNanoseconds)));
 
-      out << frame << ',' << source.WorkTicks << ',' << target << ',' << shown << ',' << (shown > target ? 1 : 0) << ',' << schedule.SwapInterval
-          << ',' << ChangeName(schedule.Change) << ',' << intendedDisplayTicks << ',' << schedule.AnimationTime.Ticks() << ',' << window.Frames << ','
-          << window.LateFrames << ',' << source.ReferenceSwapInterval << ',' << source.ReferenceShownRefresh << '\n';
+      out << frame << ',' << source.WorkNanoseconds << ',' << target << ',' << shown << ',' << (shown > target ? 1 : 0) << ','
+          << schedule.SwapInterval << ',' << ChangeName(schedule.Change) << ',' << intendedDisplayNanoseconds << ','
+          << schedule.AnimationTime.Nanoseconds() << ',' << window.Frames << ',' << window.LateFrames << ',' << source.ReferenceSwapInterval << ','
+          << source.ReferenceShownRefresh << '\n';
       // The next frame starts when this one is shown
-      now = StartTicks + period.TimeFor(shown).Ticks();
+      now = StartNanoseconds + period.TimeFor(shown).Nanoseconds();
     }
     return out.str();
   }

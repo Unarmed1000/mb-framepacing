@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -19,44 +19,45 @@ namespace MB::FramePacing::Pacer
   {
     //! The frame: its PresentPlan::FrameId.
     uint64_t FrameId{0};
-    //! When the GPU began the frame's work, on the application's steady clock; TickCount64(): not known. It is not worked out
+    //! When the GPU began the frame's work, on the application's steady clock; NanosecondTickCount(): not known. It is not worked out
     //! from an end and a duration: that only holds where the GPU did not pause inside the frame
-    TickCount64 BeginTime;
-    //! When the GPU ended the frame's work, on the same clock; TickCount64(): not known
-    TickCount64 EndTime;
+    NanosecondTickCount BeginTime;
+    //! When the GPU ended the frame's work, on the same clock; NanosecondTickCount(): not known
+    NanosecondTickCount EndTime;
     //! How long the work took: the end minus the begin where both are given
-    TimeDuration Duration;
+    NanosecondTimeDuration Duration;
 
     //! True when the report says when the work began and when it ended.
     [[nodiscard]] constexpr bool HasTimes() const noexcept
     {
-      return BeginTime != TickCount64() && EndTime != TickCount64();
+      return BeginTime != NanosecondTickCount() && EndTime != NanosecondTickCount();
     }
 
     //! True when the report says when the work ended, with or without when it began: enough to hold the frame against the
     //! refresh it was aimed at.
     [[nodiscard]] constexpr bool HasEndTime() const noexcept
     {
-      return EndTime != TickCount64();
+      return EndTime != NanosecondTickCount();
     }
 
     //! The GPU worked on the frame from beginTime to endTime. An end before the begin is no work.
-    [[nodiscard]] static constexpr GpuWorkReport Times(const uint64_t frameId, const TickCount64 beginTime, const TickCount64 endTime) noexcept
+    [[nodiscard]] static constexpr GpuWorkReport Times(const uint64_t frameId, const NanosecondTickCount beginTime,
+                                                       const NanosecondTickCount endTime) noexcept
     {
-      return {frameId, beginTime, endTime, TimeDuration(endTime - beginTime)};
+      return {frameId, beginTime, endTime, NanosecondTimeDuration(endTime - beginTime)};
     }
 
     //! The GPU ended its work on the frame at endTime, after working on it for a duration; when it began is not known.
-    [[nodiscard]] static constexpr GpuWorkReport EndAndDuration(const uint64_t frameId, const TickCount64 endTime,
-                                                                const TimeDuration duration) noexcept
+    [[nodiscard]] static constexpr GpuWorkReport EndAndDuration(const uint64_t frameId, const NanosecondTickCount endTime,
+                                                                const NanosecondTimeDuration duration) noexcept
     {
-      return {frameId, TickCount64(), endTime, duration};
+      return {frameId, NanosecondTickCount(), endTime, duration};
     }
 
     //! The GPU worked on the frame for a duration; when is not known.
-    [[nodiscard]] static constexpr GpuWorkReport OfDuration(const uint64_t frameId, const TimeDuration duration) noexcept
+    [[nodiscard]] static constexpr GpuWorkReport OfDuration(const uint64_t frameId, const NanosecondTimeDuration duration) noexcept
     {
-      return {frameId, TickCount64(), TickCount64(), duration};
+      return {frameId, NanosecondTickCount(), NanosecondTickCount(), duration};
     }
   };
 }

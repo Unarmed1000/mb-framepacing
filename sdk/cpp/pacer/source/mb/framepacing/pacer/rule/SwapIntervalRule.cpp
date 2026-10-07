@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // EXPERIMENTAL. The swap interval rule of sdk/doc/pacer.md: the adaptive swap interval rule (as mb-framepacing-explained simulates it in
-// tools/frame_pacing_video/adaptive_rate.py) and the late count fix. Integer arithmetic on whole ticks only, so every port decides
+// tools/frame_pacing_video/adaptive_rate.py) and the late count fix. Integer arithmetic on whole nanoseconds only, so every port decides
 // exactly alike.
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
 #include <algorithm>
@@ -17,14 +17,14 @@ namespace MB::FramePacing::Pacer
     std::size_t Capacity(const PacerSettings& settings) noexcept
     {
       // The frames of a window at the preferred swap interval, and the frame on either side; twice that for a faster display
-      const TimeSpan frameTime = settings.Refresh().TimeFor(settings.PreferredSwapIntervalAt(settings.Refresh()));
-      const int64_t frames = (settings.FrameWindowLength().Ticks() / frameTime.Ticks()) + 2;
+      const NanosecondTimeSpan frameTime = settings.Refresh().TimeFor(settings.PreferredSwapIntervalAt(settings.Refresh()));
+      const int64_t frames = (settings.FrameWindowLength().Nanoseconds() / frameTime.Nanoseconds()) + 2;
       return static_cast<std::size_t>(std::min(frames * 2, MaxCapacity));
     }
 
     //! The swap interval a frame of frameTime needs: the fewest refreshes that take at least as long, from 1 to
     //! PacerSettings::MaxSwapInterval.
-    uint32_t NeededSwapInterval(const TimeSpan frameTime, const RefreshPeriod period) noexcept
+    uint32_t NeededSwapInterval(const NanosecondTimeSpan frameTime, const RefreshPeriod period) noexcept
     {
       return static_cast<uint32_t>(std::clamp(period.RefreshesToFit(frameTime), int64_t{1}, int64_t{PacerSettings::MaxSwapInterval}));
     }
@@ -40,16 +40,16 @@ namespace MB::FramePacing::Pacer
     }
 
     //! The frames a full window holds at swapInterval: the window's length in frame times, rounded to the nearest.
-    int64_t FullWindowFrames(const TimeSpan windowLength, const uint32_t swapInterval, const RefreshPeriod period) noexcept
+    int64_t FullWindowFrames(const NanosecondTimeSpan windowLength, const uint32_t swapInterval, const RefreshPeriod period) noexcept
     {
-      const int64_t frameTicks = period.TimeFor(swapInterval).Ticks();
-      return (windowLength.Ticks() + (frameTicks / 2)) / frameTicks;
+      const int64_t frameNanoseconds = period.TimeFor(swapInterval).Nanoseconds();
+      return (windowLength.Nanoseconds() + (frameNanoseconds / 2)) / frameNanoseconds;
     }
 
-    //! a + b, for spans that are far from the ends of TimeSpan's range (TimeSpan's own + throws there, and the rule never does)
-    constexpr TimeSpan Sum(const TimeSpan a, const TimeSpan b) noexcept
+    //! a + b, for spans that are far from the ends of NanosecondTimeSpan's range (NanosecondTimeSpan's own + throws there, and the rule never does)
+    constexpr NanosecondTimeSpan Sum(const NanosecondTimeSpan a, const NanosecondTimeSpan b) noexcept
     {
-      return TimeSpan(a.Ticks() + b.Ticks());
+      return NanosecondTimeSpan(a.Nanoseconds() + b.Nanoseconds());
     }
   }
 
@@ -61,19 +61,19 @@ namespace MB::FramePacing::Pacer
   {
   }
 
-  SwapIntervalChange SwapIntervalRule::AddFrame(const TimeSpan displayTime, const TimeSpan work, const bool late,
-                                                const TimeSpan nextStartAhead) noexcept
+  SwapIntervalChange SwapIntervalRule::AddFrame(const NanosecondTimeSpan displayTime, const NanosecondTimeSpan work, const bool late,
+                                                const NanosecondTimeSpan nextStartAhead) noexcept
   {
-    const TimeSpan windowLength = m_settings.FrameWindowLength();
+    const NanosecondTimeSpan windowLength = m_settings.FrameWindowLength();
     // The frames of the last FrameWindowLength: the oldest go once the second oldest is more than FrameWindowLength older than this one (so the
     // window keeps one frame beyond it, as the reference simulation's does), and when the window holds all it can
     if (m_count == m_entries.size())
     {
       PopFront();
     }
-    const TimeSpan counted = std::clamp(work, TimeSpan(), windowLength);
+    const NanosecondTimeSpan counted = std::clamp(work, NanosecondTimeSpan(), windowLength);
     // A late frame's next start says how late it was, not whether the loop runs ahead: left out
-    const TimeSpan ahead = late ? TimeSpan() : nextStartAhead;
+    const NanosecondTimeSpan ahead = late ? NanosecondTimeSpan() : nextStartAhead;
     m_entries[(m_first + m_count) % m_entries.size()] = Entry{displayTime, counted, late, ahead};
     ++m_count;
     m_workSum = Sum(m_workSum, counted);
@@ -91,9 +91,9 @@ namespace MB::FramePacing::Pacer
     const auto frames = static_cast<uint32_t>(m_count);
     const bool full = IsFull();
     const RefreshPeriod period = m_settings.Refresh();
-    const TimeSpan margin = m_settings.FrameMargin();
+    const NanosecondTimeSpan margin = m_settings.FrameMargin();
     // What a frame needs: the frames' average work, and the margin
-    const TimeSpan frameTime(m_workSum.Ticks() / frames + margin.Ticks());
+    const NanosecondTimeSpan frameTime(m_workSum.Nanoseconds() / frames + margin.Nanoseconds());
 
     const bool mayGoSlower =
       m_swapInterval < PacerSettings::MaxSwapInterval && period.TimeFor(m_swapInterval) <= Sum(m_settings.SlowestFrameTime(), margin);
@@ -158,9 +158,9 @@ namespace MB::FramePacing::Pacer
   {
     m_first = 0;
     m_count = 0;
-    m_workSum = TimeSpan();
+    m_workSum = NanosecondTimeSpan();
     m_lateCount = 0;
-    m_startsAhead = TimeSpan();
+    m_startsAhead = NanosecondTimeSpan();
   }
 
   FrameWindowState SwapIntervalRule::FrameWindow() const noexcept
@@ -169,8 +169,13 @@ namespace MB::FramePacing::Pacer
     {
       return {};
     }
-    const TimeSpan span(At(m_count - 1u).DisplayTime.Ticks() - At(0).DisplayTime.Ticks());
-    return {static_cast<uint32_t>(m_count), m_lateCount, TimeSpan(m_workSum.Ticks() / static_cast<int64_t>(m_count)), span, IsFull(), m_startsAhead};
+    const NanosecondTimeSpan span(At(m_count - 1u).DisplayTime.Nanoseconds() - At(0).DisplayTime.Nanoseconds());
+    return {static_cast<uint32_t>(m_count),
+            m_lateCount,
+            NanosecondTimeSpan(m_workSum.Nanoseconds() / static_cast<int64_t>(m_count)),
+            span,
+            IsFull(),
+            m_startsAhead};
   }
 
   const SwapIntervalRule::Entry& SwapIntervalRule::At(const std::size_t index) const noexcept
@@ -189,9 +194,9 @@ namespace MB::FramePacing::Pacer
   void SwapIntervalRule::PopFront() noexcept
   {
     const Entry& oldest = At(0);
-    m_workSum = TimeSpan(m_workSum.Ticks() - oldest.Work.Ticks());
+    m_workSum = NanosecondTimeSpan(m_workSum.Nanoseconds() - oldest.Work.Nanoseconds());
     m_lateCount -= oldest.Late ? 1u : 0u;
-    m_startsAhead = TimeSpan(m_startsAhead.Ticks() - oldest.NextStartAhead.Ticks());
+    m_startsAhead = NanosecondTimeSpan(m_startsAhead.Nanoseconds() - oldest.NextStartAhead.Nanoseconds());
     m_first = (m_first + 1u) % m_entries.size();
     --m_count;
   }

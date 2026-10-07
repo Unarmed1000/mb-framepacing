@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
@@ -22,19 +22,19 @@ namespace MB::FramePacing::Pacer
   {
     struct Entry
     {
-      TimeSpan DisplayTime;
-      TimeSpan Work;
+      NanosecondTimeSpan DisplayTime;
+      NanosecondTimeSpan Work;
       bool Late{false};
-      TimeSpan NextStartAhead;
+      NanosecondTimeSpan NextStartAhead;
     };
 
     PacerSettings m_settings;
     std::vector<Entry> m_entries;
     std::size_t m_first{0};
     std::size_t m_count{0};
-    TimeSpan m_workSum;
+    NanosecondTimeSpan m_workSum;
     uint32_t m_lateCount{0};
-    TimeSpan m_startsAhead;
+    NanosecondTimeSpan m_startsAhead;
     uint32_t m_preferredSwapInterval{1};
     uint32_t m_swapInterval{1};
 
@@ -46,7 +46,7 @@ namespace MB::FramePacing::Pacer
     //! was late. Then the rule decides: the new swap interval is SwapInterval(), and the window restarts on a change.
     //! nextStartAhead: how long before the time it was given the frame after it began (below zero: after it). Added up for the
     //! frames that are not late (FrameWindowState::StartsAhead), and of no weight in the decision.
-    SwapIntervalChange AddFrame(TimeSpan displayTime, TimeSpan work, bool late, TimeSpan nextStartAhead = {}) noexcept;
+    SwapIntervalChange AddFrame(NanosecondTimeSpan displayTime, NanosecondTimeSpan work, bool late, NanosecondTimeSpan nextStartAhead = {}) noexcept;
 
     //! The swap interval the next frame is paced at.
     [[nodiscard]] uint32_t SwapInterval() const noexcept

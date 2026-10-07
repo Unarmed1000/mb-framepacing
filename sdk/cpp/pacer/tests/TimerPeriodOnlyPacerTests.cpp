@@ -4,10 +4,10 @@
 // The pacer of the lowest pair of tiers (a timer, and the refresh period only): frame starts on one grid of refresh periods on the
 // clock, an animation time that advances by the swap interval alone, and a frame of more than one refresh held by a wait before
 // its present. What it is given is a clock's times; what it gives back the application carries out.
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -28,20 +28,20 @@ namespace PC = MB::FramePacing::Pacer;
 
 namespace
 {
-  // 100 Hz: a refresh period of exactly 100,000 ticks
-  constexpr int64_t Period = 100'000;
-  constexpr int64_t Start = 10'000'000;
+  // 100 Hz: a refresh period of exactly 10,000,000 ns
+  constexpr int64_t Period = 10'000'000;
+  constexpr int64_t Start = 1'000'000'000;
 
   const PC::RefreshPeriod g_hz100 = PC::RefreshPeriod::FromRate(100);
 
-  constexpr FP::TickCount64 At(const int64_t ticks) noexcept
+  constexpr FP::NanosecondTickCount At(const int64_t nanoseconds) noexcept
   {
-    return FP::TickCount64(ticks);
+    return FP::NanosecondTickCount(nanoseconds);
   }
 
-  constexpr FP::TimeSpan Span(const int64_t ticks) noexcept
+  constexpr FP::NanosecondTimeSpan Span(const int64_t nanoseconds) noexcept
   {
-    return FP::TimeSpan(ticks);
+    return FP::NanosecondTimeSpan(nanoseconds);
   }
 
   //! The settings of the tests that are about the aim of low latency: the default aim is smoothness
@@ -52,40 +52,41 @@ namespace
     return settings;
   }
 
-  //! A frame as an application makes it: planned at now, begun at the time it is given (or at once), with CPU work of workTicks.
+  //! A frame as an application makes it: planned at now, begun at the time it is given (or at once), with CPU work of workNanoseconds.
   //! Returns the frame's start.
-  int64_t Frame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t nowTicks, const int64_t workTicks, PC::FrameSchedule* pSchedule = nullptr)
+  int64_t Frame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t nowNanoseconds, const int64_t workNanoseconds, PC::FrameSchedule* pSchedule = nullptr)
   {
-    const PC::FrameStartPlan plan = rPacer.PlanFrame(At(nowTicks));
-    const int64_t startTicks = plan.WaitsForStartTime() ? plan.StartTime.Ticks() : nowTicks;
-    const PC::FrameSchedule schedule = rPacer.BeginFrame(At(startTicks));
-    static_cast<void>(rPacer.EndFrame(At(startTicks + workTicks)));
+    const PC::FrameStartPlan plan = rPacer.PlanFrame(At(nowNanoseconds));
+    const int64_t startNanoseconds = plan.WaitsForStartTime() ? plan.StartTime.Nanoseconds() : nowNanoseconds;
+    const PC::FrameSchedule schedule = rPacer.BeginFrame(At(startNanoseconds));
+    static_cast<void>(rPacer.EndFrame(At(startNanoseconds + workNanoseconds)));
     if (pSchedule != nullptr)
     {
       *pSchedule = schedule;
     }
-    return startTicks;
+    return startNanoseconds;
   }
 
-  //! A frame as Frame makes it, with CPU work of 30,000 ticks and its present reported: taken by the system or not. Returns
+  //! A frame as Frame makes it, with CPU work of 3 ms and its present reported: taken by the system or not. Returns
   //! the frame's start.
-  int64_t PresentedFrame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t nowTicks, PC::FrameSchedule* pSchedule = nullptr, const bool accepted = true)
+  int64_t PresentedFrame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t nowNanoseconds, PC::FrameSchedule* pSchedule = nullptr,
+                         const bool accepted = true)
   {
-    const PC::FrameStartPlan plan = rPacer.PlanFrame(At(nowTicks));
-    const int64_t startTicks = plan.WaitsForStartTime() ? plan.StartTime.Ticks() : nowTicks;
-    const PC::FrameSchedule schedule = rPacer.BeginFrame(At(startTicks));
-    const PC::PresentPlan present = rPacer.EndFrame(At(startTicks + 30'000));
+    const PC::FrameStartPlan plan = rPacer.PlanFrame(At(nowNanoseconds));
+    const int64_t startNanoseconds = plan.WaitsForStartTime() ? plan.StartTime.Nanoseconds() : nowNanoseconds;
+    const PC::FrameSchedule schedule = rPacer.BeginFrame(At(startNanoseconds));
+    const PC::PresentPlan present = rPacer.EndFrame(At(startNanoseconds + 3'000'000));
     PC::PresentReport report;
     report.FrameId = present.FrameId;
-    report.CallTime = At(startTicks + 30'000);
-    report.ReturnTime = At(startTicks + 30'600);
+    report.CallTime = At(startNanoseconds + 3'000'000);
+    report.ReturnTime = At(startNanoseconds + 3'060'000);
     report.Accepted = accepted;
     rPacer.AddPresent(report);
     if (pSchedule != nullptr)
     {
       *pSchedule = schedule;
     }
-    return startTicks;
+    return startNanoseconds;
   }
 
   static_assert(PC::TimerPeriodOnlyPacer::Hold == PC::HoldTier::Timer);
@@ -105,40 +106,40 @@ TEST(TimerPeriodOnlyPacer, TheFirstFrameStartsAtOnceAndStartsTheGrid)
   EXPECT_EQ(schedule.AnimationStep, Span(0));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + Period));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + Period));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(Period));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::TimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(Period));
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
 
-  const PC::PresentPlan present = pacer.EndFrame(At(Start + 30'000));
+  const PC::PresentPlan present = pacer.EndFrame(At(Start + 3'000'000));
   EXPECT_EQ(present.FrameId, 1u);
-  EXPECT_EQ(present.CpuBusy, FP::TimeSpan32(30'000));
+  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeSpan32(3'000'000));
   // A frame of one refresh is presented when it is done, with nothing for a present that takes values
   EXPECT_FALSE(present.WaitsForPresentTime());
   EXPECT_EQ(present.SwapInterval, 1u);
-  EXPECT_EQ(present.NotBeforeTime, FP::TickCount64());
-  EXPECT_EQ(present.MinimumDuration, FP::TimeDuration::Zero());
+  EXPECT_EQ(present.NotBeforeTime, FP::NanosecondTickCount());
+  EXPECT_EQ(present.MinimumDuration, FP::NanosecondTimeDuration::Zero());
 }
 
 TEST(TimerPeriodOnlyPacer, EveryFrameIsDueAWholeNumberOfPeriodsAfterTheFirst)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
 
   for (int64_t frame = 1; frame < 500; ++frame)
   {
     // The loop is back a fifth of a period after the frame before it started
-    const int64_t now = Start + ((frame - 1) * Period) + 20'000;
+    const int64_t now = Start + ((frame - 1) * Period) + 2'000'000;
     const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
     ASSERT_EQ(plan.StartTime, At(Start + (frame * Period))) << frame;
     // Planned again, it is the same plan
-    ASSERT_EQ(pacer.PlanFrame(At(now + 5'000)).StartTime, plan.StartTime) << frame;
+    ASSERT_EQ(pacer.PlanFrame(At(now + 500'000)).StartTime, plan.StartTime) << frame;
     // The wait wakes a little late
-    const PC::FrameSchedule schedule = pacer.BeginFrame(At(plan.StartTime.Ticks() + 300));
+    const PC::FrameSchedule schedule = pacer.BeginFrame(At(plan.StartTime.Nanoseconds() + 30'000));
     ASSERT_EQ(schedule.FrameId, static_cast<uint64_t>(frame + 1));
     ASSERT_EQ(schedule.AnimationTime, Span(frame * Period)) << frame;
     ASSERT_EQ(schedule.AnimationStep, Span(Period)) << frame;
     ASSERT_EQ(schedule.NextFrameStartTime, At(Start + ((frame + 1) * Period))) << frame;
-    static_cast<void>(pacer.EndFrame(At(plan.StartTime.Ticks() + 30'300)));
+    static_cast<void>(pacer.EndFrame(At(plan.StartTime.Nanoseconds() + 3'030'000)));
   }
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
@@ -148,35 +149,35 @@ TEST(TimerPeriodOnlyPacer, EveryFrameIsDueAWholeNumberOfPeriodsAfterTheFirst)
 TEST(TimerPeriodOnlyPacer, AStartThatIsLateCostsThatFrameAndNoFrameAfterIt)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
 
   // The loop comes back 0.4 of a period after the second frame was due: it starts at once and keeps its step
-  const int64_t late = Start + Period + 40'000;
+  const int64_t late = Start + Period + 4'000'000;
   EXPECT_FALSE(pacer.PlanFrame(At(late)).WaitsForStartTime());
   const PC::FrameSchedule second = pacer.BeginFrame(At(late));
   EXPECT_EQ(second.AnimationStep, Span(Period));
   // The frame after it is due where it would have been, not a period after the late start
   EXPECT_EQ(second.NextFrameStartTime, At(Start + (2 * Period)));
-  static_cast<void>(pacer.EndFrame(At(late + 30'000)));
-  EXPECT_EQ(pacer.PlanFrame(At(late + 30'600)).StartTime, At(Start + (2 * Period)));
-  static_cast<void>(Frame(pacer, late + 30'600, 30'000));
+  static_cast<void>(pacer.EndFrame(At(late + 3'000'000)));
+  EXPECT_EQ(pacer.PlanFrame(At(late + 3'060'000)).StartTime, At(Start + (2 * Period)));
+  static_cast<void>(Frame(pacer, late + 3'060'000, 3'000'000));
 
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
   // It shows as a frame that began after its time
-  EXPECT_EQ(pacer.FrameWindow().StartsAhead, Span(-40'000));
+  EXPECT_EQ(pacer.FrameWindow().StartsAhead, Span(-4'000'000));
 }
 
 TEST(TimerPeriodOnlyPacer, AFrameThatRanLongCostsWholeStepsAndTheLoopIsBackOnTheGrid)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
 
   // The second frame works for 2.25 periods: it is done 3.25 periods after the grid's start, no later in its step than the
   // frame before it was (0.3 of a period)
-  const int64_t secondStart = Frame(pacer, Start + 30'600, 225'000);
+  const int64_t secondStart = Frame(pacer, Start + 3'060'000, 22'500'000);
   ASSERT_EQ(secondStart, Start + Period);
-  const int64_t now = secondStart + 225'600;
+  const int64_t now = secondStart + 22'560'000;
   // The next frame takes the next step, the fourth, and waits for it: not the moment the work was done
   const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
   EXPECT_EQ(plan.StartTime, At(Start + (4 * Period)));
@@ -188,12 +189,12 @@ TEST(TimerPeriodOnlyPacer, AFrameThatRanLongCostsWholeStepsAndTheLoopIsBackOnThe
   EXPECT_EQ(third.AnimationTime, Span(2 * Period));
   EXPECT_EQ(third.NextFrameStartTime, At(Start + (5 * Period)));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
-  static_cast<void>(pacer.EndFrame(At(Start + (4 * Period) + 30'000)));
+  static_cast<void>(pacer.EndFrame(At(Start + (4 * Period) + 3'000'000)));
 
   // And every frame after it is on the grid it was on before
   for (int64_t frame = 5; frame < 50; ++frame)
   {
-    ASSERT_EQ(Frame(pacer, Start + ((frame - 1) * Period) + 30'600, 30'000), Start + (frame * Period)) << frame;
+    ASSERT_EQ(Frame(pacer, Start + ((frame - 1) * Period) + 3'060'000, 3'000'000), Start + (frame * Period)) << frame;
   }
   EXPECT_EQ(pacer.RefreshesBehindClock(), 2u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
@@ -204,12 +205,12 @@ TEST(TimerPeriodOnlyPacer, AfterALatePresentTheNextPresentComesAWholePeriodLater
   // Frames are presented 0.3 of a period into their step. A frame of 2.6 periods on step 1 is done 3.6 periods after the
   // grid's start: later in its step than a present is
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
-  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
-  static_cast<void>(Frame(pacer, Start + Period + 30'600, 260'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
+  static_cast<void>(Frame(pacer, Start + 3'060'000, 3'000'000));
+  static_cast<void>(Frame(pacer, Start + Period + 3'060'000, 26'000'000));
   // The next step would put the next present 0.7 of a period after this one, and the two could reach the display between
   // the same two refreshes: the step after it, the sixth
-  const int64_t now = Start + (2 * Period) + 260'600;
+  const int64_t now = Start + (2 * Period) + 26'060'000;
   const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
   EXPECT_EQ(plan.StartTime, At(Start + (6 * Period)));
   // Begun without the wait, it is on that step all the same
@@ -222,46 +223,46 @@ TEST(TimerPeriodOnlyPacer, AfterALatePresentTheNextPresentComesAWholePeriodLater
 TEST(TimerPeriodOnlyPacer, WhenThePresentWasMadeIsThePresentReportsWordAndWithoutItEndFrames)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
-  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
+  static_cast<void>(Frame(pacer, Start + 3'060'000, 3'000'000));
 
   // Work of 1.3 periods on step 2, and no present report: made when the work was done, 0.3 into step 3, where a present is.
   // The next step
   static_cast<void>(pacer.BeginFrame(At(Start + (2 * Period))));
-  const PC::PresentPlan present = pacer.EndFrame(At(Start + (2 * Period) + 130'000));
-  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 136'000)).StartTime, At(Start + (4 * Period)));
+  const PC::PresentPlan present = pacer.EndFrame(At(Start + (2 * Period) + 13'000'000));
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 13'600'000)).StartTime, At(Start + (4 * Period)));
 
   // A report of another frame changes nothing
   PC::PresentReport report;
   report.FrameId = present.FrameId - 1u;
-  report.CallTime = At(Start + (2 * Period) + 180'000);
+  report.CallTime = At(Start + (2 * Period) + 18'000'000);
   report.ReturnTime = report.CallTime;
   pacer.AddPresent(report);
-  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 136'000)).StartTime, At(Start + (4 * Period)));
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 13'600'000)).StartTime, At(Start + (4 * Period)));
   // The report of this frame says the present was called 0.8 into step 3 (the application did something in between): the
   // step after the next
   report.FrameId = present.FrameId;
   pacer.AddPresent(report);
-  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 181'000)).StartTime, At(Start + (5 * Period)));
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 18'100'000)).StartTime, At(Start + (5 * Period)));
 
   // A report before the frame's work is done is of no frame
   static_cast<void>(pacer.BeginFrame(At(Start + (5 * Period))));
   report.FrameId = present.FrameId + 1u;
   report.CallTime = At(Start + (9 * Period));
   pacer.AddPresent(report);
-  static_cast<void>(pacer.EndFrame(At(Start + (5 * Period) + 30'000)));
-  EXPECT_EQ(pacer.PlanFrame(At(Start + (5 * Period) + 31'000)).StartTime, At(Start + (6 * Period)));
+  static_cast<void>(pacer.EndFrame(At(Start + (5 * Period) + 3'000'000)));
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (5 * Period) + 3'100'000)).StartTime, At(Start + (6 * Period)));
 }
 
 TEST(TimerPeriodOnlyPacer, ALoopThatComesBackLateAfterAPresentOnTimeKeepsItsStep)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
-  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
+  static_cast<void>(Frame(pacer, Start + 3'060'000, 3'000'000));
 
   // The frame was presented on time and the loop is back 0.3 of a period after the next frame was due: it starts at once, on
   // its step, and the frame after it is due a period after that step
-  const int64_t now = Start + (2 * Period) + 30'000;
+  const int64_t now = Start + (2 * Period) + 3'000'000;
   EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
   const PC::FrameSchedule schedule = pacer.BeginFrame(At(now));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (3 * Period)));
@@ -272,11 +273,11 @@ TEST(TimerPeriodOnlyPacer, ALoopThatComesBackLateAfterAPresentOnTimeKeepsItsStep
 TEST(TimerPeriodOnlyPacer, AFrameWhoseWorkIsOverItsTimeIsLateAndCostsAStep)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  static_cast<void>(Frame(pacer, Start, 30'000));
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
 
   // Work of 1.3 periods: its present is made in the step the next frame was due at, and the next frame takes the step after
-  static_cast<void>(Frame(pacer, Start + 30'600, 130'000));
-  const int64_t now = Start + Period + 130'600;
+  static_cast<void>(Frame(pacer, Start + 3'060'000, 13'000'000));
+  const int64_t now = Start + Period + 13'060'000;
   EXPECT_EQ(pacer.PlanFrame(At(now)).StartTime, At(Start + (3 * Period)));
   static_cast<void>(pacer.BeginFrame(At(Start + (3 * Period))));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
@@ -291,7 +292,7 @@ TEST(TimerPeriodOnlyPacer, FramesThatKeepRunningLongMakeTheRuleSlowDownAndTheAni
   // Work of 1.3 periods every frame, at one refresh per frame
   while (pacer.SwapInterval() == 1 && frames < 2'000)
   {
-    now = Frame(pacer, now, 130'000) + 130'600;
+    now = Frame(pacer, now, 13'000'000) + 13'060'000;
     ++frames;
   }
   ASSERT_EQ(pacer.SwapInterval(), 2u);
@@ -304,7 +305,7 @@ TEST(TimerPeriodOnlyPacer, FramesThatKeepRunningLongMakeTheRuleSlowDownAndTheAni
   PC::FrameSchedule schedule;
   for (int32_t frame = 0; frame < 100; ++frame)
   {
-    now = Frame(pacer, now, 130'000, &schedule) + 130'600;
+    now = Frame(pacer, now, 13'000'000, &schedule) + 13'060'000;
     ASSERT_EQ(schedule.SwapInterval, 2u);
   }
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
@@ -322,23 +323,23 @@ TEST(TimerPeriodOnlyPacer, AFrameOfMoreThanOneRefreshIsHeldByAWaitBeforeItsPrese
   const PC::FrameSchedule first = pacer.BeginFrame(At(Start));
   EXPECT_EQ(first.SwapInterval, 4u);
   EXPECT_EQ(first.NextFrameStartTime, At(Start + (4 * Period)));
-  EXPECT_EQ(first.TargetFrameTime, FP::TimeSpan32(4 * Period));
+  EXPECT_EQ(first.TargetFrameTime, FP::NanosecondTimeSpan32(4 * Period));
   // Presented in the period before the step the next frame is due at, the frame margin (1 ms here) into it
-  const PC::PresentPlan present = pacer.EndFrame(At(Start + 30'000));
-  EXPECT_EQ(settings.FrameMargin(), Span(10'000));
-  EXPECT_EQ(present.PresentTime, At(Start + (3 * Period) + 10'000));
+  const PC::PresentPlan present = pacer.EndFrame(At(Start + 3'000'000));
+  EXPECT_EQ(settings.FrameMargin(), Span(1'000'000));
+  EXPECT_EQ(present.PresentTime, At(Start + (3 * Period) + 1'000'000));
   // The present has no swap interval at this tier: the loop holds the frame
   EXPECT_EQ(present.SwapInterval, 1u);
 
   // The next frame is due four periods after the first, and its animation time is four periods on
-  const PC::FrameStartPlan plan = pacer.PlanFrame(At(Start + (3 * Period) + 10'600));
+  const PC::FrameStartPlan plan = pacer.PlanFrame(At(Start + (3 * Period) + 1'060'000));
   EXPECT_EQ(plan.StartTime, At(Start + (4 * Period)));
   const PC::FrameSchedule second = pacer.BeginFrame(plan.StartTime);
   EXPECT_EQ(second.AnimationStep, Span(4 * Period));
   // Work that is done after the time to present at is presented at once
-  EXPECT_FALSE(pacer.EndFrame(At(Start + (7 * Period) + 20'000)).WaitsForPresentTime());
-  EXPECT_FALSE(pacer.EndFrame(At(Start + (7 * Period) + 10'000)).WaitsForPresentTime());
-  EXPECT_TRUE(pacer.EndFrame(At(Start + (7 * Period) + 9'999)).WaitsForPresentTime());
+  EXPECT_FALSE(pacer.EndFrame(At(Start + (7 * Period) + 2'000'000)).WaitsForPresentTime());
+  EXPECT_FALSE(pacer.EndFrame(At(Start + (7 * Period) + 1'000'000)).WaitsForPresentTime());
+  EXPECT_TRUE(pacer.EndFrame(At(Start + (7 * Period) + 999'999)).WaitsForPresentTime());
 }
 
 TEST(TimerPeriodOnlyPacer, APauseOrAClockThatWentBackStartsTheGridAgain)
@@ -347,12 +348,12 @@ TEST(TimerPeriodOnlyPacer, APauseOrAClockThatWentBackStartsTheGridAgain)
   int64_t now = Start;
   for (int32_t frame = 0; frame < 20; ++frame)
   {
-    now = Frame(pacer, now, 30'000) + 30'600;
+    now = Frame(pacer, now, 3'000'000) + 3'060'000;
   }
   ASSERT_EQ(pacer.FrameWindow().Frames, 19u);
 
   // A minute later: no wait, a new grid from this start, an empty frame window, and no refresh counted as lost
-  const int64_t later = now + (60 * FP::TimeSpan::TicksPerSecond);
+  const int64_t later = now + (60 * FP::NanosecondTimeSpan::NanosecondsPerSecond);
   EXPECT_FALSE(pacer.PlanFrame(At(later)).WaitsForStartTime());
   const PC::FrameSchedule resumed = pacer.BeginFrame(At(later));
   EXPECT_EQ(resumed.NextFrameStartTime, At(later + Period));
@@ -360,7 +361,7 @@ TEST(TimerPeriodOnlyPacer, APauseOrAClockThatWentBackStartsTheGridAgain)
   EXPECT_EQ(resumed.AnimationStep, Span(Period));
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
-  static_cast<void>(pacer.EndFrame(At(later + 30'000)));
+  static_cast<void>(pacer.EndFrame(At(later + 3'000'000)));
 
   // A start before the frame before it: the same
   EXPECT_FALSE(pacer.PlanFrame(At(later - 1)).WaitsForStartTime());
@@ -374,10 +375,10 @@ TEST(TimerPeriodOnlyPacer, AFrameWithoutAnEndIsNotJudgedByItsWork)
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
   static_cast<void>(pacer.BeginFrame(At(Start)));
   // No EndFrame, and the next frame starts 1.4 periods later: a step, not late by work, and its work is the time between
-  static_cast<void>(pacer.BeginFrame(At(Start + 140'000)));
+  static_cast<void>(pacer.BeginFrame(At(Start + 14'000'000)));
   EXPECT_EQ(pacer.FrameWindow().Frames, 1u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
-  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(140'000));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(14'000'000));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
 }
 
@@ -388,28 +389,28 @@ TEST(TimerPeriodOnlyPacer, EndFrameWithoutAFrameIsNothingAndAPresentReportIsKept
   const PC::PresentPlan nothing = pacer.EndFrame(At(Start));
   EXPECT_EQ(nothing.FrameId, 0u);
   EXPECT_FALSE(nothing.WaitsForPresentTime());
-  EXPECT_EQ(pacer.LastPresentBlocked(), FP::TimeDuration::Zero());
+  EXPECT_EQ(pacer.LastPresentBlocked(), FP::NanosecondTimeDuration::Zero());
 
   static_cast<void>(pacer.BeginFrame(At(Start)));
-  static_cast<void>(pacer.EndFrame(At(Start + 30'000)));
+  static_cast<void>(pacer.EndFrame(At(Start + 3'000'000)));
   PC::PresentReport report;
   report.FrameId = 1;
-  report.CallTime = At(Start + 30'000);
-  report.ReturnTime = At(Start + 30'600);
+  report.CallTime = At(Start + 3'000'000);
+  report.ReturnTime = At(Start + 3'060'000);
   pacer.AddPresent(report);
-  EXPECT_EQ(pacer.LastPresentBlocked(), FP::TimeDuration::FromTicks(600));
+  EXPECT_EQ(pacer.LastPresentBlocked(), FP::NanosecondTimeDuration::FromNanoseconds(60'000));
 }
 
 TEST(TimerPeriodOnlyPacer, TheCpuBusyTimeCanBeAskedForWhileTheFrameIsOpen)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::TimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeSpan32());
   static_cast<void>(pacer.BeginFrame(At(Start)));
   // Where a marker is drawn before the frame's work is done
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 12'000)), FP::TimeSpan32(12'000));
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::TimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeSpan32(1'200'000));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::NanosecondTimeSpan32());
   pacer.Reset();
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 12'000)), FP::TimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeSpan32());
 }
 
 TEST(TimerPeriodOnlyPacer, AnotherRefreshPeriodOrOtherSettingsStartTheGridAgainAndTheAnimationTimeGoesOn)
@@ -419,7 +420,7 @@ TEST(TimerPeriodOnlyPacer, AnotherRefreshPeriodOrOtherSettingsStartTheGridAgainA
   int64_t now = Start;
   for (int32_t frame = 0; frame < 10; ++frame)
   {
-    now = Frame(pacer, now, 30'000) + 30'600;
+    now = Frame(pacer, now, 3'000'000) + 3'060'000;
   }
   EXPECT_EQ(pacer.Refresh(), g_hz100);
   EXPECT_EQ(pacer.Settings(), settings);
@@ -439,24 +440,24 @@ TEST(TimerPeriodOnlyPacer, AnotherRefreshPeriodOrOtherSettingsStartTheGridAgainA
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
   EXPECT_EQ(schedule.NextFrameStartTime, At(now + (2 * Period)));
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
-  static_cast<void>(pacer.EndFrame(At(now + 30'000)));
+  static_cast<void>(pacer.EndFrame(At(now + 3'000'000)));
 
   // Other settings: the same, at the swap interval they prefer
   settings.SetRefresh(hz50);
   settings.SetPreferredFrameRate(25);
   pacer.SetSettings(settings);
-  EXPECT_FALSE(pacer.PlanFrame(At(now + 30'600)).WaitsForStartTime());
-  schedule = pacer.BeginFrame(At(now + 30'600));
+  EXPECT_FALSE(pacer.PlanFrame(At(now + 3'060'000)).WaitsForStartTime());
+  schedule = pacer.BeginFrame(At(now + 3'060'000));
   EXPECT_EQ(schedule.SwapInterval, 2u);
-  EXPECT_EQ(schedule.NextFrameStartTime, At(now + 30'600 + (4 * Period)));
-  static_cast<void>(pacer.EndFrame(At(now + 60'600)));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(now + 3'060'000 + (4 * Period)));
+  static_cast<void>(pacer.EndFrame(At(now + 6'060'000)));
 
   // Reset: the next frame starts at once on a grid of its own, and a frame that was open is not ended afterwards
   pacer.Reset();
-  EXPECT_FALSE(pacer.PlanFrame(At(now + 61'000)).WaitsForStartTime());
-  EXPECT_EQ(pacer.EndFrame(At(now + 61'000)).FrameId, 0u);
-  schedule = pacer.BeginFrame(At(now + 61'000));
-  EXPECT_EQ(schedule.NextFrameStartTime, At(now + 61'000 + (4 * Period)));
+  EXPECT_FALSE(pacer.PlanFrame(At(now + 6'100'000)).WaitsForStartTime());
+  EXPECT_EQ(pacer.EndFrame(At(now + 6'100'000)).FrameId, 0u);
+  schedule = pacer.BeginFrame(At(now + 6'100'000));
+  EXPECT_EQ(schedule.NextFrameStartTime, At(now + 6'100'000 + (4 * Period)));
 }
 
 TEST(TimerPeriodOnlyPacer, HalfASecondAfterStartUpTheLoopPausesOnceAndTheFrameOnScreenStays)
@@ -469,7 +470,7 @@ TEST(TimerPeriodOnlyPacer, HalfASecondAfterStartUpTheLoopPausesOnceAndTheFrameOn
     const int64_t start = PresentedFrame(pacer, now, &schedule);
     ASSERT_EQ(start, Start + (frame * Period));
     ASSERT_EQ(schedule.NextFrameStartTime, At(start + Period));
-    now = start + 30'600;
+    now = start + 3'060'000;
   }
   EXPECT_EQ(pacer.StartupPauses(), 0u);
 
@@ -480,12 +481,12 @@ TEST(TimerPeriodOnlyPacer, HalfASecondAfterStartUpTheLoopPausesOnceAndTheFrameOn
   EXPECT_EQ(schedule.AnimationStep, Span(Period));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + (51 * Period)));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (55 * Period)));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
   EXPECT_EQ(pacer.StartupPauses(), 1u);
-  EXPECT_EQ(pacer.PlanFrame(At(start + 30'600)).StartTime, At(Start + (55 * Period)));
+  EXPECT_EQ(pacer.PlanFrame(At(start + 3'060'000)).StartTime, At(Start + (55 * Period)));
 
   // The frame after the pause is on time, its animation time a swap interval on: the pause is not caught up with
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   EXPECT_EQ(start, Start + (55 * Period));
   EXPECT_EQ(schedule.AnimationStep, Span(Period));
   EXPECT_EQ(schedule.AnimationTime, Span(51 * Period));
@@ -496,7 +497,7 @@ TEST(TimerPeriodOnlyPacer, HalfASecondAfterStartUpTheLoopPausesOnceAndTheFrameOn
   // Once: never again in this run
   for (int64_t frame = 0; frame < 300; ++frame)
   {
-    const int64_t next = PresentedFrame(pacer, start + 30'600, &schedule);
+    const int64_t next = PresentedFrame(pacer, start + 3'060'000, &schedule);
     ASSERT_EQ(next, start + Period);
     start = next;
   }
@@ -515,7 +516,7 @@ TEST(TimerPeriodOnlyPacer, ThereIsNoPauseBeforeAPresentWasTaken)
   int64_t now = Start;
   for (int32_t frame = 0; frame < 80; ++frame)
   {
-    now = Frame(pacer, now, 30'000) + 30'600;
+    now = Frame(pacer, now, 3'000'000) + 3'060'000;
   }
   EXPECT_EQ(pacer.StartupPauses(), 0u);
 
@@ -524,7 +525,7 @@ TEST(TimerPeriodOnlyPacer, ThereIsNoPauseBeforeAPresentWasTaken)
   int64_t start = PresentedFrame(pacer, now, &schedule);
   EXPECT_EQ(schedule.NextFrameStartTime, At(start + Period));
   EXPECT_EQ(pacer.StartupPauses(), 0u);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   EXPECT_EQ(schedule.NextFrameStartTime, At(start + (5 * Period)));
   EXPECT_EQ(pacer.StartupPauses(), 1u);
 }
@@ -539,30 +540,30 @@ TEST(TimerPeriodOnlyPacer, ASwapChainMadeAnewAndAResetGetThePauseOfAStart)
 
   // Frames at 0, 1 and 2 periods: the third is two periods after the first
   int64_t start = PresentedFrame(pacer, Start);
-  start = PresentedFrame(pacer, start + 30'600);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (6 * Period)));
   EXPECT_EQ(pacer.StartupPauses(), 1u);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   ASSERT_EQ(start, Start + (6 * Period));
 
   // The application made its swap chain anew: counted from the next frame, with a present of the new one taken
   pacer.ForgetPresents();
-  start = PresentedFrame(pacer, start + 30'600);
-  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 3'060'000);
+  start = PresentedFrame(pacer, start + 3'060'000);
   EXPECT_EQ(pacer.StartupPauses(), 1u);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   ASSERT_EQ(start, Start + (9 * Period));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (13 * Period)));
   EXPECT_EQ(pacer.StartupPauses(), 2u);
 
   // A present the system did not take says the same
-  start = PresentedFrame(pacer, start + 30'600, &schedule, false);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule, false);
   ASSERT_EQ(start, Start + (13 * Period));
-  start = PresentedFrame(pacer, start + 30'600);
-  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 3'060'000);
+  start = PresentedFrame(pacer, start + 3'060'000);
   EXPECT_EQ(pacer.StartupPauses(), 2u);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   ASSERT_EQ(start, Start + (16 * Period));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (20 * Period)));
   EXPECT_EQ(pacer.StartupPauses(), 3u);
@@ -570,8 +571,8 @@ TEST(TimerPeriodOnlyPacer, ASwapChainMadeAnewAndAResetGetThePauseOfAStart)
   // And so does a reset
   pacer.Reset();
   start = PresentedFrame(pacer, Start + (30 * Period));
-  start = PresentedFrame(pacer, start + 30'600);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   ASSERT_EQ(start, Start + (32 * Period));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (36 * Period)));
   EXPECT_EQ(pacer.StartupPauses(), 4u);
@@ -589,7 +590,7 @@ TEST(TimerPeriodOnlyPacer, AtTwoRefreshesPerFrameOrWithAPauseOfNoRefreshesThereI
   int64_t start = Start;
   for (int64_t frame = 0; frame < 20; ++frame)
   {
-    start = PresentedFrame(slow, start + (frame == 0 ? 0 : Period + 10'600), &schedule);
+    start = PresentedFrame(slow, start + (frame == 0 ? 0 : Period + 1'060'000), &schedule);
     ASSERT_EQ(start, Start + (frame * 2 * Period));
     ASSERT_EQ(schedule.NextFrameStartTime, At(start + (2 * Period)));
   }
@@ -604,7 +605,7 @@ TEST(TimerPeriodOnlyPacer, AtTwoRefreshesPerFrameOrWithAPauseOfNoRefreshesThereI
   start = Start;
   for (int64_t frame = 0; frame < 20; ++frame)
   {
-    start = PresentedFrame(pacer, start + (frame == 0 ? 0 : 30'600), &schedule);
+    start = PresentedFrame(pacer, start + (frame == 0 ? 0 : 3'060'000), &schedule);
     ASSERT_EQ(schedule.NextFrameStartTime, At(Start + ((frame + 1) * Period)));
   }
   EXPECT_EQ(pacer.StartupPauses(), 0u);
@@ -619,11 +620,11 @@ TEST(TimerPeriodOnlyPacer, ThePauseIsNoGapThatStartsTheGridAgain)
   PC::TimerPeriodOnlyPacer pacer(settings);
   PC::FrameSchedule schedule;
   int64_t start = PresentedFrame(pacer, Start);
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   ASSERT_EQ(schedule.NextFrameStartTime, At(Start + (6 * Period)));
-  const PC::FrameStartPlan plan = pacer.PlanFrame(At(start + 30'600));
+  const PC::FrameStartPlan plan = pacer.PlanFrame(At(start + 3'060'000));
   EXPECT_EQ(plan.StartTime, At(Start + (6 * Period)));
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
   EXPECT_EQ(start, Start + (6 * Period));
   // The frame before it was judged, on time: a grid that started again would have an empty frame window
   EXPECT_GT(pacer.FrameWindow().Frames, 0u);
@@ -636,34 +637,34 @@ TEST(TimerPeriodOnlyPacer, ThePauseIsNoGapThatStartsTheGridAgain)
 TEST(TimerPeriodOnlyPacer, WithGpuWorkReportsAFramesWorkIsTheCpusAndTheGpus)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::Zero());
-  static_cast<void>(Frame(pacer, Start, 30'000));
-  static_cast<void>(Frame(pacer, Start + 30'600, 30'000));
-  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(30'000));
+  EXPECT_EQ(pacer.GpuTime(), FP::NanosecondTimeDuration::Zero());
+  static_cast<void>(Frame(pacer, Start, 3'000'000));
+  static_cast<void>(Frame(pacer, Start + 3'060'000, 3'000'000));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(3'000'000));
 
   // The GPU was done with frame 1 before frame 2 began: one after the other, the two added, and they fit
-  pacer.AddGpuWork(PC::GpuWorkReport::Times(1, At(Start + 30'000), At(Start + 95'000)));
-  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::FromTicks(65'000));
-  static_cast<void>(Frame(pacer, Start + Period + 30'600, 30'000));
-  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((30'000 + 95'000) / 2));
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(1, At(Start + 3'000'000), At(Start + 9'500'000)));
+  EXPECT_EQ(pacer.GpuTime(), FP::NanosecondTimeDuration::FromNanoseconds(6'500'000));
+  static_cast<void>(Frame(pacer, Start + Period + 3'060'000, 3'000'000));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((3'000'000 + 9'500'000) / 2));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 
   // GPU work of 0.8 periods that ends within the margin of the next frame's start: added to the CPU's it is over the frame's
   // time, and the frame is late although it kept its step
-  pacer.AddGpuWork(PC::GpuWorkReport::Times(2, At(Start + Period + 30'000), At(Start + (2 * Period) + 10'000)));
-  static_cast<void>(Frame(pacer, Start + (2 * Period) + 30'600, 30'000));
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(2, At(Start + Period + 3'000'000), At(Start + (2 * Period) + 1'000'000)));
+  static_cast<void>(Frame(pacer, Start + (2 * Period) + 3'060'000, 3'000'000));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
 
   // The same GPU work beside the CPU's work on the frame after it: the longer of the two, and it fits
-  pacer.AddGpuWork(PC::GpuWorkReport::Times(3, At(Start + (2 * Period) + 50'000), At(Start + (3 * Period) + 30'000)));
-  static_cast<void>(Frame(pacer, Start + (3 * Period) + 30'600, 30'000));
+  pacer.AddGpuWork(PC::GpuWorkReport::Times(3, At(Start + (2 * Period) + 5'000'000), At(Start + (3 * Period) + 3'000'000)));
+  static_cast<void>(Frame(pacer, Start + (3 * Period) + 3'060'000, 3'000'000));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
-  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((30'000 + 95'000 + 110'000 + 80'000) / 4));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span((3'000'000 + 9'500'000 + 11'000'000 + 8'000'000) / 4));
 
   // A reset forgets the GPU's work
   pacer.Reset();
-  EXPECT_EQ(pacer.GpuTime(), FP::TimeDuration::Zero());
+  EXPECT_EQ(pacer.GpuTime(), FP::NanosecondTimeDuration::Zero());
 }
 
 TEST(TimerPeriodOnlyPacer, AnApplicationThatSaysItHasTwoFramesInFlightIsJudgedByTheLongerOfTheTwo)
@@ -671,13 +672,13 @@ TEST(TimerPeriodOnlyPacer, AnApplicationThatSaysItHasTwoFramesInFlightIsJudgedBy
   PC::PacerSettings settings = LowLatencySettings();
   settings.SetMaxFramesInFlight(2);
   PC::TimerPeriodOnlyPacer pacer(settings);
-  static_cast<void>(Frame(pacer, Start, 60'000));
+  static_cast<void>(Frame(pacer, Start, 6'000'000));
   // How long, not when: 0.7 periods beside CPU work of 0.6
-  pacer.AddGpuWork(PC::GpuWorkReport::OfDuration(1, FP::TimeDuration::FromTicks(70'000)));
-  static_cast<void>(Frame(pacer, Start + 60'600, 60'000));
-  static_cast<void>(Frame(pacer, Start + Period + 60'600, 60'000));
+  pacer.AddGpuWork(PC::GpuWorkReport::OfDuration(1, FP::NanosecondTimeDuration::FromNanoseconds(7'000'000)));
+  static_cast<void>(Frame(pacer, Start + 6'060'000, 6'000'000));
+  static_cast<void>(Frame(pacer, Start + Period + 6'060'000, 6'000'000));
   EXPECT_EQ(pacer.FrameWindow().Frames, 2u);
-  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(70'000));
+  EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(7'000'000));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 }
 
@@ -698,7 +699,7 @@ TEST(TimerPeriodOnlyPacer, ALossThatRepeatsIsInTheAnimationStepAndALossThatDoesN
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   schedule = pacer.BeginFrame(At(Start + (6 * Period)));
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::TimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
 
   // A frame on time ends it at once
@@ -723,7 +724,7 @@ TEST(TimerPeriodOnlyPacer, ASwapIntervalTheRuleChangesIsItsAnswerToTheLossesBefo
   // Every frame takes two steps of the grid until the rule slows down
   while (schedule.Change != PC::SwapIntervalChange::Slower && start < Start + (1'000 * Period))
   {
-    static_cast<void>(pacer.EndFrame(At(start + 30'000)));
+    static_cast<void>(pacer.EndFrame(At(start + 3'000'000)));
     start += 2 * Period;
     schedule = pacer.BeginFrame(At(start));
   }
@@ -731,7 +732,7 @@ TEST(TimerPeriodOnlyPacer, ASwapIntervalTheRuleChangesIsItsAnswerToTheLossesBefo
   ASSERT_EQ(schedule.SwapInterval, 2u);
   // The step is the new swap interval, with nothing of the losses in it, and the frame after it is on time
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
-  static_cast<void>(pacer.EndFrame(At(start + 30'000)));
+  static_cast<void>(pacer.EndFrame(At(start + 3'000'000)));
   schedule = pacer.BeginFrame(At(start + (2 * Period)));
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
@@ -748,20 +749,20 @@ namespace
     int64_t start = PresentedFrame(rPacer, Start);
     for (int64_t frame = 1; frame < frames; ++frame)
     {
-      start = PresentedFrame(rPacer, start + 30'600);
+      start = PresentedFrame(rPacer, start + 3'060'000);
     }
     return start;
   }
 
-  //! A frame begun at startTicks whose work takes workTicks, with its present reported
-  void LongFrame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t startTicks, const int64_t workTicks)
+  //! A frame begun at startNanoseconds whose work takes workNanoseconds, with its present reported
+  void LongFrame(PC::TimerPeriodOnlyPacer& rPacer, const int64_t startNanoseconds, const int64_t workNanoseconds)
   {
-    static_cast<void>(rPacer.BeginFrame(At(startTicks)));
-    const PC::PresentPlan present = rPacer.EndFrame(At(startTicks + workTicks));
+    static_cast<void>(rPacer.BeginFrame(At(startNanoseconds)));
+    const PC::PresentPlan present = rPacer.EndFrame(At(startNanoseconds + workNanoseconds));
     PC::PresentReport report;
     report.FrameId = present.FrameId;
-    report.CallTime = At(startTicks + workTicks);
-    report.ReturnTime = At(startTicks + workTicks + 600);
+    report.CallTime = At(startNanoseconds + workNanoseconds);
+    report.ReturnTime = At(startNanoseconds + workNanoseconds + 60'000);
     rPacer.AddPresent(report);
   }
 }
@@ -779,9 +780,9 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessAFrameIsMadeAheadOfTheDisplayAn
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + Period));
 
   // The second starts at once: it is the frame made ahead, expected on screen two periods after the grid's start
-  EXPECT_FALSE(pacer.PlanFrame(At(start + 30'600)).WaitsForStartTime());
-  start = PresentedFrame(pacer, start + 30'600, &schedule);
-  EXPECT_EQ(start, Start + 30'600);
+  EXPECT_FALSE(pacer.PlanFrame(At(start + 3'060'000)).WaitsForStartTime());
+  start = PresentedFrame(pacer, start + 3'060'000, &schedule);
+  EXPECT_EQ(start, Start + 3'060'000);
   EXPECT_EQ(schedule.AnimationStep, Span(Period));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + Period));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + (2 * Period)));
@@ -789,7 +790,7 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessAFrameIsMadeAheadOfTheDisplayAn
   // From the third on a frame starts a period before the step it is for, one per period, for as long as the loop runs
   for (int64_t frame = 2; frame < 200; ++frame)
   {
-    start = PresentedFrame(pacer, start + 30'600, &schedule);
+    start = PresentedFrame(pacer, start + 3'060'000, &schedule);
     ASSERT_EQ(start, Start + ((frame - 1) * Period)) << frame;
     ASSERT_EQ(schedule.IntendedDisplayTime, At(Start + ((frame + 1) * Period))) << frame;
     ASSERT_EQ(schedule.AnimationTime, Span(frame * Period)) << frame;
@@ -807,9 +808,9 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessAFrameThatRunsLongWithinTheRese
   ASSERT_EQ(start, Start + (4 * Period));
 
   // The next frame, due a period later, works for 1.6 periods: the frame made ahead covers one refresh
-  LongFrame(pacer, Start + (5 * Period), 160'000);
+  LongFrame(pacer, Start + (5 * Period), 16'000'000);
   // The frame after it starts at once, a step behind its own, and no step of the grid is given up
-  const int64_t now = Start + (5 * Period) + 160'600;
+  const int64_t now = Start + (5 * Period) + 16'060'000;
   EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
   PC::FrameSchedule schedule;
   int64_t next = PresentedFrame(pacer, now, &schedule);
@@ -820,8 +821,8 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessAFrameThatRunsLongWithinTheRese
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
 
   // And the one after that is back where the loop was: a period before its step, with the reserve made again
-  EXPECT_EQ(pacer.PlanFrame(At(next + 30'600)).StartTime, At(Start + (7 * Period)));
-  next = PresentedFrame(pacer, next + 30'600, &schedule);
+  EXPECT_EQ(pacer.PlanFrame(At(next + 3'060'000)).StartTime, At(Start + (7 * Period)));
+  next = PresentedFrame(pacer, next + 3'060'000, &schedule);
   EXPECT_EQ(next, Start + (7 * Period));
   EXPECT_EQ(schedule.AnimationTime, Span(8 * Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
@@ -834,8 +835,8 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessWhatIsBeyondTheReserveIsGivenUp
   static_cast<void>(SteadyFrames(pacer, 6));
 
   // A frame of 2.4 periods: one refresh more than the frame made ahead covers, so the display showed a frame again, once
-  LongFrame(pacer, Start + (5 * Period), 240'000);
-  const int64_t now = Start + (5 * Period) + 240'600;
+  LongFrame(pacer, Start + (5 * Period), 24'000'000);
+  const int64_t now = Start + (5 * Period) + 24'060'000;
   EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
   PC::FrameSchedule schedule;
   int64_t next = PresentedFrame(pacer, now, &schedule);
@@ -843,7 +844,7 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessWhatIsBeyondTheReserveIsGivenUp
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   EXPECT_EQ(schedule.AnimationStep, Span(Period));
   // The frame after it waits for its time: the loop is a period before its step again
-  next = PresentedFrame(pacer, next + 30'600, &schedule);
+  next = PresentedFrame(pacer, next + 3'060'000, &schedule);
   EXPECT_EQ(next, Start + (8 * Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
 }
@@ -855,15 +856,15 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessALoopThatIsHeldBetweenFramesIsF
 
   // The frame was presented on time, and the loop is back 2.3 periods after the next frame was due (the application waited
   // for something): one step is within the reserve, the other is given up
-  const int64_t now = start + Period + 230'000;
+  const int64_t now = start + Period + 23'000'000;
   EXPECT_FALSE(pacer.PlanFrame(At(now)).WaitsForStartTime());
   PC::FrameSchedule schedule;
   int64_t next = PresentedFrame(pacer, now, &schedule);
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   // The frame after it makes up for the step within the reserve, and the one after that is a period before its step again
-  EXPECT_FALSE(pacer.PlanFrame(At(next + 30'600)).WaitsForStartTime());
-  next = PresentedFrame(pacer, next + 30'600, &schedule);
-  EXPECT_EQ(pacer.PlanFrame(At(next + 30'600)).StartTime, At(start + (4 * Period)));
+  EXPECT_FALSE(pacer.PlanFrame(At(next + 3'060'000)).WaitsForStartTime());
+  next = PresentedFrame(pacer, next + 3'060'000, &schedule);
+  EXPECT_EQ(pacer.PlanFrame(At(next + 3'060'000)).StartTime, At(start + (4 * Period)));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
 }
 
@@ -877,8 +878,8 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessThereIsNoReserveAtTwoRefreshesP
   PC::FrameSchedule schedule = slow.BeginFrame(At(Start));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (2 * Period)));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + (2 * Period)));
-  EXPECT_EQ(slow.EndFrame(At(Start + 30'000)).PresentTime, At(Start + Period + 10'000));
-  EXPECT_EQ(slow.PlanFrame(At(Start + Period + 10'600)).StartTime, At(Start + (2 * Period)));
+  EXPECT_EQ(slow.EndFrame(At(Start + 3'000'000)).PresentTime, At(Start + Period + 1'000'000));
+  EXPECT_EQ(slow.PlanFrame(At(Start + Period + 1'060'000)).StartTime, At(Start + (2 * Period)));
 
   // No present may wait beside the frame that is made: no reserve, and a frame of 1.3 periods costs the step its present took
   PC::PacerSettings none(g_hz100);
@@ -886,15 +887,15 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessThereIsNoReserveAtTwoRefreshesP
   PC::TimerPeriodOnlyPacer pacer(none);
   int64_t start = PresentedFrame(pacer, Start, &schedule);
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + Period));
-  start = PresentedFrame(pacer, start + 30'600);
+  start = PresentedFrame(pacer, start + 3'060'000);
   ASSERT_EQ(start, Start + Period);
-  LongFrame(pacer, Start + (2 * Period), 130'000);
-  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 130'600)).StartTime, At(Start + (4 * Period)));
+  LongFrame(pacer, Start + (2 * Period), 13'000'000);
+  EXPECT_EQ(pacer.PlanFrame(At(Start + (2 * Period) + 13'060'000)).StartTime, At(Start + (4 * Period)));
   static_cast<void>(pacer.BeginFrame(At(Start + (4 * Period))));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   // A frame without an end, begun 2.4 periods after the one before it: a step given up, as it is that late for its own. It
   // is the second loss in a row, so it is in the animation step and the animation time is no further behind the clock
-  schedule = pacer.BeginFrame(At(Start + (4 * Period) + 240'000));
+  schedule = pacer.BeginFrame(At(Start + (4 * Period) + 24'000'000));
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   EXPECT_EQ(pacer.StartupPauses(), 0u);

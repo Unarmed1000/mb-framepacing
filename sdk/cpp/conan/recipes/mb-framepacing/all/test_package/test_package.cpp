@@ -46,27 +46,25 @@ namespace
     PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));
     settings.SetPreferredFrameRate(30);
     PC::FramePacer pacer(settings);
-    const FP::TickCount64 cpuStartTime = FP::TickCount64::FromSeconds(10);
+    const FP::NanosecondTickCount cpuStartTime = FP::NanosecondTickCount::FromSeconds(10);
     const PC::FrameSchedule schedule = pacer.BeginFrame(cpuStartTime);
-    const FP::TimeSpan32 cpuBusy = pacer.EndFrame(cpuStartTime + FP::TimeSpan::FromMilliseconds(4));
-    // This pacer counts in ticks of 100 ns and the marker in nanoseconds: its values are converted here, exactly (a tick is 100 ns),
-    // until the pacer counts in nanoseconds too
-    const auto duration = [](const FP::TimeSpan32 ticks) { return FP::NanosecondTimeDuration::FromTimeDuration(FP::TimeDuration::From(ticks)); };
+    const FP::NanosecondTimeDuration cpuBusy = pacer.EndFrame(cpuStartTime + FP::NanosecondTimeSpan::FromMilliseconds(4));
+    // The pacer and the marker both count in nanoseconds: the schedule's values go into the payload as they are
     const FM::Payload payload{FM::MarkerKind::Frame,
                               1u,
                               frameIndex,
                               FM::MarkerFlags::NoFlags,
-                              FP::NanosecondTimeSpan::FromTimeSpan(schedule.AnimationTime),
-                              duration(schedule.PreferredFrameTime),
-                              duration(schedule.TargetFrameTime),
-                              FP::NanosecondTickCount::FromTickCount64(schedule.IntendedDisplayTime),
-                              FP::NanosecondTickCount::FromTickCount64(cpuStartTime),
-                              duration(cpuBusy)};
+                              schedule.AnimationTime,
+                              schedule.PreferredFrameTime,
+                              schedule.TargetFrameTime,
+                              schedule.IntendedDisplayTime,
+                              cpuStartTime,
+                              cpuBusy};
     FM::ModuleMatrix matrix;
     const bool encoded = FM::GenerateModules(payload, matrix);
     std::printf("the pacer (experimental): swap interval %u, a %lld ns frame, %lld ns busy\n", static_cast<unsigned>(schedule.SwapInterval),
                 static_cast<long long>(payload.TargetFrameTime().Nanoseconds()), static_cast<long long>(payload.CpuBusy().Nanoseconds()));
-    return encoded && schedule.SwapInterval == 2u && payload.TargetFrameTime().Nanoseconds() == 33'333'300 &&
+    return encoded && schedule.SwapInterval == 2u && payload.TargetFrameTime().Nanoseconds() == 33'333'333 &&
            payload.CpuBusy().Nanoseconds() == 4'000'000;
   }
 }

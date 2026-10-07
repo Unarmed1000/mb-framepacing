@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 #include "DisplayModel.hpp"
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <utility>
@@ -14,22 +14,24 @@ namespace MB::FramePacing::Pacer::Simulation
   {
   }
 
-  int64_t DisplayModel::BlankTicks(const int64_t blank) const noexcept
+  int64_t DisplayModel::BlankNanoseconds(const int64_t blank) const noexcept
   {
-    return m_settings.FirstBlankTicks + m_period.TimeFor(blank).Ticks();
+    return m_settings.FirstBlankNanoseconds + m_period.TimeFor(blank).Nanoseconds();
   }
 
-  int64_t DisplayModel::BlankAtOrBefore(const int64_t ticks) const noexcept
+  int64_t DisplayModel::BlankAtOrBefore(const int64_t nanoseconds) const noexcept
   {
-    return ticks <= m_settings.FirstBlankTicks ? 0 : m_period.FloorRefreshes(TimeSpan(ticks - m_settings.FirstBlankTicks));
+    return nanoseconds <= m_settings.FirstBlankNanoseconds
+             ? 0
+             : m_period.FloorRefreshes(NanosecondTimeSpan(nanoseconds - m_settings.FirstBlankNanoseconds));
   }
 
-  int64_t DisplayModel::Present(const int64_t presentTicks, const int64_t gpuEndTicks, const uint32_t swapInterval)
+  int64_t DisplayModel::Present(const int64_t presentNanoseconds, const int64_t gpuEndNanoseconds, const uint32_t swapInterval)
   {
     // The first blank the frame is ready for in time
-    const int64_t latchTicks = std::max(presentTicks, gpuEndTicks) + m_settings.LatchLeadTicks;
-    int64_t blank = BlankAtOrBefore(latchTicks);
-    if (BlankTicks(blank) < latchTicks)
+    const int64_t latchNanoseconds = std::max(presentNanoseconds, gpuEndNanoseconds) + m_settings.LatchLeadNanoseconds;
+    int64_t blank = BlankAtOrBefore(latchNanoseconds);
+    if (BlankNanoseconds(blank) < latchNanoseconds)
     {
       ++blank;
     }
@@ -44,18 +46,18 @@ namespace MB::FramePacing::Pacer::Simulation
     }
     m_lastTakenBlank = blank;
     m_anyTaken = true;
-    const int64_t shownTicks = BlankTicks(blank + m_settings.PipelineRefreshes);
-    m_presents.push_back({presentTicks, shownTicks});
-    return shownTicks;
+    const int64_t shownNanoseconds = BlankNanoseconds(blank + m_settings.PipelineRefreshes);
+    m_presents.push_back({presentNanoseconds, shownNanoseconds});
+    return shownNanoseconds;
   }
 
-  int32_t DisplayModel::Pending(const int64_t ticks) const noexcept
+  int32_t DisplayModel::Pending(const int64_t nanoseconds) const noexcept
   {
     // Shown times rise with the presents, so the frames still waiting are the last ones
     int32_t pending = 0;
-    for (std::size_t index = m_presents.size(); index > 0 && m_presents[index - 1].ShownTicks > ticks; --index)
+    for (std::size_t index = m_presents.size(); index > 0 && m_presents[index - 1].ShownNanoseconds > nanoseconds; --index)
     {
-      if (m_presents[index - 1].PresentTicks <= ticks)
+      if (m_presents[index - 1].PresentNanoseconds <= nanoseconds)
       {
         ++pending;
       }
@@ -63,20 +65,20 @@ namespace MB::FramePacing::Pacer::Simulation
     return pending;
   }
 
-  int64_t DisplayModel::AcquireTicks(const int64_t ticks) const noexcept
+  int64_t DisplayModel::AcquireNanoseconds(const int64_t nanoseconds) const noexcept
   {
     if (m_settings.Images <= 0)
     {
-      return ticks;
+      return nanoseconds;
     }
     const int32_t allowed = std::max(m_settings.Images, 2) - 2;
-    const int32_t pending = Pending(ticks);
+    const int32_t pending = Pending(nanoseconds);
     if (pending <= allowed)
     {
-      return ticks;
+      return nanoseconds;
     }
     // The waiting frames are the last `pending` presents: the acquire returns when all but `allowed` of them are shown
     const std::size_t first = m_presents.size() - static_cast<std::size_t>(pending);
-    return m_presents[first + static_cast<std::size_t>(pending - allowed - 1)].ShownTicks;
+    return m_presents[first + static_cast<std::size_t>(pending - allowed - 1)].ShownNanoseconds;
   }
 }

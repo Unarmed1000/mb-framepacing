@@ -12,16 +12,16 @@ namespace MB::FramePacing::Pacer
   namespace
   {
     //! The longest GPU time that is kept: sums with a frame's CPU work stay far from the ends of a span's range
-    constexpr int64_t MaxGpuTicks = std::numeric_limits<uint32_t>::max();
+    constexpr int64_t MaxGpuNanoseconds = std::numeric_limits<uint32_t>::max();
   }
 
-  void FrameWorkRule::AddFrameStart(const uint64_t frameId, const TickCount64 cpuStartTime) noexcept
+  void FrameWorkRule::AddFrameStart(const uint64_t frameId, const NanosecondTickCount cpuStartTime) noexcept
   {
     m_startTimes[frameId % FrameCapacity] = cpuStartTime;
     m_newestFrameId = frameId;
   }
 
-  void FrameWorkRule::AddGpuWork(const GpuWorkReport& report, const TimeSpan margin) noexcept
+  void FrameWorkRule::AddGpuWork(const GpuWorkReport& report, const NanosecondTimeSpan margin) noexcept
   {
     // Of a frame that started, not older than the one the rule has (a later report for the same frame takes the place of the
     // first), and not so old that the start of the frame after it is gone
@@ -31,7 +31,7 @@ namespace MB::FramePacing::Pacer
       return;
     }
     m_gpuFrameId = report.FrameId;
-    m_gpuTime = TimeSpan(std::min(report.Duration.Ticks(), MaxGpuTicks));
+    m_gpuTime = NanosecondTimeSpan(std::min(report.Duration.Nanoseconds(), MaxGpuNanoseconds));
     m_hasGpuTime = true;
     if (!report.HasEndTime() || report.FrameId == m_newestFrameId)
     {
@@ -42,14 +42,14 @@ namespace MB::FramePacing::Pacer
     m_overlapSeen = (report.EndTime - m_startTimes[(report.FrameId + 1u) % FrameCapacity]) > margin;
   }
 
-  TimeSpan FrameWorkRule::WorkOf(const TimeSpan cpuWork, const uint32_t maxFramesInFlight) const noexcept
+  NanosecondTimeSpan FrameWorkRule::WorkOf(const NanosecondTimeSpan cpuWork, const uint32_t maxFramesInFlight) const noexcept
   {
     if (!HasGpuTime())
     {
       return cpuWork;
     }
     const bool sideBySide = maxFramesInFlight >= 2u || m_overlapSeen;
-    return sideBySide ? std::max(cpuWork, m_gpuTime) : TimeSpan(cpuWork.Ticks() + m_gpuTime.Ticks());
+    return sideBySide ? std::max(cpuWork, m_gpuTime) : NanosecondTimeSpan(cpuWork.Nanoseconds() + m_gpuTime.Nanoseconds());
   }
 
   void FrameWorkRule::Clear() noexcept

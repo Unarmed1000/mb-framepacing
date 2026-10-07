@@ -3,10 +3,10 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
@@ -98,21 +98,21 @@ namespace MB::FramePacing::Pacer
   {
     SwapIntervalRule m_rule;
     // The grid on the clock: step 0 is at m_origin, the frame that started last is on m_slot and the next is due at m_nextSlot
-    TickCount64 m_origin;
+    NanosecondTickCount m_origin;
     int64_t m_slot{0};
     int64_t m_nextSlot{0};
     bool m_hasGrid{false};
     // The step the frame is due to leave the grid at (the next frame's step, but for a pause), when its present was made, and
     // where in its step a present is made that is on time
     int64_t m_dueSlot{0};
-    TickCount64 m_presentTime;
+    NanosecondTickCount m_presentTime;
     bool m_hasPresentTime{false};
-    TimeSpan m_presentPlace;
+    NanosecondTimeSpan m_presentPlace;
     // The frame between BeginFrame and the next BeginFrame
     uint64_t m_frameId{0};
-    TickCount64 m_startTime;
+    NanosecondTickCount m_startTime;
     uint32_t m_swapInterval{1};
-    TimeSpan m_work;
+    NanosecondTimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
     // The steps of the grid the frame before it took more than it was given, and the steps the frame is behind its own
@@ -120,14 +120,14 @@ namespace MB::FramePacing::Pacer
     int64_t m_behind{0};
     FrameWorkRule m_frameWork;
     RefreshTime m_animationTime;
-    TimeSpan m_lastAnimationTime;
+    NanosecondTimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
-    TimeDuration m_lastPresentBlocked;
+    NanosecondTimeDuration m_lastPresentBlocked;
     // The pause after start-up: still to be made, the first frame's start since it was asked for, and whether the system
     // took a present since
     bool m_pausePending{true};
     bool m_pauseHasFirstFrame{false};
-    TickCount64 m_pauseFirstFrameTime;
+    NanosecondTickCount m_pauseFirstFrameTime;
     bool m_presentTaken{false};
     uint64_t m_startupPauses{0};
 
@@ -140,17 +140,17 @@ namespace MB::FramePacing::Pacer
 
     //! Before a frame takes anything, at now on the application's steady clock: the time of the step the frame is due at, when
     //! that is still to come. It changes nothing, so a frame may be planned again.
-    [[nodiscard]] FrameStartPlan PlanFrame(TickCount64 now) const noexcept;
+    [[nodiscard]] FrameStartPlan PlanFrame(NanosecondTickCount now) const noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
-    FrameSchedule BeginFrame(TickCount64 cpuStartTime) noexcept;
+    FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
 
     //! The frame's CPU work is done, at workDoneTime: how to present it.
-    PresentPlan EndFrame(TickCount64 workDoneTime) noexcept;
+    PresentPlan EndFrame(NanosecondTickCount workDoneTime) noexcept;
 
     //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
     //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
-    [[nodiscard]] TimeSpan32 CpuBusyAt(TickCount64 now) const noexcept;
+    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(NanosecondTickCount now) const noexcept;
 
     //! After the present, before the next frame is planned: when it was called is what the next frame's step is kept away
     //! from when the frame ran long (without the report it is taken as made when EndFrame said). A present the system did not
@@ -193,13 +193,13 @@ namespace MB::FramePacing::Pacer
     }
 
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
-    [[nodiscard]] TimeDuration GpuTime() const noexcept
+    [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
       return m_frameWork.GpuTime();
     }
 
     //! How long the last present that was reported held the frame loop.
-    [[nodiscard]] TimeDuration LastPresentBlocked() const noexcept
+    [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
       return m_lastPresentBlocked;
     }
@@ -226,15 +226,15 @@ namespace MB::FramePacing::Pacer
     }
 
   private:
-    [[nodiscard]] bool StartsAgainAt(TickCount64 time) const noexcept;
-    [[nodiscard]] int64_t SlotFor(TickCount64 time) const noexcept;
+    [[nodiscard]] bool StartsAgainAt(NanosecondTickCount time) const noexcept;
+    [[nodiscard]] int64_t SlotFor(NanosecondTickCount time) const noexcept;
     [[nodiscard]] int64_t SlotAfterPresent() const noexcept;
     [[nodiscard]] int64_t Reserve() const noexcept;
-    [[nodiscard]] TickCount64 DueTime(int64_t slot) const noexcept;
-    [[nodiscard]] int64_t SmoothSlotFor(TickCount64 time) const noexcept;
-    [[nodiscard]] TickCount64 TimeOfSlot(int64_t slot) const noexcept;
+    [[nodiscard]] NanosecondTickCount DueTime(int64_t slot) const noexcept;
+    [[nodiscard]] int64_t SmoothSlotFor(NanosecondTickCount time) const noexcept;
+    [[nodiscard]] NanosecondTickCount TimeOfSlot(int64_t slot) const noexcept;
     void ArmStartupPause() noexcept;
-    [[nodiscard]] uint32_t StartupPauseAt(TickCount64 cpuStartTime) noexcept;
+    [[nodiscard]] uint32_t StartupPauseAt(NanosecondTickCount cpuStartTime) noexcept;
   };
 }
 

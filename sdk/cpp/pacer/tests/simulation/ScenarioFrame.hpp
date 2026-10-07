@@ -10,7 +10,7 @@ namespace MB::FramePacing::Pacer::Simulation
   //! One frame of a scenario given frame by frame: how long it works, and what a reference simulation paced it at (for a cross-check).
   struct ScenarioFrame
   {
-    int64_t WorkTicks{0};
+    int64_t WorkNanoseconds{0};
     //! The reference's swap interval for this frame, 0 = none
     int32_t ReferenceSwapInterval{0};
     //! The refresh the reference showed this frame on (any origin), -1 = none

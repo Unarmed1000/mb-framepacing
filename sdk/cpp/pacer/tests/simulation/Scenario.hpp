@@ -12,7 +12,7 @@
 namespace MB::FramePacing::Pacer::Simulation
 {
   //! A load to pace: given frame by frame (Frames, played Passes times), or as stages of time (Stages, Calm outside them) until
-  //! DurationTicks, each frame's work drawn by the stage its start falls in with SplitMix64 from Seed.
+  //! DurationNanoseconds, each frame's work drawn by the stage its start falls in with SplitMix64 from Seed.
   struct Scenario
   {
     std::string Name;
@@ -25,7 +25,7 @@ namespace MB::FramePacing::Pacer::Simulation
     int32_t Passes{1};
     std::vector<LoadStage> Stages;
     LoadStage Calm;
-    int64_t DurationTicks{0};
+    int64_t DurationNanoseconds{0};
     uint64_t Seed{0};
   };
 }

@@ -3,10 +3,10 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
@@ -72,28 +72,28 @@ namespace MB::FramePacing::Pacer
   {
     SwapIntervalRule m_rule;
     // The grid on the clock: step 0 is at m_origin, the frame that started last is on m_slot and the next is due at m_nextSlot
-    TickCount64 m_origin;
+    NanosecondTickCount m_origin;
     int64_t m_slot{0};
     int64_t m_nextSlot{0};
     bool m_hasGrid{false};
     // The frame between BeginFrame and the next BeginFrame
     uint64_t m_frameId{0};
-    TickCount64 m_startTime;
+    NanosecondTickCount m_startTime;
     uint32_t m_swapInterval{1};
-    TimeSpan m_work;
+    NanosecondTimeSpan m_work;
     bool m_frameOpen{false};
     bool m_frameEnded{false};
     // The steps of the grid the frame before it took more than it was given, and the steps the frame is behind its own
     int64_t m_lost{0};
     int64_t m_behind{0};
     // When the frame's present was made, when that is known
-    TickCount64 m_presentTime;
+    NanosecondTickCount m_presentTime;
     bool m_hasPresentTime{false};
     FrameWorkRule m_frameWork;
     RefreshTime m_animationTime;
-    TimeSpan m_lastAnimationTime;
+    NanosecondTimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
-    TimeDuration m_lastPresentBlocked;
+    NanosecondTimeDuration m_lastPresentBlocked;
     // The presents: the last one the system took, and the first that can still be waited for (0: none yet)
     uint64_t m_lastAcceptedId{0};
     uint64_t m_oldestWaitableId{1};
@@ -114,7 +114,7 @@ namespace MB::FramePacing::Pacer
     //! of the step the frame is due at, when that is still to come. It changes nothing, so a frame may be planned again, and
     //! after AddPresentWait it is planned again: the present that was waited for is not asked for a second time, and the
     //! time is the one that holds then.
-    [[nodiscard]] FrameStartPlan PlanFrame(TickCount64 now) const noexcept;
+    [[nodiscard]] FrameStartPlan PlanFrame(NanosecondTickCount now) const noexcept;
 
     //! What became of the wait for a present the plan asked for. A wait that held the loop for a share of a refresh period and
     //! ended with the present shown moves the grid towards its end. One that ended without it is counted
@@ -122,14 +122,14 @@ namespace MB::FramePacing::Pacer
     void AddPresentWait(const PresentWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
-    FrameSchedule BeginFrame(TickCount64 cpuStartTime) noexcept;
+    FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
 
     //! The frame's CPU work is done, at workDoneTime: how to present it.
-    PresentPlan EndFrame(TickCount64 workDoneTime) noexcept;
+    PresentPlan EndFrame(NanosecondTickCount workDoneTime) noexcept;
 
     //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
     //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
-    [[nodiscard]] TimeSpan32 CpuBusyAt(TickCount64 now) const noexcept;
+    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(NanosecondTickCount now) const noexcept;
 
     //! After the present, before the next frame is planned. A present the system did not take is not waited for, nor is any
     //! present before it (a swap chain that is made anew starts with nothing to wait for). A frame that is presented again
@@ -171,13 +171,13 @@ namespace MB::FramePacing::Pacer
     }
 
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
-    [[nodiscard]] TimeDuration GpuTime() const noexcept
+    [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
       return m_frameWork.GpuTime();
     }
 
     //! How long the last present that was reported held the frame loop.
-    [[nodiscard]] TimeDuration LastPresentBlocked() const noexcept
+    [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
       return m_lastPresentBlocked;
     }
@@ -204,12 +204,12 @@ namespace MB::FramePacing::Pacer
     }
 
   private:
-    [[nodiscard]] bool StartsAgainAt(TickCount64 time) const noexcept;
-    [[nodiscard]] int64_t SlotFor(TickCount64 time) const noexcept;
-    [[nodiscard]] TickCount64 TimeOfSlot(int64_t slot) const noexcept;
+    [[nodiscard]] bool StartsAgainAt(NanosecondTickCount time) const noexcept;
+    [[nodiscard]] int64_t SlotFor(NanosecondTickCount time) const noexcept;
+    [[nodiscard]] NanosecondTickCount TimeOfSlot(int64_t slot) const noexcept;
     [[nodiscard]] int64_t Reserve() const noexcept;
-    [[nodiscard]] TickCount64 DueTime(int64_t slot) const noexcept;
-    [[nodiscard]] int64_t SmoothSlotFor(TickCount64 time) const noexcept;
+    [[nodiscard]] NanosecondTickCount DueTime(int64_t slot) const noexcept;
+    [[nodiscard]] int64_t SmoothSlotFor(NanosecondTickCount time) const noexcept;
   };
 }
 

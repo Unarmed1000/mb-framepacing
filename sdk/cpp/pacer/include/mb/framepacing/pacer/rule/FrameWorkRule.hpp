@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeDuration.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <array>
 #include <cstdint>
@@ -34,27 +34,27 @@ namespace MB::FramePacing::Pacer
 
   private:
     // The starts of the newest frames, by frame id
-    std::array<TickCount64, FrameCapacity> m_startTimes{};
+    std::array<NanosecondTickCount, FrameCapacity> m_startTimes{};
     uint64_t m_newestFrameId{0};
     // The newest GPU work: the frame it is of (reports of frames before it are not taken), how long, and whether the frame
     // after it began before it ended
     uint64_t m_gpuFrameId{0};
-    TimeSpan m_gpuTime;
+    NanosecondTimeSpan m_gpuTime;
     bool m_hasGpuTime{false};
     bool m_overlapSeen{false};
 
   public:
     //! A frame started: frames are given in the order of their ids, one after the other.
-    void AddFrameStart(uint64_t frameId, TickCount64 cpuStartTime) noexcept;
+    void AddFrameStart(uint64_t frameId, NanosecondTickCount cpuStartTime) noexcept;
 
     //! The GPU's work on a frame. Taken when it is of one of the newest FrameCapacity frames that started and not of an older
     //! frame than the one the rule has: a later report for the same frame takes the place of the first, for an application that
     //! learns how long the work took before it learns when. margin: a frame began before the GPU's work ended when it began
     //! more than this before it (the two are measured on clocks that are placed against each other, which is not exact).
-    void AddGpuWork(const GpuWorkReport& report, TimeSpan margin) noexcept;
+    void AddGpuWork(const GpuWorkReport& report, NanosecondTimeSpan margin) noexcept;
 
     //! The frame time the loop needs for a frame whose CPU work took cpuWork.
-    [[nodiscard]] TimeSpan WorkOf(TimeSpan cpuWork, uint32_t maxFramesInFlight) const noexcept;
+    [[nodiscard]] NanosecondTimeSpan WorkOf(NanosecondTimeSpan cpuWork, uint32_t maxFramesInFlight) const noexcept;
 
     //! True when there is a GPU time to judge a frame with.
     [[nodiscard]] bool HasGpuTime() const noexcept
@@ -63,9 +63,9 @@ namespace MB::FramePacing::Pacer
     }
 
     //! The newest GPU time (zero without one).
-    [[nodiscard]] TimeDuration GpuTime() const noexcept
+    [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
-      return HasGpuTime() ? TimeDuration(m_gpuTime) : TimeDuration();
+      return HasGpuTime() ? NanosecondTimeDuration(m_gpuTime) : NanosecondTimeDuration();
     }
 
     //! True when the newest GPU work report showed the CPU's and the GPU's work side by side.

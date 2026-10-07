@@ -10,9 +10,9 @@
 // And a frame loop on a display that queues its presents (FrameLoopSimulation.hpp), as a frame log to stdout that
 // tools/frame_stages_chart.py draws:
 //
-//   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-ticks <n>] [--timer-only]
-//             [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
-//             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]
+//   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-nanoseconds <n>] [--timer-only]
+//             [--timer-late-nanoseconds <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
+//             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]
 //             [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>] [--startup-pause <refreshes>]
 //
 //   --tier-pacer  the application carries out what the pacer of the lowest pair of tiers gives it, in place of today's pacer and
@@ -29,7 +29,7 @@
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
 //   --smooth            a tier pacer with the aim of smoothness (a reserve of frames that wait); low latency without it.
 //                       With --tier-pacer the reserve is the --wait-for-present number less one, and the wait is not made
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <algorithm>
@@ -53,9 +53,9 @@ namespace
   {
     std::cerr << "pacer-sim --golden <dir>\n"
                  "pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]\n"
-                 "pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <n>] [--cpu-ticks <n>] [--timer-only]\n"
-                 "          [--timer-late-ticks <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
-                 "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU ticks>] [--tier-pacer]\n"
+                 "pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <n>] [--cpu-nanoseconds <n>] [--timer-only]\n"
+                 "          [--timer-late-nanoseconds <max>] [--fixed] [--seed <n>] [--latch-lead-percent <n>] [--pipeline <refreshes>]\n"
+                 "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]\n"
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
                  "          [--startup-pause <refreshes>] [--smooth] [--vblank-pacer] [--ready-place <percent>]\n"
                  "          [--display-ppm <parts per million>] [--swap-interval <refreshes>]\n";
@@ -131,11 +131,11 @@ namespace
       {
         gpuPercent = Number(value);
       }
-      else if (name == "--cpu-ticks")
+      else if (name == "--cpu-nanoseconds")
       {
         settings.CpuWork = {Number(value), Number(value)};
       }
-      else if (name == "--timer-late-ticks")
+      else if (name == "--timer-late-nanoseconds")
       {
         settings.TimerLate = {0, Number(value)};
       }
@@ -190,7 +190,7 @@ namespace
           return Usage();
         }
         settings.LongFrames.push_back(static_cast<int32_t>(Number(value.substr(0, comma))));
-        settings.LongFrameCpuTicks = Number(value.substr(comma + 1));
+        settings.LongFrameCpuNanoseconds = Number(value.substr(comma + 1));
       }
       else if (name == "--hold")
       {
@@ -208,9 +208,9 @@ namespace
         return Usage();
       }
     }
-    const int64_t periodTicks = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToTimeSpan().Ticks();
-    settings.GpuWork = {(periodTicks * gpuPercent) / 100, (periodTicks * gpuPercent) / 100};
-    settings.Display.LatchLeadTicks = (periodTicks * latchLeadPercent) / 100;
+    const int64_t periodNanoseconds = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToNanosecondTimeSpan().Nanoseconds();
+    settings.GpuWork = {(periodNanoseconds * gpuPercent) / 100, (periodNanoseconds * gpuPercent) / 100};
+    settings.Display.LatchLeadNanoseconds = (periodNanoseconds * latchLeadPercent) / 100;
     if (vblankPacer)
     {
       std::cout << Sim::ToFrameLog(Sim::SimulateVBlankPeriodOnlyLoop(settings), settings);

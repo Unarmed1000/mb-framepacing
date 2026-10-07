@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
 #include <mb/framepacing/pacer/clock/AnimationTime.hpp>
@@ -32,14 +32,14 @@ namespace MB::FramePacing::Pacer
   class PacerRefreshClock
   {
     RefreshPeriod m_period;
-    TimeSpan m_longestGap;
+    NanosecondTimeSpan m_longestGap;
     RefreshTime m_animationTime;
     // The display's clock: the refreshes counted
     RefreshTime m_displayTime;
-    TickCount64 m_lastStartTime;
+    NanosecondTickCount m_lastStartTime;
     uint32_t m_lastSwapInterval{0};
     // What rounding left over at the last frame that worked over its time
-    TimeSpan m_carried;
+    NanosecondTimeSpan m_carried;
     bool m_hasLast{false};
     bool m_stepped{false};
     FrameMeasurement m_measurement;
@@ -49,18 +49,18 @@ namespace MB::FramePacing::Pacer
     //! longestGap: a frame that starts longer than this after the previous one (or two of its frames, when that is longer), or before
     //! it, starts the clock again instead of stepping by the gap: after a pause, a suspended process, a stop in a debugger. start: the
     //! animation time of the first frame.
-    explicit PacerRefreshClock(RefreshPeriod period, TimeSpan longestGap, TimeSpan start = {}) noexcept;
+    explicit PacerRefreshClock(RefreshPeriod period, NanosecondTimeSpan longestGap, NanosecondTimeSpan start = {}) noexcept;
 
     //! A frame starts at frameStartTime (the application's steady clock) and is held for swapInterval refreshes (at least 1): Measure,
     //! then Step.
-    AnimationTime Advance(TickCount64 frameStartTime, uint32_t swapInterval) noexcept;
+    AnimationTime Advance(NanosecondTickCount frameStartTime, uint32_t swapInterval) noexcept;
 
     //! A frame starts at frameStartTime: what that says about the previous frame. For a loop that decides the frame's swap interval
     //! from it (FramePacer does); Step follows. work: how long the previous frame worked (the GPU's time included where the GPU
     //! limits the loop), zero when unknown. A frame that worked longer than its swap interval's time is late, and its loop is not
     //! held by vsync: the time between the frame starts then counts as real time, what rounding it to whole refreshes leaves being
     //! carried to the next such frame, so their refreshes add up to the time that passed.
-    FrameMeasurement Measure(TickCount64 frameStartTime, TimeSpan work = {}) noexcept;
+    FrameMeasurement Measure(NanosecondTickCount frameStartTime, NanosecondTimeSpan work = {}) noexcept;
 
     //! The frame measured last is held for swapInterval refreshes (at least 1): its animation time. The first frame's is the clock's
     //! start; after a restart the step is the swap interval. Without a Measure since the last Step it counts as restarted.
@@ -73,20 +73,20 @@ namespace MB::FramePacing::Pacer
     void Restart() noexcept;
 
     //! The longest gap between two frame starts that is measured (see the constructor).
-    [[nodiscard]] TimeSpan LongestGap() const noexcept
+    [[nodiscard]] NanosecondTimeSpan LongestGap() const noexcept
     {
       return m_longestGap;
     }
 
     //! Another longest gap, from the next frame on. The clock goes on as it is.
-    void SetLongestGap(const TimeSpan longestGap) noexcept
+    void SetLongestGap(const NanosecondTimeSpan longestGap) noexcept
     {
       m_longestGap = longestGap;
     }
 
     //! The display's clock that many refreshes after the previous frame's display (FrameMeasurement::DisplayTime is the time at 0):
-    //! exact, rounded to the nearest tick.
-    [[nodiscard]] TimeSpan DisplayTimeAfter(uint32_t refreshes) const noexcept;
+    //! exact, rounded to the nearest nanosecond.
+    [[nodiscard]] NanosecondTimeSpan DisplayTimeAfter(uint32_t refreshes) const noexcept;
 
     //! The refresh period the clock counts in.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept

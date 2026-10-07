@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
@@ -18,40 +18,40 @@ namespace MB::FramePacing::Pacer
   class PacerSettings
   {
     RefreshPeriod m_refresh;
-    TimeSpan m_preferredFrameTime;
+    NanosecondTimeSpan m_preferredFrameTime;
     uint32_t m_preferredSwapInterval{1};
     bool m_autoSwapInterval{true};
     SlowDownRule m_slowDown{SlowDownRule::LateCount};
-    TimeSpan m_frameWindowLength{2 * TimeSpan::TicksPerSecond};
+    NanosecondTimeSpan m_frameWindowLength{2 * NanosecondTimeSpan::NanosecondsPerSecond};
     uint32_t m_slowDownLatePercent{10};
-    TimeSpan m_frameMargin{TimeSpan::TicksPerMillisecond};
+    NanosecondTimeSpan m_frameMargin{NanosecondTimeSpan::NanosecondsPerMillisecond};
     bool m_frameMarginSet{false};
-    TimeSpan m_slowestFrameTime{50 * TimeSpan::TicksPerMillisecond};
+    NanosecondTimeSpan m_slowestFrameTime{50 * NanosecondTimeSpan::NanosecondsPerMillisecond};
     bool m_usePresentFeedback{false};
     PacerAim m_aim{PacerAim::Smoothness};
     uint32_t m_waitingPresents{2};
     uint32_t m_presentWaitSwapIntervals{4};
     uint32_t m_maxFramesInFlight{1};
     uint32_t m_startupPauseRefreshes{4};
-    TimeSpan m_startupPauseDelay{500 * TimeSpan::TicksPerMillisecond};
+    NanosecondTimeSpan m_startupPauseDelay{500 * NanosecondTimeSpan::NanosecondsPerMillisecond};
     uint32_t m_readyPlacePercent{50};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
-    static constexpr TimeSpan MaxPreferredFrameTime{10 * TimeSpan::TicksPerSecond};
-    static constexpr TimeSpan MinFrameWindowLength{1};
-    static constexpr TimeSpan MaxFrameWindowLength{60 * TimeSpan::TicksPerSecond};
+    static constexpr NanosecondTimeSpan MaxPreferredFrameTime{10 * NanosecondTimeSpan::NanosecondsPerSecond};
+    static constexpr NanosecondTimeSpan MinFrameWindowLength{1};
+    static constexpr NanosecondTimeSpan MaxFrameWindowLength{60 * NanosecondTimeSpan::NanosecondsPerSecond};
     static constexpr uint32_t MaxSlowDownLatePercent = 100;
-    static constexpr TimeSpan MaxFrameMargin{TimeSpan::TicksPerSecond};
+    static constexpr NanosecondTimeSpan MaxFrameMargin{NanosecondTimeSpan::NanosecondsPerSecond};
     //! The default frame margin is this, and on a fast display less: the refresh period divided by DefaultFrameMarginDivisor
-    static constexpr TimeSpan DefaultFrameMargin{TimeSpan::TicksPerMillisecond};
+    static constexpr NanosecondTimeSpan DefaultFrameMargin{NanosecondTimeSpan::NanosecondsPerMillisecond};
     static constexpr int64_t DefaultFrameMarginDivisor = 8;
-    static constexpr TimeSpan MaxSlowestFrameTime{10 * TimeSpan::TicksPerSecond};
+    static constexpr NanosecondTimeSpan MaxSlowestFrameTime{10 * NanosecondTimeSpan::NanosecondsPerSecond};
     static constexpr uint32_t MaxWaitingPresents = 8;
     static constexpr uint32_t MaxPresentWaitSwapIntervals = 64;
     static constexpr uint32_t MaxMaxFramesInFlight = 8;
     static constexpr uint32_t MaxStartupPauseRefreshes = 64;
-    static constexpr TimeSpan MaxStartupPauseDelay{10 * TimeSpan::TicksPerSecond};
+    static constexpr NanosecondTimeSpan MaxStartupPauseDelay{10 * NanosecondTimeSpan::NanosecondsPerSecond};
     static constexpr uint32_t MaxReadyPlacePercent = 100;
 
     //! The display's refresh period, from its display mode (a DXGI output mode, Display.getRefreshRate, wl_output's mode).
@@ -74,12 +74,12 @@ namespace MB::FramePacing::Pacer
     //! The frame time the application wants: its target frame rate, as the time of one frame (0 to MaxPreferredFrameTime). 0, the
     //! default: none, the display's rate. The pacer holds every frame for the whole refreshes that frame time needs on the display it
     //! runs on (PreferredSwapIntervalAt) and never runs faster.
-    [[nodiscard]] TimeSpan PreferredFrameTime() const noexcept
+    [[nodiscard]] NanosecondTimeSpan PreferredFrameTime() const noexcept
     {
       return m_preferredFrameTime;
     }
 
-    void SetPreferredFrameTime(TimeSpan frameTime) noexcept;
+    void SetPreferredFrameTime(NanosecondTimeSpan frameTime) noexcept;
 
     //! The target frame rate as numerator / denominator frames a second: 30, or 30000 / 1001. From 0.1 fps; a numerator or denominator
     //! of 0 is outside (SetPreferredFrameTime({}) for none).
@@ -121,12 +121,12 @@ namespace MB::FramePacing::Pacer
 
     //! How long a stretch of frames the rule looks at: its frame window (MinFrameWindowLength to MaxFrameWindowLength). A frame that
     //! begins longer than this after the previous one starts again with an empty frame window.
-    [[nodiscard]] TimeSpan FrameWindowLength() const noexcept
+    [[nodiscard]] NanosecondTimeSpan FrameWindowLength() const noexcept
     {
       return m_frameWindowLength;
     }
 
-    void SetFrameWindowLength(TimeSpan length) noexcept;
+    void SetFrameWindowLength(NanosecondTimeSpan length) noexcept;
 
     //! The rule slows down when more than this share of the frame window's frames was late (percent, 0 to 100).
     [[nodiscard]] uint32_t SlowDownLatePercent() const noexcept
@@ -138,7 +138,7 @@ namespace MB::FramePacing::Pacer
 
     //! Added to the frames' average work time before it is compared with swap intervals, and asked for as room to spare to speed up (0
     //! to MaxFrameMargin): on the settings' own display (FrameMarginAt(Refresh())).
-    [[nodiscard]] TimeSpan FrameMargin() const noexcept
+    [[nodiscard]] NanosecondTimeSpan FrameMargin() const noexcept
     {
       return FrameMarginAt(m_refresh);
     }
@@ -146,18 +146,18 @@ namespace MB::FramePacing::Pacer
     //! The frame margin on a display with this refresh period: the one that was set, on any display. By default the smaller of
     //! DefaultFrameMargin (1 ms) and an eighth of the refresh period (above 125 Hz): the rule speeds up only when the frames' work
     //! and twice the margin fit a refresh, and 1 ms is half a refresh at 500 Hz.
-    [[nodiscard]] TimeSpan FrameMarginAt(RefreshPeriod refresh) const noexcept;
+    [[nodiscard]] NanosecondTimeSpan FrameMarginAt(RefreshPeriod refresh) const noexcept;
 
     //! Set the frame margin: it then is this on every display.
-    void SetFrameMargin(TimeSpan margin) noexcept;
+    void SetFrameMargin(NanosecondTimeSpan margin) noexcept;
 
     //! The rule slows down no further once the current swap interval is longer than this plus the margin (0 to MaxSlowestFrameTime).
-    [[nodiscard]] TimeSpan SlowestFrameTime() const noexcept
+    [[nodiscard]] NanosecondTimeSpan SlowestFrameTime() const noexcept
     {
       return m_slowestFrameTime;
     }
 
-    void SetSlowestFrameTime(TimeSpan frameTime) noexcept;
+    void SetSlowestFrameTime(NanosecondTimeSpan frameTime) noexcept;
 
     //! Take the display times the application reports (FramePacer::AddPresentFeedback): for a platform with present feedback, on a
     //! display with a fixed refresh rate. The pacer paces the same with it (by the frame starts and the frames' work); the display
@@ -236,12 +236,12 @@ namespace MB::FramePacing::Pacer
 
     //! How long after the first frame of a start (or of a new swap chain) that pause is made (0 to MaxStartupPauseDelay;
     //! half a second by default): after the presents that pile up were made. A guess as well.
-    [[nodiscard]] TimeSpan StartupPauseDelay() const noexcept
+    [[nodiscard]] NanosecondTimeSpan StartupPauseDelay() const noexcept
     {
       return m_startupPauseDelay;
     }
 
-    void SetStartupPauseDelay(TimeSpan delay) noexcept;
+    void SetStartupPauseDelay(NanosecondTimeSpan delay) noexcept;
 
     //! For a pacer that knows where the display's refreshes are (HoldTier::VBlank): where in a refresh a frame is to be ready,
     //! in percent of the refresh period after its vertical blank (0 to MaxReadyPlacePercent; 50 by default). Ready is
