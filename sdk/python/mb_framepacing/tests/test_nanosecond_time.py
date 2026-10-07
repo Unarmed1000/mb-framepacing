@@ -6,7 +6,7 @@
 import unittest
 from typing import cast
 
-from .. import NanosecondTickCount, NanosecondTimeSpan, NanosecondTimeSpan32
+from .. import NanosecondTickCount, NanosecondTimeSpan
 
 MAX_INT64 = 2**63 - 1
 MIN_INT64 = -(2**63)
@@ -235,53 +235,3 @@ class NanosecondTickCountTests(unittest.TestCase):
                 _ = make(A_FLOAT)
         with self.assertRaises(TypeError):
             _ = NanosecondTickCount(A_BOOL)
-
-
-class NanosecondTimeSpan32Tests(unittest.TestCase):
-    def test_holds_a_count_of_nanoseconds_that_fits_32_bits(self) -> None:
-        self.assertEqual(NanosecondTimeSpan32().nanoseconds, 0)
-        self.assertEqual(NanosecondTimeSpan32(4_166_389).nanoseconds, 4_166_389)
-        self.assertEqual(NanosecondTimeSpan32.max_value().nanoseconds, 4_294_967_295)
-        with self.assertRaises(OverflowError):
-            _ = NanosecondTimeSpan32(4_294_967_296)
-        with self.assertRaises(OverflowError):
-            _ = NanosecondTimeSpan32(-1)
-        # An int and nothing else
-        self.assertIs(type(NanosecondTimeSpan32.from_ticks(41_664).nanoseconds), int)
-        with self.assertRaises(TypeError):
-            _ = NanosecondTimeSpan32(A_FLOAT)
-        with self.assertRaises(TypeError):
-            _ = NanosecondTimeSpan32.from_ticks(A_FLOAT)
-        with self.assertRaises(TypeError):
-            _ = NanosecondTimeSpan32(A_BOOL)
-
-    def test_is_made_from_a_span_that_fits_and_raises_for_one_that_does_not(self) -> None:
-        self.assertEqual(NanosecondTimeSpan32.from_nanosecond_time_span(NanosecondTimeSpan(4_166_389)).nanoseconds, 4_166_389)
-        self.assertEqual(NanosecondTimeSpan32.from_nanosecond_time_span(NanosecondTimeSpan(4_294_967_295)), NanosecondTimeSpan32.max_value())
-        with self.assertRaises(OverflowError):
-            _ = NanosecondTimeSpan32.from_nanosecond_time_span(NanosecondTimeSpan(4_294_967_296))
-        with self.assertRaises(OverflowError):
-            _ = NanosecondTimeSpan32.from_nanosecond_time_span(NanosecondTimeSpan(-1))
-        # From ticks of 100 ns, exactly: 42,949,672 ticks is the longest that fits
-        self.assertEqual(NanosecondTimeSpan32.from_ticks(41_664).nanoseconds, 4_166_400)
-        self.assertEqual(NanosecondTimeSpan32.from_ticks(42_949_672).nanoseconds, 4_294_967_200)
-        with self.assertRaises(OverflowError):
-            _ = NanosecondTimeSpan32.from_ticks(42_949_673)
-        with self.assertRaises(OverflowError):
-            _ = NanosecondTimeSpan32.from_ticks(-1)
-
-    def test_widens_to_a_span_exactly_and_to_ticks_truncated(self) -> None:
-        self.assertEqual(NanosecondTimeSpan32(4_166_389).to_nanosecond_time_span(), NanosecondTimeSpan(4_166_389))
-        self.assertEqual(NanosecondTimeSpan32(4_166_389).to_ticks(), 41_663)
-        self.assertEqual(NanosecondTimeSpan32(99).to_ticks(), 0)
-        self.assertEqual(NanosecondTimeSpan32.max_value().to_ticks(), 42_949_672)
-
-    def test_compares_by_its_count_and_is_written_with_its_unit(self) -> None:
-        shorter = NanosecondTimeSpan32(4_166_389)
-        longer = NanosecondTimeSpan32(16_666_667)
-        self.assertTrue(shorter < longer and shorter <= longer and longer > shorter and longer >= shorter)
-        self.assertEqual(shorter, NanosecondTimeSpan32(4_166_389))
-        self.assertNotEqual(shorter, longer)
-        self.assertEqual(hash(shorter), hash(NanosecondTimeSpan32(4_166_389)))
-        self.assertEqual(str(shorter), "4166389 ns")
-        self.assertEqual(repr(shorter), "NanosecondTimeSpan32(nanoseconds=4166389)")

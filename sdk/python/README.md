@@ -23,8 +23,7 @@ subpackages. Standard library only, Python 3.12 or later.
 The package's times are whole ticks of 100 ns, as plain integers. Two types hold what a platform reports in nanoseconds
 without losing the last two digits: `NanosecondTimeSpan` (a signed interval) and `NanosecondTickCount` (a point on a clock,
 kept as an unsigned 64-bit count that compares across its wrap), both as the C++ and C# cores have them. Each holds a whole number
-of nanoseconds, an `int`: a float is refused, so nothing is rounded on the way in. `NanosecondTimeSpan32` is an interval that
-fits a 32-bit field (0 to 4.294967295 s): a longer or a negative one is refused. `from_ticks` is
+of nanoseconds, an `int`: a float is refused, so nothing is rounded on the way in. `from_ticks` is
 exact, and `to_ticks()` gives ticks (truncated toward zero for an interval, the tick it is in for a point).
 
 ```python

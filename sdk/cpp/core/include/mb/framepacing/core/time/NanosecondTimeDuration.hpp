@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <cassert>
 #include <compare>
@@ -55,12 +54,6 @@ namespace MB::FramePacing
     static constexpr NanosecondTimeDuration FromNanoseconds(const int64_t nanoseconds) noexcept
     {
       return NanosecondTimeDuration(NanosecondTimeSpan(nanoseconds));
-    }
-
-    //! The marker's 32-bit interval, which every NanosecondTimeDuration can hold.
-    static constexpr NanosecondTimeDuration From(const NanosecondTimeSpan32 value) noexcept
-    {
-      return UncheckedCreate(value.ToNanosecondTimeSpan());
     }
 
     //! Exact: a tick is 100 ns. Throws std::out_of_range for a duration of more than 292 years, which nanoseconds can not hold.

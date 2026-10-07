@@ -51,7 +51,7 @@ CI checks it):
 
 | Assembly                | Target         |     Size |
 | ----------------------- | -------------- | -------: |
-| `MB.FramePacing`        | netstandard2.1 | 19.0 KiB |
+| `MB.FramePacing`        | netstandard2.1 | 18.0 KiB |
 | `MB.FramePacing.Marker` | netstandard2.1 | 27.5 KiB |
 | `MB.FramePacing.Data`   | net10.0        | 97.0 KiB |
 

@@ -4,7 +4,6 @@
 // and what its arithmetic gives is a duration where the result can not be negative and a NanosecondTimeSpan where it can.
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <gtest/gtest.h>
@@ -38,15 +37,10 @@ TEST(NanosecondTimeDuration, IsMadeFromNanosecondsASpanOfTheMarkersAndUnchecked)
   EXPECT_EQ(FP::NanosecondTimeDuration::FromNanoseconds(0).Nanoseconds(), 0);
   EXPECT_EQ(FP::NanosecondTimeDuration::FromNanoseconds(-80'000).Nanoseconds(), 0);
   EXPECT_EQ(FP::NanosecondTimeDuration::FromNanoseconds(std::numeric_limits<int64_t>::min()).Nanoseconds(), 0);
-  // Every 32-bit interval of the marker is a duration
-  EXPECT_EQ(FP::NanosecondTimeDuration::From(FP::NanosecondTimeSpan32()).Nanoseconds(), 0);
-  EXPECT_EQ(FP::NanosecondTimeDuration::From(FP::NanosecondTimeSpan32(166'667u)), FP::NanosecondTimeDuration::FromNanoseconds(166'667));
-  EXPECT_EQ(FP::NanosecondTimeDuration::From(FP::NanosecondTimeSpan32::MaxValue()).Nanoseconds(), 4'294'967'295);
   // For a value that is known not to be negative
   EXPECT_EQ(FP::NanosecondTimeDuration::UncheckedCreate(FP::NanosecondTimeSpan(7)).Nanoseconds(), 7);
   EXPECT_EQ(FP::NanosecondTimeDuration::UncheckedCreate(FP::NanosecondTimeSpan()), FP::NanosecondTimeDuration::Zero());
   static_assert(FP::NanosecondTimeDuration::UncheckedCreate(FP::NanosecondTimeSpan(5)) == FP::NanosecondTimeDuration::FromNanoseconds(5));
-  static_assert(FP::NanosecondTimeDuration::From(FP::NanosecondTimeSpan32(5u)) == FP::NanosecondTimeDuration::FromNanoseconds(5));
 }
 
 TEST(NanosecondTimeDuration, GivesItsValueAsASpanAndAsNanoseconds)
