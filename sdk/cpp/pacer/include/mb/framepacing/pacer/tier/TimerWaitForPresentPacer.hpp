@@ -5,11 +5,9 @@
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/RefreshTime.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
@@ -17,10 +15,8 @@
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
-#include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
-#include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
-#include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
+#include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -68,156 +64,140 @@ namespace MB::FramePacing::Pacer
   //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
+  //!
+  //! The class is ClockGridLoopPacer with the wait for a present: the rules and the calculations are there.
   class TimerWaitForPresentPacer
   {
-    SwapIntervalRule m_rule;
-    // The grid on the clock: step 0 is at m_origin, the frame that started last is on m_slot and the next is due at m_nextSlot
-    NanosecondTickCount m_origin;
-    int64_t m_slot{0};
-    int64_t m_nextSlot{0};
-    bool m_hasGrid{false};
-    // The frame between BeginFrame and the next BeginFrame
-    uint64_t m_frameId{0};
-    NanosecondTickCount m_startTime;
-    uint32_t m_swapInterval{1};
-    NanosecondTimeSpan m_work;
-    bool m_frameOpen{false};
-    bool m_frameEnded{false};
-    // The steps of the grid the frame before it took more than it was given, and the steps the frame is behind its own
-    int64_t m_lost{0};
-    int64_t m_behind{0};
-    // When the frame's present was made, when that is known
-    NanosecondTickCount m_presentTime;
-    bool m_hasPresentTime{false};
-    FrameWorkRule m_frameWork;
-    RefreshTime m_animationTime;
-    NanosecondTimeSpan m_lastAnimationTime;
-    uint64_t m_refreshesBehindClock{0};
-    NanosecondTimeDuration m_lastPresentBlocked;
-    // What holds the loop: the wait for a present
-    PresentWaitRule m_wait;
+    ClockGridLoopPacer m_pacer;
 
   public:
     //! The tier this pacer is for.
     static constexpr PacerTier Tier = PacerTier::TimerWaitForPresent;
 
-    explicit TimerWaitForPresentPacer(const PacerSettings& settings);
-
-    //! Before a frame takes anything, at now on the application's steady clock: the present to wait for (the one
-    //! PacerSettings::WaitingPresents back, where the system took it and it can still be waited for) and the longest the
-    //! wait may take (PacerSettings::PresentWaitSwapIntervals of the swap interval the frame is paced at), and after it the time
-    //! of the step the frame is due at, when that is still to come. It changes nothing, so a frame may be planned again, and
-    //! after AddPresentWait it is planned again: the present that was waited for is not asked for a second time, and the
-    //! time is the one that holds then.
-    [[nodiscard]] FrameStartPlan PlanFrame(NanosecondTickCount now) const noexcept;
-
-    //! What became of the wait for a present the plan asked for. A wait that held the loop for a share of a refresh period and
-    //! ended with the present shown moves the grid towards its end. One that ended without it is counted
-    //! (PresentWaitTimeouts), and the frame it held is not judged: the pacer asked for the wait, so the frame is not late, and
-    //! the grid goes on from where that frame starts. After PresentWaitRule::WaitsRunOutToStop of them in a row the display is not taking the
-    //! window's frames (a window that is covered or minimised): the pacer stops waiting (PresentWaitsStopped) until presents
-    //! are shown again. While it is stopped the report is the answer to what the plan asked, and a frame the asking held is
-    //! not judged either.
-    void AddPresentWait(const PresentWaitReport& report) noexcept;
-
-    //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
-    FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
-
-    //! The frame's CPU work is done, at workDoneTime: how to present it.
-    PresentPlan EndFrame(NanosecondTickCount workDoneTime) noexcept;
-
-    //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
-    //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
-    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(NanosecondTickCount now) const noexcept;
-
-    //! After the present, before the next frame is planned. A present the system did not take is not waited for, nor is any
-    //! present before it (a swap chain that is made anew starts with nothing to wait for). A frame that is presented again
-    //! after that, on the new swap chain, is reported again, and can be waited for.
-    void AddPresent(const PresentReport& report) noexcept;
-
-    //! The GPU's work on an earlier frame, when the application has it: from then on a frame's work is the CPU's and the
-    //! GPU's (FrameWorkRule).
-    void AddGpuWork(const GpuWorkReport& report) noexcept;
-
-    //! The display's refresh period changed (a mode change, the window on another display): the grid starts again on it with an
-    //! empty frame window, at the swap interval the application prefers there. The animation time goes on.
-    void SetRefreshPeriod(RefreshPeriod period) noexcept;
-
-    //! Other settings on a live pacer: it starts again with them, as with another refresh period. The same settings change
-    //! nothing. Allocates when the frame window needs more room than it has, and only then.
-    void SetSettings(const PacerSettings& settings);
-
-    //! The presents made so far can no longer be waited for (a swap chain was made anew, for a window that is resized, say).
-    //! Nothing else changes: the grid, the frame window and the swap interval go on.
-    void ForgetPresents() noexcept;
-
-    //! Start again (after a pause the application knows of): the next frame starts the grid, the frame window is empty, the
-    //! swap interval the preferred one, the GPU's work is forgotten, and no present from before is waited for. The animation
-    //! time goes on.
-    void Reset() noexcept;
-
-    //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and
-    //! that it was not moved over.
-    [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
+    explicit TimerWaitForPresentPacer(const PacerSettings& settings)
+      : m_pacer(settings, true)
     {
-      return m_refreshesBehindClock;
     }
 
-    //! True while the pacer does not wait for presents, because its waits ran out: the frames are paced on the timer, and
-    //! every PresentWaitRule::FramesBetweenAsks frames the plan asks, with no time to wait, whether an older present was shown (one that has
-    //! had the time a wait would have given it, and no older than the first whose wait ran out). PresentWaitRule::AsksShownToWait answers in
-    //! a row that say shown end it.
+    //! Before a frame takes anything: what to wait for before it starts.
+    [[nodiscard]] FrameStartPlan PlanFrame(const NanosecondTickCount now) const noexcept
+    {
+      return m_pacer.PlanFrame(now);
+    }
+
+    //! After the wait the plan asked for: what became of it. The frame is then planned again.
+    void AddPresentWait(const PresentWaitReport& report) noexcept
+    {
+      m_pacer.AddPresentWait(report);
+    }
+
+    //! The frame starts: the previous frame is judged, the rule decides, and this frame is planned.
+    FrameSchedule BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
+    {
+      return m_pacer.BeginFrame(cpuStartTime);
+    }
+
+    //! The frame's CPU work is done: how it is to be presented.
+    PresentPlan EndFrame(const NanosecondTickCount workDoneTime) noexcept
+    {
+      return m_pacer.EndFrame(workDoneTime);
+    }
+
+    //! The CPU busy time of the open frame up to now, for a marker drawn before the frame's end.
+    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(const NanosecondTickCount now) const noexcept
+    {
+      return m_pacer.CpuBusyAt(now);
+    }
+
+    //! After the present, before the next frame is planned: when it was called and returned, and whether the system took it.
+    void AddPresent(const PresentReport& report) noexcept
+    {
+      m_pacer.AddPresent(report);
+    }
+
+    //! The GPU's work on an earlier frame, where the application has it.
+    void AddGpuWork(const GpuWorkReport& report) noexcept
+    {
+      m_pacer.AddGpuWork(report);
+    }
+
+    //! The swap chain was made anew: the presents made so far are never shown.
+    void ForgetPresents() noexcept
+    {
+      m_pacer.ForgetPresents();
+    }
+
+    //! The display's refresh period changed: the grid starts again, the animation time goes on.
+    void SetRefreshPeriod(const RefreshPeriod period) noexcept
+    {
+      m_pacer.SetRefreshPeriod(period);
+    }
+
+    //! Other settings: the grid starts again, the animation time goes on. It may allocate.
+    void SetSettings(const PacerSettings& settings)
+    {
+      m_pacer.SetSettings(settings);
+    }
+
+    //! Starts again as made, with the settings it has; the animation time goes on.
+    void Reset() noexcept
+    {
+      m_pacer.Reset();
+    }
+
+    //! The refreshes the animation time is behind the clock: what was lost and not caught up with.
+    [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
+    {
+      return m_pacer.RefreshesBehindClock();
+    }
+
+    //! True while no wait for a present is made because the waits ran out (PresentWaitRule).
     [[nodiscard]] bool PresentWaitsStopped() const noexcept
     {
-      return m_wait.Stopped();
+      return m_pacer.PresentWaitsStopped();
     }
 
     //! The waits for a present that ended without the present being shown, since the pacer was made.
     [[nodiscard]] uint64_t PresentWaitTimeouts() const noexcept
     {
-      return m_wait.Timeouts();
+      return m_pacer.PresentWaitTimeouts();
     }
 
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
     [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
-      return m_frameWork.GpuTime();
+      return m_pacer.GpuTime();
     }
 
-    //! How long the last present that was reported held the frame loop.
+    //! How long the last present held the frame loop.
     [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
-      return m_lastPresentBlocked;
+      return m_pacer.LastPresentBlocked();
     }
 
+    //! What the rule's frame window holds.
     [[nodiscard]] FrameWindowState FrameWindow() const noexcept
     {
-      return m_rule.FrameWindow();
+      return m_pacer.FrameWindow();
     }
 
-    //! The swap interval the next frame is paced at.
+    //! The swap interval of the frames now.
     [[nodiscard]] uint32_t SwapInterval() const noexcept
     {
-      return m_rule.SwapInterval();
+      return m_pacer.SwapInterval();
     }
 
+    //! The refresh period the pacer is on.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
-      return m_rule.Refresh();
+      return m_pacer.Refresh();
     }
 
+    //! The settings the pacer has.
     [[nodiscard]] const PacerSettings& Settings() const noexcept
     {
-      return m_rule.Settings();
+      return m_pacer.Settings();
     }
-
-  private:
-    [[nodiscard]] bool StartsAgainAt(NanosecondTickCount time) const noexcept;
-    [[nodiscard]] int64_t SlotFor(NanosecondTickCount time) const noexcept;
-    [[nodiscard]] NanosecondTickCount TimeOfSlot(int64_t slot) const noexcept;
-    [[nodiscard]] int64_t Reserve() const noexcept;
-    [[nodiscard]] NanosecondTickCount DueTime(int64_t slot) const noexcept;
-    [[nodiscard]] int64_t SmoothSlotFor(NanosecondTickCount time) const noexcept;
   };
 }
 

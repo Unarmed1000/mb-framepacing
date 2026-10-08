@@ -20,9 +20,8 @@ target_sources(mb_framepacing_pacer
     source/mb/framepacing/pacer/RefreshTime.cpp
     source/mb/framepacing/pacer/rule/FrameWorkRule.cpp
     source/mb/framepacing/pacer/rule/SwapIntervalRule.cpp
-    source/mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.cpp
+    source/mb/framepacing/pacer/tier/ClockGridLoopPacer.cpp
     source/mb/framepacing/pacer/timeline/VBlankTimeline.cpp
-    source/mb/framepacing/pacer/tier/TimerWaitForPresentPacer.cpp
     source/mb/framepacing/pacer/tier/VBlankLoopPacer.cpp
   PUBLIC
     FILE_SET HEADERS
@@ -63,6 +62,7 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/rule/SwapIntervalChange.hpp
       include/mb/framepacing/pacer/rule/SwapIntervalRule.hpp
       include/mb/framepacing/pacer/rule/FrameWindowState.hpp
+      include/mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp
       include/mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp
       include/mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp
       include/mb/framepacing/pacer/tier/VBlankLoopPacer.hpp

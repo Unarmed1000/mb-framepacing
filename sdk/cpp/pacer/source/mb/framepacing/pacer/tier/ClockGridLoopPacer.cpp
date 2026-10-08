@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The pacer of the lowest tier (sdk/doc/pacer-design.md "A grid on the clock"): frame starts on one grid of
-// refresh periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval and by a loss
-// that repeats, and one pause after start-up.
+// EXPERIMENTAL. The pacers on a timer (sdk/doc/pacer-design.md "A grid on the clock"): frame starts on one grid of refresh
+// periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval and by a loss that
+// repeats. With a wait for a present the loop is held until the display took an earlier frame and the grid follows the ends of
+// the waits that held it; without one there is a pause after start-up, a whole period after a late present, and the system's
+// own waits.
 #include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
-#include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
+#include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
 #include <algorithm>
 #include "../detail/MarkerValue.hpp"
 
@@ -19,6 +21,8 @@ namespace MB::FramePacing::Pacer
     //! Where the system is to pace the loop, the loop is held to this share of a period before a frame is due: one in this
     //! many, twice what counts as held
     constexpr int64_t HoldLeadDivisor = 4;
+    //! A wait for a present that held the loop moves the grid this share of the way towards its end: one in this many
+    constexpr int64_t FollowDivisor = 4;
 
     //! A time a wait held the loop for, added to what the waits before it did: never more than the longest refresh period
     NanosecondTimeSpan AddHeld(const NanosecondTimeSpan held, const NanosecondTimeDuration blocked) noexcept
@@ -28,12 +32,13 @@ namespace MB::FramePacing::Pacer
     }
   }
 
-  TimerPeriodOnlyPacer::TimerPeriodOnlyPacer(const PacerSettings& settings)
+  ClockGridLoopPacer::ClockGridLoopPacer(const PacerSettings& settings, const bool waitsForPresent)
     : m_rule(settings)
+    , m_waitsForPresent(waitsForPresent)
   {
   }
 
-  bool TimerPeriodOnlyPacer::StartsAgainAt(const NanosecondTickCount time) const noexcept
+  bool ClockGridLoopPacer::StartsAgainAt(const NanosecondTickCount time) const noexcept
   {
     if (!m_hasGrid)
     {
@@ -45,7 +50,7 @@ namespace MB::FramePacing::Pacer
     return gap < NanosecondTimeSpan() || gap > reach;
   }
 
-  int64_t TimerPeriodOnlyPacer::Reserve() const noexcept
+  int64_t ClockGridLoopPacer::Reserve() const noexcept
   {
     // The frames made ahead of the display: with the aim of smoothness, and at one refresh per frame only (at more the display
     // takes a frame before the next one is made, and nothing can wait)
@@ -53,21 +58,22 @@ namespace MB::FramePacing::Pacer
     return settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1 ? int64_t{settings.ReserveFrames()} : 0;
   }
 
-  bool TimerPeriodOnlyPacer::LetsTheSystemPace() const noexcept
+  bool ClockGridLoopPacer::LetsTheSystemPace() const noexcept
   {
     // Where the system holds the loop while its queue is full, the aim of smoothness means that on purpose, at one refresh
     // per frame (at more the display takes a frame before the next one is made, and the queue is never full)
     const PacerSettings& settings = m_rule.Settings();
-    return settings.SystemHoldsLoop() && settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1;
+    // A loop that waits for a present is held by that wait, and not by a queue that is full
+    return !m_waitsForPresent && settings.SystemHoldsLoop() && settings.Aim() == PacerAim::Smoothness && m_rule.SwapInterval() == 1;
   }
 
-  bool TimerPeriodOnlyPacer::HeldByTheDisplaysSide() const noexcept
+  bool ClockGridLoopPacer::HeldByTheDisplaysSide() const noexcept
   {
     // The waits since the last frame started in which the display's side held the loop took a share of a refresh period
     return m_displayHeld.Nanoseconds() >= (m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / HeldDivisor);
   }
 
-  bool TimerPeriodOnlyPacer::LetThroughByTheDisplay() const noexcept
+  bool ClockGridLoopPacer::LetThroughByTheDisplay() const noexcept
   {
     // The display's side let the loop through when its wait held the loop past the time the pacer holds it to, for a share of a
     // refresh period. A wait that was over before that time paced nothing: the timer did (a present that waits a third of a
@@ -75,14 +81,14 @@ namespace MB::FramePacing::Pacer
     return m_displayHeldPastTimer.Nanoseconds() >= (m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / HeldDivisor);
   }
 
-  NanosecondTimeDuration TimerPeriodOnlyPacer::HeldPastTheTimer(const NanosecondTickCount beginTime, const NanosecondTickCount endTime) const noexcept
+  NanosecondTimeDuration ClockGridLoopPacer::HeldPastTheTimer(const NanosecondTickCount beginTime, const NanosecondTickCount endTime) const noexcept
   {
     // Before there is a grid the pacer holds the loop to no time, and the whole wait counts
     const int64_t from = m_hasGrid ? std::max(beginTime.Nanoseconds(), StartTimeOf(m_nextSlot).Nanoseconds()) : beginTime.Nanoseconds();
     return NanosecondTimeDuration::FromNanoseconds(std::max(endTime.Nanoseconds() - from, int64_t{0}));
   }
 
-  NanosecondTickCount TimerPeriodOnlyPacer::StartTimeOf(const int64_t slot) const noexcept
+  NanosecondTickCount ClockGridLoopPacer::StartTimeOf(const int64_t slot) const noexcept
   {
     // The time the loop is held to before a frame. Where the system is to pace the loop it is a share of a period before the
     // frame is due, so that the loop is there first and the system's wait, not the timer, says when the frame starts; the
@@ -91,13 +97,13 @@ namespace MB::FramePacing::Pacer
     return LetsTheSystemPace() ? due - NanosecondTimeSpan(m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / HoldLeadDivisor) : due;
   }
 
-  NanosecondTickCount TimerPeriodOnlyPacer::DueTime(const int64_t slot) const noexcept
+  NanosecondTickCount ClockGridLoopPacer::DueTime(const int64_t slot) const noexcept
   {
     // A frame starts the reserve's refreshes before its step of the grid
     return TimeOfSlot(slot - Reserve());
   }
 
-  int64_t TimerPeriodOnlyPacer::SmoothSlotFor(const NanosecondTickCount time) const noexcept
+  int64_t ClockGridLoopPacer::SmoothSlotFor(const NanosecondTickCount time) const noexcept
   {
     const RefreshPeriod period = m_rule.Refresh();
     // How late the loop is for the step the frame is due at, in whole steps
@@ -115,7 +121,7 @@ namespace MB::FramePacing::Pacer
     return m_nextSlot + std::max(std::max(startLate, presentLate) - Reserve(), int64_t{0});
   }
 
-  int64_t TimerPeriodOnlyPacer::SlotFor(const NanosecondTickCount time) const noexcept
+  int64_t ClockGridLoopPacer::SlotFor(const NanosecondTickCount time) const noexcept
   {
     if (m_rule.Settings().Aim() == PacerAim::Smoothness)
     {
@@ -126,10 +132,11 @@ namespace MB::FramePacing::Pacer
     return std::max({m_nextSlot, m_rule.Refresh().NearestRefreshes(time - m_origin), SlotAfterPresent()});
   }
 
-  int64_t TimerPeriodOnlyPacer::SlotAfterPresent() const noexcept
+  int64_t ClockGridLoopPacer::SlotAfterPresent() const noexcept
   {
-    // A present made before the step the next frame is due at is where it always is: nothing to keep away from
-    if (!m_hasPresentTime || m_presentTime <= TimeOfSlot(m_dueSlot))
+    // A present made before the step the next frame is due at is where it always is: nothing to keep away from. With a wait
+    // for a present it is the wait that keeps two presents apart
+    if (m_waitsForPresent || !m_hasPresentTime || m_presentTime <= TimeOfSlot(m_dueSlot))
     {
       return m_nextSlot;
     }
@@ -141,22 +148,23 @@ namespace MB::FramePacing::Pacer
     return slot + ((m_presentTime - TimeOfSlot(slot)) <= m_presentPlace ? 1 : 2);
   }
 
-  NanosecondTickCount TimerPeriodOnlyPacer::TimeOfSlot(const int64_t slot) const noexcept
+  NanosecondTickCount ClockGridLoopPacer::TimeOfSlot(const int64_t slot) const noexcept
   {
     return m_origin + m_rule.Refresh().TimeFor(slot);
   }
 
-  void TimerPeriodOnlyPacer::ArmStartupPause() noexcept
+  void ClockGridLoopPacer::ArmStartupPause() noexcept
   {
     m_pausePending = true;
     m_pauseHasFirstFrame = false;
     m_presentTaken = false;
   }
 
-  uint32_t TimerPeriodOnlyPacer::StartupPauseAt(const NanosecondTickCount cpuStartTime) noexcept
+  uint32_t ClockGridLoopPacer::StartupPauseAt(const NanosecondTickCount cpuStartTime) noexcept
   {
-    // The pause takes the frames that wait away: it belongs to the aim of low latency
-    if (!m_pausePending || m_rule.Settings().Aim() != PacerAim::LowLatency)
+    // The pause takes the frames that wait away: it belongs to the aim of low latency, and to a loop that no wait for a
+    // present holds
+    if (m_waitsForPresent || !m_pausePending || m_rule.Settings().Aim() != PacerAim::LowLatency)
     {
       return 0;
     }
@@ -181,9 +189,10 @@ namespace MB::FramePacing::Pacer
     return refreshes;
   }
 
-  FrameStartPlan TimerPeriodOnlyPacer::PlanFrame(const NanosecondTickCount now) const noexcept
+  FrameStartPlan ClockGridLoopPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
-    FrameStartPlan plan;
+    // The wait for a present, where the loop has one, and after it the time the frame is due at
+    FrameStartPlan plan = m_waitsForPresent ? m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval()) : FrameStartPlan();
     // A present that waited for the display past the time the loop is held to has let the loop through: the frame starts now
     if (!StartsAgainAt(now) && !(LetsTheSystemPace() && LetThroughByTheDisplay()))
     {
@@ -196,7 +205,7 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  void TimerPeriodOnlyPacer::AddSystemWait(const SystemWaitReport& report) noexcept
+  void ClockGridLoopPacer::AddSystemWait(const SystemWaitReport& report) noexcept
   {
     // Added up over the waits before one frame: the display's side holds the loop with a wait for an image, the GPU with a
     // wait for a frame slot
@@ -211,7 +220,26 @@ namespace MB::FramePacing::Pacer
     }
   }
 
-  FrameSchedule TimerPeriodOnlyPacer::BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
+  void ClockGridLoopPacer::AddPresentWait(const PresentWaitReport& report) noexcept
+  {
+    const RefreshPeriod period = m_rule.Refresh();
+    // A wait that ran out, or an answer while the waits are stopped, says nothing of where the display is
+    if (!m_wait.AddPresentWait(report, period))
+    {
+      return;
+    }
+    // A wait that returned at once says nothing: the present was shown some time before. One that held the loop ended when the
+    // display took a frame: the grid's step nearest to its end is moved a quarter of the way towards it
+    if (!m_hasGrid || StartsAgainAt(report.EndTime) || !PresentWaitRule::HeldTheLoop(report, period))
+    {
+      return;
+    }
+    const int64_t nearest = period.NearestRefreshes(report.EndTime - m_origin);
+    const int64_t offNanoseconds = (report.EndTime - TimeOfSlot(nearest)).Nanoseconds();
+    m_origin = m_origin + NanosecondTimeSpan(offNanoseconds / FollowDivisor);
+  }
+
+  FrameSchedule ClockGridLoopPacer::BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
   {
     const RefreshPeriod period = m_rule.Refresh();
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
@@ -232,6 +260,15 @@ namespace MB::FramePacing::Pacer
       m_slot = 0;
       m_behind = 0;
       m_hasGrid = true;
+    }
+    else if (m_wait.WaitRanOut())
+    {
+      // The pacer's own wait held this frame's start until it ran out: the display is not taking the window's frames, so when
+      // the previous frame was shown, or whether, is not known, and this start is late by the pacer's doing. Nothing is
+      // judged and the frame window stays as it is; the grid goes on from this frame
+      m_origin = cpuStartTime;
+      m_slot = 0;
+      m_behind = 0;
     }
     else
     {
@@ -269,6 +306,7 @@ namespace MB::FramePacing::Pacer
     m_displayHeld = NanosecondTimeSpan();
     m_displayHeldPastTimer = NanosecondTimeSpan();
     m_frameSlotHeld = NanosecondTimeSpan();
+    m_wait.BeginFrame();
     m_swapInterval = m_rule.SwapInterval();
     m_startTime = cpuStartTime;
     m_work = NanosecondTimeSpan();
@@ -310,7 +348,7 @@ namespace MB::FramePacing::Pacer
     return schedule;
   }
 
-  PresentPlan TimerPeriodOnlyPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
+  PresentPlan ClockGridLoopPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
   {
     PresentPlan plan;
     if (!m_frameOpen)
@@ -338,12 +376,12 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  NanosecondTimeSpan32 TimerPeriodOnlyPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
+  NanosecondTimeSpan32 ClockGridLoopPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
   {
     return m_frameOpen ? MarkerValue::Duration(now - m_startTime) : NanosecondTimeSpan32();
   }
 
-  void TimerPeriodOnlyPacer::AddPresent(const PresentReport& report) noexcept
+  void ClockGridLoopPacer::AddPresent(const PresentReport& report) noexcept
   {
     m_lastPresentBlocked = report.Blocked();
     // A present that waited for the display held the loop before the next frame
@@ -362,19 +400,21 @@ namespace MB::FramePacing::Pacer
       // The swap chain the present was made for is gone, and a new one starts as a new window does
       ArmStartupPause();
     }
+    m_wait.AddPresent(report);
   }
 
-  void TimerPeriodOnlyPacer::AddGpuWork(const GpuWorkReport& report) noexcept
+  void ClockGridLoopPacer::AddGpuWork(const GpuWorkReport& report) noexcept
   {
     m_frameWork.AddGpuWork(report, m_rule.Settings().FrameMargin());
   }
 
-  void TimerPeriodOnlyPacer::ForgetPresents() noexcept
+  void ClockGridLoopPacer::ForgetPresents() noexcept
   {
     ArmStartupPause();
+    m_wait.ForgetPresents();
   }
 
-  void TimerPeriodOnlyPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
+  void ClockGridLoopPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
   {
     if (period != m_rule.Refresh())
     {
@@ -383,7 +423,7 @@ namespace MB::FramePacing::Pacer
     }
   }
 
-  void TimerPeriodOnlyPacer::SetSettings(const PacerSettings& settings)
+  void ClockGridLoopPacer::SetSettings(const PacerSettings& settings)
   {
     if (settings != m_rule.Settings())
     {
@@ -392,7 +432,7 @@ namespace MB::FramePacing::Pacer
     }
   }
 
-  void TimerPeriodOnlyPacer::Reset() noexcept
+  void ClockGridLoopPacer::Reset() noexcept
   {
     m_rule.Reset(m_rule.PreferredSwapInterval());
     m_frameWork.Clear();
@@ -401,5 +441,6 @@ namespace MB::FramePacing::Pacer
     m_frameEnded = false;
     m_hasPresentTime = false;
     ArmStartupPause();
+    m_wait.Reset();
   }
 }
