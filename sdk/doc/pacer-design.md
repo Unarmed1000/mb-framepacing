@@ -131,6 +131,65 @@ The reason for this order is the rule at the top: the calculation is the pacer's
 on the display is a mechanism that needs no calculation, so it is preferred; each step down replaces it with a calculation
 from less information.
 
+## What Android's frame pacing library does, from its source
+
+Read on 2026-10-09: the library's source as the Android Open Source Project publishes it, and the platform's source
+around it. Its page ([Frame Pacing library](https://developer.android.com/games/sdk/frame-pacing)) says what it is for;
+how it does it is in the source only. Nothing of it is copied here, as it is under another license: this says what it
+does, next to what this proposal does, and what the look changed. It is one implementation, for one platform that has a
+compositor, a call for every vertical blank and a time on every present.
+
+| Topic                                          | The library                                                                                                                                                                                                                                        | This proposal                                                                                                                             | Changes here?                                                           |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| The display under a present with a time        | It counts on the platform, which shows the later of two buffers that are both due and releases the earlier unshown ("A display that skips a frame that is overdue")                                                                                | The tiers with a time on the present were built for a display that shows every frame in order                                             | **Yes**: a display's side that skips is a major tier of its own         |
+| The longest a wait may take                    | 50 ms, and a wait that ran out is taken as done                                                                                                                                                                                                    | Four swap intervals, which is 16.7 ms at 240 Hz                                                                                           | **Yes**: 50 ms at the least (decision 12)                               |
+| What is counted of the display                 | Four counts in whole refreshes: how late against the time asked for, from a frame's start to its display, from display to display, and the margin                                                                                                  | Error frames, frames at another refresh, late frames                                                                                      | **Yes**: from a frame's start to its display is counted too (the `+`)   |
+| Two ways to run                                | One aims two swap intervals ahead, takes the longer of the CPU's and the GPU's work as a frame's, and waits before the present. The other aims one ahead, adds the two, and presents at once                                                       | Smoothness and low latency                                                                                                                | No: the same split                                                      |
+| Which frame the wait for the GPU's work is for | With two ahead: before a frame's present, the frame before it. With one ahead: after a frame's present, that frame. So two frames in flight, or one                                                                                                | Before a frame's start: the frame two back with smoothness, the frame before with low latency (decision 15). Two frames in flight, or one | No: the same frames in flight, waited for at another place in the frame |
+| The time on a present                          | The vertical blank's time plus the swap intervals, moved half a period earlier                                                                                                                                                                     | The intended display time less half a period                                                                                              | No: the same                                                            |
+| After a late frame                             | The next target is counted from the vertical blank that is current. Nothing is caught up with and nothing is skipped by the library                                                                                                                | The same ("A lost refresh and game time")                                                                                                 | No                                                                      |
+| The swap interval                              | The average work of the last 2 s. Slower when over a tenth of the frames missed their vertical blank, faster when none did and the work fits one interval less with 1 ms to spare. Never faster than asked for, and no pacing beyond 50 ms a frame | A rule over a frame window of 2 s by default, a margin of 1 ms or an eighth of a refresh, the application's rate as the fastest           | No. Compared on its own test loads, below                               |
+| Which of the two ways                          | **It switches by itself**: to one ahead when the CPU's and the GPU's work added, and half as much again, fit the frame time; back when over a tenth of the frames miss, or the swap interval goes down                                             | The application says its aim                                                                                                              | No (decided on 2026-10-09: not now). Below                              |
+| Where the refreshes are                        | The moment each vertical blank call arrives, not the time it carries. The period is smoothed, short intervals are left out, and a gap is stepped over in whole periods. The calls stop ten vertical blanks after the last present                  | Vertical blank readings with the time they are of, followed by a quarter, checked against the period, which is given                      | No. A test of readings that stop and come back is missing here          |
+| Too many frames waiting                        | Optional, off unless asked for, for one graphics API: after a number of frames with more time from start to display than expected, one vertical blank is waited out once                                                                           | Not built ("Pacing by display times")                                                                                                     | No. It reads the time that is counted here now                          |
+| A start, a pause, a window that is not shown   | Nothing of its own                                                                                                                                                                                                                                 | A pause after start-up, waits that stop for a window that is not shown, the handover                                                      | No                                                                      |
+| The display's refresh rate                     | It asks the platform for a frame rate, or picks a display mode                                                                                                                                                                                     | The application's; the pacer says which rates a display can show                                                                          | No                                                                      |
+| How the wait for the GPU's work is made        | The library submits a small piece of GPU work behind the application's, and a thread of its own waits for it                                                                                                                                       | The application makes the wait and reports it                                                                                             | No. It goes into the guide as one way to make that wait                 |
+
+**On its own test loads.** The library's tests run it on a 60 Hz display they simulate, with a frame's CPU work as a
+sleep and its GPU work on a second thread, and check the number of frames and the average work: nothing of what a
+display shows. The same loads on the tier pacer in the simulation's loop (`tests/WorkloadLoopTests.cpp`: vertical blank
+times, a wait for the GPU's work, the GPU's work reported, two frames let be in flight; the same with a time on the
+present and without one). **Numbers of two models, and nothing measured.**
+
+| CPU and GPU work a frame             | Its tests expect                                                                            | Here, smoothness                        | Here, low latency                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------- |
+| 10 and 10 ms                         | 60 frames in a first second, give or take 2                                                 | 60 a second                             | 30: two refreshes per frame from 0.31 s |
+| 30 and 10 ms                         | 33, give or take 1                                                                          | 30: two refreshes per frame from 0.39 s | 20: three from 0.66 s                   |
+| 10 and 30 ms                         | 30, give or take 4                                                                          | 30: two from 0.43 s                     | 20: three from 0.59 s                   |
+| 40 and 40 ms                         | 22, give or take 4                                                                          | 20: three from 0.52 s                   | 12: five from 1.32 s                    |
+| 30 and 10 ms for 3 s, then 10 and 10 | Two refreshes per frame 2.0 s into the run, one again at 4.6 s (give or take 0.1 and 0.2 s) | Two from 0.39 s, one again at 4.60 s    | Three from 0.66 s, two again at 3.94 s  |
+
+- **Going slower**: here within 0.3 to 0.7 s, as the rule goes by the frames that are late and they are late from the
+  first one on. The library collects 2 s of frames before it changes anything, so its first seconds under a load are
+  not paced: 33 frames in a second is a loop that takes 30 ms a frame.
+- **Going faster after a load ended** takes both 1.6 s: both look back over 2 s.
+- **Low latency here halves the frame rate of a loop whose work fits side by side** (10 and 10 ms on a 60 Hz display):
+  one frame in flight puts the CPU's and the GPU's work one after the other. It is what the aim is for and what it
+  costs, and the first integration measured the same on a system ("The rules that move into the pacer"). The library
+  does not run this load that way: it takes its own way with one frame ahead only where it costs no frame rate.
+
+**The aim, picked by the pacer: not now** (decided on 2026-10-09). The library's switch is the option this proposal
+already has as "the pacer picks the presents that may wait and the frames in flight", off unless asked for and built
+only once the tier pacers are measured. What the source adds to that: its rule (the work added, and half as much
+again, has to fit the frame time), and that it is not settled there either. Its own tests of the switch under a load
+that changes are switched off in the source, with notes of frame counts that did not come out as expected. To be
+looked at again after runs under a real GPU load with both aims.
+
+**What the look confirmed**, each built here before the source was read: half a period before the vertical blank as
+the time for a present; the frame a wait for the GPU's work is for, by the aim; no catching up after a late frame; the
+two ways to run as one setting; a swap interval that only ever goes slower than the application asked.
+
 ## First measurements of the two waits
 
 The first integration built both waits into its Vulkan host and ran them on 2026-10-07 (the same machine, driver and window
@@ -1387,7 +1446,8 @@ present.
 
 #### A display that skips a frame that is overdue
 
-Researched on 2026-10-09 from the platforms' own pages; **not built, not in the simulation, not run anywhere**. The
+Researched on 2026-10-09 from the platforms' own pages, and for Android from the platform's source; **not built, not
+in the simulation, not run anywhere**. The
 question: two frames wait, the time of the first has passed and the second is due now. A display that shows every
 frame in order shows the first and is a refresh late from then on. One that skips shows the second, at the refresh it
 was made for: no frame is on screen with an animation time that is not its refresh's, nothing waits a refresh longer,
@@ -1395,14 +1455,14 @@ and the one frame's work is lost. That is not the catching up this proposal keep
 time"): no frame is given another time, a stale one is left out. Only a time before which a frame is not shown can do
 it. A time the frame before stays counts from the frame that was shown, and can not leave one out.
 
-| Where                                                               | What its documentation says                                                                                                                                                                                                                                                                                                                                                                                   | Skips    |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| Vulkan, `VK_PRESENT_MODE_FIFO_KHR`                                  | "one request is removed from the beginning of the queue and processed during each vertical blanking period in which the queue is non-empty"                                                                                                                                                                                                                                                                   | No       |
-| Vulkan, `VK_PRESENT_MODE_FIFO_LATEST_READY_KHR`                     | With a target present time from `VK_GOOGLE_display_timing` or the `presentAtAbsoluteTime` feature: "If the target present time is less-than or equal-to the current time, the presentation engine dequeues the image and checks the next one. The image of the last dequeued request is presented. The other dequeued requests are dropped."                                                                  | Yes      |
-| Windows 11, the composition swapchain's presents with a target time | "If there are multiple _ready_ presents, all but the latest (that is, the present with the greatest present identifier) will be _skipped_"; a present is ready when its drawing is done and its target time is met. Its status is then `PresentStatus_Skipped`                                                                                                                                                | Yes      |
-| Wayland, `commit-timing-v1`                                         | The content is "presented as closely as possible to, but not before, the specified time", and content updates are applied in the order they are received. `presentation-time` has an event for an update that "was never displayed to the user", and `fifo-v1` exists to keep an update on screen for a refresh. Whether two updates whose times have both passed are both shown is not said in what was read | Not said |
-| Android, `ASurfaceTransaction_setDesiredPresentTime`                | Presented at or after the time; a later transaction with an earlier time does not go before an earlier one. `EGL_ANDROID_presentation_time` says only that the time is passed along. Nothing on leaving a buffer out                                                                                                                                                                                          | Not said |
-| Metal, `present(at:)`                                               | Presented at the time when its drawing is done before it, and as soon as possible when it is done after. Nothing on another drawable that is due as well                                                                                                                                                                                                                                                      | Not said |
+| Where                                                                                                                                                       | What its documentation says                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Skips    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Vulkan, `VK_PRESENT_MODE_FIFO_KHR`                                                                                                                          | "one request is removed from the beginning of the queue and processed during each vertical blanking period in which the queue is non-empty"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | No       |
+| Vulkan, `VK_PRESENT_MODE_FIFO_LATEST_READY_KHR`                                                                                                             | With a target present time from `VK_GOOGLE_display_timing` or the `presentAtAbsoluteTime` feature: "If the target present time is less-than or equal-to the current time, the presentation engine dequeues the image and checks the next one. The image of the last dequeued request is presented. The other dequeued requests are dropped."                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Yes      |
+| Windows 11, the composition swapchain's presents with a target time                                                                                         | "If there are multiple _ready_ presents, all but the latest (that is, the present with the greatest present identifier) will be _skipped_"; a present is ready when its drawing is done and its target time is met. Its status is then `PresentStatus_Skipped`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Yes      |
+| Wayland, `commit-timing-v1`                                                                                                                                 | The content is "presented as closely as possible to, but not before, the specified time", and content updates are applied in the order they are received. `presentation-time` has an event for an update that "was never displayed to the user", and `fifo-v1` exists to keep an update on screen for a refresh. Whether two updates whose times have both passed are both shown is not said in what was read                                                                                                                                                                                                                                                                                                                                                                                         | Not said |
+| Android, buffers with a time the application set (`EGL_ANDROID_presentation_time`, `VK_GOOGLE_display_timing`, `ASurfaceTransaction_setDesiredPresentTime`) | Its pages say that a buffer is presented at or after its time, and nothing on leaving one out. The platform's source (read on 2026-10-09, not run on a device) does. The buffer queue, for a time that is not automatic and within a second: "If entry[1] is timely, drop entry[0] (and repeat)". On the path newer versions take, the time goes to the compositor with the buffer: every buffer whose time has passed is applied at one composition, and one that is replaced before it was shown is released unshown. The rule that would hold a second buffer back until the first was shown is for automatic times only: "If the buffers have presentation timestamps, then we may drop buffers". The application learns of it from the buffer's release, and gets no display time for that frame | Yes      |
+| Metal, `present(at:)`                                                                                                                                       | Presented at the time when its drawing is done before it, and as soon as possible when it is done after. Nothing on another drawable that is due as well                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Not said |
 
 Sources:
 [VkPresentModeKHR](https://docs.vulkan.org/refpages/latest/refpages/source/VkPresentModeKHR.html),
@@ -1414,11 +1474,21 @@ Sources:
 [EGL_ANDROID_presentation_time](https://registry.khronos.org/EGL/extensions/ANDROID/EGL_ANDROID_presentation_time.txt),
 [MTLDrawable present(at:)](<https://developer.apple.com/documentation/metal/mtldrawable/present(at:)>).
 
-What it would take here, as an open point and nothing decided: it is something the application chooses (a present
-mode, an API), so it is a capability of its own next to `PresentAtTime`; the simulation's display would have to be able
-to skip; and a pacer has to take a frame that is never shown (a wait for its present runs out, its display report says
-so, and the frame after it is judged against the frame before it). The first integration's Windows system has no
-present that takes a time before which a frame is not shown, so it can not run it as it is.
+**Decided on 2026-10-09: rated now, built later.** A display's side that skips is major tier 1 of the list ("Tiers"),
+with a capability of its own, `PresentSkipsOverdue`, and no pacer. What a pacer for it takes:
+
+- the simulation's display has to be able to skip, and can then not say at a present when the frame is shown;
+- a present that is never shown must not be read as a window that is not shown: a wait for it runs out, or returns
+  for the frame after it;
+- neither way of placing a frame may count it as a refresh the display lost: the frame after it was shown where it was
+  made for;
+- the display statistics judge the frame after it against the last one shown (they take "never shown" already);
+- and no frame is made ahead without a time on its present, or the display drops the frame made ahead.
+
+On Android a present with a time has the skip whether it is asked for or not, so the tiers of major tier 2 describe no
+system there: a set on it has `PresentSkipsOverdue`. In Vulkan it is the present mode. The first integration's Windows
+system lists that present mode for its surface and has no present with an absolute time for it, so it can not run it
+as its page defines it.
 
 #### The duration on one system
 
@@ -1933,6 +2003,36 @@ checked. Four things are settled now, because they cost little now and a second 
 - **The timeline of refreshes belongs to the pacers for a fixed refresh rate**, not to the shared parts. What is shared has no
   refresh grid in it: the frames in flight, the work as two stretches of time, the animation time. The wait for a present
   asks nothing about the refresh rate and is expected to carry over as it is.
+
+## What is still missing
+
+As of 2026-10-09, in the order it is planned. What is built is built against the simulation and unit tests, and
+measured only where a section above says so.
+
+1. **A capture session of the first integration** on the pacer as it is now: the minimum duration again, by the
+   measurement rules; display reports with the time from start to display held against its own script; a baseline with
+   a fixed set; the wait for the GPU's work under a real GPU load with both aims; a start the system held on vertical
+   blanks; and, as a first look only, the present mode that skips.
+2. **Gaps in what is built.** Vertical blank readings that stop and come back are not tested. A swap interval on the
+   present (`PresentSwapInterval`) is rated and no pacer uses it to hold a frame. In major tier 3 on vertical blanks a
+   frame that is shown earlier than the pacer placed it is not taken, so the pacer is then a refresh ahead of what it
+   says. That a present's time was not kept is not seen (major tier 2 with a wait could). An application can not say
+   that its display's refresh rate is variable ("Variable refresh"). With both timed presents active the absolute time
+   alone is given, which after a lost refresh brings a frame back at two refreshes per frame without a wait.
+3. **Decisions that are open** ("Decisions needed"): 1, 3, 4, 7, the setting of 9, and what is open of 10.
+4. **Checked as today's pacer is.** The tier loops have no golden data in the repository: the stored runs the changes
+   are compared with are kept outside it. The monitor rates from 50 to 540 Hz run today's pacer only. Coverage is not
+   measured, and only one compiler has built it.
+5. **Today's pacer replaced**: `FramePacer` and what only it uses, the four classes of one tier each, the consumer and
+   package checks, the simulation's golden files, the frame log's pacer chunks.
+6. **The documents**: the guide written anew from this proposal, with how an application makes each wait and each report
+   on its graphics API.
+7. **Measured**: no run of a tier pacer has been captured and analysed with the tools; the sub tiers of major tier 3
+   are not measured against each other; major tier 2 has run on no system, as the one at hand has no present with an
+   absolute time.
+
+Not planned, and written down above: a pacer for major tier 1; an aim the pacer picks; pacing by display times; variable
+refresh.
 
 ## Decisions needed
 
