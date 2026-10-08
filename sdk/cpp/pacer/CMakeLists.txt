@@ -23,8 +23,7 @@ target_sources(mb_framepacing_pacer
     source/mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.cpp
     source/mb/framepacing/pacer/timeline/VBlankTimeline.cpp
     source/mb/framepacing/pacer/tier/TimerWaitForPresentPacer.cpp
-    source/mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.cpp
-    source/mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.cpp
+    source/mb/framepacing/pacer/tier/VBlankLoopPacer.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
@@ -66,6 +65,7 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/rule/FrameWindowState.hpp
       include/mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp
       include/mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp
+      include/mb/framepacing/pacer/tier/VBlankLoopPacer.hpp
       include/mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp
       include/mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.hpp
       include/mb/framepacing/pacer/timeline/VBlankTimeline.hpp)

@@ -9,7 +9,6 @@
 #include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
-#include <mb/framepacing/pacer/RefreshTime.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
@@ -18,13 +17,8 @@
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
-#include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
-#include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
-#include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
-#include <mb/framepacing/pacer/timeline/VBlankTimeline.hpp>
-#include <array>
-#include <cstddef>
+#include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -85,216 +79,170 @@ namespace MB::FramePacing::Pacer
   //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
+  //!
+  //! The class is VBlankLoopPacer with the wait for a present: the rules and the calculations are there.
   class VBlankWaitForPresentPacer
   {
-    //! The frames whose time from start to present the low latency aim holds a frame's start by
-    static constexpr std::size_t LeadFrames = 8;
-
-    SwapIntervalRule m_rule;
-    FrameWorkRule m_frameWork;
-    // Where the display's refreshes are: the vertical blanks, from the readings
-    VBlankTimeline m_timeline;
-    // The frame between BeginFrame and the next BeginFrame: the vertical blank it is for, and the one it is shown at as far as
-    // that is known (later than the one it is for once its present or a wait says so)
-    bool m_hasFrame{false};
-    uint64_t m_frameId{0};
-    NanosecondTickCount m_startTime;
-    uint32_t m_swapInterval{1};
-    int64_t m_displaySlot{0};
-    bool m_startedLate{false};
-    NanosecondTimeSpan m_work;
-    bool m_frameOpen{false};
-    bool m_frameEnded{false};
-    NanosecondTickCount m_presentTime;
-    bool m_hasPresentTime{false};
-    // What the waits say of the frame last made: the earliest vertical blank it can be shown at, and the latest
-    bool m_hasShownFloor{false};
-    int64_t m_shownFloor{0};
-    bool m_hasShownCeiling{false};
-    int64_t m_shownCeiling{0};
-    uint64_t m_shownLaterByWaits{0};
-    // The frames a wait said were shown later than the pacer had worked out, with no more than a few frames between them, the
-    // frames since the last one, and how far the place a frame is to be ready at was moved earlier for it, in steps
-    uint32_t m_shownLaterCount{0};
-    uint32_t m_framesSinceShownLater{0};
-    uint32_t m_readyPlaceSteps{0};
-    // A window that is not shown says nothing of where a display takes a frame: the frames since a wait ran out or the waits
-    // were stopped, and the frames since the place was last moved (each counted to a few)
-    uint32_t m_framesSinceDisturbed{UINT32_MAX};
-    uint32_t m_framesSincePlaceStep{UINT32_MAX};
-    // How long the last frames took from their start to the end of their CPU work
-    std::array<NanosecondTimeSpan, LeadFrames> m_leads{};
-    std::size_t m_leadCount{0};
-    RefreshTime m_animationTime;
-    NanosecondTimeSpan m_lastAnimationTime;
-    uint64_t m_refreshesBehindClock{0};
-    NanosecondTimeDuration m_lastPresentBlocked;
-    // What holds the loop: the wait for a present
-    PresentWaitRule m_wait;
+    VBlankLoopPacer m_pacer;
 
   public:
     //! The tier this pacer is for.
     static constexpr PacerTier Tier = PacerTier::VBlankWaitForPresent;
 
-    explicit VBlankWaitForPresentPacer(const PacerSettings& settings);
+    explicit VBlankWaitForPresentPacer(const PacerSettings& settings)
+      : m_pacer(settings, true)
+    {
+    }
 
-    //! Where the display's refreshes are: the time of a vertical blank of the display the window is on, a recent one or the next.
-    //! Given whenever the application has one; the newest by its ReadTime counts. The frames go on from where they are. The
-    //! first reading is taken whole. One after it moves the vertical blanks a quarter of the way to it (one reading is not
-    //! exact), and one that is off where the readings before it put them is not taken by itself (VBlankJumps).
-    void AddVBlank(const VBlankReading& reading) noexcept;
+    //! A vertical blank of the display the window is on, whenever the application has one.
+    void AddVBlank(const VBlankReading& reading) noexcept
+    {
+      m_pacer.AddVBlank(reading);
+    }
 
-    //! Before a frame takes anything, at now on the application's steady clock: the present to wait for until it was shown (the
-    //! one PacerSettings::WaitingPresents back, where the system took it and it can still be waited for) and the longest the wait
-    //! may take (PacerSettings::PresentWaitSwapIntervals of the swap interval the frame is paced at), and after it, with the aim
-    //! of low latency, the time to wait until. It changes nothing, so a frame may be planned again, and after AddPresentWait
-    //! it is planned again: no second present is asked for, and the time is the one that holds then.
-    [[nodiscard]] FrameStartPlan PlanFrame(NanosecondTickCount now) const noexcept;
+    //! Before a frame takes anything: what to wait for before it starts.
+    [[nodiscard]] FrameStartPlan PlanFrame(const NanosecondTickCount now) const noexcept
+    {
+      return m_pacer.PlanFrame(now);
+    }
 
-    //! What became of the wait for a present the plan asked for. A wait that held the loop and ended with the present shown
-    //! says which vertical blank that frame was shown at; one that returned at once says that it was shown by then. One that
-    //! ended without the present shown is counted (PresentWaitTimeouts) and the frame it held is not judged; after
-    //! PresentWaitRule::WaitsRunOutToStop of them in a row the pacer stops waiting (PresentWaitsStopped) until presents are shown again.
-    void AddPresentWait(const PresentWaitReport& report) noexcept;
+    //! After the wait the plan asked for: what became of it. The frame is then planned again.
+    void AddPresentWait(const PresentWaitReport& report) noexcept
+    {
+      m_pacer.AddPresentWait(report);
+    }
 
-    //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
-    FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
+    //! The frame starts: the previous frame is judged, the rule decides, and this frame is planned.
+    FrameSchedule BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
+    {
+      return m_pacer.BeginFrame(cpuStartTime);
+    }
 
-    //! The frame's CPU work is done, at workDoneTime: how to present it.
-    PresentPlan EndFrame(NanosecondTickCount workDoneTime) noexcept;
+    //! The frame's CPU work is done: how it is to be presented.
+    PresentPlan EndFrame(const NanosecondTickCount workDoneTime) noexcept
+    {
+      return m_pacer.EndFrame(workDoneTime);
+    }
 
-    //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
-    //! frame's start to now. Zero: no frame is open.
-    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(NanosecondTickCount now) const noexcept;
+    //! The CPU busy time of the open frame up to now, for a marker drawn before the frame's end.
+    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(const NanosecondTickCount now) const noexcept
+    {
+      return m_pacer.CpuBusyAt(now);
+    }
 
-    //! After the present, before the next frame is planned: when it was called says which vertical blank the frame is shown at
-    //! (without the report it is taken as made when EndFrame said), and whether the system took it says whether it can be
-    //! waited for. A present the system did not take says the swap chain is gone: neither it nor a present before it is
-    //! waited for.
-    void AddPresent(const PresentReport& report) noexcept;
+    //! After the present, before the next frame is planned: when it was called and returned, and whether the system took it.
+    void AddPresent(const PresentReport& report) noexcept
+    {
+      m_pacer.AddPresent(report);
+    }
 
-    //! The GPU's work on an earlier frame, when the application has it: from then on a frame is ready when the GPU is done with
-    //! it, and a frame's work is the CPU's and the GPU's (FrameWorkRule).
-    void AddGpuWork(const GpuWorkReport& report) noexcept;
+    //! The GPU's work on an earlier frame, where the application has it.
+    void AddGpuWork(const GpuWorkReport& report) noexcept
+    {
+      m_pacer.AddGpuWork(report);
+    }
 
-    //! The presents made so far are gone (a swap chain was made anew): none of them is waited for, and the waits that ran out
-    //! are forgotten with them. Nothing else changes.
-    void ForgetPresents() noexcept;
+    //! The swap chain was made anew: the presents made so far are never shown.
+    void ForgetPresents() noexcept
+    {
+      m_pacer.ForgetPresents();
+    }
 
-    //! The display's refresh period changed (a mode change, the window on another display): the frames start again on it with an
-    //! empty frame window, at the swap interval the application prefers there, and the vertical blank readings from before are
-    //! not of this display. The animation time goes on.
-    void SetRefreshPeriod(RefreshPeriod period) noexcept;
+    //! The display's refresh period changed: the frames start again, the animation time goes on.
+    void SetRefreshPeriod(const RefreshPeriod period) noexcept
+    {
+      m_pacer.SetRefreshPeriod(period);
+    }
 
-    //! Other settings on a live pacer: it starts again with them. The same settings change nothing. Allocates when the frame
-    //! window needs more room than it has, and only then.
-    void SetSettings(const PacerSettings& settings);
+    //! Other settings: the frames start again, the animation time goes on. It may allocate.
+    void SetSettings(const PacerSettings& settings)
+    {
+      m_pacer.SetSettings(settings);
+    }
 
-    //! Start again (after a pause the application knows of): the next frame is for the first vertical blank it can be ready for,
-    //! the frame window is empty, the swap interval the preferred one, the GPU's work is forgotten and no present from before is
-    //! waited for. Where the refreshes are is kept, and the animation time goes on.
-    void Reset() noexcept;
+    //! Starts again as made, with the settings it has; the animation time goes on.
+    void Reset() noexcept
+    {
+      m_pacer.Reset();
+    }
 
-    //! True once a vertical blank reading was given for the display the pacer is on: until then the refreshes are a guess.
+    //! True when a vertical blank reading was taken.
     [[nodiscard]] bool HasVBlankReading() const noexcept
     {
-      return m_timeline.HasReading();
+      return m_pacer.HasVBlankReading();
     }
 
-    //! The readings that were more than an eighth of a refresh period off where the readings before them put the vertical
-    //! blanks, since the pacer was made: a display that changed, or readings that are not exact. Such a reading is not
-    //! taken by itself (the frames go on by the refresh period from the last reading that was taken); eight in a row
-    //! that are on one grid of their own move the pacer to it. A count that rises with nearly every reading says the
-    //! source is no vertical blank time, and the pacer is then a pacer on a timer.
+    //! The readings that were off where the readings before them put the vertical blanks.
     [[nodiscard]] uint64_t VBlankJumps() const noexcept
     {
-      return m_timeline.Jumps();
+      return m_pacer.VBlankJumps();
     }
 
-    //! How far the animation time is behind the display, in refreshes, since the pacer was made: the refreshes frames were
-    //! shown later than they were made for, which it is not moved over.
+    //! The refreshes the animation time is behind the clock: what was lost and not caught up with.
     [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
     {
-      return m_refreshesBehindClock;
+      return m_pacer.RefreshesBehindClock();
     }
 
-    //! The refreshes a wait said a frame was shown later than the pacer had worked out, since the pacer was made: a frame that
-    //! waited although it was ready in time, a refresh the display lost by itself.
+    //! The vertical blanks that frames were shown later than worked out, by what the waits said.
     [[nodiscard]] uint64_t ShownLaterByWaits() const noexcept
     {
-      return m_shownLaterByWaits;
+      return m_pacer.ShownLaterByWaits();
     }
 
-    //! Where in the refresh before its vertical blank a frame is to be ready now: PacerSettings::ReadyPlacePercent of the
-    //! refresh period at first, and earlier by an eighth of a period each time two frames within a few that were ready there
-    //! were shown a vertical blank late (the display takes a frame sooner before a vertical blank than that, or the GPU needs time
-    //! nobody reported). Never later again until the pacer starts again with other settings or is reset.
+    //! Where in a refresh a frame is to be ready now: the settings' place, and earlier by what the waits taught.
     [[nodiscard]] NanosecondTimeSpan ReadyPlaceNow() const noexcept
     {
-      return ReadyPlace();
+      return m_pacer.ReadyPlaceNow();
     }
 
-    //! True while the pacer does not wait for presents, because its waits ran out: every PresentWaitRule::FramesBetweenAsks frames the plan asks,
-    //! with no time to wait, whether an older present was shown, and PresentWaitRule::AsksShownToWait answers in a row that say shown end it.
+    //! True while no wait for a present is made because the waits ran out (PresentWaitRule).
     [[nodiscard]] bool PresentWaitsStopped() const noexcept
     {
-      return m_wait.Stopped();
+      return m_pacer.PresentWaitsStopped();
     }
 
     //! The waits for a present that ended without the present being shown, since the pacer was made.
     [[nodiscard]] uint64_t PresentWaitTimeouts() const noexcept
     {
-      return m_wait.Timeouts();
+      return m_pacer.PresentWaitTimeouts();
     }
 
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
     [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
-      return m_frameWork.GpuTime();
+      return m_pacer.GpuTime();
     }
 
-    //! How long the last present that was reported held the frame loop.
+    //! How long the last present held the frame loop.
     [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
-      return m_lastPresentBlocked;
+      return m_pacer.LastPresentBlocked();
     }
 
+    //! What the rule's frame window holds.
     [[nodiscard]] FrameWindowState FrameWindow() const noexcept
     {
-      return m_rule.FrameWindow();
+      return m_pacer.FrameWindow();
     }
 
-    //! The swap interval the next frame is paced at.
+    //! The swap interval of the frames now.
     [[nodiscard]] uint32_t SwapInterval() const noexcept
     {
-      return m_rule.SwapInterval();
+      return m_pacer.SwapInterval();
     }
 
+    //! The refresh period the pacer is on.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
-      return m_rule.Refresh();
+      return m_pacer.Refresh();
     }
 
+    //! The settings the pacer has.
     [[nodiscard]] const PacerSettings& Settings() const noexcept
     {
-      return m_rule.Settings();
+      return m_pacer.Settings();
     }
-
-  private:
-    [[nodiscard]] bool StartsAgainAt(NanosecondTickCount time) const noexcept;
-    [[nodiscard]] NanosecondTickCount TimeOfBlank(int64_t slot) const noexcept;
-    [[nodiscard]] int64_t BlankAtOrBefore(NanosecondTickCount time) const noexcept;
-    [[nodiscard]] int64_t FirstBlankAfterReadyAt(NanosecondTickCount readyTime) const noexcept;
-    [[nodiscard]] int64_t Reserve() const noexcept;
-    [[nodiscard]] NanosecondTimeSpan ReadyPlace() const noexcept;
-    [[nodiscard]] NanosecondTimeSpan GpuLead() const noexcept;
-    [[nodiscard]] NanosecondTimeSpan ShortestLead() const noexcept;
-    [[nodiscard]] NanosecondTimeSpan LongestLead() const noexcept;
-    [[nodiscard]] int64_t ShownSlotByPresent() const noexcept;
-    [[nodiscard]] int64_t ShownSlot() const noexcept;
-    [[nodiscard]] int64_t DisplaySlotFor(NanosecondTickCount startTime, bool hasPrevious) const noexcept;
-    [[nodiscard]] NanosecondTickCount StartTimeFor(int64_t displaySlot) const noexcept;
-    [[nodiscard]] NanosecondTickCount PresentTimeFor(int64_t displaySlot) const noexcept;
   };
 }
 
