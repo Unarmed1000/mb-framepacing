@@ -13,6 +13,7 @@
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
+#include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -357,7 +358,7 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
     PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
     settings.SetAim(aim);
     const PacerCapabilities has(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent | PacerCapability::PresentAfterDuration |
-                                PacerCapability::PresentAtTime);
+                                PacerCapability::PresentAtTime | PacerCapability::DisplayTimes);
     PC::TierPacer pacer(settings, has);
 
     int64_t checked = 0;
@@ -410,6 +411,13 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
         pacer.AddPresent(report);
         pacer.AddGpuWork(
           PC::GpuWorkReport::Times(present.FrameId - 1u, FP::NanosecondTickCount(now - 6'000'000), FP::NanosecondTickCount(now - 500'000)));
+        // The display time of the frame three back, as a platform reports it, and with it what the pacer counted
+        PC::DisplayReport displayReport;
+        displayReport.FrameId = present.FrameId > 3u ? present.FrameId - 3u : 0u;
+        displayReport.DisplayTime = FP::NanosecondTickCount(now - (now % period) - period);
+        displayReport.Shown = (frame % 53) != 0;
+        pacer.AddDisplayReport(displayReport);
+        checked += static_cast<int64_t>(pacer.DisplayErrors().RecentJudgedFrames);
         now += 60'000;
         checked +=
           static_cast<int64_t>(schedule.SwapInterval) + static_cast<int64_t>(pacer.WorkingTier()) + static_cast<int64_t>(pacer.ActiveRating().Tier);

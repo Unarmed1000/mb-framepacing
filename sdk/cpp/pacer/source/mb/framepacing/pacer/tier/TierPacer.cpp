@@ -156,7 +156,10 @@ namespace MB::FramePacing::Pacer
   {
     // A change that waited for a frame that was never ended
     ApplyPending();
-    return m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
+    const FrameSchedule schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
+    // Kept for the display report that comes for it later
+    m_display.AddFrame(schedule.FrameId, schedule.AnimationStep);
+    return schedule;
   }
 
   PresentPlan TierPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
@@ -204,6 +207,14 @@ namespace MB::FramePacing::Pacer
     }
   }
 
+  void TierPacer::AddDisplayReport(const DisplayReport& report) noexcept
+  {
+    if (m_active.Has(PacerCapability::DisplayTimes))
+    {
+      m_display.AddDisplayReport(report, Refresh());
+    }
+  }
+
   void TierPacer::ForgetPresents() noexcept
   {
     if (m_onVBlanks)
@@ -218,12 +229,21 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
   {
+    if (period != Refresh())
+    {
+      // The frames start again: nothing is judged across it
+      m_display.Restart();
+    }
     m_grid.SetRefreshPeriod(period);
     m_vblank.SetRefreshPeriod(period);
   }
 
   void TierPacer::SetSettings(const PacerSettings& settings)
   {
+    if (settings != Settings())
+    {
+      m_display.Restart();
+    }
     m_grid.SetSettings(settings);
     m_vblank.SetSettings(settings);
   }
@@ -232,5 +252,6 @@ namespace MB::FramePacing::Pacer
   {
     m_grid.Reset();
     m_vblank.Reset();
+    m_display.Restart();
   }
 }

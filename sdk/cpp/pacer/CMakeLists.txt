@@ -10,6 +10,7 @@ set_target_properties(mb_framepacing_pacer PROPERTIES EXPORT_NAME pacer POSITION
 target_sources(mb_framepacing_pacer
   PRIVATE
     source/mb/framepacing/pacer/clock/PacerRefreshClock.cpp
+    source/mb/framepacing/pacer/display/DisplayErrorCounter.cpp
     source/mb/framepacing/pacer/frame/FramesInFlight.cpp
     source/mb/framepacing/pacer/frame/PresentFeedback.cpp
     source/mb/framepacing/pacer/FramePacer.cpp
@@ -37,6 +38,9 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/clock/PacerRefreshClock.hpp
       include/mb/framepacing/pacer/clock/AnimationTime.hpp
       include/mb/framepacing/pacer/clock/FrameMeasurement.hpp
+      include/mb/framepacing/pacer/display/DisplayErrorCounter.hpp
+      include/mb/framepacing/pacer/display/DisplayErrorState.hpp
+      include/mb/framepacing/pacer/display/DisplayReport.hpp
       include/mb/framepacing/pacer/FramePacer.hpp
       include/mb/framepacing/pacer/FrameRateStep.hpp
       include/mb/framepacing/pacer/FrameRateStepUtil.hpp
@@ -111,7 +115,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
                                             tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp tests/FrameWorkRuleTests.cpp
                                             tests/TimerPeriodOnlyPacerTests.cpp tests/TimerWaitForPresentPacerTests.cpp
                                             tests/VBlankPeriodOnlyPacerTests.cpp tests/FrameRateStepTests.cpp
-                                            tests/VBlankWaitForPresentPacerTests.cpp tests/TimedPresentLoopTests.cpp tests/DisplayPlacementUtilTests.cpp tests/TierPacerTests.cpp tests/VBlankTimelineTests.cpp tests/PresentWaitRuleTests.cpp)
+                                            tests/VBlankWaitForPresentPacerTests.cpp tests/DisplayErrorCounterTests.cpp tests/TimedPresentLoopTests.cpp tests/DisplayPlacementUtilTests.cpp tests/TierPacerTests.cpp tests/VBlankTimelineTests.cpp tests/PresentWaitRuleTests.cpp)
   target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests

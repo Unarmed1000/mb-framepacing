@@ -1095,7 +1095,16 @@ paced, and a tier is one combination of them:
   "5+"). The animation error can then be worked out where the application runs: the animation time step is the pacer's,
   and the display time step is between two reported times. It is statistics, as display times are in today's pacer, and
   changes no frame and no tier. Driver display times are no measurement by the tools, and the mark says that they are
-  reported, not that they are right. Pacing by them is "Pacing by display times", below. Not built.
+  reported, not that they are right. Pacing by them is "Pacing by display times", below.
+  **Built on 2026-10-08** (`DisplayErrorCounter`, `TierPacer::AddDisplayReport` and `DisplayErrors`; the simulation and
+  unit tests only): the application gives each frame's display time back by its frame id, a few frames later, or says
+  that it was never shown. The rules are the measuring tools': a frame is judged when it and the frame before it were
+  both reported as shown; its animation error is its animation time step less the time between the two display times;
+  more than 1 ms either way is an error frame; half a refresh or more is a frame at another refresh than it was made
+  for, and late when it is the later one; a step next to a frame without a display time is not judged. Counted since
+  the pacer was made and for about the last second (eight eighths of a second), over the last 64 frames at most, with
+  nothing allocated. A pause the pacer did not ask for shows as one late frame. What it is not: the tools read the
+  display, and this reads what the platform says.
 - **A swap interval on the present** (`PresentSwapInterval` of two or more, `DisplaySideHolds`): the display's side holds a
   frame of more than one refresh for exactly its refreshes, whenever the loop presents it. Below tier 4 that is the one way
   the display's side holds a frame, and it does nothing at one refresh per frame, so it changes no tier. A frame the
@@ -1259,13 +1268,51 @@ frame of a run on its refresh, and the duration keeps the ones after it there.
   have had shown: with two frames in flight and work of 72 % of a refresh on the CPU and on the GPU, on a display that
   takes a frame up to its vertical blank, the frames that were ready inside the pacer's frame margin were shown without
   a timed present (87 of 2,900 frames off their refresh, no frame slowed down) and were late with the time (the rule
-  slowed down nearly half of the frames, and a frame was on screen a refresh later after its start). On a display that takes a frame 13 % of a refresh before its vertical blank, just over that margin (an eighth), the two slowed down alike.
+  slowed down nearly half of the frames, and a frame was on screen a refresh later after its start). On a display that
+  takes a frame 13 % of a refresh before its vertical blank, just over that margin (an eighth), the two slowed down
+  alike.
 - **Switched on and off while the frames go on**: the timed present is a part of the active set like any other, and a
   change of it is no handover: the frame ids, the animation steps and the intended display times go on, and it is the
   next present that gets the time or does not any more.
 
 **Not built:** seeing that a present's time was not kept (tiers 1 and 2 could, by their wait); a swap interval on the
 present; the fence wait of tiers 3 and 4.
+
+#### The duration on one system
+
+The first integration carried the duration out on 2026-10-08, at the commit after the one that built it: Windows, Vulkan,
+one driver, a window on a 240 Hz display with a second display at 120 Hz on, variable refresh off on both, a machine
+with no input for an hour. Its present takes a relative target time and nothing else, so the time before which a
+frame is not shown was not run. Each of the four kinds without a timed present, with both aims, at one, two and four
+refreshes per frame, a run without the duration and one with it right after, 1,200 frames each, three rounds: 144
+runs, counted from frame 240. **Driver display times, not a measurement by the tools, and three runs a setting.**
+
+| Refreshes per frame | Frames not on screen for their swap interval, without | With the duration | From a frame's start to its display                                                                                                         |
+| ------------------- | ----------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1                   | 1 of 22,963                                           | 1 of 22,970       | The same with and without, wherever a setting was steady from round to round                                                                |
+| 2                   | 6 of 22,984                                           | 0 of 22,972       | Vertical blank times alone: one refresh later in five of six runs, three later in one. On a timer: 0.6 to 15 ms later. With both: no change |
+| 4                   | 59 of 22,983                                          | 147 of 22,983     | On a timer with smoothness: up to 3 ms later; with low latency it differed from round to round either way. Vertical blank times: no change  |
+
+- **At one refresh per frame it changed nothing**, as a display that shows one frame per refresh does that by itself.
+- **At two it did what the simulation said**: the frames that were off were gone, and frames were shown later for it,
+  by whole refreshes where the loop knows the vertical blanks and has no wait. Within a run the time to the display did
+  not climb after frame 240: what was taken was taken in the first second.
+- **At four it did not.** Of the 147 frames off with the duration, 144 were in two runs of a timer with a wait for a
+  present and low latency (119 and 25); the one run of that setting with frames off without the duration had 55. In
+  those runs the present was called 0.10 to 0.18 of a refresh before the frame's display time, so a frame made or missed
+  that refresh. And in the worse run 60 of 959 frames were shown 12.499 ms after the frame before them although
+  their present was given 14.582 ms: on this system a relative target time did not keep a frame from being shown
+  sooner than that after the display time the driver reports for the frame before. What the time is counted from
+  there is not known.
+- The frames that waited and the refreshes the animation time fell behind the clock did not differ with the duration.
+
+The same session ran the changes of the active set again (84 changes, three runs an aim): the frame id, the swap
+interval, the animation step and the start no earlier than the frame before said held in all of them, and all 918
+intervals on screen around the changes were one refresh. From vertical blank times to the grid on the clock with
+smoothness the animation time no longer fell behind (it had, by two refreshes, in three of three before the handover
+stopped making the frames ahead again). Switching the wait for a present on still costs one long frame start with
+smoothness, while the frames that wait come down to what may wait. The pause after start-up was made once over
+thirteen changes in each of two runs.
 
 A third value is the tier the pacer is **working at** this frame: the tier of the parts that are really pacing. It is lower
 than the active tier while something a capability promised is missing: no vertical blank time has come yet, the readings
@@ -1533,7 +1580,8 @@ interval rule has to end it by slowing down. Which of the two the pacer does is 
 
 ### What each tier allows
 
-Tiers 1 to 4 are designed and not built; what is said of them is what the design is to do.
+Tiers 1 to 4 are built against the simulation's display and measured on no system, but for the duration on one ("The
+duration on one system"); what is said of them is what the design is to do.
 
 | Tier                                                         | Who puts a frame on its refresh                               | Does it know where the refreshes are?                             | The frames that wait                                                               | After a refresh the display lost by itself                                                                                                         |
 | ------------------------------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1573,7 +1621,8 @@ Two things are the same at every tier:
   afterwards.
 
 Status: tiers 7 and 8 are measured on the first integration's first system, one run a case, and tiers 5 and 6 have their
-first runs there on a quiet machine (their sections above). Tiers 1 to 4 are not built. The second system is a virtual
+first runs there on a quiet machine (their sections above). Tiers 1 to 4 are built against the simulation, and the
+duration alone has run on that system. The second system is a virtual
 machine whose display times are poor: what it showed is in "A loop the system holds" and "Readings that are no vertical
 blank times". All of it is driver display times, and no run of a tier pacer has been captured and analysed with the tools.
 
@@ -1767,7 +1816,8 @@ checked. Four things are settled now, because they cost little now and a second 
     options: (a) as it is, either kind rates tiers 1 to 4; (b) only `PresentAtTime` does, and `PresentAfterDuration` is
     rated beside the tier as a swap interval on the present is ("the display's side holds"), and its duration is given
     at every tier. Proposed: (b), by the list's own rule of who places the frame. What speaks against it: the duration
-    is the only timed present that has been measured on a system, and it did what it is for there.
+    is the only timed present that has been measured on a system. There it took the frames off their refresh away at
+    two refreshes per frame and not at four ("The duration on one system").
 
 ## What changes for whom
 

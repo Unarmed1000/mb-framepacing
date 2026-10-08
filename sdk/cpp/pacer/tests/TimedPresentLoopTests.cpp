@@ -281,3 +281,60 @@ TEST(TimedPresentLoop, WithATimeOnThePresentTheDisplayShowsWhatThePacerWorkedOut
   EXPECT_GT(untimed, 1'000);
   EXPECT_NEAR(timed, untimed, 100);
 }
+
+TEST(TimedPresentLoop, TheAnimationErrorCountedFromDisplayReportsIsWhatTheDisplayShowed)
+{
+  // The loop on a timer whose held present falls on either side of a refresh, at two refreshes per frame, with the display
+  // times reported to the pacer: what it counts from them is what these tests count from the display
+  for (const Timed timed : {Timed::No, Timed::AtTime})
+  {
+    Sim::LoopSettings settings = LightLoop(PC::PacerAim::LowLatency, timed);
+    settings.PreferredSwapInterval = 2;
+    settings.TimerLate = {0, 100'000};
+    settings.ReportsDisplayTimes = true;
+    const int64_t period = PeriodNanoseconds(settings);
+    settings.Display.LatchLeadNanoseconds = (period * 85) / 100;
+    const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerPeriodOnlyLoop(settings);
+
+    // The frames that were reported when the last frame started: those whose display time had passed before its waits.
+    // Every one of them was judged but the first, which has no frame before it
+    const Sim::LoopFrame& last = frames.back();
+    const auto reported = static_cast<std::size_t>(last.DisplayJudgedFrames) + 1u;
+    ASSERT_GT(reported, frames.size() - 6u);
+    ASSERT_LT(reported, frames.size());
+    ASSERT_LE(frames[reported - 1u].ShownNanoseconds, last.StartNanoseconds);
+    uint64_t off = 0;
+    uint64_t late = 0;
+    for (std::size_t index = 1; index < reported; ++index)
+    {
+      const int64_t refreshes = RefreshesOnScreen(frames, index, period);
+      const int64_t stepRefreshes = (frames[index].AnimationStepNanoseconds + (period / 2)) / period;
+      off += refreshes != stepRefreshes ? 1u : 0u;
+      late += refreshes > stepRefreshes ? 1u : 0u;
+    }
+    EXPECT_EQ(last.DisplayOffTargetFrames, off) << static_cast<int32_t>(timed);
+    EXPECT_EQ(last.DisplayErrorFrames, off) << static_cast<int32_t>(timed);
+    EXPECT_EQ(last.DisplayLateFrames, late) << static_cast<int32_t>(timed);
+    if (timed == Timed::No)
+    {
+      EXPECT_GT(off, 500u);
+    }
+    else
+    {
+      // With a time on the present: the frames at the start of the run, and none after
+      EXPECT_LT(off, 10u);
+      EXPECT_EQ(frames[100].DisplayOffTargetFrames, off);
+    }
+
+    // The reports change no frame
+    settings.ReportsDisplayTimes = false;
+    const std::vector<Sim::LoopFrame> unreported = Sim::SimulateTimerPeriodOnlyLoop(settings);
+    ASSERT_EQ(unreported.size(), frames.size());
+    for (std::size_t index = 0; index < frames.size(); ++index)
+    {
+      ASSERT_EQ(unreported[index].ShownNanoseconds, frames[index].ShownNanoseconds) << index;
+      ASSERT_EQ(unreported[index].StartNanoseconds, frames[index].StartNanoseconds) << index;
+    }
+    EXPECT_EQ(unreported.back().DisplayJudgedFrames, 0u);
+  }
+}

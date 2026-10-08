@@ -8,6 +8,8 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
+#include <mb/framepacing/pacer/display/DisplayErrorState.hpp>
+#include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -63,6 +65,10 @@ namespace MB::FramePacing::Pacer::Simulation
       {
         capabilities = capabilities | PacerCapability::PresentAfterDuration;
       }
+      if (settings.ReportsDisplayTimes)
+      {
+        capabilities = capabilities | PacerCapability::DisplayTimes;
+      }
       return PacerCapabilities(capabilities);
     }
 
@@ -97,6 +103,28 @@ namespace MB::FramePacing::Pacer::Simulation
         rPacer.AddGpuWork(
           GpuWorkReport::Times(frame.FrameId, NanosecondTickCount(frame.GpuBeginNanoseconds), NanosecondTickCount(frame.GpuEndNanoseconds)));
       }
+    }
+
+    //! The display times of the frames that were shown by now, given to a tier pacer in the frames' order
+    void ReportDisplayTimes(TierPacer& rPacer, const std::vector<LoopFrame>& frames, std::size_t& rNext, const int64_t now) noexcept
+    {
+      for (; rNext < frames.size() && frames[rNext].ShownNanoseconds <= now; ++rNext)
+      {
+        DisplayReport report;
+        report.FrameId = frames[rNext].FrameId;
+        report.DisplayTime = NanosecondTickCount(frames[rNext].ShownNanoseconds);
+        rPacer.AddDisplayReport(report);
+      }
+    }
+
+    //! What the pacer counted from the display times so far, into a frame
+    void SetDisplayErrors(LoopFrame& rFrame, const TierPacer& pacer) noexcept
+    {
+      const DisplayErrorState state = pacer.DisplayErrors();
+      rFrame.DisplayJudgedFrames = state.JudgedFrames;
+      rFrame.DisplayErrorFrames = state.ErrorFrames;
+      rFrame.DisplayOffTargetFrames = state.OffTargetFrames;
+      rFrame.DisplayLateFrames = state.LateFrames;
     }
 
     //! The frame log is the first integration's, which counts in ticks of 100 ns
@@ -275,6 +303,7 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
     int64_t previousGpuEndNanoseconds = 0;
     std::size_t nextGpuReport = 0;
+    std::size_t nextDisplayReport = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -286,6 +315,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (settings.ReportsGpuWork)
       {
         ReportGpuWork(pacer, frames, nextGpuReport, now);
+      }
+      if (settings.ReportsDisplayTimes)
+      {
+        ReportDisplayTimes(pacer, frames, nextDisplayReport, now);
       }
       // Before the frame takes anything: the wait the pacer gives
       const FrameStartPlan startPlan = pacer.PlanFrame(NanosecondTickCount(now));
@@ -322,6 +355,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
+      SetDisplayErrors(frame, pacer);
 
       frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
       frame.WorkGpuNanoseconds = pacer.GpuTime().Nanoseconds();
@@ -371,6 +405,7 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
     int64_t previousGpuEndNanoseconds = 0;
     std::size_t nextGpuReport = 0;
+    std::size_t nextDisplayReport = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -382,6 +417,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (settings.ReportsGpuWork)
       {
         ReportGpuWork(pacer, frames, nextGpuReport, now);
+      }
+      if (settings.ReportsDisplayTimes)
+      {
+        ReportDisplayTimes(pacer, frames, nextDisplayReport, now);
       }
       // Before the frame takes anything: the waits the pacer gives, the present first
       FrameStartPlan startPlan = pacer.PlanFrame(NanosecondTickCount(now));
@@ -427,6 +466,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
+      SetDisplayErrors(frame, pacer);
 
       frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
       frame.WorkGpuNanoseconds = pacer.GpuTime().Nanoseconds();
@@ -477,6 +517,7 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
     int64_t previousGpuEndNanoseconds = 0;
     std::size_t nextGpuReport = 0;
+    std::size_t nextDisplayReport = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -488,6 +529,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (settings.ReportsGpuWork)
       {
         ReportGpuWork(pacer, frames, nextGpuReport, now);
+      }
+      if (settings.ReportsDisplayTimes)
+      {
+        ReportDisplayTimes(pacer, frames, nextDisplayReport, now);
       }
       // What the window system says of the display: its last vertical blank
       VBlankReading reading;
@@ -522,6 +567,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
+      SetDisplayErrors(frame, pacer);
 
       frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
       frame.WorkGpuNanoseconds = pacer.GpuTime().Nanoseconds();
@@ -573,6 +619,7 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
     int64_t previousGpuEndNanoseconds = 0;
     std::size_t nextGpuReport = 0;
+    std::size_t nextDisplayReport = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -584,6 +631,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (settings.ReportsGpuWork)
       {
         ReportGpuWork(pacer, frames, nextGpuReport, now);
+      }
+      if (settings.ReportsDisplayTimes)
+      {
+        ReportDisplayTimes(pacer, frames, nextDisplayReport, now);
       }
       // What the window system says of the display: its last vertical blank
       VBlankReading reading;
@@ -637,6 +688,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
+      SetDisplayErrors(frame, pacer);
 
       frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
       frame.WorkGpuNanoseconds = pacer.GpuTime().Nanoseconds();

@@ -11,6 +11,9 @@
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerRating.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
+#include <mb/framepacing/pacer/display/DisplayErrorCounter.hpp>
+#include <mb/framepacing/pacer/display/DisplayErrorState.hpp>
+#include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -38,8 +41,8 @@ namespace MB::FramePacing::Pacer
   //!   BeginFrame      the frame starts: its swap interval, its animation time and the marker's values
   //!   EndFrame        the CPU's work is done: the time to wait until before the present, or the time to give the present
   //!   AddPresent      after the present, before the next frame is planned
-  //! and, where the application has them, AddGpuWork (the GPU's work on an earlier frame) and AddSystemWait (a wait it made
-  //! by itself).
+  //! and, where the application has them, AddGpuWork (the GPU's work on an earlier frame), AddSystemWait (a wait it made
+  //! by itself) and AddDisplayReport (when an earlier frame was shown: statistics only, DisplayErrors).
   //!
   //! Which tier paces: where the refreshes are comes from vertical blank times when they are active and from a grid on the clock
   //! when not, the loop is held by a wait for a present when that is active, and with a timed present active the present is
@@ -65,6 +68,8 @@ namespace MB::FramePacing::Pacer
     ClockGridLoopPacer m_grid;
     VBlankLoopPacer m_vblank;
     bool m_onVBlanks;
+    // What the display reports say of the frames: statistics, whichever part paces
+    DisplayErrorCounter m_display;
 
   public:
     //! The settings, and what the application can do: all of it is active.
@@ -129,6 +134,17 @@ namespace MB::FramePacing::Pacer
     //! A wait the application made by itself before the frame starts (for an image, for a frame slot). Used on the grid on the
     //! clock, where the system may be what paces the loop.
     void AddSystemWait(const SystemWaitReport& report) noexcept;
+
+    //! What the platform says of a frame that was presented earlier: when it was shown, or that it never was. Taken with
+    //! PacerCapability::DisplayTimes active, oldest first. Statistics only: no frame is paced by it.
+    void AddDisplayReport(const DisplayReport& report) noexcept;
+
+    //! What the display reports said of the frames so far: the animation error where the application runs (the "+" beside
+    //! a tier). A pause the pacer did not ask for shows in it as one frame shown late.
+    [[nodiscard]] DisplayErrorState DisplayErrors() const noexcept
+    {
+      return m_display.State();
+    }
 
     //! The swap chain was made anew: the presents made so far are never shown.
     void ForgetPresents() noexcept;

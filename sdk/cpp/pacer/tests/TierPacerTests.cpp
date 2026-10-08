@@ -14,6 +14,8 @@
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
+#include <mb/framepacing/pacer/display/DisplayErrorState.hpp>
+#include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
@@ -680,4 +682,96 @@ TEST(TierPacer, ThePauseAfterStartUpIsMadeOnceWhicheverPartPlacesTheFrames)
   // Half a second after the first frame, not after the first on the vertical blanks
   EXPECT_GE(pausedAt, first + pausing.StartupPauseDelay().Nanoseconds());
   EXPECT_LT(pausedAt, first + pausing.StartupPauseDelay().Nanoseconds() + (3 * Period));
+}
+
+// Display reports (the "+" beside a tier): the animation error where the application runs, counted from the display times it
+// reports. Statistics only.
+
+TEST(TierPacer, DisplayReportsAreCountedAndPaceNothing)
+{
+  for (const PacerCapability named : {PacerCapability::NoCapabilities, Wait, VBlank, VBlank | Wait, VBlank | Wait | AtTime})
+  {
+    PC::PacerSettings settings = Settings();
+    settings.SetPreferredSwapInterval(2);
+    Loop plain(settings, PacerCapabilities(named));
+    Loop loop(settings, PacerCapabilities(named | PacerCapability::DisplayTimes));
+    EXPECT_TRUE(loop.Pacer.Rating().ReportsDisplayTimes);
+    EXPECT_EQ(loop.Pacer.Rating().Tier, plain.Pacer.Rating().Tier);
+    PC::FrameSchedule before;
+    for (int32_t frame = 0; frame < 100; ++frame)
+    {
+      const PC::FrameSchedule expected = plain.Frame();
+      const PC::FrameSchedule schedule = loop.Frame();
+      // The frame is the one the pacer makes without the reports
+      ASSERT_EQ(loop.StartNanoseconds, plain.StartNanoseconds) << frame;
+      ASSERT_EQ(schedule.IntendedDisplayTime, expected.IntendedDisplayTime) << frame;
+      ASSERT_EQ(schedule.AnimationTime, expected.AnimationTime) << frame;
+      if (frame > 0)
+      {
+        // The platform reports the frame before this one: shown when it was meant to be, but for every tenth, which was
+        // shown a refresh late
+        PC::DisplayReport report;
+        report.FrameId = before.FrameId;
+        report.DisplayTime = At(before.IntendedDisplayTime.Nanoseconds() + ((before.FrameId % 10u) == 0 ? Period : 0));
+        loop.Pacer.AddDisplayReport(report);
+        // A pacer whose application has no display times takes none
+        plain.Pacer.AddDisplayReport(report);
+      }
+      before = schedule;
+    }
+    EXPECT_EQ(plain.Pacer.DisplayErrors(), PC::DisplayErrorState());
+    const PC::DisplayErrorState state = loop.Pacer.DisplayErrors();
+    EXPECT_EQ(state.Reports, 99u);
+    EXPECT_EQ(state.Refused, 0u);
+    // Every frame but the first: one of them late and the one after it a refresh sooner after it, nine times
+    EXPECT_EQ(state.JudgedFrames, 98u);
+    EXPECT_EQ(state.LateFrames, 9u);
+    EXPECT_EQ(state.OffTargetFrames, 18u);
+    EXPECT_EQ(state.ErrorFrames, 18u);
+    EXPECT_EQ(loop.Pacer.FrameWindow().LateFrames, plain.Pacer.FrameWindow().LateFrames);
+
+    // Left out of the active set, reports are not taken; and a reset judges nothing across it
+    loop.Pacer.SetActiveCapabilities(PacerCapabilities(named));
+    PC::DisplayReport late;
+    late.FrameId = before.FrameId;
+    late.DisplayTime = At(before.IntendedDisplayTime.Nanoseconds() + (5 * Period));
+    loop.Pacer.AddDisplayReport(late);
+    EXPECT_EQ(loop.Pacer.DisplayErrors(), state);
+    loop.Pacer.SetActiveCapabilities(PacerCapabilities(named | PacerCapability::DisplayTimes));
+    loop.Pacer.Reset();
+    loop.Pacer.AddDisplayReport(late);
+    EXPECT_EQ(loop.Pacer.DisplayErrors().Refused, 1u);
+    EXPECT_EQ(loop.Pacer.DisplayErrors().JudgedFrames, 98u);
+  }
+}
+
+TEST(TierPacer, DisplayReportsGoOnAcrossAChangeOfWhatPlacesTheFrames)
+{
+  PC::PacerSettings settings = Settings();
+  settings.SetPreferredSwapInterval(2);
+  Loop loop(settings, PacerCapabilities(VBlank | PacerCapability::DisplayTimes));
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(PacerCapability::DisplayTimes));
+  PC::FrameSchedule before;
+  for (int32_t frame = 0; frame < 120; ++frame)
+  {
+    if (frame == 40 || frame == 80)
+    {
+      loop.Pacer.SetActiveCapabilities(frame == 40 ? PacerCapabilities(VBlank | PacerCapability::DisplayTimes)
+                                                   : PacerCapabilities(PacerCapability::DisplayTimes));
+    }
+    const PC::FrameSchedule schedule = loop.Frame();
+    if (frame > 0)
+    {
+      // Each frame shown its animation time step after the frame before it, whichever part made its time
+      PC::DisplayReport report;
+      report.FrameId = before.FrameId;
+      report.DisplayTime = At(Start + before.AnimationTime.Nanoseconds());
+      loop.Pacer.AddDisplayReport(report);
+    }
+    before = schedule;
+  }
+  const PC::DisplayErrorState state = loop.Pacer.DisplayErrors();
+  EXPECT_EQ(state.Reports, 119u);
+  EXPECT_EQ(state.JudgedFrames, 118u);
+  EXPECT_EQ(state.ErrorFrames, 0u);
 }
