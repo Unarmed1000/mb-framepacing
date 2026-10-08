@@ -47,11 +47,17 @@ namespace MB::FramePacing::Pacer::Simulation
       return now < target ? target + random.Draw(late.MinNanoseconds, late.MaxNanoseconds) : now;
     }
 
-    //! A frame's work on the CPU: drawn, and longer for the frames that run long
-    int64_t CpuWork(const LoopSettings& settings, const int32_t index, SplitMix64& random)
+    //! A frame's work on the CPU: drawn from the range, and longer for the frames that run long
+    int64_t CpuWork(const LoopSettings& settings, const NanosecondRange& range, const int32_t index, SplitMix64& random)
     {
       const bool isLong = std::find(settings.LongFrames.begin(), settings.LongFrames.end(), index) != settings.LongFrames.end();
-      return random.Draw(settings.CpuWork.MinNanoseconds, settings.CpuWork.MaxNanoseconds) + (isLong ? settings.LongFrameCpuNanoseconds : 0);
+      return random.Draw(range.MinNanoseconds, range.MaxNanoseconds) + (isLong ? settings.LongFrameCpuNanoseconds : 0);
+    }
+
+    //! A frame's work on the CPU, of a loop whose work does not change in a run
+    int64_t CpuWork(const LoopSettings& settings, const int32_t index, SplitMix64& random)
+    {
+      return CpuWork(settings, settings.CpuWork, index, random);
     }
 
     //! What a tier pacer's loop can do: what its pacer is named for, and the timed presents the settings give it
@@ -321,6 +327,11 @@ namespace MB::FramePacing::Pacer::Simulation
     std::size_t nextGpuReport = 0;
     std::size_t nextDisplayReport = 0;
     std::size_t nextChange = 0;
+    // The work of a frame: the settings', until a change of it is due
+    NanosecondRange cpuWork = settings.CpuWork;
+    NanosecondRange gpuWork = settings.GpuWork;
+    std::size_t nextWorkChange = 0;
+    int64_t firstStartNanoseconds = 0;
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -428,6 +439,14 @@ namespace MB::FramePacing::Pacer::Simulation
 
       frame.StartNanoseconds = now;
       frame.PendingAtStart = display.Pending(now);
+      // A change of the work that is due by this frame's start
+      firstStartNanoseconds = index == 0 ? now : firstStartNanoseconds;
+      for (; nextWorkChange < settings.WorkChanges.size() && settings.WorkChanges[nextWorkChange].AfterNanoseconds <= (now - firstStartNanoseconds);
+           ++nextWorkChange)
+      {
+        cpuWork = settings.WorkChanges[nextWorkChange].CpuWork;
+        gpuWork = settings.WorkChanges[nextWorkChange].GpuWork;
+      }
       const FrameSchedule schedule = pacer.BeginFrame(NanosecondTickCount(now));
       const FrameWindowState window = pacer.FrameWindow();
       frame.FrameId = schedule.FrameId;
@@ -442,12 +461,12 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.RefreshesBehindClock = pacer.RefreshesBehindClock();
       SetDisplayErrors(frame, pacer);
 
-      frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
+      frame.WorkCpuNanoseconds = CpuWork(settings, cpuWork, index, random);
       frame.WorkGpuNanoseconds = pacer.GpuTime().Nanoseconds();
       now += frame.WorkCpuNanoseconds;
       frame.WorkEndNanoseconds = now;
       const PresentPlan presentPlan = pacer.EndFrame(NanosecondTickCount(now));
-      const int64_t gpuWorkNanoseconds = random.Draw(settings.GpuWork.MinNanoseconds, settings.GpuWork.MaxNanoseconds);
+      const int64_t gpuWorkNanoseconds = random.Draw(gpuWork.MinNanoseconds, gpuWork.MaxNanoseconds);
       frame.GpuBeginNanoseconds = std::max(now, previousGpuEndNanoseconds);
       frame.GpuEndNanoseconds = frame.GpuBeginNanoseconds + gpuWorkNanoseconds;
       previousGpuEndNanoseconds = frame.GpuEndNanoseconds;

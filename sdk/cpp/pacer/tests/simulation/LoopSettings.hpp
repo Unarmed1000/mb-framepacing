@@ -9,6 +9,7 @@
 #include "DisplayModelSettings.hpp"
 #include "LoopActiveSetChange.hpp"
 #include "LoopProfile.hpp"
+#include "LoopWorkChange.hpp"
 #include "NanosecondRange.hpp"
 
 namespace MB::FramePacing::Pacer::Simulation
@@ -81,6 +82,8 @@ namespace MB::FramePacing::Pacer::Simulation
     bool PresentsAfterDuration{false};
     //! For the tier pacers (SimulateTierLoop): changes of the active set in the run, by frame, ascending
     std::vector<LoopActiveSetChange> ActiveSetChanges;
+    //! For the tier pacers (SimulateTierLoop): changes of the frames' work in the run, by time, ascending
+    std::vector<LoopWorkChange> WorkChanges;
     //! false: paced at a fixed swap interval of 1, the rule off
     bool AutoSwapInterval{true};
     DisplayModelSettings Display;
