@@ -138,8 +138,9 @@ namespace MB::FramePacing::Pacer
     //! The GPU's work on an earlier frame, where the application has it.
     void AddGpuWork(const GpuWorkReport& report) noexcept;
 
-    //! A wait the application made by itself before the frame starts (for an image, for a frame slot). Used on the grid on the
-    //! clock, where the system may be what paces the loop.
+    //! A wait the application made by itself before the frame starts (for an image, for a frame slot). On the grid on the
+    //! clock the system may be what paces the loop (PacerSettings::SystemHoldsLoop). On vertical blanks a start that the
+    //! display's side held is not stepped over by the animation time (DisplayHeldRefreshes).
     void AddSystemWait(const SystemWaitReport& report) noexcept;
 
     //! What the platform says of a frame that was presented earlier: when it was shown, or that it never was. Taken with
@@ -229,6 +230,13 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] uint64_t GpuWaitTimeouts() const noexcept
     {
       return m_onVBlanks ? m_vblank.GpuWaitTimeouts() : m_grid.GpuWaitTimeouts();
+    }
+
+    //! The refreshes frame starts were late by while the display's side held the loop, on vertical blanks: not stepped over
+    //! by the animation time, and counted in RefreshesBehindClock.
+    [[nodiscard]] uint64_t DisplayHeldRefreshes() const noexcept
+    {
+      return m_vblank.DisplayHeldRefreshes();
     }
 
     //! The frames whose start the display's side held for a share of a refresh period, on the grid on the clock.

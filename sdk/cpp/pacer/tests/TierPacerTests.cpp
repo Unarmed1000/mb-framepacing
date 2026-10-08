@@ -19,9 +19,12 @@
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
+#include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitKind.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
@@ -898,4 +901,147 @@ TEST(TierPacer, AWaitForTheGpusWorkThatRanOutIsCountedAndTheFramesGoOn)
   EXPECT_EQ(pacer.GpuWaitTimeouts(), 19u);
   // A loop held that long is late: its frames are late frames to the rule, as those of any loop that does not keep up
   EXPECT_GT(pacer.FrameWindow().LateFrames, 15u);
+}
+
+// A start the display's side held, on vertical blanks (the proposal's decision 17): the frames before it were still on their
+// way and are shown one after the other, so the animation time does not step over the refreshes the loop was held for.
+
+namespace
+{
+  //! What held the loop for five refresh periods before a frame
+  enum class Held
+  {
+    Nothing,
+    Acquire,
+    FrameSlot,
+  };
+
+  //! Twenty frames, then five refresh periods in which the loop stands before the next frame, reported as given: that frame
+  PC::FrameSchedule FrameAfterAHold(Loop& rLoop, const Held held, const int64_t gpuWorkNanoseconds)
+  {
+    PC::FrameSchedule schedule;
+    for (int32_t frame = 0; frame < 20; ++frame)
+    {
+      schedule = rLoop.Frame();
+      if (gpuWorkNanoseconds > 0)
+      {
+        // The GPU's work on the frame, begun when the CPU was done with it
+        const int64_t begin = rLoop.StartNanoseconds + Work;
+        rLoop.Pacer.AddGpuWork(PC::GpuWorkReport::Times(schedule.FrameId, At(begin), At(begin + gpuWorkNanoseconds)));
+      }
+    }
+    if (held != Held::Nothing)
+    {
+      PC::SystemWaitReport wait;
+      wait.Kind = held == Held::Acquire ? PC::SystemWaitKind::Acquire : PC::SystemWaitKind::FrameSlot;
+      wait.BeginTime = At(rLoop.Now);
+      wait.EndTime = At(rLoop.Now + (5 * Period));
+      rLoop.Pacer.AddSystemWait(wait);
+    }
+    rLoop.Now += 5 * Period;
+    return rLoop.Frame();
+  }
+}
+
+TEST(TierPacer, OnVerticalBlanksAStartTheDisplaysSideHeldIsNotSteppedOver)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability named : {VBlank, VBlank | Wait})
+    {
+      SCOPED_TRACE(testing::Message() << "aim " << static_cast<int32_t>(aim) << " set " << static_cast<uint32_t>(named));
+      // Nobody says what held the loop: the time passed, and the animation time steps over it
+      Loop unsaid(Settings(aim), PacerCapabilities(named));
+      const PC::FrameSchedule late = FrameAfterAHold(unsaid, Held::Nothing, 0);
+      // By the vertical blanks its start was late for (fewer than five where a frame is made ahead, or started late in its
+      // refresh)
+      const auto lateBlanks = static_cast<uint64_t>((late.AnimationStep.Nanoseconds() - Period) / Period);
+      EXPECT_GE(lateBlanks, 3u);
+      EXPECT_LE(lateBlanks, 5u);
+      EXPECT_EQ(unsaid.Pacer.DisplayHeldRefreshes(), 0u);
+
+      // A wait for an image held it: the display's side. The frame is for the vertical blank after the last one's, and the
+      // refreshes it was late by are behind the clock
+      Loop acquire(Settings(aim), PacerCapabilities(named));
+      const PC::FrameSchedule held = FrameAfterAHold(acquire, Held::Acquire, 0);
+      EXPECT_EQ(held.AnimationStep.Nanoseconds(), Period);
+      EXPECT_EQ(acquire.Pacer.DisplayHeldRefreshes(), lateBlanks);
+      EXPECT_EQ(acquire.Pacer.RefreshesBehindClock(), unsaid.Pacer.RefreshesBehindClock() + lateBlanks);
+      // Its time is that of a real vertical blank all the same: the first one it can make
+      EXPECT_EQ(held.IntendedDisplayTime, late.IntendedDisplayTime);
+      EXPECT_EQ(held.FrameId, late.FrameId);
+      // And the frames go on from there a refresh apart, none of them late for it
+      for (int32_t frame = 0; frame < 20; ++frame)
+      {
+        const PC::FrameSchedule next = acquire.Frame();
+        ASSERT_EQ(next.AnimationStep.Nanoseconds(), Period) << frame;
+      }
+      EXPECT_EQ(acquire.Pacer.DisplayHeldRefreshes(), lateBlanks);
+      EXPECT_EQ(acquire.Pacer.FrameWindow().LateFrames, 0u);
+
+      // A wait for a frame slot, and no GPU time reported: not known whose wait it was, so it is the GPU's, and time passed
+      Loop slotUnknown(Settings(aim), PacerCapabilities(named));
+      EXPECT_EQ(FrameAfterAHold(slotUnknown, Held::FrameSlot, 0).AnimationStep, late.AnimationStep);
+      EXPECT_EQ(slotUnknown.Pacer.DisplayHeldRefreshes(), 0u);
+
+      // A wait for a frame slot while the GPU's work on a frame takes a hundredth of a refresh: the GPU did not work for it,
+      // the display's side held the loop
+      Loop slotIdle(Settings(aim), PacerCapabilities(named));
+      EXPECT_EQ(FrameAfterAHold(slotIdle, Held::FrameSlot, Period / 100).AnimationStep.Nanoseconds(), Period);
+      EXPECT_EQ(slotIdle.Pacer.DisplayHeldRefreshes(), lateBlanks);
+
+      // The same wait while the GPU's work on a frame takes five refreshes: the GPU's, and time passed
+      Loop slotBusy(Settings(aim), PacerCapabilities(named));
+      const PC::FrameSchedule busy = FrameAfterAHold(slotBusy, Held::FrameSlot, 5 * Period);
+      EXPECT_GT(busy.AnimationStep.Nanoseconds(), Period);
+      EXPECT_EQ(slotBusy.Pacer.DisplayHeldRefreshes(), 0u);
+    }
+  }
+}
+
+TEST(TierPacer, OnVerticalBlanksAWaitForTheGpusWorkThatTheGpuDidNotWorkForIsTheDisplaysSide)
+{
+  constexpr PacerCapability GpuWait = PacerCapability::WaitForGpuWork;
+  PC::TierPacer pacer(Settings(PC::PacerAim::Smoothness), PacerCapabilities(VBlank | GpuWait));
+  int64_t now = Start;
+  PC::FrameSchedule schedule;
+  for (uint64_t frame = 1; frame <= 40; ++frame)
+  {
+    PC::VBlankReading reading;
+    reading.VBlankTime = At(Start + (((now - Start) / Period) * Period));
+    reading.ReadTime = At(now);
+    pacer.AddVBlank(reading);
+    PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+    if (plan.WaitsForGpuWork())
+    {
+      // Before the 30th frame the wait takes five refresh periods; the GPU's work on a frame is a hundredth of one
+      PC::GpuWaitReport wait;
+      wait.FrameId = plan.WaitForGpuWorkFrameId;
+      wait.BeginTime = At(now);
+      now += frame == 30 ? 5 * Period : 20'000;
+      wait.EndTime = At(now);
+      pacer.AddGpuWait(wait);
+      plan = pacer.PlanFrame(At(now));
+    }
+    now = plan.WaitsForStartTime() ? std::max(now, plan.StartTime.Nanoseconds()) : now;
+    schedule = pacer.BeginFrame(At(now));
+    if (frame > 5)
+    {
+      // Held or not, every frame is a refresh after the one before it to the animation
+      ASSERT_EQ(schedule.AnimationStep.Nanoseconds(), Period) << frame;
+    }
+    const PC::PresentPlan present = pacer.EndFrame(At(now + Work));
+    pacer.AddGpuWork(PC::GpuWorkReport::Times(schedule.FrameId, At(now + Work), At(now + Work + (Period / 100))));
+    const int64_t presentNanoseconds = present.WaitsForPresentTime() ? std::max(now + Work, present.PresentTime.Nanoseconds()) : now + Work;
+    PC::PresentReport report;
+    report.FrameId = present.FrameId;
+    report.CallTime = At(presentNanoseconds);
+    report.ReturnTime = At(presentNanoseconds);
+    pacer.AddPresent(report);
+    now = presentNanoseconds + 100'000;
+  }
+  // Made ahead, the frame was late for three vertical blanks of the five periods
+  EXPECT_EQ(pacer.DisplayHeldRefreshes(), 3u);
+  EXPECT_EQ(pacer.RefreshesBehindClock(), 3u);
+  EXPECT_EQ(pacer.GpuWaitTimeouts(), 0u);
 }

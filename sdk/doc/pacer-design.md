@@ -1404,6 +1404,30 @@ display times: a start that comes late is time that passed. The pacer on the gri
 that held the loop lets the frame through and no step is lost); the pacers on vertical blanks are not told of the
 application's waits at all. Decision 17.
 
+**Decided and built on 2026-10-08** (`VBlankLoopPacer`, `TierPacer::AddSystemWait`, `DisplayHeldRefreshes`; the
+simulation and unit tests only). On vertical blanks, with a wait for a present or without one:
+
+- **What counts as the display's side holding the loop** before a frame: a wait for an image the application reports
+  (`AddSystemWait`), a present that waited, and a wait for a frame slot or for the GPU's work (the application's own, or
+  the one the plan asks for) for as long as the GPU did not work. How long the GPU worked is not in a wait: it is taken
+  to be no more than the GPU's time on a frame as it was last reported and the frame margin. Without a reported GPU time
+  such a wait is the GPU's, whole: a loop the GPU limits is late and is not to be read as held by the display.
+- **What the pacer does with it**: where the frame's start is too late for the vertical blank its swap interval after
+  the last one, and the display's side held the loop an eighth of a refresh or more, the vertical blanks it was held
+  over (no more than the hold covers) are no refreshes that were lost. The frame is for the blank its swap interval
+  after the last one, counted without them: its animation step is its swap interval, its intended display time is still
+  the first real vertical blank it can make, it is no late frame to the rule, and the refreshes are behind the clock
+  (`RefreshesBehindClock`, and counted by themselves in `DisplayHeldRefreshes`). What the start is late by beyond the
+  hold is late as any start is.
+- **In the simulation** (a swap chain of three images whose display takes no frame at six vertical blanks in a row, so
+  the loop is held by its wait for an image; vertical blank times, no wait for a present, both aims): not told of the
+  wait, one frame's animation time stepped six refreshes while the frame followed the one before it on screen by one;
+  told of it, every frame's animation time was a refresh after the one before it. The display showed the same frames at
+  the same times either way. With a wait for a present no frame's animation time stepped over them told or not: the
+  wait says where the frames were shown.
+- **Not run on a system.** On the one that showed the case the wait was the frame slot's, so there it rests on the
+  GPU's work being reported.
+
 A third value is the tier the pacer is **working at** this frame: the tier of the parts that are really pacing. It is lower
 than the active tier while something a capability promised is missing: no vertical blank time has come yet, the readings
 turned out to be no vertical blank times, the waits for a present stopped because none is shown, a present's time was not
@@ -1912,22 +1936,16 @@ checked. Four things are settled now, because they cost little now and a second 
     is the only timed present that has been measured on a system. There it took the frames off their refresh away at
     two refreshes per frame and not at four ("The duration on one system").
 
-17. **A start the system held, on vertical blanks** (new, 2026-10-08; "A start the system held, at the start of a
-    run"). The options: (a) as it is: a late start is time that passed, and the animation time steps over it; (b) the
-    pacers on vertical blanks take the application's own waits as the pacer on the grid does, and a start that such a
-    wait held is not stepped over: the frame is for the vertical blank a swap interval after the last one, and the
-    refreshes are counted as behind the clock. What is not known, and decides between them: whether a wait for a frame
-    slot that holds the loop means frames that are still on their way (then (b) is right, and (a) made the jump that
-    was seen) or a GPU that does not keep up (then the display does hold a frame, and (a) is right). On the one system
-    it was the first, in two runs, and the wait was the frame slot's, not the acquire's, which the grid's rule would
-    not have let through either. The GPU's reported work on the frame tells the two apart where it is reported, and
-    there it did: the GPU's work on a frame took 0.10 ms, and it did not begin the two frames until 10 and 21 ms after
-    they were submitted, the second half a millisecond after the first frame of the run was shown. The frame slot came
-    free when the GPU had ended the frame before. So the slot was held while the GPU waited to start, not while it
-    worked: frames on their way. That makes a rule possible that needs no guess: a wait of the application's that held
-    the loop while the GPU did no work on the frame it waited for is the display's side holding the loop, whatever
-    the wait is called. Proposed with that condition: (b), for an application that reports its waits and the GPU's
-    work. Still one system and the start of a run.
+17. **A start the system held, on vertical blanks**: decided on 2026-10-08 and built ("A start the system held, at
+    the start of a run"). The pacers on vertical blanks take the application's own waits, and a start that the
+    display's side held is not stepped over: the frame is for the vertical blank a swap interval after the last one,
+    and the refreshes are counted as behind the clock. What decided it: whether a wait for a frame slot that holds the
+    loop means frames that are still on their way or a GPU that does not keep up can be told from the GPU's reported
+    work, and on the one system it was the first (the GPU's work on a frame took 0.10 ms, and it did not begin the two
+    frames until 10 and 21 ms after they were submitted; the frame slot came free when it had ended the frame
+    before). So the rule needs no guess: a wait that held the loop while the GPU did no work on the frame it waited for
+    is the display's side holding the loop, whatever the wait is called. Still one system and the start of a run, and
+    not run there since.
 
 ## What changes for whom
 

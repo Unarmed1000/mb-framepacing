@@ -17,6 +17,7 @@
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/hold/GpuWaitRule.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
@@ -55,6 +56,12 @@ namespace MB::FramePacing::Pacer
   //! learnt from it and tried later again (ReadyPlaceNow, ReadyPlaceTries), and a window that is not shown stops the waits
   //! (PresentWaitsStopped).
   //!
+  //! A start the display's side held (AddSystemWait, the present's own wait, and a wait for the GPU's work or a frame slot
+  //! for as long as the GPU did not work, by the GPU time that was reported) is not time that passed for the frames: the
+  //! frame is for the vertical blank its swap interval after the last one, the animation time does not step over the
+  //! refreshes it was held for, and they are counted as behind the clock (DisplayHeldRefreshes). The frames before it were
+  //! still on their way, and are shown one after the other.
+  //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
   class VBlankLoopPacer
@@ -71,6 +78,12 @@ namespace MB::FramePacing::Pacer
     FrameWorkRule m_frameWork;
     // Where the display's refreshes are: the vertical blanks, from the readings
     VBlankTimeline m_timeline;
+    // The vertical blanks the frames are counted in are the display's less the ones a start was held over by the display's
+    // side: how many of those there were so far
+    int64_t m_heldSlots{0};
+    // How long the display's side held the loop since the last frame started, and the refreshes frames were held for
+    NanosecondTimeSpan m_displayHeld;
+    uint64_t m_displayHeldRefreshes{0};
     // The frame between BeginFrame and the next BeginFrame: the vertical blank it is for, and the one it is shown at as far as
     // that is known (later than the one it is for once its present or a wait says so)
     bool m_hasFrame{false};
@@ -174,8 +187,14 @@ namespace MB::FramePacing::Pacer
     void AddPresentWait(const PresentWaitReport& report) noexcept;
 
     //! What became of the wait for the GPU's work the plan asked for. One that ended without the GPU done is counted
-    //! (GpuWaitTimeouts). The frame is then planned again.
+    //! (GpuWaitTimeouts). The frame is then planned again. For as long as the GPU did not work, by the GPU time that was
+    //! last reported, it was the display's side that held the loop.
     void AddGpuWait(const GpuWaitReport& report) noexcept;
+
+    //! A wait the application made by itself before the frame starts. A wait for an image is the display's side holding
+    //! the loop; a wait for a frame slot is, for as long as the GPU did not work (by the GPU time that was last reported:
+    //! without one it is not known, and the wait is taken as the GPU's).
+    void AddSystemWait(const SystemWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
     FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
@@ -345,6 +364,13 @@ namespace MB::FramePacing::Pacer
       m_waitsForGpuWork = waitsForGpuWork;
     }
 
+    //! The refreshes frame starts were late by while the display's side held the loop, since the pacer was made: not
+    //! stepped over by the animation time, and counted in RefreshesBehindClock.
+    [[nodiscard]] uint64_t DisplayHeldRefreshes() const noexcept
+    {
+      return m_displayHeldRefreshes;
+    }
+
     //! The waits for the GPU's work that ended without the GPU done, since the pacer was made.
     [[nodiscard]] uint64_t GpuWaitTimeouts() const noexcept
     {
@@ -391,6 +417,8 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] int64_t FirstBlankAfterReadyAt(NanosecondTickCount readyTime) const noexcept;
     [[nodiscard]] int64_t Reserve() const noexcept;
     [[nodiscard]] uint32_t FramesInFlightNow() const noexcept;
+    void AddDisplayHeld(NanosecondTimeDuration held) noexcept;
+    [[nodiscard]] NanosecondTimeDuration WithoutGpuWork(NanosecondTimeDuration blocked) const noexcept;
     [[nodiscard]] NanosecondTimeSpan ReadyPlace() const noexcept;
     [[nodiscard]] NanosecondTimeSpan GpuLead() const noexcept;
     [[nodiscard]] NanosecondTimeSpan ShortestLead() const noexcept;

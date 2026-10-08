@@ -223,7 +223,11 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::AddSystemWait(const SystemWaitReport& report) noexcept
   {
-    if (!m_onVBlanks)
+    if (m_onVBlanks)
+    {
+      m_vblank.AddSystemWait(report);
+    }
+    else
     {
       m_grid.AddSystemWait(report);
     }

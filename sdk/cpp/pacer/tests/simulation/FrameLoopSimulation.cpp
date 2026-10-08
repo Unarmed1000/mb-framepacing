@@ -295,10 +295,11 @@ namespace MB::FramePacing::Pacer::Simulation
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
     pacerSettings.SetReadyPlacePercent(settings.ReadyPlacePercent);
-    // That the system holds the loop while its queue is full is said, and the loop's own waits are reported, by the
-    // application that has neither vertical blank times nor a wait for a present: the one case it was built and measured for
-    const bool tellsOfSystemWaits = settings.SystemHoldsLoop && named == PacerCapability::NoCapabilities;
-    if (tellsOfSystemWaits)
+    // The loop's own waits are reported to the pacer where the settings say so. That the system holds the loop while its
+    // queue is full, with the images it has, is said by the application that has neither vertical blank times nor a wait
+    // for a present: the one case that setting was built and measured for
+    const bool tellsOfSystemWaits = settings.SystemHoldsLoop;
+    if (tellsOfSystemWaits && named == PacerCapability::NoCapabilities)
     {
       pacerSettings.SetSystemHoldsLoop(true);
       if (settings.Display.Images > 0)

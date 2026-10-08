@@ -5,7 +5,9 @@
 // display, made early and its present held (smoothness) or its start held so that it is ready just in time (low latency).
 // With a wait for a present the loop is held until the display took an earlier frame, and the wait says which vertical blank
 // a frame was shown at; without one there is a pause after start-up.
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitKind.hpp>
 #include <mb/framepacing/pacer/placement/DisplayPlacementUtil.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
@@ -29,6 +31,8 @@ namespace MB::FramePacing::Pacer
     //! The stretch without a frame shown later before a try is the frame window's length, and twice as long after each try
     //! that was taken back: doubled no more often than this
     constexpr uint32_t MaxPlaceTryDoublings = 10;
+    //! The display's side held the loop when its waits took this share of a refresh period or more: one in this many
+    constexpr int64_t HeldDivisor = 8;
   }
 
   VBlankLoopPacer::VBlankLoopPacer(const PacerSettings& settings, const bool waitsForPresent)
@@ -52,12 +56,13 @@ namespace MB::FramePacing::Pacer
 
   NanosecondTickCount VBlankLoopPacer::TimeOfBlank(const int64_t slot) const noexcept
   {
-    return m_timeline.TimeOfBlank(slot, m_rule.Refresh());
+    // The frames' vertical blanks are the display's without the ones a start was held over
+    return m_timeline.TimeOfBlank(slot + m_heldSlots, m_rule.Refresh());
   }
 
   int64_t VBlankLoopPacer::BlankAtOrBefore(const NanosecondTickCount time) const noexcept
   {
-    return m_timeline.BlankAtOrBefore(time, m_rule.Refresh());
+    return m_timeline.BlankAtOrBefore(time, m_rule.Refresh()) - m_heldSlots;
   }
 
   int64_t VBlankLoopPacer::FirstBlankAfterReadyAt(const NanosecondTickCount readyTime) const noexcept
@@ -76,9 +81,36 @@ namespace MB::FramePacing::Pacer
     return (!m_waitsForPresent && m_waitsForGpuWork) ? GpuWaitRule::FramesInFlight(settings) : settings.MaxFramesInFlight();
   }
 
+  void VBlankLoopPacer::AddDisplayHeld(const NanosecondTimeDuration held) noexcept
+  {
+    // Added up over the waits before one frame: never more than the longest refresh period a time
+    const int64_t longest = RefreshPeriod::MaxPeriod.Nanoseconds();
+    m_displayHeld = NanosecondTimeSpan(std::min(m_displayHeld.Nanoseconds() + std::min(held.Nanoseconds(), longest), longest * 64));
+  }
+
+  NanosecondTimeDuration VBlankLoopPacer::WithoutGpuWork(const NanosecondTimeDuration blocked) const noexcept
+  {
+    // A wait for the GPU's work on a frame, or for a frame slot, holds the loop while the GPU works and also while a frame
+    // that is done, or not begun, waits for the display's side. What of it was the GPU's is not in the wait: it is taken
+    // to be no more than the GPU's time on a frame as it was last reported, and the frame margin. Without a reported GPU
+    // time the whole wait is the GPU's: a loop the GPU limits is late, and is not to be read as held by the display
+    if (!m_frameWork.HasGpuTime())
+    {
+      return {};
+    }
+    const int64_t gpuNanoseconds = m_frameWork.GpuTime().Nanoseconds() + m_rule.Settings().FrameMargin().Nanoseconds();
+    return NanosecondTimeDuration::FromNanoseconds(std::max(blocked.Nanoseconds() - gpuNanoseconds, int64_t{0}));
+  }
+
   void VBlankLoopPacer::AddGpuWait(const GpuWaitReport& report) noexcept
   {
     m_gpuWait.AddGpuWait(report, m_rule.Refresh());
+    AddDisplayHeld(WithoutGpuWork(report.Blocked()));
+  }
+
+  void VBlankLoopPacer::AddSystemWait(const SystemWaitReport& report) noexcept
+  {
+    AddDisplayHeld(report.Kind == SystemWaitKind::FrameSlot ? WithoutGpuWork(report.Blocked()) : report.Blocked());
   }
 
   int64_t VBlankLoopPacer::Reserve() const noexcept
@@ -468,7 +500,22 @@ namespace MB::FramePacing::Pacer
       displaySlot = std::max(displaySlot, FirstBlankAfterReadyAt(m_takeOverPresentTime + GpuLead()) + int64_t{swapInterval});
     }
     m_hasTakeOverPresent = false;
-    m_startedLate = hasPrevious && displaySlot > previousShown + m_pauseSlots + int64_t{swapInterval};
+    const int64_t dueSlot = previousShown + m_pauseSlots + int64_t{swapInterval};
+    if (hasPrevious && displaySlot > dueSlot && m_displayHeld.Nanoseconds() >= (period.ToNanosecondTimeSpan().Nanoseconds() / HeldDivisor))
+    {
+      // The display's side held the loop before this frame: the frames before it were still on their way, and are shown one
+      // after the other while it was held. The vertical blanks it was held over are no refreshes that were lost: the
+      // frame is for the blank its swap interval after the last one, as if they had not been, the animation time does
+      // not step over them, and it is that many refreshes further behind the clock. What the start was late by beyond
+      // the display's hold is late as any start is
+      const int64_t held = std::min(displaySlot - dueSlot, period.RefreshesToFit(m_displayHeld));
+      m_heldSlots += held;
+      displaySlot -= held;
+      m_refreshesBehindClock += static_cast<uint64_t>(held);
+      m_displayHeldRefreshes += static_cast<uint64_t>(held);
+    }
+    m_displayHeld = NanosecondTimeSpan();
+    m_startedLate = hasPrevious && displaySlot > dueSlot;
     if (m_takenOver)
     {
       // Another pacer placed the frames up to this one: the frame window's times go on on the vertical blanks, the frame
@@ -564,6 +611,8 @@ namespace MB::FramePacing::Pacer
   void VBlankLoopPacer::AddPresent(const PresentReport& report) noexcept
   {
     m_lastPresentBlocked = report.Blocked();
+    // A present that waited for the display held the loop before the next frame
+    AddDisplayHeld(report.Blocked());
     if (m_frameEnded && report.FrameId == m_frameId)
     {
       m_presentTime = report.CallTime;
@@ -652,6 +701,7 @@ namespace MB::FramePacing::Pacer
     m_hasFrame = handover.HasFrame;
     m_takenOver = handover.HasFrame;
     m_takeOverStartTime = handover.NextFrameStartTime;
+    m_displayHeld = NanosecondTimeSpan();
     m_hasTakeOverPresent = handover.HasFrame && handover.HasPresentTime;
     m_takeOverPresentTime = handover.LastPresentTime;
     m_startTime = handover.StartTime;

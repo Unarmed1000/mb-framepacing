@@ -118,7 +118,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
                                             tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp tests/FrameWorkRuleTests.cpp
                                             tests/TimerPeriodOnlyPacerTests.cpp tests/TimerWaitForPresentPacerTests.cpp
                                             tests/VBlankPeriodOnlyPacerTests.cpp tests/FrameRateStepTests.cpp
-                                            tests/VBlankWaitForPresentPacerTests.cpp tests/GpuWaitLoopTests.cpp tests/GpuWaitRuleTests.cpp tests/ActiveSetChangeLoopTests.cpp tests/DisplayErrorCounterTests.cpp tests/TimedPresentLoopTests.cpp tests/DisplayPlacementUtilTests.cpp tests/TierPacerTests.cpp tests/VBlankTimelineTests.cpp tests/PresentWaitRuleTests.cpp)
+                                            tests/VBlankWaitForPresentPacerTests.cpp tests/DisplayHeldLoopTests.cpp tests/GpuWaitLoopTests.cpp tests/GpuWaitRuleTests.cpp tests/ActiveSetChangeLoopTests.cpp tests/DisplayErrorCounterTests.cpp tests/TimedPresentLoopTests.cpp tests/DisplayPlacementUtilTests.cpp tests/TierPacerTests.cpp tests/VBlankTimelineTests.cpp tests/PresentWaitRuleTests.cpp)
   target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests
