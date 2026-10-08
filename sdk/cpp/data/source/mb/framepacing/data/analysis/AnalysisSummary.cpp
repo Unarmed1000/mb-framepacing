@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/data/analysis/SummaryCamera.hpp>
@@ -160,10 +160,10 @@ namespace MB::FramePacing::Data
       }
     }
 
-    //! A time: a whole number of ticks.
-    TimeSpan RequiredTicks(const Json& object, const char* name)
+    //! A time: a whole number of nanoseconds.
+    NanosecondTimeSpan RequiredNanoseconds(const Json& object, const char* name)
     {
-      return TimeSpan(Required<int64_t>(object, name));
+      return NanosecondTimeSpan(Required<int64_t>(object, name));
     }
 
     std::vector<std::string> Texts(const Json& object, const char* name)
@@ -263,9 +263,9 @@ namespace MB::FramePacing::Data
       if (const Json* pacing = OptionalObject(value, "pacing"))
       {
         SummaryPacing p;
-        p.RefreshPeriod = RequiredTicks(*pacing, "refreshPeriodTicks");
+        p.RefreshPeriod = RequiredNanoseconds(*pacing, "refreshPeriodNs");
         p.RefreshCalculated = Required<bool>(*pacing, "refreshCalculated");
-        p.TargetFrameTime = RequiredTicks(*pacing, "targetFrameTicks");
+        p.TargetFrameTime = RequiredNanoseconds(*pacing, "targetFrameNs");
         p.Source = Required<std::string>(*pacing, "source");
         p.LateFrames = Required<int64_t>(*pacing, "lateFrames");
         p.LateShare = Required<double>(*pacing, "lateShare");
@@ -344,14 +344,14 @@ namespace MB::FramePacing::Data
     }
     summary.FrameSize = Optional<std::string>(root, "frameSize");
     summary.TimeSource = Optional<std::string>(root, "timeSource");
-    summary.CapturePeriod = RequiredTicks(root, "capturePeriodTicks");
+    summary.CapturePeriod = RequiredNanoseconds(root, "capturePeriodNs");
     // 0 is a file without the field, as C# reads it
-    summary.MeasurementResolution = TimeSpan(OrDefault<int64_t>(root, "measurementResolutionTicks", 0));
-    if (summary.MeasurementResolution == TimeSpan::Zero())
+    summary.MeasurementResolution = NanosecondTimeSpan(OrDefault<int64_t>(root, "measurementResolutionNs", 0));
+    if (summary.MeasurementResolution == NanosecondTimeSpan::Zero())
     {
       summary.MeasurementResolution = summary.CapturePeriod;
     }
-    summary.ErrorThreshold = RequiredTicks(root, "errorThresholdTicks");
+    summary.ErrorThreshold = RequiredNanoseconds(root, "errorThresholdNs");
     if (const Json* markers = OptionalList(root, "markers"))
     {
       for (const Json& marker : *markers)

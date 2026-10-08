@@ -8,7 +8,6 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
@@ -20,7 +19,8 @@ namespace MB.FramePacing.Charts.UnitTest
   [TestFixture]
   public class HoldKindTests
   {
-    private const long Period = TimeSpan.TicksPerSecond / 60;
+    // 1/60 s cut to the nanosecond
+    private const long Period = 16_666_666;
 
     /// <summary>
     /// Capture rows of a 60 Hz capture card: each entry is a frame index shown for one capture, or null for a capture not recorded. The pacer
@@ -32,9 +32,14 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var rows = new List<CaptureRow>();
       void Add(CaptureStatus status, MarkerPayload payload) =>
-        rows.Add(new CaptureRow(rows.Count, status == CaptureStatus.NotRecorded ? default : new TickCount64(rows.Count * Period), status, payload));
+        rows.Add(
+          new CaptureRow(rows.Count, status == CaptureStatus.NotRecorded ? default : new NanosecondTickCount(rows.Count * Period), status, payload)
+        );
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)));
+        Add(
+          CaptureStatus.Decoded,
+          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0))
+        );
       foreach (var index in shown)
       {
         if (index is { } frame)
@@ -45,15 +50,18 @@ namespace MB.FramePacing.Charts.UnitTest
               1,
               frame,
               MB.FramePacing.Marker.MarkerFlags.NoFlags,
-              new TimeSpan((long)frame * Period),
-              IntendedDisplayTime: new TickCount64(schedule ? 1_000_000 + ((long)frame * Period) : 0)
+              new NanosecondTimeSpan((long)frame * Period),
+              IntendedDisplayTime: new NanosecondTickCount(schedule ? 100_000_000 + ((long)frame * Period) : 0)
             )
           );
         else
           Add(CaptureStatus.NotRecorded, default);
       }
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)));
+        Add(
+          CaptureStatus.Decoded,
+          new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0))
+        );
       var result = TimelineAnalyzer.Analyze(rows);
       return RunChartData.Of(new ChartRun(result.Runs.Single(), result.CapturePeriod, result.ErrorThreshold, Camera: false));
     }
@@ -80,7 +88,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var data = Data(schedule: false, 1, 2, 3, 3, 5, 6, 7);
 
       Assert.That(data.Run.Run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
-      Assert.That(data.Frames[3].TargetFrameTime?.Ticks, Is.EqualTo(2 * Period), "frame 5 is due two refreshes after frame 3");
+      Assert.That(data.Frames[3].TargetFrameTime?.Nanoseconds, Is.EqualTo(2 * Period), "frame 5 is due two refreshes after frame 3");
       Assert.That(data.Frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.All.False);
       Assert.That(data.HoldKinds[2], Is.EqualTo(HoldKind.FramesDropped));
     }

@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* Capture source that renders a SyntheticScenario like a capture card, at the display's native refresh rate: frames carry real markers,
-//* device ticks are the exact simulated capture instants. Runs either paced in real time (to exercise the recorder like real hardware) or as
+//* device times are the exact simulated capture instants. Runs either paced in real time (to exercise the recorder like real hardware) or as
 //* fast as possible.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -61,7 +61,7 @@ namespace MB.FramePacing.Capture.Synthetic
       {
         var captureTime = m_scenario.CaptureTime(captureIndex);
         if (m_paced)
-          WaitUntil(clock, runStart + captureTime.ToTimeSpan(), cancellationToken);
+          WaitUntil(clock, runStart + captureTime.ToNanosecondTimeSpan(), cancellationToken);
 
         int presentedIndex = m_scenario.PresentedIndexAt(captureIndex);
         if (presentedIndex != shownIndex)
@@ -89,14 +89,14 @@ namespace MB.FramePacing.Capture.Synthetic
       MarkerRenderer.Render(frame, payload, o.OriginX, o.OriginY, o.ModuleSizePx, MarkerRenderer.RecommendedQuietZoneModules, metadata);
     }
 
-    private static void WaitUntil(CaptureClock clock, TickCount64 target, CancellationToken cancellationToken)
+    private static void WaitUntil(CaptureClock clock, NanosecondTickCount target, CancellationToken cancellationToken)
     {
       while (!cancellationToken.IsCancellationRequested)
       {
         var remaining = target - clock.Now;
-        if (remaining <= TimeSpan.Zero)
+        if (remaining <= NanosecondTimeSpan.Zero)
           return;
-        if (remaining > TimeSpan.FromMilliseconds(2))
+        if (remaining > NanosecondTimeSpan.FromMilliseconds(2))
           Thread.Sleep(1);
         else
           Thread.SpinWait(64);

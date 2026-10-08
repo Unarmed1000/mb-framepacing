@@ -123,7 +123,7 @@ namespace MB.FramePacing.Capture.UnitTest
           if (position(i) is { } origin)
             MarkerRenderer.Render(
               image,
-              new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(i * 41_667L)),
+              new MarkerPayload(MarkerKind.Frame, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(i * 4_166_667L)),
               origin.X,
               origin.Y,
               ModulePx
@@ -131,13 +131,13 @@ namespace MB.FramePacing.Capture.UnitTest
           if (syncPosition?.Invoke(i) is { } syncOrigin)
             MarkerRenderer.Render(
               image,
-              new MarkerPayload(MarkerKind.Sync, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)),
+              new MarkerPayload(MarkerKind.Sync, 1, (ulong)i, MB.FramePacing.Marker.MarkerFlags.NoFlags, NanosecondTimeSpan.Zero),
               syncOrigin.X,
               syncOrigin.Y,
               ModulePx
             );
           image.Pixels.CopyTo(sink.BeginFrame());
-          sink.EndFrame(clock.Now, new DeviceTimestamp(new TickCount64(i * 41_667L)), 0);
+          sink.EndFrame(clock.Now, new DeviceTimestamp(new NanosecondTickCount(i * 4_166_667L)), 0);
         }
       }
 

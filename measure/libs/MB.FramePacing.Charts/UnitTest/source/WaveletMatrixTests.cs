@@ -46,7 +46,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(matrix.KthSmallest(start, end, end - start - 1), Is.EqualTo(sorted[^1]), "max");
         long bound = values[random.Next(0, count)] + random.Next(-1, 2);
         Assert.That(matrix.CountBelow(start, end, bound), Is.EqualTo(sorted.Count(v => v < bound)), $"below {bound} in {start}..{end}");
-        var ms = sorted.Select(v => v / (double)TimeSpan.TicksPerMillisecond).ToArray();
+        var ms = sorted.Select(v => v / (double)NanosecondTimeSpan.NanosecondsPerMillisecond).ToArray();
         foreach (double fraction in new[] { 0, 0.05, 0.5, 0.95, 0.99, 1 })
           Assert.That(matrix.PercentileMs(start, end, fraction), Is.EqualTo(Statistics.Percentile(ms, fraction)), $"p{fraction}");
       }

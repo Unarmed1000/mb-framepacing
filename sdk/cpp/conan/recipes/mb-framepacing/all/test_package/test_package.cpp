@@ -85,14 +85,14 @@ int main()
   const FM::Payload payload{FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime, frameTime, frameTime};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
-  const int64_t ticks = FP::Data::ParseSummary(R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000 })").CapturePeriod.Ticks();
+  const int64_t capturePeriod = FP::Data::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000 })").CapturePeriod.Nanoseconds();
   const std::string_view version = FP::GetLibraryVersion().Text;
-  std::printf("mb_framepacing %.*s: %zu vertices, a capture period of %lld ticks, a %lld ns frame\n", static_cast<int>(version.size()),
-              version.data(), count, static_cast<long long>(ticks), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()));
+  std::printf("mb_framepacing %.*s: %zu vertices, a capture period of %lld ns, a %lld ns frame\n", static_cast<int>(version.size()), version.data(),
+              count, static_cast<long long>(capturePeriod), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()));
 #ifdef MB_TEST_PACKAGE_PACER
   const bool paced = PaceOneFrame(frameIndex);
 #else
   const bool paced = true;
 #endif
-  return count > 0 && ticks == 166'667 && payload.TargetFrameTime().Nanoseconds() == 16'666'667 && paced ? 0 : 1;
+  return count > 0 && capturePeriod == 16'666'667 && payload.TargetFrameTime().Nanoseconds() == 16'666'667 && paced ? 0 : 1;
 }

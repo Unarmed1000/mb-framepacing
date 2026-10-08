@@ -95,15 +95,16 @@ namespace MB.FramePacing.Analysis.UnitTest
       var errors = new List<double>();
       for (int i = 1; i < truth.Count; ++i)
       {
-        double expected = camera.ToCameraTicks(truth[i].DisplayTime.Ticks - truth[i - 1].DisplayTime.Ticks);
-        errors.Add(Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - expected) / TimeSpan.TicksPerMillisecond);
+        double expected = camera.ToCameraNanoseconds((truth[i].DisplayTime - truth[i - 1].DisplayTime).Nanoseconds);
+        errors.Add(Math.Abs(run.Frames[i].DisplayDelta!.Value.Nanoseconds - expected) / NanosecondTimeSpan.NanosecondsPerMillisecond);
       }
       TestContext.Out.WriteLine($"display delta error: mean {errors.Average():0.000} ms, max {errors.Max():0.000} ms");
       Assert.That(errors.Max(), Is.LessThanOrEqualTo(2.0));
       Assert.That(errors.Average(), Is.LessThan(0.8));
 
       Assert.That(run.Camera, Is.Not.Null);
-      double scanout = camera.ToCameraTicks(camera.ZoneScanTicks(1) - camera.ZoneScanTicks(0)) / TimeSpan.TicksPerMillisecond;
+      double scanout =
+        camera.ToCameraNanoseconds(camera.ZoneScanNanoseconds(1) - camera.ZoneScanNanoseconds(0)) / NanosecondTimeSpan.NanosecondsPerMillisecond;
       Assert.That(run.Camera!.ScanoutDelay.P50, Is.EqualTo(scanout).Within(1.0));
       Assert.That(run.Camera.TornFrames, Is.EqualTo(0));
       Assert.That(run.Camera.SecondZoneOnlyFrames, Is.EqualTo(0));
@@ -111,13 +112,11 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.Torn, Is.EqualTo(0), "zones that disagree are scanout progress, not torn captures");
 
       // The camera films faster than the display, so the display's refresh is calculated from the frames; the stalls are late
-      double refreshMs = camera.ToCameraTicks(camera.Scenario.RefreshInterval.Ticks) / TimeSpan.TicksPerMillisecond;
+      double refreshMs = camera.ToCameraNanoseconds(camera.Scenario.RefreshInterval.Nanoseconds) / NanosecondTimeSpan.NanosecondsPerMillisecond;
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshCalculated);
       Assert.That(run.Pacing.RefreshPeriod.TotalMilliseconds, Is.EqualTo(refreshMs).Within(0.1));
-      int stalls = Enumerable
-        .Range(1, truth.Count - 1)
-        .Count(i => truth[i].DisplayTime.Ticks - truth[i - 1].DisplayTime.Ticks > camera.Scenario.RefreshInterval.Ticks);
+      int stalls = Enumerable.Range(1, truth.Count - 1).Count(i => truth[i].DisplayTime - truth[i - 1].DisplayTime > camera.Scenario.RefreshInterval);
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(stalls));
     }
 
@@ -130,7 +129,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = report.Timeline.Runs.Single();
       // The synthetic tear happens half a refresh after vsync: below the top zone, above the bottom one
       var torn = RunFrames(camera)
-        .Where(f => f.DisplayTime.Ticks % camera.Scenario.RefreshInterval.Ticks != 0)
+        .Where(f => f.DisplayTime.Nanoseconds % camera.Scenario.RefreshInterval.Nanoseconds != 0)
         .Select(f => f.Payload.FrameIndex)
         .ToHashSet();
       var flagged = run.Frames.Where(f => f.Flags.HasFlag(PresentedFrameFlags.Torn)).Select(f => f.FrameIndex).ToHashSet();

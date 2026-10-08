@@ -91,7 +91,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var root = data.RootElement;
       Assert.That(root.GetProperty("video").GetProperty("url").GetString(), Is.EqualTo("video.mp4"));
       Assert.That(root.GetProperty("video").GetProperty("playable").GetBoolean(), Is.True);
-      Assert.That(root.GetProperty("originTicks").GetInt64(), Is.EqualTo(run.Frames[0].FirstSeenTime.Ticks));
+      Assert.That(root.GetProperty("originNs").GetInt64(), Is.EqualTo(run.Frames[0].FirstSeenTime.Nanoseconds));
 
       // The plots are the cards', as the page draws them (its own header has the title and the tiles)
       var cards = root.GetProperty("cards").EnumerateArray().ToList();
@@ -115,11 +115,11 @@ namespace MB.FramePacing.Charts.UnitTest
       // Every frame of the run, as the analysis has it
       var frames = PlaybackFrameColumns.Read(root);
       var origin = run.Frames[0].FirstSeenTime;
-      Assert.That(frames["t"], Is.EqualTo(run.Frames.Select(f => (long?)(f.FirstSeenTime - origin).Ticks)));
+      Assert.That(frames["t"], Is.EqualTo(run.Frames.Select(f => (long?)(f.FirstSeenTime - origin).Nanoseconds)));
       Assert.That(frames["index"], Is.EqualTo(run.Frames.Select(f => (long?)f.FrameIndex)));
       Assert.That(frames["capture"], Is.EqualTo(run.Frames.Select(f => (long?)f.FirstCaptureIndex)));
-      Assert.That(frames["error"], Is.EqualTo(run.Frames.Select(f => f.AnimationError?.Ticks)));
-      Assert.That(frames["step"], Is.EqualTo(run.Frames.Skip(1).Select(f => f.DisplayDelta?.Ticks).Append(null)));
+      Assert.That(frames["error"], Is.EqualTo(run.Frames.Select(f => f.AnimationError?.Nanoseconds)));
+      Assert.That(frames["step"], Is.EqualTo(run.Frames.Skip(1).Select(f => f.DisplayDelta?.Nanoseconds).Append(null)));
       Assert.That(frames["flags"].Count(f => (f!.Value & (long)PresentedFrameFlags.Late) != 0), Is.EqualTo(run.Pacing!.LateFrames));
 
       // A section's report: a folder of its own (with its own copy, answered in advance) and only the section's frames
@@ -139,7 +139,7 @@ namespace MB.FramePacing.Charts.UnitTest
       using var sectionData = PageData(File.ReadAllText(section.Pages[0]));
       var times = PlaybackFrameColumns.Read(sectionData.RootElement)["t"];
       Assert.That(times, Is.Not.Empty);
-      Assert.That(times, Is.All.InRange(2 * TimeSpan.TicksPerSecond, 4 * TimeSpan.TicksPerSecond));
+      Assert.That(times, Is.All.InRange(2 * NanosecondTimeSpan.NanosecondsPerSecond, 4 * NanosecondTimeSpan.NanosecondsPerSecond));
 
       // The copy shows every capture at the time the import read from the recording
       var again = CaptureAnalyzer.Analyze(

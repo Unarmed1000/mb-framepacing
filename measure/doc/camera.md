@@ -169,7 +169,7 @@ absolute times are later than vsync.
 
 The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`run-*-frames.csv`):
 
-- **Scanout delay** (`scanoutDelay`, `scanoutDelayTicks`, with `mainMarkerFirstSeenTicks`): how much later the sync marker shows each
+- **Scanout delay** (`scanoutDelay`, `scanoutDelayNs`, with `mainMarkerFirstSeenNs`): how much later the sync marker shows each
   frame than the main marker. It is roughly constant; its median is the time the scanout takes between the two markers.
 - **Camera tears** (`tornFrames`, flag `Torn`): a frame that reached the sync marker clearly before the main marker was
   presented while the scanout was between them (vsync off).
@@ -178,7 +178,7 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
 - `captures.csv` has the second zone's marker in `syncRunId` and `syncFrameIndex`. Zones that disagree are normal for a camera and are
   **not** counted as torn captures.
 - `UncertainStart` is only set when the gap before a frame is clearly longer than the usual scanout transition.
-- **The display's refresh rate** (`runs[].pacing.refreshPeriodTicks`, `refreshCalculated: true`): a capture card captures at the
+- **The display's refresh rate** (`runs[].pacing.refreshPeriodNs`, `refreshCalculated: true`): a capture card captures at the
   refresh rate, a camera films faster, so the refresh is calculated from the frames. The first-seen intervals are whole refreshes
   quantised to camera periods; the refresh is the largest period that makes them whole multiples. A steady game below the refresh
   rate is ambiguous alone: the rig's calibrated refresh settles it, and the analysis warns when the two disagree. The intervals

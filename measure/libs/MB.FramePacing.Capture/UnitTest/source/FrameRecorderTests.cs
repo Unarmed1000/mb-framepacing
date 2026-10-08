@@ -28,19 +28,19 @@ namespace MB.FramePacing.Capture.UnitTest
 
       public void Release() => m_gate.Set();
 
-      public bool TryGetDeviceTime(long captureIndex, out TickCount64 deviceTime)
+      public bool TryGetDeviceTime(long captureIndex, out NanosecondTickCount deviceTime)
       {
         m_gate.Wait();
-        deviceTime = new TickCount64(captureIndex * 10);
+        deviceTime = new NanosecondTickCount(captureIndex * 10);
         return true;
       }
     }
 
     private sealed class DictionaryTimestamps : IDeviceTimestampSource
     {
-      public readonly Dictionary<long, TickCount64> Values = new Dictionary<long, TickCount64>();
+      public readonly Dictionary<long, NanosecondTickCount> Values = new Dictionary<long, NanosecondTickCount>();
 
-      public bool TryGetDeviceTime(long captureIndex, out TickCount64 deviceTime)
+      public bool TryGetDeviceTime(long captureIndex, out NanosecondTickCount deviceTime)
       {
         lock (Values)
           return Values.TryGetValue(captureIndex, out deviceTime);
@@ -54,7 +54,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var pixels = recorder.BeginFrame();
         pixels.Fill((byte)(i & 0xFF));
-        recorder.EndFrame(new TickCount64(i * 100), DeviceTimestamp.Pending, 0);
+        recorder.EndFrame(new NanosecondTickCount(i * 100), DeviceTimestamp.Pending, 0);
       }
     }
 
@@ -73,7 +73,7 @@ namespace MB.FramePacing.Capture.UnitTest
             Thread.Sleep(0);
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)i);
-          recorder.EndFrame(new TickCount64(i), new DeviceTimestamp(new TickCount64(i * 3)), 0);
+          recorder.EndFrame(new NanosecondTickCount(i), new DeviceTimestamp(new NanosecondTickCount(i * 3)), 0);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);
@@ -86,7 +86,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var header = reader.ReadRecord(i, image);
         Assert.That(header.CaptureIndex, Is.EqualTo(i));
-        Assert.That(header.DeviceTime.Time.Ticks, Is.EqualTo(i * 3));
+        Assert.That(header.DeviceTime.Time.Nanoseconds, Is.EqualTo(i * 3));
         Assert.That(image[0, 0], Is.EqualTo((byte)i));
       }
     }
@@ -114,7 +114,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var header = reader.ReadRecordHeader(i);
         Assert.That(header.CaptureIndex, Is.EqualTo(i));
-        Assert.That(header.DeviceTime.Time.Ticks, Is.EqualTo(i * 10), "late device timestamp resolved by the writer");
+        Assert.That(header.DeviceTime.Time.Nanoseconds, Is.EqualTo(i * 10), "late device timestamp resolved by the writer");
       }
     }
 
@@ -133,7 +133,7 @@ namespace MB.FramePacing.Capture.UnitTest
         {
           recorder.BeginFrame();
           // Every frame the ring drops says the source dropped 2 before it
-          recorder.EndFrame(new TickCount64(i * 100), DeviceTimestamp.Pending, i >= RingFrames ? 2u : 0u);
+          recorder.EndFrame(new NanosecondTickCount(i * 100), DeviceTimestamp.Pending, i >= RingFrames ? 2u : 0u);
         }
         Assert.That(recorder.Stats.FramesDropped, Is.EqualTo(5));
         gate.Release();
@@ -141,7 +141,7 @@ namespace MB.FramePacing.Capture.UnitTest
         while (recorder.Stats.RingFill > 0 && DateTime.UtcNow < deadline)
           Thread.Sleep(1);
         recorder.BeginFrame();
-        recorder.EndFrame(new TickCount64((RingFrames + 5) * 100), DeviceTimestamp.Pending, 1u);
+        recorder.EndFrame(new NanosecondTickCount((RingFrames + 5) * 100), DeviceTimestamp.Pending, 1u);
         recorder.Complete();
       }
 
@@ -168,7 +168,7 @@ namespace MB.FramePacing.Capture.UnitTest
             Thread.Sleep(0);
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)i);
-          recorder.EndFrame(new TickCount64(i * 100), new DeviceTimestamp(new TickCount64(i * 3)), i == 5 ? 3u : 0u);
+          recorder.EndFrame(new NanosecondTickCount(i * 100), new DeviceTimestamp(new NanosecondTickCount(i * 3)), i == 5 ? 3u : 0u);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);
@@ -178,8 +178,8 @@ namespace MB.FramePacing.Capture.UnitTest
       using var reader = new CaptureDataReader(path);
       var records = reader.ReadAll();
       Assert.That(records.Select(r => r.CaptureIndex), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long)i)));
-      Assert.That(records.Select(r => r.HostTime.Ticks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
-      Assert.That(records.Select(r => r.DeviceTime?.Ticks), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long?)(i * 3L))));
+      Assert.That(records.Select(r => r.HostTime.Nanoseconds), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i * 100L)));
+      Assert.That(records.Select(r => r.DeviceTime?.Nanoseconds), Is.EqualTo(Enumerable.Range(0, 200).Select(i => (long?)(i * 3L))));
       Assert.That(records.Select(r => r.SourceDrops), Is.EqualTo(Enumerable.Range(0, 200).Select(i => i == 5 ? 3u : 0u)));
       Assert.That(records.All(r => r.CaptureStatus == CaptureDataStatus.Undecodable && r.MainBytes == null), "no marker in these frames");
       Assert.That(System.IO.File.Exists(temp.File("frames.mbfc")), Is.False);
@@ -214,7 +214,7 @@ namespace MB.FramePacing.Capture.UnitTest
         var header = frameReader.ReadRecordHeader(i);
         var record = dataReader.ReadRecord(i);
         Assert.That((record.CaptureIndex, record.DeviceTime), Is.EqualTo((header.CaptureIndex, header.DeviceTime.ToNullable())));
-        Assert.That(record.DeviceTime?.Ticks, Is.EqualTo(i * 10), "the late device timestamp, resolved by the writer");
+        Assert.That(record.DeviceTime?.Nanoseconds, Is.EqualTo(i * 10), "the late device timestamp, resolved by the writer");
       }
     }
 
@@ -227,7 +227,7 @@ namespace MB.FramePacing.Capture.UnitTest
       lock (timestamps.Values)
       {
         for (int i = 0; i < 10; i += 2)
-          timestamps.Values[i] = new TickCount64(1_000_000 + i);
+          timestamps.Values[i] = new NanosecondTickCount(1_000_000 + i);
       }
       var options = new FrameRecorderOptions { RingFrames = 32, DeviceTimeWait = TimeSpan.FromMilliseconds(30) };
       using (var writer = new CaptureFileWriter(path, g_header))
@@ -247,7 +247,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var header = reader.ReadRecordHeader(i);
         if (i % 2 == 0)
-          Assert.That(header.DeviceTime.Time.Ticks, Is.EqualTo(1_000_000 + i));
+          Assert.That(header.DeviceTime.Time.Nanoseconds, Is.EqualTo(1_000_000 + i));
         else
           Assert.That(header.DeviceTime, Is.EqualTo(DeviceTimestamp.Unknown));
       }
@@ -280,7 +280,7 @@ namespace MB.FramePacing.Capture.UnitTest
           {
             await System.Threading.Tasks.Task.Delay(i == 0 ? 400 : 5);
             lock (timestamps.Values)
-              timestamps.Values[i] = new TickCount64(1_000_000 + i);
+              timestamps.Values[i] = new NanosecondTickCount(1_000_000 + i);
           }
         });
         ProducePending(recorder, Frames);
@@ -292,7 +292,7 @@ namespace MB.FramePacing.Capture.UnitTest
       using var reader = new CaptureFileReader(path);
       Assert.That(reader.RecordCount, Is.EqualTo(Frames));
       for (int i = 0; i < Frames; ++i)
-        Assert.That(reader.ReadRecordHeader(i).DeviceTime.Time.Ticks, Is.EqualTo(1_000_000 + i), $"record {i}");
+        Assert.That(reader.ReadRecordHeader(i).DeviceTime.Time.Nanoseconds, Is.EqualTo(1_000_000 + i), $"record {i}");
     }
 
     [Test]
@@ -312,7 +312,7 @@ namespace MB.FramePacing.Capture.UnitTest
         for (int i = 0; i < 50; ++i)
         {
           recorder.BeginFrame();
-          recorder.EndFrame(new TickCount64(i), new DeviceTimestamp(new TickCount64(i)), 0);
+          recorder.EndFrame(new NanosecondTickCount(i), new DeviceTimestamp(new NanosecondTickCount(i)), 0);
           // Give the writer a chance to trim so the ring never fills
           if (i % 8 == 0)
             Thread.Sleep(5);
@@ -326,7 +326,7 @@ namespace MB.FramePacing.Capture.UnitTest
         for (int i = 50; i < 60; ++i)
         {
           recorder.BeginFrame();
-          recorder.EndFrame(new TickCount64(i), new DeviceTimestamp(new TickCount64(i)), 0);
+          recorder.EndFrame(new NanosecondTickCount(i), new DeviceTimestamp(new NanosecondTickCount(i)), 0);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);
@@ -401,7 +401,7 @@ namespace MB.FramePacing.Capture.UnitTest
             WaitForRoom(recorder);
           var pixels = recorder.BeginFrame();
           pixels.Fill((byte)(i & 0xFF));
-          recorder.EndFrame(new TickCount64(i * 100), new DeviceTimestamp(new TickCount64(i * 7)), 0);
+          recorder.EndFrame(new NanosecondTickCount(i * 100), new DeviceTimestamp(new NanosecondTickCount(i * 7)), 0);
         }
         recorder.Complete();
         Assert.That(recorder.Stats.FramesDropped, Is.Zero);

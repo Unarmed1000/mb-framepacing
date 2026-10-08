@@ -20,8 +20,9 @@ namespace MB.FramePacing.Charts.UnitTest
   [TestFixture]
   public class StaticScaleTests
   {
-    private const long Period = TimeSpan.TicksPerSecond / 60;
-    private const uint Idle = (uint)TimeSpan.TicksPerSecond;
+    // 1/60 s cut to the nanosecond
+    private const long Period = 16_666_666;
+    private const long Idle = NanosecondTimeSpan.NanosecondsPerSecond;
     private const int IdleFrames = 4;
 
     /// <summary>
@@ -34,27 +35,27 @@ namespace MB.FramePacing.Charts.UnitTest
       void Add(MarkerPayload payload, int captures)
       {
         for (int k = 0; k < captures; ++k)
-          rows.Add(new CaptureRow(rows.Count, new TickCount64(rows.Count * Period), CaptureStatus.Decoded, payload));
+          rows.Add(new CaptureRow(rows.Count, new NanosecondTickCount(rows.Count * Period), CaptureStatus.Decoded, payload));
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)), 1);
+        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0)), 1);
       ulong index = 1;
       long animation = 0;
       void Frame(bool isIdle)
       {
         int captures = isIdle ? 60 : 1;
-        uint aim = isIdle ? Idle : (uint)Period;
+        long aim = isIdle ? Idle : Period;
         Add(
           new MarkerPayload(
             MarkerKind.Frame,
             1,
             index++,
             isIdle ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.NoFlags,
-            new TimeSpan(animation),
-            PreferredFrameTime: new TimeSpan32(aim),
-            TargetFrameTime: new TimeSpan32(aim),
-            CpuStartTime: new TickCount64(1_000_000 + (rows.Count * Period)),
-            CpuBusy: new TimeSpan32(isIdle ? Idle - 50_000 : 80_000)
+            new NanosecondTimeSpan(animation),
+            PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(aim),
+            TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(aim),
+            CpuStartTime: new NanosecondTickCount(100_000_000 + (rows.Count * Period)),
+            CpuBusy: NanosecondTimeDuration.FromNanoseconds(isIdle ? Idle - 5_000_000 : 8_000_000)
           ),
           captures
         );
@@ -67,7 +68,7 @@ namespace MB.FramePacing.Charts.UnitTest
       for (int i = 0; i < 60; ++i)
         Frame(isIdle: false);
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)), 1);
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0)), 1);
       var result = TimelineAnalyzer.Analyze(rows);
       return new ChartRun(result.Runs.Single(), result.CapturePeriod, result.ErrorThreshold, Camera: false);
     }
@@ -107,7 +108,7 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var data = RunChartData.Of(Run());
       int lastAnimating = data.StaticStretches[0].Start - 1;
-      long idle = FrameTimeRounding.WholeRefreshes(new TimeSpan(Idle), new TimeSpan(Period)).Ticks;
+      long idle = FrameTimeRounding.WholeRefreshes(new NanosecondTimeSpan(Idle), new NanosecondTimeSpan(Period)).Nanoseconds;
 
       Assert.That(data.AnimatingStepReferences.Frames[lastAnimating], Is.False, "its line comes from an idle frame");
       Assert.That(data.AllStepReferences.Frames[lastAnimating], Is.True);

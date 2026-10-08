@@ -71,12 +71,12 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(payload.Kind, Is.EqualTo(expected.Kind), where + ": kind");
         Assert.That(payload.FrameIndex, Is.EqualTo(expected.FrameIndex), where + ": frame index");
         Assert.That(payload.RunId, Is.EqualTo(expected.RunId), where + ": run id");
-        Assert.That(payload.AnimationTime.Ticks, Is.EqualTo(expected.AnimationTime.Ticks), where + ": animation time");
-        Assert.That(payload.IntendedDisplayTime.Ticks, Is.EqualTo(expected.IntendedDisplayTime.Ticks), where + ": intended display time");
-        Assert.That(payload.TargetFrameTime.Ticks, Is.EqualTo(expected.TargetFrameTime.Ticks), where + ": target frame time");
-        Assert.That(payload.CpuStartTime.Ticks, Is.EqualTo(expected.CpuStartTime.Ticks), where + ": CPU start time");
-        Assert.That(payload.CpuBusy.Ticks, Is.EqualTo(expected.CpuBusy.Ticks), where + ": CPU busy");
-        Assert.That(payload.PreferredFrameTime.Ticks, Is.EqualTo(expected.PreferredFrameTime.Ticks), where + ": preferred frame time");
+        Assert.That(payload.AnimationTime.Nanoseconds, Is.EqualTo(expected.AnimationTime.Nanoseconds), where + ": animation time");
+        Assert.That(payload.IntendedDisplayTime.Nanoseconds, Is.EqualTo(expected.IntendedDisplayTime.Nanoseconds), where + ": intended display time");
+        Assert.That(payload.TargetFrameTime.Nanoseconds, Is.EqualTo(expected.TargetFrameTime.Nanoseconds), where + ": target frame time");
+        Assert.That(payload.CpuStartTime.Nanoseconds, Is.EqualTo(expected.CpuStartTime.Nanoseconds), where + ": CPU start time");
+        Assert.That(payload.CpuBusy.Nanoseconds, Is.EqualTo(expected.CpuBusy.Nanoseconds), where + ": CPU busy");
+        Assert.That(payload.PreferredFrameTime.Nanoseconds, Is.EqualTo(expected.PreferredFrameTime.Nanoseconds), where + ": preferred frame time");
         Assert.That(payload.Flags, Is.EqualTo(expected.Flags), where + ": flags");
         if (expected.Kind == MarkerKind.SequenceStart)
         {
@@ -88,7 +88,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// The analysis of the decoded clip, frame by frame and to the tick: the presented frames (dropped frames never appear, a frame shown out of
+    /// The analysis of the decoded clip, frame by frame and to the nanosecond: the presented frames (dropped frames never appear, a frame shown out of
     /// order is not presented again) with their frame index and the indices skipped before them, display time step, animation time step and
     /// error (not judged from a static frame), drift, the late flag and how late, the target and preferred frame time, the pacing and
     /// prediction errors against the pacer's schedule in the markers, and the CPU start time, CPU busy, frametime and CPU wait.
@@ -135,6 +135,23 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(guessed.Statistics.AnimationErrorMs.Min, Is.EqualTo(0).Within(0.01), $"{clip}: no error left with it");
     }
 
+    /// <summary>
+    /// Clips whose frames are all shown on time, at the full rate and at half of it: the markers' animation times and the video's frame
+    /// times are the same whole nanoseconds, so every judged frame's animation error is exactly 0.
+    /// </summary>
+    [TestCase("60")]
+    [TestCase("30")]
+    [TestCase("60-diagram-half-rate-even")]
+    public void FramesShownOnTime_HaveNoAnimationErrorAtAll(string clip)
+    {
+      var run = CaptureAnalyzer.Analyze(Import(clip), new AnalysisOptions()).Timeline.Runs.Single();
+      var errors = run.Frames.Where(f => f.AnimationError.HasValue).Select(f => f.AnimationError!.Value.Nanoseconds).ToList();
+
+      Assert.That(errors, Has.Count.EqualTo(run.Frames.Count - 1), $"{clip}: every frame after the first is judged");
+      Assert.That(errors, Is.All.Zero, $"{clip}: animation errors in nanoseconds");
+      Assert.That(run.Statistics.AbsoluteAnimationErrorMs.Max, Is.Zero, $"{clip}: the largest |animation error|");
+    }
+
     private void CheckAgainstManifest(string clip, bool assumeStatic)
     {
       var manifest = VideoClips.Manifest(clip) with { AssumeStatic = assumeStatic };
@@ -146,13 +163,13 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(manifest.ExpectedSkippedFrameIndices), $"{clip}: frame indices never presented");
       Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(manifest.ExpectedOutOfOrderCaptures), $"{clip}: captures out of order");
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule), "the markers carry the pacer's schedule");
-      long refresh = run.Pacing.RefreshPeriod.Ticks;
-      Assert.That(refresh, Is.AnyOf(166666L, 166667L), "the refresh is the capture period: 1/60 s in whole ticks");
+      long refresh = run.Pacing.RefreshPeriod.Nanoseconds;
+      Assert.That(refresh, Is.AnyOf(16_666_666L, 16_666_667L), "the refresh is the capture period: 1/60 s to the nanosecond");
 
       // Lateness is measured from the run's on-time frames: the earliest (shown - intended) of the frames on time (an out-of-order frame is early)
       long onTime = Enumerable
         .Range(0, manifest.FrameCount)
-        .Where(i => manifest.IntendedTicks(i) != 0 && manifest.LateRefreshes(i) == 0)
+        .Where(i => manifest.IntendedNanoseconds(i) != 0 && manifest.LateRefreshes(i) == 0)
         .Min(i => Behind(manifest, i));
       for (int i = 0; i < manifest.FrameCount; ++i)
       {
@@ -161,8 +178,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.FrameIndex, Is.EqualTo(manifest.FrameIndex(i)), where + ": frame index");
         // The refreshes after it that showed an older frame out of order: kept with the frame, at their capture's time
         Assert.That(
-          (frame.OlderFrames ?? Array.Empty<OlderFrameCapture>()).Select(o => (o.FrameIndex, o.CaptureTime.Ticks)),
-          Is.EqualTo(manifest.OlderFramesAfter(i).Select(o => (o.FrameIndex, manifest.VideoFrameTicks(o.Refresh)))),
+          (frame.OlderFrames ?? Array.Empty<OlderFrameCapture>()).Select(o => (o.FrameIndex, o.CaptureTime.Nanoseconds)),
+          Is.EqualTo(manifest.OlderFramesAfter(i).Select(o => (o.FrameIndex, manifest.VideoFrameNanoseconds(o.Refresh)))),
           where + ": older frames shown out of order after it"
         );
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.UncertainStep), Is.False, where + ": the clip's capture has no gap");
@@ -180,36 +197,36 @@ namespace MB.FramePacing.Analysis.UnitTest
             where + ": the step into it is static by the flags alone, as the manifest lists"
           );
         Assert.That(
-          frame.PreferredFrameTime?.Ticks,
+          frame.PreferredFrameTime?.Nanoseconds,
           Is.EqualTo(manifest.PreferredRefreshes(i) * refresh),
           where + ": preferred frame time (null on demand)"
         );
-        Assert.That(frame.Drift.Ticks, Is.EqualTo(manifest.DriftTicks(i)), where + ": drift");
+        Assert.That(frame.Drift.Nanoseconds, Is.EqualTo(manifest.DriftNanoseconds(i)), where + ": drift");
         Assert.That(
-          frame.Lateness?.Ticks,
-          Is.EqualTo(manifest.IntendedTicks(i) != 0 ? Behind(manifest, i) - onTime : null),
+          frame.Lateness?.Nanoseconds,
+          Is.EqualTo(manifest.IntendedNanoseconds(i) != 0 ? Behind(manifest, i) - onTime : null),
           where + ": how late (0 = unknown intended time)"
         );
         // The application side: CPU start and CPU busy from the marker; the frametime to the next frame's CPU start (the clip's last frame
         // is followed by the end marker, not a measured frame) and CPU wait = frametime - CPU busy
-        long cpuStart = manifest.CpuStartTicks(i);
-        long cpuBusy = manifest.CpuBusyTicks(i);
+        long cpuStart = manifest.CpuStartNanoseconds(i);
+        long cpuBusy = manifest.CpuBusyNanoseconds(i);
         // Only to the next frame index: after dropped or out-of-order frames the next presented frame is not the next one rendered
         long? frameTime =
           i + 1 < manifest.FrameCount
           && manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1
           && cpuStart != 0
-          && manifest.CpuStartTicks(i + 1) != 0
-            ? manifest.CpuStartTicks(i + 1) - cpuStart
+          && manifest.CpuStartNanoseconds(i + 1) != 0
+            ? manifest.CpuStartNanoseconds(i + 1) - cpuStart
             : null;
-        Assert.That(frame.CpuStartTime.Ticks, Is.EqualTo(cpuStart), where + ": CPU start time");
-        Assert.That(frame.CpuBusy.Ticks, Is.EqualTo((uint)cpuBusy), where + ": CPU busy");
-        Assert.That(frame.FrameTime?.Ticks, Is.EqualTo(frameTime), where + ": frametime");
-        Assert.That(frame.CpuWait?.Ticks, Is.EqualTo(frameTime.HasValue && cpuBusy != 0 ? frameTime - cpuBusy : null), where + ": CPU wait");
+        Assert.That(frame.CpuStartTime.Nanoseconds, Is.EqualTo(cpuStart), where + ": CPU start time");
+        Assert.That(frame.CpuBusy.Nanoseconds, Is.EqualTo(cpuBusy), where + ": CPU busy");
+        Assert.That(frame.FrameTime?.Nanoseconds, Is.EqualTo(frameTime), where + ": frametime");
+        Assert.That(frame.CpuWait?.Nanoseconds, Is.EqualTo(frameTime.HasValue && cpuBusy != 0 ? frameTime - cpuBusy : null), where + ": CPU wait");
         if (i == 0)
         {
           // The manifest measures its first frame against the last frame of the previous loop, which the capture does not hold
-          Assert.That(frame.DisplayDelta?.Ticks, Is.Null, where + ": no display time step");
+          Assert.That(frame.DisplayDelta?.Nanoseconds, Is.Null, where + ": no display time step");
           Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.StaticBefore), Is.False, where + ": nothing before it");
           continue;
         }
@@ -218,16 +235,16 @@ namespace MB.FramePacing.Analysis.UnitTest
           Is.EqualTo(!manifest.CountsTowardFrameRate(i)),
           where + ": the frame before it is static"
         );
-        Assert.That(frame.DisplayDelta?.Ticks, Is.EqualTo(manifest.DisplayStepTicks(i)), where + ": display time step");
-        Assert.That(frame.AnimationDelta?.Ticks, Is.EqualTo(manifest.AnimationStepTicks(i)), where + ": animation time step");
-        Assert.That(frame.AnimationError?.Ticks, Is.EqualTo(manifest.AnimationErrorTicks(i)), where + ": animation error");
+        Assert.That(frame.DisplayDelta?.Nanoseconds, Is.EqualTo(manifest.DisplayStepNanoseconds(i)), where + ": display time step");
+        Assert.That(frame.AnimationDelta?.Nanoseconds, Is.EqualTo(manifest.AnimationStepNanoseconds(i)), where + ": animation time step");
+        Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(manifest.AnimationErrorNanoseconds(i)), where + ": animation error");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Late), Is.EqualTo(manifest.IsLate(i)), where + ": late");
-        Assert.That(frame.TargetFrameTime?.Ticks, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
-        long? intended = manifest.IntendedStepTicks(i);
-        Assert.That(frame.PacingError?.Ticks, Is.EqualTo(manifest.DisplayStepTicks(i) - intended), where + ": pacing error");
+        Assert.That(frame.TargetFrameTime?.Nanoseconds, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
+        long? intended = manifest.IntendedStepNanoseconds(i);
+        Assert.That(frame.PacingError?.Nanoseconds, Is.EqualTo(manifest.DisplayStepNanoseconds(i) - intended), where + ": pacing error");
         Assert.That(
-          frame.PredictionError?.Ticks,
-          Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepTicks(i) - intended : null),
+          frame.PredictionError?.Nanoseconds,
+          Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepNanoseconds(i) - intended : null),
           where + ": prediction error (not judged from a static frame)"
         );
       }
@@ -235,21 +252,25 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       // Gamers Nexus's summaries over the judged frames: the |animation error| per frame, and as a percentage of their display time
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.IsJudged).ToArray();
-      long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorTicks(i)!.Value));
-      double errorPerFrameMs = absolute / (double)measured.Length / TimeSpan.TicksPerMillisecond;
-      double percentError = absolute * 100.0 / measured.Sum(manifest.DisplayStepTicks);
+      long absolute = measured.Sum(i => Math.Abs(manifest.AnimationErrorNanoseconds(i)!.Value));
+      double errorPerFrameMs = absolute / (double)measured.Length / NanosecondTimeSpan.NanosecondsPerMillisecond;
+      double percentError = absolute * 100.0 / measured.Sum(manifest.DisplayStepNanoseconds);
       Assert.That(run.Statistics.ErrorPerFrameMs, Is.EqualTo(errorPerFrameMs).Within(1e-9), $"{clip}: error per frame");
       Assert.That(run.Statistics.PercentError, Is.EqualTo(percentError).Within(1e-9), $"{clip}: percent error");
       TestContext.Out.WriteLine($"{clip}: error per frame {errorPerFrameMs:0.00} ms, percent error {percentError:0.0} %");
 
       // The frame rate numbers describe the frames that animate: every display time step but a static frame's time on screen
-      var steps = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.CountsTowardFrameRate).Select(manifest.DisplayStepTicks).ToArray();
+      var steps = Enumerable
+        .Range(1, manifest.FrameCount - 1)
+        .Where(manifest.CountsTowardFrameRate)
+        .Select(manifest.DisplayStepNanoseconds)
+        .ToArray();
       Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(steps.Length), $"{clip}: display time steps");
       Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(manifest.FrameCount - 1 - steps.Length), $"{clip}: static frames left out");
       Assert.That(run.Statistics.UncertainSteps, Is.Zero, $"{clip}: no step across a capture gap");
       Assert.That(
         run.Statistics.AverageFps,
-        Is.EqualTo(steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum()).Within(1e-9),
+        Is.EqualTo(steps.Length * (double)NanosecondTimeSpan.NanosecondsPerSecond / steps.Sum()).Within(1e-9),
         $"{clip}: average fps"
       );
       var sortedSteps = steps.Order().ToArray();
@@ -257,7 +278,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         run.Statistics.OnePercentLowFps,
         Is.EqualTo(
           sortedSteps.Length >= RunStatistics.MinFramesForOnePercentLow
-            ? TimeSpan.TicksPerSecond / (double)sortedSteps[(int)Math.Ceiling(0.99 * sortedSteps.Length) - 1]
+            ? NanosecondTimeSpan.NanosecondsPerSecond / (double)sortedSteps[(int)Math.Ceiling(0.99 * sortedSteps.Length) - 1]
             : (double?)null
         ),
         $"{clip}: 1 % low"
@@ -316,7 +337,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>How long after its intended display time the frame is first shown (the pacer's and the video's clocks differ by a constant).</summary>
-    private static long Behind(ClipManifest manifest, int frame) => manifest.ShownTicks(frame) - manifest.IntendedTicks(frame);
+    private static long Behind(ClipManifest manifest, int frame) => manifest.ShownNanoseconds(frame) - manifest.IntendedNanoseconds(frame);
 
     private string Import(string clip) => VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, "capture"));
   }

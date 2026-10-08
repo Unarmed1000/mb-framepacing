@@ -9,8 +9,6 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
-
 namespace MB.FramePacing.Analysis
 {
   /// <param name="FirstSeenTime">
@@ -45,31 +43,31 @@ namespace MB.FramePacing.Analysis
   public sealed record PresentedFrame(
     int Segment,
     ulong FrameIndex,
-    TimeSpan AnimationTime,
+    NanosecondTimeSpan AnimationTime,
     long FirstCaptureIndex,
-    TickCount64 FirstSeenTime,
-    TickCount64 LastSeenTime,
+    NanosecondTickCount FirstSeenTime,
+    NanosecondTickCount LastSeenTime,
     int CaptureCount,
-    TimeSpan OnScreen,
+    NanosecondTimeSpan OnScreen,
     ulong SkippedBefore,
-    TimeSpan? DisplayDelta,
-    TimeSpan? AnimationDelta,
-    TimeSpan? AnimationError,
-    TimeSpan Drift,
+    NanosecondTimeSpan? DisplayDelta,
+    NanosecondTimeSpan? AnimationDelta,
+    NanosecondTimeSpan? AnimationError,
+    NanosecondTimeSpan Drift,
     PresentedFrameFlags Flags,
-    TickCount64? MainMarkerFirstSeenTime = null,
-    TickCount64 IntendedDisplayTime = default,
-    TimeSpan32 MarkerTargetFrameTime = default,
-    TimeSpan? TargetFrameTime = null,
-    TimeSpan? PacingError = null,
-    TimeSpan? PredictionError = null,
-    TimeSpan? Lateness = null,
-    TickCount64 CpuStartTime = default,
-    TimeSpan32 CpuBusy = default,
-    TimeSpan? FrameTime = null,
-    TimeSpan? CpuWait = null,
-    TimeSpan32 MarkerPreferredFrameTime = default,
-    TimeSpan? PreferredFrameTime = null,
+    NanosecondTickCount? MainMarkerFirstSeenTime = null,
+    NanosecondTickCount IntendedDisplayTime = default,
+    NanosecondTimeDuration MarkerTargetFrameTime = default,
+    NanosecondTimeSpan? TargetFrameTime = null,
+    NanosecondTimeSpan? PacingError = null,
+    NanosecondTimeSpan? PredictionError = null,
+    NanosecondTimeSpan? Lateness = null,
+    NanosecondTickCount CpuStartTime = default,
+    NanosecondTimeDuration CpuBusy = default,
+    NanosecondTimeSpan? FrameTime = null,
+    NanosecondTimeSpan? CpuWait = null,
+    NanosecondTimeDuration MarkerPreferredFrameTime = default,
+    NanosecondTimeSpan? PreferredFrameTime = null,
     System.Collections.Generic.IReadOnlyList<OlderFrameCapture>? OlderFrames = null
   );
 }

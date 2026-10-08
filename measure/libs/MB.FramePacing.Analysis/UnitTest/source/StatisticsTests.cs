@@ -1,9 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The statistics of a run come from its values' ticks, sorted once with a radix sort (TickSort, TickList) instead of an array of doubles
-//* sorted per statistic: the sort is the numbers' order, and every statistic is to the bit what the formulas over sorted milliseconds
-//* give, which this file keeps as the reference.
+//* The statistics of a run come from its values' nanoseconds, sorted once with a radix sort (NanosecondSort, NanosecondList) instead of an
+//* array of doubles sorted per statistic: the sort is the numbers' order, and every statistic is to the bit what the formulas over sorted
+//* milliseconds give, which this file keeps as the reference.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -19,10 +19,11 @@ namespace MB.FramePacing.Analysis.UnitTest
   [TestFixture]
   public class StatisticsTests
   {
-    private const long Refresh = TimeSpan.TicksPerSecond / 240;
+    // 1/240 s cut to the nanosecond
+    private const long Refresh = 4_166_666;
 
     [Test]
-    public void TickSort_IsTheNumbersOrder()
+    public void NanosecondSort_IsTheNumbersOrder()
     {
       var random = new Random(5);
       // Below and above where the radix sort starts, and values that differ in one byte, in every byte, or not at all
@@ -37,7 +38,7 @@ namespace MB.FramePacing.Analysis.UnitTest
               0 => random.Next(0, 200),
               1 => random.Next(-5000, 5000),
               2 => random.NextInt64(long.MinValue, long.MaxValue),
-              3 => 41_666 * (long)random.Next(1, 4),
+              3 => Refresh * random.Next(1, 4),
               4 => i % 2 == 0 ? long.MinValue : long.MaxValue,
               _ => -7,
             };
@@ -45,8 +46,8 @@ namespace MB.FramePacing.Analysis.UnitTest
           Array.Sort(expected);
 
           var withScratch = (long[])values.Clone();
-          TickSort.Sort(values);
-          TickSort.Sort(withScratch, new long[count + 3]);
+          NanosecondSort.Sort(values);
+          NanosecondSort.Sort(withScratch, new long[count + 3]);
 
           Assert.That(values, Is.EqualTo(expected), $"{count} values of kind {kind}");
           Assert.That(withScratch, Is.EqualTo(expected), $"{count} values of kind {kind}, with the caller's scratch array");
@@ -55,19 +56,19 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void TickSort_AScratchArrayTooShort_IsRefused()
+    public void NanosecondSort_AScratchArrayTooShort_IsRefused()
     {
-      Assert.Throws<ArgumentException>(() => TickSort.Sort(new long[1000], new long[999]));
-      Assert.DoesNotThrow(() => TickSort.Sort(new long[10], Span<long>.Empty), "few values need none");
+      Assert.Throws<ArgumentException>(() => NanosecondSort.Sort(new long[1000], new long[999]));
+      Assert.DoesNotThrow(() => NanosecondSort.Sort(new long[10], Span<long>.Empty), "few values need none");
     }
 
     [Test]
-    public void TickList_GrowsAndSorts()
+    public void NanosecondList_GrowsAndSorts()
     {
-      var list = new TickList();
+      var list = new NanosecondList();
       for (int i = 5000; i > 0; --i)
         list.Add(i % 2 == 0 ? i : -i);
-      list.Add(new TimeSpan(0));
+      list.Add(new NanosecondTimeSpan(0));
       list.Sort();
 
       Assert.That(list.Count, Is.EqualTo(5001));
@@ -84,7 +85,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         // A run's values: a few steps many times over, and values all over the place
         var spans = Enumerable
           .Range(0, count)
-          .Select(i => new TimeSpan(i % 3 == 0 ? random.NextInt64(-400_000, 400_000) : Refresh * random.Next(1, 4)))
+          .Select(i => new NanosecondTimeSpan(i % 3 == 0 ? random.NextInt64(-40_000_000, 40_000_000) : Refresh * random.Next(1, 4)))
           .ToList();
 
         Assert.That(Statistics.From(spans), Is.EqualTo(Statistics.From(spans.Select(s => s.TotalMilliseconds))), $"{count} values");
@@ -94,11 +95,11 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void RunStatistics_AreTheReferenceFormulas_ToTheBit()
     {
-      var threshold = TimeSpan.FromMilliseconds(1);
+      var threshold = NanosecondTimeSpan.FromMilliseconds(1);
       foreach (int count in new[] { 0, 1, 2, 99, 100, 999, 1000, 20_000 })
       {
         var frames = Frames(count, new Random(count + 1));
-        foreach (var period in new[] { new TimeSpan(Refresh), TimeSpan.Zero })
+        foreach (var period in new[] { new NanosecondTimeSpan(Refresh), NanosecondTimeSpan.Zero })
           Assert.That(RunStatistics.From(frames, threshold, period), Is.EqualTo(Reference(frames, threshold, period)), $"{count} frames");
       }
     }
@@ -111,7 +112,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       for (int i = 0; i < count; ++i)
       {
         long display = Refresh * random.Next(1, 4);
-        long error = random.Next(5) == 0 ? random.Next(-30_000, 30_000) : 0;
+        long error = random.Next(5) == 0 ? random.Next(-3_000_000, 3_000_000) : 0;
         bool first = i == 0;
         bool judged = !first && random.Next(20) != 0;
         var flags =
@@ -123,21 +124,21 @@ namespace MB.FramePacing.Analysis.UnitTest
           new PresentedFrame(
             0,
             (ulong)i,
-            new TimeSpan(time),
+            new NanosecondTimeSpan(time),
             i,
-            new TickCount64(time),
-            new TickCount64(time),
+            new NanosecondTickCount(time),
+            new NanosecondTickCount(time),
             1,
-            new TimeSpan(Refresh * random.Next(1, 3)),
+            new NanosecondTimeSpan(Refresh * random.Next(1, 3)),
             0,
-            first ? null : new TimeSpan(display),
-            judged ? new TimeSpan(display + error) : null,
-            judged ? new TimeSpan(error) : null,
-            new TimeSpan(random.Next(-9000, 9000)),
+            first ? null : new NanosecondTimeSpan(display),
+            judged ? new NanosecondTimeSpan(display + error) : null,
+            judged ? new NanosecondTimeSpan(error) : null,
+            new NanosecondTimeSpan(random.Next(-900_000, 900_000)),
             flags,
-            CpuBusy: random.Next(4) == 0 ? default : new TimeSpan32((uint)random.Next(1, 40_000)),
-            FrameTime: random.Next(6) == 0 ? null : new TimeSpan(display + random.Next(-500, 500)),
-            CpuWait: random.Next(3) == 0 ? null : new TimeSpan(random.Next(0, 30_000))
+            CpuBusy: random.Next(4) == 0 ? default : NanosecondTimeDuration.FromNanoseconds(random.Next(1, 4_000_000)),
+            FrameTime: random.Next(6) == 0 ? null : new NanosecondTimeSpan(display + random.Next(-50_000, 50_000)),
+            CpuWait: random.Next(3) == 0 ? null : new NanosecondTimeSpan(random.Next(0, 3_000_000))
           )
         );
       }
@@ -145,22 +146,22 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>The statistics as they were computed before: a list and a sorted array of milliseconds per statistic.</summary>
-    private static RunStatistics Reference(IReadOnlyList<PresentedFrame> frames, TimeSpan threshold, TimeSpan capturePeriod)
+    private static RunStatistics Reference(IReadOnlyList<PresentedFrame> frames, NanosecondTimeSpan threshold, NanosecondTimeSpan capturePeriod)
     {
-      static Statistics Of(IEnumerable<TimeSpan> spans) => Statistics.From(spans.Select(s => s.TotalMilliseconds));
+      static Statistics Of(IEnumerable<NanosecondTimeSpan> spans) => Statistics.From(spans.Select(s => s.TotalMilliseconds));
       var withMetrics = frames.Where(f => f.AnimationError.HasValue).ToList();
       var frameRate = frames.Where(RunStatistics.CountsTowardFrameRate).ToList();
       var (errorPerFrameMs, percentError) = RunStatistics.ErrorSummary(
         withMetrics.Select(f => (f.AnimationError!.Value, f.DisplayDelta!.Value)).ToList()
       );
-      long frameRateTicks = frameRate.Sum(f => f.DisplayDelta!.Value.Ticks);
+      long frameRateNanoseconds = frameRate.Sum(f => f.DisplayDelta!.Value.Nanoseconds);
       double? LowFps(double fraction, int minFrames)
       {
         if (frameRate.Count < minFrames)
           return null;
         var steps = frameRate.Select(f => f.DisplayDelta!.Value).OrderBy(t => t).ToArray();
         var step = steps[Math.Max(0, (int)Math.Ceiling(fraction * steps.Length) - 1)];
-        return step > TimeSpan.Zero ? TimeSpan.TicksPerSecond / (double)step.Ticks : null;
+        return step > NanosecondTimeSpan.Zero ? NanosecondTimeSpan.NanosecondsPerSecond / (double)step.Nanoseconds : null;
       }
       return new RunStatistics(
         Of(frameRate.Select(f => f.DisplayDelta!.Value)),
@@ -169,13 +170,13 @@ namespace MB.FramePacing.Analysis.UnitTest
         Of(withMetrics.Select(f => f.AnimationError!.Value.Duration())),
         Of(frames.Select(f => f.Drift)),
         Of(frames.Select(f => f.OnScreen)),
-        withMetrics.LongCount(f => capturePeriod > TimeSpan.Zero && f.AnimationError!.Value.Duration() > threshold),
+        withMetrics.LongCount(f => capturePeriod > NanosecondTimeSpan.Zero && f.AnimationError!.Value.Duration() > threshold),
         errorPerFrameMs,
         percentError,
-        frameRateTicks > 0 ? frameRate.Count * (double)TimeSpan.TicksPerSecond / frameRateTicks : 0,
+        frameRateNanoseconds > 0 ? frameRate.Count * (double)NanosecondTimeSpan.NanosecondsPerSecond / frameRateNanoseconds : 0,
         LowFps(0.99, RunStatistics.MinFramesForOnePercentLow),
         LowFps(0.999, RunStatistics.MinFramesForPointOnePercentLow),
-        Of(frames.Where(f => f.CpuBusy != TimeSpan32.Zero).Select(f => f.CpuBusy.ToTimeSpan())),
+        Of(frames.Where(f => f.CpuBusy != NanosecondTimeDuration.Zero).Select(f => f.CpuBusy.Value)),
         Of(frames.Where(f => f.FrameTime.HasValue).Select(f => f.FrameTime!.Value)),
         Of(frames.Where(f => f.CpuWait.HasValue).Select(f => f.CpuWait!.Value)),
         frames.LongCount(f => f.DisplayDelta.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0),

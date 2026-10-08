@@ -2,14 +2,13 @@
 //* File Description
 //* ----------------
 //* One line of a run's frames CSV (run-<id>-frames.csv, doc/analysis-output-format.md): one presented frame. Points in time are
-//* TickCount64s, on the capture's clock or the frame pacer's; spans are TimeSpans; the marker's own 32-bit values TimeSpan32s; null is an
-//* empty cell. The display side comes from the capture, the pacing and CPU fields from the markers. The C++ data module's FrameRow.
+//* NanosecondTickCounts, on the capture's clock or the frame pacer's; spans are NanosecondTimeSpans; the marker's own durations (a u32 in
+//* the file) NanosecondTimeDurations; null is an empty cell. The display side comes from the capture, the pacing and CPU fields from the markers. The C++ data module's FrameRow.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
 
-using System;
 using System.Collections.Generic;
 
 namespace MB.FramePacing.Data
@@ -46,32 +45,32 @@ namespace MB.FramePacing.Data
   public sealed record FrameRow(
     int Segment,
     ulong FrameIndex,
-    TimeSpan AnimationTime,
+    NanosecondTimeSpan AnimationTime,
     long FirstCaptureIndex,
-    TickCount64 FirstSeenTime,
-    TimeSpan OnScreen,
+    NanosecondTickCount FirstSeenTime,
+    NanosecondTimeSpan OnScreen,
     int Captures,
     ulong SkippedBefore,
-    TimeSpan? DisplayDelta,
-    TimeSpan? AnimationDelta,
-    TimeSpan? AnimationError,
-    TimeSpan Drift,
+    NanosecondTimeSpan? DisplayDelta,
+    NanosecondTimeSpan? AnimationDelta,
+    NanosecondTimeSpan? AnimationError,
+    NanosecondTimeSpan Drift,
     IReadOnlyList<string> Flags,
-    TickCount64? IntendedDisplayTime,
-    TimeSpan32? MarkerTargetFrameTime,
-    TimeSpan? TargetFrameTime,
-    TimeSpan32? MarkerPreferredFrameTime,
-    TimeSpan? PreferredFrameTime,
-    TimeSpan? PacingError,
-    TimeSpan? PredictionError,
-    TimeSpan? Lateness,
-    TickCount64? LastSeenTime,
-    TickCount64? CpuStartTime,
-    TimeSpan32? CpuBusy,
-    TimeSpan? FrameTime,
-    TimeSpan? CpuWait,
+    NanosecondTickCount? IntendedDisplayTime,
+    NanosecondTimeDuration? MarkerTargetFrameTime,
+    NanosecondTimeSpan? TargetFrameTime,
+    NanosecondTimeDuration? MarkerPreferredFrameTime,
+    NanosecondTimeSpan? PreferredFrameTime,
+    NanosecondTimeSpan? PacingError,
+    NanosecondTimeSpan? PredictionError,
+    NanosecondTimeSpan? Lateness,
+    NanosecondTickCount? LastSeenTime,
+    NanosecondTickCount? CpuStartTime,
+    NanosecondTimeDuration? CpuBusy,
+    NanosecondTimeSpan? FrameTime,
+    NanosecondTimeSpan? CpuWait,
     IReadOnlyList<OlderFrame> OlderFrames,
-    TickCount64? MainMarkerFirstSeenTime = null,
-    TimeSpan? ScanoutDelay = null
+    NanosecondTickCount? MainMarkerFirstSeenTime = null,
+    NanosecondTimeSpan? ScanoutDelay = null
   );
 }

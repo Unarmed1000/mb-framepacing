@@ -3,7 +3,7 @@
 //* ----------------
 //* Reads an analysis output folder back (summary.json and every run's run-<id>-frames.csv), so reports can be drawn from what an analysis
 //* wrote without the capture: the runs, their pacing, statistics and counts, and every presented frame. The files hold every time as its
-//* 100 ns ticks, so the frames come back exactly.
+//* whole nanoseconds, so the frames come back exactly.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -54,7 +54,7 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>The presented frames of a run-&lt;id&gt;-frames.csv, by column name.</summary>
-    public static IReadOnlyList<PresentedFrame> ReadFrames(string path, TimeSpan capturePeriod) =>
+    public static IReadOnlyList<PresentedFrame> ReadFrames(string path, NanosecondTimeSpan capturePeriod) =>
       FramesCsv.Read(path).Select(row => row.ToFrame(capturePeriod)).ToList();
   }
 }

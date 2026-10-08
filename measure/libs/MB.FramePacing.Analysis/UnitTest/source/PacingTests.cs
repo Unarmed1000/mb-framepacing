@@ -19,31 +19,31 @@ namespace MB.FramePacing.Analysis.UnitTest
   [TestFixture]
   public class PacingTests
   {
-    private const long Ms = TimeSpan.TicksPerMillisecond;
+    private const long Ms = NanosecondTimeSpan.NanosecondsPerMillisecond;
     private const long Refresh = 16 * Ms; // 62.5 Hz display, captured at 62.5 fps
 
     /// <summary>A run of frames: each shown for its number of refreshes, with its animation time step (ms) from the previous frame.</summary>
-    private static List<CaptureRow> Rows(IEnumerable<(int Refreshes, long StepMs)> frames, long refresh = Refresh, uint preferredTicks = 0) =>
-      PacedRows(frames.Select(f => (f.Refreshes, f.StepMs, 0L, 0u)), refresh, preferredTicks);
+    private static List<CaptureRow> Rows(IEnumerable<(int Refreshes, long StepMs)> frames, long refresh = Refresh, long preferredNanoseconds = 0) =>
+      PacedRows(frames.Select(f => (f.Refreshes, f.StepMs, 0L, 0L)), refresh, preferredNanoseconds);
 
     /// <summary>
     /// A run of frames with pacing information: each shown for its number of refreshes, with its animation time step (ms), the pacer's
-    /// intended display time (ms on its own clock, 0 = none) and target frame time (ticks, 0 = none); every frame's preferred frame time
-    /// is <paramref name="preferredTicks"/> (0 = none).
+    /// intended display time (ms on its own clock, 0 = none) and target frame time (ns, 0 = none); every frame's preferred frame time
+    /// is <paramref name="preferredNanoseconds"/> (0 = none).
     /// </summary>
     private static List<CaptureRow> PacedRows(
-      IEnumerable<(int Refreshes, long StepMs, long IntendedMs, uint TargetTicks)> frames,
+      IEnumerable<(int Refreshes, long StepMs, long IntendedMs, long TargetNanoseconds)> frames,
       long refresh = Refresh,
-      uint preferredTicks = 0
+      long preferredNanoseconds = 0
     )
     {
       var rows = new List<CaptureRow>();
       void Add(MarkerPayload payload, StartMetadata? start = null) =>
-        rows.Add(new CaptureRow(rows.Count, new TickCount64(rows.Count * refresh), CaptureStatus.Decoded, payload, start));
+        rows.Add(new CaptureRow(rows.Count, new NanosecondTickCount(rows.Count * refresh), CaptureStatus.Decoded, payload, start));
 
       for (int i = 0; i < 3; ++i)
         Add(
-          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)),
+          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0)),
           StartMetadata.FromTag(0, "pacing")
         );
       ulong index = 100;
@@ -58,16 +58,16 @@ namespace MB.FramePacing.Analysis.UnitTest
               1,
               index,
               MB.FramePacing.Marker.MarkerFlags.NoFlags,
-              new TimeSpan(animationMs * Ms),
-              PreferredFrameTime: new TimeSpan32(preferredTicks),
-              TargetFrameTime: new TimeSpan32(target),
-              IntendedDisplayTime: new TickCount64(intendedMs * Ms)
+              new NanosecondTimeSpan(animationMs * Ms),
+              PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(preferredNanoseconds),
+              TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(target),
+              IntendedDisplayTime: new NanosecondTickCount(intendedMs * Ms)
             )
           );
         ++index;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 999_999, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0)));
       return rows;
     }
 
@@ -84,9 +84,9 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(60)));
 
       var pacing = run.Pacing!;
-      Assert.That(pacing.RefreshPeriod, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
+      Assert.That(pacing.RefreshPeriod, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
       Assert.That(pacing.RefreshCalculated, Is.False, "a capture card's refresh is its capture period");
-      Assert.That(pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
+      Assert.That(pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
       Assert.That(pacing.Source, Is.EqualTo(PacingSource.NativeRefresh));
       Assert.That(pacing.LateFrames, Is.Zero);
       Assert.That(pacing.Verdict, Is.EqualTo(PacingVerdict.None));
@@ -100,7 +100,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[9] = (2, 16);
       var run = Analyze(Rows(frames));
 
-      Assert.That(run.Frames[10].DisplayDelta?.Ticks, Is.EqualTo(32 * Ms));
+      Assert.That(run.Frames[10].DisplayDelta?.Nanoseconds, Is.EqualTo(32 * Ms));
       Assert.That(IsLate(run.Frames[10]));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(run.Statistics.FramesWithAnimationError, Is.EqualTo(1), "an error of one refresh is real at the display's refresh rate");
@@ -118,8 +118,8 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames.AddRange(Steady(10));
       var run = Analyze(Rows(frames));
 
-      Assert.That(run.Frames[10].AnimationError?.Ticks, Is.EqualTo(-16 * Ms));
-      Assert.That(run.Frames[11].AnimationError?.Ticks, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[10].AnimationError?.Nanoseconds, Is.EqualTo(-16 * Ms));
+      Assert.That(run.Frames[11].AnimationError?.Nanoseconds, Is.EqualTo(16 * Ms));
       Assert.That(IsLate(run.Frames[11]), Is.False);
       Assert.That(run.Pacing!.ErrorFramesWithUnevenDisplay, Is.EqualTo(2));
       Assert.That(run.Pacing.ErrorFramesWithEvenDisplay, Is.Zero);
@@ -146,7 +146,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(20, refreshes: 2)));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
-      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(19));
     }
 
@@ -156,13 +156,13 @@ namespace MB.FramePacing.Analysis.UnitTest
       // The markers say only that the game wants 31.25 fps on this 62.5 Hz display: two refreshes per frame are its target, three are late
       var frames = Steady(20, refreshes: 2).ToList();
       frames[9] = (3, 32);
-      var run = Analyze(Rows(frames, preferredTicks: 320_000));
+      var run = Analyze(Rows(frames, preferredNanoseconds: 32 * Ms));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.PreferredFrameTime));
-      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(32)));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(32)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
-      Assert.That(run.Frames.Skip(1).All(f => f.PreferredFrameTime?.Ticks == 32 * Ms));
+      Assert.That(run.Frames.Skip(1).All(f => f.PreferredFrameTime?.Nanoseconds == 32 * Ms));
     }
 
     [Test]
@@ -173,7 +173,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[9] = (3, 32);
       var run = Analyze(Rows(frames), targetFps: 31.25);
 
-      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(32)));
+      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(32)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
     }
@@ -183,9 +183,9 @@ namespace MB.FramePacing.Analysis.UnitTest
     {
       // An adaptive pacer: 60 fps, then a stretch at 30 fps it chose itself, then 60 again. A frame's target frame time is the interval
       // before it, so the 30 fps targets start one frame after the first frame shown for two refreshes
-      const uint Full = 160_000;
-      const uint Half = 320_000;
-      var frames = new List<(int, long, long, uint)>();
+      const long Full = 16 * Ms;
+      const long Half = 32 * Ms;
+      var frames = new List<(int, long, long, long)>();
       for (int i = 0; i < 30; ++i)
       {
         bool halfRate = i >= 10 && i < 20;
@@ -198,31 +198,31 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.TargetFrameTime));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1), "the chosen 30 fps stretch is not late, the miss is");
       Assert.That(IsLate(run.Frames[26]));
-      Assert.That(run.Frames[15].TargetFrameTime?.Ticks, Is.EqualTo(32 * Ms));
+      Assert.That(run.Frames[15].TargetFrameTime?.Nanoseconds, Is.EqualTo(32 * Ms));
     }
 
     [Test]
     public void Schedule_FindsFramesThatStayLateAfterAHitch()
     {
       // A full frame queue: after frame 10 misses a refresh, every later frame is shown a refresh after its intended time, with even steps
-      var frames = new List<(int, long, long, uint)>();
+      var frames = new List<(int, long, long, long)>();
       long intended = 1000;
       for (int i = 0; i < 30; ++i, intended += 16)
-        frames.Add((i == 9 ? 2 : 1, 16L, intended, 160_000u));
+        frames.Add((i == 9 ? 2 : 1, 16L, intended, 16 * Ms));
       var run = Analyze(PacedRows(frames));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule));
       Assert.That(run.Frames.Take(10).Count(IsLate), Is.Zero);
       Assert.That(run.Frames.Skip(10).All(IsLate), Is.True, "every frame after the hitch stays a refresh late");
-      Assert.That(run.Frames[20].Lateness?.Ticks, Is.EqualTo(16 * Ms));
-      Assert.That(run.Frames[20].DisplayDelta?.Ticks, Is.EqualTo(16 * Ms), "the steps look even; only the schedule shows the delay");
+      Assert.That(run.Frames[20].Lateness?.Nanoseconds, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[20].DisplayDelta?.Nanoseconds, Is.EqualTo(16 * Ms), "the steps look even; only the schedule shows the delay");
     }
 
     [Test]
     public void Schedule_SplitsTheAnimationErrorIntoPacingAndPrediction()
     {
       // The pacer shows every frame on time, but the game animates with a naive delta time: all of the error is prediction error
-      var frames = new List<(int, long, long, uint)>();
+      var frames = new List<(int, long, long, long)>();
       long intended = 1000;
       for (int i = 0; i < 20; ++i, intended += 16)
         frames.Add(
@@ -232,17 +232,17 @@ namespace MB.FramePacing.Analysis.UnitTest
             : i % 4 == 3 ? 0L
             : 16L,
             intended,
-            160_000u
+            16 * Ms
           )
         );
       var run = Analyze(PacedRows(frames));
 
-      var errors = run.Frames.Where(f => f.AnimationError?.Ticks is { } e && e != 0).ToList();
+      var errors = run.Frames.Where(f => f.AnimationError?.Nanoseconds is { } e && e != 0).ToList();
       Assert.That(errors, Is.Not.Empty);
       foreach (var frame in errors)
       {
-        Assert.That(frame.PacingError?.Ticks, Is.Zero);
-        Assert.That(frame.AnimationError?.Ticks, Is.EqualTo(frame.PredictionError?.Ticks - frame.PacingError?.Ticks));
+        Assert.That(frame.PacingError?.Nanoseconds, Is.Zero);
+        Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(frame.PredictionError?.Nanoseconds - frame.PacingError?.Nanoseconds));
       }
       Assert.That(run.Pacing!.LateFrames, Is.Zero);
       Assert.That(run.Pacing.PredictionErrorMs!.Max, Is.EqualTo(16));
@@ -256,7 +256,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(20, refreshes: 2)), targetFps: 62.5);
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.GivenTarget));
-      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(16)));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
       Assert.That(run.Pacing.LateFrames, Is.EqualTo(19), "all but the first frame, which has no display time step");
     }
 
@@ -270,7 +270,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[11] = (4, 21);
       var run = Analyze(Rows(frames, refresh: 7 * Ms), targetFps: 60);
 
-      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(TimeSpan.FromMilliseconds(21)));
+      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(21)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[12]));
     }
@@ -287,7 +287,11 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       var wrong = Expecting(120);
       Assert.That(wrong.Pacing!.MatchesExpectedRefresh, Is.False);
-      Assert.That(wrong.Pacing.RefreshPeriod, Is.EqualTo(TimeSpan.FromMilliseconds(16)), "a capture card's refresh stays the capture period");
+      Assert.That(
+        wrong.Pacing.RefreshPeriod,
+        Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)),
+        "a capture card's refresh stays the capture period"
+      );
       Assert.That(wrong.Warnings, Has.Some.Contains("capture runs at 62.5 fps, but a 120 Hz display was expected"));
     }
 

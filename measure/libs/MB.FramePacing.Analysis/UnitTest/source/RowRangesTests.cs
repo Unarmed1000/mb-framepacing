@@ -19,7 +19,7 @@ namespace MB.FramePacing.Analysis.UnitTest
   public class RowRangesTests
   {
     private static List<CaptureRow> CaptureRows(int count) =>
-      Enumerable.Range(0, count).Select(i => new CaptureRow(1000 + i, new TickCount64(i * 10L), CaptureStatus.Undecodable, default)).ToList();
+      Enumerable.Range(0, count).Select(i => new CaptureRow(1000 + i, new NanosecondTickCount(i * 10L), CaptureStatus.Undecodable, default)).ToList();
 
     [Test]
     public void Rows_AreTheOnesAdded_InOrderAndInAnyOrder()

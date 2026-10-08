@@ -92,8 +92,9 @@ namespace MB.FramePacing.App.Commands
             RunId = parseResult.GetValue(runOption),
             TargetFps = parseResult.GetValue(targetOption),
             ExpectedRefreshHz = parseResult.GetValue(displayOption),
+            // The threshold's milliseconds, rounded to the nearest nanosecond
             ErrorThreshold = parseResult.GetValue(thresholdOption) is { } ms
-              ? new TimeSpan((long)Math.Round(ms * TimeSpan.TicksPerMillisecond))
+              ? new NanosecondTimeSpan((long)Math.Round(ms * NanosecondTimeSpan.NanosecondsPerMillisecond))
               : TimelineAnalyzer.DefaultErrorThreshold,
             AssumeStatic = !parseResult.GetValue(noStaticGuessOption),
           },

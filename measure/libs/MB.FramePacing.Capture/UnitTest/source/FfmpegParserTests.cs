@@ -45,20 +45,31 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(parser.DroppedFrames, Is.EqualTo(1));
       Assert.That(parser.LastFrameNumber, Is.EqualTo(1));
       Assert.That(parser.TryGetDeviceTime(0, out var first), Is.True);
-      Assert.That(first.Ticks, Is.EqualTo(123456789000L));
+      Assert.That(first.Nanoseconds, Is.EqualTo(12_345_678_900_000L));
       Assert.That(parser.TryGetDeviceTime(1, out var second), Is.True);
-      Assert.That(second.Ticks, Is.EqualTo(123456955833L));
+      Assert.That(second.Nanoseconds, Is.EqualTo(12_345_695_583_300L), "a pts in ticks of 100 ns, exactly");
       Assert.That(parser.TryGetDeviceTime(0, out _), Is.False, "a timestamp is handed out once");
     }
 
-    [TestCase(90000L, 1L, 90000L, 10_000_000L)]
-    [TestCase(1L, 1L, 1000000L, 10L)]
-    [TestCase(3L, 1001L, 60000L, 500_500L)]
-    [TestCase(-90000L, 1L, 90000L, -10_000_000L)]
-    [TestCase(long.MaxValue / 2, 1L, 10_000_000L, long.MaxValue / 2)]
-    public void PtsToTime(long pts, long numerator, long denominator, long expectedTicks)
+    // The nearest nanosecond, half a nanosecond away from zero; a pts beyond what nanoseconds hold is the last time they hold
+    [TestCase(90000L, 1L, 90000L, 1_000_000_000L)]
+    [TestCase(1L, 1L, 1000000L, 1_000L)]
+    [TestCase(3L, 1001L, 60000L, 50_050_000L)]
+    [TestCase(1L, 1L, 30L, 33_333_333L)]
+    [TestCase(2L, 1L, 30L, 66_666_667L)]
+    [TestCase(1L, 1L, 60L, 16_666_667L)]
+    [TestCase(1001L, 1L, 60000L, 16_683_333L)]
+    [TestCase(1L, 1L, 2_000_000_000L, 1L, Description = "half a nanosecond: away from zero")]
+    [TestCase(-1L, 1L, 2_000_000_000L, -1L, Description = "half a nanosecond: away from zero")]
+    [TestCase(-1L, 1L, 30L, -33_333_333L)]
+    [TestCase(-2L, 1L, 30L, -66_666_667L)]
+    [TestCase(-90000L, 1L, 90000L, -1_000_000_000L)]
+    [TestCase(long.MaxValue / 200, 1L, 10_000_000L, long.MaxValue / 200 * 100)]
+    [TestCase(long.MaxValue / 2, 1L, 10_000_000L, long.MaxValue)]
+    [TestCase(long.MinValue / 2, 1L, 10_000_000L, long.MinValue)]
+    public void PtsToTime(long pts, long numerator, long denominator, long expectedNanoseconds)
     {
-      Assert.That(FfmpegStderrParser.PtsToTime(pts, numerator, denominator).Ticks, Is.EqualTo(expectedTicks));
+      Assert.That(FfmpegStderrParser.PtsToTime(pts, numerator, denominator).Nanoseconds, Is.EqualTo(expectedNanoseconds));
     }
 
     [Test]

@@ -8,7 +8,6 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
@@ -20,7 +19,8 @@ namespace MB.FramePacing.Charts.UnitTest
   [TestFixture]
   public class RunEventsTests
   {
-    private const long Period = TimeSpan.TicksPerSecond / 60;
+    // 1/60 s cut to the nanosecond
+    private const long Period = 16_666_666;
 
     /// <summary>The capture rows of a 60 Hz capture card, one refresh each, with one event of every kind; and when each happened.</summary>
     private static (List<CaptureRow> Rows, Dictionary<RunEventKind, long> At) Capture()
@@ -29,36 +29,42 @@ namespace MB.FramePacing.Charts.UnitTest
       var at = new Dictionary<RunEventKind, long>();
       long time = 0;
       MarkerPayload Frame(ulong index) =>
-        new MarkerPayload(MarkerKind.Frame, 1, index, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan((long)index * Period));
+        new MarkerPayload(MarkerKind.Frame, 1, index, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan((long)index * Period));
       CaptureRow Add(CaptureStatus status, MarkerPayload payload, uint sourceDrops = 0, MarkerPayload? sync = null, long missed = 0)
       {
         time += missed * Period;
-        var row = new CaptureRow(rows.Count, new TickCount64(time), status, payload, null, sourceDrops, sync) { MissedBefore = missed };
+        var row = new CaptureRow(rows.Count, new NanosecondTickCount(time), status, payload, null, sourceDrops, sync) { MissedBefore = missed };
         rows.Add(row);
         time += Period;
         return row;
       }
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)));
+        Add(
+          CaptureStatus.Decoded,
+          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0))
+        );
       Add(CaptureStatus.Decoded, Frame(1));
       Add(CaptureStatus.Decoded, Frame(2));
-      at[RunEventKind.NotDecoded] = Add(CaptureStatus.Undecodable, default).CaptureTime.Ticks;
+      at[RunEventKind.NotDecoded] = Add(CaptureStatus.Undecodable, default).CaptureTime.Nanoseconds;
       Add(CaptureStatus.Decoded, Frame(3));
-      at[RunEventKind.NotRecorded] = Add(CaptureStatus.NotRecorded, default).CaptureTime.Ticks;
+      at[RunEventKind.NotRecorded] = Add(CaptureStatus.NotRecorded, default).CaptureTime.Nanoseconds;
       Add(CaptureStatus.Decoded, Frame(4));
-      at[RunEventKind.Torn] = Add(CaptureStatus.Torn, Frame(5), sync: Frame(4)).CaptureTime.Ticks;
-      at[RunEventKind.SourceDropped] = Add(CaptureStatus.Decoded, Frame(5), sourceDrops: 2).CaptureTime.Ticks - Period;
+      at[RunEventKind.Torn] = Add(CaptureStatus.Torn, Frame(5), sync: Frame(4)).CaptureTime.Nanoseconds;
+      at[RunEventKind.SourceDropped] = Add(CaptureStatus.Decoded, Frame(5), sourceDrops: 2).CaptureTime.Nanoseconds - Period;
       Add(CaptureStatus.Decoded, Frame(5));
-      at[RunEventKind.Missed] = Add(CaptureStatus.Decoded, Frame(6), missed: 1).CaptureTime.Ticks - Period;
+      at[RunEventKind.Missed] = Add(CaptureStatus.Decoded, Frame(6), missed: 1).CaptureTime.Nanoseconds - Period;
       Add(CaptureStatus.Decoded, Frame(6));
       // Frame 7 never shown over a capture without gaps: dropped, due in the refresh before frame 8
-      at[RunEventKind.FramesDropped] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTime.Ticks - Period;
+      at[RunEventKind.FramesDropped] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTime.Nanoseconds - Period;
       Add(CaptureStatus.Decoded, Frame(9));
-      at[RunEventKind.OutOfOrder] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTime.Ticks;
+      at[RunEventKind.OutOfOrder] = Add(CaptureStatus.Decoded, Frame(8)).CaptureTime.Nanoseconds;
       Add(CaptureStatus.Decoded, Frame(10));
       Add(CaptureStatus.Decoded, Frame(10));
       for (int i = 0; i < 3; ++i)
-        Add(CaptureStatus.Decoded, new MarkerPayload(MarkerKind.SequenceEnd, 1, 11, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)));
+        Add(
+          CaptureStatus.Decoded,
+          new MarkerPayload(MarkerKind.SequenceEnd, 1, 11, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0))
+        );
       return (rows, at);
     }
 
@@ -91,7 +97,7 @@ namespace MB.FramePacing.Charts.UnitTest
       {
         Assert.That(events.Count(kind), Is.EqualTo(count), $"{kind}: how many");
         var single = events.All(kind).ToArray().Single();
-        Assert.That(single.Time.Ticks, Is.EqualTo(at[kind]), $"{kind}: when");
+        Assert.That(single.Time.Nanoseconds, Is.EqualTo(at[kind]), $"{kind}: when");
       }
       Assert.That(events.All(RunEventKind.OutOfOrder)[0].FrameIndex, Is.EqualTo(8), "the older frame");
       var torn = events.All(RunEventKind.Torn)[0];
@@ -144,7 +150,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var drawing = ReportCard.Build(section, ReportOptions.ShowOnly(new[] { ReportItem.Events }));
       var plot = drawing.Plots.Single(p => p.Id == ReportItem.Events);
       var hover = new CardHover(section);
-      double Seconds(long ticks) => (ticks - section.Data.Origin.Ticks) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(long nanoseconds) => (nanoseconds - section.Data.Origin.Nanoseconds) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
 
       Assert.That(hover.Describe(plot, Seconds(at[RunEventKind.Torn]), 0.5), Does.Contain("torn: frames 5 and 4"));
       Assert.That(hover.Describe(plot, Seconds(at[RunEventKind.OutOfOrder]), 0.5), Does.Contain("an older frame, 8, shown again"));

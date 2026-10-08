@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* Reads and writes captures.csv: a header line, then one line per capture index, comma separated, UTF-8 without a byte order mark. Reading
-//* goes by column name. Every time is written as its 100 ns ticks, a whole number.
+//* goes by column name. Every time is written as its nanoseconds, a whole number.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -18,7 +18,7 @@ namespace MB.FramePacing.Data
   public static class CapturesCsv
   {
     public const string Header =
-      "captureIndex,captureTicks,status,kind,runId,frameIndex,animationTicks,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostTicks,deviceTicks,payloadHex";
+      "captureIndex,captureNs,status,kind,runId,frameIndex,animationNs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostNs,deviceNs,payloadHex";
 
     public static void Write(string path, IEnumerable<CaptureCsvRow> rows)
     {
@@ -34,18 +34,18 @@ namespace MB.FramePacing.Data
       foreach (var row in rows)
       {
         line.Add(row.CaptureIndex);
-        line.Add(row.CaptureTime?.Ticks);
+        line.Add(row.CaptureTime?.Nanoseconds);
         line.Add(row.CaptureStatus);
         line.Add(row.Kind ?? string.Empty);
         line.Add((ulong?)row.RunId);
         line.Add(row.FrameIndex);
-        line.Add(row.AnimationTime?.Ticks);
+        line.Add(row.AnimationTime?.Nanoseconds);
         line.Add(row.SourceDropsBefore);
         line.Add(row.MissedBefore);
         line.Add((ulong?)row.SyncRunId);
         line.Add(row.SyncFrameIndex);
-        line.Add(row.HostTime?.Ticks);
-        line.Add(row.DeviceTime?.Ticks);
+        line.Add(row.HostTime?.Nanoseconds);
+        line.Add(row.DeviceTime?.Nanoseconds);
         line.AddHex(row.Payload);
         line.End(writer);
       }
@@ -67,18 +67,18 @@ namespace MB.FramePacing.Data
       var column = CsvRow.Columns(header, out int columnCount);
       int Column(string columnName) => column.TryGetValue(columnName, out int index) ? index : -1;
       int captureIndex = Column("captureIndex");
-      int capture = Column("captureTicks");
+      int capture = Column("captureNs");
       int status = Column("status");
       int kind = Column("kind");
       int runId = Column("runId");
       int frameIndex = Column("frameIndex");
-      int animation = Column("animationTicks");
+      int animation = Column("animationNs");
       int sourceDrops = Column("sourceDropsBefore");
       int missed = Column("missedBefore");
       int syncRunId = Column("syncRunId");
       int syncFrameIndex = Column("syncFrameIndex");
-      int host = Column("hostTicks");
-      int device = Column("deviceTicks");
+      int host = Column("hostNs");
+      int device = Column("deviceNs");
       int payload = Column("payloadHex");
 
       var rows = new List<CaptureCsvRow>();

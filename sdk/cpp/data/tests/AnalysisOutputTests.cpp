@@ -1,14 +1,16 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-// summary.json and the CSVs: the format version, columns by name, times as whole ticks, and content that is refused.
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+// summary.json and the CSVs: the format version, columns by name, times as whole nanoseconds, and content that is refused (files from
+// before the nanoseconds, with their times in ticks of 100 ns under "...Ticks" names, among it).
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/data/analysis/CapturesCsv.hpp>
 #include <mb/framepacing/data/analysis/FramesCsv.hpp>
+#include <mb/framepacing/marker/payload/Payload.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
 #include <filesystem>
@@ -21,10 +23,21 @@
 
 namespace FP = MB::FramePacing;
 namespace FD = MB::FramePacing::Data;
+namespace FM = MB::FramePacing::Marker;
 
 namespace
 {
   constexpr std::string_view MinimalSummary = R"({
+  "scanout": "SingleScanout",
+  "analysedUtc": "2026-01-01T00:00:00Z",
+  "capturePeriodNs": 16666667,
+  "measurementResolutionNs": 16666667,
+  "errorThresholdNs": 1000000,
+  "runs": []
+})";
+
+  //! The minimal summary as it was before the nanoseconds: its times in ticks of 100 ns, under names that end in Ticks.
+  constexpr std::string_view TickSummary = R"({
   "scanout": "SingleScanout",
   "analysedUtc": "2026-01-01T00:00:00Z",
   "capturePeriodTicks": 166667,
@@ -59,7 +72,7 @@ namespace
   //! A summary whose one run has the given members.
   std::string SummaryWithRun(const std::string& members)
   {
-    return R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000, "runs": [ { )" + members + " } ] }";
+    return R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000, "runs": [ { )" + members + " } ] }";
   }
 
   std::string OneRun(const std::string_view start, const std::string_view counts, const std::string_view statistics, const std::string_view more = {})
@@ -96,9 +109,18 @@ namespace
   }
 
   constexpr std::string_view FrameColumns =
+    "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags";
+
+  //! The same columns as a frames CSV named them before the nanoseconds.
+  constexpr std::string_view TickFrameColumns =
     "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags";
 
   constexpr std::string_view CaptureColumns =
+    "captureIndex,captureNs,status,kind,runId,frameIndex,animationNs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostNs,"
+    "deviceNs,payloadHex";
+
+  //! The same columns as captures.csv named them before the nanoseconds.
+  constexpr std::string_view TickCaptureColumns =
     "captureIndex,captureTicks,status,kind,runId,frameIndex,animationTicks,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostTicks,"
     "deviceTicks,payloadHex";
 
@@ -171,40 +193,86 @@ TEST(AnalysisOutput, FormatVersionZeroIsFormatOne)
   EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("formatVersion": -1)")), FD::DataFormatError);
 }
 
-TEST(AnalysisOutput, ASummarysTimesAreWholeTicks)
+TEST(AnalysisOutput, ASummarysTimesAreWholeNanoseconds)
 {
   const auto summary = FD::ParseSummary(MinimalSummary);
-  EXPECT_EQ(summary.CapturePeriod, FP::TimeSpan(166'667));
-  EXPECT_EQ(summary.MeasurementResolution, FP::TimeSpan(166'667));
-  EXPECT_EQ(summary.ErrorThreshold, FP::TimeSpan(10'000));
-  EXPECT_EQ(FD::ParseSummary(R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000 })").MeasurementResolution, FP::TimeSpan(166'667))
+  EXPECT_EQ(summary.CapturePeriod, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(summary.MeasurementResolution, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(summary.ErrorThreshold, FP::NanosecondTimeSpan(1'000'000));
+  EXPECT_EQ(FD::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000 })").MeasurementResolution,
+            FP::NanosecondTimeSpan(16'666'667))
     << "a file without it: the capture period";
-  constexpr std::string_view Resolution = R"("measurementResolutionTicks": 166667)";
-  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionTicks": 0)")).MeasurementResolution, FP::TimeSpan(166'667))
+  constexpr std::string_view Resolution = R"("measurementResolutionNs": 16666667)";
+  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionNs": 0)")).MeasurementResolution,
+            FP::NanosecondTimeSpan(16'666'667))
     << "0, as C# reads a file without it";
-  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionTicks": 5)")).MeasurementResolution, FP::TimeSpan(5));
+  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionNs": 5)")).MeasurementResolution,
+            FP::NanosecondTimeSpan(5));
+  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, "16666667,", "9223372036854775807,")).CapturePeriod, FP::NanosecondTimeSpan::MaxValue())
+    << "the 64 bits a time has";
 
   // Never a fraction, a text or another unit's field
-  constexpr std::string_view Threshold = R"("errorThresholdTicks": 10000)";
-  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "166667,", "166667.5,")), FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, Threshold, R"("errorThresholdTicks": "10000")")), FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, Threshold, R"("errorThresholdTicks": 1e30)")), FD::DataFormatError);
+  constexpr std::string_view Threshold = R"("errorThresholdNs": 1000000)";
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "16666667,", "16666667.5,")), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "16666667,", "16666667.0,")), FD::DataFormatError) << "a fraction of nothing";
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "16666667,", "9223372036854775808,")), FD::DataFormatError) << "beyond 64 bits";
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, Threshold, R"("errorThresholdNs": "1000000")")), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, Threshold, R"("errorThresholdNs": 1e30)")), FD::DataFormatError);
   try
   {
-    (void)FD::ParseSummary(Replaced(MinimalSummary, "capturePeriodTicks", "capturePeriodMs"));
+    (void)FD::ParseSummary(Replaced(MinimalSummary, "capturePeriodNs", "capturePeriodMs"));
     FAIL() << "a summary in milliseconds was read";
   }
   catch (const FD::DataFormatError& error)
   {
-    EXPECT_NE(std::string(error.what()).find("capturePeriodTicks"), std::string::npos) << error.what();
+    EXPECT_NE(std::string(error.what()).find("capturePeriodNs"), std::string::npos) << error.what();
   }
+}
+
+TEST(AnalysisOutput, ASummaryFromBeforeTheNanosecondsIsRefused)
+{
+  // Its times are ticks of 100 ns under "...Ticks" names: read as nanoseconds they would be a hundred times too small, so the required
+  // "...Ns" fields it lacks refuse it
+  try
+  {
+    (void)FD::ParseSummary(TickSummary);
+    FAIL() << "a summary in ticks was read";
+  }
+  catch (const FD::DataFormatError& error)
+  {
+    EXPECT_NE(std::string(error.what()).find("capturePeriodNs"), std::string::npos) << error.what();
+  }
+  // One name at a time: each required time is refused by its own name
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "capturePeriodNs", "capturePeriodTicks")), FD::DataFormatError);
+  try
+  {
+    (void)FD::ParseSummary(Replaced(MinimalSummary, "errorThresholdNs", "errorThresholdTicks"));
+    FAIL() << "an error threshold in ticks was read";
+  }
+  catch (const FD::DataFormatError& error)
+  {
+    EXPECT_NE(std::string(error.what()).find("errorThresholdNs"), std::string::npos) << error.what();
+  }
+  // The optional one is not read under its old name: the capture period, as in a file without it
+  constexpr std::string_view Resolution = R"("measurementResolutionNs": 16666667)";
+  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionTicks": 5)")).MeasurementResolution,
+            FP::NanosecondTimeSpan(16'666'667));
+
+  // A run's pacing from then
+  constexpr std::string_view Pacing = R"("pacing": { "refreshPeriodNs": 16666667, "refreshCalculated": false, "targetFrameNs": 33333334,
+    "source": "TargetFrameTime", "lateFrames": 1, "lateShare": 0.125, "worstLateShare": 0.5, "errorFramesWithUnevenDisplay": 1,
+    "errorFramesWithEvenDisplay": 1, "verdict": "Both" })";
+  const auto parse = [](const std::string& pacing) { return FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), pacing)); };
+  EXPECT_EQ(parse(std::string(Pacing)).Runs.size(), 1u) << "the pacing these cases change one name of";
+  EXPECT_THROW((void)parse(Replaced(Pacing, R"("refreshPeriodNs": 16666667)", R"("refreshPeriodTicks": 166667)")), FD::DataFormatError);
+  EXPECT_THROW((void)parse(Replaced(Pacing, R"("targetFrameNs": 33333334)", R"("targetFrameTicks": 333334)")), FD::DataFormatError);
 }
 
 TEST(AnalysisOutput, ARunIsReadWithItsCountsStatisticsAndPacing)
 {
-  constexpr std::string_view Pacing = R"("pacing": { "refreshPeriodTicks": 166667, "refreshCalculated": false, "targetFrameTicks": 333334,
+  constexpr std::string_view Pacing = R"("pacing": { "refreshPeriodNs": 16666667, "refreshCalculated": false, "targetFrameNs": 33333334,
     "source": "TargetFrameTime", "lateFrames": 1, "lateShare": 0.125, "worstLateShare": 0.5, "errorFramesWithUnevenDisplay": 1,
-    "errorFramesWithEvenDisplay": 1, "verdict": "Both", "refreshHz": 59.99988 })";
+    "errorFramesWithEvenDisplay": 1, "verdict": "Both", "refreshHz": 59.9999988 })";
   const auto summary = FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), Pacing));
   ASSERT_EQ(summary.Runs.size(), 1u);
   const FD::SummaryRun& run = summary.Runs[0];
@@ -224,13 +292,13 @@ TEST(AnalysisOutput, ARunIsReadWithItsCountsStatisticsAndPacing)
   {
     FAIL() << "no pacing";
   }
-  EXPECT_EQ(run.Pacing->RefreshPeriod, FP::TimeSpan(166'667));
-  EXPECT_EQ(run.Pacing->TargetFrameTime, FP::TimeSpan(333'334));
+  EXPECT_EQ(run.Pacing->RefreshPeriod, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(run.Pacing->TargetFrameTime, FP::NanosecondTimeSpan(33'333'334));
   EXPECT_EQ(run.Pacing->Source, "TargetFrameTime");
   EXPECT_FALSE(run.Histograms.has_value());
 
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), Replaced(Pacing, "333334", "333334.5"))), FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), Replaced(Pacing, "refreshPeriodTicks", "refreshPeriodMs"))),
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), Replaced(Pacing, "33333334", "33333334.5"))), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), Replaced(Pacing, "refreshPeriodNs", "refreshPeriodMs"))),
                FD::DataFormatError);
   EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Statistics(), R"("pacing": 1)")), FD::DataFormatError) << "pacing that is a number";
 }
@@ -288,8 +356,8 @@ TEST(AnalysisOutput, HistogramsAndTheCameraAreReadWhole)
 
 TEST(AnalysisOutput, ListsMustBeLists)
 {
-  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000, "runs": { "a": 1 } })"), FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000, "runs": [ 5 ] })"), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000, "runs": { "a": 1 } })"), FD::DataFormatError);
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000, "runs": [ 5 ] })"), FD::DataFormatError);
   EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("markers": { "bounds": "0,0,1,1", "moduleSizePx": 3 })")), FD::DataFormatError);
   EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("markers": [ 3 ])")), FD::DataFormatError);
   EXPECT_THROW((void)FD::ParseSummary(MinimalWith(R"("warnings": "one text")")), FD::DataFormatError);
@@ -338,25 +406,25 @@ TEST(AnalysisOutput, NumbersMustFitTheirFields)
 
 TEST(AnalysisOutput, RequiredFieldsAreRequired)
 {
-  EXPECT_THROW((void)FD::ParseSummary(R"({ "errorThresholdTicks": 10000 })"), FD::DataFormatError) << "no capture period";
-  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodTicks": 166667 })"), FD::DataFormatError) << "no error threshold";
-  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodTicks": null, "errorThresholdTicks": 10000 })"), FD::DataFormatError) << "null is absent";
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "errorThresholdNs": 1000000 })"), FD::DataFormatError) << "no capture period";
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodNs": 16666667 })"), FD::DataFormatError) << "no error threshold";
+  EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodNs": null, "errorThresholdNs": 1000000 })"), FD::DataFormatError) << "null is absent";
   EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")), FD::DataFormatError)
     << "no run id";
   EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false)")), FD::DataFormatError)
     << "no frames file";
   EXPECT_THROW((void)FD::ParseSummary("[]"), FD::DataFormatError) << "not an object";
-  EXPECT_THROW((void)FD::ParseSummary("{ \"capturePeriodTicks\": "), FD::DataFormatError) << "not JSON";
+  EXPECT_THROW((void)FD::ParseSummary("{ \"capturePeriodNs\": "), FD::DataFormatError) << "not JSON";
   EXPECT_THROW((void)FD::ParseSummary(""), FD::DataFormatError) << "empty";
   EXPECT_THROW((void)FD::ParseSummary("null"), FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "capturePeriodTicks", "CapturePeriodTicks")), FD::DataFormatError)
+  EXPECT_THROW((void)FD::ParseSummary(Replaced(MinimalSummary, "capturePeriodNs", "CapturePeriodNs")), FD::DataFormatError)
     << "names are case sensitive";
 }
 
 TEST(AnalysisOutput, AFileIsReadOrSaidToBeMissing)
 {
   const TemporaryFile file("summary.json", std::string(MinimalSummary));
-  EXPECT_EQ(FD::ReadSummary(file.Path()).CapturePeriod, FP::TimeSpan(166'667));
+  EXPECT_EQ(FD::ReadSummary(file.Path()).CapturePeriod, FP::NanosecondTimeSpan(16'666'667));
   const auto missing = std::filesystem::temp_directory_path() / "mb_framepacing_data_test-no-such-folder" / "summary.json";
   EXPECT_THROW((void)FD::ReadFrames(missing), std::runtime_error);
   EXPECT_THROW((void)FD::ReadCaptures(missing), std::runtime_error);
@@ -407,91 +475,129 @@ TEST(AnalysisOutput, TheAnalysisIsFoundInTheFolderOrItsAnalysisFolder)
 TEST(AnalysisOutput, FramesAreReadByColumnNameWhateverTheOrder)
 {
   const auto rows = ReadFrames(
-    "frameIndex,newColumn,segment,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags,"
-    "cpuBusyTicks\r\n"
-    "7,x,0,1166667,3,500000,333333,2,1,-5000,SkippedBefore|Late,\r\n"
+    "frameIndex,newColumn,segment,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags,"
+    "cpuBusyNs\r\n"
+    "7,x,0,116666669,3,50000000,33333334,2,1,-500000,SkippedBefore|Late,\r\n"
     "\r\n"
     "8,x,1,0,4,0,1,1,0,0,,5\n");
   ASSERT_EQ(rows.size(), 2u);
   EXPECT_EQ(rows[0].FrameIndex, 7u);
   EXPECT_EQ(rows[0].Segment, 0);
-  EXPECT_EQ(rows[0].AnimationTime, FP::TimeSpan(1'166'667));
-  EXPECT_EQ(rows[0].FirstSeenTime, FP::TickCount64(500'000));
-  EXPECT_EQ(rows[0].OnScreen, FP::TimeSpan(333'333));
-  EXPECT_EQ(rows[0].Drift, FP::TimeSpan(-5'000));
+  EXPECT_EQ(rows[0].AnimationTime, FP::NanosecondTimeSpan(116'666'669));
+  EXPECT_EQ(rows[0].FirstSeenTime, FP::NanosecondTickCount(50'000'000));
+  EXPECT_EQ(rows[0].OnScreen, FP::NanosecondTimeSpan(33'333'334));
+  EXPECT_EQ(rows[0].Drift, FP::NanosecondTimeSpan(-500'000));
   EXPECT_EQ(rows[0].Flags, (std::vector<std::string>{"SkippedBefore", "Late"}));
   EXPECT_FALSE(rows[0].CpuBusy.has_value()) << "an empty cell";
   EXPECT_FALSE(rows[0].LastSeenTime.has_value()) << "a column the file lacks";
   EXPECT_TRUE(rows[0].OlderFrames.empty());
   EXPECT_EQ(rows[1].Segment, 1) << "an empty line is skipped, a line may end with \\n";
   EXPECT_TRUE(rows[1].Flags.empty());
-  EXPECT_EQ(rows[1].CpuBusy, FP::TimeSpan32(5u));
+  EXPECT_EQ(rows[1].CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(5));
 }
 
-TEST(AnalysisOutput, EveryTimeIsReadAsTheTicksItIs)
+TEST(AnalysisOutput, EveryTimeIsReadAsTheNanosecondsItIs)
 {
   // The values a marker can carry at their limits: nothing between the file and the type converts them
   const auto rows = ReadFrames(
-    "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,displayDeltaTicks,"
-    "animationDeltaTicks,animationErrorTicks,driftTicks,flags,intendedDisplayTicks,markerTargetTicks,targetTicks,markerPreferredTicks,"
-    "preferredTicks,pacingErrorTicks,predictionErrorTicks,latenessTicks,lastSeenTicks,cpuStartTicks,cpuBusyTicks,frameTimeTicks,cpuWaitTicks,"
-    "olderFrames,mainMarkerFirstSeenTicks,scanoutDelayTicks\n"
-    "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,166667,1,0,166666,9223372036854775807,-1,-7,Late,"
-    "-9223372036854775808,4294967295,333334,1,166667,3,-3,83333,1234567890123456789,-1234567890123456789,120060,166668,46608,"
+    "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,"
+    "animationDeltaNs,animationErrorNs,driftNs,flags,intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,"
+    "preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,cpuWaitNs,"
+    "olderFrames,mainMarkerFirstSeenNs,scanoutDelayNs\n"
+    "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,16666667,1,0,16666666,9223372036854775807,-1,-7,Late,"
+    "-9223372036854775808,4294967295,33333334,1,16666667,3,-3,8333333,1234567890123456789,-1234567890123456789,12006000,16666800,4660800,"
     "41@1234567890123456790|40@-5,9007199254740993,-9007199254740993\n");
   ASSERT_EQ(rows.size(), 1u);
   const FD::FrameRow& row = rows[0];
   EXPECT_EQ(row.Segment, 2);
   EXPECT_EQ(row.FrameIndex, std::numeric_limits<uint64_t>::max());
-  EXPECT_EQ(row.AnimationTime, FP::TimeSpan::MinValue());
-  EXPECT_EQ(row.FirstSeenTime, FP::TickCount64(std::numeric_limits<int64_t>::max()));
-  EXPECT_EQ(row.OnScreen, FP::TimeSpan(166'667));
-  EXPECT_EQ(row.DisplayDelta, FP::TimeSpan(166'666));
-  EXPECT_EQ(row.AnimationDelta, FP::TimeSpan::MaxValue());
-  EXPECT_EQ(row.AnimationError, FP::TimeSpan(-1));
-  EXPECT_EQ(row.Drift, FP::TimeSpan(-7));
-  EXPECT_EQ(row.IntendedDisplayTime, FP::TickCount64(std::numeric_limits<int64_t>::min()));
-  EXPECT_EQ(row.MarkerTargetFrameTime, FP::TimeSpan32::MaxValue()) << "on demand";
-  EXPECT_EQ(row.TargetFrameTime, FP::TimeSpan(333'334));
-  EXPECT_EQ(row.MarkerPreferredFrameTime, FP::TimeSpan32(1u));
-  EXPECT_EQ(row.PreferredFrameTime, FP::TimeSpan(166'667));
-  EXPECT_EQ(row.PacingError, FP::TimeSpan(3));
-  EXPECT_EQ(row.PredictionError, FP::TimeSpan(-3));
-  EXPECT_EQ(row.Lateness, FP::TimeSpan(83'333));
-  EXPECT_EQ(row.LastSeenTime, FP::TickCount64(1'234'567'890'123'456'789));
-  EXPECT_EQ(row.CpuStartTime, FP::TickCount64(-1'234'567'890'123'456'789));
-  EXPECT_EQ(row.CpuBusy, FP::TimeSpan32(120'060u));
-  EXPECT_EQ(row.FrameTime, FP::TimeSpan(166'668));
-  EXPECT_EQ(row.CpuWait, FP::TimeSpan(46'608));
+  EXPECT_EQ(row.AnimationTime, FP::NanosecondTimeSpan::MinValue());
+  EXPECT_EQ(row.FirstSeenTime, FP::NanosecondTickCount(std::numeric_limits<int64_t>::max()));
+  EXPECT_EQ(row.OnScreen, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(row.DisplayDelta, FP::NanosecondTimeSpan(16'666'666));
+  EXPECT_EQ(row.AnimationDelta, FP::NanosecondTimeSpan::MaxValue());
+  EXPECT_EQ(row.AnimationError, FP::NanosecondTimeSpan(-1));
+  EXPECT_EQ(row.Drift, FP::NanosecondTimeSpan(-7));
+  EXPECT_EQ(row.IntendedDisplayTime, FP::NanosecondTickCount(std::numeric_limits<int64_t>::min()));
+  EXPECT_EQ(row.MarkerTargetFrameTime, FM::Payload::OnDemandFrameTime) << "on demand, as the marker library names it";
+  EXPECT_EQ(row.TargetFrameTime, FP::NanosecondTimeSpan(33'333'334));
+  EXPECT_EQ(row.MarkerPreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(1));
+  EXPECT_EQ(row.PreferredFrameTime, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(row.PacingError, FP::NanosecondTimeSpan(3));
+  EXPECT_EQ(row.PredictionError, FP::NanosecondTimeSpan(-3));
+  EXPECT_EQ(row.Lateness, FP::NanosecondTimeSpan(8'333'333));
+  EXPECT_EQ(row.LastSeenTime, FP::NanosecondTickCount(1'234'567'890'123'456'789));
+  EXPECT_EQ(row.CpuStartTime, FP::NanosecondTickCount(-1'234'567'890'123'456'789));
+  EXPECT_EQ(row.CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(12'006'000));
+  EXPECT_EQ(row.FrameTime, FP::NanosecondTimeSpan(16'666'800));
+  EXPECT_EQ(row.CpuWait, FP::NanosecondTimeSpan(4'660'800));
   ASSERT_EQ(row.OlderFrames.size(), 2u);
   EXPECT_EQ(row.OlderFrames[0].FrameIndex, 41u);
-  EXPECT_EQ(row.OlderFrames[0].CaptureTime, FP::TickCount64(1'234'567'890'123'456'790)) << "beyond what a double holds exactly";
+  EXPECT_EQ(row.OlderFrames[0].CaptureTime, FP::NanosecondTickCount(1'234'567'890'123'456'790)) << "beyond what a double holds exactly";
   EXPECT_EQ(row.OlderFrames[1].FrameIndex, 40u);
-  EXPECT_EQ(row.OlderFrames[1].CaptureTime, FP::TickCount64(-5));
-  EXPECT_EQ(row.MainMarkerFirstSeenTime, FP::TickCount64(9'007'199'254'740'993)) << "2^53 + 1";
-  EXPECT_EQ(row.ScanoutDelay, FP::TimeSpan(-9'007'199'254'740'993));
+  EXPECT_EQ(row.OlderFrames[1].CaptureTime, FP::NanosecondTickCount(-5));
+  EXPECT_EQ(row.MainMarkerFirstSeenTime, FP::NanosecondTickCount(9'007'199'254'740'993)) << "2^53 + 1";
+  EXPECT_EQ(row.ScanoutDelay, FP::NanosecondTimeSpan(-9'007'199'254'740'993));
 }
 
-TEST(AnalysisOutput, ATimeThatIsNotWholeTicksIsRefused)
+TEST(AnalysisOutput, ATimeThatIsNotWholeNanosecondsIsRefused)
 {
-  for (const std::string_view cell : {"16.6667", "1e3", " 5", "5 ", "+5", "1_000", "0x10", "NaN", "9223372036854775808", "-9223372036854775809", ""})
+  for (const std::string_view cell :
+       {"16666666.7", "16666667.0", "1e3", " 5", "5 ", "+5", "1_000", "0x10", "NaN", "9223372036854775808", "-9223372036854775809", ""})
   {
-    EXPECT_THROW((void)ReadFrames(std::string(FrameColumns) + "\n0,1," + std::string(cell) + ",0,0,166667,1,0,0,\n"), FD::DataFormatError)
+    EXPECT_THROW((void)ReadFrames(std::string(FrameColumns) + "\n0,1," + std::string(cell) + ",0,0,16666667,1,0,0,\n"), FD::DataFormatError)
       << "'" << cell << "'";
   }
-  EXPECT_EQ(ReadFrames(std::string(FrameColumns) + "\n0,1,-0,0,0,166667,1,0,0,\n").at(0).AnimationTime, FP::TimeSpan(0));
-  EXPECT_EQ(ReadFrames(std::string(FrameColumns) + "\n0,1,007,0,0,166667,1,0,0,\n").at(0).AnimationTime, FP::TimeSpan(7));
+  EXPECT_EQ(ReadFrames(std::string(FrameColumns) + "\n0,1,-0,0,0,16666667,1,0,0,\n").at(0).AnimationTime, FP::NanosecondTimeSpan(0));
+  EXPECT_EQ(ReadFrames(std::string(FrameColumns) + "\n0,1,007,0,0,16666667,1,0,0,\n").at(0).AnimationTime, FP::NanosecondTimeSpan(7));
 }
 
-TEST(AnalysisOutput, TheMarkersValuesMustFit32Bits)
+TEST(AnalysisOutput, TheMarkersDurationsMustFit32Bits)
 {
-  const auto read = [](const std::string_view cpuBusy)
-  { return ReadFrames(std::string(FrameColumns) + ",cpuBusyTicks\n0,1,0,0,0,166667,1,0,0,," + std::string(cpuBusy) + "\n"); };
-  EXPECT_EQ(read("4294967295").at(0).CpuBusy, FP::TimeSpan32::MaxValue()) << "the largest: on demand in a frame time";
-  EXPECT_EQ(read("80000").at(0).CpuBusy, FP::TimeSpan32(80'000u));
-  EXPECT_EQ(read("0").at(0).CpuBusy, FP::TimeSpan32(0u));
-  EXPECT_THROW((void)read("4294967296"), FD::DataFormatError);
-  EXPECT_THROW((void)read("-1"), FD::DataFormatError);
+  // 32 bits unsigned in the marker and in the file, whatever the 64 bits of the type they are read into
+  const auto read = [](const std::string_view column, const std::string_view value)
+  { return ReadFrames(std::string(FrameColumns) + "," + std::string(column) + "\n0,1,0,0,0,16666667,1,0,0,," + std::string(value) + "\n").at(0); };
+  EXPECT_EQ(read("cpuBusyNs", "4294967295").CpuBusy, FM::Payload::MaxCpuBusy) << "the largest: 4.29 s";
+  EXPECT_EQ(read("cpuBusyNs", "8000000").CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(8'000'000));
+  EXPECT_EQ(read("cpuBusyNs", "0").CpuBusy, FP::NanosecondTimeDuration::Zero());
+  EXPECT_EQ(read("markerTargetNs", "4294967295").MarkerTargetFrameTime, FM::Payload::OnDemandFrameTime) << "on demand";
+  EXPECT_EQ(read("markerTargetNs", "4294967294").MarkerTargetFrameTime, FM::Payload::MaxFrameTime) << "the longest frame time";
+  EXPECT_EQ(read("markerPreferredNs", "4294967295").MarkerPreferredFrameTime, FM::Payload::OnDemandFrameTime) << "on demand";
+  EXPECT_EQ(read("markerPreferredNs", "16666667").MarkerPreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  EXPECT_FALSE(read("markerPreferredNs", "").MarkerPreferredFrameTime.has_value()) << "an empty cell";
+  for (const std::string_view column : {"cpuBusyNs", "markerTargetNs", "markerPreferredNs"})
+  {
+    EXPECT_THROW((void)read(column, "4294967296"), FD::DataFormatError) << column << ": one beyond 32 bits";
+    EXPECT_THROW((void)read(column, "9223372036854775807"), FD::DataFormatError) << column << ": what the type itself would hold";
+    EXPECT_THROW((void)read(column, "-1"), FD::DataFormatError) << column << ": a duration is never negative";
+    EXPECT_THROW((void)read(column, "1.5"), FD::DataFormatError) << column;
+  }
+}
+
+TEST(AnalysisOutput, AFramesCsvFromBeforeTheNanosecondsIsRefused)
+{
+  // Its times are ticks of 100 ns in "...Ticks" columns: the required "...Ns" columns it lacks refuse its first row
+  try
+  {
+    (void)ReadFrames(std::string(TickFrameColumns) + "\n0,1,166667,0,0,166667,1,0,0,\n");
+    FAIL() << "a frames CSV in ticks was read";
+  }
+  catch (const FD::DataFormatError& error)
+  {
+    EXPECT_NE(std::string(error.what()).find("frames.csv' line 2"), std::string::npos) << error.what();
+  }
+  EXPECT_EQ(ReadFrames(std::string(FrameColumns) + "\n0,1,16666667,0,0,16666667,1,0,0,\n").size(), 1u) << "the same row in nanoseconds";
+  // One required column at a time under its old name
+  for (const std::string_view column : {"animationNs", "firstSeenNs", "onScreenNs", "driftNs"})
+  {
+    const std::string ticks = std::string(column.substr(0, column.size() - 2)) + "Ticks";
+    EXPECT_THROW((void)ReadFrames(Replaced(FrameColumns, column, ticks) + "\n0,1,16666667,0,0,16666667,1,0,0,\n"), FD::DataFormatError) << column;
+  }
+  // An optional column under its old name is a column the reader does not know: empty
+  const auto rows = ReadFrames(std::string(FrameColumns) + ",displayDeltaTicks,cpuBusyTicks\n0,1,16666667,0,0,16666667,1,0,0,,166667,80000\n");
+  ASSERT_EQ(rows.size(), 1u);
+  EXPECT_FALSE(rows[0].DisplayDelta.has_value());
+  EXPECT_FALSE(rows[0].CpuBusy.has_value());
 }
 
 TEST(AnalysisOutput, OtherContentThatIsNotAFrameIsRefused)
@@ -499,21 +605,21 @@ TEST(AnalysisOutput, OtherContentThatIsNotAFrameIsRefused)
   const auto read = [](const std::string_view header, const std::string& line) { return ReadFrames(std::string(header) + "\n" + line + "\n"); };
   EXPECT_THROW((void)ReadFrames(""), FD::DataFormatError) << "an empty file";
   EXPECT_TRUE(ReadFrames(std::string(FrameColumns) + "\n\n").empty()) << "a header and an empty line";
-  EXPECT_THROW((void)read(FrameColumns, "x,1,0,0,0,166667,1,0,0,"), FD::DataFormatError) << "a segment that is no number";
-  EXPECT_THROW((void)read(FrameColumns, "0,-1,0,0,0,166667,1,0,0,"), FD::DataFormatError) << "a negative frame index";
-  EXPECT_THROW((void)read(FrameColumns, "0,1,0,0,0,166667,2147483648,0,0,"), FD::DataFormatError) << "captures beyond 32 bits";
-  EXPECT_THROW((void)read("frameIndex,animationTicks", "1,0"), FD::DataFormatError) << "a required column the file lacks";
+  EXPECT_THROW((void)read(FrameColumns, "x,1,0,0,0,16666667,1,0,0,"), FD::DataFormatError) << "a segment that is no number";
+  EXPECT_THROW((void)read(FrameColumns, "0,-1,0,0,0,16666667,1,0,0,"), FD::DataFormatError) << "a negative frame index";
+  EXPECT_THROW((void)read(FrameColumns, "0,1,0,0,0,16666667,2147483648,0,0,"), FD::DataFormatError) << "captures beyond 32 bits";
+  EXPECT_THROW((void)read("frameIndex,animationNs", "1,0"), FD::DataFormatError) << "a required column the file lacks";
   const std::string withOlder = std::string(FrameColumns) + ",olderFrames";
   for (const std::string_view older : {"41", "@5", "41@", "x@5", "41@5.5", "41@5|", "41@5||42@6", "|41@5"})
   {
-    EXPECT_THROW((void)read(withOlder, "0,1,0,0,0,166667,1,0,0,," + std::string(older)), FD::DataFormatError) << "olderFrames '" << older << "'";
+    EXPECT_THROW((void)read(withOlder, "0,1,0,0,0,16666667,1,0,0,," + std::string(older)), FD::DataFormatError) << "olderFrames '" << older << "'";
   }
-  EXPECT_THROW((void)read(FrameColumns, "0,1,0,0,0,166667,1,0,0,Late|"), FD::DataFormatError) << "an empty flag";
+  EXPECT_THROW((void)read(FrameColumns, "0,1,0,0,0,16666667,1,0,0,Late|"), FD::DataFormatError) << "an empty flag";
 
   // The error names the file and the line
   try
   {
-    (void)ReadFrames(std::string(FrameColumns) + "\n0,1,0,0,0,166667,1,0,0,\n\n0,2,1.5,0,0,166667,1,0,0,\n");
+    (void)ReadFrames(std::string(FrameColumns) + "\n0,1,0,0,0,16666667,1,0,0,\n\n0,2,1.5,0,0,16666667,1,0,0,\n");
     FAIL() << "a fraction was read";
   }
   catch (const FD::DataFormatError& error)
@@ -526,22 +632,22 @@ TEST(AnalysisOutput, OtherContentThatIsNotAFrameIsRefused)
 
 TEST(AnalysisOutput, CapturesCarrySourceDropsMissedRefreshesAndTheSyncMarker)
 {
-  const auto rows = ReadCaptures(std::string(CaptureColumns) + "\r\n4,666667,Torn,Frame,7,12,2000000,3,1,7,11,701000,666667,4D46\r\n" +
+  const auto rows = ReadCaptures(std::string(CaptureColumns) + "\r\n4,66666668,Torn,Frame,7,12,200000004,3,1,7,11,70100000,66666668,4D46\r\n" +
                                  "5,,NotRecorded,,,,,0,0,,,,,\r\n");
   ASSERT_EQ(rows.size(), 2u);
   EXPECT_EQ(rows[0].CaptureIndex, 4);
-  EXPECT_EQ(rows[0].CaptureTime, FP::TickCount64(666'667));
+  EXPECT_EQ(rows[0].CaptureTime, FP::NanosecondTickCount(66'666'668));
   EXPECT_EQ(rows[0].CaptureStatus, "Torn");
   EXPECT_EQ(rows[0].Kind, "Frame");
   EXPECT_EQ(rows[0].RunId, 7u);
   EXPECT_EQ(rows[0].FrameIndex, 12u);
-  EXPECT_EQ(rows[0].AnimationTime, FP::TimeSpan(2'000'000));
+  EXPECT_EQ(rows[0].AnimationTime, FP::NanosecondTimeSpan(200'000'004));
   EXPECT_EQ(rows[0].SyncRunId, 7u);
   EXPECT_EQ(rows[0].SyncFrameIndex, 11u);
   EXPECT_EQ(rows[0].SourceDropsBefore, 3);
   EXPECT_EQ(rows[0].MissedBefore, 1);
-  EXPECT_EQ(rows[0].HostTime, FP::TickCount64(701'000));
-  EXPECT_EQ(rows[0].DeviceTime, FP::TickCount64(666'667));
+  EXPECT_EQ(rows[0].HostTime, FP::NanosecondTickCount(70'100'000));
+  EXPECT_EQ(rows[0].DeviceTime, FP::NanosecondTickCount(66'666'668));
   EXPECT_EQ(rows[0].Payload, (std::vector<uint8_t>{0x4D, 0x46}));
   EXPECT_FALSE(rows[1].CaptureTime.has_value()) << "a capture the recorder dropped";
   EXPECT_FALSE(rows[1].Kind.has_value());
@@ -549,18 +655,34 @@ TEST(AnalysisOutput, CapturesCarrySourceDropsMissedRefreshesAndTheSyncMarker)
   EXPECT_TRUE(rows[1].Payload.empty());
 }
 
+TEST(AnalysisOutput, ACapturesCsvFromBeforeTheNanosecondsReadsAsCapturesWithoutTimes)
+{
+  // Only the capture index is required, so the file reads; its times, in ticks of 100 ns in "...Ticks" columns, are columns the reader
+  // does not know and never become nanoseconds
+  const auto rows = ReadCaptures(std::string(TickCaptureColumns) + "\n4,666667,Torn,Frame,7,12,2000000,3,1,7,11,701000,666667,4D46\n");
+  ASSERT_EQ(rows.size(), 1u);
+  EXPECT_EQ(rows[0].CaptureIndex, 4);
+  EXPECT_EQ(rows[0].CaptureStatus, "Torn");
+  EXPECT_EQ(rows[0].FrameIndex, 12u);
+  EXPECT_FALSE(rows[0].CaptureTime.has_value());
+  EXPECT_FALSE(rows[0].AnimationTime.has_value());
+  EXPECT_FALSE(rows[0].HostTime.has_value());
+  EXPECT_FALSE(rows[0].DeviceTime.has_value());
+}
+
 TEST(AnalysisOutput, ContentThatIsNotACaptureIsRefused)
 {
   const auto read = [](const std::string_view line) { return ReadCaptures(std::string(CaptureColumns) + "\n" + std::string(line) + "\n"); };
-  EXPECT_EQ(read("4,666667,Decoded,Frame,4294967295,12,2000000,0,0,4294967295,11,701000,666667,4D46").at(0).RunId, 4294967295u);
-  EXPECT_THROW((void)read("4,666667,Decoded,Frame,-1,12,2000000,0,0,,,701000,666667,4D46"), FD::DataFormatError) << "a run id below 0";
-  EXPECT_THROW((void)read("4,666667,Decoded,Frame,4294967296,12,2000000,0,0,,,701000,666667,4D46"), FD::DataFormatError) << "a run id beyond 32 bits";
-  EXPECT_THROW((void)read("4,666667,Torn,Frame,7,12,2000000,0,0,4294967296,11,701000,666667,4D46"), FD::DataFormatError)
+  EXPECT_EQ(read("4,66666668,Decoded,Frame,4294967295,12,200000004,0,0,4294967295,11,70100000,66666668,4D46").at(0).RunId, 4294967295u);
+  EXPECT_THROW((void)read("4,66666668,Decoded,Frame,-1,12,200000004,0,0,,,70100000,66666668,4D46"), FD::DataFormatError) << "a run id below 0";
+  EXPECT_THROW((void)read("4,66666668,Decoded,Frame,4294967296,12,200000004,0,0,,,70100000,66666668,4D46"), FD::DataFormatError)
+    << "a run id beyond 32 bits";
+  EXPECT_THROW((void)read("4,66666668,Torn,Frame,7,12,200000004,0,0,4294967296,11,70100000,66666668,4D46"), FD::DataFormatError)
     << "a sync run id beyond 32 bits";
-  EXPECT_THROW((void)read("4,66.6667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46"), FD::DataFormatError) << "a fraction";
-  EXPECT_THROW((void)read("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D4"), FD::DataFormatError) << "half a byte";
-  EXPECT_THROW((void)read("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D4G"), FD::DataFormatError) << "no hex digit";
-  EXPECT_THROW((void)read("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,+D46"), FD::DataFormatError) << "a sign in a byte";
-  EXPECT_THROW((void)read("x,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46"), FD::DataFormatError) << "no capture index";
+  EXPECT_THROW((void)read("4,66666668.5,Decoded,Frame,7,12,200000004,0,0,,,70100000,66666668,4D46"), FD::DataFormatError) << "a fraction";
+  EXPECT_THROW((void)read("4,66666668,Decoded,Frame,7,12,200000004,0,0,,,70100000,66666668,4D4"), FD::DataFormatError) << "half a byte";
+  EXPECT_THROW((void)read("4,66666668,Decoded,Frame,7,12,200000004,0,0,,,70100000,66666668,4D4G"), FD::DataFormatError) << "no hex digit";
+  EXPECT_THROW((void)read("4,66666668,Decoded,Frame,7,12,200000004,0,0,,,70100000,66666668,+D46"), FD::DataFormatError) << "a sign in a byte";
+  EXPECT_THROW((void)read("x,66666668,Decoded,Frame,7,12,200000004,0,0,,,70100000,66666668,4D46"), FD::DataFormatError) << "no capture index";
   EXPECT_THROW((void)ReadCaptures(""), FD::DataFormatError) << "an empty file";
 }

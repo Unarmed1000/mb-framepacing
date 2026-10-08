@@ -16,13 +16,13 @@ namespace MB.FramePacing.Analysis
   {
     public const double WindowSeconds = 2;
 
-    public static readonly TimeSpan Window = new TimeSpan((long)(WindowSeconds * TimeSpan.TicksPerSecond));
+    public static readonly NanosecondTimeSpan Window = NanosecondTimeSpan.FromSeconds(WindowSeconds);
 
     /// <summary>
     /// Per presented frame: the share of late frames (0..1) among the frames with a display time step first seen in the window that ends at this
     /// frame. Frames without a display time step (the first of a segment) count in neither.
     /// </summary>
-    public static double[] Rolling(IReadOnlyList<PresentedFrame> frames, TimeSpan window)
+    public static double[] Rolling(IReadOnlyList<PresentedFrame> frames, NanosecondTimeSpan window)
     {
       var shares = new double[frames.Count];
       int start = 0;
@@ -39,7 +39,7 @@ namespace MB.FramePacing.Analysis
     }
 
     /// <summary>The highest <see cref="Rolling"/> share over the windows that lie completely inside the run; the whole run's share if it is shorter.</summary>
-    public static double Worst(IReadOnlyList<PresentedFrame> frames, TimeSpan window)
+    public static double Worst(IReadOnlyList<PresentedFrame> frames, NanosecondTimeSpan window)
     {
       if (frames.Count == 0)
         return 0;
@@ -50,7 +50,7 @@ namespace MB.FramePacing.Analysis
         if (frames[i].FirstSeenTime - frames[0].FirstSeenTime >= window)
           worst = Math.Max(worst, shares[i]);
       }
-      return worst >= 0 ? worst : Rolling(frames, TimeSpan.MaxValue)[^1];
+      return worst >= 0 ? worst : Rolling(frames, NanosecondTimeSpan.MaxValue)[^1];
     }
 
     /// <summary>

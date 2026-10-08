@@ -43,7 +43,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       catch (IOException) { }
     }
 
-    private static List<(ulong FrameIndex, long AnimationTicks, long FirstSeenTicks)> ExpectedFrames(SyntheticScenario scenario)
+    private static List<(ulong FrameIndex, long AnimationNanoseconds, long FirstSeenNanoseconds)> ExpectedFrames(SyntheticScenario scenario)
     {
       var expected = new List<(ulong, long, long)>();
       for (long i = 0; i < scenario.CaptureCount; ++i)
@@ -55,7 +55,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         if (payload.Kind != MarkerKind.Frame)
           continue;
         if (expected.Count == 0 || expected[^1].Item1 != payload.FrameIndex)
-          expected.Add((payload.FrameIndex, payload.AnimationTime.Ticks, scenario.CaptureTime(i).Ticks));
+          expected.Add((payload.FrameIndex, payload.AnimationTime.Nanoseconds, scenario.CaptureTime(i).Nanoseconds));
       }
       return expected;
     }
@@ -121,12 +121,13 @@ namespace MB.FramePacing.Analysis.UnitTest
       for (int i = 0; i < expected.Count; ++i)
       {
         var frame = run.Frames[i];
-        Assert.That(frame.FirstSeenTime.Ticks, Is.EqualTo(expected[i].FirstSeenTicks), $"frame {frame.FrameIndex}");
+        Assert.That(frame.FirstSeenTime.Nanoseconds, Is.EqualTo(expected[i].FirstSeenNanoseconds), $"frame {frame.FrameIndex}");
         if (i > 0)
         {
           long expectedError =
-            (expected[i].AnimationTicks - expected[i - 1].AnimationTicks) - (expected[i].FirstSeenTicks - expected[i - 1].FirstSeenTicks);
-          Assert.That(frame.AnimationError?.Ticks, Is.EqualTo(expectedError), $"frame {frame.FrameIndex}");
+            (expected[i].AnimationNanoseconds - expected[i - 1].AnimationNanoseconds)
+            - (expected[i].FirstSeenNanoseconds - expected[i - 1].FirstSeenNanoseconds);
+          Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(expectedError), $"frame {frame.FrameIndex}");
         }
       }
 
@@ -135,8 +136,9 @@ namespace MB.FramePacing.Analysis.UnitTest
       int stalls = expected
         .Skip(1)
         .Count(e =>
-          truth[e.FrameIndex].DisplayTime.Ticks - (truth[e.FrameIndex].Payload.IntendedDisplayTime.Ticks - SyntheticScenario.PacerEpoch.Ticks)
-          >= scenario.RefreshInterval.Ticks / 2
+          truth[e.FrameIndex].DisplayTime.Nanoseconds
+            - (truth[e.FrameIndex].Payload.IntendedDisplayTime.Nanoseconds - SyntheticScenario.PacerEpoch.Nanoseconds)
+          >= scenario.RefreshInterval.Nanoseconds / 2
         );
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(run.Pacing!.RefreshPeriod, Is.EqualTo(report.Timeline.CapturePeriod), "a capture card captures at the display's refresh rate");
@@ -162,10 +164,10 @@ namespace MB.FramePacing.Analysis.UnitTest
         var histograms = summary.RootElement.GetProperty("runs")[0].GetProperty("histograms");
         long withError = run.Frames.LongCount(f => f.AnimationError.HasValue);
         Assert.That(histograms.GetProperty("animationErrorMs").GetProperty("total").GetInt64(), Is.EqualTo(withError));
-        long binWidthTicks = (long)
-          Math.Round(histograms.GetProperty("displayDeltaMs").GetProperty("binWidthMs").GetDouble() * TimeSpan.TicksPerMillisecond);
+        long binWidthNanoseconds = (long)
+          Math.Round(histograms.GetProperty("displayDeltaMs").GetProperty("binWidthMs").GetDouble() * NanosecondTimeSpan.NanosecondsPerMillisecond);
         Assert.That(
-          binWidthTicks % Histogram.DefaultBinWidth.Ticks,
+          binWidthNanoseconds % Histogram.DefaultBinWidth.Nanoseconds,
           Is.Zero,
           "the fixed bin width (or a multiple for a wide range), whatever the capture period"
         );
@@ -200,7 +202,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           Array.Fill(frame.Pixels, (byte)96);
           MarkerRenderer.Render(
             frame,
-            new MarkerPayload(kind, 1, top, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan((long)top * 166_667)),
+            new MarkerPayload(kind, 1, top, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan((long)top * 16_666_667)),
             12,
             12,
             3,
@@ -209,14 +211,18 @@ namespace MB.FramePacing.Analysis.UnitTest
           if (kind == MarkerKind.Frame)
             MarkerRenderer.Render(
               frame,
-              new MarkerPayload(MarkerKind.Sync, bottomRun, bottom, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)),
+              new MarkerPayload(MarkerKind.Sync, bottomRun, bottom, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0)),
               12,
               200,
               3
             );
-          new CaptureRecordHeader(i, new TickCount64(i * 41_667L), new DeviceTimestamp(new TickCount64(i * 41_667L)), 0, header.PixelByteCount).Write(
-            record
-          );
+          new CaptureRecordHeader(
+            i,
+            new NanosecondTickCount(i * 4_166_667L),
+            new DeviceTimestamp(new NanosecondTickCount(i * 4_166_667L)),
+            0,
+            header.PixelByteCount
+          ).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }
@@ -251,14 +257,24 @@ namespace MB.FramePacing.Analysis.UnitTest
           if (i < Captures - lostCaptures)
             MarkerRenderer.Render(
               frame,
-              new MarkerPayload(MarkerKind.Frame, 1, (ulong)(i / 4), MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(i / 4 * 166_667L)),
+              new MarkerPayload(
+                MarkerKind.Frame,
+                1,
+                (ulong)(i / 4),
+                MB.FramePacing.Marker.MarkerFlags.NoFlags,
+                new NanosecondTimeSpan(i / 4 * 16_666_667L)
+              ),
               8,
               8,
               3
             );
-          new CaptureRecordHeader(i, new TickCount64(i * 41_667L), new DeviceTimestamp(new TickCount64(i * 41_667L)), 0, header.PixelByteCount).Write(
-            record
-          );
+          new CaptureRecordHeader(
+            i,
+            new NanosecondTickCount(i * 4_166_667L),
+            new DeviceTimestamp(new NanosecondTickCount(i * 4_166_667L)),
+            0,
+            header.PixelByteCount
+          ).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }
@@ -298,16 +314,20 @@ namespace MB.FramePacing.Analysis.UnitTest
                 1,
                 (ulong)(shown / 4),
                 MB.FramePacing.Marker.MarkerFlags.NoFlags,
-                new TimeSpan(shown / 4 * 166_667L)
+                new NanosecondTimeSpan(shown / 4 * 16_666_667L)
               ),
               8,
               8,
               3
             );
           }
-          new CaptureRecordHeader(i, new TickCount64(i * 41_667L), new DeviceTimestamp(new TickCount64(i * 41_667L)), 0, header.PixelByteCount).Write(
-            record
-          );
+          new CaptureRecordHeader(
+            i,
+            new NanosecondTickCount(i * 4_166_667L),
+            new DeviceTimestamp(new NanosecondTickCount(i * 4_166_667L)),
+            0,
+            header.PixelByteCount
+          ).Write(record);
           frame.Pixels.CopyTo(record, CaptureFileHeader.RecordHeaderSize);
           writer.WriteRecords(record);
         }

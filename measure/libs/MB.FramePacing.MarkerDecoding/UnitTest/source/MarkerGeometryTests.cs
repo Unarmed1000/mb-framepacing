@@ -36,7 +36,10 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     private static void AssertGeometryMatches(ImagePoint[] view)
     {
       var screenToCamera = ScreenToCamera(view);
-      var camera = FilmScreen(screenToCamera, new MarkerPayload(MarkerKind.Frame, 1, 7, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(70)));
+      var camera = FilmScreen(
+        screenToCamera,
+        new MarkerPayload(MarkerKind.Frame, 1, 7, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(7000))
+      );
 
       var result = new MarkerDecoder(tryHarder: true).Decode(camera);
 
@@ -60,7 +63,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var image = new GrayImage(ScreenSize, ScreenSize, 96);
       MarkerRenderer.Render(
         image,
-        new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)),
+        new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200)),
         Origin,
         Origin,
         ModulePx

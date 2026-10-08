@@ -4,7 +4,7 @@
 //* The report cards of the test clips in measure/test-data/videos (the GUI draws them, the command line and the GUI write them as SVG): every
 //* series each card draws is read back through its shapes and plot areas and compared with the values the clip's manifest gives, point by
 //* point: exactly where the shape holds the number, within the SVG's rounding where a path holds it. The x axis is seconds since the run's
-//* first frame and the values are milliseconds, both converted from whole ticks the same way. Skipped when ffmpeg is not installed.
+//* first frame and the values are milliseconds, both converted from whole nanoseconds the same way. Skipped when ffmpeg is not installed.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -66,8 +66,8 @@ namespace MB.FramePacing.Charts.UnitTest
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
       // The frames with an animation error: a step from a static frame is not judged
       var judged = measured.Where(manifest.IsJudged).ToArray();
-      double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
-      double Error(int i) => Ms(manifest.AnimationErrorTicks(i)!.Value);
+      double Seconds(int i) => (manifest.ShownNanoseconds(i) - manifest.ShownNanoseconds(0)) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
+      double Error(int i) => Ms(manifest.AnimationErrorNanoseconds(i)!.Value);
 
       var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
       // Symmetric, covering every error unless a few are a hitch far beyond the rest (the report's rule, ChartScale): those reach the edge
@@ -87,7 +87,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(lines, Is.EqualTo(expectedLines).Within(0.05 * (error.YTo - error.YFrom) / (error.Bottom - error.Top)), $"{clip}: refresh lines");
       var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "band");
       Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
-      var withError = judged.Where(i => manifest.AnimationErrorTicks(i) != 0).ToArray();
+      var withError = judged.Where(i => manifest.AnimationErrorNanoseconds(i) != 0).ToArray();
       var bars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class == "bar").ToArray();
       Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
       double zeroY = error.PixelY(0);
@@ -109,7 +109,7 @@ namespace MB.FramePacing.Charts.UnitTest
       double pixelMs = (step.YTo - step.YFrom) / (step.Bottom - step.Top);
       double pixelSeconds = (step.XTo - step.XFrom) / (step.Right - step.Left);
       // The scale covers the display time steps of the frames that animate: a static frame's hold (the next frame's step) is left out
-      var animating = measured.Where(manifest.CountsTowardFrameRate).Select(i => Ms(manifest.DisplayStepTicks(i))).ToArray();
+      var animating = measured.Where(manifest.CountsTowardFrameRate).Select(i => Ms(manifest.DisplayStepNanoseconds(i))).ToArray();
       Assert.That(step.YTo, Is.EqualTo(ChartScale.StepTop(animating, refreshMs)).Within(1e-9), $"{clip}: the step scale leaves static holds out");
       // Each hold in its kind's class: late, an older frame came back while it was the newest, frames the target dropped before the next,
       // as planned (a clip has no capture gap)
@@ -126,7 +126,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(step.ValueX(hold.X1), Is.EqualTo(Seconds(i)).Within(0.051 * pixelSeconds), $"{clip}: hold {i} ends at the next frame");
         Assert.That(
           step.ValueY(hold.Y),
-          Is.EqualTo(Math.Min(Ms(manifest.DisplayStepTicks(i)), step.YTo)).Within(0.051 * pixelMs),
+          Is.EqualTo(Math.Min(Ms(manifest.DisplayStepNanoseconds(i)), step.YTo)).Within(0.051 * pixelMs),
           $"{clip}: display time step {i} (at the top edge beyond the scale)"
         );
         string expectedClass =
@@ -157,11 +157,13 @@ namespace MB.FramePacing.Charts.UnitTest
         .Where(i =>
           !manifest.IsStatic(i)
           && manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1
-          && manifest.CpuStartTicks(i) != 0
-          && manifest.CpuStartTicks(i + 1) != 0
+          && manifest.CpuStartNanoseconds(i) != 0
+          && manifest.CpuStartNanoseconds(i + 1) != 0
         )
-        .Select(i => Ms(manifest.CpuStartTicks(i + 1) - manifest.CpuStartTicks(i)))
-        .Concat(Enumerable.Range(0, manifest.FrameCount).Where(i => manifest.CpuBusyTicks(i) != 0).Select(i => Ms(manifest.CpuBusyTicks(i))))
+        .Select(i => Ms(manifest.CpuStartNanoseconds(i + 1) - manifest.CpuStartNanoseconds(i)))
+        .Concat(
+          Enumerable.Range(0, manifest.FrameCount).Where(i => manifest.CpuBusyNanoseconds(i) != 0).Select(i => Ms(manifest.CpuBusyNanoseconds(i)))
+        )
         .ToArray();
       Assert.That(
         frameTime.YTo,
@@ -224,7 +226,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var (manifest, _, chart) = Analyze(clip);
       var drawing = ReportCard.Build(RunSection.Whole(chart), ReportOptions.ShowOnly(new[] { ReportItem.AnimationTimeStep }));
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray(); // frame 0 follows the previous loop, not in the capture
-      double Seconds(int i) => (manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(int i) => (manifest.ShownNanoseconds(i) - manifest.ShownNanoseconds(0)) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
 
       var step = drawing.Plots.Single(p => p.Id == ReportItem.DisplayTimeStep);
       double pixelMs = (step.YTo - step.YFrom) / (step.Bottom - step.Top);
@@ -235,7 +237,7 @@ namespace MB.FramePacing.Charts.UnitTest
       {
         int i = measured[k];
         var hold = drawn[k];
-        double expected = Math.Clamp(Ms(manifest.AnimationStepTicks(i)), 0, step.YTo);
+        double expected = Math.Clamp(Ms(manifest.AnimationStepNanoseconds(i)), 0, step.YTo);
         Assert.That(step.ValueX(hold.X0), Is.EqualTo(Seconds(i - 1)).Within(0.051 * pixelSeconds), $"{clip}: step {i} starts");
         Assert.That(step.ValueX(hold.X1), Is.EqualTo(Seconds(i)).Within(0.051 * pixelSeconds), $"{clip}: step {i} ends at the next frame");
         Assert.That(step.ValueY(hold.Y), Is.EqualTo(expected).Within(0.051 * pixelMs), $"{clip}: animation time step {i}");
@@ -258,7 +260,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var counted = Enumerable.Range(1, manifest.FrameCount - 1).Where(manifest.CountsTowardFrameRate).ToArray();
 
       var errors = DistributionCard.Build(DistributionCard.ErrorHistogram, section);
-      AssertCardBars(errors, measured.Select(i => manifest.AnimationErrorTicks(i)!.Value), clip + ": animation error histogram");
+      AssertCardBars(errors, measured.Select(i => manifest.AnimationErrorNanoseconds(i)!.Value), clip + ": animation error histogram");
       var errorPlot = errors.Plots.Single();
       Assert.That(
         errors.FlatShapes.OfType<LineShape>().Where(l => l.Class == "average-line").Select(l => errorPlot.ValueX(l.X1.Value)),
@@ -267,13 +269,15 @@ namespace MB.FramePacing.Charts.UnitTest
       );
 
       var display = DistributionCard.Build(DistributionCard.DisplayTimeStepHistogram, section);
-      AssertCardBars(display, counted.Select(manifest.DisplayStepTicks), clip + ": display time step histogram");
-      double median = Analysis.Statistics.From(counted.Select(manifest.DisplayStepTicks).Select(ticks => new TimeSpan(ticks))).P50;
+      AssertCardBars(display, counted.Select(manifest.DisplayStepNanoseconds), clip + ": display time step histogram");
+      double median = Analysis
+        .Statistics.From(counted.Select(manifest.DisplayStepNanoseconds).Select(nanoseconds => new NanosecondTimeSpan(nanoseconds)))
+        .P50;
       var medianLine = display.FlatShapes.OfType<LineShape>().Single(l => l.Class == "average-line");
       Assert.That(display.Plots.Single().ValueX(medianLine.X1.Value), Is.EqualTo(median).Within(1e-9), $"{clip}: median display time step");
 
       var percentiles = DistributionCard.Build(DistributionCard.ErrorPercentiles, section);
-      var sorted = measured.Select(i => Ms(Math.Abs(manifest.AnimationErrorTicks(i)!.Value))).Order().ToArray();
+      var sorted = measured.Select(i => Ms(Math.Abs(manifest.AnimationErrorNanoseconds(i)!.Value))).Order().ToArray();
       AssertCurve(
         percentiles,
         DistributionCard.CurvePercentiles.Select(p => (p, Analysis.Statistics.Percentile(sorted, p / 100))),
@@ -284,7 +288,12 @@ namespace MB.FramePacing.Charts.UnitTest
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
       AssertCurve(
         drift,
-        all.Select(i => ((manifest.ShownTicks(i) - manifest.ShownTicks(0)) / (double)TimeSpan.TicksPerSecond, Ms(manifest.DriftTicks(i)))),
+        all.Select(i =>
+          (
+            (manifest.ShownNanoseconds(i) - manifest.ShownNanoseconds(0)) / (double)NanosecondTimeSpan.NanosecondsPerSecond,
+            Ms(manifest.DriftNanoseconds(i))
+          )
+        ),
         clip + ": drift"
       );
     }
@@ -316,7 +325,7 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// The analysis output reads back exactly: every presented frame to the tick, the pacing, statistics and counts, the capture period and the
+    /// The analysis output reads back exactly: every presented frame to the nanosecond, the pacing, statistics and counts, the capture period and the
     /// error threshold.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
@@ -327,9 +336,9 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(read.FilePrefix, Is.EqualTo("run-1"));
       var back = read.Chart;
       Assert.That((back.CapturePeriod, back.ErrorThreshold, back.Camera), Is.EqualTo((chart.CapturePeriod, chart.ErrorThreshold, chart.Camera)));
-      // Every frame to the tick; the older frames shown out of order after it compared by their content (a list compares by reference)
+      // Every frame to the nanosecond; the older frames shown out of order after it compared by their content (a list compares by reference)
       static PresentedFrame WithoutLists(PresentedFrame f) => f with { OlderFrames = null };
-      Assert.That(back.Run.Frames.Select(WithoutLists), Is.EqualTo(chart.Run.Frames.Select(WithoutLists)), $"{clip}: every frame to the tick");
+      Assert.That(back.Run.Frames.Select(WithoutLists), Is.EqualTo(chart.Run.Frames.Select(WithoutLists)), $"{clip}: every frame to the nanosecond");
       Assert.That(
         back.Run.Frames.Select(f => f.OlderFrames ?? Array.Empty<OlderFrameCapture>()),
         Is.EqualTo(chart.Run.Frames.Select(f => f.OlderFrames ?? Array.Empty<OlderFrameCapture>())),
@@ -360,7 +369,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
       Assert.That(
         Of("bar").Count(),
-        Is.EqualTo(measured.Count(i => manifest.AnimationErrorTicks(i) is { } e && e != 0)),
+        Is.EqualTo(measured.Count(i => manifest.AnimationErrorNanoseconds(i) is { } e && e != 0)),
         $"{clip}: a bar per frame with an error"
       );
       int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
@@ -410,9 +419,15 @@ namespace MB.FramePacing.Charts.UnitTest
       // frame that has one
       int frameTimes = Enumerable
         .Range(0, manifest.FrameCount - 1)
-        .Count(i => manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1 && manifest.CpuStartTicks(i) != 0 && manifest.CpuStartTicks(i + 1) != 0);
+        .Count(i =>
+          manifest.FrameIndex(i + 1) == manifest.FrameIndex(i) + 1 && manifest.CpuStartNanoseconds(i) != 0 && manifest.CpuStartNanoseconds(i + 1) != 0
+        );
       Assert.That(Segments("frametime"), Is.EqualTo(frameTimes), $"{clip}: a frametime step per frame with a frametime");
-      Assert.That(Segments("cpu-busy"), Is.EqualTo(all.Count(i => manifest.CpuBusyTicks(i) != 0)), $"{clip}: a CPU busy bar per frame with CPU busy");
+      Assert.That(
+        Segments("cpu-busy"),
+        Is.EqualTo(all.Count(i => manifest.CpuBusyNanoseconds(i) != 0)),
+        $"{clip}: a CPU busy bar per frame with CPU busy"
+      );
     }
 
     /// <summary>
@@ -430,10 +445,14 @@ namespace MB.FramePacing.Charts.UnitTest
       int checkedFrames = 0;
       for (int i = 1; i < frames.Count; ++i)
       {
-        if (frames[i].CpuStartTime.Ticks == 0)
+        if (frames[i].CpuStartTime.Nanoseconds == 0)
           continue;
-        // Within a tick: the manifest and the capture round 1/60 s to ticks independently
-        Assert.That((frames[i].CpuStartTime + offset!.Value).Ticks, Is.EqualTo(frames[i - 1].FirstSeenTime.Ticks).Within(1), $"{clip}: frame {i}");
+        // Within a nanosecond: the manifest and the capture round 1/60 s to nanoseconds independently
+        Assert.That(
+          (frames[i].CpuStartTime + offset!.Value).Nanoseconds,
+          Is.EqualTo(frames[i - 1].FirstSeenTime.Nanoseconds).Within(1),
+          $"{clip}: frame {i}"
+        );
         ++checkedFrames;
       }
       Assert.That(checkedFrames, Is.GreaterThan(frames.Count - 3), $"{clip}: nearly every frame has a CPU start");
@@ -452,7 +471,11 @@ namespace MB.FramePacing.Charts.UnitTest
       IEnumerable<System.Xml.Linq.XElement> Of(string cls) => document.Descendants().Where(e => (string?)e.Attribute("class") == cls);
       // The key's box sits at x 20; every other box is a frame's CPU work
       int boxes = Of("box").Count(e => (string?)e.Attribute("x") != "20");
-      Assert.That(boxes, Is.EqualTo(frames.Count(f => f.CpuStartTime.Ticks != 0 && f.CpuBusy.Ticks != 0)), "a CPU box per frame with CPU times");
+      Assert.That(
+        boxes,
+        Is.EqualTo(frames.Count(f => f.CpuStartTime.Nanoseconds != 0 && f.CpuBusy.Nanoseconds != 0)),
+        "a CPU box per frame with CPU times"
+      );
       Assert.That(Of("arrow").Count(), Is.EqualTo(boxes + 1), "a present arrow per box, and the key's");
       // Every frame appears on a bright vsync: the line at the left edge of its first refresh (ok or off cell, 2 px inside it) is not faint
       var brightX = Of("vsync").Select(e => double.Parse((string)e.Attribute("x1")!, System.Globalization.CultureInfo.InvariantCulture)).ToHashSet();
@@ -512,7 +535,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(cells.Select(c => c.Class), Has.None.EqualTo("again"), "a frame presented on demand is never late for waiting");
       Assert.That(
         texts.Count(t => t == "static"),
-        Is.EqualTo(frames.Count(f => f.AnimationError?.Ticks is null && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)),
+        Is.EqualTo(frames.Count(f => f.AnimationError?.Nanoseconds is null && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)),
         $"{clip}: \"static\" for each step from a static frame"
       );
       Assert.That(texts, Does.Contain("static: nothing animates"), $"{clip}: the key");
@@ -529,12 +552,12 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var (manifest, _, chart) = Analyze(clip);
       var data = RunChartData.Of(chart);
-      long refresh = RefreshTicks(chart);
+      long refresh = RefreshNanoseconds(chart);
       var byHold = new Dictionary<int, (long? Target, long? Preferred)>();
       foreach (var stretch in data.StepReferences)
       {
         for (int i = stretch.Start; i < stretch.End; ++i)
-          byHold[i] = (stretch.TargetFrameTime?.Ticks, stretch.PreferredFrameTime?.Ticks);
+          byHold[i] = (stretch.TargetFrameTime?.Nanoseconds, stretch.PreferredFrameTime?.Nanoseconds);
       }
       int differing = 0;
       for (int i = 0; i + 1 < manifest.FrameCount; ++i)
@@ -582,13 +605,13 @@ namespace MB.FramePacing.Charts.UnitTest
       // The frame rates cover the steps toward the frame rate (a static frame's time on screen is left out); the clip's refreshes give the
       // fps and the nearest-rank lows
       var judged = measured.Where(manifest.IsJudged).ToArray();
-      var steps = measured.Where(manifest.CountsTowardFrameRate).Select(manifest.DisplayStepTicks).OrderBy(t => t).ToArray();
-      double averageFps = steps.Length * (double)TimeSpan.TicksPerSecond / steps.Sum();
+      var steps = measured.Where(manifest.CountsTowardFrameRate).Select(manifest.DisplayStepNanoseconds).OrderBy(t => t).ToArray();
+      double averageFps = steps.Length * (double)NanosecondTimeSpan.NanosecondsPerSecond / steps.Sum();
       Assert.That(tiles.Single(t => t.Caption == "Average fps").Value, Is.EqualTo(averageFps.ToString("0.0", CultureInfo.InvariantCulture)));
       long p99 = steps[(int)Math.Ceiling(0.99 * steps.Length) - 1];
       Assert.That(
         tiles.Single(t => t.Caption == "1 % low").Value,
-        Is.EqualTo((TimeSpan.TicksPerSecond / (double)p99).ToString("0.0", CultureInfo.InvariantCulture))
+        Is.EqualTo((NanosecondTimeSpan.NanosecondsPerSecond / (double)p99).ToString("0.0", CultureInfo.InvariantCulture))
       );
       Assert.That(
         tiles.Single(t => t.Caption == "Error p99").Value,
@@ -597,7 +620,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var late = tiles.Single(t => t.Caption == "Late frames");
       Assert.That(late.Value, Is.EqualTo(measured.Count(manifest.IsLate).ToString(CultureInfo.InvariantCulture)));
       Assert.That(late.Warning, Is.EqualTo(measured.Any(manifest.IsLate)));
-      double worst = judged.Max(i => Math.Abs(Ms(manifest.AnimationErrorTicks(i)!.Value)));
+      double worst = judged.Max(i => Math.Abs(Ms(manifest.AnimationErrorNanoseconds(i)!.Value)));
       Assert.That(tiles.Single(t => t.Caption == "Worst error").Value, Is.EqualTo(worst.ToString("0.0", CultureInfo.InvariantCulture) + " ms"));
     }
 
@@ -705,11 +728,12 @@ namespace MB.FramePacing.Charts.UnitTest
       return (manifest, report, ChartRun.From(report, run));
     }
 
-    /// <summary>The refresh the run is measured with: the capture period, 1/60 s in whole ticks.</summary>
-    private static long RefreshTicks(ChartRun chart)
+    /// <summary>The refresh the run is measured with: the capture period, 1/60 s.</summary>
+    private static long RefreshNanoseconds(ChartRun chart)
     {
-      long refresh = chart.Run.Pacing!.RefreshPeriod.Ticks;
-      Assert.That(refresh, Is.AnyOf(166666L, 166667L));
+      long refresh = chart.Run.Pacing!.RefreshPeriod.Nanoseconds;
+      // The video's frame times are 1/60 s apart to the nanosecond
+      Assert.That(refresh, Is.AnyOf(16_666_666L, 16_666_667L));
       return refresh;
     }
 
@@ -727,7 +751,7 @@ namespace MB.FramePacing.Charts.UnitTest
       int start = 0;
       for (int i = 0; i < manifest.FrameCount; ++i)
       {
-        while (manifest.ShownTicks(i) - manifest.ShownTicks(start) >= LateShare.Window.Ticks)
+        while (manifest.ShownNanoseconds(i) - manifest.ShownNanoseconds(start) >= LateShare.Window.Nanoseconds)
           ++start;
         var window = Enumerable.Range(start, i - start + 1).Where(j => j > 0).ToArray();
         int late = window.Count(j => manifest.IsLate(j) || Longer(j));
@@ -772,19 +796,19 @@ namespace MB.FramePacing.Charts.UnitTest
     private static double Number(string text) => double.Parse(text, CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// A distribution card's bars of <paramref name="ticks"/>: 0.1 ms bins centred on multiples of 0.1 ms (wider, a multiple, only when the
+    /// A distribution card's bars of <paramref name="nanoseconds"/>: 0.1 ms bins centred on multiples of 0.1 ms (wider, a multiple, only when the
     /// range needs more than the maximum bin count), each bar's centre at its bin's centre and its top at log10 of its count, read back
     /// through the card's plot area.
     /// </summary>
-    private static void AssertCardBars(CardDrawing card, IEnumerable<long> ticks, string what)
+    private static void AssertCardBars(CardDrawing card, IEnumerable<long> nanoseconds, string what)
     {
-      var values = ticks.ToArray();
-      long width = Histogram.DefaultBinWidth.Ticks;
+      var values = nanoseconds.ToArray();
+      long width = Histogram.DefaultBinWidth.Nanoseconds;
       long Bin(long value) => (long)Math.Floor((value / (double)width) + 0.5);
       long needed = Bin(values.Max()) - Bin(values.Min()) + 1;
       if (needed > Histogram.DefaultMaxBins)
         width *= (needed + Histogram.DefaultMaxBins - 1) / Histogram.DefaultMaxBins;
-      double widthMs = width / (double)TimeSpan.TicksPerMillisecond;
+      double widthMs = width / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
       var expected = values.GroupBy(Bin).OrderBy(g => g.Key).Select(g => (Position: g.Key * widthMs, Height: Math.Log10(g.Count()))).ToArray();
 
       var plot = card.Plots.Single();
@@ -813,6 +837,6 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(points.Select(p => p.Y), Is.EqualTo(want.Select(w => w.Y)).Within(0.0501), what + ": y");
     }
 
-    private static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
+    private static double Ms(long nanoseconds) => nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
   }
 }

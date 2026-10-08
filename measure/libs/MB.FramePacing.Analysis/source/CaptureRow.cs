@@ -20,7 +20,7 @@ namespace MB.FramePacing.Analysis
   /// <param name="CaptureTime">The capture time used for analysis (device or host clock). Unknown (default) for NotRecorded rows.</param>
   public readonly record struct CaptureRow(
     long CaptureIndex,
-    TickCount64 CaptureTime,
+    NanosecondTickCount CaptureTime,
     CaptureStatus Status,
     MarkerPayload Payload,
     StartMetadata? Start = null,
@@ -31,10 +31,10 @@ namespace MB.FramePacing.Analysis
     public bool IsDecoded => Status == CaptureStatus.Decoded;
 
     /// <summary>The capture data's host clock timestamp, when the row came from it.</summary>
-    public TickCount64? HostTime { get; init; }
+    public NanosecondTickCount? HostTime { get; init; }
 
     /// <summary>The capture data's device clock timestamp, when the row came from it and the device gave one.</summary>
-    public TickCount64? DeviceTime { get; init; }
+    public NanosecondTickCount? DeviceTime { get; init; }
 
     /// <summary>
     /// How many refreshes the capture's device clock says were missed since the previous capture (<see cref="MissedCaptures"/>); 0 on the

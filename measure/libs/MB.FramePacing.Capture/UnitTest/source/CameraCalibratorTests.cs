@@ -62,7 +62,8 @@ namespace MB.FramePacing.Capture.UnitTest
         }
       }
 
-      double expectedDelay = camera.ToCameraTicks(camera.ZoneScanTicks(1) - camera.ZoneScanTicks(0)) / TimeSpan.TicksPerMillisecond;
+      double expectedDelay =
+        camera.ToCameraNanoseconds(camera.ZoneScanNanoseconds(1) - camera.ZoneScanNanoseconds(0)) / NanosecondTimeSpan.NanosecondsPerMillisecond;
       Assert.That(rig.ScanoutDelayMs, Is.EqualTo(expectedDelay).Within(1.0));
       Assert.That(rig.RefreshHz, Is.EqualTo(60).Within(0.5));
       Assert.That(rig.CameraFps, Is.EqualTo(1000).Within(1));

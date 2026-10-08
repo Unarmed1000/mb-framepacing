@@ -26,7 +26,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
   {
     private const int MaxDiagnosticLines = 40;
 
-    private readonly ConcurrentDictionary<long, TickCount64> m_deviceTimes = new ConcurrentDictionary<long, TickCount64>();
+    private readonly ConcurrentDictionary<long, NanosecondTickCount> m_deviceTimes = new ConcurrentDictionary<long, NanosecondTickCount>();
     private readonly Queue<string> m_recentLines = new Queue<string>();
     private readonly object m_lock = new object();
     private readonly ManualResetEventSlim m_outputKnown = new ManualResetEventSlim(false);
@@ -98,15 +98,18 @@ namespace MB.FramePacing.Capture.Ffmpeg
     }
 
     /// <summary>Device timestamp of output frame <paramref name="captureIndex"/>; removes it once taken.</summary>
-    public bool TryGetDeviceTime(long captureIndex, out TickCount64 deviceTime) => m_deviceTimes.TryRemove(captureIndex, out deviceTime);
+    public bool TryGetDeviceTime(long captureIndex, out NanosecondTickCount deviceTime) => m_deviceTimes.TryRemove(captureIndex, out deviceTime);
 
-    /// <summary>Convert a pts in the given time base to a time, rounded to the nearest tick, without overflow.</summary>
-    public static TickCount64 PtsToTime(long pts, long timeBaseNumerator, long timeBaseDenominator)
+    /// <summary>
+    /// Convert a pts in the given time base to a time, rounded to the nearest nanosecond (half a nanosecond away from zero), without
+    /// overflow. A pts further from zero than nanoseconds hold (292 years: no recording's time) is the last time they hold on that side.
+    /// </summary>
+    public static NanosecondTickCount PtsToTime(long pts, long timeBaseNumerator, long timeBaseDenominator)
     {
-      Int128 scaled = (Int128)pts * timeBaseNumerator * TimeSpan.TicksPerSecond;
+      Int128 scaled = (Int128)pts * timeBaseNumerator * NanosecondTimeSpan.NanosecondsPerSecond;
       Int128 rounded =
         scaled >= 0 ? (scaled + (timeBaseDenominator / 2)) / timeBaseDenominator : (scaled - (timeBaseDenominator / 2)) / timeBaseDenominator;
-      return new TickCount64((long)rounded);
+      return new NanosecondTickCount((long)Int128.Clamp(rounded, long.MinValue, long.MaxValue));
     }
 
     private bool TryParseShowInfoFrame(string line)

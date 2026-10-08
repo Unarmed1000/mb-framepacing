@@ -65,7 +65,7 @@ namespace MB.FramePacing.Charts
       bool sorted = true;
       for (int i = 1; i < frames.Count && sorted; ++i)
         sorted = frames[i].FirstSeenTime >= frames[i - 1].FirstSeenTime;
-      Frames = sorted ? frames : frames.OrderBy(f => f.FirstSeenTime.Ticks).ToArray();
+      Frames = sorted ? frames : frames.OrderBy(f => f.FirstSeenTime.Nanoseconds).ToArray();
       Origin = run.Run.Frames.Count > 0 ? run.Run.Frames[0].FirstSeenTime : default;
       int count = Frames.Count;
 
@@ -82,19 +82,19 @@ namespace MB.FramePacing.Charts
         }
         return false;
       });
-      m_errors = Once(() => new FrameSequence(count, i => Frames[i].AnimationError?.Ticks));
+      m_errors = Once(() => new FrameSequence(count, i => Frames[i].AnimationError?.Nanoseconds));
       // The same frames as the errors: they share which ones
-      m_absoluteErrors = Once(() => new FrameSequence(Errors.Frames, i => Frames[i].AnimationError?.Ticks is { } e ? Math.Abs(e) : null));
+      m_absoluteErrors = Once(() => new FrameSequence(Errors.Frames, i => Frames[i].AnimationError?.Nanoseconds is { } e ? Math.Abs(e) : null));
       m_frameRateSteps = Once(() =>
-        new FrameSequence(count, i => RunStatistics.CountsTowardFrameRate(Frames[i]) ? Frames[i].DisplayDelta?.Ticks : null)
+        new FrameSequence(count, i => RunStatistics.CountsTowardFrameRate(Frames[i]) ? Frames[i].DisplayDelta?.Nanoseconds : null)
       );
-      m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDelta?.Ticks));
-      m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDelta?.Ticks : null));
+      m_displaySteps = Once(() => new FrameSequence(count, i => Frames[i].DisplayDelta?.Nanoseconds));
+      m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDelta?.Nanoseconds : null));
       m_animatingHolds = Once(() =>
         anyStatic.Value
           ? new FrameSequence(
             count,
-            i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDelta?.Ticks : null
+            i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDelta?.Nanoseconds : null
           )
           : Holds
       );
@@ -113,18 +113,18 @@ namespace MB.FramePacing.Charts
         }
         return stretches.ToArray();
       });
-      m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDelta?.Ticks : null));
+      m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDelta?.Nanoseconds : null));
       m_animatingAnimationHolds = Once(() =>
         anyStatic.Value
           ? new FrameSequence(
             count,
-            i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDelta?.Ticks : null
+            i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDelta?.Nanoseconds : null
           )
           : AnimationHolds
       );
-      m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTime?.Ticks is > 0 and var t ? t : null));
-      m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusy.Ticks > 0 ? Frames[i].CpuBusy.Ticks : null));
-      m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTime?.Ticks is > 0 || Frames[i].CpuBusy.Ticks > 0));
+      m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTime?.Nanoseconds is > 0 and var t ? t : null));
+      m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusy.Nanoseconds > 0 ? Frames[i].CpuBusy.Nanoseconds : null));
+      m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTime?.Nanoseconds is > 0 || Frames[i].CpuBusy.Nanoseconds > 0));
       m_droppedBefore = Once(() => DroppedFrames.Before(Frames));
       m_holdKinds = Once(() =>
       {
@@ -149,7 +149,7 @@ namespace MB.FramePacing.Charts
       m_holdsByKind = Enum.GetValues<HoldKind>()
         .ToDictionary(
           kind => kind,
-          kind => Once(() => new FrameSequence(count, i => HasNext(i) && HoldKinds[i] == kind ? Frames[i + 1].DisplayDelta?.Ticks : null))
+          kind => Once(() => new FrameSequence(count, i => HasNext(i) && HoldKinds[i] == kind ? Frames[i + 1].DisplayDelta?.Nanoseconds : null))
         );
       m_uncertainSteps = Once(() =>
         new RankBits(
@@ -166,7 +166,7 @@ namespace MB.FramePacing.Charts
         anyStatic.Value
           ? new FrameSequence(
             count,
-            i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTime?.Ticks is > 0 and var t ? t : null
+            i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTime?.Nanoseconds is > 0 and var t ? t : null
           )
           : FrameTimes
       );
@@ -175,7 +175,7 @@ namespace MB.FramePacing.Charts
         anyStatic.Value
           ? new FrameSequence(
             count,
-            i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusy.Ticks > 0 ? Frames[i].CpuBusy.Ticks : null
+            i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusy.Nanoseconds > 0 ? Frames[i].CpuBusy.Nanoseconds : null
           )
           : CpuBusy
       );
@@ -188,29 +188,29 @@ namespace MB.FramePacing.Charts
         {
           if (!withStatic && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) != 0)
             continue;
-          if (Frames[i].FrameTime?.Ticks is > 0 and var t)
+          if (Frames[i].FrameTime?.Nanoseconds is > 0 and var t)
             values.Add(t);
-          if (Frames[i].CpuBusy.Ticks > 0)
-            values.Add(Frames[i].CpuBusy.Ticks);
+          if (Frames[i].CpuBusy.Nanoseconds > 0)
+            values.Add(Frames[i].CpuBusy.Nanoseconds);
         }
         // The matrix makes its own copy to sort: the list's values as they are, not a second array of them
         return new WaveletMatrix(CollectionsMarshal.AsSpan(values));
       }
       m_frameTimesAndCpuBusy = Once(() => anyStatic.Value ? FrameTimesAndCpuBusyOf(withStatic: false) : AllFrameTimesAndCpuBusy);
       m_allFrameTimesAndCpuBusy = Once(() => FrameTimesAndCpuBusyOf(withStatic: true));
-      m_drift = Once(() => new FrameSequence(count, i => Frames[i].Drift.Ticks));
+      m_drift = Once(() => new FrameSequence(count, i => Frames[i].Drift.Nanoseconds));
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
       m_events = Once(() => RunEvents.Of(this));
 
       // What each hold was aimed at: the target and preferred frame time of the frame that ends it. The display time step panel draws them
       // in whole refreshes, as the analysis compares; the frametime panel as written. Without pacing (no refresh rate) there are none
-      var refresh = run.Run.Pacing?.RefreshPeriod ?? TimeSpan.Zero;
-      TimeSpan? Rounded(TimeSpan? frameTime) => frameTime is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
-      ReferenceStretch[] Stretches(Func<PresentedFrame, TimeSpan?> target, Func<PresentedFrame, TimeSpan?> preferred)
+      var refresh = run.Run.Pacing?.RefreshPeriod ?? NanosecondTimeSpan.Zero;
+      NanosecondTimeSpan? Rounded(NanosecondTimeSpan? frameTime) => frameTime is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
+      ReferenceStretch[] Stretches(Func<PresentedFrame, NanosecondTimeSpan?> target, Func<PresentedFrame, NanosecondTimeSpan?> preferred)
       {
         var stretches = new List<ReferenceStretch>();
-        for (int i = 0; refresh > TimeSpan.Zero && i < count; ++i)
+        for (int i = 0; refresh > NanosecondTimeSpan.Zero && i < count; ++i)
         {
           if (!HasNext(i))
             continue;
@@ -227,15 +227,21 @@ namespace MB.FramePacing.Charts
       }
       // The scales take the lines of the holds that animate: neither the frame holding nor the frame ending the hold, whose aim the line is,
       // is static (an idle screen's aim, 1 s at 1 fps, would squash them, as its hold would). Unless static values count too
-      FrameSequence References(Func<PresentedFrame, TimeSpan?> target, Func<PresentedFrame, TimeSpan?> preferred, bool withStatic) =>
+      FrameSequence References(
+        Func<PresentedFrame, NanosecondTimeSpan?> target,
+        Func<PresentedFrame, NanosecondTimeSpan?> preferred,
+        bool withStatic
+      ) =>
         new FrameSequence(
           count,
           i =>
-            refresh > TimeSpan.Zero && HasNext(i) && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
+            refresh > NanosecondTimeSpan.Zero
+            && HasNext(i)
+            && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
               ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
               {
                 (null, null) => null,
-                var (t, p) => Math.Max(t?.Ticks ?? 0, p?.Ticks ?? 0),
+                var (t, p) => Math.Max(t?.Nanoseconds ?? 0, p?.Nanoseconds ?? 0),
               }
               : null
         );
@@ -264,7 +270,7 @@ namespace MB.FramePacing.Charts
     public IReadOnlyList<PresentedFrame> Frames { get; }
 
     /// <summary>The time at 0 s: the run's first frame.</summary>
-    public TickCount64 Origin { get; }
+    public NanosecondTickCount Origin { get; }
 
     public FrameSequence Errors => m_errors.Value;
 
@@ -366,6 +372,13 @@ namespace MB.FramePacing.Charts
 
     /// <summary>Frame <paramref name="index"/>'s display time in seconds since the run's first frame.</summary>
     public double Seconds(int index) => (Frames[index].FirstSeenTime - Origin).TotalSeconds;
+
+    /// <summary>
+    /// The time on the capture's clock <paramref name="seconds"/> after the run's first frame, rounded to the nearest nanosecond (a
+    /// section's ends, a pixel column, the pointer).
+    /// </summary>
+    internal NanosecondTickCount TimeAt(double seconds) =>
+      Origin + new NanosecondTimeSpan((long)Math.Round(seconds * NanosecondTimeSpan.NanosecondsPerSecond));
 
     /// <summary>The frames first seen from <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> (both included), as a range.</summary>
     public (int Start, int End) Range(double fromSeconds, double toSeconds) =>

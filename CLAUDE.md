@@ -17,10 +17,10 @@ The repository has two parts, and the license follows them (see Conventions):
     statistics only);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
     language (C++
-    `MB::FramePacing` with the library version and the time types in `core/time/`: `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32`, `NanosecondTimeSpan`, `NanosecondTickCount` and `NanosecondTimeDuration` (a signed interval, a point on a clock and a length of time that is never negative, in nanoseconds, kept as a platform gives them: exact from ticks, and to ticks truncated for an interval and the tick it is in for a point; `FromSeconds(double)` truncates to the nanosecond and `NanosecondTickCount::FromCounter` rounds down to it; in C# and Python too, where they are the only time types Python has), and the optional `core/time/ChronoConversion.hpp` (the tick and the nanosecond types); `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
+    `MB::FramePacing` with the library version and the time types in `core/time/`: `NanosecondTimeSpan`, `NanosecondTickCount` and `NanosecondTimeDuration` (a signed interval, a point on a clock and a length of time that is never negative, in nanoseconds: **what the marker, the data modules and the tools hold every time in**; exact from ticks, and to ticks truncated for an interval and the tick it is in for a point; `FromSeconds(double)` truncates to the nanosecond and `NanosecondTickCount::FromCounter` rounds down to it; in C# and Python too, where they are the only time types Python has), the tick types `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32` and `TimeDuration` (ticks of 100 ns, for applications and .NET's own APIs: nothing in the marker, the data modules or the tools holds a measured time in them), and the optional `core/time/ChronoConversion.hpp` (the tick and the nanosecond types); `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
     byte count from the type) for every module's file and wire formats; the core and the marker module have 100 % test coverage
-    (regions, functions, lines, branches), measured with llvm-cov without asserts (`NDEBUG`); the C# core has the same `TickCount64`, `TickCount32` and `TimeSpan32`
-    (`sdk/csharp/core/source/Time/`, member for member, `System.TimeSpan` as the signed interval, .NET exceptions; `TimeSpanUtil.FromSeconds`
+    (regions, functions, lines, branches), measured with llvm-cov without asserts (`NDEBUG`); the C# core has the same time types
+    (`sdk/csharp/core/source/Time/`, member for member, .NET exceptions; among the tick types `System.TimeSpan` is the signed interval, and `TimeSpanUtil.FromSeconds`
     converts seconds to the tick on every runtime, since Unity's `TimeSpan.FromSeconds` rounds to a millisecond), and the C# core and
     marker module have 100 % line and branch coverage too: `python tools/check_csharp_coverage.py` (Microsoft code coverage through `dotnet test --collect`; CI's `dotnet-lint`), C# assembly `MB.FramePacing`, Python
     `mb_framepacing`). The SDK never reads a clock: applications pass their own clock's times (the C++ tests' `SteadyClock` is a test
@@ -192,23 +192,24 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     a main marker's QR code can carry (106), so a field added to the markers does not change the records (the user's choice over
     the smallest slots that fit). Readers refuse another record size.
   - **Typed times** (C++ and C#, the same names; the tools are typed throughout too, with these names: `PresentedFrame`, `CaptureRow`,
-    `ChartRun`): points in time are `TickCount64` (named `…Time`:
-    `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
-    `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`).
-  - **The files hold times as whole ticks** (`…Ticks` columns and fields), in the integer type the value has: a marker's value is in
-    the CSV in the marker's integer type (`animationTicks` an `i64`, `markerTargetTicks` a `u32`, 4294967295 = on demand), **as the
-    nearest tick for now**: the marker counts in nanoseconds (below) and the tools still count in ticks, converted in one place,
-    `MarkerPayload`. To a marker it is exact, with the types' own helpers (`FromTimeSpan`, `FromTickCount64`: never `* 100` or `/ 100`
-    at a call site). From a marker it is the nearest tick, a tie the even one, written there (`NearestTick`, the user's choice of
-    2026-10-08, the one exception to "the type's own helper"): the helpers cut to the tick, so 16 666 667 ns became 166 666 ticks
-    while the tools' own times round the recording's to 166 667, and every report of a frame shown on time had errors of a tick
-    (a "too late" key, 20 % larger SVGs). With the nearest tick the tools' output on the 22 clips is what it was before the marker
-    changed unit. All of it goes when the tools and their files move to nanoseconds too (`…Ns` names), and
-    `summary.json`'s settings too (`capturePeriodTicks`, `errorThresholdTicks`, `pacing.refreshPeriodTicks`, `targetFrameTicks`).
-    Nothing between a marker and a file goes through a floating point number: never add a milliseconds column or field for a time.
-    Only `summary.json`'s statistics and histograms are milliseconds (`…Ms`): a mean or an interpolated percentile is no whole tick.
-    A whole number is digits with a `-` in front when negative, in every language's reader (no `+`, spaces, fraction or exponent).
-    The rule covers the files the tools read too: an image sequence's timestamp file (`import --timestamps`) is `fileName,timeTicks`.
+    `ChartRun`): every time is a whole number of nanoseconds. Points in time are `NanosecondTickCount` (named `…Time`:
+    `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `NanosecondTimeSpan` (named for what they are: `DisplayDelta`,
+    `Drift`, `TargetFrameTime`), and a length of time that is never negative is `NanosecondTimeDuration`: the marker's frame times and
+    CPU busy (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`). The tools' other lengths (display time step, time on
+    screen, frametime, CPU wait, periods) are signed spans. `System.TimeSpan` remains only for .NET waits, timeouts and progress,
+    converted with the types' own helpers (`ToTimeSpan()`, `FromTimeSpan(...)`: never `* 100` or `/ 100` at a call site). Python's
+    marker and data modules keep plain `int`s named `*_ns`.
+  - **The files hold times as whole nanoseconds** (`…Ns` columns and fields), in the integer type the value has: a marker's value is
+    in the CSV exactly as the marker carried it (`animationNs` an `i64`, `markerTargetNs` a `u32`, 4294967295 = on demand), and
+    `summary.json`'s settings too (`capturePeriodNs`, `errorThresholdNs`, `pacing.refreshPeriodNs`, `targetFrameNs`). The tools'
+    `MarkerPayload` holds the marker's nanoseconds as they are: nothing between a marker and a file is converted or rounded, and
+    nothing goes through a floating point number: never add a milliseconds column or field for a time.
+    Only `summary.json`'s statistics and histograms are milliseconds (`…Ms`): a mean or an interpolated percentile is no whole
+    nanosecond. A whole number is digits with a `-` in front when negative, in every language's reader (no `+`, spaces, fraction or
+    exponent). The rule covers the files the tools read too: an image sequence's timestamp file (`import --timestamps`) is
+    `fileName,timeNs`. **The format versions stayed 1** (changed in place; the user's decision: no migration): a marker, a recording,
+    a capture folder or an analysis output from before the nanoseconds is invalid and is made again
+    (`sdk/doc/analysis-output-format.md` and `capture-data-format.md` say what is refused and what reads a hundred times too small).
   - **Readers are strict, and alike:** what every file has is required (`sdk/doc/analysis-output-format.md` marks it), a value must be
     of its field's type and in its range, and content that is not is one error type per module (C++ `DataFormatError`, C#
     `InvalidDataException`, Python `DataFormatError`), with the file and line for a CSV. A file that cannot be opened is the
@@ -217,19 +218,20 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `CsvLineWriter` builds a line in its own buffer and `CsvLineReader` hands out each line as a span of its buffer; `CsvRow` is a view
     of the line's cells; the texts a file repeats (status, kind, a set of flags) are made once (`CsvTextCache`, and the name caches in
     `AnalysisDataMapping`). The output is byte for byte what `ToString` and `string.Join` wrote. `OutputFileBenchmarks`
-    (`--long-running`): an hour's frames CSV writes in 83 ms with 1 KB allocated and reads in 289 ms with 320 MB (the rows). Regenerating
+    (`--long-running`): an hour's frames CSV writes in 87 ms with 1 KB allocated and reads in 295 ms with 340 MB (the rows). Regenerating
     the golden data (`update_test_data.py`) always changes its wall-clock values (start and analysis times, duration, host times);
     anything else that changes is a real difference.
-  - **Capture times** (`MB.FramePacing.Capture`): `CaptureClock.Now` and a frame's host time are `TickCount64` (the time since the capture
-    started). A frame's device time is a `DeviceTimestamp`: a time, `Unknown` (the device gave none) or `Pending` (it arrives after the
+  - **Capture times** (`MB.FramePacing.Capture`): `CaptureClock.Now` and a frame's host time are `NanosecondTickCount` (the time since the capture
+    started, from the stopwatch counter: `NanosecondTickCount.FromCounter`); ffmpeg's timestamps become nanoseconds in integer
+    arithmetic, rounded to the nearest nanosecond. A frame's device time is a `DeviceTimestamp`: a time, `Unknown` (the device gave none) or `Pending` (it arrives after the
     pixels: ffmpeg's showinfo lines, resolved by the recorder through `IDeviceTimestampSource`). Pending exists only between a source and
-    the recorder; files hold a time or unknown, and everything after the recorder has a `TickCount64?`.
+    the recorder; files hold a time or unknown, and everything after the recorder has a `NanosecondTickCount?`.
   - **Analysis times** (`PresentedFrame`, `CaptureRow`): the marker's own values keep the marker's 0 = unknown (`IntendedDisplayTime`,
     `CpuStartTime`, `MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`); what the analysis works out is nullable
     (`DisplayDelta`, `TargetFrameTime`, `Lateness`). `IntendedDisplayTime` and `CpuStartTime` are on the pacer's clock, `FirstSeenTime`
     on the capture's: `PacingAnalyzer.CaptureMinusPacer` is where the analysis subtracts them. Milliseconds are
-    `TimeSpan.TotalMilliseconds` (on .NET 10 the same bits as ticks / 10000.0, so the output does not change).
-    The charts read the typed values; what they keep in ticks is integer arithmetic (whole refreshes, strip cells) and the prepared
+    `NanosecondTimeSpan.TotalMilliseconds`, one division of the nanosecond count (for a value of whole ticks, the same double as ticks / 10000.0).
+    The charts read the typed values; what they keep as nanosecond counts is integer arithmetic (whole refreshes, strip cells) and the prepared
     sequences (`FrameSequence`, `WaveletMatrix`), which rank plain integers. The GUI's `Stopwatch` timestamps stay raw.
 - **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`): EXPERIMENTAL.** A first version designed from scratch as the baseline that
   works on any platform: it needs a steady clock (passed in), a `Present` that waits for vsync and the display's refresh period, nothing
@@ -385,10 +387,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **100 % opt-in:** `--playback` on `import`/`analyze`/`render`, the GUI's **Save playback page**; never by `--charts` or Save charts.
   - **One HTML page that runs from the disk** (`PlaybackPage.html`, an embedded resource: markup, CSS, vanilla JS; no network): the
     report card inline (its title and tiles in the page's header), the data inline (`PlaybackData`: the card's `CardPlot`s, the
-    section's frames as tick columns), a player bar, a playhead on every panel. The frame columns are written small, in whole
+    section's frames as columns of whole nanoseconds; `PlaybackData.FormatVersion` 3: `periodNs`, `originNs`, `firstNs`, `lastNs`), a
+    player bar, a playhead on every panel. The frame columns are written small, in whole
     numbers the page's `readFrames` turns back exactly (the file's header comment has the form: steps from the frame before, the
-    time as what is left after its captures' whole periods, runs of equal values as value and count): about 4 bytes a frame on a
-    test clip instead of 30. `PlaybackFrameColumns` (the unit tests) reads them the same way: change the three together. Video time = the capture's time: an import keeps the
+    time as what is left after its captures' whole periods, runs of equal values as value and count): about 5 bytes a frame on a
+    test clip, and exact in the page's JavaScript for runs under 104 days (2^53 ns). `PlaybackFrameColumns` (the unit tests) reads them the same way: change the three together. Video time = the capture's time: an import keeps the
     file's own pts (`-copyts`), so only video-file imports with the Device time source qualify (`PlaybackCapture.Problem`: no camera,
     no `--recorded-fps`, not images). capture.json `inputPath` names the recording (`--video` for older imports).
   - **Zoom steps** (`PlaybackZoom`: whole, 60, 10, 2 s per screen): a zoomed card is `ReportCard.Build(..., visible:)` with its
@@ -416,8 +419,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - Sources other than capture cards (`mb-framepacing import`, and the GUI's "Video file... / Image folder... / Network stream") go through
     `MediaInput` -> ffmpeg.
   - Image sequences get their exact times from `--fps` or the timestamp CSV (`FrameTimestamps`), not from ffmpeg: its concat
-    timestamps are 40 ms coarse. The CSV (`ImageSequence.ReadTimestamps`) needs its header line, `fileName,timeTicks` found by name,
-    and holds whole ticks: a headerless file, or one with `timeMs`, is refused, since whole milliseconds would read as ticks.
+    timestamps are 40 ms coarse. The CSV (`ImageSequence.ReadTimestamps`) needs its header line, `fileName,timeNs` found by name,
+    and holds whole nanoseconds: a headerless file, or one with `timeTicks` or `timeMs`, is refused, since ticks or whole milliseconds
+    would read as nanoseconds.
   - Non-live sources make the recorder wait instead of dropping frames (`IsLive`).
 - **Only the markers are read** (an import's default; `--roi auto`, `locate`, the GUI's "Locate marker" for live capture, which is
   experimental; agreed with the user):
@@ -474,9 +478,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       median, percentiles and histograms (`SectionHistograms`) exactly: the output is byte-identical to sorting. The GUI builds cards
       at the window's width (`width`), with the whole run's scales (`wholeRunScales`), in the background (`SectionCards`,
       `LatestRequest`: a newer zoom cancels an older build). `CardBenchmarks` (`--long-running`) measures 1 and 10 hours at 240 Hz: a few ms per zoom or
-      window. **Preparing the data** is the cost of a run's first card (an hour at 240 Hz: about 0.55 s and 150 MB allocated to keep
+      window. **Preparing the data** is the cost of a run's first card (an hour at 240 Hz: about 0.14 s and 145 MB allocated to keep
       25 MB; `CardBenchmarks.FirstReportCard`): a `WaveletMatrix` collects and sorts only the different values while there are few
-      (`MaxCollectedDistinct`; else all of them, `TickSort` with a scratch array of its own, since a rented one would stay in the pool
+      (`MaxCollectedDistinct`; else all of them, `NanosecondSort` with a scratch array of its own, since a rented one would stay in the pool
       while the panels prepare at once); a run without a static frame prepares each `Animating…` sequence as its unfiltered twin, the
       same object; sequences over the same frames share their `RankBits` (`Errors`, `AbsoluteErrors`); the holds of a kind are
       prepared when a panel asks for that kind (never the holds as planned). `--charts` and "Save
@@ -485,7 +489,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       with `VideoClipTests` by linked source files).
     - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
-      output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the tick), any section
+      output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the nanosecond), any section
       (`RunSection`); more frames than pixels draw per column. PNG goes through a headless Edge/Chrome (`HeadlessBrowser`, `MB_BROWSER`):
       a run that fails gets one more (CI's browsers abort or hang now and then), Linux drops the sandbox when the browser says it has
       none, and an image already at the target is deleted first (the browser is ended as soon as the file is whole).
@@ -547,10 +551,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `TimelineOptions.ErrorThreshold`), and a display time step is off its target from half a refresh on. A source's precision (a
     camera's period) goes into warnings, never into the binning or the thresholds.
   - Camera captures film faster and calculate the refresh from the frames (`Capture/source/Camera/RefreshEstimator.cs`:
-    `EstimatePeriodTicks` finds which period from the intervals, `GridPeriodTicks` asks the first-seen times which grid of refreshes
+    `EstimatePeriodNanoseconds` finds which period from the intervals, `GridPeriodNanoseconds` asks the first-seen times which grid of refreshes
     they are on (a search of the periods with `GridFit`, the periodogram of the times; the intervals mislead a camera that sees a
     refresh in two or three frames, and the times are on no grid at exactly twice the refresh rate with half of the sightings late:
-    the analysis then warns that the rate is unreliable), `RefinePeriodTicks` measures it with a line through every
+    the analysis then warns that the rate is unreliable), `RefinePeriodNanoseconds` measures it with a line through every
     first-seen time, the maximum likelihood estimate once the refresh numbers are known; also used
     by the calibration). After a change to it run `RefreshGridTests` and `selftest --experimental --camera --fps <2 x refresh> --refresh <rate>`
     for a few monitor rates. The user's expected display rate (`--display-hz`, capture.json `expectedRefreshHz`) settles an ambiguous
@@ -562,11 +566,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     error, no late verdict, not in the frame rates; `RunStatistics.UncertainSteps`), and frame indices skipped across the gap are never
     called dropped. A camera decides uncertain starts itself. Out-of-order captures are kept with the newest frame
     (`PresentedFrame.OlderFrames`).
-  - **A long capture's analysis sorts ticks, not doubles, and copies no rows:** the statistics gather each kind of value as ticks
-    (`TickList`), sort it once with a radix sort (`TickSort`) and take every number from that (`Statistics.FromSortedTicks`,
+  - **A long capture's analysis sorts nanosecond counts, not doubles, and copies no rows:** the statistics gather each kind of value as
+    whole nanoseconds (`NanosecondList`), sort it once with a radix sort (`NanosecondSort`) and take every number from that (`Statistics.FromSortedNanoseconds`,
     `RunStatistics.From`: to the bit what the formulas over sorted milliseconds give, which `StatisticsTests` keeps as the reference);
     never `OrderBy` or a sorted array per statistic. A run's rows are stretches of the capture's row list (`RowRanges`), not a copy (a
-    row is over 200 bytes). The tick lists own their arrays: rented ones would stay in the pool after the analysis.
+    row is over 200 bytes). The nanosecond lists own their arrays: rented ones would stay in the pool after the analysis.
     `AnalysisBenchmarks` (`--long-running`): the timeline of an hour at 240 Hz takes 0.35 s. Each frame is still made twice (the
     pacing pass copies it to add its values): measured as about 0.05 s and 269 MB of short-lived garbage, left as it is.
   - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
@@ -591,7 +595,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     (`NanosecondTimeSpan`), the intended display and CPU start time points on the pacer's clock (`NanosecondTickCount`), the two frame
     times and CPU busy four unsigned bytes each. **A length of time is the duration type**, never negative by construction
     (`NanosecondTimeDuration`, 64-bit: what the code computes with and what a decoded payload returns), never a signed span and
-    never a 32-bit time type (`NanosecondTimeSpan32` existed for a day and was removed: the four bytes are the marker's business).
+    never a 32-bit time type (the four bytes are the marker's business).
     `Payload` caps a duration that is too long for its four bytes where it is made, never an error (it runs in a frame loop): CPU
     busy at `Payload::MaxCpuBusy` (`0xFFFFFFFF`, 4.294967295 s), a frame time at `Payload::MaxFrameTime` (`0xFFFFFFFE`), since
     `0xFFFFFFFF` there is `Payload::OnDemandFrameTime`, a duration of exactly 4294967295 ns. So every payload is valid on the wire
@@ -700,7 +704,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - The digest's seed (`marker-render`'s `WriteModuleDigest`) is one with which both symbol versions use all eight masks in its
     rows. Check that again when the payload's bytes change (the mask is in a symbol's format bits: row 8, columns 2 to 4, XOR 5)
     and take the next seed that does.
-  - **A change to the payload's bytes also needs new test clips** (`measure/test-data/videos`: their markers are in the pixels).
+  - **A change to the payload's bytes also needs new test clips** (`measure/test-data/videos`: their markers are in the pixels, and their manifests hold `animationNs`, `cpuStartNs` and `cpuBusyNs`,
+    each value rounded once from the exact time).
     mb-framepacing-explained makes them from a local, unpublished commit of this repository (it fetches a named branch into its
     submodule, exports into its own folder and never writes here). Copy the 22 folders unchanged, then `update_test_data.py`,
     DocImages and `camera_rate_table.py --update-doc`. The format change, the golden data and the clips go in one commit: `master`

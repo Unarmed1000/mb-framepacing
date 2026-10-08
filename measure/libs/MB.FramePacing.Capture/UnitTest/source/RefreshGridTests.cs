@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL camera captures: which grid of refreshes the first-seen times are on (RefreshEstimator.GridPeriodTicks, GridFit). A
+//* EXPERIMENTAL camera captures: which grid of refreshes the first-seen times are on (RefreshEstimator.GridPeriodNanoseconds, GridFit). A
 //* camera that sees a refresh in two or three frames, with sightings that come a camera frame late, gives intervals whose clusters run
 //* into each other; the times themselves still say the refresh, unless half of them are late at exactly twice the refresh rate.
 //*
@@ -28,13 +28,23 @@ namespace MB.FramePacing.Capture.UnitTest
     /// frame later (the marker was changing in that first frame, so it did not decode). Every 37th frame is held a second refresh and
     /// every 53rd is never shown, as in the synthetic camera's scenario; <paramref name="refreshesPerFrame"/> is the game's rate.
     /// </summary>
-    private static List<TickCount64> Sightings(double refreshHz, double cameraFps, int frames, double lateShare, int seed, int refreshesPerFrame = 1)
+    // The estimator's periods and intervals are doubles of nanoseconds, and the times it is given are whole nanoseconds
+    private static NanosecondTickCount Time(long nanoseconds) => new NanosecondTickCount(nanoseconds);
+
+    private static List<NanosecondTickCount> Sightings(
+      double refreshHz,
+      double cameraFps,
+      int frames,
+      double lateShare,
+      int seed,
+      int refreshesPerFrame = 1
+    )
     {
-      double refresh = TimeSpan.TicksPerSecond / refreshHz;
-      double camera = TimeSpan.TicksPerSecond / cameraFps;
+      double refresh = NanosecondTimeSpan.NanosecondsPerSecond / refreshHz;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
       var random = new Random(seed);
       double phase = 0.3 * camera;
-      var seen = new List<TickCount64>();
+      var seen = new List<NanosecondTickCount>();
       long shownOn = 0;
       for (int frame = 0; frame < frames; ++frame)
       {
@@ -42,28 +52,28 @@ namespace MB.FramePacing.Capture.UnitTest
         if (frame % 53 == 52)
           continue;
         double first = Math.Ceiling(((shownOn * refresh) + phase) / camera) + (random.NextDouble() < lateShare ? 1 : 0);
-        seen.Add(new TickCount64((long)Math.Round(first * camera)));
+        seen.Add(Time((long)Math.Round(first * camera)));
       }
       return seen;
     }
 
-    private static List<double> Intervals(List<TickCount64> seen)
+    private static List<double> Intervals(List<NanosecondTickCount> seen)
     {
       var intervals = new List<double>();
       for (int i = 1; i < seen.Count; ++i)
-        intervals.Add((seen[i] - seen[i - 1]).Ticks);
+        intervals.Add((seen[i] - seen[i - 1]).Nanoseconds);
       return intervals;
     }
 
-    private static double Estimate(List<TickCount64> seen, double cameraFps) =>
-      RefreshEstimator.EstimatePeriodTicks(Intervals(seen), TimeSpan.TicksPerSecond / cameraFps)
+    private static double Estimate(List<NanosecondTickCount> seen, double cameraFps) =>
+      RefreshEstimator.EstimatePeriodNanoseconds(Intervals(seen), NanosecondTimeSpan.NanosecondsPerSecond / cameraFps)
       ?? throw new InvalidOperationException("no estimate");
 
-    private static double Hz(double periodTicks) => TimeSpan.TicksPerSecond / periodTicks;
+    private static double Hz(double periodNanoseconds) => NanosecondTimeSpan.NanosecondsPerSecond / periodNanoseconds;
 
     /// <summary>The period the analysis goes on with: the grid's, else the intervals' estimate.</summary>
-    private static double Settle(List<TickCount64> seen, double estimate, List<double> intervals, double camera, double? expected = null) =>
-      RefreshEstimator.GridPeriodTicks(seen, estimate, intervals, camera, expected) ?? estimate;
+    private static double Settle(List<NanosecondTickCount> seen, double estimate, List<double> intervals, double camera, double? expected = null) =>
+      RefreshEstimator.GridPeriodNanoseconds(seen, estimate, intervals, camera, expected) ?? estimate;
 
     /// <summary>
     /// A camera at exactly twice the refresh rate, on the refresh rates monitors have: the intervals are 1, 2 and 3 camera periods, and
@@ -85,18 +95,18 @@ namespace MB.FramePacing.Capture.UnitTest
     public void AtTwiceTheRefreshRate_TheIntervalsMisleadAndTheTimesGiveTheRefresh(double refreshHz)
     {
       double cameraFps = 2 * refreshHz;
-      double camera = TimeSpan.TicksPerSecond / cameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
       var seen = Sightings(refreshHz, cameraFps, 300, LateShare, 1);
       var intervals = Intervals(seen);
 
       double estimate = Estimate(seen, cameraFps);
       double alone = Settle(seen, estimate, intervals, camera);
-      double withExpected = Settle(seen, estimate, intervals, camera, TimeSpan.TicksPerSecond / refreshHz);
+      double withExpected = Settle(seen, estimate, intervals, camera, NanosecondTimeSpan.NanosecondsPerSecond / refreshHz);
 
       Assert.That(Hz(estimate), Is.GreaterThan(1.1 * refreshHz), "the intervals' estimate (the failure this test is about)");
       Assert.That(Hz(alone), Is.EqualTo(refreshHz).Within(0.001 * refreshHz), "settled by the search of the times");
       Assert.That(Hz(withExpected), Is.EqualTo(refreshHz).Within(0.001 * refreshHz), "settled by the expected rate");
-      Assert.That(Hz(RefreshEstimator.RefinePeriodTicks(seen, alone)), Is.EqualTo(refreshHz).Within(0.01 * refreshHz), "and measured");
+      Assert.That(Hz(RefreshEstimator.RefinePeriodNanoseconds(seen, alone)), Is.EqualTo(refreshHz).Within(0.01 * refreshHz), "and measured");
     }
 
     /// <summary>
@@ -114,8 +124,8 @@ namespace MB.FramePacing.Capture.UnitTest
     [TestCase(500, 1100, 0.2)]
     public void FewCameraFramesPerRefresh_TheSettledPeriodIsTheRefresh(double refreshHz, double cameraFps, double lateShare)
     {
-      double camera = TimeSpan.TicksPerSecond / cameraFps;
-      double refresh = TimeSpan.TicksPerSecond / refreshHz;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
+      double refresh = NanosecondTimeSpan.NanosecondsPerSecond / refreshHz;
       var seen = Sightings(refreshHz, cameraFps, 300, lateShare, 2);
       var intervals = Intervals(seen);
       double estimate = Estimate(seen, cameraFps);
@@ -144,7 +154,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [TestCase(500, 2000)]
     public void ARightEstimate_StaysAsItIs(double refreshHz, double cameraFps)
     {
-      double camera = TimeSpan.TicksPerSecond / cameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
       var seen = Sightings(refreshHz, cameraFps, 300, 0.1, 2);
       var intervals = Intervals(seen);
       double estimate = Estimate(seen, cameraFps);
@@ -178,8 +188,8 @@ namespace MB.FramePacing.Capture.UnitTest
             {
               int refreshesPerFrame = 1 + (run % 2);
               double cameraFps = multiple * refreshHz;
-              double camera = TimeSpan.TicksPerSecond / cameraFps;
-              double refresh = TimeSpan.TicksPerSecond / refreshHz;
+              double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
+              double refresh = NanosecondTimeSpan.NanosecondsPerSecond / refreshHz;
               double frameTime = refresh * refreshesPerFrame;
               var seen = Sightings(refreshHz, cameraFps, 300, late, run, refreshesPerFrame);
               var intervals = Intervals(seen);
@@ -188,7 +198,7 @@ namespace MB.FramePacing.Capture.UnitTest
               double alone = Settle(seen, estimate, intervals, camera);
               double expected = Settle(seen, estimate, intervals, camera, refresh);
               double wronglyExpected = Settle(seen, estimate, intervals, camera, frameTime * 1.2);
-              double measured = RefreshEstimator.RefinePeriodTicks(seen, alone);
+              double measured = RefreshEstimator.RefinePeriodNanoseconds(seen, alone);
 
               string scenario = $"{refreshHz} Hz at {cameraFps:0} fps, {late:0.##} late, {refreshesPerFrame} refreshes per frame, run {run}";
               misledIntervals += Math.Abs(estimate - frameTime) > 0.005 * frameTime ? 1 : 0;
@@ -217,11 +227,11 @@ namespace MB.FramePacing.Capture.UnitTest
     public void AWrongExpectedRate_IsNotTaken()
     {
       const double CameraFps = 120;
-      double camera = TimeSpan.TicksPerSecond / CameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / CameraFps;
       var seen = Sightings(60, CameraFps, 300, LateShare, 3);
       var intervals = Intervals(seen);
 
-      double settled = Settle(seen, Estimate(seen, CameraFps), intervals, camera, TimeSpan.TicksPerSecond / 75.0);
+      double settled = Settle(seen, Estimate(seen, CameraFps), intervals, camera, NanosecondTimeSpan.NanosecondsPerSecond / 75.0);
 
       Assert.That(Hz(settled), Is.EqualTo(60).Within(0.06));
     }
@@ -231,7 +241,7 @@ namespace MB.FramePacing.Capture.UnitTest
     public void ASteadyGameAtHalfRate_StaysAsEstimated()
     {
       const double CameraFps = 1000;
-      double camera = TimeSpan.TicksPerSecond / CameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / CameraFps;
       var seen = Sightings(60, CameraFps, 300, 0, 4, refreshesPerFrame: 2);
       var intervals = Intervals(seen);
       double estimate = Estimate(seen, CameraFps);
@@ -239,7 +249,7 @@ namespace MB.FramePacing.Capture.UnitTest
 
       Assert.That(Settle(seen, estimate, intervals, camera), Is.EqualTo(estimate));
       // The times of a game at half rate are on the refresh's grid too: the expected rate says which it is, as it does for the intervals
-      double refresh = TimeSpan.TicksPerSecond / 60.0;
+      double refresh = NanosecondTimeSpan.NanosecondsPerSecond / 60.0;
       Assert.That(Settle(seen, estimate, intervals, camera, refresh), Is.EqualTo(refresh));
     }
 
@@ -248,12 +258,12 @@ namespace MB.FramePacing.Capture.UnitTest
     public void TooFewTimes_SayNothing()
     {
       const double CameraFps = 120;
-      double camera = TimeSpan.TicksPerSecond / CameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / CameraFps;
       var seen = Sightings(60, CameraFps, 300, LateShare, 1).Take(RefreshEstimator.MinGridTimes - 1).ToList();
       var intervals = Intervals(seen);
       double estimate = Estimate(seen, CameraFps);
 
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, estimate, intervals, camera, TimeSpan.TicksPerSecond / 60.0), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, estimate, intervals, camera, NanosecondTimeSpan.NanosecondsPerSecond / 60.0), Is.Null);
     }
 
     /// <summary>Times on no grid at all (vsync off): nothing fits, with a rate expected or without.</summary>
@@ -261,17 +271,17 @@ namespace MB.FramePacing.Capture.UnitTest
     public void TimesOnNoGrid_GiveNoPeriod()
     {
       var random = new Random(5);
-      var seen = new List<TickCount64>();
+      var seen = new List<NanosecondTickCount>();
       long time = 0;
       for (int i = 0; i < 300; ++i)
       {
-        time += 100_000 + random.Next(150_000);
-        seen.Add(new TickCount64(time));
+        time += 10_000_000 + random.Next(15_000_000);
+        seen.Add(Time(time));
       }
       var intervals = Intervals(seen);
 
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, 166_667, intervals, 10_000), Is.Null);
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, 166_667, intervals, 10_000, 200_000), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, 16_666_667, intervals, 1_000_000), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, 16_666_667, intervals, 1_000_000, 20_000_000), Is.Null);
     }
 
     /// <summary>
@@ -286,13 +296,16 @@ namespace MB.FramePacing.Capture.UnitTest
     public void HalfTheSightingsLate_AtTwiceTheRefreshRate_GiveNoPeriod(double refreshHz)
     {
       double cameraFps = 2 * refreshHz;
-      double camera = TimeSpan.TicksPerSecond / cameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
       var seen = Sightings(refreshHz, cameraFps, 600, 0.5, 8);
       var intervals = Intervals(seen);
       double estimate = Estimate(seen, cameraFps);
 
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, estimate, intervals, camera), Is.Null);
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, estimate, intervals, camera, TimeSpan.TicksPerSecond / refreshHz), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, estimate, intervals, camera), Is.Null);
+      Assert.That(
+        RefreshEstimator.GridPeriodNanoseconds(seen, estimate, intervals, camera, NanosecondTimeSpan.NanosecondsPerSecond / refreshHz),
+        Is.Null
+      );
     }
 
     /// <summary>Values that are not a period or a camera period change nothing.</summary>
@@ -302,10 +315,10 @@ namespace MB.FramePacing.Capture.UnitTest
       var seen = Sightings(60, 120, 300, LateShare, 1);
       var intervals = Intervals(seen);
 
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, 0, intervals, 83_333), Is.Null);
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, double.NaN, intervals, 83_333), Is.Null);
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, 139_000, intervals, 0), Is.Null);
-      Assert.That(RefreshEstimator.GridPeriodTicks(seen, 139_000, new List<double>(), 83_333), Is.Null, "no intervals");
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, 0, intervals, 8_333_333), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, double.NaN, intervals, 8_333_333), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, 13_900_000, intervals, 0), Is.Null);
+      Assert.That(RefreshEstimator.GridPeriodNanoseconds(seen, 13_900_000, new List<double>(), 8_333_333), Is.Null, "no intervals");
     }
 
     /// <summary>
@@ -315,7 +328,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void GridFit_IsHighOnTheGridAndLowOffIt()
     {
-      const double Refresh = TimeSpan.TicksPerSecond / 60.0;
+      const double Refresh = NanosecondTimeSpan.NanosecondsPerSecond / 60.0;
       var times = Enumerable.Range(0, 10_000).Select(i => (long)Math.Round(i * Refresh)).ToArray();
 
       Assert.That(RefreshEstimator.GridFit(times, Refresh), Is.GreaterThan(0.999));
@@ -331,9 +344,9 @@ namespace MB.FramePacing.Capture.UnitTest
     [TestCase(1000, 0.95)]
     public void GridFit_OfTheTruePeriod_IsWellAboveTheLimit(double cameraFps, double atLeast)
     {
-      var times = Sightings(60, cameraFps, 600, 0, 6).Select(time => time.Ticks).ToArray();
+      var times = Sightings(60, cameraFps, 600, 0, 6).Select(time => time.Nanoseconds).ToArray();
 
-      Assert.That(RefreshEstimator.GridFit(times, TimeSpan.TicksPerSecond / 60.0), Is.GreaterThan(atLeast));
+      Assert.That(RefreshEstimator.GridFit(times, NanosecondTimeSpan.NanosecondsPerSecond / 60.0), Is.GreaterThan(atLeast));
       Assert.That(atLeast, Is.GreaterThan(RefreshEstimator.MinGridFit(times.Length)));
     }
 

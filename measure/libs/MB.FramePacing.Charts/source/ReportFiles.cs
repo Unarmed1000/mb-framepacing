@@ -9,7 +9,6 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -84,7 +83,7 @@ namespace MB.FramePacing.Charts
       var origin = frames[0].FirstSeenTime;
       double Seconds(PresentedFrame f) => (f.FirstSeenTime - origin).TotalSeconds;
       var worstError = frames.Where(f => f.AnimationError.HasValue).MaxBy(f => f.AnimationError!.Value.Duration());
-      if (worstError != null && worstError.AnimationError != TimeSpan.Zero)
+      if (worstError != null && worstError.AnimationError != NanosecondTimeSpan.Zero)
       {
         double t = Seconds(worstError);
         yield return ("worst-error", RunSection.Create(run, t - DetailSeconds, t + DetailSeconds));

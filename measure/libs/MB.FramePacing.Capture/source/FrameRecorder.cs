@@ -72,7 +72,7 @@ namespace MB.FramePacing.Capture
     private volatile bool m_armed;
     private volatile bool m_completing;
     private volatile Exception? m_writerError;
-    private TickCount64? m_lastPreviewTime;
+    private NanosecondTickCount? m_lastPreviewTime;
     private long m_previewCaptureIndex = -1;
     private bool m_disposed;
 
@@ -206,7 +206,7 @@ namespace MB.FramePacing.Capture
       return m_ring.AsSpan(SlotOffset(head) + CaptureFileHeader.RecordHeaderSize, m_pixelByteCount);
     }
 
-    public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
+    public void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
     {
       long captureIndex = m_nextCaptureIndex;
       Volatile.Write(ref m_nextCaptureIndex, captureIndex + 1);
@@ -297,7 +297,7 @@ namespace MB.FramePacing.Capture
     {
       try
       {
-        var wait = m_options.DeviceTimeWait;
+        var wait = NanosecondTimeSpan.FromTimeSpan(m_options.DeviceTimeWait);
         while (true)
         {
           // Read completion before the counters: once it is seen, the counters read afterwards are final
@@ -461,7 +461,7 @@ namespace MB.FramePacing.Capture
     }
 
     /// <summary>Fill in pending device timestamps. Returns how many records starting at <paramref name="first"/> are ready to write.</summary>
-    private int ResolveDeviceTimes(long first, int count, bool force, TimeSpan wait)
+    private int ResolveDeviceTimes(long first, int count, bool force, NanosecondTimeSpan wait)
     {
       for (int i = 0; i < count; ++i)
       {
@@ -486,11 +486,11 @@ namespace MB.FramePacing.Capture
 
     private int DataSlotOffset(long sequence) => (int)(sequence % m_slotCount) * CaptureDataRecord.Size;
 
-    private void UpdatePreview(ReadOnlySpan<byte> pixels, long captureIndex, TickCount64 hostTime)
+    private void UpdatePreview(ReadOnlySpan<byte> pixels, long captureIndex, NanosecondTickCount hostTime)
     {
       if (m_preview == null)
         return;
-      if (m_lastPreviewTime is { } last && hostTime - last < m_options.PreviewInterval)
+      if (m_lastPreviewTime is { } last && hostTime - last < NanosecondTimeSpan.FromTimeSpan(m_options.PreviewInterval))
         return;
       m_lastPreviewTime = hostTime;
       lock (m_previewLock)

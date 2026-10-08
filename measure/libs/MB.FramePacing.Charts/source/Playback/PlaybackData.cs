@@ -3,14 +3,14 @@
 //* ----------------
 //* The data a playback page carries inline (a JSON script element): the report's title and tiles, the plots of its card (where each panel is
 //* on the card and which seconds it shows, so the page can draw the playhead and seek where it is clicked), the video, and the section's
-//* frames as columns of whole ticks. Times are the capture's: for an import, the video's own timestamps (originTicks is the run's first
-//* frame), so a video time in seconds times 10^7 minus originTicks is the report's time. The JSON escapes '<', '>' and '&', so it cannot
-//* end its script element.
+//* frames as columns of whole nanoseconds. Times are the capture's: for an import, the video's own timestamps (originNs is the run's
+//* first frame), so a video time in seconds times 10^9 minus originNs is the report's time. The JSON escapes '<', '>' and '&', so it
+//* cannot end its script element.
 //*
 //* The frame columns are written small (an hour at 240 Hz is 864,000 frames), in whole numbers the page turns back exactly:
 //* - capture, index: the first value, then each frame's step from the one before;
 //* - t: the first value, then what is left of the step from the frame before after its captures' whole periods
-//*   (t[i] - t[i-1] - (capture[i] - capture[i-1]) * periodTicks: a tick or two of the recording's timestamps);
+//*   (t[i] - t[i-1] - (capture[i] - capture[i-1]) * periodNs: the rounding of the recording's timestamps);
 //* - step: its difference from the time to the section's next frame (t[i+1] - t[i]; 0 for the last one), null as null;
 //* - error, hold, flags: as they are.
 //* Each column is then {"values": [...]}, or {"rle": [value, count, value, count, ...]} when that is fewer numbers.
@@ -31,8 +31,8 @@ namespace MB.FramePacing.Charts.Playback
 {
   public static class PlaybackData
   {
-    /// <summary>The format of the data; the page's script reads this one.</summary>
-    public const int FormatVersion = 2;
+    /// <summary>The format of the data; the page's script reads this one. 3: every time is in nanoseconds (periodNs, originNs, ...).</summary>
+    public const int FormatVersion = 3;
 
     /// <summary>
     /// The data of <paramref name="section"/> drawn as <paramref name="cards"/> (the whole report, then the zoom steps), playing
@@ -72,8 +72,12 @@ namespace MB.FramePacing.Charts.Playback
         json.WriteBoolean("whole", section.IsWholeRun);
         json.WriteEndObject();
 
-        json.WriteNumber("periodTicks", run.CapturePeriod.Ticks);
-        json.WriteNumber("originTicks", data.Origin.Ticks);
+        // A page's script counts in doubles, which hold every whole number up to 2^53: 104 days of nanoseconds. Every other time of the
+        // data (the frame columns, the two captures below) counts from the run's first frame, so it is exact for any run shorter than
+        // that. originNs alone is a time on the capture's clock, which a recording may start anywhere: the page only adds it to a time
+        // that it turns into the video's seconds, never to the columns' whole numbers
+        json.WriteNumber("periodNs", run.CapturePeriod.Nanoseconds);
+        json.WriteNumber("originNs", data.Origin.Nanoseconds);
         // Two captures far apart (the run's first and last frames' first sightings) give the video frame of any time without the drift of
         // a rounded period: video frame = first + (time - its time) * (last - first) / (last's time - first's time)
         if (data.Frames.Count > 0)
@@ -82,9 +86,9 @@ namespace MB.FramePacing.Charts.Playback
           var last = data.Frames[^1];
           json.WriteStartObject("captures");
           json.WriteNumber("firstIndex", first.FirstCaptureIndex);
-          json.WriteNumber("firstTicks", (first.FirstSeenTime - data.Origin).Ticks);
+          json.WriteNumber("firstNs", (first.FirstSeenTime - data.Origin).Nanoseconds);
           json.WriteNumber("lastIndex", last.FirstCaptureIndex);
-          json.WriteNumber("lastTicks", (last.FirstSeenTime - data.Origin).Ticks);
+          json.WriteNumber("lastNs", (last.FirstSeenTime - data.Origin).Nanoseconds);
           json.WriteEndObject();
         }
         if (run.Run.Pacing is { } pacing)
@@ -162,9 +166,10 @@ namespace MB.FramePacing.Charts.Playback
     }
 
     /// <summary>
-    /// The section's frames, a column each: first seen (ticks since the run's first frame), the application's frame index, the first capture
-    /// that showed it (the video frame), its display time step (until the next frame; null for the run's last), the animation error of the step
-    /// into it (null when not judged), the kind of its hold (<see cref="HoldKind"/>) and its flags (<see cref="PresentedFrameFlags"/>).
+    /// The section's frames, a column each: first seen (nanoseconds since the run's first frame), the application's frame index, the first
+    /// capture that showed it (the video frame), its display time step (until the next frame; null for the run's last), the animation error
+    /// of the step into it (null when not judged), the kind of its hold (<see cref="HoldKind"/>) and its flags
+    /// (<see cref="PresentedFrameFlags"/>).
     /// </summary>
     private static void WriteFrames(Utf8JsonWriter json, RunSection section)
     {
@@ -172,17 +177,17 @@ namespace MB.FramePacing.Charts.Playback
       var frames = data.Frames;
       var holds = data.HoldKinds;
       int first = section.Start;
-      long period = section.Run.CapturePeriod.Ticks;
-      long Time(int i) => (frames[i].FirstSeenTime - data.Origin).Ticks;
+      long period = section.Run.CapturePeriod.Nanoseconds;
+      long Time(int i) => (frames[i].FirstSeenTime - data.Origin).Nanoseconds;
       long CaptureStep(int i) => frames[i].FirstCaptureIndex - frames[i - 1].FirstCaptureIndex;
-      long? Step(int i) => i + 1 < frames.Count ? frames[i + 1].DisplayDelta?.Ticks : null;
+      long? Step(int i) => i + 1 < frames.Count ? frames[i + 1].DisplayDelta?.Nanoseconds : null;
       json.WriteStartObject("frames");
       // The page reads capture before t, and t before step: each is written against the one before it
       WriteColumn(json, "capture", section, i => i == first ? frames[i].FirstCaptureIndex : CaptureStep(i));
       WriteColumn(json, "index", section, i => i == first ? (long)frames[i].FrameIndex : (long)frames[i].FrameIndex - (long)frames[i - 1].FrameIndex);
       WriteColumn(json, "t", section, i => i == first ? Time(i) : Time(i) - Time(i - 1) - (CaptureStep(i) * period));
       WriteColumn(json, "step", section, i => Step(i) is { } step ? step - (i + 1 < section.End ? Time(i + 1) - Time(i) : 0) : null);
-      WriteColumn(json, "error", section, i => frames[i].AnimationError?.Ticks);
+      WriteColumn(json, "error", section, i => frames[i].AnimationError?.Nanoseconds);
       WriteColumn(json, "hold", section, i => (long)holds[i]);
       WriteColumn(json, "flags", section, i => (long)frames[i].Flags);
       json.WriteEndObject();

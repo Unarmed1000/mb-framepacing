@@ -63,9 +63,10 @@ namespace MB.FramePacing.Charts
     {
       var data = m_section.Data;
       double column = Math.Floor(plot.PixelX(seconds));
-      TickCount64 TimeAt(double s) => data.Origin + new TimeSpan((long)Math.Round(s * TimeSpan.TicksPerSecond));
-      var from = TimeAt(plot.ValueX(column)) - new TimeSpan(Math.Max(1, data.Run.CapturePeriod.Ticks) - 1);
-      var to = TimeAt(plot.ValueX(column + 1));
+      // An event covers its refresh: it reaches a nanosecond less than the period (which is at least one) after its time
+      var reach = new NanosecondTimeSpan(Math.Max(1, data.Run.CapturePeriod.Nanoseconds) - 1);
+      var from = data.TimeAt(plot.ValueX(column)) - reach;
+      var to = data.TimeAt(plot.ValueX(column + 1));
       var lines = new List<string>();
       foreach (var kind in RunEvents.FrameKinds.Concat(RunEvents.CaptureKinds))
       {
@@ -96,7 +97,7 @@ namespace MB.FramePacing.Charts
       if (m_section.FrameCount == 0)
         return null;
       var frames = m_section.Data.Frames;
-      var time = m_section.Origin + new TimeSpan((long)Math.Round(seconds * TimeSpan.TicksPerSecond));
+      var time = m_section.Data.TimeAt(seconds);
       int after = RunChartData.FirstWhere(m_section.Start, m_section.End, i => frames[i].FirstSeenTime > time);
       return frames[Math.Max(m_section.Start, after - 1)];
     }
@@ -112,16 +113,16 @@ namespace MB.FramePacing.Charts
         lines.Add($"lateness {Ms(lateness, sign: true)} ms");
       if (frame.FrameTime is { } frameTime)
         lines.Add($"frametime {Ms(frameTime)} ms");
-      if (frame.CpuBusy != TimeSpan32.Zero)
-        lines.Add($"CPU busy {Ms(frame.CpuBusy.ToTimeSpan())} ms");
+      if (frame.CpuBusy != NanosecondTimeDuration.Zero)
+        lines.Add($"CPU busy {Ms(frame.CpuBusy)} ms");
       // What the step to this frame was aimed at, as the reference lines draw it (the preferred frame time below, as the marker says it)
       if (FrameReference.Target(frame) is { } target)
-        lines.Add($"target {Ms(target)} ms ({Invariant(TimeSpan.TicksPerSecond / (double)target.Ticks, "0.#")} fps)");
+        lines.Add($"target {Ms(target)} ms ({Invariant(NanosecondTimeSpan.NanosecondsPerSecond / (double)target.Nanoseconds, "0.#")} fps)");
       if (frame.MarkerPreferredFrameTime == MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime)
         lines.Add("preferred: on demand");
-      else if (frame.MarkerPreferredFrameTime != TimeSpan32.Zero)
+      else if (frame.MarkerPreferredFrameTime != NanosecondTimeDuration.Zero)
         lines.Add(
-          $"preferred {Ms(frame.MarkerPreferredFrameTime.ToTimeSpan())} ms ({Invariant(TimeSpan.TicksPerSecond / (double)frame.MarkerPreferredFrameTime.Ticks, "0.#")} fps)"
+          $"preferred {Ms(frame.MarkerPreferredFrameTime)} ms ({Invariant(NanosecondTimeSpan.NanosecondsPerSecond / (double)frame.MarkerPreferredFrameTime.Nanoseconds, "0.#")} fps)"
         );
       return string.Join('\n', lines);
     }
@@ -159,7 +160,7 @@ namespace MB.FramePacing.Charts
       return $"{what} {center} ms (bin of {Invariant(histogram.BinWidthMs, "0.0#")} ms): {frames}";
     }
 
-    private static string Ms(TimeSpan span, bool sign = false)
+    private static string Ms(NanosecondTimeSpan span, bool sign = false)
     {
       double ms = span.TotalMilliseconds;
       return (sign && ms > 0 ? "+" : string.Empty) + Invariant(ms, "0.00");

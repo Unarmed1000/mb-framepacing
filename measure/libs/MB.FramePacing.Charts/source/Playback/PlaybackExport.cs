@@ -233,7 +233,7 @@ namespace MB.FramePacing.Charts.Playback
       try
       {
         // The page plays the run at its own timestamps: the video must reach the run's last capture
-        double needed = (frames[^1].LastSeenTime.Ticks + run.CapturePeriod.Ticks) / (double)TimeSpan.TicksPerSecond;
+        double needed = (frames[^1].LastSeenTime.Nanoseconds + run.CapturePeriod.Nanoseconds) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
         if (probe(path).Duration is { } duration && duration.TotalSeconds + 0.5 < needed)
           return string.Create(
             CultureInfo.InvariantCulture,

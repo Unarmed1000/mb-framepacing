@@ -36,7 +36,7 @@ namespace MB.FramePacing.Charts
 
     private RunEvents(List<RunEvent>[] events, bool capturesKnown)
     {
-      m_events = events.Select(list => list.OrderBy(e => e.Time.Ticks).ToArray()).ToArray();
+      m_events = events.Select(list => list.OrderBy(e => e.Time.Nanoseconds).ToArray()).ToArray();
       m_totals = m_events
         .Select(list =>
         {
@@ -59,27 +59,27 @@ namespace MB.FramePacing.Charts
     public long Count(RunEventKind kind) => m_totals[(int)kind][^1];
 
     /// <summary>The events of <paramref name="kind"/> from <paramref name="from"/> up to (not including) <paramref name="to"/>.</summary>
-    public ReadOnlySpan<RunEvent> In(RunEventKind kind, TickCount64 from, TickCount64 to)
+    public ReadOnlySpan<RunEvent> In(RunEventKind kind, NanosecondTickCount from, NanosecondTickCount to)
     {
       var (start, end) = Range(kind, from, to);
       return m_events[(int)kind].AsSpan(start, end - start);
     }
 
     /// <summary>Whether <paramref name="kind"/> has an event from <paramref name="from"/> up to <paramref name="to"/>.</summary>
-    public bool Any(RunEventKind kind, TickCount64 from, TickCount64 to)
+    public bool Any(RunEventKind kind, NanosecondTickCount from, NanosecondTickCount to)
     {
       var (start, end) = Range(kind, from, to);
       return end > start;
     }
 
     /// <summary>How many frames or refreshes the events of <paramref name="kind"/> in the range stand for.</summary>
-    public long Count(RunEventKind kind, TickCount64 from, TickCount64 to)
+    public long Count(RunEventKind kind, NanosecondTickCount from, NanosecondTickCount to)
     {
       var (start, end) = Range(kind, from, to);
       return m_totals[(int)kind][end] - m_totals[(int)kind][start];
     }
 
-    private (int Start, int End) Range(RunEventKind kind, TickCount64 from, TickCount64 to)
+    private (int Start, int End) Range(RunEventKind kind, NanosecondTickCount from, NanosecondTickCount to)
     {
       var list = m_events[(int)kind];
       int start = FirstAt(list, 0, from);
@@ -90,7 +90,7 @@ namespace MB.FramePacing.Charts
     /// The first event from <paramref name="start"/> on at or after <paramref name="time"/> (RunChartData.FirstWhere's search, inline: the
     /// events panel asks per pixel column and kind, and a predicate would be a new closure each time).
     /// </summary>
-    private static int FirstAt(RunEvent[] list, int start, TickCount64 time)
+    private static int FirstAt(RunEvent[] list, int start, NanosecondTickCount time)
     {
       int end = list.Length;
       while (start < end)
@@ -137,13 +137,13 @@ namespace MB.FramePacing.Charts
     private static void AddCaptures(
       IReadOnlyList<CaptureCsvRow> rows,
       IReadOnlyList<PresentedFrame> frames,
-      TimeSpan period,
+      NanosecondTimeSpan period,
       bool camera,
       Action<RunEventKind, RunEvent> add
     )
     {
       long firstIndex = frames.Min(f => f.FirstCaptureIndex);
-      var lastSeen = new TickCount64(frames.Max(f => f.LastSeenTime.Ticks));
+      var lastSeen = new NanosecondTickCount(frames.Max(f => f.LastSeenTime.Nanoseconds));
       int start = RunChartData.FirstWhere(0, rows.Count, i => rows[i].CaptureIndex >= firstIndex);
       // A capture the recorder dropped has no time: it is placed a period per capture index after the last one recorded
       var knownTime = start < rows.Count ? rows[start].CaptureTime ?? frames[0].FirstSeenTime : default;
@@ -151,7 +151,7 @@ namespace MB.FramePacing.Charts
       for (int i = start; i < rows.Count; ++i)
       {
         var row = rows[i];
-        var time = row.CaptureTime ?? knownTime + new TimeSpan((row.CaptureIndex - knownIndex) * period.Ticks);
+        var time = row.CaptureTime ?? knownTime + new NanosecondTimeSpan((row.CaptureIndex - knownIndex) * period.Nanoseconds);
         if (time > lastSeen)
           break;
         if (row.CaptureTime is { } recorded)

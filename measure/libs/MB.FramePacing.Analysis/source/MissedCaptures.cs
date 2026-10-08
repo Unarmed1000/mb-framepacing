@@ -23,7 +23,7 @@ namespace MB.FramePacing.Analysis
     public static List<CaptureRow> Mark(List<CaptureRow> rows)
     {
       var period = TimelineAnalyzer.EstimateCapturePeriod(rows);
-      if (period <= TimeSpan.Zero)
+      if (period <= NanosecondTimeSpan.Zero)
         return rows;
       for (int i = 1; i < rows.Count; ++i)
       {
@@ -39,9 +39,9 @@ namespace MB.FramePacing.Analysis
     }
 
     /// <summary>The refreshes missed in a <paramref name="step"/> between two consecutive captures: 0 below 1.5 periods.</summary>
-    public static long Before(TimeSpan step, TimeSpan period) =>
-      period > TimeSpan.Zero && 2 * step.Ticks >= 3 * period.Ticks
-        ? (long)Math.Round(step.Ticks / (double)period.Ticks, MidpointRounding.AwayFromZero) - 1
+    public static long Before(NanosecondTimeSpan step, NanosecondTimeSpan period) =>
+      period > NanosecondTimeSpan.Zero && 2 * step.Nanoseconds >= 3 * period.Nanoseconds
+        ? (long)Math.Round(step.Nanoseconds / (double)period.Nanoseconds, MidpointRounding.AwayFromZero) - 1
         : 0;
   }
 }

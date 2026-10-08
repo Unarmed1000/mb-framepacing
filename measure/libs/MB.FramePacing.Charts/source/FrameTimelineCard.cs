@@ -52,30 +52,30 @@ namespace MB.FramePacing.Charts
           $"The section has {frames.Count} presented frames; the frame timeline draws at most {MaxFrames}: choose a shorter section (--from, --to)"
         );
 
-      var refresh = run.Pacing is { } pacing && pacing.RefreshPeriod > TimeSpan.Zero ? pacing.RefreshPeriod : chart.CapturePeriod;
+      var refresh = run.Pacing is { } pacing && pacing.RefreshPeriod > NanosecondTimeSpan.Zero ? pacing.RefreshPeriod : chart.CapturePeriod;
       var (offset, alignedBySchedule) = PacerToCapture(run.Frames);
 
       // The refresh grid starts at the first frame's display time; each frame's first refresh on it
       var first = frames[0].FirstSeenTime;
-      TickCount64 RefreshAt(int k) => first + new TimeSpan(k * refresh.Ticks);
-      int RefreshOf(TickCount64 time) => (int)Math.Round((time - first).Ticks / (double)refresh.Ticks);
+      NanosecondTickCount RefreshAt(int k) => first + new NanosecondTimeSpan(k * refresh.Nanoseconds);
+      int RefreshOf(NanosecondTickCount time) => (int)Math.Round((time - first).Nanoseconds / (double)refresh.Nanoseconds);
       var shownAt = frames.Select(f => RefreshOf(f.FirstSeenTime)).ToArray();
       var last = frames[^1];
-      int endRefresh = shownAt[^1] + Math.Max(1, (int)Math.Round(last.OnScreen.Ticks / (double)refresh.Ticks));
+      int endRefresh = shownAt[^1] + Math.Max(1, (int)Math.Round(last.OnScreen.Nanoseconds / (double)refresh.Nanoseconds));
 
       // The CPU boxes, on the capture's clock, and the lanes that keep overlapping boxes apart
-      var boxes = new List<(int Frame, TickCount64 Start, TickCount64 End, int Lane)>();
+      var boxes = new List<(int Frame, NanosecondTickCount Start, NanosecondTickCount End, int Lane)>();
       if (offset is { } shift)
       {
-        var laneEnds = new List<TickCount64>();
+        var laneEnds = new List<NanosecondTickCount>();
         for (int i = 0; i < frames.Count; ++i)
         {
           var frame = frames[i];
-          if (frame.CpuStartTime == default || frame.CpuBusy == TimeSpan32.Zero)
+          if (frame.CpuStartTime == default || frame.CpuBusy == NanosecondTimeDuration.Zero)
             continue;
           // The CPU start time is on the pacer's clock: the shift puts it on the capture's
           var start = frame.CpuStartTime + shift;
-          var stop = start + frame.CpuBusy.ToTimeSpan();
+          var stop = start + frame.CpuBusy;
           int lane = laneEnds.FindIndex(e => e <= start);
           if (lane < 0)
           {
@@ -92,13 +92,13 @@ namespace MB.FramePacing.Charts
       // Time runs from the refresh the earliest box starts in (at least one refresh before the first display) to the last frame's end
       int startRefresh = -1;
       if (boxes.Count > 0)
-        startRefresh = Math.Min(startRefresh, (int)Math.Floor(boxes.Min(b => (b.Start - first).Ticks) / (double)refresh.Ticks));
+        startRefresh = Math.Min(startRefresh, (int)Math.Floor(boxes.Min(b => (b.Start - first).Nanoseconds) / (double)refresh.Nanoseconds));
       var origin = RefreshAt(startRefresh);
       var end = RefreshAt(endRefresh);
       double refreshMs = refresh.TotalMilliseconds;
       double scale = Math.Max(1.2, MinRefreshPixels / refreshMs);
       double width = Math.Max(MinWidth, Left + ((end - origin).TotalMilliseconds * scale) + Right);
-      double XOf(TickCount64 time) => Left + ((time - origin).TotalMilliseconds * scale);
+      double XOf(NanosecondTickCount time) => Left + ((time - origin).TotalMilliseconds * scale);
 
       double laneBottom = LaneTop + (lanes * LaneH) + ((lanes - 1) * LaneGap);
       double arrowY0 = laneBottom + 8;
@@ -132,7 +132,7 @@ namespace MB.FramePacing.Charts
       var targetable = new HashSet<int>(shownAt);
       for (int i = 1; i < frames.Count; ++i)
       {
-        int step = Math.Max(1, (int)Math.Round((frames[i].TargetFrameTime ?? refresh).Ticks / (double)refresh.Ticks));
+        int step = Math.Max(1, (int)Math.Round((frames[i].TargetFrameTime ?? refresh).Nanoseconds / (double)refresh.Nanoseconds));
         for (int at = shownAt[i - 1] + step; at <= shownAt[i]; at += step)
           targetable.Add(at);
       }
@@ -191,7 +191,7 @@ namespace MB.FramePacing.Charts
         // How long the frame is meant to stay: the next frame's target (its swap interval), the last frame's own. A frame presented on
         // demand has no interval to aim for: the wait for it is never late
         var next = i + 1 < frames.Count ? frames[i + 1] : frame;
-        var intendedHold = OnDemand(next) ? TimeSpan.MaxValue : next.TargetFrameTime ?? refresh;
+        var intendedHold = OnDemand(next) ? NanosecondTimeSpan.MaxValue : next.TargetFrameTime ?? refresh;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         for (int k = from; k < to; ++k)
@@ -200,7 +200,7 @@ namespace MB.FramePacing.Charts
           string kind =
             isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
             : firstRefresh ? (frame.AnimationError is { } e && e.Duration() > threshold ? "off" : "ok")
-            : (k - from) * refresh.Ticks < intendedHold.Ticks - (refresh.Ticks / 2) ? "hold"
+            : (k - from) * refresh.Nanoseconds < intendedHold.Nanoseconds - (refresh.Nanoseconds / 2) ? "hold"
             : "again";
           used.Add(kind == "strip-static-b" ? "strip-static-a" : kind);
           double x0 = XOf(RefreshAt(k));
@@ -226,7 +226,7 @@ namespace MB.FramePacing.Charts
         }
         parts.Add(new TextShape(cx, rowsY, $"{Ms(animation.TotalMilliseconds)} ms"));
         parts.Add(new TextShape(cx, rowsY + RowStep, $"{Ms(display.TotalMilliseconds)} ms"));
-        // Rounded first, so an error of a tick of rounding reads 0, not +0
+        // Rounded first, so an error that is only the rounding of the times reads 0, not +0
         string value = $"{Ms(Math.Round(error.TotalMilliseconds, 1), sign: true)} ms";
         double errorY = rowsY + (2 * RowStep);
         if (error.Duration() > threshold)
@@ -248,7 +248,7 @@ namespace MB.FramePacing.Charts
     /// The shift from the pacer's clock to the capture's: from the analysis's on-time alignment of the intended display times (display time -
     /// intended display time - lateness), else so that no frame is presented after it first appears; null without CPU start times.
     /// </summary>
-    public static (TimeSpan? Offset, bool BySchedule) PacerToCapture(IReadOnlyList<PresentedFrame> frames)
+    public static (NanosecondTimeSpan? Offset, bool BySchedule) PacerToCapture(IReadOnlyList<PresentedFrame> frames)
     {
       foreach (var frame in frames)
       {
@@ -256,8 +256,8 @@ namespace MB.FramePacing.Charts
           return (frame.FirstSeenTime - frame.IntendedDisplayTime - lateness, true);
       }
       var presented = frames
-        .Where(f => f.CpuStartTime != default && f.CpuBusy != TimeSpan32.Zero)
-        .Select(f => f.FirstSeenTime - (f.CpuStartTime + f.CpuBusy.ToTimeSpan()))
+        .Where(f => f.CpuStartTime != default && f.CpuBusy != NanosecondTimeDuration.Zero)
+        .Select(f => f.FirstSeenTime - (f.CpuStartTime + f.CpuBusy))
         .ToList();
       return presented.Count > 0 ? (presented.Min(), false) : (null, false);
     }
@@ -267,7 +267,7 @@ namespace MB.FramePacing.Charts
     {
       var onDemand = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
       return frame.MarkerTargetFrameTime == onDemand
-        || (frame.MarkerTargetFrameTime == TimeSpan32.Zero && frame.MarkerPreferredFrameTime == onDemand);
+        || (frame.MarkerTargetFrameTime == NanosecondTimeDuration.Zero && frame.MarkerPreferredFrameTime == onDemand);
     }
 
     /// <summary>A frame's short name in the boxes and cells: the last three digits of its frame index.</summary>
@@ -282,7 +282,7 @@ namespace MB.FramePacing.Charts
       ("strip-static-a", "static: nothing animates"),
     };
 
-    private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, TimeSpan threshold)
+    private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, NanosecondTimeSpan threshold)
     {
       parts.Add(new RectShape("box", N(20, 0), N(legendY - 12, 1), N(30, 0), N(16, 0), "4"));
       parts.Add(

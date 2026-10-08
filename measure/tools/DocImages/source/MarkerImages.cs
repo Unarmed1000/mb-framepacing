@@ -50,7 +50,8 @@ namespace MB.FramePacing.DocImages
 
     public static void WriteAll(string directory)
     {
-      var frameMarker = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, TimeSpan.FromSeconds(20.567));
+      var animationTime = NanosecondTimeSpan.FromSeconds(20.567);
+      var frameMarker = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, animationTime);
       var start = StartMetadata.FromTag(new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc).Ticks, "menu scroll");
 
       // The three kinds at the same module size

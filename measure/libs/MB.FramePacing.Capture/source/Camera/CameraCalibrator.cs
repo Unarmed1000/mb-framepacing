@@ -341,10 +341,10 @@ namespace MB.FramePacing.Capture.Camera
         _ => { }
       );
 
-      var firstSeen = new Dictionary<long, TickCount64>[zoneCount];
+      var firstSeen = new Dictionary<long, NanosecondTickCount>[zoneCount];
       for (int z = 0; z < zoneCount; ++z)
       {
-        firstSeen[z] = new Dictionary<long, TickCount64>();
+        firstSeen[z] = new Dictionary<long, NanosecondTickCount>();
         for (int i = 0; i < frames.Count; ++i)
         {
           if (decoded[z][i] >= 0)
@@ -357,33 +357,34 @@ namespace MB.FramePacing.Capture.Camera
       foreach (var (frameIndex, first) in firstSeen[0])
       {
         if (zoneCount > 1 && firstSeen[1].TryGetValue(frameIndex, out var second) && first != frames.Times[0] && second != frames.Times[0])
-          delays.Add((second - first).Ticks / (double)TimeSpan.TicksPerMillisecond);
+          delays.Add((second - first).TotalMilliseconds);
       }
       double? delay = delays.Count >= 3 ? Median(delays) : null;
 
       // The refresh from the sync marker: the scanout crosses the small marker quickly, so its first-seen times are the sharpest
       var ordered = firstSeen[zoneCount > 1 ? CameraZone.SyncZone : CameraZone.MainZone].OrderBy(kv => kv.Key).ToList();
+      // The estimator's numbers are nanoseconds: the intervals, the camera's period and the three periods
       var intervals = new List<double>();
       for (int k = 1; k < ordered.Count; ++k)
       {
         if (ordered[k].Key == ordered[k - 1].Key + 1 && ordered[k - 1].Value != frames.Times[0])
-          intervals.Add((ordered[k].Value - ordered[k - 1].Value).Ticks);
+          intervals.Add((ordered[k].Value - ordered[k - 1].Value).Nanoseconds);
       }
       // The intervals are whole refreshes quantised to camera periods (16 or 17 ms for 60 Hz at 1000 fps)
-      double cameraPeriod = TimeSpan.TicksPerSecond / Math.Max(1, MeasureFps(frames));
-      double? estimatedPeriod = RefreshEstimator.EstimatePeriodTicks(intervals, cameraPeriod);
+      double cameraPeriod = NanosecondTimeSpan.NanosecondsPerSecond / Math.Max(1, MeasureFps(frames));
+      double? estimatedPeriod = RefreshEstimator.EstimatePeriodNanoseconds(intervals, cameraPeriod);
       // Every first sighting (not the frames already on screen when the capture began), skipped and held frames included: they say
       // which grid of refreshes the times are on (a clip of a second or more), and then measure that period
       var sightings = ordered.Select(kv => kv.Value).Where(time => time != frames.Times[0]).ToList();
       double? settledPeriod = estimatedPeriod is { } estimated
-        ? RefreshEstimator.GridPeriodTicks(sightings, estimated, intervals, cameraPeriod) ?? estimated
+        ? RefreshEstimator.GridPeriodNanoseconds(sightings, estimated, intervals, cameraPeriod) ?? estimated
         : null;
-      double? refreshPeriod = settledPeriod is { } settled ? RefreshEstimator.RefinePeriodTicks(sightings, settled) : null;
-      double? refreshHz = refreshPeriod is { } refresh ? TimeSpan.TicksPerSecond / refresh : null;
+      double? refreshPeriod = settledPeriod is { } settled ? RefreshEstimator.RefinePeriodNanoseconds(sightings, settled) : null;
+      double? refreshHz = refreshPeriod is { } refresh ? NanosecondTimeSpan.NanosecondsPerSecond / refresh : null;
       // What the estimate was made from, in full: the check's text rounds the rate to a tenth
       g_logger.Info(
         CultureInfo.InvariantCulture,
-        "Calibration timing: {0} camera frames, {1} frames first seen, {2} intervals between consecutive ones, refresh period {3} ticks by the intervals, {4} by the grid the first-seen times are on, {5} by the line through them ({6} Hz)",
+        "Calibration timing: {0} camera frames, {1} frames first seen, {2} intervals between consecutive ones, refresh period {3} ns by the intervals, {4} by the grid the first-seen times are on, {5} by the line through them ({6} Hz)",
         frames.Count,
         ordered.Count,
         intervals.Count,
@@ -393,7 +394,7 @@ namespace MB.FramePacing.Capture.Camera
         refreshHz
       );
       if (g_logger.IsTraceEnabled)
-        g_logger.Trace("Calibration first seen (frame@ticks): {0}", string.Join(" ", ordered.Select(kv => $"{kv.Key}@{kv.Value.Ticks}")));
+        g_logger.Trace("Calibration first seen (frame@ns): {0}", string.Join(" ", ordered.Select(kv => $"{kv.Key}@{kv.Value.Nanoseconds}")));
 
       var decodeRate = decoded.Select(d => d.Count(v => v >= 0) / (double)Math.Max(1, frames.Count)).ToArray();
       var whiteVariation = new double[zoneCount];
@@ -576,11 +577,11 @@ namespace MB.FramePacing.Capture.Camera
       var deltas = new List<double>();
       for (int i = 1; i < frames.Count; ++i)
       {
-        long delta = (frames.Times[i] - frames.Times[i - 1]).Ticks;
+        long delta = (frames.Times[i] - frames.Times[i - 1]).Nanoseconds;
         if (delta > 0)
           deltas.Add(delta);
       }
-      return deltas.Count > 0 ? TimeSpan.TicksPerSecond / Median(deltas) : 0;
+      return deltas.Count > 0 ? NanosecondTimeSpan.NanosecondsPerSecond / Median(deltas) : 0;
     }
 
     private static double Median(IEnumerable<double> values)

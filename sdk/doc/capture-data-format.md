@@ -8,7 +8,9 @@ A capture that only has `frames.mbfc` (made before the capture data existed, or 
 time it is analysed; `analyze --redecode` decodes the frames again and replaces it. Both ways decode the same way (a search frame by
 frame until the markers are located, then the locked decoder), so they give the same records.
 
-All numbers are little endian. Times are TimeSpan ticks (100 ns).
+All numbers are little endian. Times are whole nanoseconds. A file from before the nanoseconds counted its times in ticks of 100 ns
+in the same bytes and under the same format version: it reads without an error and a hundred times too small, and the markers in
+its records are in ticks too. Record such a capture again.
 
 The SDK's data modules ([the SDK](../README.md#the-data-module)) read this file in C#, Python and C++; the C# module also writes it, and the tools
 write through it.

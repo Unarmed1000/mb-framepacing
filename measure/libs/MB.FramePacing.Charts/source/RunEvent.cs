@@ -15,5 +15,5 @@ namespace MB.FramePacing.Charts
   /// The frame it names: the older frame shown out of order, a torn capture's main marker, the frame after dropped frames.
   /// </param>
   /// <param name="OtherFrameIndex">A torn capture's sync marker: the other frame of the refresh.</param>
-  public readonly record struct RunEvent(TickCount64 Time, long Count, ulong? FrameIndex = null, ulong? OtherFrameIndex = null);
+  public readonly record struct RunEvent(NanosecondTickCount Time, long Count, ulong? FrameIndex = null, ulong? OtherFrameIndex = null);
 }

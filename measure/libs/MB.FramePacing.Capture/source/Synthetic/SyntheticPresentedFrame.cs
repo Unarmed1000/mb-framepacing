@@ -12,5 +12,5 @@ using MB.FramePacing.MarkerDecoding;
 namespace MB.FramePacing.Capture.Synthetic
 {
   /// <summary>One application frame that reached the screen.</summary>
-  public readonly record struct SyntheticPresentedFrame(MarkerPayload Payload, TickCount64 DisplayTime);
+  public readonly record struct SyntheticPresentedFrame(MarkerPayload Payload, NanosecondTickCount DisplayTime);
 }

@@ -26,6 +26,6 @@ namespace MB.FramePacing.Capture
     /// <param name="deviceTime">The device's timestamp, <see cref="DeviceTimestamp.Unknown"/>, or <see cref="DeviceTimestamp.Pending"/>
     /// when the source resolves it later through <see cref="IDeviceTimestampSource"/>.</param>
     /// <param name="sourceDrops">How many frames the source reported dropping since the previous frame (0: none).</param>
-    void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops);
+    void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops);
   }
 }

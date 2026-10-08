@@ -41,13 +41,13 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(frames[^1].Payload.Kind, Is.EqualTo(MarkerKind.SequenceEnd));
       for (int i = 1; i < frames.Count; ++i)
       {
-        Assert.That(frames[i].DisplayTime.Ticks, Is.GreaterThan(frames[i - 1].DisplayTime.Ticks));
+        Assert.That(frames[i].DisplayTime.Nanoseconds, Is.GreaterThan(frames[i - 1].DisplayTime.Nanoseconds));
         Assert.That(frames[i].Payload.FrameIndex, Is.GreaterThan(frames[i - 1].Payload.FrameIndex));
         // A frame starts only after the previous one was handed over, also after a skipped frame
         var previous = frames[i - 1].Payload;
         Assert.That(
-          frames[i].Payload.CpuStartTime.Ticks,
-          Is.GreaterThanOrEqualTo(previous.CpuStartTime.Ticks + previous.CpuBusy.Ticks),
+          frames[i].Payload.CpuStartTime.Nanoseconds,
+          Is.GreaterThanOrEqualTo(previous.CpuStartTime.Nanoseconds + previous.CpuBusy.Nanoseconds),
           $"frame {i}: CPU start"
         );
       }

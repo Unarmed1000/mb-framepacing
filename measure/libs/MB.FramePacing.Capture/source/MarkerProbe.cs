@@ -92,14 +92,14 @@ namespace MB.FramePacing.Capture
     {
       private readonly GrayImage m_frame;
       private readonly MarkerDecoder m_decoder = new MarkerDecoder(tryHarder: true);
-      private readonly TimeSpan m_interval;
+      private readonly NanosecondTimeSpan m_interval;
       private readonly CancellationTokenSource m_stop;
-      private TickCount64? m_lastDecodeTime;
+      private NanosecondTickCount? m_lastDecodeTime;
 
       public Sink(int width, int height, TimeSpan interval, CancellationTokenSource stop)
       {
         m_frame = new GrayImage(width, height);
-        m_interval = interval;
+        m_interval = NanosecondTimeSpan.FromTimeSpan(interval);
         m_stop = stop;
       }
 
@@ -114,7 +114,7 @@ namespace MB.FramePacing.Capture
 
       public Span<byte> BeginFrame() => m_frame.Pixels.AsSpan(0, m_frame.Width * m_frame.Height);
 
-      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
+      public void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
       {
         ++FramesSeen;
         if (m_stop.IsCancellationRequested || (m_lastDecodeTime is { } last && hostTime - last < m_interval))

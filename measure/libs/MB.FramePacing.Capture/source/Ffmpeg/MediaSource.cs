@@ -14,7 +14,12 @@ namespace MB.FramePacing.Capture.Ffmpeg
   /// <param name="Mode">Only carries the nominal frame rate of an image sequence.</param>
   /// <param name="FrameTimestamps">Exact frame times for an image sequence (see <see cref="FfmpegCaptureOptions.FrameTimestamps"/>).</param>
   /// <param name="RecordedFps">The real recording rate of a slow motion video file (see <see cref="FfmpegCaptureOptions.RecordedFps"/>).</param>
-  public sealed record MediaSource(CaptureDevice Device, RequestedMode Mode, IReadOnlyList<TickCount64>? FrameTimestamps, double? RecordedFps = null)
+  public sealed record MediaSource(
+    CaptureDevice Device,
+    RequestedMode Mode,
+    IReadOnlyList<NanosecondTickCount>? FrameTimestamps,
+    double? RecordedFps = null
+  )
   {
     /// <summary>The absolute path of the imported video file or image folder, for capture.json; null for a stream.</summary>
     public string? InputPath { get; init; }

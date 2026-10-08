@@ -81,7 +81,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       public Span<byte> BeginFrame() => m_pixels;
 
-      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops) =>
+      public void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops) =>
         PgmFile.Write(Path.Combine(directory, $"frame{Count++}.pgm"), new GrayImage(width, height, width, m_pixels));
     }
 
@@ -96,13 +96,13 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       public Span<byte> BeginFrame() => m_frame.Pixels.AsSpan(0, m_frame.Width * m_frame.Height);
 
-      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
+      public void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
       {
         var shown = scenario.PresentedFrames[scenario.PresentedIndexAt(m_capture)].Payload;
         ulong frameIndex = shown.FrameIndex + (m_capture == tornCapture ? 1UL : 0UL);
         MarkerRenderer.Render(
           m_frame,
-          new MarkerPayload(MarkerKind.Sync, shown.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, TimeSpan.Zero),
+          new MarkerPayload(MarkerKind.Sync, shown.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, NanosecondTimeSpan.Zero),
           x,
           y,
           scenario.Options.ModuleSizePx
@@ -113,14 +113,14 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
     }
 
-    private static List<(ulong FrameIndex, long AnimationTicks)> ExpectedFrames(SyntheticScenario scenario)
+    private static List<(ulong FrameIndex, long AnimationNanoseconds)> ExpectedFrames(SyntheticScenario scenario)
     {
       var expected = new List<(ulong, long)>();
       for (long i = 0; i < scenario.CaptureCount; ++i)
       {
         var payload = scenario.PresentedFrames[scenario.PresentedIndexAt(i)].Payload;
         if (payload.Kind == MarkerKind.Frame && (expected.Count == 0 || expected[^1].Item1 != payload.FrameIndex))
-          expected.Add((payload.FrameIndex, payload.AnimationTime.Ticks));
+          expected.Add((payload.FrameIndex, payload.AnimationTime.Nanoseconds));
       }
       return expected;
     }
@@ -183,7 +183,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
       Assert.That(report.CapturePeriodMs, Is.EqualTo(capturePeriodMs).Within(0.01));
       var expected = ExpectedFrames(scenario);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(expected));
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Nanoseconds)), Is.EqualTo(expected));
     }
 
     [Test]
@@ -212,7 +212,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       // Matroska stores millisecond timestamps, so the period is 4 ms (+-1) rather than 4.167 ms; the frames must still all be there
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(ExpectedFrames(scenario)));
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Nanoseconds)), Is.EqualTo(ExpectedFrames(scenario)));
     }
 
     /// <summary>Fast capture (--roi auto): locate the marker, store only its region downscaled, and still recover every frame.</summary>
@@ -245,7 +245,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Counts.Undecodable + run.Counts.NotRecorded, Is.Zero);
-      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Ticks)), Is.EqualTo(ExpectedFrames(scenario)));
+      Assert.That(run.Frames.Select(f => (f.FrameIndex, f.AnimationTime.Nanoseconds)), Is.EqualTo(ExpectedFrames(scenario)));
     }
 
     /// <summary>

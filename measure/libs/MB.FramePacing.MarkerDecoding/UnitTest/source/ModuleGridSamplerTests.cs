@@ -26,7 +26,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     public void DecodeGrid_FrameMarker()
     {
       var image = new GrayImage(240, 240, 96);
-      var payload = new MarkerPayload(MarkerKind.Frame, 7, 4242, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(123456));
+      var payload = new MarkerPayload(MarkerKind.Frame, 7, 4242, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(12_345_600));
       MarkerRenderer.Render(image, payload, Origin, Origin, ModulePx);
 
       var result = new MarkerDecoder().DecodeGrid(image, Lock());
@@ -42,7 +42,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     public void DecodeGrid_StartMarkers(ulong high, ulong low)
     {
       var image = new GrayImage(240, 240, 96);
-      var payload = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0));
+      var payload = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0));
       var start = new StartMetadata(638000000000000000, new MB.FramePacing.Marker.SequenceId(high, low));
       MarkerRenderer.Render(image, payload, Origin, Origin, ModulePx, MarkerRenderer.RecommendedQuietZoneModules, start);
 
@@ -57,7 +57,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     {
       // Area downscale then bilinear upscale: every edge is spread over two pixels, like a rectified camera zone
       var sharp = new GrayImage(240, 240, 96);
-      var payload = new MarkerPayload(MarkerKind.Frame, 2, 99, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(1));
+      var payload = new MarkerPayload(MarkerKind.Frame, 2, 99, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(100));
       MarkerRenderer.Render(sharp, payload, Origin, Origin, ModulePx);
       var soft = sharp.DownscaleBox(2).ResizeBilinear(240, 240);
 

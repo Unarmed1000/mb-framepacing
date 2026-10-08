@@ -220,9 +220,14 @@ namespace MB.FramePacing.App.Commands
       var failures = new List<string>();
       var scenario = camera.Scenario;
       var truth = scenario.PresentedFrames.Where(f => f.Payload.Kind == MarkerKind.Frame && f.Payload.RunId == scenario.Options.RunId).ToList();
-      var tears = truth.Where(f => f.DisplayTime.Ticks % scenario.RefreshInterval.Ticks != 0).Select(f => f.Payload.FrameIndex).ToHashSet();
+      var tears = truth
+        .Where(f => f.DisplayTime.Nanoseconds % scenario.RefreshInterval.Nanoseconds != 0)
+        .Select(f => f.Payload.FrameIndex)
+        .ToHashSet();
       var run = report.Timeline.Runs.FirstOrDefault();
-      double period = TimeSpan.TicksPerSecond / scenario.Options.CaptureFps;
+      // The comparison with the simulation is in nanoseconds: the camera's period and the simulation's times have a fraction (doubles),
+      // the display time steps the analysis found are whole
+      double periodNanoseconds = NanosecondTimeSpan.NanosecondsPerSecond / scenario.Options.CaptureFps;
       int checkedFrames = 0;
       int insideTears = 0;
       var errorsMs = new List<double>();
@@ -241,10 +246,14 @@ namespace MB.FramePacing.App.Commands
           {
             if (tears.Contains(expected[i].Payload.FrameIndex) || tears.Contains(expected[i - 1].Payload.FrameIndex))
               continue;
-            double truthDelta = camera.ToCameraTicks((expected[i].DisplayTime - expected[i - 1].DisplayTime).Ticks);
+            double truthDeltaNanoseconds = camera.ToCameraNanoseconds((expected[i].DisplayTime - expected[i - 1].DisplayTime).Nanoseconds);
+            long displayDeltaNanoseconds = run.Frames[i].DisplayDelta!.Value.Nanoseconds;
             ++checkedFrames;
-            errorsMs.Add(Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - truthDelta) / TimeSpan.TicksPerMillisecond);
-            if (Math.Abs(run.Frames[i].DisplayDelta!.Value.Ticks - truthDelta) > (2 * period) + 1)
+            double errorNanoseconds = Math.Abs(displayDeltaNanoseconds - truthDeltaNanoseconds);
+            errorsMs.Add(errorNanoseconds / NanosecondTimeSpan.NanosecondsPerMillisecond);
+            // Two camera periods, and a nanosecond: a display time step is the difference of two camera timestamps, each rounded to
+            // the nearest nanosecond (half a nanosecond off at most)
+            if (errorNanoseconds > (2 * periodNanoseconds) + 1)
               failures.Add($"frame {expected[i].Payload.FrameIndex}: display delta off by more than two camera periods");
           }
         }
@@ -256,8 +265,11 @@ namespace MB.FramePacing.App.Commands
               $"calculated display refresh {run.Pacing?.RefreshHz:0.##} Hz, expected {scenario.Options.RefreshHz:0.##} Hz"
             )
           );
-        double scanout = camera.ToCameraTicks(camera.ZoneScanTicks(1) - camera.ZoneScanTicks(0)) / TimeSpan.TicksPerMillisecond;
-        if (run.Camera == null || Math.Abs(run.Camera.ScanoutDelay.P50 - scanout) > Math.Max(1, period / TimeSpan.TicksPerMillisecond))
+        // The simulated scanout delay and the camera's period in milliseconds
+        double periodMs = periodNanoseconds / NanosecondTimeSpan.NanosecondsPerMillisecond;
+        double scanout =
+          camera.ToCameraNanoseconds(camera.ZoneScanNanoseconds(1) - camera.ZoneScanNanoseconds(0)) / NanosecondTimeSpan.NanosecondsPerMillisecond;
+        if (run.Camera == null || Math.Abs(run.Camera.ScanoutDelay.P50 - scanout) > Math.Max(1, periodMs))
           failures.Add($"scanout delay {run.Camera?.ScanoutDelay.P50:0.00} ms, expected {scanout:0.00} ms");
         // A tear right at the start or end of the run can not be told from the start/end marker transition
         if (run.Frames.Count > 0)
@@ -280,7 +292,7 @@ namespace MB.FramePacing.App.Commands
         Console.WriteLine(
           string.Create(
             CultureInfo.InvariantCulture,
-            $"Display time step error against the simulation: mean {errorsMs.Average():0.00} ms, p95 {p95:0.00} ms, max {errorsMs[^1]:0.00} ms (camera period {period / TimeSpan.TicksPerMillisecond:0.00} ms, {errorsMs.Count} frames)."
+            $"Display time step error against the simulation: mean {errorsMs.Average():0.00} ms, p95 {p95:0.00} ms, max {errorsMs[^1]:0.00} ms (camera period {periodNanoseconds / NanosecondTimeSpan.NanosecondsPerMillisecond:0.00} ms, {errorsMs.Count} frames)."
           )
         );
       }
@@ -305,7 +317,7 @@ namespace MB.FramePacing.App.Commands
         );
 
       // Ground truth: the application frame visible at each capture, collapsed to presented frames
-      var expected = new List<(ulong FrameIndex, TickCount64 FirstSeen)>();
+      var expected = new List<(ulong FrameIndex, NanosecondTickCount FirstSeen)>();
       for (long i = 0; i < scenario.CaptureCount; ++i)
       {
         int index = scenario.PresentedIndexAt(i);

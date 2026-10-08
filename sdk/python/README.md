@@ -20,16 +20,17 @@ subpackages. Standard library only, Python 3.12 or later.
 
 ## Times in nanoseconds
 
-The marker's times are whole nanoseconds, as plain integers (a payload's `…_ns` fields): `time.monotonic_ns()` is a steady clock
-that counts in them, and `seconds_to_ns` converts an animation clock's seconds. The data module still reads whole ticks of 100 ns
-(its `…_ticks` fields), as the tools' files hold them, until the tools move to nanoseconds.
+The package's times are whole nanoseconds, as plain integers named `…_ns`. A marker's payload takes them: `time.monotonic_ns()`
+is a steady clock that counts in them, and `seconds_to_ns` converts an animation clock's seconds. The data module reads them, as
+the tools' files hold them (their `…Ns` columns and fields). The one time in another unit is a start marker's calendar time
+(below).
 
 Three types hold a count of nanoseconds as what it is, as the C++ and C# cores have them: `NanosecondTimeSpan` (a signed
 interval), `NanosecondTickCount` (a point on a clock, kept as an unsigned 64-bit count that compares across its wrap) and
 `NanosecondTimeDuration` (a length of time that is never negative: a negative count becomes zero, two added are a duration, and
 one less another is a `NanosecondTimeSpan`). Each holds a whole number of nanoseconds, an `int` (its `nanoseconds`, which is what
-a payload's field takes): a float is refused, so nothing is rounded on the way in. `from_ticks` is exact, and `to_ticks()` gives
-ticks (truncated toward zero for an interval, the tick it is in for a point).
+a payload's field takes): a float is refused, so nothing is rounded on the way in. For what counts in ticks of 100 ns (.NET's
+times), `from_ticks` is exact, and `to_ticks()` gives ticks (truncated toward zero for an interval, the tick it is in for a point).
 
 ```python
 from mb_framepacing import NanosecondTickCount, NanosecondTimeSpan
@@ -172,9 +173,9 @@ summary = read_summary(analysis / "summary.json")
 for run in summary.runs:
     print(run.run_id, run.statistics.average_fps, run.pacing.late_frames if run.pacing else None)
     for frame in read_frames(analysis / run.frames_file):
-        # Times are 100 ns ticks; None where the file has an empty cell
-        if frame.animation_error_ticks is not None:
-            print(frame.frame_index, frame.animation_error_ticks / 10_000, "ms")
+        # Times are whole nanoseconds; None where the file has an empty cell
+        if frame.animation_error_ns is not None:
+            print(frame.frame_index, frame.animation_error_ns / 1_000_000, "ms")
 
 with CaptureDataReader(capture_folder / "captures.mbcd") as reader:
     for record in reader.records():
@@ -184,16 +185,21 @@ with CaptureDataReader(capture_folder / "captures.mbcd") as reader:
             print(record.capture_index, payload.frame_index)
 ```
 
+Every time is a whole number of nanoseconds in a field named `…_ns` (`FrameRow.first_seen_ns`, `CaptureDataRecord.host_ns`,
+`AnalysisSummary.capture_period_ns`), exactly the number the file holds. Files from before the tools counted in nanoseconds held
+ticks of 100 ns under names that end in `Ticks`: such a `summary.json` or frames CSV is refused (`DataFormatError`), and the two
+format documents above say what the other files read as. Analyse the capture again.
+
 ### API
 
 | Python                                                                                           | What it is                                                                |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
 | `CaptureDataReader`, `CaptureDataHeader`, `CaptureDataRecord`                                    | `captures.mbcd`: the header, the records (`records()`, `read_all()`, ...) |
-| `CaptureDataStatus`, `Rectangle`, `MarkerLocation`, `UNKNOWN_TICKS`                              | A record's status, where the markers are, a missing device time           |
+| `CaptureDataStatus`, `Rectangle`, `MarkerLocation`, `UNKNOWN_NS`                                 | A record's status, where the markers are, a missing device time           |
 | `read_summary`, `parse_summary`, `AnalysisSummary`, the `Summary…` classes and `ValueStatistics` | `summary.json`                                                            |
 | `read_frames`, `FrameRow`                                                                        | A run's frames CSV                                                        |
 | `read_captures`, `CaptureCsvRow`                                                                 | `captures.csv`                                                            |
-| `find_analysis`, `frames_file_name`, `run_file_prefix`, `TICKS_PER_MILLISECOND`                  | The analysis folder, the file names, the ticks in a millisecond           |
+| `find_analysis`, `frames_file_name`, `run_file_prefix`, `NS_PER_MILLISECOND`                     | The analysis folder, the file names, the nanoseconds in a millisecond     |
 | `DataFormatError`                                                                                | Raised for another kind of file or a newer format version ("update ...")  |
 
 ## Tests

@@ -5,7 +5,8 @@
 
 The capture data (captures.mbcd: every captured frame's times and markers, doc/capture-data-format.md) and the analysis output
 (summary.json, captures.csv and run-<id>-frames.csv: every run's statistics and every presented frame, doc/analysis-output-format.md).
-Times are 100 ns ticks (TimeSpan ticks); a value a file does not have is None.
+Times are whole nanoseconds, plain ints named ..._ns; a value a file does not have is None. The analysis output of tools from before the
+files counted in nanoseconds (names that end in Ticks) is not read: its summary.json and frames CSVs lack what is required and are refused.
 
     from mb_framepacing.data import find_analysis, read_frames, read_summary
 
@@ -13,7 +14,7 @@ Times are 100 ns ticks (TimeSpan ticks); a value a file does not have is None.
     summary = read_summary(analysis / "summary.json")
     for run in summary.runs:
         frames = read_frames(analysis / run.frames_file)
-        errors_ms = [f.animation_error_ticks / 10_000 for f in frames if f.animation_error_ticks is not None]
+        errors_ms = [f.animation_error_ns / 1_000_000 for f in frames if f.animation_error_ns is not None]
 
 Standard library only, Python 3.12 or later. A marker's payload in the capture data (CaptureDataRecord.try_decode_main) is decoded with
 mb_framepacing.marker.
@@ -23,8 +24,8 @@ from ..rectangle import Rectangle
 from .analysis_files import (
     CAPTURES_FILE_NAME,
     DIRECTORY_NAME,
+    NS_PER_MILLISECOND,
     SUMMARY_FILE_NAME,
-    TICKS_PER_MILLISECOND,
     find_analysis,
     frames_file_name,
     run_file_prefix,
@@ -36,14 +37,14 @@ from .capture_data import (
     FORMAT_VERSION as CAPTURE_DATA_FORMAT_VERSION,
 )
 from .capture_data import (
-    UNKNOWN_TICKS,
+    UNKNOWN_NS,
     CaptureDataHeader,
     CaptureDataReader,
     CaptureDataRecord,
     CaptureDataStatus,
     MarkerLocation,
 )
-from .csv_files import ON_DEMAND_FRAME_TICKS, CaptureCsvRow, FrameRow, read_captures, read_frames
+from .csv_files import ON_DEMAND_FRAME_NS, CaptureCsvRow, FrameRow, read_captures, read_frames
 from .errors import DataFormatError
 from .summary import (
     FORMAT_VERSION as ANALYSIS_FORMAT_VERSION,
@@ -70,10 +71,10 @@ __all__ = [
     "CAPTURE_DATA_FILE_NAME",
     "CAPTURE_DATA_FORMAT_VERSION",
     "DIRECTORY_NAME",
-    "ON_DEMAND_FRAME_TICKS",
+    "NS_PER_MILLISECOND",
+    "ON_DEMAND_FRAME_NS",
     "SUMMARY_FILE_NAME",
-    "TICKS_PER_MILLISECOND",
-    "UNKNOWN_TICKS",
+    "UNKNOWN_NS",
     "AnalysisSummary",
     "CaptureCsvRow",
     "CaptureDataHeader",

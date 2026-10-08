@@ -541,9 +541,9 @@ namespace MB.FramePacing.Charts
       return bands.Count > 0;
     }
 
-    private static double TicksMs(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
+    private static double NanosecondsMs(long nanoseconds) => nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
 
-    private static double MaxMs(WaveletMatrix values, int start, int end) => TicksMs(values.KthSmallest(start, end, end - start - 1));
+    private static double MaxMs(WaveletMatrix values, int start, int end) => NanosecondsMs(values.KthSmallest(start, end, end - start - 1));
 
     private static void ErrorPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, double refreshMs, double errorY)
     {
@@ -579,7 +579,7 @@ namespace MB.FramePacing.Charts
       var (rangeStart, rangeEnd) = errors.Of(view.ScaleFrames.Start, view.ScaleFrames.End);
       if (rangeEnd > rangeStart)
       {
-        double lowest = TicksMs(errors.Values.KthSmallest(rangeStart, rangeEnd, 0));
+        double lowest = NanosecondsMs(errors.Values.KthSmallest(rangeStart, rangeEnd, 0));
         double highest = MaxMs(errors.Values, rangeStart, rangeEnd);
         foreach (double position in ChartScale.ErrorRefreshTicks(refreshMs, limit, lowest, highest))
         {
@@ -633,7 +633,7 @@ namespace MB.FramePacing.Charts
           int count = end - start;
           if (count == 0)
             continue;
-          double min = TicksMs(errors.Values.KthSmallest(start, end, 0));
+          double min = NanosecondsMs(errors.Values.KthSmallest(start, end, 0));
           double max = MaxMs(errors.Values, start, end);
           if (count >= MinFramesForTypical)
           {
@@ -794,7 +794,7 @@ namespace MB.FramePacing.Charts
           while (!holds.Frames[last])
             --last;
           double columnEnd = Math.Max(key + 1, X1(last));
-          double lowest = TicksMs(holds.Values.KthSmallest(start, end, 0));
+          double lowest = NanosecondsMs(holds.Values.KthSmallest(start, end, 0));
           double highest = MaxMs(holds.Values, start, end);
           var boxKind = g_holdPriority.FirstOrDefault(kind => data.HoldsOf(kind).Frames.CountIn(frameStart, frameEnd) > 0, HoldKind.AsPlanned);
           string box = $"M{N(key, 0)} {N(YOf(highest) - 1.25, 1)}H{N(columnEnd, 1)}V{N(YOf(lowest) + 1.25, 1)}H{N(key, 0)}Z";
@@ -819,7 +819,7 @@ namespace MB.FramePacing.Charts
             },
             HoldKind.AsPlanned
           );
-          medians[middleKind].Append($"M{N(key, 0)} {N(YOf(TicksMs(middle)), 1)}H{N(columnEnd, 1)}");
+          medians[middleKind].Append($"M{N(key, 0)} {N(YOf(NanosecondsMs(middle)), 1)}H{N(columnEnd, 1)}");
         }
         foreach (var kind in Enum.GetValues<HoldKind>())
         {
@@ -855,7 +855,7 @@ namespace MB.FramePacing.Charts
       var preferred = new StringBuilder();
       double? targetEnd = null;
       double? preferredEnd = null;
-      void Add(StringBuilder path, ref double? end, double x0, double x1, TimeSpan frameTime)
+      void Add(StringBuilder path, ref double? end, double x0, double x1, NanosecondTimeSpan frameTime)
       {
         double ms = frameTime.TotalMilliseconds;
         double y = yOf(ms);
@@ -938,10 +938,10 @@ namespace MB.FramePacing.Charts
         while (!steps.Frames[last])
           --last;
         double columnEnd = Math.Max(key + 1, x1Of(last));
-        double lowest = TicksMs(steps.Values.KthSmallest(start, end, 0));
+        double lowest = NanosecondsMs(steps.Values.KthSmallest(start, end, 0));
         double highest = MaxMs(steps.Values, start, end);
         range.Append($"M{N(key, 0)} {N(yOf(highest) - 0.6, 1)}H{N(columnEnd, 1)}V{N(yOf(lowest) + 0.6, 1)}H{N(key, 0)}Z");
-        double middle = TicksMs(steps.Values.KthSmallest(start, end, (count - 1) / 2));
+        double middle = NanosecondsMs(steps.Values.KthSmallest(start, end, (count - 1) / 2));
         line.Append($"M{N(key, 0)} {N(yOf(middle), 1)}H{N(columnEnd, 1)}");
       }
       view.MovePath(parts, "step-range", range, stepY, stepY + StepH);
@@ -1047,7 +1047,7 @@ namespace MB.FramePacing.Charts
           if (!data.Spans[i])
             continue;
           double frameTime = frames[i].FrameTime?.TotalMilliseconds ?? 0;
-          double cpuBusyMs = frames[i].CpuBusy.ToTimeSpan().TotalMilliseconds;
+          double cpuBusyMs = frames[i].CpuBusy.Value.TotalMilliseconds;
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
           if (cpuBusyMs > 0)
@@ -1089,7 +1089,7 @@ namespace MB.FramePacing.Charts
           int levelCount = levelEnd - levelStart;
           if (busyCount > 0)
           {
-            double middleBusy = TicksMs(cpuBusy.Values.KthSmallest(busyStart, busyEnd, (busyCount - 1) / 2));
+            double middleBusy = NanosecondsMs(cpuBusy.Values.KthSmallest(busyStart, busyEnd, (busyCount - 1) / 2));
             busy.Append($"M{N(key, 0)} {N(YOf(middleBusy), 1)}H{N(end, 1)}V{N(bottom, 1)}H{N(key, 0)}Z");
           }
           double highest = Math.Max(
@@ -1100,7 +1100,7 @@ namespace MB.FramePacing.Charts
             clipped.Add((key + 0.5, highest, true));
           if (levelCount == 0)
             continue;
-          double lowest = TicksMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, 0));
+          double lowest = NanosecondsMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, 0));
           double levelMax = MaxMs(frameTimes.Values, levelStart, levelEnd);
           string box = $"M{N(key, 0)} {N(YOf(levelMax) - 1.25, 1)}H{N(end, 1)}V{N(YOf(lowest) + 1.25, 1)}H{N(key, 0)}Z";
           if (levelCount < MinFramesForTypical)
@@ -1109,7 +1109,7 @@ namespace MB.FramePacing.Charts
             continue;
           }
           range.Append(box);
-          double middle = TicksMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, (levelCount - 1) / 2));
+          double middle = NanosecondsMs(frameTimes.Values.KthSmallest(levelStart, levelEnd, (levelCount - 1) / 2));
           median.Append($"M{N(key, 0)} {N(YOf(middle), 1)}H{N(end, 1)}");
         }
         view.MovePath(parts, "cpu-busy", busy, frameTimeY, frameTimeY + FrameTimeH);
@@ -1256,8 +1256,10 @@ namespace MB.FramePacing.Charts
       plots.Add(new CardPlot(ReportItem.RefreshStrip, PlotX0, stripY, view.PlotX1, stripY + StripH, from, to, 0, 1));
       int legend = parts.Count;
       parts.Add(new TextShape(view.PlotX1, stripY - 16, string.Empty, "vsync-n", "end"));
-      var refresh = new TimeSpan((long)Math.Round(refreshMs * TimeSpan.TicksPerMillisecond));
-      int Cells(TimeSpan span) => refresh > TimeSpan.Zero ? (int)Math.Max(0, (span.Ticks + (refresh.Ticks / 2)) / refresh.Ticks) : 1;
+      // The refresh's milliseconds rounded back to its nanoseconds
+      var refresh = new NanosecondTimeSpan((long)Math.Round(refreshMs * NanosecondTimeSpan.NanosecondsPerMillisecond));
+      int Cells(NanosecondTimeSpan span) =>
+        refresh > NanosecondTimeSpan.Zero ? (int)Math.Max(0, (span.Nanoseconds + (refresh.Nanoseconds / 2)) / refresh.Nanoseconds) : 1;
       bool anyUnknown = false;
       bool anyStatic = false;
       bool anyLate = false;
@@ -1266,7 +1268,7 @@ namespace MB.FramePacing.Charts
       for (int i = section.Start; i < section.End; ++i)
       {
         var frame = frames[i];
-        var onScreen = frame.OnScreen > TimeSpan.Zero ? frame.OnScreen : chart.CapturePeriod;
+        var onScreen = frame.OnScreen > NanosecondTimeSpan.Zero ? frame.OnScreen : chart.CapturePeriod;
         int cells = Math.Max(1, Cells(onScreen));
         int seen = cells;
         if (!chart.Camera && i + 1 < section.End && frames[i + 1].Segment == frame.Segment)
@@ -1291,7 +1293,7 @@ namespace MB.FramePacing.Charts
         int repeats = 0;
         if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment && view.Data.DroppedBeforeFrame[i + 1] is > 0 and var dropped)
         {
-          var target = frames[i + 1].TargetFrameTime is { } t && t > TimeSpan.Zero ? t : refresh;
+          var target = frames[i + 1].TargetFrameTime is { } t && t > NanosecondTimeSpan.Zero ? t : refresh;
           repeats = (int)Math.Min(seen - 1, dropped * Math.Max(1, Cells(target)));
         }
         for (int c = 0; c < cells; ++c)
@@ -1301,8 +1303,8 @@ namespace MB.FramePacing.Charts
             break;
           // A refresh that showed an older frame out of order (also between two sightings of this frame); after the frame's last
           // sighting, else one the capture did not tell; the refreshes where dropped frames were due repeat this frame
-          var at = frame.FirstSeenTime + new TimeSpan(c * refresh.Ticks);
-          bool older = frame.OlderFrames is { } shown && shown.Any(o => (o.CaptureTime - at).Duration().Ticks * 2 < refresh.Ticks);
+          var at = frame.FirstSeenTime + new NanosecondTimeSpan(c * refresh.Nanoseconds);
+          bool older = frame.OlderFrames is { } shown && shown.Any(o => (o.CaptureTime - at).Duration().Nanoseconds * 2 < refresh.Nanoseconds);
           string cell =
             older ? "strip-older"
             : c >= seen ? "neutral"
@@ -1349,11 +1351,8 @@ namespace MB.FramePacing.Charts
     };
 
     /// <summary>The section's time on the capture's clock, for its events: from its start to its end, and the last frame's refresh.</summary>
-    private static (TickCount64 From, TickCount64 To) EventTimes(RunSection section) =>
-      (
-        section.Data.Origin + new TimeSpan((long)Math.Round(section.FromSeconds * TimeSpan.TicksPerSecond)),
-        section.Data.Origin + new TimeSpan((long)Math.Round(section.ToSeconds * TimeSpan.TicksPerSecond)) + section.Data.Run.CapturePeriod
-      );
+    private static (NanosecondTickCount From, NanosecondTickCount To) EventTimes(RunSection section) =>
+      (section.Data.TimeAt(section.FromSeconds), section.Data.TimeAt(section.ToSeconds) + section.Data.Run.CapturePeriod);
 
     /// <summary>What the capture missed in the section, by kind ("2 not decoded, 1 missed"); empty when nothing, or the rows are not known.</summary>
     private static string CaptureGaps(RunSection section)
@@ -1377,8 +1376,10 @@ namespace MB.FramePacing.Charts
     private static void EventsPanel(List<CardShape> parts, List<CardPlot> plots, PanelView view, ChartRun chart, double eventsY)
     {
       var events = view.Data.Events;
-      var origin = view.Data.Origin;
-      var period = new TimeSpan(Math.Max(1, chart.CapturePeriod.Ticks));
+      var data = view.Data;
+      // The period is at least one nanosecond, the smallest step of time
+      var period = new NanosecondTimeSpan(Math.Max(1, chart.CapturePeriod.Nanoseconds));
+      var smallestStep = new NanosecondTimeSpan(1);
       var (from, to) = EventTimes(view.Section);
       parts.Add(new TextShape(20, eventsY - 16, "EVENTS: WHAT THE FRAMES DID, WHAT THE CAPTURE MISSED", "label", "start"));
       plots.Add(new CardPlot(ReportItem.Events, PlotX0, eventsY, view.PlotX1, eventsY + EventsH, view.ViewFrom, view.ViewTo, 0, 1));
@@ -1386,7 +1387,7 @@ namespace MB.FramePacing.Charts
       // The time axis is linear: a pixel column's time on the capture's clock
       double x0 = view.XOf(0);
       double pixelsPerSecond = view.XOf(1) - x0;
-      TickCount64 TimeAt(double x) => origin + new TimeSpan((long)Math.Round((x - x0) / pixelsPerSecond * TimeSpan.TicksPerSecond));
+      NanosecondTickCount TimeAt(double x) => data.TimeAt((x - x0) / pixelsPerSecond);
       int firstColumn = (int)Math.Floor(Math.Max(view.XOf(view.From), 0));
       int lastColumn = (int)Math.Ceiling(view.EndX);
 
@@ -1411,7 +1412,7 @@ namespace MB.FramePacing.Charts
         for (int column = firstColumn; column < lastColumn; ++column)
         {
           // An event covers its refresh: it shows in every column that refresh reaches
-          var columnStart = TimeAt(column) - period + new TimeSpan(1);
+          var columnStart = TimeAt(column) - period + smallestStep;
           var columnEnd = TimeAt(column + 1);
           var start = columnStart > from ? columnStart : from;
           var end = columnEnd < to ? columnEnd : to;

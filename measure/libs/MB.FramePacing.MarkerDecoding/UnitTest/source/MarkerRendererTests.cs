@@ -19,16 +19,18 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     public void EveryMarkerKind_IsVersion6()
     {
       Assert.That(
-        MarkerRenderer.GenerateModules(new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2))).Size,
+        MarkerRenderer
+          .GenerateModules(new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200)))
+          .Size,
         Is.EqualTo(41)
       );
       Assert.That(
         MarkerRenderer
-          .GenerateModules(new MarkerPayload(MarkerKind.SequenceEnd, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)))
+          .GenerateModules(new MarkerPayload(MarkerKind.SequenceEnd, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200)))
           .Size,
         Is.EqualTo(41)
       );
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2));
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200));
       Assert.That(MarkerRenderer.GenerateModules(start).Size, Is.EqualTo(41));
       var full = MarkerRenderer.GenerateModules(
         start,
@@ -45,9 +47,9 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         30,
         10,
         MB.FramePacing.Marker.MarkerFlags.NoFlags,
-        new TimeSpan(20),
-        TargetFrameTime: new TimeSpan32(166_667),
-        IntendedDisplayTime: new TickCount64(1_234_567_890_123)
+        new NanosecondTimeSpan(2000),
+        TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(16_666_667),
+        IntendedDisplayTime: new NanosecondTickCount(123_456_789_012_300)
       );
       var image = new GrayImage(400, 400, 96);
       MarkerRenderer.Render(image, payload, 20, 20, 3, MarkerRenderer.RecommendedQuietZoneModules);
@@ -76,21 +78,21 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var image = new GrayImage(640, 1100, 128);
       MarkerRenderer.Render(
         image,
-        new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(100)),
+        new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(10000)),
         32,
         32,
         6
       );
       MarkerRenderer.Render(
         image,
-        new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(100)),
+        new MarkerPayload(MarkerKind.Frame, 1, 10, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(10000)),
         32,
         400,
         6
       );
       MarkerRenderer.Render(
         image,
-        new MarkerPayload(MarkerKind.Frame, 1, 11, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(200)),
+        new MarkerPayload(MarkerKind.Frame, 1, 11, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(20000)),
         32,
         768,
         6
@@ -133,7 +135,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     {
       // A well-formed QR code of a frame marker's bytes, and of the same bytes with one bit of the frame index changed: what a
       // decoder's error correction can hand back for a symbol that mixes two frames. The CRC is what tells them apart
-      var payload = new MarkerPayload(MarkerKind.Frame, 7, 1000, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(166_667));
+      var payload = new MarkerPayload(MarkerKind.Frame, 7, 1000, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(16_666_667));
       var bytes = payload.Encode();
       var asDrawn = new MarkerDecoder().Decode(QrImage(System.Text.Encoding.Latin1.GetString(bytes)));
       Assert.That(asDrawn.Status, Is.EqualTo(MarkerDecodeStatus.Decoded));

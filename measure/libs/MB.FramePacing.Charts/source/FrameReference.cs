@@ -10,7 +10,6 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.MarkerDecoding;
 
@@ -19,18 +18,18 @@ namespace MB.FramePacing.Charts
   public static class FrameReference
   {
     /// <summary>The target frame time before <paramref name="frame"/>, as written: the marker's, else its preferred frame time.</summary>
-    public static TimeSpan? Target(PresentedFrame frame) =>
+    public static NanosecondTimeSpan? Target(PresentedFrame frame) =>
       frame.MarkerTargetFrameTime == MarkerPayload.OnDemandFrameTime ? null
-      : frame.MarkerTargetFrameTime == TimeSpan32.Zero ? Preferred(frame)
-      : frame.MarkerTargetFrameTime.ToTimeSpan();
+      : frame.MarkerTargetFrameTime == NanosecondTimeDuration.Zero ? Preferred(frame)
+      : frame.MarkerTargetFrameTime.Value;
 
     /// <summary>
     /// The preferred frame time of <paramref name="frame"/>, as written: the marker's, else what the analysis took (the target given
     /// to the tools, else one refresh).
     /// </summary>
-    public static TimeSpan? Preferred(PresentedFrame frame) =>
+    public static NanosecondTimeSpan? Preferred(PresentedFrame frame) =>
       frame.MarkerPreferredFrameTime == MarkerPayload.OnDemandFrameTime ? null
-      : frame.MarkerPreferredFrameTime == TimeSpan32.Zero ? frame.PreferredFrameTime
-      : frame.MarkerPreferredFrameTime.ToTimeSpan();
+      : frame.MarkerPreferredFrameTime == NanosecondTimeDuration.Zero ? frame.PreferredFrameTime
+      : frame.MarkerPreferredFrameTime.Value;
   }
 }

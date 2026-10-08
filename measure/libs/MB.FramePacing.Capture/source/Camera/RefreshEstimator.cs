@@ -4,11 +4,11 @@
 //* EXPERIMENTAL camera captures: calculate the display's refresh period from when a camera first saw each frame. A capture card needs no
 //* estimate: it captures at the display's refresh rate.
 //*
-//* Three steps. EstimatePeriodTicks finds which period it is, from the intervals between frames (the refresh, not a multiple of it).
-//* GridPeriodTicks asks the first-seen times themselves which period's grid they are on (the periodogram of the times at each period:
+//* Three steps. EstimatePeriodNanoseconds finds which period it is, from the intervals between frames (the refresh, not a multiple of it).
+//* GridPeriodNanoseconds asks the first-seen times themselves which period's grid they are on (the periodogram of the times at each period:
 //* the usual way to find a period in timing data when the event numbers are not known), and takes that one where the intervals gave
 //* another: a camera that sees a refresh in two or three frames gives intervals that mislead.
-//* RefinePeriodTicks then measures it: a line through every first-seen time against the refresh it fell on. With the refreshes known,
+//* RefinePeriodNanoseconds then measures it: a line through every first-seen time against the refresh it fell on. With the refreshes known,
 //* that least squares slope is the maximum likelihood period (I. V. L. Clarkson, "On the Estimation of Period from Sparse, Noisy Timing
 //* Data", 2006, equation 5: times = refresh number x period + offset + noise). An average of intervals only uses the first and the last
 //* time of every unbroken stretch; the line uses them all, and frames that were skipped or held longer stay in. That paper's
@@ -25,6 +25,8 @@ using System.Linq;
 
 namespace MB.FramePacing.Capture.Camera
 {
+  // The estimator's periods and intervals are doubles of nanoseconds (the "...Nanoseconds" names): a period has a fraction. The
+  // first-seen times come in as the tools hold them, whole nanoseconds. A caller rounds a period to the whole time it needs.
   public static class RefreshEstimator
   {
     /// <summary>Fewer intervals than this give no estimate.</summary>
@@ -37,7 +39,7 @@ namespace MB.FramePacing.Capture.Camera
     public const double MaxRefinement = 0.01;
 
     /// <summary>
-    /// Fewer first-seen times than this say nothing about which grid they are on (<see cref="GridPeriodTicks"/>): about a second of
+    /// Fewer first-seen times than this say nothing about which grid they are on (<see cref="GridPeriodNanoseconds"/>): about a second of
     /// frames at 60 Hz. It is also the stretch of times <see cref="GridFit"/> looks at.
     /// </summary>
     public const int MinGridTimes = 64;
@@ -59,7 +61,7 @@ namespace MB.FramePacing.Capture.Camera
 
     /// <summary>
     /// The intervals' estimate is the period the search found when the two are within this share: the search's periods are a fifth of
-    /// a percent apart, and the line (<see cref="RefinePeriodTicks"/>) measures either to the same period.
+    /// a percent apart, and the line (<see cref="RefinePeriodNanoseconds"/>) measures either to the same period.
     /// </summary>
     private const double SamePeriod = 0.005;
 
@@ -77,18 +79,22 @@ namespace MB.FramePacing.Capture.Camera
     /// interval is a whole number of refreshes, quantised to camera periods (16 or 17 ms for 60 Hz at 1000 fps), so the intervals form
     /// clusters at multiples of the refresh. The refresh is the largest period that makes every well-populated cluster a whole multiple: a
     /// game that alternates 2 and 3 refreshes still gives the refresh, not its frame time. A steady game below the refresh rate (only 2
-    /// refreshes) can not be told from a slower display; <paramref name="calibratedPeriodTicks"/> (the rig's measurement) settles that when
+    /// refreshes) can not be told from a slower display; <paramref name="calibratedPeriodNanoseconds"/> (the rig's measurement) settles that when
     /// the clusters are whole multiples of it.
     /// </summary>
-    /// <returns>The refresh period in ticks, or null when there are too few intervals or the camera is too slow to tell.</returns>
-    public static double? EstimatePeriodTicks(IEnumerable<double> intervalTicks, double cameraPeriodTicks, double? calibratedPeriodTicks = null)
+    /// <returns>The refresh period in nanoseconds, or null when there are too few intervals or the camera is too slow to tell.</returns>
+    public static double? EstimatePeriodNanoseconds(
+      IEnumerable<double> intervalNanoseconds,
+      double cameraPeriodNanoseconds,
+      double? calibratedPeriodNanoseconds = null
+    )
     {
-      var sorted = intervalTicks.Where(v => v > 0).Order().ToArray();
-      if (sorted.Length < MinIntervals || cameraPeriodTicks <= 0)
+      var sorted = intervalNanoseconds.Where(v => v > 0).Order().ToArray();
+      if (sorted.Length < MinIntervals || cameraPeriodNanoseconds <= 0)
         return null;
 
       // One refresh count quantises to two neighbouring camera periods (plus a little jitter)
-      double width = 1.5 * cameraPeriodTicks;
+      double width = 1.5 * cameraPeriodNanoseconds;
       var clusters = new List<(double Mean, int Count)>();
       int start = 0;
       for (int i = 1; i <= sorted.Length; ++i)
@@ -106,18 +112,18 @@ namespace MB.FramePacing.Capture.Camera
 
       double shortest = populated[0].Mean;
       int divisor = 1;
-      for (int d = 2; d <= 4 && shortest / d >= 2 * cameraPeriodTicks; ++d)
+      for (int d = 2; d <= 4 && shortest / d >= 2 * cameraPeriodNanoseconds; ++d)
       {
-        if (!Fits(populated, shortest / divisor, cameraPeriodTicks) && Fits(populated, shortest / d, cameraPeriodTicks))
+        if (!Fits(populated, shortest / divisor, cameraPeriodNanoseconds) && Fits(populated, shortest / d, cameraPeriodNanoseconds))
           divisor = d;
       }
-      if (calibratedPeriodTicks is { } calibrated && calibrated > 0)
+      if (calibratedPeriodNanoseconds is { } calibrated && calibrated > 0)
       {
         int multiple = (int)Math.Round(shortest / calibrated);
         if (
           multiple > divisor
-          && Math.Abs(shortest - (multiple * calibrated)) <= cameraPeriodTicks
-          && Fits(populated, shortest / multiple, cameraPeriodTicks)
+          && Math.Abs(shortest - (multiple * calibrated)) <= cameraPeriodNanoseconds
+          && Fits(populated, shortest / multiple, cameraPeriodNanoseconds)
         )
           divisor = multiple;
       }
@@ -136,9 +142,9 @@ namespace MB.FramePacing.Capture.Camera
 
     /// <summary>
     /// The period of the grid of refreshes the first-seen times are on (<see cref="GridFit"/>), found by a search of the times; null
-    /// when they are on none the camera can see, or are too few to say. It is <paramref name="expectedPeriodTicks"/> (the user's or
-    /// the rig's rate) when the times are on its grid, else the period found, and <paramref name="periodTicks"/>
-    /// (<see cref="EstimatePeriodTicks"/>'s) as it came when it is that period.
+    /// when they are on none the camera can see, or are too few to say. It is <paramref name="expectedPeriodNanoseconds"/> (the user's or
+    /// the rig's rate) when the times are on its grid, else the period found, and <paramref name="periodNanoseconds"/>
+    /// (<see cref="EstimatePeriodNanoseconds"/>'s) as it came when it is that period.
     /// <para>
     /// The intervals mislead when a camera sees a refresh in two or three frames and some sightings come a camera frame late (the
     /// marker was changing in the frame before): the interval before is a camera period longer and the one after a camera period
@@ -162,25 +168,25 @@ namespace MB.FramePacing.Capture.Camera
     /// </para>
     /// </summary>
     /// <param name="firstSeenTimes">When frames were first seen, in any order; only times that are a frame's true first sighting.</param>
-    /// <param name="periodTicks">The period the intervals gave.</param>
-    /// <param name="intervalTicks">The intervals that period was estimated from.</param>
-    /// <param name="cameraPeriodTicks">The camera's frame period.</param>
-    /// <param name="expectedPeriodTicks">The refresh period the user or the rig expects, when there is one.</param>
-    /// <returns>The period in ticks, or null: no grid, or fewer than <see cref="MinGridTimes"/> times.</returns>
-    public static double? GridPeriodTicks(
-      IEnumerable<TickCount64> firstSeenTimes,
-      double periodTicks,
-      IEnumerable<double> intervalTicks,
-      double cameraPeriodTicks,
-      double? expectedPeriodTicks = null
+    /// <param name="periodNanoseconds">The period the intervals gave.</param>
+    /// <param name="intervalNanoseconds">The intervals that period was estimated from.</param>
+    /// <param name="cameraPeriodNanoseconds">The camera's frame period.</param>
+    /// <param name="expectedPeriodNanoseconds">The refresh period the user or the rig expects, when there is one.</param>
+    /// <returns>The period in nanoseconds, or null: no grid, or fewer than <see cref="MinGridTimes"/> times.</returns>
+    public static double? GridPeriodNanoseconds(
+      IEnumerable<NanosecondTickCount> firstSeenTimes,
+      double periodNanoseconds,
+      IEnumerable<double> intervalNanoseconds,
+      double cameraPeriodNanoseconds,
+      double? expectedPeriodNanoseconds = null
     )
     {
-      var times = firstSeenTimes.Select(time => time.Ticks).Distinct().Order().ToArray();
-      var intervals = intervalTicks.Where(v => v > 0).ToArray();
-      if (times.Length < MinGridTimes || intervals.Length < MinIntervals || !(periodTicks > 0) || !(cameraPeriodTicks > 0))
+      var times = SortedNanoseconds(firstSeenTimes);
+      var intervals = intervalNanoseconds.Where(v => v > 0).ToArray();
+      if (times.Length < MinGridTimes || intervals.Length < MinIntervals || !(periodNanoseconds > 0) || !(cameraPeriodNanoseconds > 0))
         return null;
       // A period must be longer than the camera's: every time is on the camera's own grid, and on the grid of any period that divides it
-      double shortest = ShortestPeriod * cameraPeriodTicks;
+      double shortest = ShortestPeriod * cameraPeriodNanoseconds;
       double longest = intervals.Average() * (1 + MeanIntervalSlack);
       if (longest <= shortest)
         return null;
@@ -188,13 +194,13 @@ namespace MB.FramePacing.Capture.Camera
       // The first stretches say which grid it is; the line through every time measures it afterwards
       var first = new ArraySegment<long>(times, 0, Math.Min(times.Length, SearchTimes));
       double onGrid = MinGridFit(first.Count);
-      double found = SearchPeriodTicks(first, shortest, longest, out double fit);
+      double found = SearchPeriodNanoseconds(first, shortest, longest, out double fit);
       if (fit < onGrid)
         return null;
       // The expected period may be a whole share of the one found (a game at half rate): its grid holds the times too, less sharply
-      if (expectedPeriodTicks is { } expected && expected >= shortest && GridFit(first, expected) >= onGrid)
+      if (expectedPeriodNanoseconds is { } expected && expected >= shortest && GridFit(first, expected) >= onGrid)
         return expected;
-      return Math.Abs(periodTicks - found) <= SamePeriod * found ? periodTicks : found;
+      return Math.Abs(periodNanoseconds - found) <= SamePeriod * found ? periodNanoseconds : found;
     }
 
     /// <summary>
@@ -208,7 +214,7 @@ namespace MB.FramePacing.Capture.Camera
     public static double MinGridFit(int timeCount) => OffGridFit + (5 * OffGridFitDeviation / Math.Sqrt(Math.Max(1, timeCount / MinGridTimes)));
 
     /// <summary>
-    /// How well times sit on a grid of <paramref name="periodTicks"/>: 1 when every time is a whole number of periods from the others,
+    /// How well times sit on a grid of <paramref name="periodNanoseconds"/>: 1 when every time is a whole number of periods from the others,
     /// about 1 / sqrt(<see cref="MinGridTimes"/>) (0.1) when they have nothing to do with it. It is the periodogram of the times at
     /// that period (the length of the sum of every time's phase on the grid, per time), taken over stretches of
     /// <see cref="MinGridTimes"/> times and averaged: within a stretch a period that is a little off (a few tenths of a percent) still
@@ -218,11 +224,11 @@ namespace MB.FramePacing.Capture.Camera
     /// the refresh rate, 0.9 at four times and more above; sightings a camera frame late cost more.
     /// </para>
     /// </summary>
-    /// <param name="sortedTimes">The times in ticks, in ascending order.</param>
-    /// <param name="periodTicks">The grid's period.</param>
-    public static double GridFit(IReadOnlyList<long> sortedTimes, double periodTicks)
+    /// <param name="sortedTimes">The times in nanoseconds, in ascending order.</param>
+    /// <param name="periodNanoseconds">The grid's period.</param>
+    public static double GridFit(IReadOnlyList<long> sortedTimes, double periodNanoseconds)
     {
-      if (!(periodTicks > 0))
+      if (!(periodNanoseconds > 0))
         return 0;
       double total = 0;
       int counted = 0;
@@ -234,7 +240,7 @@ namespace MB.FramePacing.Capture.Camera
         double imaginary = 0;
         for (int i = start; i < end; ++i)
         {
-          double phase = 2 * Math.PI * ((sortedTimes[i] - sortedTimes[start]) / periodTicks);
+          double phase = 2 * Math.PI * ((sortedTimes[i] - sortedTimes[start]) / periodNanoseconds);
           real += Math.Cos(phase);
           imaginary += Math.Sin(phase);
         }
@@ -250,7 +256,7 @@ namespace MB.FramePacing.Capture.Camera
     /// The longest period between <paramref name="shortest"/> and <paramref name="longest"/> that the times are on, with its fit: the
     /// longest one whose fit is a peak within <see cref="SearchPeakShare"/> of the best.
     /// </summary>
-    private static double SearchPeriodTicks(IReadOnlyList<long> sortedTimes, double shortest, double longest, out double fit)
+    private static double SearchPeriodNanoseconds(IReadOnlyList<long> sortedTimes, double shortest, double longest, out double fit)
     {
       var periods = new List<double>();
       for (double period = shortest; period < longest; period *= 1 + SearchStep)
@@ -274,7 +280,7 @@ namespace MB.FramePacing.Capture.Camera
 
     /// <summary>
     /// The refresh period measured with every first-seen time: the slope of the least squares line through the times against the
-    /// refresh each one fell on. <paramref name="periodTicks"/> (<see cref="EstimatePeriodTicks"/>'s) says which refresh that is, from
+    /// refresh each one fell on. <paramref name="periodNanoseconds"/> (<see cref="EstimatePeriodNanoseconds"/>'s) says which refresh that is, from
     /// the step since the time before.
     /// <para>
     /// The line is only taken when that numbering holds up against it: every time is nearer to its own refresh on the line than to the
@@ -284,13 +290,15 @@ namespace MB.FramePacing.Capture.Camera
     /// </para>
     /// </summary>
     /// <param name="firstSeenTimes">When frames were first seen, in any order; only times that are a frame's true first sighting.</param>
-    /// <param name="periodTicks">The period to refine.</param>
-    /// <returns>The refined period in ticks; <paramref name="periodTicks"/> when there are too few times or the line is not taken.</returns>
-    public static double RefinePeriodTicks(IEnumerable<TickCount64> firstSeenTimes, double periodTicks)
+    /// <param name="periodNanoseconds">The period to refine.</param>
+    /// <returns>
+    /// The refined period in nanoseconds; <paramref name="periodNanoseconds"/> when there are too few times or the line is not taken.
+    /// </returns>
+    public static double RefinePeriodNanoseconds(IEnumerable<NanosecondTickCount> firstSeenTimes, double periodNanoseconds)
     {
-      var times = firstSeenTimes.Select(time => time.Ticks).Distinct().Order().ToArray();
-      if (times.Length <= MinIntervals || !(periodTicks > 0))
-        return periodTicks;
+      var times = SortedNanoseconds(firstSeenTimes);
+      if (times.Length <= MinIntervals || !(periodNanoseconds > 0))
+        return periodNanoseconds;
 
       // Relative to the first time, so the sums stay small
       var seen = new double[times.Length];
@@ -298,17 +306,24 @@ namespace MB.FramePacing.Capture.Camera
       for (int i = 1; i < times.Length; ++i)
       {
         seen[i] = times[i] - times[0];
-        refreshes[i] = refreshes[i - 1] + Math.Round((times[i] - times[i - 1]) / periodTicks);
+        refreshes[i] = refreshes[i - 1] + Math.Round((times[i] - times[i - 1]) / periodNanoseconds);
       }
-      if (!TryFitLine(refreshes, seen, out double slope, out double offset) || Math.Abs(slope - periodTicks) > MaxRefinement * periodTicks)
-        return periodTicks;
+      if (
+        !TryFitLine(refreshes, seen, out double slope, out double offset)
+        || Math.Abs(slope - periodNanoseconds) > MaxRefinement * periodNanoseconds
+      )
+        return periodNanoseconds;
       for (int i = 0; i < seen.Length; ++i)
       {
         if (Math.Round((seen[i] - offset) / slope) != refreshes[i])
-          return periodTicks;
+          return periodNanoseconds;
       }
       return slope;
     }
+
+    /// <summary>The different times in ascending order, in nanoseconds.</summary>
+    private static long[] SortedNanoseconds(IEnumerable<NanosecondTickCount> times) =>
+      times.Select(time => time.Nanoseconds).Distinct().Order().ToArray();
 
     /// <summary>The least squares line y = slope x + offset; false when every x is the same.</summary>
     private static bool TryFitLine(double[] x, double[] y, out double slope, out double offset)
@@ -327,7 +342,7 @@ namespace MB.FramePacing.Capture.Camera
       return slope > 0;
     }
 
-    private static bool Fits(List<(double Mean, int Count)> clusters, double period, double cameraPeriodTicks) =>
-      clusters.All(c => Math.Round(c.Mean / period) >= 1 && Math.Abs(c.Mean - (Math.Round(c.Mean / period) * period)) <= cameraPeriodTicks);
+    private static bool Fits(List<(double Mean, int Count)> clusters, double period, double cameraPeriodNanoseconds) =>
+      clusters.All(c => Math.Round(c.Mean / period) >= 1 && Math.Abs(c.Mean - (Math.Round(c.Mean / period) * period)) <= cameraPeriodNanoseconds);
   }
 }

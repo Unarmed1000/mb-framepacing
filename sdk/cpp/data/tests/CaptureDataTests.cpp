@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-// captures.mbcd: header fields at their offsets, newer and foreign files refused, records read back, a partial last record ignored.
+// captures.mbcd: header fields at their offsets, newer and foreign files refused, records read back with their times in nanoseconds, a
+// partial last record ignored.
 #include <mb/framepacing/core/Rectangle.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/TickCount64.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/capture/CaptureDataHeader.hpp>
 #include <mb/framepacing/data/capture/CaptureDataReader.hpp>
@@ -77,12 +77,13 @@ namespace
     return bytes;
   }
 
+  //! A record whose host time is index times a 60 Hz period, in nanoseconds as the device time given.
   std::vector<uint8_t> RecordBytes(const int64_t index, const int64_t device, const uint8_t status, const std::vector<uint8_t>& main,
                                    const std::vector<uint8_t>& second)
   {
     std::vector<uint8_t> bytes(FD::CaptureDataFormat::RecordSize);
     Put(bytes, 0, static_cast<uint64_t>(index), 8);
-    Put(bytes, 8, static_cast<uint64_t>(index * 100), 8);
+    Put(bytes, 8, static_cast<uint64_t>(index * 16'666'667), 8);
     Put(bytes, 16, static_cast<uint64_t>(device), 8);
     Put(bytes, 24, index == 2 ? 3u : 0u, 4);
     bytes[28] = status;
@@ -136,7 +137,7 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
   }
   const std::vector<uint8_t> second(FD::CaptureDataFormat::SecondMarkerCapacity, 0x5Au);
   auto file = HeaderBytes();
-  for (const auto& record : {RecordBytes(0, 200, 1, main, second), RecordBytes(2, FD::CaptureDataFormat::UnknownTicks, 0, {}, {})})
+  for (const auto& record : {RecordBytes(0, 16'683'333, 1, main, second), RecordBytes(2, FD::CaptureDataFormat::UnknownNanoseconds, 0, {}, {})})
   {
     file.insert(file.end(), record.begin(), record.end());
   }
@@ -157,12 +158,14 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
   std::filesystem::remove(path);
 
   EXPECT_EQ(records[0].CaptureIndex, 0);
-  EXPECT_EQ(records[0].DeviceTime, FP::TickCount64(200));
+  EXPECT_EQ(records[0].HostTime, FP::NanosecondTickCount(0));
+  EXPECT_EQ(records[0].DeviceTime, FP::NanosecondTickCount(16'683'333));
   EXPECT_EQ(records[0].CaptureStatus, FD::CaptureDataStatus::Decoded);
   EXPECT_EQ(records[0].MainBytes, main);
   EXPECT_EQ(records[0].SecondBytes, second);
   EXPECT_EQ(records[1].SourceDrops, 3u);
-  EXPECT_FALSE(records[1].DeviceTime.has_value());
+  EXPECT_EQ(records[1].HostTime, FP::NanosecondTickCount(33'333'334));
+  EXPECT_FALSE(records[1].DeviceTime.has_value()) << "the device gave none";
   EXPECT_TRUE(records[1].MainBytes.empty());
 }
 
@@ -196,10 +199,11 @@ TEST(CaptureData, ARecordThatIsNotOneIsRefused)
 {
   const std::vector<uint8_t> main{'m', 'a', 'i', 'n'};
   const std::vector<uint8_t> second{'s', 'e', 'c'};
-  const auto good = RecordBytes(7, 200, 2, main, second);
+  const auto good = RecordBytes(7, 116'683'336, 2, main, second);
   const auto record = FD::CaptureDataRecord::Parse(good);
   EXPECT_EQ(record.CaptureIndex, 7);
-  EXPECT_EQ(record.HostTime, FP::TickCount64(700));
+  EXPECT_EQ(record.HostTime, FP::NanosecondTickCount(116'666'669));
+  EXPECT_EQ(record.DeviceTime, FP::NanosecondTickCount(116'683'336));
   EXPECT_EQ(record.CaptureStatus, FD::CaptureDataStatus::Torn);
   EXPECT_EQ(record.MainBytes, main);
   EXPECT_EQ(record.SecondBytes, second);
@@ -234,7 +238,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
   ASSERT_EQ(main.size(), 81u) << "the longest marker";
   ASSERT_EQ(sync.size(), 20u) << "the shortest";
 
-  const auto record = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 2, main, sync));
+  const auto record = FD::CaptureDataRecord::Parse(RecordBytes(5, 83'350'002, 2, main, sync));
   FM::Payload payload;
   FM::StartMetadata metadata;
   ASSERT_TRUE(record.TryDecodeMain(payload, &metadata));
@@ -253,11 +257,11 @@ TEST(CaptureData, ARecordsMarkersDecode)
   EXPECT_EQ(second.FrameIndex(), 11u);
 
   // A record without markers, and bytes that are no marker
-  const auto none = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 0, {}, {}));
+  const auto none = FD::CaptureDataRecord::Parse(RecordBytes(5, 83'350'002, 0, {}, {}));
   FM::Payload untouched{FM::MarkerKind::Frame, 99u, 98u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(97)};
   EXPECT_FALSE(none.TryDecodeMain(untouched));
   EXPECT_FALSE(none.TryDecodeSecond(untouched));
-  const auto garbage = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 1, std::vector<uint8_t>(57), {1, 2, 3}));
+  const auto garbage = FD::CaptureDataRecord::Parse(RecordBytes(5, 83'350'002, 1, std::vector<uint8_t>(57), {1, 2, 3}));
   EXPECT_FALSE(garbage.TryDecodeMain(untouched));
   EXPECT_FALSE(garbage.TryDecodeSecond(untouched));
 }
@@ -291,7 +295,7 @@ TEST(CaptureData, WhatIsNoCaptureDataFileIsRefused)
     EXPECT_EQ(reader.Header().Width, 960);
     EXPECT_EQ(FD::CaptureDataReader::FileName, "captures.mbcd");
   }
-  const auto record = RecordBytes(3, 200, 0, {}, {});
+  const auto record = RecordBytes(3, 50'016'668, 0, {}, {});
   file.insert(file.end(), record.begin(), record.end());
   write(file);
   {

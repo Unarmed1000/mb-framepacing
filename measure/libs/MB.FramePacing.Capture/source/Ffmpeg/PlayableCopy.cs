@@ -100,7 +100,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
       if (!line.StartsWith(Key, StringComparison.Ordinal))
         return null;
       return long.TryParse(line.AsSpan(Key.Length), NumberStyles.Integer, CultureInfo.InvariantCulture, out long microseconds) && microseconds >= 0
-        ? TimeSpan.FromTicks(microseconds * 10)
+        ? TimeSpan.FromMicroseconds(microseconds)
         : null;
     }
 

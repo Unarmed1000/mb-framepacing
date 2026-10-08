@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL camera captures: the refresh period measured with a line through every first-seen time (RefreshEstimator.RefinePeriodTicks),
+//* EXPERIMENTAL camera captures: the refresh period measured with a line through every first-seen time (RefreshEstimator.RefinePeriodNanoseconds),
 //* against the average of the intervals it starts from, on simulated sightings: a display's refreshes as a camera sees them, up to a
 //* millisecond late and then at its next frame, with frames held longer and frames skipped.
 //*
@@ -20,7 +20,7 @@ namespace MB.FramePacing.Capture.UnitTest
   [TestFixture]
   public class RefreshRefinementTests
   {
-    private const double Refresh = TimeSpan.TicksPerSecond / 60.0;
+    private const double Refresh = NanosecondTimeSpan.NanosecondsPerSecond / 60.0;
 
     /// <summary>
     /// When a camera first sees each frame of a 60 Hz display: at its first frame after the marker has changed, which takes up to a
@@ -28,36 +28,39 @@ namespace MB.FramePacing.Capture.UnitTest
     /// camera then sees a refresh after 15 to 18 ms, as the synthetic camera does. Every 37th frame is held a second refresh and every
     /// 53rd is never shown, as in the synthetic camera's scenario.
     /// </summary>
-    private static List<TickCount64> Sightings(int frames, double cameraFps, int seed, double refresh = Refresh)
+    // The estimator's periods and intervals are doubles of nanoseconds, and the times it is given are whole nanoseconds
+    private static NanosecondTickCount Time(long nanoseconds) => new NanosecondTickCount(nanoseconds);
+
+    private static List<NanosecondTickCount> Sightings(int frames, double cameraFps, int seed, double refresh = Refresh)
     {
-      double camera = TimeSpan.TicksPerSecond / cameraFps;
+      double camera = NanosecondTimeSpan.NanosecondsPerSecond / cameraFps;
       var random = new Random(seed);
       double phase = random.NextDouble() * camera;
-      var seen = new List<TickCount64>();
+      var seen = new List<NanosecondTickCount>();
       long shownOn = 0;
       for (int frame = 0; frame < frames; ++frame)
       {
         shownOn += frame % 37 == 36 ? 2 : 1;
         if (frame % 53 == 52)
           continue;
-        double changed = (shownOn * refresh) + phase + (random.NextDouble() * TimeSpan.TicksPerMillisecond);
+        double changed = (shownOn * refresh) + phase + (random.NextDouble() * NanosecondTimeSpan.NanosecondsPerMillisecond);
         double first = Math.Ceiling(changed / camera);
-        seen.Add(new TickCount64((long)Math.Round(first * camera)));
+        seen.Add(Time((long)Math.Round(first * camera)));
       }
       return seen;
     }
 
     /// <summary>The estimate the line starts from: the average of the intervals of one refresh.</summary>
-    private static double AverageInterval(List<TickCount64> seen, double cameraFps)
+    private static double AverageInterval(List<NanosecondTickCount> seen, double cameraFps)
     {
       var intervals = new List<double>();
       for (int i = 1; i < seen.Count; ++i)
-        intervals.Add((seen[i] - seen[i - 1]).Ticks);
-      return RefreshEstimator.EstimatePeriodTicks(intervals, TimeSpan.TicksPerSecond / cameraFps)
+        intervals.Add((seen[i] - seen[i - 1]).Nanoseconds);
+      return RefreshEstimator.EstimatePeriodNanoseconds(intervals, NanosecondTimeSpan.NanosecondsPerSecond / cameraFps)
         ?? throw new InvalidOperationException("no estimate");
     }
 
-    private static double Hz(double periodTicks) => TimeSpan.TicksPerSecond / periodTicks;
+    private static double Hz(double periodNanoseconds) => NanosecondTimeSpan.NanosecondsPerSecond / periodNanoseconds;
 
     /// <summary>
     /// Two seconds of frames, as the calibration reads, in many runs: the root mean square error of the average of the intervals and of
@@ -73,7 +76,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var seen = Sightings(120, cameraFps, seed);
         double average = AverageInterval(seen, cameraFps);
-        double line = RefreshEstimator.RefinePeriodTicks(seen, average);
+        double line = RefreshEstimator.RefinePeriodNanoseconds(seen, average);
         averageSquares += Math.Pow(Hz(average) - 60, 2);
         lineSquares += Math.Pow(Hz(line) - 60, 2);
         worst = Math.Max(worst, Math.Abs(Hz(line) - 60));
@@ -122,7 +125,7 @@ namespace MB.FramePacing.Capture.UnitTest
     {
       var seen = Sightings(3600, 1000, 7);
 
-      double line = RefreshEstimator.RefinePeriodTicks(seen, AverageInterval(seen, 1000));
+      double line = RefreshEstimator.RefinePeriodNanoseconds(seen, AverageInterval(seen, 1000));
 
       Assert.That(Hz(line), Is.EqualTo(60).Within(0.0001));
     }
@@ -136,8 +139,8 @@ namespace MB.FramePacing.Capture.UnitTest
       double average = AverageInterval(seen, 1000);
 
       Assert.That(
-        RefreshEstimator.RefinePeriodTicks(seen, average * factor),
-        Is.EqualTo(RefreshEstimator.RefinePeriodTicks(seen, average)).Within(1e-6)
+        RefreshEstimator.RefinePeriodNanoseconds(seen, average * factor),
+        Is.EqualTo(RefreshEstimator.RefinePeriodNanoseconds(seen, average)).Within(1e-4)
       );
     }
 
@@ -148,7 +151,7 @@ namespace MB.FramePacing.Capture.UnitTest
       double average = AverageInterval(seen, 1000);
       var shuffled = seen.Concat(seen.Take(10)).Reverse().ToList();
 
-      Assert.That(RefreshEstimator.RefinePeriodTicks(shuffled, average), Is.EqualTo(RefreshEstimator.RefinePeriodTicks(seen, average)));
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(shuffled, average), Is.EqualTo(RefreshEstimator.RefinePeriodNanoseconds(seen, average)));
     }
 
     [Test]
@@ -157,8 +160,8 @@ namespace MB.FramePacing.Capture.UnitTest
       var seen = Sightings(RefreshEstimator.MinIntervals, 1000, 1);
 
       Assert.That(seen, Has.Count.EqualTo(RefreshEstimator.MinIntervals));
-      Assert.That(RefreshEstimator.RefinePeriodTicks(seen, 166000), Is.EqualTo(166000));
-      Assert.That(RefreshEstimator.RefinePeriodTicks(Array.Empty<TickCount64>(), 166000), Is.EqualTo(166000));
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(seen, 16_600_000), Is.EqualTo(16_600_000));
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(Array.Empty<NanosecondTickCount>(), 16_600_000), Is.EqualTo(16_600_000));
     }
 
     /// <summary>Times on another grid than the period's (a display at another rate than the estimate) are not taken for a refinement of it.</summary>
@@ -167,7 +170,7 @@ namespace MB.FramePacing.Capture.UnitTest
     {
       var seen = Sightings(120, 1000, 2, refresh: Refresh * 1.03);
 
-      Assert.That(RefreshEstimator.RefinePeriodTicks(seen, Refresh), Is.EqualTo(Refresh));
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(seen, Refresh), Is.EqualTo(Refresh));
     }
 
     [Test]
@@ -175,17 +178,17 @@ namespace MB.FramePacing.Capture.UnitTest
     {
       var seen = Sightings(120, 1000, 2);
 
-      Assert.That(RefreshEstimator.RefinePeriodTicks(seen, 0), Is.Zero);
-      Assert.That(RefreshEstimator.RefinePeriodTicks(seen, double.NaN), Is.NaN);
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(seen, 0), Is.Zero);
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(seen, double.NaN), Is.NaN);
     }
 
     /// <summary>Every sighting at one time has no line through it.</summary>
     [Test]
     public void TimesTooCloseForARefresh_KeepThePeriod()
     {
-      var seen = Enumerable.Range(0, 20).Select(i => new TickCount64(1000 + i)).ToList();
+      var seen = Enumerable.Range(0, 20).Select(i => Time(100_000 + i)).ToList();
 
-      Assert.That(RefreshEstimator.RefinePeriodTicks(seen, Refresh), Is.EqualTo(Refresh));
+      Assert.That(RefreshEstimator.RefinePeriodNanoseconds(seen, Refresh), Is.EqualTo(Refresh));
     }
   }
 }

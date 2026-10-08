@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """captures.mbcd (doc/capture-data-format.md): a 256 byte header, then one 256 byte record per capture, little endian. The header describes
-the frames the markers were read from and where the markers are; a record holds a capture's times and its markers' bytes as read."""
+the frames the markers were read from and where the markers are; a record holds a capture's times, in whole nanoseconds, and its markers'
+bytes as read. A file from before the nanoseconds has ticks of 100 ns in the same bytes under the same format version: it reads without an
+error, and a hundred times too small."""
 
 import struct
 from collections.abc import Iterator
@@ -21,7 +23,7 @@ FORMAT_VERSION = 1
 HEADER_SIZE = 256
 RECORD_SIZE = 256
 MAX_MARKERS = 4
-UNKNOWN_TICKS = -(2**63)
+UNKNOWN_NS = -(2**63)
 """A device timestamp the capture source did not give (i64 minimum)."""
 
 MAIN_CAPACITY = 112
@@ -116,20 +118,20 @@ class CaptureDataHeader:
 @dataclass(frozen=True)
 class CaptureDataRecord:
     """One capture: the source's frame counter (gaps are captures the recorder dropped), when it arrived on the host's steady clock and the
-    device's timestamp (100 ns ticks since the capture started; UNKNOWN_TICKS when the device gave none), how many frames the source
+    device's timestamp (nanoseconds since the capture started; UNKNOWN_NS when the device gave none), how many frames the source
     reported dropping since the previous record, the status, and the main and second markers' bytes as read (None when not read)."""
 
     capture_index: int
-    host_ticks: int
-    device_ticks: int
+    host_ns: int
+    device_ns: int
     source_drops: int
     capture_status: CaptureDataStatus
     main_bytes: bytes | None
     second_bytes: bytes | None
 
     @property
-    def has_device_ticks(self) -> bool:
-        return self.device_ticks != UNKNOWN_TICKS
+    def has_device_ns(self) -> bool:
+        return self.device_ns != UNKNOWN_NS
 
     def try_decode_main(self) -> "tuple[Payload, StartMetadata | None] | None":
         """The main marker's payload (and a start marker's metadata), decoded with mb_framepacing.marker; None when there is none or it is not valid."""
@@ -155,8 +157,8 @@ class CaptureDataRecord:
         second_offset = main_offset + MAIN_CAPACITY
         return CaptureDataRecord(
             capture_index=capture_index,
-            host_ticks=host,
-            device_ticks=device,
+            host_ns=host,
+            device_ns=device,
             source_drops=source_drops,
             capture_status=CaptureDataStatus(status),
             main_bytes=bytes(data[main_offset : main_offset + main_length]) if main_length > 0 else None,

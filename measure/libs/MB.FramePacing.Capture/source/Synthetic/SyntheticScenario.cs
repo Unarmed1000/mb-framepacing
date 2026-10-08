@@ -4,6 +4,10 @@
 //* A deterministic model of "a game presenting frames on vsync, captured by a capture card". It produces the ground truth the analyzer must
 //* recover: which application frame is on screen at every capture instant.
 //*
+//* The scenario is worked out in whole nanoseconds: the refresh period is its rate's period rounded to the nearest nanosecond, every display
+//* time a whole number of those periods, and a capture's time, a length given in seconds and a torn frame's share of a refresh are rounded
+//* to the nearest nanosecond.
+//*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
@@ -37,20 +41,22 @@ namespace MB.FramePacing.Capture.Synthetic
 
     public long CaptureCount { get; }
 
-    public TimeSpan RefreshInterval => new TimeSpan((long)Math.Round(TimeSpan.TicksPerSecond / Options.RefreshHz));
+    /// <summary>The display's refresh period, rounded to the nearest nanosecond.</summary>
+    public NanosecondTimeSpan RefreshInterval =>
+      new NanosecondTimeSpan((long)Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / Options.RefreshHz));
 
     /// <summary>Where the synthetic pacer's steady clock starts.</summary>
-    public static readonly TickCount64 PacerEpoch = TickCount64.FromSeconds(1);
+    public static readonly NanosecondTickCount PacerEpoch = NanosecondTickCount.FromSeconds(1);
 
-    /// <summary>Capture instant of capture index <paramref name="captureIndex"/>.</summary>
-    public TickCount64 CaptureTime(long captureIndex) =>
-      new TickCount64((long)Math.Round((captureIndex + Options.CapturePhase) * TimeSpan.TicksPerSecond / Options.CaptureFps));
+    /// <summary>Capture instant of capture index <paramref name="captureIndex"/>, rounded to the nearest nanosecond.</summary>
+    public NanosecondTickCount CaptureTime(long captureIndex) =>
+      new NanosecondTickCount((long)Math.Round((captureIndex + Options.CapturePhase) * NanosecondTimeSpan.NanosecondsPerSecond / Options.CaptureFps));
 
     /// <summary>Index into <see cref="PresentedFrames"/> of the frame on screen at a capture, -1 if nothing is shown yet.</summary>
     public int PresentedIndexAt(long captureIndex) => PresentedIndexAtTime(CaptureTime(captureIndex));
 
     /// <summary>Index into <see cref="PresentedFrames"/> of the latest frame presented at or before <paramref name="time"/>, -1 if none.</summary>
-    public int PresentedIndexAtTime(TickCount64 time)
+    public int PresentedIndexAtTime(NanosecondTickCount time)
     {
       int lo = 0;
       int hi = m_presented.Count - 1;
@@ -74,11 +80,11 @@ namespace MB.FramePacing.Capture.Synthetic
       var o = Options;
       var refresh = RefreshInterval;
       // Display times, on the capture's clock
-      var leadInEnd = new TickCount64(Seconds(o.LeadInSeconds));
+      var leadInEnd = new NanosecondTickCount(Seconds(o.LeadInSeconds));
       var startEnd = leadInEnd + Seconds(o.StartMarkerSeconds);
       var runEnd = startEnd + Seconds(o.RunSeconds);
       var endEnd = runEnd + Seconds(o.EndMarkerSeconds);
-      var totalEnd = new TickCount64(Seconds(o.TotalSeconds));
+      var totalEnd = new NanosecondTickCount(Seconds(o.TotalSeconds));
 
       long slot = 0;
       // The pacer's plan: every frame one vsync after the previous one. A stall shows a frame later than planned, a skipped frame (replaced
@@ -86,8 +92,8 @@ namespace MB.FramePacing.Capture.Synthetic
       long planned = 0;
       bool replan = false;
       ulong frameIndex = o.FirstFrameIndex;
-      var animationTime = TimeSpan.Zero;
-      TickCount64? previousCpuEnd = null;
+      var animationTime = NanosecondTimeSpan.Zero;
+      NanosecondTickCount? previousCpuEnd = null;
       for (long k = 0; ; ++k, ++frameIndex, animationTime += refresh)
       {
         if (k > 0)
@@ -102,27 +108,27 @@ namespace MB.FramePacing.Capture.Synthetic
           replan = false;
         }
         // The CPU starts each frame one refresh before the vsync it is rendered for, but not before it has finished the previous frame (a
-        // skipped frame can leave two frames planned for one vsync), and is busy for 60 % of a refresh; a stalled frame is busy that many
-        // refreshes longer, so it is shown late and the next frame starts late
-        var intendedDisplayTime = PacerEpoch + new TimeSpan(intendedSlot * refresh.Ticks);
+        // skipped frame can leave two frames planned for one vsync), and is busy for 60 % of a refresh (cut to the nanosecond); a stalled
+        // frame is busy that many refreshes longer, so it is shown late and the next frame starts late
+        var intendedDisplayTime = PacerEpoch + new NanosecondTimeSpan(intendedSlot * refresh.Nanoseconds);
         var cpuStartTime = intendedDisplayTime - refresh;
         if (previousCpuEnd is { } busyUntil && busyUntil > cpuStartTime)
           cpuStartTime = busyUntil;
-        var cpuBusy = new TimeSpan(refresh.Ticks * 6 / 10);
+        var cpuBusy = new NanosecondTimeSpan(refresh.Nanoseconds * 6 / 10);
         if (k > 0 && o.StallEvery > 0 && k % o.StallEvery == 0)
         {
           slot += o.StallSlots;
           planned += o.StallSlots;
-          cpuBusy += new TimeSpan(o.StallSlots * refresh.Ticks);
+          cpuBusy += new NanosecondTimeSpan(o.StallSlots * refresh.Nanoseconds);
         }
         previousCpuEnd = cpuStartTime + cpuBusy;
-        var displayTime = new TickCount64(slot * refresh.Ticks);
+        var displayTime = new NanosecondTickCount(slot * refresh.Nanoseconds);
         if (displayTime >= totalEnd)
           break;
 
         // Vsync off: the frame is presented part way through the scanout, so the scanout shows the old frame above and the new one below
         if (o.TearEvery > 0 && k > 0 && k % o.TearEvery == 0)
-          displayTime += new TimeSpan((long)Math.Round(o.TearFraction * refresh.Ticks));
+          displayTime += new NanosecondTimeSpan((long)Math.Round(o.TearFraction * refresh.Nanoseconds));
 
         // Skipped frames are rendered (frame index and animation advance) but never shown: the next frame takes this vsync.
         if (o.SkipEvery > 0 && k > 0 && k % o.SkipEvery == 0)
@@ -148,18 +154,19 @@ namespace MB.FramePacing.Capture.Synthetic
             frameIndex,
             MB.FramePacing.Marker.MarkerFlags.NoFlags,
             animationTime,
-            PreferredFrameTime: TimeSpan32.FromTimeSpan(refresh),
-            TargetFrameTime: TimeSpan32.FromTimeSpan(refresh),
+            PreferredFrameTime: new NanosecondTimeDuration(refresh),
+            TargetFrameTime: new NanosecondTimeDuration(refresh),
             IntendedDisplayTime: intendedDisplayTime,
             CpuStartTime: cpuStartTime,
-            CpuBusy: TimeSpan32.FromTimeSpan(cpuBusy)
+            CpuBusy: new NanosecondTimeDuration(cpuBusy)
           )
           : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, animationTime);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTime));
       }
     }
 
-    /// <summary>Rounded to the nearest tick, as the scenario always was.</summary>
-    private static TimeSpan Seconds(double seconds) => new TimeSpan((long)Math.Round(seconds * TimeSpan.TicksPerSecond));
+    /// <summary>A length in seconds, rounded to the nearest nanosecond.</summary>
+    private static NanosecondTimeSpan Seconds(double seconds) =>
+      new NanosecondTimeSpan((long)Math.Round(seconds * NanosecondTimeSpan.NanosecondsPerSecond));
   }
 }

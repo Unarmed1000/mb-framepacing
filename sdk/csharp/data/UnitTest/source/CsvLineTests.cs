@@ -22,7 +22,7 @@ namespace MB.FramePacing.Data.UnitTest
   public class CsvLineTests
   {
     private const string FrameHeader =
-      "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags,olderFrames";
+      "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags,olderFrames";
 
     [TestCase("")]
     [TestCase("a")]
@@ -127,7 +127,10 @@ namespace MB.FramePacing.Data.UnitTest
 
       Assert.That(rows.Select(r => r.FrameIndex), Is.EqualTo(new[] { 7UL, 8UL }));
       Assert.That(rows[0].Flags, Is.EqualTo(new[] { "Late" }));
-      Assert.That(rows[0].OlderFrames, Is.EqualTo(new[] { new OlderFrame(41, new TickCount64(5)), new OlderFrame(40, new TickCount64(-5)) }));
+      Assert.That(
+        rows[0].OlderFrames,
+        Is.EqualTo(new[] { new OlderFrame(41, new NanosecondTickCount(5)), new OlderFrame(40, new NanosecondTickCount(-5)) })
+      );
       Assert.That(rows[1].Flags, Is.Empty);
       Assert.That(rows[1].OlderFrames, Is.Empty);
     }
@@ -142,7 +145,7 @@ namespace MB.FramePacing.Data.UnitTest
       var rows = FramesCsv.Read(new StringReader(csv));
 
       Assert.That(rows, Has.Count.EqualTo(1));
-      Assert.That((rows[0].FrameIndex, rows[0].Drift), Is.EqualTo((7UL, new TimeSpan(-5))));
+      Assert.That((rows[0].FrameIndex, rows[0].Drift), Is.EqualTo((7UL, new NanosecondTimeSpan(-5))));
       Assert.That(rows[0].Flags, Is.EqualTo(new[] { "Late", "StaticAfter" }));
     }
 
@@ -155,30 +158,30 @@ namespace MB.FramePacing.Data.UnitTest
         .Select(i => new FrameRow(
           0,
           (ulong)i,
-          new TimeSpan(i * 166_667L),
+          new NanosecondTimeSpan(i * 16_666_700L),
           i,
-          new TickCount64(i * 166_667L),
-          new TimeSpan(166_667),
+          new NanosecondTickCount(i * 16_666_700L),
+          new NanosecondTimeSpan(16_666_700),
           1,
           0,
-          new TimeSpan(166_667),
-          new TimeSpan(166_667),
-          TimeSpan.Zero,
-          TimeSpan.Zero,
+          new NanosecondTimeSpan(16_666_700),
+          new NanosecondTimeSpan(16_666_700),
+          NanosecondTimeSpan.Zero,
+          NanosecondTimeSpan.Zero,
           i % 97 == 0 ? new[] { "Late" } : Array.Empty<string>(),
-          new TickCount64(i * 166_667L),
-          new TimeSpan32(166_667),
-          new TimeSpan(166_667),
-          new TimeSpan32(166_667),
-          new TimeSpan(166_667),
-          TimeSpan.Zero,
-          TimeSpan.Zero,
-          TimeSpan.Zero,
-          new TickCount64(i * 166_667L),
-          new TickCount64(i * 166_667L),
-          new TimeSpan32(50_000),
-          new TimeSpan(166_667),
-          new TimeSpan(100_000),
+          new NanosecondTickCount(i * 16_666_700L),
+          NanosecondTimeDuration.FromNanoseconds(16_666_700),
+          new NanosecondTimeSpan(16_666_700),
+          NanosecondTimeDuration.FromNanoseconds(16_666_700),
+          new NanosecondTimeSpan(16_666_700),
+          NanosecondTimeSpan.Zero,
+          NanosecondTimeSpan.Zero,
+          NanosecondTimeSpan.Zero,
+          new NanosecondTickCount(i * 16_666_700L),
+          new NanosecondTickCount(i * 16_666_700L),
+          NanosecondTimeDuration.FromNanoseconds(5_000_000),
+          new NanosecondTimeSpan(16_666_700),
+          new NanosecondTimeSpan(10_000_000),
           Array.Empty<OlderFrame>()
         ))
         .ToList();

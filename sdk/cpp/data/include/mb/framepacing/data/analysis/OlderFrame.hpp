@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Data
@@ -14,7 +14,7 @@ namespace MB::FramePacing::Data
     //! The older frame index the capture showed.
     uint64_t FrameIndex{0};
     //! When the capture was taken, on the capture's clock (as FrameRow::FirstSeenTime).
-    TickCount64 CaptureTime;
+    NanosecondTickCount CaptureTime;
   };
 }
 

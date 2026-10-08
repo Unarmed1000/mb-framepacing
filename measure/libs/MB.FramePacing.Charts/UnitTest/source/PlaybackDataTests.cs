@@ -78,12 +78,12 @@ namespace MB.FramePacing.Charts.UnitTest
       var indices = Enumerable.Range(section.Start, section.End - section.Start).ToList();
       var columns = PlaybackFrameColumns.Read(root);
 
-      Assert.That(columns["t"], Is.EqualTo(indices.Select(i => (long?)(all[i].FirstSeenTime - origin).Ticks)));
+      Assert.That(columns["t"], Is.EqualTo(indices.Select(i => (long?)(all[i].FirstSeenTime - origin).Nanoseconds)));
       Assert.That(columns["index"], Is.EqualTo(indices.Select(i => (long?)all[i].FrameIndex)));
       Assert.That(columns["capture"], Is.EqualTo(indices.Select(i => (long?)all[i].FirstCaptureIndex)));
       // A frame's step is the next frame's display time step: a section's last frame has it too when the run goes on
-      Assert.That(columns["step"], Is.EqualTo(indices.Select(i => i + 1 < all.Count ? all[i + 1].DisplayDelta?.Ticks : null)));
-      Assert.That(columns["error"], Is.EqualTo(indices.Select(i => all[i].AnimationError?.Ticks)));
+      Assert.That(columns["step"], Is.EqualTo(indices.Select(i => i + 1 < all.Count ? all[i + 1].DisplayDelta?.Nanoseconds : null)));
+      Assert.That(columns["error"], Is.EqualTo(indices.Select(i => all[i].AnimationError?.Nanoseconds)));
       Assert.That(columns["hold"], Is.EqualTo(indices.Select(i => (long?)(long)section.Data.HoldKinds[i])));
       Assert.That(columns["flags"], Is.EqualTo(indices.Select(i => (long?)(long)all[i].Flags)));
     }

@@ -35,25 +35,26 @@ namespace MB.FramePacing.Benchmarks
     public void Setup()
     {
       int captures = RefreshHz * 60 * Minutes;
-      long refresh = TimeSpan.TicksPerSecond / RefreshHz;
+      // The refresh period is a second over the rate, cut to the nanosecond
+      long refresh = NanosecondTimeSpan.NanosecondsPerSecond / RefreshHz;
       m_rows = new List<CaptureRow>(captures);
       void Add(MarkerPayload payload, StartMetadata? start = null) =>
-        m_rows.Add(new CaptureRow(m_rows.Count, new TickCount64(m_rows.Count * refresh), CaptureStatus.Decoded, payload, start));
+        m_rows.Add(new CaptureRow(m_rows.Count, new NanosecondTickCount(m_rows.Count * refresh), CaptureStatus.Decoded, payload, start));
 
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, RunId, 0, NoFlags, TimeSpan.Zero), StartMetadata.FromTag(0, "benchmark"));
+        Add(new MarkerPayload(MarkerKind.SequenceStart, RunId, 0, NoFlags, NanosecondTimeSpan.Zero), StartMetadata.FromTag(0, "benchmark"));
       ulong frameIndex = 1;
       while (m_rows.Count < captures - 3)
       {
         // The frame's animation time is the time it is first captured at; every 97th stays for two captures
-        var payload = new MarkerPayload(MarkerKind.Frame, RunId, frameIndex, NoFlags, new TimeSpan(m_rows.Count * refresh));
+        var payload = new MarkerPayload(MarkerKind.Frame, RunId, frameIndex, NoFlags, new NanosecondTimeSpan(m_rows.Count * refresh));
         Add(payload);
         if (frameIndex % 97 == 0)
           Add(payload);
         ++frameIndex;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, RunId, frameIndex, NoFlags, TimeSpan.Zero));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, RunId, frameIndex, NoFlags, NanosecondTimeSpan.Zero));
     }
 
     [Benchmark]

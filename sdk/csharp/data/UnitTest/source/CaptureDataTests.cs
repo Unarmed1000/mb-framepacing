@@ -67,9 +67,9 @@ namespace MB.FramePacing.Data.UnitTest
       Array.Fill(second, (byte)0x5A);
       var records = new[]
       {
-        new CaptureDataRecord(0, new TickCount64(100), new TickCount64(200), 0, CaptureDataStatus.Decoded, main, second),
-        new CaptureDataRecord(2, new TickCount64(300), null, 2u, CaptureDataStatus.Undecodable, null, null),
-        new CaptureDataRecord(3, new TickCount64(400), new TickCount64(500), 0, CaptureDataStatus.Torn, null, second),
+        new CaptureDataRecord(0, new NanosecondTickCount(100), new NanosecondTickCount(200), 0, CaptureDataStatus.Decoded, main, second),
+        new CaptureDataRecord(2, new NanosecondTickCount(300), null, 2u, CaptureDataStatus.Undecodable, null, null),
+        new CaptureDataRecord(3, new NanosecondTickCount(400), new NanosecondTickCount(500), 0, CaptureDataStatus.Torn, null, second),
       };
       string path = Path.Combine(Path.GetTempPath(), $"mb-framepacing-data-{Guid.NewGuid():N}.mbcd");
       try
@@ -176,7 +176,7 @@ namespace MB.FramePacing.Data.UnitTest
       byte[] With(int offset, byte value)
       {
         var bytes = new byte[CaptureDataRecord.Size];
-        new CaptureDataRecord(7, new TickCount64(100), null, 0, CaptureDataStatus.Decoded, null, null).Write(bytes);
+        new CaptureDataRecord(7, new NanosecondTickCount(100), null, 0, CaptureDataStatus.Decoded, null, null).Write(bytes);
         bytes[offset] = value;
         return bytes;
       }
@@ -231,7 +231,7 @@ namespace MB.FramePacing.Data.UnitTest
       // The recorder writes the capture part when the frame arrives and the decoded part when the decoder is done
       var parts = new byte[CaptureDataRecord.Size];
       Array.Fill(parts, (byte)0xEE);
-      CaptureDataRecord.WriteCapture(parts, 5, new TickCount64(100), new TickCount64(-200), 3);
+      CaptureDataRecord.WriteCapture(parts, 5, new NanosecondTickCount(100), new NanosecondTickCount(-200), 3);
       CaptureDataRecord.WriteDecoded(parts, CaptureDataStatus.Torn, main.AsSpan(0, mainLength), sync.AsSpan(0, syncLength));
       var record = CaptureDataRecord.Read(parts);
       var whole = new byte[CaptureDataRecord.Size];
@@ -240,11 +240,11 @@ namespace MB.FramePacing.Data.UnitTest
       // Each part leaves the other as it is, in either order
       var reversed = new byte[CaptureDataRecord.Size];
       CaptureDataRecord.WriteDecoded(reversed, CaptureDataStatus.Torn, main.AsSpan(0, mainLength), sync.AsSpan(0, syncLength));
-      CaptureDataRecord.WriteCapture(reversed, 5, new TickCount64(100), new TickCount64(-200), 3);
+      CaptureDataRecord.WriteCapture(reversed, 5, new NanosecondTickCount(100), new NanosecondTickCount(-200), 3);
       Assert.That(reversed, Is.EqualTo(whole), "the capture part written last");
       Assert.That(
         (record.CaptureIndex, record.HostTime, record.DeviceTime, record.SourceDrops, record.CaptureStatus),
-        Is.EqualTo((5L, new TickCount64(100), (TickCount64?)new TickCount64(-200), 3u, CaptureDataStatus.Torn))
+        Is.EqualTo((5L, new NanosecondTickCount(100), (NanosecondTickCount?)new NanosecondTickCount(-200), 3u, CaptureDataStatus.Torn))
       );
 
       Assert.That(record.TryDecodeMain(out var payload, out _), Is.True);
@@ -275,8 +275,8 @@ namespace MB.FramePacing.Data.UnitTest
         for (int i = 0; i < records.Length; ++i)
           records[i] = new CaptureDataRecord(
             i * 2,
-            new TickCount64(i * 100L),
-            i % 3 == 0 ? null : new TickCount64(i),
+            new NanosecondTickCount(i * 100L),
+            i % 3 == 0 ? null : new NanosecondTickCount(i),
             (uint)(i % 7),
             CaptureDataStatus.Undecodable,
             null,

@@ -259,7 +259,7 @@ namespace MB.FramePacing.Gui.ViewModels
       if (SelectedRun?.Chart is not { } chart)
         return;
       double whole = RunSection.Whole(chart).ToSeconds;
-      double shortest = Math.Min(whole, Math.Max(0.01, 4.0 * chart.CapturePeriod.Ticks / TimeSpan.TicksPerSecond));
+      double shortest = Math.Min(whole, Math.Max(0.01, 4.0 * chart.CapturePeriod.Nanoseconds / NanosecondTimeSpan.NanosecondsPerSecond));
       double length = Math.Clamp(toSeconds - fromSeconds, shortest, whole);
       double from = Math.Clamp(fromSeconds, 0, whole - length);
       Request(chart, from <= 0 && length >= whole ? null : (from, from + length));

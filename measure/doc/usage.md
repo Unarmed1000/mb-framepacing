@@ -123,17 +123,18 @@ rate works. A camera filming the screen needs a calibrated camera rig and `--cam
   (`--camera`) films faster; its refresh rate is calculated from the frames.
 - Record **lossless or at a high bit rate** (FFV1, lossless H.264/HEVC, PNG images): heavy compression blurs the marker.
 - Images are sorted by name with numbers compared as numbers (`frame2` before `frame10`).
-- A timestamp file is CSV: a header line that names the columns, `fileName,timeTicks`, then one line per image in the order the
-  frames were taken. A time is a whole number of 100 ns ticks, as every time in the tools' files (a millisecond is 10 000 ticks):
+- A timestamp file is CSV: a header line that names the columns, `fileName,timeNs`, then one line per image in the order the
+  frames were taken. A time is a whole number of nanoseconds, as every time in the tools' files (a millisecond is 1 000 000 ns):
 
   ```text
-  fileName,timeTicks
+  fileName,timeNs
   frame0001.png,0
-  frame0002.png,166667
+  frame0002.png,16666667
   ```
 
   The columns are found by their names, so their order does not matter and other columns are ignored; `#` comments and empty lines
-  are skipped. A file without the header, or with a time that is not a whole number, is refused with the line it is on.
+  are skipped. A file without the header, with a `timeTicks` or `timeMs` column in place of `timeNs`, or with a time that is not a
+  whole number, is refused with the line it is on.
 
 - **Only the markers are read.** An import first finds the markers in the recording (it reads on until the first one, so the
   recording may start before the application does), then has ffmpeg deliver only their regions: the main marker's and, when the
@@ -172,6 +173,8 @@ capture-20260924-153000/          (import-... for imports)
 
 `summary.json` and the CSV files are specified in [the analysis output format](../../sdk/doc/analysis-output-format.md), `captures.mbcd` in
 [the capture data format](../../sdk/doc/capture-data-format.md); the SDK's [data modules](../../sdk/README.md#the-data-module) read them in your own code.
+Every time in them is a whole number of nanoseconds: a recording, a capture folder or an analysis output made before the tools
+counted in nanoseconds is not valid and must be made again.
 
 ### The playback page
 

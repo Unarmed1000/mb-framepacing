@@ -3,7 +3,7 @@
 //* ----------------
 //* summary.json (doc/analysis-output-format.md): the capture, the analysis settings and every run's counts, statistics, pacing and histograms.
 //* Its formatVersion covers the CSV files it names. Written indented, camelCase, without null values; a time setting is a whole number of
-//* ticks ("...Ticks").
+//* nanoseconds ("...Ns").
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -26,11 +26,11 @@ namespace MB.FramePacing.Data
   /// <param name="Capture">The capture's capture.json, as it was when analysed.</param>
   /// <param name="FrameSize">The stored frame size, "WIDTHxHEIGHT".</param>
   /// <param name="TimeSource">The clock the capture times come from: "Device" or "Host".</param>
-  /// <param name="CapturePeriod">The capture period (capturePeriodTicks). Required.</param>
+  /// <param name="CapturePeriod">The capture period (capturePeriodNs). Required.</param>
   /// <param name="MeasurementResolution">
-  /// How precisely a display time is known (measurementResolutionTicks); a file without it, or with 0, reads as the capture period.
+  /// How precisely a display time is known (measurementResolutionNs); a file without it, or with 0, reads as the capture period.
   /// </param>
-  /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (errorThresholdTicks). Required.</param>
+  /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (errorThresholdNs). Required.</param>
   public sealed record AnalysisSummary(
     int FormatVersion,
     string? ToolVersion,
@@ -41,9 +41,9 @@ namespace MB.FramePacing.Data
     JsonElement? Capture,
     string? FrameSize,
     string? TimeSource,
-    [property: JsonPropertyName("capturePeriodTicks"), JsonConverter(typeof(TicksJsonConverter)), JsonRequired] TimeSpan CapturePeriod,
-    [property: JsonPropertyName("measurementResolutionTicks"), JsonConverter(typeof(TicksJsonConverter))] TimeSpan MeasurementResolution,
-    [property: JsonPropertyName("errorThresholdTicks"), JsonConverter(typeof(TicksJsonConverter)), JsonRequired] TimeSpan ErrorThreshold,
+    [property: JsonPropertyName("capturePeriodNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired] NanosecondTimeSpan CapturePeriod,
+    [property: JsonPropertyName("measurementResolutionNs"), JsonConverter(typeof(NanosecondsJsonConverter))] NanosecondTimeSpan MeasurementResolution,
+    [property: JsonPropertyName("errorThresholdNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired] NanosecondTimeSpan ErrorThreshold,
     IReadOnlyList<SummaryMarker> Markers,
     IReadOnlyList<string> Warnings,
     IReadOnlyList<SummaryRun> Runs
@@ -72,7 +72,7 @@ namespace MB.FramePacing.Data
 
     /// <summary>
     /// Parse summary.json. Throws <see cref="InvalidDataException"/> for a newer format version and for text that is not a summary: not
-    /// JSON, a required field missing (capturePeriodTicks, errorThresholdTicks, and a run's runId, hasStartMarker, hasEndMarker, framesFile,
+    /// JSON, a required field missing (capturePeriodNs, errorThresholdNs, and a run's runId, hasStartMarker, hasEndMarker, framesFile,
     /// counts and statistics; doc/analysis-output-format.md marks them), or a value that is not of its field's type or outside its range.
     /// </summary>
     public static AnalysisSummary Parse(string json)
@@ -99,7 +99,7 @@ namespace MB.FramePacing.Data
       return summary with
       {
         FormatVersion = version,
-        MeasurementResolution = summary.MeasurementResolution == TimeSpan.Zero ? summary.CapturePeriod : summary.MeasurementResolution,
+        MeasurementResolution = summary.MeasurementResolution == NanosecondTimeSpan.Zero ? summary.CapturePeriod : summary.MeasurementResolution,
         Markers = summary.Markers ?? Array.Empty<SummaryMarker>(),
         Warnings = summary.Warnings ?? Array.Empty<string>(),
         Runs = summary.Runs ?? Array.Empty<SummaryRun>(),

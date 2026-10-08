@@ -18,7 +18,7 @@ namespace MB.FramePacing.Analysis.UnitTest
   [TestFixture]
   public class TimelineAnalyzerTests
   {
-    private const long Ms = TimeSpan.TicksPerMillisecond;
+    private const long Ms = NanosecondTimeSpan.NanosecondsPerMillisecond;
     private const long Period = 4 * Ms; // 250 fps capture
 
     /// <summary>Builds rows at a fixed capture period. Each call appends <paramref name="captures"/> captures showing one marker.</summary>
@@ -35,8 +35,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         uint runId = 1,
         MarkerKind kind = MarkerKind.Frame,
         StartMetadata? start = null,
-        uint targetFrameTicks = 0,
-        uint preferredFrameTicks = 0,
+        long targetFrameNanoseconds = 0,
+        long preferredFrameNanoseconds = 0,
         MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.NoFlags
       )
       {
@@ -45,12 +45,12 @@ namespace MB.FramePacing.Analysis.UnitTest
           runId,
           frameIndex,
           flags,
-          new TimeSpan(animationMs * Ms),
-          PreferredFrameTime: new TimeSpan32(preferredFrameTicks),
-          TargetFrameTime: new TimeSpan32(targetFrameTicks)
+          new NanosecondTimeSpan(animationMs * Ms),
+          PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(preferredFrameNanoseconds),
+          TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(targetFrameNanoseconds)
         );
         for (int i = 0; i < captures; ++i)
-          Rows.Add(new CaptureRow(Next, new TickCount64(Next * Period), CaptureStatus.Decoded, payload, start));
+          Rows.Add(new CaptureRow(Next, new NanosecondTickCount(Next * Period), CaptureStatus.Decoded, payload, start));
         return this;
       }
 
@@ -69,7 +69,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       public RowBuilder Status(CaptureStatus status, int captures = 1)
       {
         for (int i = 0; i < captures; ++i)
-          Rows.Add(new CaptureRow(Next, status == CaptureStatus.NotRecorded ? default : new TickCount64(Next * Period), status, default));
+          Rows.Add(new CaptureRow(Next, status == CaptureStatus.NotRecorded ? default : new NanosecondTickCount(Next * Period), status, default));
         return this;
       }
     }
@@ -85,15 +85,15 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       var result = TimelineAnalyzer.Analyze(rows.Rows);
 
-      Assert.That(result.CapturePeriod.Ticks, Is.EqualTo(Period));
+      Assert.That(result.CapturePeriod.Nanoseconds, Is.EqualTo(Period));
       var run = result.Runs.Single();
       Assert.That(run.SequenceId, Is.EqualTo("test"));
       Assert.That(run.HasStartMarker && run.HasEndMarker);
       Assert.That(run.Counts.PresentedFrames, Is.EqualTo(20));
-      Assert.That(run.Frames.Skip(1).All(f => f.AnimationError?.Ticks == 0), Is.True);
+      Assert.That(run.Frames.Skip(1).All(f => f.AnimationError?.Nanoseconds == 0), Is.True);
       Assert.That(run.Statistics.DisplayDeltaMs.Mean, Is.EqualTo(16).Within(1e-9));
       Assert.That(run.Statistics.FramesWithAnimationError, Is.Zero);
-      Assert.That(run.Frames[5].OnScreen.Ticks, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[5].OnScreen.Nanoseconds, Is.EqualTo(16 * Ms));
     }
 
     [Test]
@@ -106,11 +106,11 @@ namespace MB.FramePacing.Analysis.UnitTest
       var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
 
       // Frame 3 stays on screen for 32 ms, so frame 4 appears 32 ms after frame 3 but its animation advanced only 16 ms
-      Assert.That(frames[2].OnScreen.Ticks, Is.EqualTo(32 * Ms));
-      Assert.That(frames[3].DisplayDelta?.Ticks, Is.EqualTo(32 * Ms));
-      Assert.That(frames[3].AnimationError?.Ticks, Is.EqualTo(-16 * Ms));
-      Assert.That(frames[3].Drift.Ticks, Is.EqualTo(-16 * Ms));
-      Assert.That(frames[4].AnimationError?.Ticks, Is.EqualTo(0));
+      Assert.That(frames[2].OnScreen.Nanoseconds, Is.EqualTo(32 * Ms));
+      Assert.That(frames[3].DisplayDelta?.Nanoseconds, Is.EqualTo(32 * Ms));
+      Assert.That(frames[3].AnimationError?.Nanoseconds, Is.EqualTo(-16 * Ms));
+      Assert.That(frames[3].Drift.Nanoseconds, Is.EqualTo(-16 * Ms));
+      Assert.That(frames[4].AnimationError?.Nanoseconds, Is.EqualTo(0));
     }
 
     /// <summary>
@@ -133,9 +133,9 @@ namespace MB.FramePacing.Analysis.UnitTest
         frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStep)),
         Is.EqualTo(new[] { false, false, false, true, true, false, false })
       );
-      Assert.That(frames[3].AnimationError?.Ticks, Is.Null, "the step into the frame after the gap");
-      Assert.That(frames[4].AnimationError?.Ticks, Is.Null, "the step out of it");
-      Assert.That(frames[3].DisplayDelta?.Ticks, Is.EqualTo(20 * Ms), "what the capture saw is still stored");
+      Assert.That(frames[3].AnimationError?.Nanoseconds, Is.Null, "the step into the frame after the gap");
+      Assert.That(frames[4].AnimationError?.Nanoseconds, Is.Null, "the step out of it");
+      Assert.That(frames[3].DisplayDelta?.Nanoseconds, Is.EqualTo(20 * Ms), "what the capture saw is still stored");
       Assert.That(
         frames.Where(f => f.Flags.HasFlag(PresentedFrameFlags.UncertainStep)).Select(f => f.Flags.HasFlag(PresentedFrameFlags.Late)),
         Is.All.False
@@ -178,7 +178,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
 
       Assert.That(run.Frames.Select(f => f.FrameIndex), Is.EqualTo(new ulong[] { 1, 3, 4, 5 }));
-      Assert.That(run.Frames[1].OlderFrames, Is.EqualTo(new[] { new OlderFrameCapture(new TickCount64(older * Period), 2) }));
+      Assert.That(run.Frames[1].OlderFrames, Is.EqualTo(new[] { new OlderFrameCapture(new NanosecondTickCount(older * Period), 2) }));
       Assert.That(run.Frames.Where((_, i) => i != 1).Select(f => f.OlderFrames), Is.All.Null);
       Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(1));
     }
@@ -213,15 +213,15 @@ namespace MB.FramePacing.Analysis.UnitTest
         frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.StaticAfter)),
         Is.EqualTo(new[] { false, false, false, true, false, false })
       );
-      Assert.That(frames[3].AnimationError?.Ticks, Is.EqualTo(0), "the step to the static frame: judged");
-      Assert.That(frames[4].AnimationError?.Ticks, Is.Null, "the step from it");
-      Assert.That(frames[4].DisplayDelta?.Ticks, Is.EqualTo(1000 * Ms), "the static frame's time on screen");
+      Assert.That(frames[3].AnimationError?.Nanoseconds, Is.EqualTo(0), "the step to the static frame: judged");
+      Assert.That(frames[4].AnimationError?.Nanoseconds, Is.Null, "the step from it");
+      Assert.That(frames[4].DisplayDelta?.Nanoseconds, Is.EqualTo(1000 * Ms), "the static frame's time on screen");
       Assert.That(
         frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.StaticBefore)),
         Is.EqualTo(new[] { false, false, false, false, true, false })
       );
-      Assert.That(frames[5].AnimationError?.Ticks, Is.EqualTo(0));
-      Assert.That(frames.Select(f => f.Drift.Ticks), Is.All.EqualTo(0L), "the drift adds up only the judged steps");
+      Assert.That(frames[5].AnimationError?.Nanoseconds, Is.EqualTo(0));
+      Assert.That(frames.Select(f => f.Drift.Nanoseconds), Is.All.EqualTo(0L), "the drift adds up only the judged steps");
       Assert.That(run.Statistics.FramesWithAnimationError, Is.Zero);
       // The frame rates: the four 16 ms steps (the last animated frame's time on screen, before the static one, included)
       Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(1));
@@ -251,7 +251,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var held = assume ? PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed : PresentedFrameFlags.None;
       Assert.That(frames[2].Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed), Is.EqualTo(held), "frame 3 held the rest");
       Assert.That(frames[3].Flags.HasFlag(PresentedFrameFlags.StaticBefore), Is.EqualTo(assume));
-      Assert.That(frames[3].AnimationError?.Ticks, Is.EqualTo(assume ? null : (32 - 120) * Ms), "the rest: assumed static, or judged");
+      Assert.That(frames[3].AnimationError?.Nanoseconds, Is.EqualTo(assume ? null : (32 - 120) * Ms), "the rest: assumed static, or judged");
       Assert.That(run.Statistics.ExcludedStaticFrames, Is.EqualTo(assume ? 1 : 0));
       Assert.That(frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.StaticAssumed)), Is.EqualTo(assume ? 1 : 0));
     }
@@ -270,20 +270,22 @@ namespace MB.FramePacing.Analysis.UnitTest
       bool assume = true
     )
     {
-      const uint Target = 160_000;
+      const long Target = 16 * Ms;
       var rows = new RowBuilder().Start(1);
-      rows.Show(1, 0, 4, targetFrameTicks: Target);
+      rows.Show(1, 0, 4, targetFrameNanoseconds: Target);
       if (staticElsewhere)
-        rows.Show(2, 16, 30, targetFrameTicks: Target, flags: MB.FramePacing.Marker.MarkerFlags.StaticAfter);
+        rows.Show(2, 16, 30, targetFrameNanoseconds: Target, flags: MB.FramePacing.Marker.MarkerFlags.StaticAfter);
       else
-        rows.Show(2, 16, 4, targetFrameTicks: Target);
-      rows.Show(3, 32, 4, targetFrameTicks: Target).Show(4, 48, 4, targetFrameTicks: Target).Show(5, 64, 4, targetFrameTicks: Target);
-      rows.Show(6, 80, holdCaptures, targetFrameTicks: Target);
+        rows.Show(2, 16, 4, targetFrameNanoseconds: Target);
+      rows.Show(3, 32, 4, targetFrameNanoseconds: Target)
+        .Show(4, 48, 4, targetFrameNanoseconds: Target)
+        .Show(5, 64, 4, targetFrameNanoseconds: Target);
+      rows.Show(6, 80, holdCaptures, targetFrameNanoseconds: Target);
       if (captureGap)
         rows.Status(CaptureStatus.Undecodable, 2);
       ulong next = dropped ? 8u : 7u;
-      uint aim = onDemand ? uint.MaxValue : Target;
-      rows.Show(next, 80 + animationStepMs, 4, targetFrameTicks: aim).Show(next + 1, 96 + animationStepMs, 4, targetFrameTicks: aim);
+      long aim = onDemand ? MarkerPayload.OnDemandFrameTime.Nanoseconds : Target;
+      rows.Show(next, 80 + animationStepMs, 4, targetFrameNanoseconds: aim).Show(next + 1, 96 + animationStepMs, 4, targetFrameNanoseconds: aim);
       rows.End(1);
       var frames = TimelineAnalyzer.Analyze(rows.Rows, new TimelineOptions { AssumeStatic = assume }).Runs.Single().Frames;
       return (frames[5], frames[6]);
@@ -318,7 +320,7 @@ namespace MB.FramePacing.Analysis.UnitTest
           Is.EqualTo(PresentedFrameFlags.None),
           why
         );
-        Assert.That(frames.After.AnimationError?.Ticks, Is.EqualTo(errorMs * Ms), why);
+        Assert.That(frames.After.AnimationError?.Nanoseconds, Is.EqualTo(errorMs * Ms), why);
       }
       Judged(LostFlag(staticElsewhere: false), 32 - 120, "the run does not use the static flags");
       Judged(LostFlag(animationStepMs: 120), 0, "the animation clock kept running: a stall");
@@ -334,19 +336,19 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void OnDemand_IsNeverLateByTheTargetRule()
     {
-      uint OnDemand = MarkerPayload.OnDemandFrameTime.Ticks;
+      long OnDemand = MarkerPayload.OnDemandFrameTime.Nanoseconds;
       var rows = new RowBuilder().Start(1);
-      rows.Show(1, 0, 4, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
-      rows.Show(2, 16, 500, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
-      rows.Show(3, 2016, 4, targetFrameTicks: OnDemand, preferredFrameTicks: OnDemand);
+      rows.Show(1, 0, 4, targetFrameNanoseconds: OnDemand, preferredFrameNanoseconds: OnDemand);
+      rows.Show(2, 16, 500, targetFrameNanoseconds: OnDemand, preferredFrameNanoseconds: OnDemand);
+      rows.Show(3, 2016, 4, targetFrameNanoseconds: OnDemand, preferredFrameNanoseconds: OnDemand);
       rows.End(1);
 
       var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
 
       Assert.That(frames.Any(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.False);
-      Assert.That(frames.Select(f => f.TargetFrameTime?.Ticks), Is.All.Null);
-      Assert.That(frames.Select(f => f.PreferredFrameTime?.Ticks), Is.All.Null);
-      Assert.That(frames.Select(f => f.MarkerPreferredFrameTime.Ticks), Is.All.EqualTo(OnDemand));
+      Assert.That(frames.Select(f => f.TargetFrameTime?.Nanoseconds), Is.All.Null);
+      Assert.That(frames.Select(f => f.PreferredFrameTime?.Nanoseconds), Is.All.Null);
+      Assert.That(frames.Select(f => f.MarkerPreferredFrameTime.Nanoseconds), Is.All.EqualTo(OnDemand));
     }
 
     /// <summary>
@@ -357,16 +359,16 @@ namespace MB.FramePacing.Analysis.UnitTest
     public void PreferredFrameTime_IsTheMarkersElseOneRefresh()
     {
       var rows = new RowBuilder().Start(1);
-      rows.Show(1, 0, 8, targetFrameTicks: 32 * (uint)Ms, preferredFrameTicks: 16 * (uint)Ms)
-        .Show(2, 32, 8, targetFrameTicks: 32 * (uint)Ms, preferredFrameTicks: 16 * (uint)Ms);
+      rows.Show(1, 0, 8, targetFrameNanoseconds: 32 * Ms, preferredFrameNanoseconds: 16 * Ms)
+        .Show(2, 32, 8, targetFrameNanoseconds: 32 * Ms, preferredFrameNanoseconds: 16 * Ms);
       rows.Show(3, 64, 4).Show(4, 80, 4);
       rows.End(1);
 
       var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
 
-      Assert.That(frames[1].PreferredFrameTime?.Ticks, Is.EqualTo(16 * Ms), "the marker's: the pacer runs slower than the application wants");
-      Assert.That(frames[1].TargetFrameTime?.Ticks, Is.EqualTo(32 * Ms));
-      Assert.That(frames[3].PreferredFrameTime?.Ticks, Is.EqualTo(Period), "without one: one refresh");
+      Assert.That(frames[1].PreferredFrameTime?.Nanoseconds, Is.EqualTo(16 * Ms), "the marker's: the pacer runs slower than the application wants");
+      Assert.That(frames[1].TargetFrameTime?.Nanoseconds, Is.EqualTo(32 * Ms));
+      Assert.That(frames[3].PreferredFrameTime?.Nanoseconds, Is.EqualTo(Period), "without one: one refresh");
     }
 
     [Test]
@@ -381,7 +383,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(1));
       Assert.That(run.Frames[2].SkippedBefore, Is.EqualTo(1UL));
       Assert.That(run.Frames[2].Flags.HasFlag(PresentedFrameFlags.SkippedBefore));
-      Assert.That(run.Frames[2].AnimationError?.Ticks, Is.EqualTo(16 * Ms));
+      Assert.That(run.Frames[2].AnimationError?.Nanoseconds, Is.EqualTo(16 * Ms));
     }
 
     [Test]
@@ -471,8 +473,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       Assert.That(run.Counts.Segments, Is.EqualTo(2));
       Assert.That(run.Frames[2].Segment, Is.EqualTo(1));
-      Assert.That(run.Frames[2].AnimationError?.Ticks, Is.Null, "the first frame of a segment has no predecessor");
-      Assert.That(run.Frames[3].AnimationError?.Ticks, Is.EqualTo(0));
+      Assert.That(run.Frames[2].AnimationError?.Nanoseconds, Is.Null, "the first frame of a segment has no predecessor");
+      Assert.That(run.Frames[3].AnimationError?.Nanoseconds, Is.EqualTo(0));
       Assert.That(run.Warnings, Has.Some.Contains("jumped back"));
     }
 

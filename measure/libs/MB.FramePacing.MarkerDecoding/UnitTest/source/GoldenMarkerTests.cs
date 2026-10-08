@@ -106,13 +106,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var frameLock = new MarkerLock(new PixelRect(32, 32, MarkerRenderer.MarkerSizePx(6), MarkerRenderer.MarkerSizePx(6)), 6);
       foreach (var golden in TestData.LoadGoldenMarkers().Where(g => g.ModuleSizePx == 6))
       {
-        // The tools count in ticks. One golden marker's intended display time is the first nanosecond a marker holds, which is inside a
-        // tick that starts before it: the tools can not draw that tick, so they draw the first one whose nanoseconds a marker holds
-        var payload = golden.Payload with
-        {
-          IntendedDisplayTime = FirstDrawable(golden.Payload.IntendedDisplayTime),
-          CpuStartTime = FirstDrawable(golden.Payload.CpuStartTime),
-        };
+        var payload = golden.Payload;
         var image = new GrayImage(400, 400, 128);
         MarkerRenderer.Render(image, payload, 32, 32, 6, metadata: golden.Start);
         var result = new MarkerDecoder().DecodeLocked(image, frameLock);
@@ -120,9 +114,6 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         Assert.That(result.Start, Is.EqualTo(golden.Start), golden.ToString());
       }
     }
-
-    private static TickCount64 FirstDrawable(TickCount64 time) =>
-      time.Ticks < NanosecondTickCount.MinTicks ? new TickCount64(NanosecondTickCount.MinTicks) : time;
 
     /// <summary>Locked decoding must read every payload, including the rare module patterns that defeat the finder pattern detector.</summary>
     [TestCase(2)]
@@ -142,8 +133,8 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
           (uint)random.Next(),
           (ulong)random.NextInt64(),
           MB.FramePacing.Marker.MarkerFlags.NoFlags,
-          // Any time a marker's nanoseconds hold (a TimeSpan reaches a hundred times as far)
-          new TimeSpan(random.NextInt64(long.MaxValue / NanosecondTimeSpan.NanosecondsPerTick))
+          // Any time, to the nanosecond
+          new NanosecondTimeSpan(random.NextInt64())
         );
         var image = new GrayImage(size + 80, size + 80, 128);
         MarkerRenderer.Render(image, payload, 32, 32, moduleSize);
@@ -159,7 +150,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
     {
       var frameLock = new MarkerLock(new PixelRect(32, 32, MarkerRenderer.MarkerSizePx(6), MarkerRenderer.MarkerSizePx(6)), 6);
       var start = new StartMetadata(639_257_616_000_000_000, new MB.FramePacing.Marker.SequenceId(0xFEDC_BA98_7654_3210, 0x0123_4567_89AB_CDEF));
-      var payload = new MarkerPayload(MarkerKind.SequenceStart, 7, 5, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(6));
+      var payload = new MarkerPayload(MarkerKind.SequenceStart, 7, 5, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(600));
       var image = new GrayImage(400, 400, 128);
       MarkerRenderer.Render(image, payload, 32, 32, 6, metadata: start);
 

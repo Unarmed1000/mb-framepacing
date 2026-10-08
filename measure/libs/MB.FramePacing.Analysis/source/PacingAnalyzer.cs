@@ -33,23 +33,30 @@ namespace MB.FramePacing.Analysis
     /// <item>Otherwise a frame is late when it is shown at least one refresh later than its target frame time after the previous frame.</item>
     /// </list>
     /// </summary>
-    public static RunPacing Analyze(List<PresentedFrame> frames, TimeSpan refresh, bool refreshCalculated, double? targetFps, TimeSpan errorThreshold)
+    public static RunPacing Analyze(
+      List<PresentedFrame> frames,
+      NanosecondTimeSpan refresh,
+      bool refreshCalculated,
+      double? targetFps,
+      NanosecondTimeSpan errorThreshold
+    )
     {
-      var half = new TimeSpan(refresh.Ticks / 2);
+      // Half a refresh, cut to the nanosecond
+      var half = new NanosecondTimeSpan(refresh.Nanoseconds / 2);
       bool schedule = frames.Count(f => f.IntendedDisplayTime != default) >= Math.Max(2, frames.Count / 2);
       var source =
         schedule ? PacingSource.Schedule
-        : frames.Any(f => f.MarkerTargetFrameTime != TimeSpan32.Zero) ? PacingSource.TargetFrameTime
-        : frames.Any(f => f.MarkerPreferredFrameTime != TimeSpan32.Zero) ? PacingSource.PreferredFrameTime
+        : frames.Any(f => f.MarkerTargetFrameTime != NanosecondTimeDuration.Zero) ? PacingSource.TargetFrameTime
+        : frames.Any(f => f.MarkerPreferredFrameTime != NanosecondTimeDuration.Zero) ? PacingSource.PreferredFrameTime
         : targetFps is > 0 ? PacingSource.GivenTarget
         : PacingSource.NativeRefresh;
       var givenTarget = targetFps is { } fps && fps > 0 ? FrameTimeRounding.WholeRefreshesAtRate(fps, refresh) : refresh;
 
       // How far after its intended time each frame appeared, relative to the run's on-time frames (the pacer and capture clocks differ)
-      TimeSpan? scheduleOffset = null;
+      NanosecondTimeSpan? scheduleOffset = null;
       if (schedule)
       {
-        var offsets = new TickList(frames.Count);
+        var offsets = new NanosecondList(frames.Count);
         foreach (var frame in frames)
         {
           if (frame.IntendedDisplayTime != default)
@@ -61,15 +68,15 @@ namespace MB.FramePacing.Analysis
 
       // Frames the target dropped before each frame: without a schedule, the frame after them is due their frame times later too
       var dropped = DroppedFrames.Before(frames);
-      var pacingErrors = new TickList();
-      var predictionErrors = new TickList();
+      var pacingErrors = new NanosecondList();
+      var predictionErrors = new NanosecondList();
       long late = 0;
       long counted = 0;
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
         var previous = i > 0 && frames[i - 1].Segment == frame.Segment ? frames[i - 1] : null;
-        TimeSpan? intendedStep =
+        NanosecondTimeSpan? intendedStep =
           schedule && previous != null && frame.IntendedDisplayTime != default && previous.IntendedDisplayTime != default
             ? frame.IntendedDisplayTime - previous.IntendedDisplayTime
             : null;
@@ -80,31 +87,31 @@ namespace MB.FramePacing.Analysis
         var markerTarget = frame.MarkerTargetFrameTime;
         var markerWants = frame.MarkerPreferredFrameTime;
         var onDemandTime = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
-        bool onDemand = markerTarget == onDemandTime || (markerTarget == TimeSpan32.Zero && markerWants == onDemandTime);
-        TimeSpan? target =
+        bool onDemand = markerTarget == onDemandTime || (markerTarget == NanosecondTimeDuration.Zero && markerWants == onDemandTime);
+        NanosecondTimeSpan? target =
           intendedStep is { } step ? WholeRefreshes(step, refresh)
           : onDemand ? null
-          : new TimeSpan(
+          : new NanosecondTimeSpan(
             (1 + dropped[i])
               * (
-                markerTarget != TimeSpan32.Zero ? WholeRefreshes(markerTarget.ToTimeSpan(), refresh)
-                : markerWants != TimeSpan32.Zero ? WholeRefreshes(markerWants.ToTimeSpan(), refresh)
+                markerTarget != NanosecondTimeDuration.Zero ? WholeRefreshes(markerTarget, refresh)
+                : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
                 : givenTarget
-              ).Ticks
+              ).Nanoseconds
           );
         // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
         // to the tools, else one refresh
-        TimeSpan? preferred =
+        NanosecondTimeSpan? preferred =
           markerWants == onDemandTime ? null
-          : markerWants != TimeSpan32.Zero ? WholeRefreshes(markerWants.ToTimeSpan(), refresh)
+          : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
           : givenTarget;
         // A static step (nothing animated while the frame before was on screen) has no prediction error; its pacing error still counts
         bool animates = (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
 
         // A step a capture gap made uncertain is not judged: no pacing or prediction error, no late verdict
         bool uncertain = (frame.Flags & PresentedFrameFlags.UncertainStep) != 0;
-        TimeSpan? pacingError = null;
-        TimeSpan? predictionError = null;
+        NanosecondTimeSpan? pacingError = null;
+        NanosecondTimeSpan? predictionError = null;
         if (!uncertain && intendedStep is { } intended && frame.DisplayDelta is { } displayStep && frame.AnimationDelta is { } animationStep)
         {
           pacingError = displayStep - intended;
@@ -115,7 +122,8 @@ namespace MB.FramePacing.Analysis
             predictionErrors.Add(predictionError.Value);
           }
         }
-        TimeSpan? lateness = scheduleOffset is { } offset && frame.IntendedDisplayTime != default ? CaptureMinusPacer(frame) - offset : null;
+        NanosecondTimeSpan? lateness =
+          scheduleOffset is { } offset && frame.IntendedDisplayTime != default ? CaptureMinusPacer(frame) - offset : null;
 
         bool isLate = false;
         if (!uncertain && frame.DisplayDelta is { } display)
@@ -137,7 +145,7 @@ namespace MB.FramePacing.Analysis
       }
 
       var (uneven, even) = Split(frames, half, errorThreshold);
-      var targets = new TickList(frames.Count);
+      var targets = new NanosecondList(frames.Count);
       foreach (var frame in frames)
       {
         if (frame.DisplayDelta.HasValue && frame.TargetFrameTime is { } frameTarget)
@@ -151,7 +159,7 @@ namespace MB.FramePacing.Analysis
         refreshCalculated,
         // The median, as a target a frame had: the lower of the two middle ones for an even number of frames
         targets.Count > 0
-          ? new TimeSpan(targets.Values[(targets.Count - 1) / 2])
+          ? new NanosecondTimeSpan(targets.Values[(targets.Count - 1) / 2])
           : givenTarget,
         source,
         late,
@@ -162,8 +170,8 @@ namespace MB.FramePacing.Analysis
         Verdict(uneven, even)
       )
       {
-        PacingErrorMs = pacingErrors.Count > 0 ? Statistics.FromSortedTicks(pacingErrors.Values) : null,
-        PredictionErrorMs = predictionErrors.Count > 0 ? Statistics.FromSortedTicks(predictionErrors.Values) : null,
+        PacingErrorMs = pacingErrors.Count > 0 ? Statistics.FromSortedNanoseconds(pacingErrors.Values) : null,
+        PredictionErrorMs = predictionErrors.Count > 0 ? Statistics.FromSortedNanoseconds(predictionErrors.Values) : null,
       };
     }
 
@@ -171,28 +179,29 @@ namespace MB.FramePacing.Analysis
     /// A frame's first-seen time minus its intended display time. The first is on the capture's clock, the second on the pacer's, so this
     /// is the two clocks' offset plus how late the frame was: only the difference between two frames' values says something.
     /// </summary>
-    private static TimeSpan CaptureMinusPacer(PresentedFrame frame) => frame.FirstSeenTime - frame.IntendedDisplayTime;
+    private static NanosecondTimeSpan CaptureMinusPacer(PresentedFrame frame) => frame.FirstSeenTime - frame.IntendedDisplayTime;
 
     /// <summary>
     /// The earliest offset (capture time minus intended time, sorted) that at least <see cref="OnTimeShare"/> of the frames share within half a
     /// refresh: the run's on-time frames.
     /// </summary>
-    private static TimeSpan OnTimeOffset(ReadOnlySpan<long> sortedTicks, TimeSpan half)
+    private static NanosecondTimeSpan OnTimeOffset(ReadOnlySpan<long> sortedNanoseconds, NanosecondTimeSpan half)
     {
-      int needed = Math.Max(1, (int)Math.Ceiling(sortedTicks.Length * OnTimeShare));
+      int needed = Math.Max(1, (int)Math.Ceiling(sortedNanoseconds.Length * OnTimeShare));
       int end = 0;
-      for (int start = 0; start < sortedTicks.Length; ++start)
+      for (int start = 0; start < sortedNanoseconds.Length; ++start)
       {
         end = Math.Max(end, start);
-        while (end < sortedTicks.Length && sortedTicks[end] - sortedTicks[start] < half.Ticks)
+        while (end < sortedNanoseconds.Length && sortedNanoseconds[end] - sortedNanoseconds[start] < half.Nanoseconds)
           ++end;
         if (end - start >= needed)
-          return new TimeSpan(sortedTicks[start]);
+          return new NanosecondTimeSpan(sortedNanoseconds[start]);
       }
-      return new TimeSpan(sortedTicks[0]);
+      return new NanosecondTimeSpan(sortedNanoseconds[0]);
     }
 
-    private static TimeSpan WholeRefreshes(TimeSpan frameTime, TimeSpan refresh) => FrameTimeRounding.WholeRefreshes(frameTime, refresh);
+    private static NanosecondTimeSpan WholeRefreshes(NanosecondTimeSpan frameTime, NanosecondTimeSpan refresh) =>
+      FrameTimeRounding.WholeRefreshes(frameTime, refresh);
 
     /// <summary>
     /// Which cause each frame with an error counts for: bad pacing (uneven) or delta time jitter (even).
@@ -205,7 +214,7 @@ namespace MB.FramePacing.Analysis
     /// </item>
     /// </list>
     /// </summary>
-    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, TimeSpan half, TimeSpan errorThreshold)
+    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, NanosecondTimeSpan half, NanosecondTimeSpan errorThreshold)
     {
       bool OffTarget(PresentedFrame f) =>
         f.Flags.HasFlag(PresentedFrameFlags.Torn)

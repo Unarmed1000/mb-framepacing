@@ -40,7 +40,7 @@ namespace MB::FramePacing::Data
     {
       CaptureCsvRow capture;
       capture.CaptureIndex = Csv::ParseInteger<int64_t>(table.Cell(row, "captureIndex"));
-      capture.CaptureTime = Csv::OptionalTickCount64(table.Cell(row, "captureTicks"));
+      capture.CaptureTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "captureNs"));
       capture.CaptureStatus = std::string(table.Cell(row, "status"));
       if (const std::string_view kind = table.Cell(row, "kind"); !kind.empty())
       {
@@ -48,13 +48,13 @@ namespace MB::FramePacing::Data
       }
       capture.RunId = Csv::OptionalInteger<uint32_t>(table.Cell(row, "runId"));
       capture.FrameIndex = Csv::OptionalInteger<uint64_t>(table.Cell(row, "frameIndex"));
-      capture.AnimationTime = Csv::OptionalTimeSpan(table.Cell(row, "animationTicks"));
+      capture.AnimationTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "animationNs"));
       capture.SourceDropsBefore = Csv::OptionalInteger<int64_t>(table.Cell(row, "sourceDropsBefore")).value_or(0);
       capture.MissedBefore = Csv::OptionalInteger<int64_t>(table.Cell(row, "missedBefore")).value_or(0);
       capture.SyncRunId = Csv::OptionalInteger<uint32_t>(table.Cell(row, "syncRunId"));
       capture.SyncFrameIndex = Csv::OptionalInteger<uint64_t>(table.Cell(row, "syncFrameIndex"));
-      capture.HostTime = Csv::OptionalTickCount64(table.Cell(row, "hostTicks"));
-      capture.DeviceTime = Csv::OptionalTickCount64(table.Cell(row, "deviceTicks"));
+      capture.HostTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "hostNs"));
+      capture.DeviceTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "deviceNs"));
       capture.Payload = FromHex(table.Cell(row, "payloadHex"));
       return capture;
     }

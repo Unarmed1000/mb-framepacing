@@ -23,7 +23,7 @@ namespace MB.FramePacing.Capture.UnitTest
       7,
       1000,
       MB.FramePacing.Marker.MarkerFlags.NoFlags,
-      new TimeSpan(166_667)
+      new NanosecondTimeSpan(16_666_667)
     );
 
     private static MarkerDecodeResult Read(byte[] bytes)

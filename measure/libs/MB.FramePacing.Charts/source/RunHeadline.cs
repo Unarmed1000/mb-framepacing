@@ -187,10 +187,7 @@ namespace MB.FramePacing.Charts
       var refreshes = frames
         .Where(f => f.DisplayDelta.HasValue && (Known(f.MarkerTargetFrameTime) || f.TargetFrameTime.HasValue))
         .Select(f =>
-          (int)
-            Math.Round(
-              (Known(f.MarkerTargetFrameTime) ? f.MarkerTargetFrameTime.ToTimeSpan() : f.TargetFrameTime!.Value).TotalMilliseconds / refreshMs
-            )
+          (int)Math.Round((Known(f.MarkerTargetFrameTime) ? f.MarkerTargetFrameTime.Value : f.TargetFrameTime!.Value).TotalMilliseconds / refreshMs)
         )
         .Distinct()
         .Order()
@@ -210,7 +207,7 @@ namespace MB.FramePacing.Charts
     {
       var preferredFps = frames
         .Where(f => Known(f.MarkerPreferredFrameTime))
-        .Select(f => Math.Round(TimeSpan.TicksPerSecond / (double)f.MarkerPreferredFrameTime.Ticks, 1))
+        .Select(f => Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / (double)f.MarkerPreferredFrameTime.Nanoseconds, 1))
         .Distinct()
         .Order()
         .ToArray();
@@ -229,8 +226,8 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>The marker says a frame time: neither unknown (0) nor on demand.</summary>
-    private static bool Known(TimeSpan32 frameTime) =>
-      frameTime != TimeSpan32.Zero && frameTime != MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
+    private static bool Known(NanosecondTimeDuration frameTime) =>
+      frameTime != NanosecondTimeDuration.Zero && frameTime != MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
 
     private static string Refreshes(int count) => count == 1 ? "1 refresh" : $"{count} refreshes";
 

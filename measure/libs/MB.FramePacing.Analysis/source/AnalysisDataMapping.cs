@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* Between the data library's analysis output (MB.FramePacing.Data: summary.json and the CSVs, the file format) and the analysis's types, in
-//* both directions: the analysis writes through it, and reports read an analysis back through it to the tick.
+//* both directions: the analysis writes through it, and reports read an analysis back through it to the nanosecond.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -101,19 +101,22 @@ namespace MB.FramePacing.Analysis
     }
 
     // A marker's value of 0 means unknown: the output leaves it out
-    private static TickCount64? Known(TickCount64 time) => time != default ? time : null;
+    private static NanosecondTickCount? Known(NanosecondTickCount time) => time != default ? time : null;
 
-    private static TimeSpan32? Known(TimeSpan32 span) => span != TimeSpan32.Zero ? span : null;
+    private static NanosecondTimeDuration? Known(NanosecondTimeDuration duration) => duration != NanosecondTimeDuration.Zero ? duration : null;
 
-    /// <summary>A presented frame read back. Output written before lastSeenTicks existed: the last capture its time on screen allows.</summary>
-    public static PresentedFrame ToFrame(this FrameRow row, TimeSpan capturePeriod) =>
+    /// <summary>
+    /// A presented frame read back. A row without a last-seen time (lastSeenNs): the last capture its time on screen allows, the time on
+    /// screen less one capture period after it was first seen, and never before that.
+    /// </summary>
+    public static PresentedFrame ToFrame(this FrameRow row, NanosecondTimeSpan capturePeriod) =>
       new PresentedFrame(
         row.Segment,
         row.FrameIndex,
         row.AnimationTime,
         row.FirstCaptureIndex,
         row.FirstSeenTime,
-        row.LastSeenTime ?? row.FirstSeenTime + new TimeSpan(Math.Max(0, row.OnScreen.Ticks - capturePeriod.Ticks)),
+        row.LastSeenTime ?? row.FirstSeenTime + new NanosecondTimeDuration(row.OnScreen - capturePeriod),
         row.Captures,
         row.OnScreen,
         row.SkippedBefore,

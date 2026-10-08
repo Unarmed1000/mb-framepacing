@@ -98,7 +98,8 @@ const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertic
 DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
 ```
 
-`frameIndex` counts rendered frames, `animationTime` is the time the frame was animated for (an `MB::FramePacing::TimeSpan`).
+`frameIndex` counts rendered frames, `animationTime` is the time the frame was animated for (an `MB::FramePacing::NanosecondTimeSpan`:
+every time in the marker is a whole number of nanoseconds).
 
 - **C++:** see **[Integrating the marker](sdk/doc/integrating.md)** for adding the library with CMake (a release archive, git,
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
@@ -251,7 +252,7 @@ recording of a capture card would be.
 
 A capture card captures at the display's refresh rate, so every capture is one refresh. The analysis relies on that: the refresh
 period is the capture period, and display time steps are whole refreshes, measured exactly. The animation error (the marker's animation
-time step against the display time step) is then exact too, to the 100 ns tick. The report's animation error panel marks every
+time step against the display time step) is then exact too, to the nanosecond. The report's animation error panel marks every
 whole refresh an error reaches with a dashed amber line (±16.7 ms at 60 Hz, ±20 ms at 50 Hz): an error that size is a frame shown a
 whole refresh early or late. The display rate you expect (`--display-hz`, **Display refresh rate**) is checked against the
 capture's rate.
@@ -386,7 +387,7 @@ mb-framepacing import recording.mkv --display-hz 60 --target-fps 30 --name "menu
 # Other recordings
 mb-framepacing import clip.mp4 --analyze                    # any video file (its own timestamps are used)
 mb-framepacing import frames/ --fps 1000 --analyze          # a folder of images at a known frame rate
-mb-framepacing import frames/ --timestamps times.csv        # ... or with each image's time (fileName,timeTicks)
+mb-framepacing import frames/ --timestamps times.csv        # ... or with each image's time (fileName,timeNs)
 
 # The results
 mb-framepacing analyze <capture folder>                     # analyse again

@@ -1,14 +1,12 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* One line of captures.csv (doc/analysis-output-format.md): one capture, as the analysis read it. Times are 100 ns ticks; null is an empty
+//* One line of captures.csv (doc/analysis-output-format.md): one capture, as the analysis read it. Times are whole nanoseconds; null is an empty
 //* cell.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
 //****************************************************************************************************************************************************
-
-using System;
 
 namespace MB.FramePacing.Data
 {
@@ -24,18 +22,18 @@ namespace MB.FramePacing.Data
   /// <param name="SyncFrameIndex">The sync marker's frame index, when it was read.</param>
   public sealed record CaptureCsvRow(
     long CaptureIndex,
-    TickCount64? CaptureTime,
+    NanosecondTickCount? CaptureTime,
     string CaptureStatus,
     string? Kind,
     uint? RunId,
     ulong? FrameIndex,
-    TimeSpan? AnimationTime,
+    NanosecondTimeSpan? AnimationTime,
     long SourceDropsBefore,
     long MissedBefore,
     uint? SyncRunId,
     ulong? SyncFrameIndex,
-    TickCount64? HostTime,
-    TickCount64? DeviceTime,
+    NanosecondTickCount? HostTime,
+    NanosecondTickCount? DeviceTime,
     byte[]? Payload
   );
 }

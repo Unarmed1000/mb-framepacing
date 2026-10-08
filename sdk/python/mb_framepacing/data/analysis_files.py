@@ -8,8 +8,8 @@ from pathlib import Path
 DIRECTORY_NAME = "analysis"
 SUMMARY_FILE_NAME = "summary.json"
 CAPTURES_FILE_NAME = "captures.csv"
-TICKS_PER_MILLISECOND = 10_000
-"""The files hold every time as 100 ns ticks; this many are a millisecond, for showing one."""
+NS_PER_MILLISECOND = 1_000_000
+"""The files hold every time as whole nanoseconds; this many are a millisecond, for showing one."""
 
 
 def run_file_prefix(run_id: int, ordinal: int = 0) -> str:

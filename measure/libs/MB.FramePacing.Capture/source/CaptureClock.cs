@@ -7,7 +7,6 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
 using System.Diagnostics;
 
 namespace MB.FramePacing.Capture
@@ -17,6 +16,7 @@ namespace MB.FramePacing.Capture
   {
     private readonly long m_startTimestamp = Stopwatch.GetTimestamp();
 
-    public TickCount64 Now => new TickCount64(Stopwatch.GetElapsedTime(m_startTimestamp));
+    /// <summary>The time since the capture started: the stopwatch's count since then, as the nanosecond it is in.</summary>
+    public NanosecondTickCount Now => NanosecondTickCount.FromCounter(Stopwatch.GetTimestamp() - m_startTimestamp, Stopwatch.Frequency);
   }
 }

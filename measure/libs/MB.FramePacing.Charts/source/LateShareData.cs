@@ -55,7 +55,7 @@ namespace MB.FramePacing.Charts
       // Held longer: on screen half a refresh or more beyond the frame time the application wants (its preferred frame time, else one
       // refresh) without being late: the pacer intended it, but runs slower than the application wants. Never for a static step (the time on
       // screen of a frame nothing animated after) or on demand
-      double half = pacing.RefreshPeriod.Ticks / 2.0;
+      double half = pacing.RefreshPeriod.Nanoseconds / 2.0;
       var held = new bool[frames.Count];
       bool anyHeldLonger = false;
       for (int i = 0; i < frames.Count; ++i)
@@ -64,8 +64,8 @@ namespace MB.FramePacing.Charts
         held[i] =
           (frame.Flags & (PresentedFrameFlags.Late | PresentedFrameFlags.StaticBefore)) == 0
           && Analysis.LateShare.Counts(frame)
-          && frame.DisplayDelta?.Ticks is { } display
-          && frame.PreferredFrameTime?.Ticks is { } preferred
+          && frame.DisplayDelta?.Nanoseconds is { } display
+          && frame.PreferredFrameTime?.Nanoseconds is { } preferred
           && display >= preferred + half;
         anyHeldLonger |= held[i];
       }

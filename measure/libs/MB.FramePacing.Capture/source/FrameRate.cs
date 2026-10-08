@@ -20,8 +20,12 @@ namespace MB.FramePacing.Capture
 
     public double FramesPerSecond => IsKnown ? (double)Numerator / Denominator : 0;
 
-    /// <summary>The time from one frame to the next, zero if unknown.</summary>
-    public TimeSpan Interval => IsKnown ? new TimeSpan((long)Math.Round(TimeSpan.TicksPerSecond * (double)Denominator / Numerator)) : TimeSpan.Zero;
+    /// <summary>The time from one frame to the next, rounded to the nearest nanosecond; zero if unknown.</summary>
+    public NanosecondTimeSpan Interval =>
+      // A second's nanoseconds times the denominator is exact in a double (a 32-bit number times 5^9 * 2^9), so one division rounds
+      IsKnown
+        ? new NanosecondTimeSpan((long)Math.Round(NanosecondTimeSpan.NanosecondsPerSecond * (double)Denominator / Numerator))
+        : NanosecondTimeSpan.Zero;
 
     public static FrameRate FromFps(double fps)
     {

@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/data/analysis/ValueStatistics.hpp>
 #include <cstdint>
 #include <optional>
@@ -14,11 +14,11 @@ namespace MB::FramePacing::Data
   //! The refresh, the target the frames are measured against, late frames and the verdict.
   struct SummaryPacing
   {
-    //! The display's refresh period (refreshPeriodTicks): a capture card's capture period, or calculated from a camera's frames.
-    TimeSpan RefreshPeriod;
+    //! The display's refresh period (refreshPeriodNs): a capture card's capture period, or calculated from a camera's frames.
+    NanosecondTimeSpan RefreshPeriod;
     bool RefreshCalculated{false};
-    //! The frame time the run is measured against, in whole refreshes (targetFrameTicks).
-    TimeSpan TargetFrameTime;
+    //! The frame time the run is measured against, in whole refreshes (targetFrameNs).
+    NanosecondTimeSpan TargetFrameTime;
     //! Schedule, TargetFrameTime, PreferredFrameTime, GivenTarget or NativeRefresh.
     std::string Source;
     int64_t LateFrames{0};

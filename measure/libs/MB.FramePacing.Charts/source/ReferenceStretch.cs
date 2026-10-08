@@ -8,13 +8,11 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
-
 namespace MB.FramePacing.Charts
 {
   /// <param name="Start">The first frame whose hold the stretch covers.</param>
   /// <param name="End">The frame after the last one: the stretch ends where it is first seen.</param>
   /// <param name="TargetFrameTime">The target frame time over the stretch; null on demand.</param>
   /// <param name="PreferredFrameTime">The preferred frame time over the stretch; null on demand.</param>
-  public readonly record struct ReferenceStretch(int Start, int End, TimeSpan? TargetFrameTime, TimeSpan? PreferredFrameTime);
+  public readonly record struct ReferenceStretch(int Start, int End, NanosecondTimeSpan? TargetFrameTime, NanosecondTimeSpan? PreferredFrameTime);
 }

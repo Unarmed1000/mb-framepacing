@@ -63,7 +63,7 @@ namespace MB.FramePacing.Gui
 
       public Span<byte> BeginFrame() => m_owner.m_frame.Pixels.AsSpan(0, m_owner.m_frame.Width * m_owner.m_frame.Height);
 
-      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
+      public void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
       {
         var frame = m_owner.m_frame;
         frame.Pixels.AsSpan(0, frame.Width * frame.Height).CopyTo(m_target.BeginFrame());

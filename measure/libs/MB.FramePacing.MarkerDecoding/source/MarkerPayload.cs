@@ -3,16 +3,10 @@
 //* ----------------
 //* The frame marker payload. The wire format (sdk/doc/marker-format.md) is implemented once in C#, by the marker library (MB.FramePacing.Marker).
 //*
-//* The tools still count in ticks of 100 ns; the marker, and the marker library's payload, count in nanoseconds. This type is the one place
-//* where the two meet (ToFrameMarker and FromFrameMarker), and the conversion goes when the tools move to nanoseconds:
-//* - to a marker (ticks to nanoseconds) is exact. A time more than 292 years from zero does not fit nanoseconds and throws; a frame time
-//*   or CPU busy longer than a marker carries (4.29 s) is held as the longest it carries, by the marker library's payload;
-//* - from a marker (nanoseconds to ticks) is the nearest tick, a tie the even one: a time an application rounded to the nanosecond
-//*   (a sixtieth of a second, 16 666 667 ns) then is the tick the tools' own times are on, which they round from the recording
-//*   (166 667), and a frame shown on time has an error of nothing. The core types' own conversions cut to the tick (16 666 667 ns is
-//*   166 666), which showed as errors of a tick in every report; so this one conversion is written here, by the user's choice, and
-//*   not with a type's helper;
-//* - 0 (unknown) is 0 both ways, and on demand is each side's own value (OnDemandFrameTime here, FM.Payload.OnDemandFrameTime there).
+//* The tools count in nanoseconds, as the marker and the marker library's payload do, with the same types, so every time is the same both
+//* ways (ToFrameMarker, FromFrameMarker): a sixtieth of a second, 16 666 667 ns in the marker, is 16 666 667 ns here.
+//* - A frame time or CPU busy longer than a marker carries (4.29 s) is held as the longest it carries, by the marker library's payload.
+//* - 0 (unknown) is 0, and on demand is the marker library's value (FM.Payload.OnDemandFrameTime).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -46,22 +40,22 @@ namespace MB.FramePacing.MarkerDecoding
     uint RunId,
     ulong FrameIndex,
     FM.MarkerFlags Flags,
-    TimeSpan AnimationTime,
-    TimeSpan32 PreferredFrameTime = default,
-    TimeSpan32 TargetFrameTime = default,
-    TickCount64 IntendedDisplayTime = default,
-    TickCount64 CpuStartTime = default,
-    TimeSpan32 CpuBusy = default
+    NanosecondTimeSpan AnimationTime,
+    NanosecondTimeDuration PreferredFrameTime = default,
+    NanosecondTimeDuration TargetFrameTime = default,
+    NanosecondTickCount IntendedDisplayTime = default,
+    NanosecondTickCount CpuStartTime = default,
+    NanosecondTimeDuration CpuBusy = default
   )
   {
     /// <summary>The most bytes a payload encodes to (a start marker's).</summary>
     public const int MaxEncodedByteCount = FM.Payload.MaxEncodedByteCount;
 
     /// <summary>
-    /// The target and preferred frame time of an application that presents only when something changes, as the tools hold it in ticks
-    /// (the marker's own value is <see cref="FM.Payload.OnDemandFrameTime"/>, in nanoseconds).
+    /// The target and preferred frame time of an application that presents only when something changes: the marker library's
+    /// <see cref="FM.Payload.OnDemandFrameTime"/>, 4 294 967 295 ns.
     /// </summary>
-    public static readonly TimeSpan32 OnDemandFrameTime = TimeSpan32.MaxValue;
+    public static readonly NanosecondTimeDuration OnDemandFrameTime = FM.Payload.OnDemandFrameTime;
 
     /// <summary>Nothing animates while this frame is on screen, until the next frame: the step from it to the next frame is not judged.</summary>
     public bool IsStaticAfter => (Flags & FM.MarkerFlags.StaticAfter) != 0;
@@ -100,9 +94,8 @@ namespace MB.FramePacing.MarkerDecoding
     public static bool TryDecode(ReadOnlySpan<byte> src, out MarkerPayload payload) => TryDecode(src, out payload, out _);
 
     /// <summary>
-    /// The same payload as the marker library's type, its times in nanoseconds (exact). Throws ArgumentOutOfRangeException or
-    /// OverflowException for a time more than 292 years from zero, which nanoseconds can not hold. A frame time (other than on demand) or
-    /// CPU busy longer than a marker carries comes back as the longest it carries.
+    /// The same payload as the marker library's type, every time as it is. A frame time (other than on demand) or CPU busy longer than a
+    /// marker carries comes back as the longest it carries.
     /// </summary>
     public FM.Payload ToFrameMarker() =>
       new FM.Payload(
@@ -110,58 +103,27 @@ namespace MB.FramePacing.MarkerDecoding
         RunId,
         FrameIndex,
         Flags,
-        NanosecondTimeSpan.FromTimeSpan(AnimationTime),
-        ToMarkerFrameTime(PreferredFrameTime),
-        ToMarkerFrameTime(TargetFrameTime),
-        NanosecondTickCount.FromTickCount64(IntendedDisplayTime),
-        NanosecondTickCount.FromTickCount64(CpuStartTime),
-        ToMarkerDuration(CpuBusy)
+        AnimationTime,
+        PreferredFrameTime,
+        TargetFrameTime,
+        IntendedDisplayTime,
+        CpuStartTime,
+        CpuBusy
       );
 
-    /// <summary>
-    /// The marker library's payload as the tools hold it, each of its times the nearest tick (a tie the even one).
-    /// </summary>
+    /// <summary>The marker library's payload as the tools hold it: every time as it is.</summary>
     public static MarkerPayload FromFrameMarker(in FM.Payload payload) =>
       new MarkerPayload(
         (MarkerKind)payload.Kind,
         payload.RunId,
         payload.FrameIndex,
         payload.Flags,
-        new TimeSpan(NearestTick(payload.AnimationTime.Nanoseconds)),
-        FromMarkerFrameTime(payload.PreferredFrameTime),
-        FromMarkerFrameTime(payload.TargetFrameTime),
-        new TickCount64(NearestTick(payload.IntendedDisplayTime.Nanoseconds)),
-        new TickCount64(NearestTick(payload.CpuStartTime.Nanoseconds)),
-        FromMarkerDuration(payload.CpuBusy)
+        payload.AnimationTime,
+        payload.PreferredFrameTime,
+        payload.TargetFrameTime,
+        payload.IntendedDisplayTime,
+        payload.CpuStartTime,
+        payload.CpuBusy
       );
-
-    private static NanosecondTimeDuration ToMarkerFrameTime(TimeSpan32 frameTime) =>
-      frameTime == OnDemandFrameTime ? FM.Payload.OnDemandFrameTime : ToMarkerDuration(frameTime);
-
-    private static NanosecondTimeDuration ToMarkerDuration(TimeSpan32 duration) =>
-      NanosecondTimeDuration.FromTimeDuration(TimeDuration.From(duration));
-
-    private static TimeSpan32 FromMarkerFrameTime(NanosecondTimeDuration frameTime) =>
-      frameTime == FM.Payload.OnDemandFrameTime ? OnDemandFrameTime : FromMarkerDuration(frameTime);
-
-    // A marker's duration is at most 4.294967295 s, so its ticks always fit
-    private static TimeSpan32 FromMarkerDuration(NanosecondTimeDuration duration) => new TimeSpan32((uint)NearestTick(duration.Nanoseconds));
-
-    /// <summary>
-    /// The tick nearest to a time in nanoseconds, a tie the even one (as the clips' generator rounds). Whole numbers only: the tools' one
-    /// conversion from the marker's unit, which goes when they count in nanoseconds.
-    /// </summary>
-    private static long NearestTick(long nanoseconds)
-    {
-      long ticks = Math.DivRem(nanoseconds, NanosecondTimeSpan.NanosecondsPerTick, out long rest);
-      if (rest < 0)
-      {
-        --ticks;
-        rest += NanosecondTimeSpan.NanosecondsPerTick;
-      }
-      long twice = 2 * rest;
-      bool up = twice > NanosecondTimeSpan.NanosecondsPerTick || (twice == NanosecondTimeSpan.NanosecondsPerTick && (ticks & 1) != 0);
-      return up ? ticks + 1 : ticks;
-    }
   }
 }

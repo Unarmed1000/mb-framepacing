@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* summary.json and the CSVs: the format version, the file names, times as whole ticks, columns an older file lacks or a newer one adds, and
+//* summary.json and the CSVs: the format version, the file names, times as whole nanoseconds, columns an older file lacks or a newer one adds, and
 //* content that is refused.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -22,9 +22,9 @@ namespace MB.FramePacing.Data.UnitTest
       {
         "scanout": "SingleScanout",
         "analysedUtc": "2026-01-01T00:00:00Z",
-        "capturePeriodTicks": 166667,
-        "measurementResolutionTicks": 166667,
-        "errorThresholdTicks": 10000,
+        "capturePeriodNs": 16666700,
+        "measurementResolutionNs": 16666700,
+        "errorThresholdNs": 1000000,
         "runs": []
       }
       """;
@@ -56,11 +56,11 @@ namespace MB.FramePacing.Data.UnitTest
       """;
 
     private const string FrameColumns =
-      "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags";
+      "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags";
 
     /// <summary>A summary whose one run has the given members.</summary>
     private static string OneRun(params string[] members) =>
-      "{ \"capturePeriodTicks\": 166667, \"errorThresholdTicks\": 10000, \"runs\": [ { " + string.Join(", ", members) + " } ] }";
+      "{ \"capturePeriodNs\": 16666700, \"errorThresholdNs\": 1000000, \"runs\": [ { " + string.Join(", ", members) + " } ] }";
 
     private static string MinimalWith(string member) => MinimalSummary.Replace("{", "{ " + member + ",", StringComparison.Ordinal);
 
@@ -89,75 +89,81 @@ namespace MB.FramePacing.Data.UnitTest
     }
 
     [Test]
-    public void Summary_TimesAreWholeTicks()
+    public void Summary_TimesAreWholeNanoseconds()
     {
       var summary = AnalysisSummary.Parse(MinimalSummary);
       Assert.That(
         (summary.CapturePeriod, summary.MeasurementResolution, summary.ErrorThreshold),
-        Is.EqualTo((new TimeSpan(166_667), new TimeSpan(166_667), new TimeSpan(10_000)))
+        Is.EqualTo((new NanosecondTimeSpan(16_666_700), new NanosecondTimeSpan(16_666_700), new NanosecondTimeSpan(1_000_000)))
       );
       Assert.That(
-        AnalysisSummary.Parse(MinimalWithout("measurementResolutionTicks")).MeasurementResolution,
-        Is.EqualTo(new TimeSpan(166_667)),
+        AnalysisSummary.Parse(MinimalWithout("measurementResolutionNs")).MeasurementResolution,
+        Is.EqualTo(new NanosecondTimeSpan(16_666_700)),
         "a file without it: the capture period"
       );
 
-      // Written as the ticks they are, and read back the same
+      // Written as the nanoseconds they are, and read back the same
       string json = summary.ToJson();
-      Assert.That(json, Does.Contain("\"capturePeriodTicks\": 166667"));
-      Assert.That(json, Does.Contain("\"measurementResolutionTicks\": 166667"));
-      Assert.That(json, Does.Contain("\"errorThresholdTicks\": 10000"));
+      Assert.That(json, Does.Contain("\"capturePeriodNs\": 16666700"));
+      Assert.That(json, Does.Contain("\"measurementResolutionNs\": 16666700"));
+      Assert.That(json, Does.Contain("\"errorThresholdNs\": 1000000"));
       Assert.That(json, Does.Not.Contain("PeriodMs").And.Not.Contain("ThresholdMs"));
       Assert.That(AnalysisSummary.Parse(json).CapturePeriod, Is.EqualTo(summary.CapturePeriod));
 
       // Never a fraction, a text or a number of another unit's name
       Assert.That(
-        () => AnalysisSummary.Parse(MinimalSummary.Replace("166667,", "166667.5,", StringComparison.Ordinal)),
+        () => AnalysisSummary.Parse(MinimalSummary.Replace("16666700,", "16666700.5,", StringComparison.Ordinal)),
         Throws.InstanceOf<InvalidDataException>()
       );
       Assert.That(
-        () => AnalysisSummary.Parse(MinimalSummary.Replace("166667,", "166667.0,", StringComparison.Ordinal)),
+        () => AnalysisSummary.Parse(MinimalSummary.Replace("16666700,", "16666700.0,", StringComparison.Ordinal)),
         Throws.InstanceOf<InvalidDataException>(),
         "a whole number written as a real one"
       );
       Assert.That(
         () =>
           AnalysisSummary.Parse(
-            MinimalSummary.Replace("\"errorThresholdTicks\": 10000", "\"errorThresholdTicks\": \"10000\"", StringComparison.Ordinal)
+            MinimalSummary.Replace("\"errorThresholdNs\": 1000000", "\"errorThresholdNs\": \"1000000\"", StringComparison.Ordinal)
           ),
         Throws.InstanceOf<InvalidDataException>()
       );
       Assert.That(
-        () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodTicks", "capturePeriodMs", StringComparison.Ordinal)),
-        Throws.InstanceOf<InvalidDataException>().With.Message.Contains("capturePeriodTicks")
+        () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodNs", "capturePeriodMs", StringComparison.Ordinal)),
+        Throws.InstanceOf<InvalidDataException>().With.Message.Contains("capturePeriodNs")
+      );
+      Assert.That(
+        () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodNs", "capturePeriodTicks", StringComparison.Ordinal)),
+        Throws.InstanceOf<InvalidDataException>().With.Message.Contains("capturePeriodNs"),
+        "a file from before the nanoseconds"
       );
     }
 
     [Test]
-    public void Summary_PacingTimesAreWholeTicks()
+    public void Summary_PacingTimesAreWholeNanoseconds()
     {
       const string pacing = """
-        "pacing": { "refreshPeriodTicks": 166667, "refreshCalculated": false, "targetFrameTicks": 333334, "source": "TargetFrameTime",
+        "pacing": { "refreshPeriodNs": 16666700, "refreshCalculated": false, "targetFrameNs": 33333400, "source": "TargetFrameTime",
           "lateFrames": 1, "lateShare": 0.125, "worstLateShare": 0.5, "errorFramesWithUnevenDisplay": 1, "errorFramesWithEvenDisplay": 1,
           "verdict": "Both", "refreshHz": 59.99988 }
         """;
       var run = AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, pacing)).Runs[0];
       Assert.That(run.Pacing, Is.Not.Null);
-      Assert.That((run.Pacing!.RefreshPeriod, run.Pacing.TargetFrameTime), Is.EqualTo((new TimeSpan(166_667), new TimeSpan(333_334))));
+      Assert.That(
+        (run.Pacing!.RefreshPeriod, run.Pacing.TargetFrameTime),
+        Is.EqualTo((new NanosecondTimeSpan(16_666_700), new NanosecondTimeSpan(33_333_400)))
+      );
       Assert.That(
         (run.RunId, run.FramesFile, run.Counts.Captures, run.Statistics.FramesWithAnimationError),
         Is.EqualTo((7u, "run-7-frames.csv", 10L, 2L))
       );
 
       Assert.That(
-        () => AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, pacing.Replace("333334", "333334.5", StringComparison.Ordinal))),
+        () => AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, pacing.Replace("33333400", "33333400.5", StringComparison.Ordinal))),
         Throws.InstanceOf<InvalidDataException>()
       );
       Assert.That(
         () =>
-          AnalysisSummary.Parse(
-            OneRun(RunStart, Counts, Statistics, pacing.Replace("refreshPeriodTicks", "refreshPeriodMs", StringComparison.Ordinal))
-          ),
+          AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, pacing.Replace("refreshPeriodNs", "refreshPeriodMs", StringComparison.Ordinal))),
         Throws.InstanceOf<InvalidDataException>()
       );
     }
@@ -165,12 +171,8 @@ namespace MB.FramePacing.Data.UnitTest
     [Test]
     public void Summary_RequiredFieldsAreRequired()
     {
-      Assert.That(() => AnalysisSummary.Parse(MinimalWithout("capturePeriodTicks")), Throws.InstanceOf<InvalidDataException>(), "no capture period");
-      Assert.That(
-        () => AnalysisSummary.Parse(MinimalWithout("errorThresholdTicks")),
-        Throws.InstanceOf<InvalidDataException>(),
-        "no error threshold"
-      );
+      Assert.That(() => AnalysisSummary.Parse(MinimalWithout("capturePeriodNs")), Throws.InstanceOf<InvalidDataException>(), "no capture period");
+      Assert.That(() => AnalysisSummary.Parse(MinimalWithout("errorThresholdNs")), Throws.InstanceOf<InvalidDataException>(), "no error threshold");
       Assert.That(() => AnalysisSummary.Parse(OneRun(RunStart, Statistics)), Throws.InstanceOf<InvalidDataException>(), "no counts");
       Assert.That(() => AnalysisSummary.Parse(OneRun(RunStart, Counts)), Throws.InstanceOf<InvalidDataException>(), "no statistics");
       Assert.That(() => AnalysisSummary.Parse(OneRun(Counts, Statistics)), Throws.InstanceOf<InvalidDataException>(), "no run id");
@@ -211,7 +213,7 @@ namespace MB.FramePacing.Data.UnitTest
     public void Summary_ThatIsNotOne_IsRefusedAsInvalidData()
     {
       Assert.That(() => AnalysisSummary.Parse("[]"), Throws.InstanceOf<InvalidDataException>(), "not an object");
-      Assert.That(() => AnalysisSummary.Parse("{ \"capturePeriodTicks\": "), Throws.InstanceOf<InvalidDataException>(), "not JSON");
+      Assert.That(() => AnalysisSummary.Parse("{ \"capturePeriodNs\": "), Throws.InstanceOf<InvalidDataException>(), "not JSON");
       Assert.That(() => AnalysisSummary.Parse(string.Empty), Throws.InstanceOf<InvalidDataException>(), "empty");
       Assert.That(() => AnalysisSummary.Parse("null"), Throws.InstanceOf<InvalidDataException>(), "null");
       Assert.That(
@@ -232,7 +234,7 @@ namespace MB.FramePacing.Data.UnitTest
       );
       Assert.That(() => AnalysisSummary.Parse(MinimalWith("\"warnings\": \"one text\"")), Throws.InstanceOf<InvalidDataException>());
       Assert.That(
-        () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodTicks", "CapturePeriodTicks", StringComparison.Ordinal)),
+        () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodNs", "CapturePeriodNs", StringComparison.Ordinal)),
         Throws.InstanceOf<InvalidDataException>(),
         "names are case sensitive, as in the other languages' readers"
       );
@@ -289,14 +291,23 @@ namespace MB.FramePacing.Data.UnitTest
     public void FramesCsv_ReadsByColumnName_WhateverTheOrderAndExtraColumns()
     {
       const string csv =
-        "frameIndex,newColumn,segment,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags,cpuBusyTicks\n"
-        + "7,x,0,1166667,3,500000,333333,2,1,-5000,SkippedBefore|Late,\n";
+        "frameIndex,newColumn,segment,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags,cpuBusyNs\n"
+        + "7,x,0,116666700,3,50000000,33333300,2,1,-500000,SkippedBefore|Late,\n";
       var rows = FramesCsv.Read(new StringReader(csv));
       Assert.That(rows, Has.Count.EqualTo(1));
       var row = rows[0];
       Assert.That(
         (row.FrameIndex, row.Segment, row.AnimationTime, row.FirstSeenTime, row.OnScreen, row.Drift),
-        Is.EqualTo((7UL, 0, new TimeSpan(1_166_667), new TickCount64(500_000), new TimeSpan(333_333), new TimeSpan(-5_000)))
+        Is.EqualTo(
+          (
+            7UL,
+            0,
+            new NanosecondTimeSpan(116_666_700),
+            new NanosecondTickCount(50_000_000),
+            new NanosecondTimeSpan(33_333_300),
+            new NanosecondTimeSpan(-500_000)
+          )
+        )
       );
       Assert.That(row.Flags, Is.EqualTo(new[] { "SkippedBefore", "Late" }));
       Assert.That(row.CpuBusy, Is.Null, "an empty cell");
@@ -304,39 +315,43 @@ namespace MB.FramePacing.Data.UnitTest
     }
 
     [Test]
-    public void FramesCsv_WritesEveryTimeAsItsTicks_AndReadsThemBack()
+    public void FramesCsv_WritesEveryTimeAsItsNanoseconds_AndReadsThemBack()
     {
       // The values a marker can carry at their limits: nothing between the marker and the file converts them
       var row = new FrameRow(
         Segment: 2,
         FrameIndex: ulong.MaxValue,
-        AnimationTime: TimeSpan.MinValue,
+        AnimationTime: NanosecondTimeSpan.MinValue,
         FirstCaptureIndex: 5,
-        FirstSeenTime: new TickCount64(long.MaxValue),
-        OnScreen: new TimeSpan(166_667),
+        FirstSeenTime: new NanosecondTickCount(long.MaxValue),
+        OnScreen: new NanosecondTimeSpan(16_666_700),
         Captures: 1,
         SkippedBefore: 0,
-        DisplayDelta: new TimeSpan(166_666),
-        AnimationDelta: TimeSpan.MaxValue,
-        AnimationError: new TimeSpan(-1),
-        Drift: new TimeSpan(-7),
+        DisplayDelta: new NanosecondTimeSpan(16_666_600),
+        AnimationDelta: NanosecondTimeSpan.MaxValue,
+        AnimationError: new NanosecondTimeSpan(-1),
+        Drift: new NanosecondTimeSpan(-7),
         Flags: new[] { "Late" },
-        IntendedDisplayTime: new TickCount64(long.MinValue),
-        MarkerTargetFrameTime: TimeSpan32.MaxValue,
-        TargetFrameTime: new TimeSpan(333_334),
-        MarkerPreferredFrameTime: new TimeSpan32(1),
-        PreferredFrameTime: new TimeSpan(166_667),
-        PacingError: new TimeSpan(3),
-        PredictionError: new TimeSpan(-3),
-        Lateness: new TimeSpan(83_333),
-        LastSeenTime: new TickCount64(1_234_567_890_123_456_789),
-        CpuStartTime: new TickCount64(-1_234_567_890_123_456_789),
-        CpuBusy: new TimeSpan32(120_060),
-        FrameTime: new TimeSpan(166_668),
-        CpuWait: new TimeSpan(46_608),
-        OlderFrames: new[] { new OlderFrame(41, new TickCount64(1_234_567_890_123_456_790)), new OlderFrame(40, new TickCount64(-5)) },
-        MainMarkerFirstSeenTime: new TickCount64(9_007_199_254_740_993),
-        ScanoutDelay: new TimeSpan(-9_007_199_254_740_993)
+        IntendedDisplayTime: new NanosecondTickCount(long.MinValue),
+        MarkerTargetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.MaxValue),
+        TargetFrameTime: new NanosecondTimeSpan(33_333_400),
+        MarkerPreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(1),
+        PreferredFrameTime: new NanosecondTimeSpan(16_666_700),
+        PacingError: new NanosecondTimeSpan(3),
+        PredictionError: new NanosecondTimeSpan(-3),
+        Lateness: new NanosecondTimeSpan(8_333_300),
+        LastSeenTime: new NanosecondTickCount(1_234_567_890_123_456_789),
+        CpuStartTime: new NanosecondTickCount(-1_234_567_890_123_456_789),
+        CpuBusy: NanosecondTimeDuration.FromNanoseconds(12_006_000),
+        FrameTime: new NanosecondTimeSpan(16_666_800),
+        CpuWait: new NanosecondTimeSpan(4_660_800),
+        OlderFrames: new[]
+        {
+          new OlderFrame(41, new NanosecondTickCount(1_234_567_890_123_456_790)),
+          new OlderFrame(40, new NanosecondTickCount(-5)),
+        },
+        MainMarkerFirstSeenTime: new NanosecondTickCount(9_007_199_254_740_993),
+        ScanoutDelay: new NanosecondTimeSpan(-9_007_199_254_740_993)
       );
       var written = new StringWriter { NewLine = "\n" };
       FramesCsv.Write(written, new[] { row }, camera: true);
@@ -346,8 +361,8 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(
         lines[1],
         Is.EqualTo(
-          "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,166667,1,0,166666,9223372036854775807,-1,-7,Late,"
-            + "-9223372036854775808,4294967295,333334,1,166667,3,-3,83333,1234567890123456789,-1234567890123456789,120060,166668,46608,"
+          "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,16666700,1,0,16666600,9223372036854775807,-1,-7,Late,"
+            + "-9223372036854775808,4294967295,33333400,1,16666700,3,-3,8333300,1234567890123456789,-1234567890123456789,12006000,16666800,4660800,"
             + "41@1234567890123456790|40@-5,9007199254740993,-9007199254740993"
         )
       );
@@ -356,26 +371,47 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(back with { Flags = row.Flags, OlderFrames = row.OlderFrames }, Is.EqualTo(row));
       Assert.That(back.Flags, Is.EqualTo(row.Flags));
       Assert.That(back.OlderFrames, Is.EqualTo(row.OlderFrames));
+
+      // A marker's duration is a u32 in the file: one no marker carries is not written (no reader would take it)
+      var beyond = NanosecondTimeDuration.FromNanoseconds(4_294_967_296);
+      foreach (
+        var tooLong in new[]
+        {
+          row with
+          {
+            MarkerTargetFrameTime = beyond,
+          },
+          row with
+          {
+            MarkerPreferredFrameTime = beyond,
+          },
+          row with
+          {
+            CpuBusy = beyond,
+          },
+        }
+      )
+        Assert.That(() => FramesCsv.Write(new StringWriter(), new[] { tooLong }, camera: false), Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 
     [Test]
-    public void FramesCsv_HeaderNamesEveryTimeInTicks()
+    public void FramesCsv_HeaderNamesEveryTimeInNanoseconds()
     {
       Assert.That(
         FramesCsv.Header,
         Is.EqualTo(
-          "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,displayDeltaTicks,"
-            + "animationDeltaTicks,animationErrorTicks,driftTicks,flags,intendedDisplayTicks,markerTargetTicks,targetTicks,markerPreferredTicks,"
-            + "preferredTicks,pacingErrorTicks,predictionErrorTicks,latenessTicks,lastSeenTicks,cpuStartTicks,cpuBusyTicks,frameTimeTicks,"
-            + "cpuWaitTicks,olderFrames"
+          "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,"
+            + "animationDeltaNs,animationErrorNs,driftNs,flags,intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,"
+            + "preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,"
+            + "cpuWaitNs,olderFrames"
         )
       );
-      Assert.That(FramesCsv.CameraColumns, Is.EqualTo(",mainMarkerFirstSeenTicks,scanoutDelayTicks"));
+      Assert.That(FramesCsv.CameraColumns, Is.EqualTo(",mainMarkerFirstSeenNs,scanoutDelayNs"));
       Assert.That(
         CapturesCsv.Header,
         Is.EqualTo(
-          "captureIndex,captureTicks,status,kind,runId,frameIndex,animationTicks,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,"
-            + "hostTicks,deviceTicks,payloadHex"
+          "captureIndex,captureNs,status,kind,runId,frameIndex,animationNs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,"
+            + "hostNs,deviceNs,payloadHex"
         )
       );
     }
@@ -390,9 +426,9 @@ namespace MB.FramePacing.Data.UnitTest
     [TestCase("9223372036854775808", TestName = "{m}(one more than 64 bits hold)")]
     [TestCase("-9223372036854775809", TestName = "{m}(one less than 64 bits hold)")]
     [TestCase("", TestName = "{m}(empty where a value is required)")]
-    public void FramesCsv_ATimeThatIsNotWholeTicks_IsRefused(string cell)
+    public void FramesCsv_ATimeThatIsNotWholeNanoseconds_IsRefused(string cell)
     {
-      string csv = FrameColumns + "\n0,1," + cell + ",0,0,166667,1,0,0,\n";
+      string csv = FrameColumns + "\n0,1," + cell + ",0,0,16666700,1,0,0,\n";
       Assert.That(() => FramesCsv.Read(new StringReader(csv)), Throws.InstanceOf<InvalidDataException>());
     }
 
@@ -400,10 +436,14 @@ namespace MB.FramePacing.Data.UnitTest
     public void FramesCsv_TheMarkersValuesMustFit32Bits()
     {
       IReadOnlyList<FrameRow> Read(string cpuBusy) =>
-        FramesCsv.Read(new StringReader(FrameColumns + ",cpuBusyTicks\n0,1,0,0,0,166667,1,0,0,," + cpuBusy + "\n"));
-      Assert.That(Read("4294967295")[0].CpuBusy, Is.EqualTo(TimeSpan32.MaxValue), "the largest: on demand in a frame time");
-      Assert.That(Read("80000")[0].CpuBusy, Is.EqualTo(new TimeSpan32(80_000)));
-      Assert.That(Read("0")[0].CpuBusy, Is.EqualTo(TimeSpan32.Zero));
+        FramesCsv.Read(new StringReader(FrameColumns + ",cpuBusyNs\n0,1,0,0,0,16666700,1,0,0,," + cpuBusy + "\n"));
+      Assert.That(
+        Read("4294967295")[0].CpuBusy,
+        Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(uint.MaxValue)),
+        "the largest: on demand in a frame time"
+      );
+      Assert.That(Read("8000000")[0].CpuBusy, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(8_000_000)));
+      Assert.That(Read("0")[0].CpuBusy, Is.EqualTo(NanosecondTimeDuration.Zero));
       Assert.That(() => Read("4294967296"), Throws.InstanceOf<InvalidDataException>());
       Assert.That(() => Read("-1"), Throws.InstanceOf<InvalidDataException>());
     }
@@ -414,33 +454,45 @@ namespace MB.FramePacing.Data.UnitTest
       IReadOnlyList<FrameRow> Read(string header, string line) => FramesCsv.Read(new StringReader(header + "\n" + line + "\n"));
       Assert.That(() => FramesCsv.Read(new StringReader(string.Empty)), Throws.InstanceOf<InvalidDataException>(), "an empty file");
       Assert.That(FramesCsv.Read(new StringReader(FrameColumns + "\n\n")), Is.Empty, "a header and an empty line");
-      Assert.That(() => Read(FrameColumns, "x,1,0,0,0,166667,1,0,0,"), Throws.InstanceOf<InvalidDataException>(), "a segment that is no number");
-      Assert.That(() => Read(FrameColumns, "0,-1,0,0,0,166667,1,0,0,"), Throws.InstanceOf<InvalidDataException>(), "a negative frame index");
-      Assert.That(() => Read(FrameColumns, "0,1,0,0,0,166667,2147483648,0,0,"), Throws.InstanceOf<InvalidDataException>(), "captures beyond 32 bits");
-      Assert.That(() => Read("frameIndex,animationTicks", "1,0"), Throws.InstanceOf<InvalidDataException>(), "a required column the file lacks");
-      Assert.That(() => Read(FrameColumns, "0,1,0,0,0,166667,1,0,0,Late|"), Throws.InstanceOf<InvalidDataException>(), "an empty flag");
+      Assert.That(() => Read(FrameColumns, "x,1,0,0,0,16666700,1,0,0,"), Throws.InstanceOf<InvalidDataException>(), "a segment that is no number");
+      Assert.That(() => Read(FrameColumns, "0,-1,0,0,0,16666700,1,0,0,"), Throws.InstanceOf<InvalidDataException>(), "a negative frame index");
       Assert.That(
-        () => FramesCsv.Read(new StringReader(FrameColumns + "\n0,1,0,0,0,166667,1,0,0,\n\n0,2,1.5,0,0,166667,1,0,0,\n"), "run-1-frames.csv"),
+        () => Read(FrameColumns, "0,1,0,0,0,16666700,2147483648,0,0,"),
+        Throws.InstanceOf<InvalidDataException>(),
+        "captures beyond 32 bits"
+      );
+      Assert.That(() => Read("frameIndex,animationNs", "1,0"), Throws.InstanceOf<InvalidDataException>(), "a required column the file lacks");
+      Assert.That(
+        () => Read(FrameColumns.Replace("Ns", "Ticks", StringComparison.Ordinal), "0,1,0,0,0,166667,1,0,0,"),
+        Throws.InstanceOf<InvalidDataException>(),
+        "a file from before the nanoseconds"
+      );
+      Assert.That(() => Read(FrameColumns, "0,1,0,0,0,16666700,1,0,0,Late|"), Throws.InstanceOf<InvalidDataException>(), "an empty flag");
+      Assert.That(
+        () => FramesCsv.Read(new StringReader(FrameColumns + "\n0,1,0,0,0,16666700,1,0,0,\n\n0,2,1.5,0,0,16666700,1,0,0,\n"), "run-1-frames.csv"),
         Throws.InstanceOf<InvalidDataException>().With.Message.Contains("'run-1-frames.csv' line 4").And.Message.Contains("'1.5'"),
         "the error names the file and the line"
       );
       foreach (string older in new[] { "41", "@5", "41@", "x@5", "41@5.5", "41@5|", "41@5||42@6", "|41@5" })
       {
         Assert.That(
-          () => Read(FrameColumns + ",olderFrames", "0,1,0,0,0,166667,1,0,0,," + older),
+          () => Read(FrameColumns + ",olderFrames", "0,1,0,0,0,16666700,1,0,0,," + older),
           Throws.InstanceOf<InvalidDataException>(),
           "olderFrames '" + older + "'"
         );
       }
-      var frames = Read(FrameColumns + ",olderFrames", "0,1,0,0,0,166667,1,0,0,,41@5|40@-6");
-      Assert.That(frames[0].OlderFrames, Is.EqualTo(new[] { new OlderFrame(41, new TickCount64(5)), new OlderFrame(40, new TickCount64(-6)) }));
+      var frames = Read(FrameColumns + ",olderFrames", "0,1,0,0,0,16666700,1,0,0,,41@5|40@-6");
+      Assert.That(
+        frames[0].OlderFrames,
+        Is.EqualTo(new[] { new OlderFrame(41, new NanosecondTickCount(5)), new OlderFrame(40, new NanosecondTickCount(-6)) })
+      );
     }
 
     [Test]
     public void CapturesCsv_CarriesSourceDropsMissedRefreshesAndTheSyncMarker_AndWritesBackAsItWas()
     {
       const string csv =
-        CapturesCsv.Header + "\r\n4,666667,Torn,Frame,7,12,2000000,3,1,7,11,701000,666667,4D46\r\n" + "5,,NotRecorded,,,,,0,0,,,,,\r\n";
+        CapturesCsv.Header + "\r\n4,66666700,Torn,Frame,7,12,200000000,3,1,7,11,70100000,66666700,4D46\r\n" + "5,,NotRecorded,,,,,0,0,,,,,\r\n";
       var rows = CapturesCsv.Read(new StringReader(csv));
 
       Assert.That(rows, Has.Count.EqualTo(2));
@@ -450,16 +502,16 @@ namespace MB.FramePacing.Data.UnitTest
         (torn.CaptureTime, torn.AnimationTime, torn.HostTime, torn.DeviceTime),
         Is.EqualTo(
           (
-            (TickCount64?)new TickCount64(666_667),
-            (TimeSpan?)new TimeSpan(2_000_000),
-            (TickCount64?)new TickCount64(701_000),
-            (TickCount64?)new TickCount64(666_667)
+            (NanosecondTickCount?)new NanosecondTickCount(66_666_700),
+            (NanosecondTimeSpan?)new NanosecondTimeSpan(200_000_000),
+            (NanosecondTickCount?)new NanosecondTickCount(70_100_000),
+            (NanosecondTickCount?)new NanosecondTickCount(66_666_700)
           )
         )
       );
       Assert.That((torn.SourceDropsBefore, torn.MissedBefore), Is.EqualTo((3L, 1L)));
       Assert.That(torn.Payload, Is.EqualTo(new byte[] { 0x4D, 0x46 }));
-      Assert.That((rows[1].CaptureTime, rows[1].SyncFrameIndex), Is.EqualTo(((TickCount64?)null, (ulong?)null)));
+      Assert.That((rows[1].CaptureTime, rows[1].SyncFrameIndex), Is.EqualTo(((NanosecondTickCount?)null, (ulong?)null)));
 
       var written = new StringWriter { NewLine = "\r\n" };
       CapturesCsv.Write(written, rows);
@@ -470,39 +522,42 @@ namespace MB.FramePacing.Data.UnitTest
     public void CapturesCsv_ContentThatIsNotACapture_IsRefusedAsInvalidData()
     {
       IReadOnlyList<CaptureCsvRow> Read(string line) => CapturesCsv.Read(new StringReader(CapturesCsv.Header + "\n" + line + "\n"));
-      Assert.That(Read("4,666667,Decoded,Frame,4294967295,12,2000000,0,0,4294967295,11,701000,666667,4D46")[0].RunId, Is.EqualTo(uint.MaxValue));
       Assert.That(
-        () => Read("4,666667,Decoded,Frame,-1,12,2000000,0,0,,,701000,666667,4D46"),
+        Read("4,66666700,Decoded,Frame,4294967295,12,200000000,0,0,4294967295,11,70100000,66666700,4D46")[0].RunId,
+        Is.EqualTo(uint.MaxValue)
+      );
+      Assert.That(
+        () => Read("4,66666700,Decoded,Frame,-1,12,200000000,0,0,,,70100000,66666700,4D46"),
         Throws.InstanceOf<InvalidDataException>(),
         "a run id below 0"
       );
       Assert.That(
-        () => Read("4,666667,Decoded,Frame,4294967296,12,2000000,0,0,,,701000,666667,4D46"),
+        () => Read("4,66666700,Decoded,Frame,4294967296,12,200000000,0,0,,,70100000,66666700,4D46"),
         Throws.InstanceOf<InvalidDataException>(),
         "a run id beyond 32 bits"
       );
       Assert.That(
-        () => Read("4,666667,Torn,Frame,7,12,2000000,0,0,4294967296,11,701000,666667,4D46"),
+        () => Read("4,66666700,Torn,Frame,7,12,200000000,0,0,4294967296,11,70100000,66666700,4D46"),
         Throws.InstanceOf<InvalidDataException>(),
         "a sync run id beyond 32 bits"
       );
       Assert.That(
-        () => Read("4,66.6667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46"),
+        () => Read("4,66.6667,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666700,4D46"),
         Throws.InstanceOf<InvalidDataException>(),
         "a fraction"
       );
       Assert.That(
-        () => Read("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D4"),
+        () => Read("4,66666700,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666700,4D4"),
         Throws.InstanceOf<InvalidDataException>(),
         "half a byte"
       );
       Assert.That(
-        () => Read("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D4G"),
+        () => Read("4,66666700,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666700,4D4G"),
         Throws.InstanceOf<InvalidDataException>(),
         "no hex digit"
       );
       Assert.That(
-        () => Read("x,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46"),
+        () => Read("x,66666700,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666700,4D46"),
         Throws.InstanceOf<InvalidDataException>(),
         "no capture index"
       );

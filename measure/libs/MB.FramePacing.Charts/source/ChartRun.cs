@@ -1,13 +1,12 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* What the charts of one run are drawn from: the analysed run and the capture's period and error threshold, in ticks.
+//* What the charts of one run are drawn from: the analysed run and the capture's period and error threshold, in nanoseconds.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
@@ -19,7 +18,7 @@ namespace MB.FramePacing.Charts
   /// <param name="CapturePeriod">The capture period (<see cref="TimelineResult.CapturePeriod"/>).</param>
   /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (<see cref="TimelineResult.ErrorThreshold"/>).</param>
   /// <param name="Camera">An EXPERIMENTAL camera capture: the refresh strip draws every frame until the next one.</param>
-  public sealed record ChartRun(RunAnalysis Run, TimeSpan CapturePeriod, TimeSpan ErrorThreshold, bool Camera)
+  public sealed record ChartRun(RunAnalysis Run, NanosecondTimeSpan CapturePeriod, NanosecondTimeSpan ErrorThreshold, bool Camera)
   {
     /// <summary>
     /// The capture's rows (captures.csv), for what the capture missed (RunEvents): every run of the capture shares them. Null when not known.

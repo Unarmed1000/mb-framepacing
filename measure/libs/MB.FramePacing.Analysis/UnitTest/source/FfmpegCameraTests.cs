@@ -92,7 +92,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         TestContext.Out.WriteLine(check);
       Assert.That(rig.HasFailures, Is.False);
       Assert.That(rig.CameraFps, Is.EqualTo(CameraFps).Within(1), "the recorded fps must replace the clip's 30 fps timestamps");
-      double expectedDelay = (camera.ZoneScanTicks(1) - camera.ZoneScanTicks(0)) / TimeSpan.TicksPerMillisecond;
+      double expectedDelay = (camera.ZoneScanNanoseconds(1) - camera.ZoneScanNanoseconds(0)) / NanosecondTimeSpan.NanosecondsPerMillisecond;
       Assert.That(rig.ScanoutDelayMs, Is.EqualTo(expectedDelay).Within(1.0));
 
       using (var source = FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(30)))

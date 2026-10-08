@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* An immutable wavelet matrix over a sequence of whole numbers (ticks): for any range of positions it answers the k-th smallest value and
+//* An immutable wavelet matrix over a sequence of whole numbers (nanoseconds): for any range of positions it answers the k-th smallest value and
 //* how many values are below a bound, exactly, in one step per bit of the number of distinct values (about 20 for a run's values), whatever
 //* the range's length. The charts ask it for each pixel column's minimum, maximum, median and percentiles, a section's scale and its
 //* histograms, so a zoom costs per column, not per frame.
@@ -113,7 +113,7 @@ namespace MB.FramePacing.Charts
 
       // The scratch array is this sort's own: a rented one would stay in the pool, and the panels prepare their data at once
       var sorted = values.ToArray();
-      TickSort.Sort(sorted, GC.AllocateUninitializedArray<long>(sorted.Length));
+      NanosecondSort.Sort(sorted, GC.AllocateUninitializedArray<long>(sorted.Length));
       int distinct = 0;
       for (int i = 0; i < sorted.Length; ++i)
       {
@@ -204,7 +204,7 @@ namespace MB.FramePacing.Charts
       return low + ((high - low) * (rank - lower));
     }
 
-    private static double Ms(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
+    private static double Ms(long nanoseconds) => nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
 
     /// <summary>The ones at <paramref name="level"/> before position <paramref name="position"/>.</summary>
     private int Ones(int level, int position)

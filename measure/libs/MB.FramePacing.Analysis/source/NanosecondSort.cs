@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Sorts whole numbers (ticks) ascending with a radix sort: a pass per byte in which the values differ, usually two or three for a run's
+//* Sorts whole numbers (times in nanoseconds) ascending with a radix sort: a pass per byte in which the values differ, a few for a run's
 //* times, each a count and a move, so a run of an hour (a million values, sorted a dozen times by the statistics) costs a fraction of a
 //* comparison sort. The order is the numbers' own, negative ones first; the scratch array is rented, or the caller's. The charts sort
 //* their prepared values with it too.
@@ -15,7 +15,7 @@ using System.Buffers;
 
 namespace MB.FramePacing.Analysis
 {
-  public static class TickSort
+  public static class NanosecondSort
   {
     // Below this a comparison sort is as fast, and needs no scratch array
     private const int RadixFrom = 256;

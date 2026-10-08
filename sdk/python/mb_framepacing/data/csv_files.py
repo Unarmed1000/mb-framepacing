@@ -3,8 +3,10 @@
 
 """A run's frames CSV (run-<id>-frames.csv) and captures.csv (doc/analysis-output-format.md): a header line, then one line per presented
 frame or per capture, comma separated. Columns are found by their name, so columns an older file lacks read as None and columns a newer
-one adds are ignored. Every number is a whole one, written as its digits with a '-' in front when negative; a time is its 100 ns ticks,
-exactly as a marker carried it. An empty cell is None. Content that is anything else raises DataFormatError, with the file and the line."""
+one adds are ignored. Every number is a whole one, written as its digits with a '-' in front when negative; a time is its whole
+nanoseconds (the '...Ns' columns), exactly as a marker carried it. An empty cell is None. Content that is anything else raises
+DataFormatError, with the file and the line. A file from before the nanoseconds named its times '...Ticks': a frames CSV from then lacks
+its required columns and is refused, and a captures.csv from then reads as captures without times."""
 
 import re
 from collections.abc import Callable
@@ -13,71 +15,71 @@ from pathlib import Path
 
 from .errors import DataFormatError
 
-ON_DEMAND_FRAME_TICKS = 0xFFFF_FFFF
+ON_DEMAND_FRAME_NS = 0xFFFF_FFFF
 """The marker's target and preferred frame time of an application that presents only when something changes (the marker's 0xFFFFFFFF)."""
 
 
 @dataclass(frozen=True)
 class FrameRow:
-    """One presented frame. first_seen_ticks is its display time (the capture's clock), display_delta_ticks the display time step,
-    animation_error_ticks the animation time step minus the display time step (None for a step from a static frame). flags holds
+    """One presented frame. first_seen_ns is its display time (the capture's clock), display_delta_ns the display time step,
+    animation_error_ns the animation time step minus the display time step (None for a step from a static frame). flags holds
     SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep or StaticAssumed. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
-    frametime and CPU wait as PresentMon names them); marker_target_ticks and marker_preferred_ticks are ON_DEMAND_FRAME_TICKS on demand,
-    target_ticks and preferred_ticks (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
+    frametime and CPU wait as PresentMon names them); marker_target_ns and marker_preferred_ns are ON_DEMAND_FRAME_NS on demand,
+    target_ns and preferred_ns (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
     camera captures' only. older_frames are the captures that showed an older frame out of order while this frame was the newest:
-    (frame index, capture ticks) in capture order."""
+    (frame index, capture nanoseconds) in capture order."""
 
     segment: int
     frame_index: int
-    animation_ticks: int
+    animation_ns: int
     first_capture_index: int
-    first_seen_ticks: int
-    on_screen_ticks: int
+    first_seen_ns: int
+    on_screen_ns: int
     captures: int
     skipped_before: int
-    display_delta_ticks: int | None
-    animation_delta_ticks: int | None
-    animation_error_ticks: int | None
-    drift_ticks: int
+    display_delta_ns: int | None
+    animation_delta_ns: int | None
+    animation_error_ns: int | None
+    drift_ns: int
     flags: tuple[str, ...]
-    intended_display_ticks: int | None
-    marker_target_ticks: int | None
-    target_ticks: int | None
-    marker_preferred_ticks: int | None
-    preferred_ticks: int | None
-    pacing_error_ticks: int | None
-    prediction_error_ticks: int | None
-    lateness_ticks: int | None
-    last_seen_ticks: int | None
-    cpu_start_ticks: int | None
-    cpu_busy_ticks: int | None
-    frame_time_ticks: int | None
-    cpu_wait_ticks: int | None
+    intended_display_ns: int | None
+    marker_target_ns: int | None
+    target_ns: int | None
+    marker_preferred_ns: int | None
+    preferred_ns: int | None
+    pacing_error_ns: int | None
+    prediction_error_ns: int | None
+    lateness_ns: int | None
+    last_seen_ns: int | None
+    cpu_start_ns: int | None
+    cpu_busy_ns: int | None
+    frame_time_ns: int | None
+    cpu_wait_ns: int | None
     older_frames: tuple[tuple[int, int], ...]
-    main_marker_first_seen_ticks: int | None = None
-    scanout_delay_ticks: int | None = None
+    main_marker_first_seen_ns: int | None = None
+    scanout_delay_ns: int | None = None
 
 
 @dataclass(frozen=True)
 class CaptureCsvRow:
-    """One capture as the analysis read it. capture_ticks is None for a capture the recorder dropped (status NotRecorded); kind, run_id,
-    frame_index and animation_ticks are the main marker's, when one was read; payload its bytes. source_drops_before: frames the source
+    """One capture as the analysis read it. capture_ns is None for a capture the recorder dropped (status NotRecorded); kind, run_id,
+    frame_index and animation_ns are the main marker's, when one was read; payload its bytes. source_drops_before: frames the source
     reported dropping before it; missed_before: refreshes the device clock says were missed since the previous capture (0 on the host
     clock); sync_run_id and sync_frame_index: the sync marker's, when it was read."""
 
     capture_index: int
-    capture_ticks: int | None
+    capture_ns: int | None
     capture_status: str
     kind: str | None
     run_id: int | None
     frame_index: int | None
-    animation_ticks: int | None
+    animation_ns: int | None
     source_drops_before: int
     missed_before: int
     sync_run_id: int | None
     sync_frame_index: int | None
-    host_ticks: int | None
-    device_ticks: int | None
+    host_ns: int | None
+    device_ns: int | None
     payload: bytes | None
 
 
@@ -149,15 +151,15 @@ class _Table:
         text = self.cell(row, name)
         return _whole(text, limits) if text else None
 
-    def ticks(self, row: list[str], name: str) -> int:
-        """A span's or a point in time's cell: its ticks."""
+    def ns(self, row: list[str], name: str) -> int:
+        """A span's or a point in time's cell: its nanoseconds."""
         return _whole(self.cell(row, name), _INT64)
 
-    def optional_ticks(self, row: list[str], name: str) -> int | None:
+    def optional_ns(self, row: list[str], name: str) -> int | None:
         return self.optional_whole(row, name, _INT64)
 
-    def optional_ticks32(self, row: list[str], name: str) -> int | None:
-        """A marker's 32-bit span (0 to ON_DEMAND_FRAME_TICKS), as the marker carried it."""
+    def optional_ns32(self, row: list[str], name: str) -> int | None:
+        """A marker's 32-bit span (0 to ON_DEMAND_FRAME_NS), as the marker carried it."""
         return self.optional_whole(row, name, _UINT32)
 
 
@@ -170,44 +172,44 @@ def _frame(table: _Table, row: list[str]) -> FrameRow:
     return FrameRow(
         segment=table.whole(row, "segment", _INT32),
         frame_index=table.whole(row, "frameIndex", _UINT64),
-        animation_ticks=table.ticks(row, "animationTicks"),
+        animation_ns=table.ns(row, "animationNs"),
         first_capture_index=table.whole(row, "firstCaptureIndex", _INT64),
-        first_seen_ticks=table.ticks(row, "firstSeenTicks"),
-        on_screen_ticks=table.ticks(row, "onScreenTicks"),
+        first_seen_ns=table.ns(row, "firstSeenNs"),
+        on_screen_ns=table.ns(row, "onScreenNs"),
         captures=table.whole(row, "captures", _INT32),
         skipped_before=table.whole(row, "skippedBefore", _UINT64),
-        display_delta_ticks=table.optional_ticks(row, "displayDeltaTicks"),
-        animation_delta_ticks=table.optional_ticks(row, "animationDeltaTicks"),
-        animation_error_ticks=table.optional_ticks(row, "animationErrorTicks"),
-        drift_ticks=table.ticks(row, "driftTicks"),
+        display_delta_ns=table.optional_ns(row, "displayDeltaNs"),
+        animation_delta_ns=table.optional_ns(row, "animationDeltaNs"),
+        animation_error_ns=table.optional_ns(row, "animationErrorNs"),
+        drift_ns=table.ns(row, "driftNs"),
         flags=tuple(_entries(table.cell(row, "flags"), "flags")),
-        intended_display_ticks=table.optional_ticks(row, "intendedDisplayTicks"),
-        marker_target_ticks=table.optional_ticks32(row, "markerTargetTicks"),
-        target_ticks=table.optional_ticks(row, "targetTicks"),
-        marker_preferred_ticks=table.optional_ticks32(row, "markerPreferredTicks"),
-        preferred_ticks=table.optional_ticks(row, "preferredTicks"),
-        pacing_error_ticks=table.optional_ticks(row, "pacingErrorTicks"),
-        prediction_error_ticks=table.optional_ticks(row, "predictionErrorTicks"),
-        lateness_ticks=table.optional_ticks(row, "latenessTicks"),
-        last_seen_ticks=table.optional_ticks(row, "lastSeenTicks"),
-        cpu_start_ticks=table.optional_ticks(row, "cpuStartTicks"),
-        cpu_busy_ticks=table.optional_ticks32(row, "cpuBusyTicks"),
-        frame_time_ticks=table.optional_ticks(row, "frameTimeTicks"),
-        cpu_wait_ticks=table.optional_ticks(row, "cpuWaitTicks"),
+        intended_display_ns=table.optional_ns(row, "intendedDisplayNs"),
+        marker_target_ns=table.optional_ns32(row, "markerTargetNs"),
+        target_ns=table.optional_ns(row, "targetNs"),
+        marker_preferred_ns=table.optional_ns32(row, "markerPreferredNs"),
+        preferred_ns=table.optional_ns(row, "preferredNs"),
+        pacing_error_ns=table.optional_ns(row, "pacingErrorNs"),
+        prediction_error_ns=table.optional_ns(row, "predictionErrorNs"),
+        lateness_ns=table.optional_ns(row, "latenessNs"),
+        last_seen_ns=table.optional_ns(row, "lastSeenNs"),
+        cpu_start_ns=table.optional_ns(row, "cpuStartNs"),
+        cpu_busy_ns=table.optional_ns32(row, "cpuBusyNs"),
+        frame_time_ns=table.optional_ns(row, "frameTimeNs"),
+        cpu_wait_ns=table.optional_ns(row, "cpuWaitNs"),
         older_frames=_older_frames(table.cell(row, "olderFrames")),
-        main_marker_first_seen_ticks=table.optional_ticks(row, "mainMarkerFirstSeenTicks"),
-        scanout_delay_ticks=table.optional_ticks(row, "scanoutDelayTicks"),
+        main_marker_first_seen_ns=table.optional_ns(row, "mainMarkerFirstSeenNs"),
+        scanout_delay_ns=table.optional_ns(row, "scanoutDelayNs"),
     )
 
 
 def _older_frames(cell: str) -> tuple[tuple[int, int], ...]:
-    """The olderFrames cell: frameIndex@captureTicks entries separated by |, empty when none."""
+    """The olderFrames cell: frameIndex@captureNs entries separated by |, empty when none."""
     older: list[tuple[int, int]] = []
     for entry in _entries(cell, "olderFrames"):
-        index, at, ticks = entry.partition("@")
+        index, at, capture_ns = entry.partition("@")
         if not at or not index:
             raise DataFormatError(f"Invalid olderFrames entry '{entry}'")
-        older.append((_whole(index, _UINT64), _whole(ticks, _INT64)))
+        older.append((_whole(index, _UINT64), _whole(capture_ns, _INT64)))
     return tuple(older)
 
 
@@ -222,17 +224,17 @@ def _capture(table: _Table, row: list[str]) -> CaptureCsvRow:
         raise DataFormatError(f"'{payload}' is not hexadecimal bytes")
     return CaptureCsvRow(
         capture_index=table.whole(row, "captureIndex", _INT64),
-        capture_ticks=table.optional_ticks(row, "captureTicks"),
+        capture_ns=table.optional_ns(row, "captureNs"),
         capture_status=table.cell(row, "status"),
         kind=table.cell(row, "kind") or None,
         run_id=table.optional_whole(row, "runId", _UINT32),
         frame_index=table.optional_whole(row, "frameIndex", _UINT64),
-        animation_ticks=table.optional_ticks(row, "animationTicks"),
+        animation_ns=table.optional_ns(row, "animationNs"),
         source_drops_before=table.optional_whole(row, "sourceDropsBefore", _INT64) or 0,
         missed_before=table.optional_whole(row, "missedBefore", _INT64) or 0,
         sync_run_id=table.optional_whole(row, "syncRunId", _UINT32),
         sync_frame_index=table.optional_whole(row, "syncFrameIndex", _UINT64),
-        host_ticks=table.optional_ticks(row, "hostTicks"),
-        device_ticks=table.optional_ticks(row, "deviceTicks"),
+        host_ns=table.optional_ns(row, "hostNs"),
+        device_ns=table.optional_ns(row, "deviceNs"),
         payload=bytes.fromhex(payload) if payload else None,
     )

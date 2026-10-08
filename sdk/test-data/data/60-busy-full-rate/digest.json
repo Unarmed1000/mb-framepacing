@@ -35,9 +35,9 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1227553897,
-    "deviceTicksCount": 486,
-    "deviceTicksSum": 19642500000,
+    "hostNsSum": 118740547300,
+    "deviceNsCount": 486,
+    "deviceNsSum": 1964250000000,
     "sourceDropsSum": 0,
     "statusCounts": {
       "Decoded": 486
@@ -52,9 +52,9 @@
     "formatVersion": 1,
     "scanout": "SingleScanout",
     "timeSource": "Device",
-    "capturePeriodTicks": 166667,
-    "measurementResolutionTicks": 166667,
-    "errorThresholdTicks": 10000,
+    "capturePeriodNs": 16666667,
+    "measurementResolutionNs": 16666667,
+    "errorThresholdNs": 1000000,
     "markerCount": 1,
     "warningCount": 0,
     "runs": [
@@ -70,16 +70,16 @@
         "missedCaptures": 0,
         "captures": 480,
         "displayDeltaCount": 387,
-        "displayDeltaP50": 16.6667,
-        "animationErrorMax": 16.6667,
-        "averageFps": 48.47599185167429,
+        "displayDeltaP50": 16.666667,
+        "animationErrorMax": 16.666667,
+        "averageFps": 48.47599165129336,
         "excludedStaticFrames": 0,
         "uncertainSteps": 0,
         "cpuBusyCount": 388,
         "pacingSource": "Schedule",
         "lateFrames": 92,
-        "refreshPeriodTicks": 166667,
-        "targetFrameTicks": 166667,
+        "refreshPeriodNs": 16666667,
+        "targetFrameNs": 16666667,
         "histogramBins": 335
       }
     ]
@@ -97,21 +97,21 @@
           "count": 388,
           "sum": 225622
         },
-        "animationTicks": {
+        "animationNs": {
           "count": 388,
-          "sum": 15877333334
+          "sum": 1587733333334
         },
         "firstCaptureIndex": {
           "count": 388,
           "sum": 96520
         },
-        "firstSeenTicks": {
+        "firstSeenNs": {
           "count": 388,
-          "sum": 16086666666
+          "sum": 1608666666666
         },
-        "onScreenTicks": {
+        "onScreenNs": {
           "count": 388,
-          "sum": 80000000
+          "sum": 8000000000
         },
         "captures": {
           "count": 388,
@@ -121,79 +121,79 @@
           "count": 388,
           "sum": 0
         },
-        "displayDeltaTicks": {
+        "displayDeltaNs": {
           "count": 387,
-          "sum": 79833333
+          "sum": 7983333333
         },
-        "animationDeltaTicks": {
+        "animationDeltaNs": {
           "count": 387,
-          "sum": 79833333
+          "sum": 7983333333
         },
-        "animationErrorTicks": {
+        "animationErrorNs": {
           "count": 387,
           "sum": 0
         },
-        "driftTicks": {
+        "driftNs": {
           "count": 388,
-          "sum": -15333332
+          "sum": -1533333332
         },
-        "intendedDisplayTicks": {
+        "intendedDisplayNs": {
           "count": 387,
-          "sum": 15877333334
+          "sum": 1587733333334
         },
-        "markerTargetTicks": {
+        "markerTargetNs": {
           "count": 388,
-          "sum": 64666796
+          "sum": 6466666796
         },
-        "targetTicks": {
+        "targetNs": {
           "count": 388,
-          "sum": 80000160
+          "sum": 8000000160
         },
-        "markerPreferredTicks": {
+        "markerPreferredNs": {
           "count": 388,
-          "sum": 64666796
+          "sum": 6466666796
         },
-        "preferredTicks": {
+        "preferredNs": {
           "count": 388,
-          "sum": 64666796
+          "sum": 6466666796
         },
-        "pacingErrorTicks": {
+        "pacingErrorNs": {
           "count": 386,
           "sum": 0
         },
-        "predictionErrorTicks": {
+        "predictionErrorNs": {
           "count": 386,
           "sum": 0
         },
-        "latenessTicks": {
+        "latenessNs": {
           "count": 387,
-          "sum": 15333332
+          "sum": 1533333332
         },
-        "lastSeenTicks": {
+        "lastSeenNs": {
           "count": 388,
-          "sum": 16102000000
+          "sum": 1610200000000
         },
-        "cpuStartTicks": {
+        "cpuStartNs": {
           "count": 387,
-          "sum": 15812666666
+          "sum": 1581266666666
         },
-        "cpuBusyTicks": {
+        "cpuBusyNs": {
           "count": 388,
-          "sum": 53484092
+          "sum": 5348409811
         },
-        "frameTimeTicks": {
+        "frameTimeNs": {
           "count": 385,
-          "sum": 79500000
+          "sum": 7950000000
         },
-        "cpuWaitTicks": {
+        "cpuWaitNs": {
           "count": 385,
-          "sum": 26378377
+          "sum": 2637837060
         },
-        "mainMarkerFirstSeenTicks": {
+        "mainMarkerFirstSeenNs": {
           "count": 0,
           "sum": 0
         },
-        "scanoutDelayTicks": {
+        "scanoutDelayNs": {
           "count": 0,
           "sum": 0
         }
@@ -215,9 +215,9 @@
       "SequenceEnd": 3,
       "SequenceStart": 3
     },
-    "captureTicksSum": 19642500000,
+    "captureNsSum": 1964250000000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1227553897,
+    "hostNsSum": 118740547300,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,

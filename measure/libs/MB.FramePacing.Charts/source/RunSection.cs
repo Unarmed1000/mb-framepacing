@@ -60,7 +60,7 @@ namespace MB.FramePacing.Charts
     public ChartRun Section => m_section.Value;
 
     /// <summary>The time at 0 s: the run's first frame.</summary>
-    public TickCount64 Origin => Run.Run.Frames.Count > 0 ? Run.Run.Frames[0].FirstSeenTime : default;
+    public NanosecondTickCount Origin => Run.Run.Frames.Count > 0 ? Run.Run.Frames[0].FirstSeenTime : default;
 
     /// <summary>The whole run: from its first frame to one capture period after its last.</summary>
     public static RunSection Whole(ChartRun run)

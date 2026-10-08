@@ -4,11 +4,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // Private to the data module: parsing the cells of the CSV files. Every number is a whole one, written as its digits with a '-' in front
-// when negative; a time is its 100 ns ticks. An empty cell is a missing value.
+// when negative; a time is its nanoseconds. An empty cell is a missing value.
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <charconv>
 #include <cstdint>
@@ -41,37 +41,39 @@ namespace MB::FramePacing::Data::Csv
     return text.empty() ? std::nullopt : std::optional<T>(ParseInteger<T>(text));
   }
 
-  //! A span from its ticks.
-  inline TimeSpan ParseTimeSpan(const std::string_view text)
+  //! A span from its nanoseconds.
+  inline NanosecondTimeSpan ParseNanosecondTimeSpan(const std::string_view text)
   {
-    return TimeSpan(ParseInteger<int64_t>(text));
+    return NanosecondTimeSpan(ParseInteger<int64_t>(text));
   }
 
-  //! A point on a clock from its ticks since the clock's zero.
-  inline TickCount64 ParseTickCount64(const std::string_view text)
+  //! A point on a clock from its nanoseconds since the clock's zero.
+  inline NanosecondTickCount ParseNanosecondTickCount(const std::string_view text)
   {
-    return TickCount64(ParseInteger<int64_t>(text));
+    return NanosecondTickCount(ParseInteger<int64_t>(text));
   }
 
-  //! A marker's 32-bit span (0 to OnDemandFrameTime) from its ticks, as the marker carried it.
-  inline TimeSpan32 ParseTimeSpan32(const std::string_view text)
+  //! One of a marker's durations from its nanoseconds, as the marker carried it: 32 bits unsigned in the marker and in the file (0 to
+  //! 4294967295, which is on demand for a frame time: the marker library's Payload::OnDemandFrameTime). Throws DataFormatError for a
+  //! number outside those 32 bits.
+  inline NanosecondTimeDuration ParseNanosecondTimeDuration(const std::string_view text)
   {
-    return TimeSpan32(ParseInteger<uint32_t>(text));
+    return NanosecondTimeDuration::FromNanoseconds(int64_t{ParseInteger<uint32_t>(text)});
   }
 
-  inline std::optional<TimeSpan> OptionalTimeSpan(const std::string_view text)
+  inline std::optional<NanosecondTimeSpan> OptionalNanosecondTimeSpan(const std::string_view text)
   {
-    return text.empty() ? std::nullopt : std::optional<TimeSpan>(ParseTimeSpan(text));
+    return text.empty() ? std::nullopt : std::optional<NanosecondTimeSpan>(ParseNanosecondTimeSpan(text));
   }
 
-  inline std::optional<TickCount64> OptionalTickCount64(const std::string_view text)
+  inline std::optional<NanosecondTickCount> OptionalNanosecondTickCount(const std::string_view text)
   {
-    return text.empty() ? std::nullopt : std::optional<TickCount64>(ParseTickCount64(text));
+    return text.empty() ? std::nullopt : std::optional<NanosecondTickCount>(ParseNanosecondTickCount(text));
   }
 
-  inline std::optional<TimeSpan32> OptionalTimeSpan32(const std::string_view text)
+  inline std::optional<NanosecondTimeDuration> OptionalNanosecondTimeDuration(const std::string_view text)
   {
-    return text.empty() ? std::nullopt : std::optional<TimeSpan32>(ParseTimeSpan32(text));
+    return text.empty() ? std::nullopt : std::optional<NanosecondTimeDuration>(ParseNanosecondTimeDuration(text));
   }
 }
 

@@ -19,7 +19,7 @@ namespace MB.FramePacing.Capture.Camera
   /// <summary>A short run of whole camera frames held in memory for calibrating or verifying a camera rig.</summary>
   public sealed class CameraFrameSet
   {
-    public CameraFrameSet(IReadOnlyList<GrayImage> frames, IReadOnlyList<TickCount64> times, bool deviceTimestamps, string sourceDescription)
+    public CameraFrameSet(IReadOnlyList<GrayImage> frames, IReadOnlyList<NanosecondTickCount> times, bool deviceTimestamps, string sourceDescription)
     {
       if (frames.Count != times.Count)
         throw new ArgumentException("Every frame needs a timestamp");
@@ -32,7 +32,7 @@ namespace MB.FramePacing.Capture.Camera
     public IReadOnlyList<GrayImage> Frames { get; }
 
     /// <summary>Capture time of every frame (the device's when all frames had one, otherwise the host's).</summary>
-    public IReadOnlyList<TickCount64> Times { get; }
+    public IReadOnlyList<NanosecondTickCount> Times { get; }
 
     public bool DeviceTimestamps { get; }
 
@@ -71,7 +71,7 @@ namespace MB.FramePacing.Capture.Camera
 
       // Device timestamps may arrive after the pixels (ffmpeg's showinfo on stderr): give them a moment
       bool device = ResolveDeviceTimes(source, sink);
-      var times = new TickCount64[sink.Frames.Count];
+      var times = new NanosecondTickCount[sink.Frames.Count];
       for (int i = 0; i < times.Length; ++i)
         times[i] = device ? sink.DeviceTimes[i].Time : sink.HostTimes[i];
       return new CameraFrameSet(sink.Frames, times, device, source.Description);
@@ -121,7 +121,7 @@ namespace MB.FramePacing.Capture.Camera
       }
 
       public List<GrayImage> Frames { get; } = new List<GrayImage>();
-      public List<TickCount64> HostTimes { get; } = new List<TickCount64>();
+      public List<NanosecondTickCount> HostTimes { get; } = new List<NanosecondTickCount>();
       public List<DeviceTimestamp> DeviceTimes { get; } = new List<DeviceTimestamp>();
 
       public Span<byte> BeginFrame()
@@ -130,7 +130,7 @@ namespace MB.FramePacing.Capture.Camera
         return m_current.Pixels.AsSpan(0, m_width * m_height);
       }
 
-      public void EndFrame(TickCount64 hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
+      public void EndFrame(NanosecondTickCount hostTime, DeviceTimestamp deviceTime, uint sourceDrops)
       {
         if (m_current == null || Frames.Count >= m_maxFrames)
           return;

@@ -73,7 +73,7 @@ of C# rectification, well above 1000 fps on one core.
   some sightings come a camera frame late (the marker was changing in the frame before), the interval before is a camera period
   longer and the one after a camera period shorter, and the clusters of neighbouring refresh counts run into each other (a 60 Hz
   display filmed at exactly 120 fps came out as 71.9 Hz). The first-seen times themselves are unharmed, so they are asked directly
-  (`RefreshEstimator.GridPeriodTicks`): a search of the periods from just above the camera's to the mean interval for the longest one
+  (`RefreshEstimator.GridPeriodNanoseconds`): a search of the periods from just above the camera's to the mean interval for the longest one
   the times are on (the periodogram of the times, `GridFit`; the mean interval leaves a period's alias on the camera's grid out),
   from 64 times on. The expected rate is taken when the times are on its grid, and the intervals' estimate stays where it is that
   period. On simulated sightings (12 monitor refresh rates from 50 to 500 Hz, cameras from 1.7 to 16.7 times as fast, a fifth of
@@ -84,7 +84,7 @@ of C# rectification, well above 1000 fps on one core.
   warns that the calculated rate is unreliable (`selftest --experimental --camera` at 150 fps on 75 Hz, 240 on 120 and 288 on 144). The
   calibration's clip in the selftest is too short for the search to be sure (half a second: at most one stretch of 64 sightings), so
   its rate is the intervals' and can be off at these camera rates. The period found is then measured with a least squares line through every
-  reliable first-seen time against its refresh number (`RefreshEstimator.RefinePeriodTicks`; the average of the intervals only uses
+  reliable first-seen time against its refresh number (`RefreshEstimator.RefinePeriodNanoseconds`; the average of the intervals only uses
   the two ends of each unbroken stretch). On simulated sightings its error is 10 to 20 times smaller, from 130 to 2000 fps on a
   60 Hz display; `selftest --experimental --camera` finds 59.99 to 60.00 Hz at every rate of the table (59.90 to 60.11 Hz before). The line is
   not taken when its own numbering does not hold up against it (a camera below about twice the refresh rate) or when it leaves

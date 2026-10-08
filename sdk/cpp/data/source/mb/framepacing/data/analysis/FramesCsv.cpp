@@ -35,31 +35,31 @@ namespace MB::FramePacing::Data
       FrameRow frame;
       frame.Segment = Csv::ParseInteger<int32_t>(table.Cell(row, "segment"));
       frame.FrameIndex = Csv::ParseInteger<uint64_t>(table.Cell(row, "frameIndex"));
-      frame.AnimationTime = Csv::ParseTimeSpan(table.Cell(row, "animationTicks"));
+      frame.AnimationTime = Csv::ParseNanosecondTimeSpan(table.Cell(row, "animationNs"));
       frame.FirstCaptureIndex = Csv::ParseInteger<int64_t>(table.Cell(row, "firstCaptureIndex"));
-      frame.FirstSeenTime = Csv::ParseTickCount64(table.Cell(row, "firstSeenTicks"));
-      frame.OnScreen = Csv::ParseTimeSpan(table.Cell(row, "onScreenTicks"));
+      frame.FirstSeenTime = Csv::ParseNanosecondTickCount(table.Cell(row, "firstSeenNs"));
+      frame.OnScreen = Csv::ParseNanosecondTimeSpan(table.Cell(row, "onScreenNs"));
       frame.Captures = Csv::ParseInteger<int32_t>(table.Cell(row, "captures"));
       frame.SkippedBefore = Csv::ParseInteger<uint64_t>(table.Cell(row, "skippedBefore"));
-      frame.DisplayDelta = Csv::OptionalTimeSpan(table.Cell(row, "displayDeltaTicks"));
-      frame.AnimationDelta = Csv::OptionalTimeSpan(table.Cell(row, "animationDeltaTicks"));
-      frame.AnimationError = Csv::OptionalTimeSpan(table.Cell(row, "animationErrorTicks"));
-      frame.Drift = Csv::ParseTimeSpan(table.Cell(row, "driftTicks"));
+      frame.DisplayDelta = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "displayDeltaNs"));
+      frame.AnimationDelta = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "animationDeltaNs"));
+      frame.AnimationError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "animationErrorNs"));
+      frame.Drift = Csv::ParseNanosecondTimeSpan(table.Cell(row, "driftNs"));
       ForEachEntry(table.Cell(row, "flags"), "flags", [&frame](const std::string_view flag) { frame.Flags.emplace_back(flag); });
-      frame.IntendedDisplayTime = Csv::OptionalTickCount64(table.Cell(row, "intendedDisplayTicks"));
-      frame.MarkerTargetFrameTime = Csv::OptionalTimeSpan32(table.Cell(row, "markerTargetTicks"));
-      frame.TargetFrameTime = Csv::OptionalTimeSpan(table.Cell(row, "targetTicks"));
-      frame.MarkerPreferredFrameTime = Csv::OptionalTimeSpan32(table.Cell(row, "markerPreferredTicks"));
-      frame.PreferredFrameTime = Csv::OptionalTimeSpan(table.Cell(row, "preferredTicks"));
-      frame.PacingError = Csv::OptionalTimeSpan(table.Cell(row, "pacingErrorTicks"));
-      frame.PredictionError = Csv::OptionalTimeSpan(table.Cell(row, "predictionErrorTicks"));
-      frame.Lateness = Csv::OptionalTimeSpan(table.Cell(row, "latenessTicks"));
-      frame.LastSeenTime = Csv::OptionalTickCount64(table.Cell(row, "lastSeenTicks"));
-      frame.CpuStartTime = Csv::OptionalTickCount64(table.Cell(row, "cpuStartTicks"));
-      frame.CpuBusy = Csv::OptionalTimeSpan32(table.Cell(row, "cpuBusyTicks"));
-      frame.FrameTime = Csv::OptionalTimeSpan(table.Cell(row, "frameTimeTicks"));
-      frame.CpuWait = Csv::OptionalTimeSpan(table.Cell(row, "cpuWaitTicks"));
-      // olderFrames: frameIndex@captureTicks entries separated by |
+      frame.IntendedDisplayTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "intendedDisplayNs"));
+      frame.MarkerTargetFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "markerTargetNs"));
+      frame.TargetFrameTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "targetNs"));
+      frame.MarkerPreferredFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "markerPreferredNs"));
+      frame.PreferredFrameTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "preferredNs"));
+      frame.PacingError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "pacingErrorNs"));
+      frame.PredictionError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "predictionErrorNs"));
+      frame.Lateness = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "latenessNs"));
+      frame.LastSeenTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "lastSeenNs"));
+      frame.CpuStartTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "cpuStartNs"));
+      frame.CpuBusy = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "cpuBusyNs"));
+      frame.FrameTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "frameTimeNs"));
+      frame.CpuWait = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "cpuWaitNs"));
+      // olderFrames: frameIndex@captureNs entries separated by |
       ForEachEntry(table.Cell(row, "olderFrames"), "olderFrames",
                    [&frame](const std::string_view entry)
                    {
@@ -68,10 +68,11 @@ namespace MB::FramePacing::Data
                      {
                        throw DataFormatError("Invalid olderFrames entry '" + std::string(entry) + "'");
                      }
-                     frame.OlderFrames.push_back({Csv::ParseInteger<uint64_t>(entry.substr(0, at)), Csv::ParseTickCount64(entry.substr(at + 1))});
+                     frame.OlderFrames.push_back(
+                       {Csv::ParseInteger<uint64_t>(entry.substr(0, at)), Csv::ParseNanosecondTickCount(entry.substr(at + 1))});
                    });
-      frame.MainMarkerFirstSeenTime = Csv::OptionalTickCount64(table.Cell(row, "mainMarkerFirstSeenTicks"));
-      frame.ScanoutDelay = Csv::OptionalTimeSpan(table.Cell(row, "scanoutDelayTicks"));
+      frame.MainMarkerFirstSeenTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "mainMarkerFirstSeenNs"));
+      frame.ScanoutDelay = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "scanoutDelayNs"));
       return frame;
     }
   }

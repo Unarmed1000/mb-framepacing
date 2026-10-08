@@ -20,7 +20,8 @@ namespace MB.FramePacing.Analysis.UnitTest
   [TestFixture]
   public class MissedCapturesTests
   {
-    private const long Period = TimeSpan.TicksPerSecond / 60;
+    // 1/60 s cut to the nanosecond
+    private const long Period = 16_666_666;
 
     private static readonly CaptureDataHeader g_header = new CaptureDataHeader(
       960,
@@ -42,7 +43,10 @@ namespace MB.FramePacing.Analysis.UnitTest
     [TestCase(2.5, 2)]
     [TestCase(3.0, 2)]
     public void Before_CountsTheRefreshesAStepLeftOut(double periods, long missed) =>
-      Assert.That(MissedCaptures.Before(new TimeSpan((long)Math.Round(periods * Period)), new TimeSpan(Period)), Is.EqualTo(missed));
+      Assert.That(
+        MissedCaptures.Before(new NanosecondTimeSpan((long)Math.Round(periods * Period)), new NanosecondTimeSpan(Period)),
+        Is.EqualTo(missed)
+      );
 
     /// <summary>
     /// Records of a 60 Hz capture showing frames 1 to 6, one capture each; the capture of <paramref name="gapBefore"/> comes a refresh late
@@ -57,8 +61,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         records.Add(
           new CaptureDataRecord(
             records.Count,
-            new TickCount64(time),
-            deviceClock ? new TickCount64(time) : null,
+            new NanosecondTickCount(time),
+            deviceClock ? new NanosecondTickCount(time) : null,
             0,
             CaptureDataStatus.Decoded,
             payload.Encode(start),
@@ -68,7 +72,10 @@ namespace MB.FramePacing.Analysis.UnitTest
         time += Period;
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)), StartMetadata.Empty);
+        Add(
+          new MarkerPayload(MarkerKind.SequenceStart, 1, 0, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0)),
+          StartMetadata.Empty
+        );
       for (ulong frame = 1; frame <= 6; ++frame)
       {
         if ((int)frame == gapBefore)
@@ -79,14 +86,14 @@ namespace MB.FramePacing.Analysis.UnitTest
             1,
             frame,
             MB.FramePacing.Marker.MarkerFlags.NoFlags,
-            new TimeSpan((long)frame * Period),
-            PreferredFrameTime: new TimeSpan32((uint)Period),
-            TargetFrameTime: new TimeSpan32((uint)Period)
+            new NanosecondTimeSpan((long)frame * Period),
+            PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(Period),
+            TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(Period)
           )
         );
       }
       for (int i = 0; i < 3; ++i)
-        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(7 * Period)));
+        Add(new MarkerPayload(MarkerKind.SequenceEnd, 1, 7, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(7 * Period)));
       return records;
     }
 

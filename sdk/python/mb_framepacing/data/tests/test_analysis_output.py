@@ -1,15 +1,18 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""summary.json and the CSVs: the format version, columns by name, times as whole ticks, and content that is refused."""
+"""summary.json and the CSVs: the format version, columns by name, times as whole nanoseconds, and content that is refused."""
 
 import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ...marker import ON_DEMAND_FRAME_NS as MARKER_ON_DEMAND_FRAME_NS
 from .. import (
     DIRECTORY_NAME,
+    NS_PER_MILLISECOND,
+    ON_DEMAND_FRAME_NS,
     SUMMARY_FILE_NAME,
     CaptureCsvRow,
     DataFormatError,
@@ -28,9 +31,9 @@ MINIMAL_SUMMARY = """
 {
   "scanout": "SingleScanout",
   "analysedUtc": "2026-01-01T00:00:00.1234567Z",
-  "capturePeriodTicks": 166667,
-  "measurementResolutionTicks": 166667,
-  "errorThresholdTicks": 10000,
+  "capturePeriodNs": 16666667,
+  "measurementResolutionNs": 16666667,
+  "errorThresholdNs": 1000000,
   "runs": []
 }
 """
@@ -42,16 +45,15 @@ VALUES = '{ "count": 3, "min": -1.5, "mean": 0.25, "stdDev": 1.25, "p50": 0, "p9
 
 RUN_START = '"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "run-7-frames.csv"'
 
-FRAME_COLUMNS = "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags"
+FRAME_COLUMNS = "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags"
 
 CAPTURE_COLUMNS = (
-    "captureIndex,captureTicks,status,kind,runId,frameIndex,animationTicks,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostTicks,"
-    "deviceTicks,payloadHex"
+    "captureIndex,captureNs,status,kind,runId,frameIndex,animationNs,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostNs,deviceNs,payloadHex"
 )
 
-PACING = """"pacing": { "refreshPeriodTicks": 166667, "refreshCalculated": false, "targetFrameTicks": 333334, "source": "TargetFrameTime",
+PACING = """"pacing": { "refreshPeriodNs": 16666667, "refreshCalculated": false, "targetFrameNs": 33333334, "source": "TargetFrameTime",
     "lateFrames": 1, "lateShare": 0.125, "worstLateShare": 0.5, "errorFramesWithUnevenDisplay": 1, "errorFramesWithEvenDisplay": 1,
-    "verdict": "Both", "refreshHz": 59.99988 }"""
+    "verdict": "Both", "refreshHz": 59.9999988 }"""
 
 HISTOGRAM = '{ "binWidthMs": 0.1, "total": 2, "bins": [ { "centerMs": 0.1, "count": 2 } ] }'
 
@@ -66,7 +68,7 @@ def statistics(without: str = "", values: str = VALUES) -> str:
 
 def one_run(*members: str) -> str:
     """A summary whose one run has the given members."""
-    return '{ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000, "runs": [ { ' + ", ".join(m for m in members if m) + " } ] }"
+    return '{ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000, "runs": [ { ' + ", ".join(m for m in members if m) + " } ] }"
 
 
 def minimal_with(member: str) -> str:
@@ -113,24 +115,46 @@ class SummaryTests(unittest.TestCase):
         self.refused(minimal_with('"formatVersion": 4294967297'), "not format 1 by wrapping in another language")
         self.refused(minimal_with('"formatVersion": 1.0'))
 
-    def test_a_summarys_times_are_whole_ticks(self) -> None:
+    def test_a_summarys_times_are_whole_nanoseconds(self) -> None:
         summary = parse_summary(MINIMAL_SUMMARY)
-        self.assertEqual((summary.capture_period_ticks, summary.measurement_resolution_ticks, summary.error_threshold_ticks), (166_667, 166_667, 10_000))
-        without = parse_summary('{ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000 }')
-        self.assertEqual(without.measurement_resolution_ticks, 166_667, "a file without it: the capture period")
-        resolution = '"measurementResolutionTicks": 166667'
-        zero = parse_summary(replaced(MINIMAL_SUMMARY, resolution, '"measurementResolutionTicks": 0'))
-        self.assertEqual(zero.measurement_resolution_ticks, 166_667, "0, as C# reads a file without it")
-        self.assertEqual(parse_summary(replaced(MINIMAL_SUMMARY, resolution, '"measurementResolutionTicks": 5')).measurement_resolution_ticks, 5)
+        self.assertEqual((summary.capture_period_ns, summary.measurement_resolution_ns, summary.error_threshold_ns), (16_666_667, 16_666_667, 1_000_000))
+        without = parse_summary('{ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000 }')
+        self.assertEqual(without.measurement_resolution_ns, 16_666_667, "a file without it: the capture period")
+        resolution = '"measurementResolutionNs": 16666667'
+        zero = parse_summary(replaced(MINIMAL_SUMMARY, resolution, '"measurementResolutionNs": 0'))
+        self.assertEqual(zero.measurement_resolution_ns, 16_666_667, "0, as C# reads a file without it")
+        self.assertEqual(parse_summary(replaced(MINIMAL_SUMMARY, resolution, '"measurementResolutionNs": 5')).measurement_resolution_ns, 5)
 
         # Never a fraction, a text or another unit's field
-        self.refused(replaced(MINIMAL_SUMMARY, "166667,", "166667.5,"))
-        self.refused(replaced(MINIMAL_SUMMARY, "166667,", "166667.0,"), "a whole number written as a real one")
-        self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdTicks": 10000', '"errorThresholdTicks": "10000"'))
-        self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdTicks": 10000', '"errorThresholdTicks": 9223372036854775808'), "beyond 64 bits")
-        self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdTicks": 10000', '"errorThresholdTicks": true'))
-        with self.assertRaisesRegex(DataFormatError, "capturePeriodTicks"):
-            _ = parse_summary(replaced(MINIMAL_SUMMARY, "capturePeriodTicks", "capturePeriodMs"))
+        self.refused(replaced(MINIMAL_SUMMARY, "16666667,", "16666667.5,"))
+        self.refused(replaced(MINIMAL_SUMMARY, "16666667,", "16666667.0,"), "a whole number written as a real one")
+        self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdNs": 1000000', '"errorThresholdNs": "1000000"'))
+        self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdNs": 1000000', '"errorThresholdNs": 9223372036854775808'), "beyond 64 bits")
+        self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdNs": 1000000', '"errorThresholdNs": true'))
+        with self.assertRaisesRegex(DataFormatError, "capturePeriodNs"):
+            _ = parse_summary(replaced(MINIMAL_SUMMARY, "capturePeriodNs", "capturePeriodMs"))
+
+    def test_a_summary_from_before_the_nanoseconds_is_refused(self) -> None:
+        # The same format version, its times in ticks of 100 ns under names that end in Ticks: the required ...Ns fields are not there
+        old = """
+{
+  "formatVersion": 1,
+  "scanout": "SingleScanout",
+  "capturePeriodTicks": 166667,
+  "measurementResolutionTicks": 166667,
+  "errorThresholdTicks": 10000,
+  "runs": []
+}
+"""
+        with self.assertRaisesRegex(DataFormatError, "lacks 'capturePeriodNs'"):
+            _ = parse_summary(old)
+        with self.assertRaisesRegex(DataFormatError, "lacks 'errorThresholdNs'"):
+            _ = parse_summary(replaced(old, "capturePeriodTicks", "capturePeriodNs"))
+        # A run's pacing has two more
+        with self.assertRaisesRegex(DataFormatError, "pacing lacks 'refreshPeriodNs'"):
+            _ = parse_summary(one_run(RUN_START, COUNTS, statistics(), replaced(PACING, "refreshPeriodNs", "refreshPeriodTicks")))
+        with self.assertRaisesRegex(DataFormatError, "pacing lacks 'targetFrameNs'"):
+            _ = parse_summary(one_run(RUN_START, COUNTS, statistics(), replaced(PACING, "targetFrameNs", "targetFrameTicks")))
 
     def test_a_run_is_read_with_its_counts_statistics_and_pacing(self) -> None:
         (run,) = parse_summary(one_run(RUN_START, COUNTS, statistics(), PACING)).runs
@@ -139,12 +163,12 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(run.statistics.drift_ms, ValueStatistics(3, -1.5, 0.25, 1.25, 0.0, 2.0, 2.5, 0.0, 3.0), "p999 is 0 in a file without it")
         self.assertEqual(run.statistics.cpu_busy_ms, ValueStatistics.empty(), "an optional one the file lacks is empty")
         assert run.pacing is not None
-        self.assertEqual((run.pacing.refresh_period_ticks, run.pacing.target_frame_ticks, run.pacing.source), (166_667, 333_334, "TargetFrameTime"))
+        self.assertEqual((run.pacing.refresh_period_ns, run.pacing.target_frame_ns, run.pacing.source), (16_666_667, 33_333_334, "TargetFrameTime"))
         self.assertIsNone(run.histograms)
         self.assertIsNone(run.start_time_utc)
 
-        self.refused(one_run(RUN_START, COUNTS, statistics(), replaced(PACING, "333334", "333334.5")))
-        self.refused(one_run(RUN_START, COUNTS, statistics(), replaced(PACING, "refreshPeriodTicks", "refreshPeriodMs")))
+        self.refused(one_run(RUN_START, COUNTS, statistics(), replaced(PACING, "33333334", "33333334.5")))
+        self.refused(one_run(RUN_START, COUNTS, statistics(), replaced(PACING, "refreshPeriodNs", "refreshPeriodMs")))
         self.refused(one_run(RUN_START, COUNTS, statistics(), '"pacing": 1'), "pacing that is a number")
 
     def test_a_run_without_what_every_run_has_is_not_a_summary(self) -> None:
@@ -183,8 +207,8 @@ class SummaryTests(unittest.TestCase):
         self.refused(one_run(RUN_START, COUNTS, statistics(), '"camera": 1'))
 
     def test_lists_must_be_lists(self) -> None:
-        self.refused('{ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000, "runs": { "a": 1 } }')
-        self.refused('{ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000, "runs": [ 5 ] }')
+        self.refused('{ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000, "runs": { "a": 1 } }')
+        self.refused('{ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000, "runs": [ 5 ] }')
         self.refused(minimal_with('"markers": { "bounds": "0,0,1,1", "moduleSizePx": 3 }'))
         self.refused(minimal_with('"markers": [ 3 ]'))
         self.refused(minimal_with('"warnings": "one text"'))
@@ -217,14 +241,14 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(run.statistics.percent_error, 25.5)
 
     def test_required_fields_are_required(self) -> None:
-        self.refused('{ "errorThresholdTicks": 10000 }', "no capture period")
-        self.refused('{ "capturePeriodTicks": 166667 }', "no error threshold")
-        self.refused('{ "capturePeriodTicks": null, "errorThresholdTicks": 10000 }', "null is absent")
+        self.refused('{ "errorThresholdNs": 1000000 }', "no capture period")
+        self.refused('{ "capturePeriodNs": 16666667 }', "no error threshold")
+        self.refused('{ "capturePeriodNs": null, "errorThresholdNs": 1000000 }', "null is absent")
         self.refused("[]", "not an object")
-        self.refused('{ "capturePeriodTicks": ', "not JSON")
+        self.refused('{ "capturePeriodNs": ', "not JSON")
         self.refused("", "empty")
         self.refused("null")
-        self.refused(replaced(MINIMAL_SUMMARY, "capturePeriodTicks", "CapturePeriodTicks"), "names are case sensitive")
+        self.refused(replaced(MINIMAL_SUMMARY, "capturePeriodNs", "CapturePeriodNs"), "names are case sensitive")
 
     def test_times_without_an_offset_are_utc(self) -> None:
         summary = parse_summary(replaced(MINIMAL_SUMMARY, "2026-01-01T00:00:00.1234567Z", "2026-01-01T12:30:00"))
@@ -238,7 +262,7 @@ class SummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / SUMMARY_FILE_NAME
             _ = path.write_text(MINIMAL_SUMMARY, encoding="utf-8")
-            self.assertEqual(read_summary(path).capture_period_ticks, 166_667)
+            self.assertEqual(read_summary(path).capture_period_ns, 16_666_667)
             missing = Path(folder) / "no-such-folder" / SUMMARY_FILE_NAME
             for read in (read_summary, read_frames, read_captures):
                 with self.assertRaises(OSError):
@@ -273,32 +297,32 @@ class FramesCsvTests(unittest.TestCase):
 
     def test_frames_are_read_by_column_name_whatever_the_order(self) -> None:
         text = (
-            "frameIndex,newColumn,segment,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,driftTicks,flags,"
-            "cpuBusyTicks\r\n"
-            "7,x,0,1166667,3,500000,333333,2,1,-5000,SkippedBefore|Late,\r\n"
+            "frameIndex,newColumn,segment,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags,"
+            "cpuBusyNs\r\n"
+            "7,x,0,116666669,3,50000001,33333334,2,1,-500000,SkippedBefore|Late,\r\n"
             "\r\n"
             "8,x,1,0,4,0,1,1,0,0,,5\n"
         )
         first, second = frames(text)
         self.assertEqual(
-            (first.frame_index, first.segment, first.animation_ticks, first.first_seen_ticks, first.on_screen_ticks, first.drift_ticks),
-            (7, 0, 1_166_667, 500_000, 333_333, -5_000),
+            (first.frame_index, first.segment, first.animation_ns, first.first_seen_ns, first.on_screen_ns, first.drift_ns),
+            (7, 0, 116_666_669, 50_000_001, 33_333_334, -500_000),
         )
         self.assertEqual(first.flags, ("SkippedBefore", "Late"))
-        self.assertIsNone(first.cpu_busy_ticks, "an empty cell")
-        self.assertIsNone(first.last_seen_ticks, "a column the file lacks")
+        self.assertIsNone(first.cpu_busy_ns, "an empty cell")
+        self.assertIsNone(first.last_seen_ns, "a column the file lacks")
         self.assertEqual(first.older_frames, ())
-        self.assertEqual((second.segment, second.flags, second.cpu_busy_ticks), (1, (), 5), "an empty line is skipped, a line may end with \\n")
+        self.assertEqual((second.segment, second.flags, second.cpu_busy_ns), (1, (), 5), "an empty line is skipped, a line may end with \\n")
 
-    def test_every_time_is_read_as_the_ticks_it_is(self) -> None:
+    def test_every_time_is_read_as_the_nanoseconds_it_is(self) -> None:
         # The values a marker can carry at their limits: nothing between the file and the row converts them
         text = (
-            "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,displayDeltaTicks,"
-            "animationDeltaTicks,animationErrorTicks,driftTicks,flags,intendedDisplayTicks,markerTargetTicks,targetTicks,markerPreferredTicks,"
-            "preferredTicks,pacingErrorTicks,predictionErrorTicks,latenessTicks,lastSeenTicks,cpuStartTicks,cpuBusyTicks,frameTimeTicks,"
-            "cpuWaitTicks,olderFrames,mainMarkerFirstSeenTicks,scanoutDelayTicks\n"
-            "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,166667,1,0,166666,9223372036854775807,-1,-7,Late,"
-            "-9223372036854775808,4294967295,333334,1,166667,3,-3,83333,1234567890123456789,-1234567890123456789,120060,166668,46608,"
+            "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,"
+            "animationDeltaNs,animationErrorNs,driftNs,flags,intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,"
+            "preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,"
+            "cpuWaitNs,olderFrames,mainMarkerFirstSeenNs,scanoutDelayNs\n"
+            "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,16666667,1,0,16666666,9223372036854775807,-1,-7,Late,"
+            "-9223372036854775808,4294967295,33333334,1,16666667,3,-3,8333333,1234567890123456789,-1234567890123456789,12006034,16666812,4660778,"
             "41@1234567890123456790|40@-5,9007199254740993,-9007199254740993\n"
         )
         (row,) = frames(text)
@@ -307,50 +331,66 @@ class FramesCsvTests(unittest.TestCase):
             FrameRow(
                 segment=2,
                 frame_index=18_446_744_073_709_551_615,
-                animation_ticks=-9_223_372_036_854_775_808,
+                animation_ns=-9_223_372_036_854_775_808,
                 first_capture_index=5,
-                first_seen_ticks=9_223_372_036_854_775_807,
-                on_screen_ticks=166_667,
+                first_seen_ns=9_223_372_036_854_775_807,
+                on_screen_ns=16_666_667,
                 captures=1,
                 skipped_before=0,
-                display_delta_ticks=166_666,
-                animation_delta_ticks=9_223_372_036_854_775_807,
-                animation_error_ticks=-1,
-                drift_ticks=-7,
+                display_delta_ns=16_666_666,
+                animation_delta_ns=9_223_372_036_854_775_807,
+                animation_error_ns=-1,
+                drift_ns=-7,
                 flags=("Late",),
-                intended_display_ticks=-9_223_372_036_854_775_808,
-                marker_target_ticks=4_294_967_295,
-                target_ticks=333_334,
-                marker_preferred_ticks=1,
-                preferred_ticks=166_667,
-                pacing_error_ticks=3,
-                prediction_error_ticks=-3,
-                lateness_ticks=83_333,
-                last_seen_ticks=1_234_567_890_123_456_789,
-                cpu_start_ticks=-1_234_567_890_123_456_789,
-                cpu_busy_ticks=120_060,
-                frame_time_ticks=166_668,
-                cpu_wait_ticks=46_608,
+                intended_display_ns=-9_223_372_036_854_775_808,
+                marker_target_ns=4_294_967_295,
+                target_ns=33_333_334,
+                marker_preferred_ns=1,
+                preferred_ns=16_666_667,
+                pacing_error_ns=3,
+                prediction_error_ns=-3,
+                lateness_ns=8_333_333,
+                last_seen_ns=1_234_567_890_123_456_789,
+                cpu_start_ns=-1_234_567_890_123_456_789,
+                cpu_busy_ns=12_006_034,
+                frame_time_ns=16_666_812,
+                cpu_wait_ns=4_660_778,
                 older_frames=((41, 1_234_567_890_123_456_790), (40, -5)),
-                main_marker_first_seen_ticks=9_007_199_254_740_993,
-                scanout_delay_ticks=-9_007_199_254_740_993,
+                main_marker_first_seen_ns=9_007_199_254_740_993,
+                scanout_delay_ns=-9_007_199_254_740_993,
             ),
         )
 
-    def test_a_time_that_is_not_whole_ticks_is_refused(self) -> None:
-        cells = ("16.6667", "1e3", " 5", "5 ", "+5", "1_000", "0x10", "NaN", "9223372036854775808", "-9223372036854775809", "", "٥")
+    def test_a_time_that_is_not_whole_nanoseconds_is_refused(self) -> None:
+        cells = ("16666666.7", "1e3", " 5", "5 ", "+5", "1_000", "0x10", "NaN", "9223372036854775808", "-9223372036854775809", "", "٥")
         for cell in cells:
-            self.refused(f"{FRAME_COLUMNS}\n0,1,{cell},0,0,166667,1,0,0,\n", f"'{cell}'")
-        self.assertEqual(frames(f"{FRAME_COLUMNS}\n0,1,-0,0,0,166667,1,0,0,\n")[0].animation_ticks, 0)
-        self.assertEqual(frames(f"{FRAME_COLUMNS}\n0,1,007,0,0,166667,1,0,0,\n")[0].animation_ticks, 7)
+            self.refused(f"{FRAME_COLUMNS}\n0,1,{cell},0,0,16666667,1,0,0,\n", f"'{cell}'")
+        self.assertEqual(frames(f"{FRAME_COLUMNS}\n0,1,-0,0,0,16666667,1,0,0,\n")[0].animation_ns, 0)
+        self.assertEqual(frames(f"{FRAME_COLUMNS}\n0,1,007,0,0,16666667,1,0,0,\n")[0].animation_ns, 7)
+
+    def test_a_frames_csv_from_before_the_nanoseconds_is_refused(self) -> None:
+        # Its times are ticks of 100 ns in columns that end in Ticks: the required ...Ns columns are not there
+        old = (
+            "segment,frameIndex,animationTicks,firstCaptureIndex,firstSeenTicks,onScreenTicks,captures,skippedBefore,displayDeltaTicks,"
+            "animationDeltaTicks,animationErrorTicks,driftTicks,flags\n"
+            "0,1,166667,0,0,166667,1,0,,,,0,\n"
+        )
+        with self.assertRaisesRegex(DataFormatError, r"run-1-frames\.csv' line 2: "):
+            _ = frames(old)
+        # Each required time on its own
+        row = "0,1,0,0,0,16666667,1,0,0,"
+        self.assertEqual(len(frames(f"{FRAME_COLUMNS}\n{row}\n")), 1, "the row these cases rename one column of")
+        for column in ("animationNs", "firstSeenNs", "onScreenNs", "driftNs"):
+            self.refused(f"{replaced(FRAME_COLUMNS, column, column.removesuffix('Ns') + 'Ticks')}\n{row}\n", column)
 
     def test_the_markers_values_must_fit_32_bits(self) -> None:
         def read(cpu_busy: str) -> list[FrameRow]:
-            return frames(f"{FRAME_COLUMNS},cpuBusyTicks\n0,1,0,0,0,166667,1,0,0,,{cpu_busy}\n")
+            return frames(f"{FRAME_COLUMNS},cpuBusyNs\n0,1,0,0,0,16666667,1,0,0,,{cpu_busy}\n")
 
-        self.assertEqual(read("4294967295")[0].cpu_busy_ticks, 0xFFFF_FFFF, "the largest: on demand in a frame time")
-        self.assertEqual(read("80000")[0].cpu_busy_ticks, 80_000)
-        self.assertEqual(read("0")[0].cpu_busy_ticks, 0)
+        self.assertEqual((ON_DEMAND_FRAME_NS, NS_PER_MILLISECOND), (MARKER_ON_DEMAND_FRAME_NS, 1_000_000), "the marker's own value, and a millisecond")
+        self.assertEqual(read("4294967295")[0].cpu_busy_ns, 0xFFFF_FFFF, "the largest: on demand in a frame time")
+        self.assertEqual(read("8000000")[0].cpu_busy_ns, 8_000_000)
+        self.assertEqual(read("0")[0].cpu_busy_ns, 0)
         for cell in ("4294967296", "-1"):
             with self.assertRaises(DataFormatError):
                 _ = read(cell)
@@ -358,17 +398,17 @@ class FramesCsvTests(unittest.TestCase):
     def test_other_content_that_is_not_a_frame_is_refused(self) -> None:
         self.refused("", "an empty file")
         self.assertEqual(frames(FRAME_COLUMNS + "\n\n"), [], "a header and an empty line")
-        self.refused(f"{FRAME_COLUMNS}\nx,1,0,0,0,166667,1,0,0,\n", "a segment that is no number")
-        self.refused(f"{FRAME_COLUMNS}\n0,-1,0,0,0,166667,1,0,0,\n", "a negative frame index")
-        self.refused(f"{FRAME_COLUMNS}\n0,18446744073709551616,0,0,0,166667,1,0,0,\n", "a frame index beyond 64 bits")
-        self.refused(f"{FRAME_COLUMNS}\n0,1,0,0,0,166667,2147483648,0,0,\n", "captures beyond 32 bits")
-        self.refused("frameIndex,animationTicks\n1,0\n", "a required column the file lacks")
+        self.refused(f"{FRAME_COLUMNS}\nx,1,0,0,0,16666667,1,0,0,\n", "a segment that is no number")
+        self.refused(f"{FRAME_COLUMNS}\n0,-1,0,0,0,16666667,1,0,0,\n", "a negative frame index")
+        self.refused(f"{FRAME_COLUMNS}\n0,18446744073709551616,0,0,0,16666667,1,0,0,\n", "a frame index beyond 64 bits")
+        self.refused(f"{FRAME_COLUMNS}\n0,1,0,0,0,16666667,2147483648,0,0,\n", "captures beyond 32 bits")
+        self.refused("frameIndex,animationNs\n1,0\n", "a required column the file lacks")
         for older in ("41", "@5", "41@", "x@5", "41@5.5", "41@5|", "41@5||42@6", "|41@5"):
-            self.refused(f"{FRAME_COLUMNS},olderFrames\n0,1,0,0,0,166667,1,0,0,,{older}\n", f"olderFrames '{older}'")
-        self.refused(f"{FRAME_COLUMNS}\n0,1,0,0,0,166667,1,0,0,Late|\n", "an empty flag")
+            self.refused(f"{FRAME_COLUMNS},olderFrames\n0,1,0,0,0,16666667,1,0,0,,{older}\n", f"olderFrames '{older}'")
+        self.refused(f"{FRAME_COLUMNS}\n0,1,0,0,0,16666667,1,0,0,Late|\n", "an empty flag")
         # The error names the file and the line
         with self.assertRaisesRegex(DataFormatError, r"run-1-frames\.csv' line 4: .*'1\.5'"):
-            _ = frames(f"{FRAME_COLUMNS}\n0,1,0,0,0,166667,1,0,0,\n\n0,2,1.5,0,0,166667,1,0,0,\n")
+            _ = frames(f"{FRAME_COLUMNS}\n0,1,0,0,0,16666667,1,0,0,\n\n0,2,1.5,0,0,16666667,1,0,0,\n")
 
 
 class CapturesCsvTests(unittest.TestCase):
@@ -377,43 +417,56 @@ class CapturesCsvTests(unittest.TestCase):
             _ = captures(f"{CAPTURE_COLUMNS}\n{line}\n")
 
     def test_captures_carry_source_drops_missed_refreshes_and_the_sync_marker(self) -> None:
-        torn, dropped = captures(CAPTURE_COLUMNS + "\r\n4,666667,Torn,Frame,7,12,2000000,3,1,7,11,701000,666667,4D46\r\n5,,NotRecorded,,,,,0,0,,,,,\r\n")
+        torn, dropped = captures(
+            CAPTURE_COLUMNS + "\r\n4,66666668,Torn,Frame,7,12,200000000,3,1,7,11,70100000,66666668,4D46\r\n5,,NotRecorded,,,,,0,0,,,,,\r\n"
+        )
         self.assertEqual(
             torn,
             CaptureCsvRow(
                 capture_index=4,
-                capture_ticks=666_667,
+                capture_ns=66_666_668,
                 capture_status="Torn",
                 kind="Frame",
                 run_id=7,
                 frame_index=12,
-                animation_ticks=2_000_000,
+                animation_ns=200_000_000,
                 source_drops_before=3,
                 missed_before=1,
                 sync_run_id=7,
                 sync_frame_index=11,
-                host_ticks=701_000,
-                device_ticks=666_667,
+                host_ns=70_100_000,
+                device_ns=66_666_668,
                 payload=bytes([0x4D, 0x46]),
             ),
         )
         self.assertEqual(
-            (dropped.capture_ticks, dropped.kind, dropped.sync_frame_index, dropped.source_drops_before, dropped.payload), (None, None, None, 0, None)
+            (dropped.capture_ns, dropped.kind, dropped.sync_frame_index, dropped.source_drops_before, dropped.payload), (None, None, None, 0, None)
         )
 
     def test_content_that_is_not_a_capture_is_refused(self) -> None:
-        (row,) = captures(f"{CAPTURE_COLUMNS}\n4,666667,Decoded,Frame,4294967295,12,2000000,0,0,4294967295,11,701000,666667,4d46\n")
+        (row,) = captures(f"{CAPTURE_COLUMNS}\n4,66666668,Decoded,Frame,4294967295,12,200000000,0,0,4294967295,11,70100000,66666668,4d46\n")
         self.assertEqual((row.run_id, row.sync_run_id, row.payload), (4_294_967_295, 4_294_967_295, b"MF"))
-        self.refused("4,666667,Decoded,Frame,-1,12,2000000,0,0,,,701000,666667,4D46", "a run id below 0")
-        self.refused("4,666667,Decoded,Frame,4294967296,12,2000000,0,0,,,701000,666667,4D46", "a run id beyond 32 bits")
-        self.refused("4,666667,Torn,Frame,7,12,2000000,0,0,4294967296,11,701000,666667,4D46", "a sync run id beyond 32 bits")
-        self.refused("4,66.6667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46", "a fraction")
-        self.refused("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D4", "half a byte")
-        self.refused("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D4G", "no hex digit")
-        self.refused("4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D 46", "a space between bytes")
-        self.refused("x,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46", "no capture index")
+        self.refused("4,66666668,Decoded,Frame,-1,12,200000000,0,0,,,70100000,66666668,4D46", "a run id below 0")
+        self.refused("4,66666668,Decoded,Frame,4294967296,12,200000000,0,0,,,70100000,66666668,4D46", "a run id beyond 32 bits")
+        self.refused("4,66666668,Torn,Frame,7,12,200000000,0,0,4294967296,11,70100000,66666668,4D46", "a sync run id beyond 32 bits")
+        self.refused("4,66666668.5,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666668,4D46", "a fraction")
+        self.refused("4,66666668,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666668,4D4", "half a byte")
+        self.refused("4,66666668,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666668,4D4G", "no hex digit")
+        self.refused("4,66666668,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666668,4D 46", "a space between bytes")
+        self.refused("x,66666668,Decoded,Frame,7,12,200000000,0,0,,,70100000,66666668,4D46", "no capture index")
         with self.assertRaises(DataFormatError):
             _ = captures("")
+
+    def test_a_captures_csv_from_before_the_nanoseconds_reads_as_captures_without_times(self) -> None:
+        # Only the capture index is required: the times in columns that end in Ticks are columns this reader does not know
+        old = (
+            "captureIndex,captureTicks,status,kind,runId,frameIndex,animationTicks,sourceDropsBefore,missedBefore,syncRunId,syncFrameIndex,hostTicks,"
+            "deviceTicks,payloadHex\n"
+            "4,666667,Decoded,Frame,7,12,2000000,0,0,,,701000,666667,4D46\n"
+        )
+        (row,) = captures(old)
+        self.assertEqual((row.capture_index, row.capture_status, row.frame_index, row.payload), (4, "Decoded", 12, b"MF"))
+        self.assertEqual((row.capture_ns, row.animation_ns, row.host_ns, row.device_ns), (None, None, None, None))
 
 
 if __name__ == "__main__":

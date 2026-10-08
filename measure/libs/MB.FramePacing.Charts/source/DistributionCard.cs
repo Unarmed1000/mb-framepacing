@@ -191,10 +191,10 @@ namespace MB.FramePacing.Charts
       if (frameCount == 0)
         return card.Empty(Drift, "no presented frames");
 
-      static double TicksMs(long ticks) => ticks / (double)TimeSpan.TicksPerMillisecond;
+      static double NanosecondsMs(long nanoseconds) => nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
       // Every frame has a drift: the frames' range is the drifts' range
-      double low = Math.Min(0, TicksMs(drift.Values.KthSmallest(section.Start, section.End, 0)));
-      double high = Math.Max(0, TicksMs(drift.Values.KthSmallest(section.Start, section.End, frameCount - 1)));
+      double low = Math.Min(0, NanosecondsMs(drift.Values.KthSmallest(section.Start, section.End, 0)));
+      double high = Math.Max(0, NanosecondsMs(drift.Values.KthSmallest(section.Start, section.End, frameCount - 1)));
       if (high - low < 1)
         (low, high) = (low - ((1 - (high - low)) / 2), high + ((1 - (high - low)) / 2));
       double pad = (high - low) * 0.1;
@@ -224,8 +224,8 @@ namespace MB.FramePacing.Charts
         // Per pixel column: from its lowest to its highest drift, so an hour stays a small file
         foreach (var (column, start, end) in PixelColumns.Walk(section.Start, section.End, XOfFrame))
         {
-          double min = TicksMs(drift.Values.KthSmallest(start, end, 0));
-          double max = TicksMs(drift.Values.KthSmallest(start, end, end - start - 1));
+          double min = NanosecondsMs(drift.Values.KthSmallest(start, end, 0));
+          double max = NanosecondsMs(drift.Values.KthSmallest(start, end, end - start - 1));
           Point(column + 0.5, min);
           if (max > min)
             Point(column + 0.5, max);

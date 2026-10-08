@@ -143,8 +143,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
         reportedDrops = drops;
         var deviceTime =
           knownTimestamps != null ? new DeviceTimestamp(knownTimestamps[frameNumber])
-          : Options.RecordedFps is > 0
-            ? new DeviceTimestamp(new TickCount64((long)Math.Round(frameNumber * (double)TimeSpan.TicksPerSecond / Options.RecordedFps.Value)))
+          : Options.RecordedFps is > 0 ? new DeviceTimestamp(RecordedTime(frameNumber, Options.RecordedFps.Value))
           : DeviceTimestamp.Pending;
         ++frameNumber;
         sink.EndFrame(hostTime, deviceTime, sourceDrops);
@@ -197,6 +196,14 @@ namespace MB.FramePacing.Capture.Ffmpeg
       m_stderrThread.Join(2000);
       m_process.Dispose();
     }
+
+    /// <summary>
+    /// The time of frame <paramref name="frameNumber"/> of a clip that was recorded at <paramref name="recordedFps"/>, rounded to the nearest
+    /// nanosecond.
+    /// </summary>
+    private static NanosecondTickCount RecordedTime(int frameNumber, double recordedFps) =>
+      // The frame number times a second's nanoseconds is exact in a double (a 32-bit number times 5^9 * 2^9), so one division rounds
+      new NanosecondTickCount((long)Math.Round(frameNumber * (double)NanosecondTimeSpan.NanosecondsPerSecond / recordedFps));
 
     private static bool ReadFrame(Stream stream, Span<byte> buffer)
     {

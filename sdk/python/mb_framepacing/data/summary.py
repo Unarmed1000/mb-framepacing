@@ -3,7 +3,7 @@
 
 """summary.json (doc/analysis-output-format.md): the capture, the analysis settings and every run's counts, statistics, pacing and
 histograms. Its formatVersion covers the CSV files it names; a file without it is format 1, a newer one is refused. A time setting is a
-whole number of 100 ns ticks (the '...Ticks' fields); the statistics and histograms are in milliseconds. The fields every summary has are
+whole number of nanoseconds (the '...Ns' fields); the statistics and histograms are in milliseconds. The fields every summary has are
 required (doc/analysis-output-format.md marks them) and a value must be of its field's type and within its range: anything else raises
 DataFormatError. Optional fields a file lacks read as None (or an empty statistics), and fields this reader does not know are ignored."""
 
@@ -193,12 +193,12 @@ class SummaryStatistics:
 class SummaryPacing:
     """The refresh, the target the frames are measured against (source: Schedule, TargetFrameTime, PreferredFrameTime, GivenTarget or
     NativeRefresh), late
-    frames and the verdict (None, BadPacing, DeltaTimeJitter or Both). refresh_period_ticks is the display's refresh period,
-    target_frame_ticks the frame time the run is measured against, in whole refreshes."""
+    frames and the verdict (None, BadPacing, DeltaTimeJitter or Both). refresh_period_ns is the display's refresh period,
+    target_frame_ns the frame time the run is measured against, in whole refreshes."""
 
-    refresh_period_ticks: int
+    refresh_period_ns: int
     refresh_calculated: bool
-    target_frame_ticks: int
+    target_frame_ns: int
     source: str
     late_frames: int
     late_share: float
@@ -275,9 +275,9 @@ class SummaryMarker:
 @dataclass(frozen=True)
 class AnalysisSummary:
     """summary.json. scanout is 'SingleScanout' (a capture card) or 'Camera'; time_source 'Device' or 'Host'; capture is the capture's
-    capture.json as it was when analysed. capture_period_ticks, measurement_resolution_ticks (how precisely a display time is known: the
-    capture period in a file without it) and error_threshold_ticks (the |animation error| above which a frame counts as off) are 100 ns
-    ticks."""
+    capture.json as it was when analysed. capture_period_ns, measurement_resolution_ns (how precisely a display time is known: the
+    capture period in a file without it) and error_threshold_ns (the |animation error| above which a frame counts as off) are whole
+    nanoseconds."""
 
     format_version: int
     tool_version: str | None
@@ -288,9 +288,9 @@ class AnalysisSummary:
     capture: dict[str, JsonValue] | None
     frame_size: str | None
     time_source: str | None
-    capture_period_ticks: int
-    measurement_resolution_ticks: int
-    error_threshold_ticks: int
+    capture_period_ns: int
+    measurement_resolution_ns: int
+    error_threshold_ns: int
     markers: tuple[SummaryMarker, ...]
     warnings: tuple[str, ...]
     runs: tuple[SummaryRun, ...]
@@ -329,10 +329,10 @@ def parse_summary(text: str) -> AnalysisSummary:
         capture=capture if isinstance(capture, dict) else None,
         frame_size=root.optional_text("frameSize"),
         time_source=root.optional_text("timeSource"),
-        capture_period_ticks=root.integer("capturePeriodTicks"),
+        capture_period_ns=root.integer("capturePeriodNs"),
         # 0 is a file without the field, as C# reads it
-        measurement_resolution_ticks=root.optional_integer("measurementResolutionTicks") or root.integer("capturePeriodTicks"),
-        error_threshold_ticks=root.integer("errorThresholdTicks"),
+        measurement_resolution_ns=root.optional_integer("measurementResolutionNs") or root.integer("capturePeriodNs"),
+        error_threshold_ns=root.integer("errorThresholdNs"),
         markers=tuple(_marker(item) for item in root.children("markers")),
         warnings=root.texts("warnings"),
         runs=tuple(_run(item) for item in root.children("runs")),
@@ -412,9 +412,9 @@ def _pacing(value: _Object) -> SummaryPacing:
         return _value_statistics(child) if child is not None else None
 
     return SummaryPacing(
-        refresh_period_ticks=value.integer("refreshPeriodTicks"),
+        refresh_period_ns=value.integer("refreshPeriodNs"),
         refresh_calculated=value.boolean("refreshCalculated"),
-        target_frame_ticks=value.integer("targetFrameTicks"),
+        target_frame_ns=value.integer("targetFrameNs"),
         source=value.text("source"),
         late_frames=value.integer("lateFrames"),
         late_share=value.number("lateShare"),

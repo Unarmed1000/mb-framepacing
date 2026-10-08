@@ -5,6 +5,10 @@
 //* perspective transform and lens, with a rolling scanout (row y shows a new frame y/height of the scanout after vsync), panel response,
 //* exposure blending, blur, noise and a drifting camera clock. It is the ground truth for the camera calibration, rectification and analysis.
 //*
+//* The camera is worked out in nanoseconds. Its times with a fraction (TrueNanoseconds, ToCameraNanoseconds, ZoneScanNanoseconds) are
+//* doubles of nanoseconds: the model's own times, between two whole ones. The timestamp it writes (CameraTime) is rounded to the nearest
+//* nanosecond.
+//*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
@@ -70,22 +74,25 @@ namespace MB.FramePacing.Capture.Synthetic
 
     public long CaptureCount => Scenario.CaptureCount;
 
-    /// <summary>The true time the exposure of a capture starts, in display clock ticks.</summary>
-    public double TrueTicks(long captureIndex) =>
-      (captureIndex + Scenario.Options.CapturePhase) * TimeSpan.TicksPerSecond / Scenario.Options.CaptureFps;
+    /// <summary>The true time the exposure of a capture starts, in nanoseconds of the display's clock (with a fraction).</summary>
+    public double TrueNanoseconds(long captureIndex) =>
+      (captureIndex + Scenario.Options.CapturePhase) * NanosecondTimeSpan.NanosecondsPerSecond / Scenario.Options.CaptureFps;
 
-    /// <summary>The timestamp the camera writes for a capture (its own, drifting clock).</summary>
-    public TickCount64 CameraTime(long captureIndex) =>
-      new TickCount64((long)Math.Round(TrueTicks(captureIndex) * (1 + (Options.ClockDriftPpm * 1e-6))));
+    /// <summary>The timestamp the camera writes for a capture (its own, drifting clock), rounded to the nearest nanosecond.</summary>
+    public NanosecondTickCount CameraTime(long captureIndex) =>
+      new NanosecondTickCount((long)Math.Round(ToCameraNanoseconds(TrueNanoseconds(captureIndex))));
 
-    /// <summary>Converts a display clock time to the camera clock.</summary>
-    public double ToCameraTicks(double displayTicks) => displayTicks * (1 + (Options.ClockDriftPpm * 1e-6));
+    /// <summary>Converts a time on the display's clock to the camera's clock (nanoseconds, with a fraction).</summary>
+    public double ToCameraNanoseconds(double displayNanoseconds) => displayNanoseconds * (1 + (Options.ClockDriftPpm * 1e-6));
 
-    /// <summary>Time from vsync until the scanout has drawn the whole marker of a zone (its bottom symbol row), in display clock ticks.</summary>
-    public double ZoneScanTicks(int zone)
+    /// <summary>
+    /// Time from vsync until the scanout has drawn the whole marker of a zone (its bottom symbol row), in nanoseconds of the display's
+    /// clock (with a fraction).
+    /// </summary>
+    public double ZoneScanNanoseconds(int zone)
     {
       double bottomRow = ZoneMarkers[zone].Bottom - (MarkerRenderer.RecommendedQuietZoneModules * (double)Options.ModuleSizePx);
-      return bottomRow / Options.ScreenHeight * ScanoutTicks;
+      return bottomRow / Options.ScreenHeight * ScanoutNanoseconds;
     }
 
     /// <summary>The true module to camera transform of a zone (without lens distortion).</summary>
@@ -120,7 +127,10 @@ namespace MB.FramePacing.Capture.Synthetic
       return new ImagePoint(ox + cx, oy + cy);
     }
 
-    private double ScanoutTicks => Options.ScanoutFraction * Scenario.RefreshInterval.Ticks;
+    private double ScanoutNanoseconds => Options.ScanoutFraction * RefreshNanoseconds;
+
+    /// <summary>The refresh period in nanoseconds (the scenario rounds it to a whole one).</summary>
+    private long RefreshNanoseconds => Scenario.RefreshInterval.Nanoseconds;
 
     /// <summary>Render capture <paramref name="captureIndex"/> into <paramref name="target"/> (camera sized).</summary>
     public void Render(long captureIndex, GrayImage target)
@@ -129,8 +139,8 @@ namespace MB.FramePacing.Capture.Synthetic
       if (target.Width != o.CameraWidth || target.Height != o.CameraHeight)
         throw new ArgumentException("The target must have the camera size", nameof(target));
 
-      double start = TrueTicks(captureIndex);
-      double exposure = o.ExposureFraction * TimeSpan.TicksPerSecond / Scenario.Options.CaptureFps;
+      double start = TrueNanoseconds(captureIndex);
+      double exposure = o.ExposureFraction * NanosecondTimeSpan.NanosecondsPerSecond / Scenario.Options.CaptureFps;
       PruneMatrices(captureIndex);
       foreach (var zone in m_zones)
         UpdateRows(zone, start, exposure);
@@ -146,17 +156,17 @@ namespace MB.FramePacing.Capture.Synthetic
     /// <summary>Which frame each screen row of a zone shows at every time sample of the exposure, and how far the panel has switched.</summary>
     private void UpdateRows(Zone zone, double start, double exposure)
     {
-      double refresh = Scenario.RefreshInterval.Ticks;
-      double tau = Options.PanelResponseSeconds * TimeSpan.TicksPerSecond;
+      double refresh = RefreshNanoseconds;
+      double tau = Options.PanelResponseSeconds * NanosecondTimeSpan.NanosecondsPerSecond;
       for (int s = 0; s < Options.TimeSamples; ++s)
       {
         double t = start + ((s + 0.5) / Options.TimeSamples * exposure);
         for (int r = 0; r < zone.RowCount; ++r)
         {
-          double offset = (zone.RowMin + r + 0.5) / Options.ScreenHeight * ScanoutTicks;
+          double offset = (zone.RowMin + r + 0.5) / Options.ScreenHeight * ScanoutNanoseconds;
           double scan = (Math.Floor((t - offset) / refresh) * refresh) + offset;
-          int current = Scenario.PresentedIndexAtTime(new TickCount64((long)Math.Floor(scan)));
-          int previous = Scenario.PresentedIndexAtTime(new TickCount64((long)Math.Floor(scan - refresh)));
+          int current = Scenario.PresentedIndexAtTime(new NanosecondTickCount((long)Math.Floor(scan)));
+          int previous = Scenario.PresentedIndexAtTime(new NanosecondTickCount((long)Math.Floor(scan - refresh)));
           int index = (s * zone.RowCount) + r;
           zone.Current[index] = MatrixFor(current, zone.Kind);
           zone.Previous[index] = MatrixFor(previous, zone.Kind);
@@ -304,7 +314,7 @@ namespace MB.FramePacing.Capture.Synthetic
     {
       if (m_matrices.Count < 64)
         return;
-      int oldest = Scenario.PresentedIndexAtTime(new TickCount64((long)(TrueTicks(captureIndex) - (4 * Scenario.RefreshInterval.Ticks))));
+      int oldest = Scenario.PresentedIndexAtTime(new NanosecondTickCount((long)(TrueNanoseconds(captureIndex) - (4 * RefreshNanoseconds))));
       var stale = new List<int>();
       foreach (var key in m_matrices.Keys)
       {

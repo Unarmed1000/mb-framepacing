@@ -89,8 +89,8 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var crop = MarkerCrop.For(sourceLock, Width, Height);
       var decoder = new MarkerDecoder();
 
-      var frame = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(5_678_000));
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 7, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0));
+      var frame = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(567_800_000));
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 7, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0));
       var metadata = new StartMetadata(638_000_000_000_000_000, new MB.FramePacing.Marker.SequenceId(0xFEDC_BA98_7654_3210, 0x0123_4567_89AB_CDEF));
       foreach (var (payload, startMetadata) in new[] { (frame, (StartMetadata?)null), (start, metadata) })
       {
@@ -151,8 +151,8 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       );
 
       // The stored frame as ffmpeg makes it: each crop downscaled, the narrower one padded with white, one below the other
-      var main = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(5_678_000));
-      var sync = new MarkerPayload(MarkerKind.Sync, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0));
+      var main = new MarkerPayload(MarkerKind.Frame, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(567_800_000));
+      var sync = new MarkerPayload(MarkerKind.Sync, 7, 1234, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0));
       var source = new GrayImage(Width, Height, 96);
       MarkerRenderer.Render(source, main, mainLock.Bounds.X, mainLock.Bounds.Y, modulePx);
       MarkerRenderer.Render(source, sync, syncLock.Bounds.X, syncLock.Bounds.Y, modulePx);

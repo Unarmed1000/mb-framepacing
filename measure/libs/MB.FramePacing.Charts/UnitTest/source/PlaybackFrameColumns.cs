@@ -20,7 +20,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// <summary>The frame columns of a page's data (<paramref name="root"/>) by name: t, index, capture, step, error, hold, flags.</summary>
     public static Dictionary<string, long?[]> Read(JsonElement root)
     {
-      long period = root.GetProperty("periodTicks").GetInt64();
+      long period = root.GetProperty("periodNs").GetInt64();
       var frames = root.GetProperty("frames");
       var columns = frames.EnumerateObject().ToDictionary(c => c.Name, c => Values(c.Value));
       var (t, capture, index, step) = (columns["t"], columns["capture"], columns["index"], columns["step"]);

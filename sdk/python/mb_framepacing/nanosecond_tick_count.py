@@ -16,11 +16,11 @@ _MAX_NANOSECONDS = _HALF - 1
 class NanosecondTickCount:
     """A point on a clock that counts in nanoseconds, any epoch (the same clock for the whole run), kept as a platform gives it.
 
-    The data module's times are whole ticks of 100 ns; to_ticks() is the tick a point is in. The count is kept as an unsigned 64-bit
-    number, as in C++ and C#, so adding and subtracting wrap around and nanoseconds is its signed view. Two counts compare and
-    subtract correctly while they are less than 2^63 nanoseconds apart (about 292 years), across the wrap too, so the order is
-    not a total one. A value outside the range raises OverflowError; adding and subtracting never do. The count is a whole
-    number, an int, as in C++ and C#: a float (or a bool) raises TypeError.
+    The marker's and the data module's times are whole nanoseconds; a tick is 100 ns (what .NET counts in), and to_ticks() is the
+    tick a point is in. The count is kept as an unsigned 64-bit number, as in C++ and C#, so adding and subtracting wrap around and
+    nanoseconds is its signed view. Two counts compare and subtract correctly while they are less than 2^63 nanoseconds apart
+    (about 292 years), across the wrap too, so the order is not a total one. A value outside the range raises OverflowError;
+    adding and subtracting never do. The count is a whole number, an int, as in C++ and C#: a float (or a bool) raises TypeError.
     """
 
     __slots__: tuple[str, ...] = ("_unsigned",)

@@ -12,5 +12,5 @@ namespace MB.FramePacing.Analysis
 {
   /// <param name="CaptureTime">When the capture was taken (the analysis's capture clock, as FirstSeenTime).</param>
   /// <param name="FrameIndex">The older frame index it showed.</param>
-  public readonly record struct OlderFrameCapture(TickCount64 CaptureTime, ulong FrameIndex);
+  public readonly record struct OlderFrameCapture(NanosecondTickCount CaptureTime, ulong FrameIndex);
 }

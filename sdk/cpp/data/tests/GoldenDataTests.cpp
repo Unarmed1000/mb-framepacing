@@ -91,9 +91,9 @@ namespace
       markers.push_back({{"bounds", Rect(marker.Bounds)}, {"moduleSizePx", marker.ModuleSizePx}});
     }
     int64_t captureIndexSum = 0;
-    int64_t hostTicksSum = 0;
-    int64_t deviceTicksCount = 0;
-    int64_t deviceTicksSum = 0;
+    int64_t hostNsSum = 0;
+    int64_t deviceNsCount = 0;
+    int64_t deviceNsSum = 0;
     int64_t sourceDropsSum = 0;
     int64_t mainByteCount = 0;
     int64_t secondByteCount = 0;
@@ -104,11 +104,11 @@ namespace
     for (const auto& record : records)
     {
       captureIndexSum += record.CaptureIndex;
-      hostTicksSum += record.HostTime.Ticks();
+      hostNsSum += record.HostTime.Nanoseconds();
       if (record.DeviceTime)
       {
-        ++deviceTicksCount;
-        deviceTicksSum += record.DeviceTime->Ticks();
+        ++deviceNsCount;
+        deviceNsSum += record.DeviceTime->Nanoseconds();
       }
       sourceDropsSum += record.SourceDrops;
       statuses.push_back(StatusName(record.CaptureStatus));
@@ -137,9 +137,9 @@ namespace
         {"camera", header.Camera}}},
       {"recordCount", records.size()},
       {"captureIndexSum", captureIndexSum},
-      {"hostTicksSum", hostTicksSum},
-      {"deviceTicksCount", deviceTicksCount},
-      {"deviceTicksSum", deviceTicksSum},
+      {"hostNsSum", hostNsSum},
+      {"deviceNsCount", deviceNsCount},
+      {"deviceNsSum", deviceNsSum},
       {"sourceDropsSum", sourceDropsSum},
       {"statusCounts", Counts(statuses)},
       {"mainByteCount", mainByteCount},
@@ -180,8 +180,8 @@ namespace
         {"cpuBusyCount", run.Statistics.CpuBusyMs.Count},
         {"pacingSource", run.Pacing ? Json(run.Pacing->Source) : Json(nullptr)},
         {"lateFrames", run.Pacing ? run.Pacing->LateFrames : 0},
-        {"refreshPeriodTicks", run.Pacing ? run.Pacing->RefreshPeriod.Ticks() : 0},
-        {"targetFrameTicks", run.Pacing ? run.Pacing->TargetFrameTime.Ticks() : 0},
+        {"refreshPeriodNs", run.Pacing ? run.Pacing->RefreshPeriod.Nanoseconds() : 0},
+        {"targetFrameNs", run.Pacing ? run.Pacing->TargetFrameTime.Nanoseconds() : 0},
         {"histogramBins", run.Histograms ? run.Histograms->AnimationErrorMs.Bins.size() : 0u},
       });
     }
@@ -189,26 +189,26 @@ namespace
       {"formatVersion", summary.FormatVersion},
       {"scanout", Optional(summary.Scanout)},
       {"timeSource", Optional(summary.TimeSource)},
-      {"capturePeriodTicks", summary.CapturePeriod.Ticks()},
-      {"measurementResolutionTicks", summary.MeasurementResolution.Ticks()},
-      {"errorThresholdTicks", summary.ErrorThreshold.Ticks()},
+      {"capturePeriodNs", summary.CapturePeriod.Nanoseconds()},
+      {"measurementResolutionNs", summary.MeasurementResolution.Nanoseconds()},
+      {"errorThresholdNs", summary.ErrorThreshold.Nanoseconds()},
       {"markerCount", summary.Markers.size()},
       {"warningCount", summary.Warnings.size()},
       {"runs", runs},
     };
   }
 
-  //! A time value's ticks, as the digest sums them.
+  //! A time value's nanoseconds, as the digest sums them.
   template <typename T>
-  std::optional<int64_t> Ticks(const T& value)
+  std::optional<int64_t> Nanoseconds(const T& value)
   {
-    return static_cast<int64_t>(value.Ticks());
+    return value.Nanoseconds();
   }
 
   template <typename T>
-  std::optional<int64_t> Ticks(const std::optional<T>& value)
+  std::optional<int64_t> Nanoseconds(const std::optional<T>& value)
   {
-    return value ? Ticks(*value) : std::nullopt;
+    return value ? Nanoseconds(*value) : std::nullopt;
   }
 
   Json Frames(const std::filesystem::path& path)
@@ -218,31 +218,31 @@ namespace
     const std::vector<std::pair<const char*, Value>> columns{
       {"segment", [](const FD::FrameRow& r) { return std::optional<int64_t>(r.Segment); }},
       {"frameIndex", [](const FD::FrameRow& r) { return std::optional<int64_t>(static_cast<int64_t>(r.FrameIndex)); }},
-      {"animationTicks", [](const FD::FrameRow& r) { return Ticks(r.AnimationTime); }},
+      {"animationNs", [](const FD::FrameRow& r) { return Nanoseconds(r.AnimationTime); }},
       {"firstCaptureIndex", [](const FD::FrameRow& r) { return std::optional<int64_t>(r.FirstCaptureIndex); }},
-      {"firstSeenTicks", [](const FD::FrameRow& r) { return Ticks(r.FirstSeenTime); }},
-      {"onScreenTicks", [](const FD::FrameRow& r) { return Ticks(r.OnScreen); }},
+      {"firstSeenNs", [](const FD::FrameRow& r) { return Nanoseconds(r.FirstSeenTime); }},
+      {"onScreenNs", [](const FD::FrameRow& r) { return Nanoseconds(r.OnScreen); }},
       {"captures", [](const FD::FrameRow& r) { return std::optional<int64_t>(r.Captures); }},
       {"skippedBefore", [](const FD::FrameRow& r) { return std::optional<int64_t>(static_cast<int64_t>(r.SkippedBefore)); }},
-      {"displayDeltaTicks", [](const FD::FrameRow& r) { return Ticks(r.DisplayDelta); }},
-      {"animationDeltaTicks", [](const FD::FrameRow& r) { return Ticks(r.AnimationDelta); }},
-      {"animationErrorTicks", [](const FD::FrameRow& r) { return Ticks(r.AnimationError); }},
-      {"driftTicks", [](const FD::FrameRow& r) { return Ticks(r.Drift); }},
-      {"intendedDisplayTicks", [](const FD::FrameRow& r) { return Ticks(r.IntendedDisplayTime); }},
-      {"markerTargetTicks", [](const FD::FrameRow& r) { return Ticks(r.MarkerTargetFrameTime); }},
-      {"targetTicks", [](const FD::FrameRow& r) { return Ticks(r.TargetFrameTime); }},
-      {"markerPreferredTicks", [](const FD::FrameRow& r) { return Ticks(r.MarkerPreferredFrameTime); }},
-      {"preferredTicks", [](const FD::FrameRow& r) { return Ticks(r.PreferredFrameTime); }},
-      {"pacingErrorTicks", [](const FD::FrameRow& r) { return Ticks(r.PacingError); }},
-      {"predictionErrorTicks", [](const FD::FrameRow& r) { return Ticks(r.PredictionError); }},
-      {"latenessTicks", [](const FD::FrameRow& r) { return Ticks(r.Lateness); }},
-      {"lastSeenTicks", [](const FD::FrameRow& r) { return Ticks(r.LastSeenTime); }},
-      {"cpuStartTicks", [](const FD::FrameRow& r) { return Ticks(r.CpuStartTime); }},
-      {"cpuBusyTicks", [](const FD::FrameRow& r) { return Ticks(r.CpuBusy); }},
-      {"frameTimeTicks", [](const FD::FrameRow& r) { return Ticks(r.FrameTime); }},
-      {"cpuWaitTicks", [](const FD::FrameRow& r) { return Ticks(r.CpuWait); }},
-      {"mainMarkerFirstSeenTicks", [](const FD::FrameRow& r) { return Ticks(r.MainMarkerFirstSeenTime); }},
-      {"scanoutDelayTicks", [](const FD::FrameRow& r) { return Ticks(r.ScanoutDelay); }},
+      {"displayDeltaNs", [](const FD::FrameRow& r) { return Nanoseconds(r.DisplayDelta); }},
+      {"animationDeltaNs", [](const FD::FrameRow& r) { return Nanoseconds(r.AnimationDelta); }},
+      {"animationErrorNs", [](const FD::FrameRow& r) { return Nanoseconds(r.AnimationError); }},
+      {"driftNs", [](const FD::FrameRow& r) { return Nanoseconds(r.Drift); }},
+      {"intendedDisplayNs", [](const FD::FrameRow& r) { return Nanoseconds(r.IntendedDisplayTime); }},
+      {"markerTargetNs", [](const FD::FrameRow& r) { return Nanoseconds(r.MarkerTargetFrameTime); }},
+      {"targetNs", [](const FD::FrameRow& r) { return Nanoseconds(r.TargetFrameTime); }},
+      {"markerPreferredNs", [](const FD::FrameRow& r) { return Nanoseconds(r.MarkerPreferredFrameTime); }},
+      {"preferredNs", [](const FD::FrameRow& r) { return Nanoseconds(r.PreferredFrameTime); }},
+      {"pacingErrorNs", [](const FD::FrameRow& r) { return Nanoseconds(r.PacingError); }},
+      {"predictionErrorNs", [](const FD::FrameRow& r) { return Nanoseconds(r.PredictionError); }},
+      {"latenessNs", [](const FD::FrameRow& r) { return Nanoseconds(r.Lateness); }},
+      {"lastSeenNs", [](const FD::FrameRow& r) { return Nanoseconds(r.LastSeenTime); }},
+      {"cpuStartNs", [](const FD::FrameRow& r) { return Nanoseconds(r.CpuStartTime); }},
+      {"cpuBusyNs", [](const FD::FrameRow& r) { return Nanoseconds(r.CpuBusy); }},
+      {"frameTimeNs", [](const FD::FrameRow& r) { return Nanoseconds(r.FrameTime); }},
+      {"cpuWaitNs", [](const FD::FrameRow& r) { return Nanoseconds(r.CpuWait); }},
+      {"mainMarkerFirstSeenNs", [](const FD::FrameRow& r) { return Nanoseconds(r.MainMarkerFirstSeenTime); }},
+      {"scanoutDelayNs", [](const FD::FrameRow& r) { return Nanoseconds(r.ScanoutDelay); }},
     };
     Json result = Json::object();
     for (const auto& [name, value] : columns)
@@ -283,9 +283,9 @@ namespace
     const auto rows = FD::ReadCaptures(path);
     std::vector<std::string> statuses;
     std::vector<std::string> kinds;
-    int64_t captureTicksSum = 0;
+    int64_t captureNsSum = 0;
     int64_t frameIndexSum = 0;
-    int64_t hostTicksSum = 0;
+    int64_t hostNsSum = 0;
     int64_t sourceDropsSum = 0;
     int64_t missedSum = 0;
     int64_t syncCount = 0;
@@ -298,9 +298,9 @@ namespace
       {
         kinds.push_back(*row.Kind);
       }
-      captureTicksSum += Ticks(row.CaptureTime).value_or(0);
+      captureNsSum += Nanoseconds(row.CaptureTime).value_or(0);
       frameIndexSum += static_cast<int64_t>(row.FrameIndex.value_or(0));
-      hostTicksSum += Ticks(row.HostTime).value_or(0);
+      hostNsSum += Nanoseconds(row.HostTime).value_or(0);
       sourceDropsSum += row.SourceDropsBefore;
       missedSum += row.MissedBefore;
       if (row.SyncFrameIndex)
@@ -314,9 +314,9 @@ namespace
       {"rowCount", rows.size()},
       {"statusCounts", Counts(statuses)},
       {"kindCounts", Counts(kinds)},
-      {"captureTicksSum", captureTicksSum},
+      {"captureNsSum", captureNsSum},
       {"frameIndexSum", frameIndexSum},
-      {"hostTicksSum", hostTicksSum},
+      {"hostNsSum", hostNsSum},
       {"sourceDropsSum", sourceDropsSum},
       {"missedSum", missedSum},
       {"syncCount", syncCount},

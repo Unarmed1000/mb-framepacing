@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""captures.mbcd: header fields at their offsets, newer and foreign files refused, a partial last record ignored."""
+"""captures.mbcd: header fields at their offsets, a record's times in nanoseconds, newer and foreign files refused, a partial last record
+ignored."""
 
 import struct
 import tempfile
@@ -10,7 +11,7 @@ from pathlib import Path
 
 from ...marker import MarkerFlags, MarkerKind, Payload, SequenceId, StartMetadata, encode_payload
 from .. import (
-    UNKNOWN_TICKS,
+    UNKNOWN_NS,
     CaptureDataHeader,
     CaptureDataReader,
     CaptureDataRecord,
@@ -19,6 +20,11 @@ from .. import (
     Rectangle,
 )
 from ..capture_data import HEADER_SIZE, MAGIC, RECORD_SIZE
+
+PERIOD_NS = 16_666_667
+"""A 60 Hz capture period: a record's times are whole nanoseconds."""
+DEVICE_NS = 8_333_333
+"""A device time."""
 
 
 def header_bytes(version: int = 1, markers: int = 1) -> bytearray:
@@ -35,8 +41,9 @@ def header_bytes(version: int = 1, markers: int = 1) -> bytearray:
 
 
 def record_bytes(index: int, device: int, status: int, main: bytes, second: bytes) -> bytes:
+    """A record whose host time is its index's capture periods."""
     data = bytearray(RECORD_SIZE)
-    struct.pack_into("<qqqIBBB", data, 0, index, index * 100, device, 3 if index == 2 else 0, status, len(main), len(second))
+    struct.pack_into("<qqqIBBB", data, 0, index, index * PERIOD_NS, device, 3 if index == 2 else 0, status, len(main), len(second))
     data[32 : 32 + len(main)] = main
     data[144 : 144 + len(second)] = second
     return bytes(data)
@@ -65,16 +72,18 @@ class CaptureDataTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "captures.mbcd"
             _ = path.write_bytes(
-                bytes(header_bytes()) + record_bytes(0, 200, 1, main, second) + record_bytes(2, UNKNOWN_TICKS, 0, b"", b"") + bytes(RECORD_SIZE // 2)
+                bytes(header_bytes()) + record_bytes(0, DEVICE_NS, 1, main, second) + record_bytes(2, UNKNOWN_NS, 0, b"", b"") + bytes(RECORD_SIZE // 2)
             )
             with CaptureDataReader(path) as reader:
                 self.assertEqual(reader.record_count, 2)
                 first, dropped = reader.read_all()
                 self.assertEqual(reader.read_record(1), dropped)
-        self.assertEqual((first.capture_index, first.host_ticks, first.device_ticks, first.capture_status), (0, 0, 200, CaptureDataStatus.DECODED))
+        self.assertEqual((first.capture_index, first.host_ns, first.device_ns, first.capture_status), (0, 0, 8_333_333, CaptureDataStatus.DECODED))
+        self.assertTrue(first.has_device_ns)
         self.assertEqual((first.main_bytes, first.second_bytes), (main, second))
-        self.assertEqual(dropped.source_drops, 3)
-        self.assertFalse(dropped.has_device_ticks)
+        self.assertEqual((dropped.capture_index, dropped.host_ns, dropped.source_drops), (2, 33_333_334, 3))
+        self.assertEqual(dropped.device_ns, -9_223_372_036_854_775_808, "the i64 minimum: the device gave no time")
+        self.assertFalse(dropped.has_device_ns)
         self.assertIsNone(dropped.main_bytes)
 
     def test_a_header_that_is_not_the_format_is_refused(self) -> None:
@@ -101,27 +110,27 @@ class CaptureDataTests(unittest.TestCase):
         self.assertEqual(CaptureDataHeader.parse(with_field(64, "<I", 0)).markers, ())
 
     def test_a_record_that_is_not_one_is_refused(self) -> None:
-        good = record_bytes(7, 200, 2, b"main", b"second")
+        good = record_bytes(7, DEVICE_NS, 2, b"main", b"second")
         record = CaptureDataRecord.parse(good)
         self.assertEqual((record.capture_index, record.capture_status, record.main_bytes, record.second_bytes), (7, CaptureDataStatus.TORN, b"main", b"second"))
         self.assertEqual(CaptureDataRecord.parse(memoryview(good + b"more")), record, "a view, and more bytes than a record")
         cases = {
             "a byte short": good[:-1],
-            "an unknown status": record_bytes(7, 200, 3, b"", b""),
-            "a main marker longer than its slot": record_bytes(7, 200, 1, bytes(113), b"")[:RECORD_SIZE],
-            "a second marker longer than its slot": record_bytes(7, 200, 1, b"", bytes(113))[:RECORD_SIZE],
+            "an unknown status": record_bytes(7, DEVICE_NS, 3, b"", b""),
+            "a main marker longer than its slot": record_bytes(7, DEVICE_NS, 1, bytes(113), b"")[:RECORD_SIZE],
+            "a second marker longer than its slot": record_bytes(7, DEVICE_NS, 1, b"", bytes(113))[:RECORD_SIZE],
         }
         for what, data in cases.items():
             with self.subTest(what), self.assertRaises(DataFormatError):
                 _ = CaptureDataRecord.parse(data)
-        self.assertEqual(len(CaptureDataRecord.parse(record_bytes(7, 200, 1, bytes(112), bytes(112))).second_bytes or b""), 112)
+        self.assertEqual(len(CaptureDataRecord.parse(record_bytes(7, DEVICE_NS, 1, bytes(112), bytes(112))).second_bytes or b""), 112)
         self.assertEqual(RECORD_SIZE, 256)
 
     def test_a_records_markers_decode(self) -> None:
         main = encode_payload(Payload(MarkerKind.SEQUENCE_START, 7, 12, MarkerFlags.STATIC_AFTER, 34), StartMetadata(5, SequenceId.from_text("run 7")))
         sync = encode_payload(Payload(MarkerKind.SYNC, 7, 11, MarkerFlags.NO_FLAGS, 0))
         self.assertEqual((len(main), len(sync)), (81, 20), "the longest and the shortest marker")
-        record = CaptureDataRecord.parse(record_bytes(5, 200, 2, main, sync))
+        record = CaptureDataRecord.parse(record_bytes(5, DEVICE_NS, 2, main, sync))
         decoded = record.try_decode_main()
         assert decoded is not None
         payload, metadata = decoded
@@ -133,16 +142,16 @@ class CaptureDataTests(unittest.TestCase):
         self.assertEqual((second.kind, second.run_id, second.frame_index), (MarkerKind.SYNC, 7, 11))
 
         # A record without markers, and bytes that are no marker
-        none = CaptureDataRecord.parse(record_bytes(5, 200, 0, b"", b""))
+        none = CaptureDataRecord.parse(record_bytes(5, DEVICE_NS, 0, b"", b""))
         self.assertEqual((none.try_decode_main(), none.try_decode_second()), (None, None))
-        garbage = CaptureDataRecord.parse(record_bytes(5, 200, 1, bytes(57), b"\x01\x02\x03"))
+        garbage = CaptureDataRecord.parse(record_bytes(5, DEVICE_NS, 1, bytes(57), b"\x01\x02\x03"))
         self.assertEqual((garbage.try_decode_main(), garbage.try_decode_second()), (None, None))
 
     def test_records_are_read_in_order_whatever_is_read_between_them(self) -> None:
         count = 5000  # more than one batch of records()
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "captures.mbcd"
-            _ = path.write_bytes(bytes(header_bytes()) + b"".join(record_bytes(i, i * 3, 1, b"", b"") for i in range(count)))
+            _ = path.write_bytes(bytes(header_bytes()) + b"".join(record_bytes(i, i * PERIOD_NS, 1, b"", b"") for i in range(count)))
             with CaptureDataReader(path) as reader:
                 self.assertEqual(reader.record_count, count)
                 indices: list[int] = []

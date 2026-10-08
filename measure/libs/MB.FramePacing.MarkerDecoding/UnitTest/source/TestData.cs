@@ -2,8 +2,8 @@
 //* File Description
 //* ----------------
 //* Locates sdk/test-data/markers (golden images written by sdk/cpp/marker/tools/marker-render --golden) and parses its manifest. The
-//* manifest's times are nanoseconds, as the markers carry them; the tools count in ticks, so a golden payload is the marker library's
-//* payload as MarkerPayload.FromFrameMarker gives it: what decoding the image gives.
+//* manifest's times are nanoseconds, as the markers carry them and the tools hold them: a golden payload is the marker library's payload
+//* as MarkerPayload.FromFrameMarker gives it, which is what decoding the image gives.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1

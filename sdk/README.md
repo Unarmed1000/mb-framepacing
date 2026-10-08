@@ -9,8 +9,10 @@ It has modules:
 - **data**: reads what the mb-framepacing tools capture and analyse.
 - **pacer** (C++, **experimental**, off by default): paces a frame loop with only a steady clock and vsync. It holds a target frame
   rate, adapts the swap interval to how the frames do, and hands the application its animation time and the values the marker carries.
-- **core**: what the modules share: `Point` and `Rectangle` in every language, the time types in nanoseconds (`NanosecondTimeSpan`, `NanosecondTickCount`, `NanosecondTimeDuration`: the marker's) in every language and in ticks of 100 ns (`TickCount64`, `TickCount32`, `TimeSpan32`) in C++ and C#, and in C++ the
-  library version.
+- **core**: what the modules share: `Point` and `Rectangle` in every language, the time types in nanoseconds (`NanosecondTimeSpan`,
+  `NanosecondTickCount`, `NanosecondTimeDuration`: what the marker and the data modules use) in every language, time types in ticks
+  of 100 ns (`TickCount64`, `TickCount32`, `TimeSpan32`) in C++ and C# for applications that count in them, and in C++ the library
+  version.
 
 Everything here is under the BSD 3-Clause License. The measuring tools themselves (capture, analysis, GUI) are in
 [`measure/`](../measure) under another license.
@@ -52,8 +54,8 @@ CI checks it):
 | Assembly                | Target         |     Size |
 | ----------------------- | -------------- | -------: |
 | `MB.FramePacing`        | netstandard2.1 | 20.0 KiB |
-| `MB.FramePacing.Marker` | netstandard2.1 | 27.5 KiB |
-| `MB.FramePacing.Data`   | net10.0        | 97.0 KiB |
+| `MB.FramePacing.Marker` | netstandard2.1 | 28.0 KiB |
+| `MB.FramePacing.Data`   | net10.0        | 96.5 KiB |
 
 <!-- /sdk-csharp-size-table -->
 
@@ -120,6 +122,11 @@ It reads what the tools write, in your own code:
 The C# module is the reference: the tools write every file through it. A marker payload inside the capture data is decoded with the
 marker module of the same language.
 
+- **Times are whole nanoseconds.** The files hold every time as a whole number of nanoseconds (`…Ns` columns and fields), and only
+  `summary.json`'s statistics and histograms are milliseconds (`…Ms`). C++ and C# read them as the core's nanosecond types (a point
+  in time a `NanosecondTickCount`, a span a `NanosecondTimeSpan`, the marker's frame times and CPU busy a
+  `NanosecondTimeDuration`), Python as plain `int`s named `*_ns`. A capture or an analysis output made before the tools counted in
+  nanoseconds is not valid and is made again: the two formats say what is refused and what reads a hundred times too small.
 - **Format versions.** `captures.mbcd` has a format version in its header, and `summary.json` a `formatVersion` that covers the CSV
   files it names. A reader refuses a newer version than it knows. Within a version, fields and columns may be added; readers look CSV
   columns up by name and ignore the ones they do not know.

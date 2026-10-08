@@ -22,7 +22,8 @@ namespace MB.FramePacing.Charts.UnitTest
   [TestFixture]
   public class ReportSvgTests
   {
-    private const long Refresh = TimeSpan.TicksPerSecond / 240;
+    // 1/240 s cut to the nanosecond
+    private const long Refresh = 4_166_666;
     private const int HitchFrame = 500_000;
 
     /// <summary>Printed by generate_diagrams.py's ms() and text() and Python's number formatting (half to even, a signed zero).</summary>
@@ -141,13 +142,13 @@ namespace MB.FramePacing.Charts.UnitTest
     public void OneHour_Section_DrawsEveryFrame()
     {
       var run = OneHour();
-      double hitch = run.Run.Frames[HitchFrame].FirstSeenTime.Ticks / (double)TimeSpan.TicksPerSecond;
+      double hitch = run.Run.Frames[HitchFrame].FirstSeenTime.Nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerSecond;
       var section = RunSection.Create(run, hitch - 1, hitch + 1);
       string svg = ReportCard.Render(section);
 
       var frames = section.Section.Run.Frames;
       Assert.That(frames, Has.Count.LessThan(1000));
-      int withError = frames.Count(f => f.AnimationError?.Ticks is { } e && e != 0);
+      int withError = frames.Count(f => f.AnimationError?.Nanoseconds is { } e && e != 0);
       Assert.That(Count(svg, "<rect class=\"bar\""), Is.EqualTo(withError), "a bar per frame with an error");
       Assert.That(svg, Does.Not.Contain("render a section of at most"));
       Assert.That(Count(svg, "<rect class=\"strip-late\""), Is.GreaterThanOrEqualTo(frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0)));
@@ -246,7 +247,8 @@ namespace MB.FramePacing.Charts.UnitTest
       // The application prefers one refresh per frame; from frame 1400 its pacer runs at two
       var (drawing, frames) = LateShareCard(i => Refresh);
       var plot = drawing.Plots.Single();
-      double Seconds(int i) => (frames[i].FirstSeenTime.Ticks - frames[0].FirstSeenTime.Ticks) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(int i) =>
+        (frames[i].FirstSeenTime.Nanoseconds - frames[0].FirstSeenTime.Nanoseconds) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
       (double X, double Y)[] Points(string cls) =>
         drawing
           .FlatShapes.OfType<PathShape>()
@@ -311,11 +313,11 @@ namespace MB.FramePacing.Charts.UnitTest
         frames.Add(
           f with
           {
-            FirstSeenTime = new TickCount64(time),
-            LastSeenTime = new TickCount64(time),
-            DisplayDelta = i > 0 ? new TimeSpan(display) : null,
-            MarkerTargetFrameTime = new TimeSpan32((uint)(i < 1400 ? Refresh : 2 * Refresh)),
-            PreferredFrameTime = new TimeSpan(preferred(i)),
+            FirstSeenTime = new NanosecondTickCount(time),
+            LastSeenTime = new NanosecondTickCount(time),
+            DisplayDelta = i > 0 ? new NanosecondTimeSpan(display) : null,
+            MarkerTargetFrameTime = NanosecondTimeDuration.FromNanoseconds(i < 1400 ? Refresh : 2 * Refresh),
+            PreferredFrameTime = new NanosecondTimeSpan(preferred(i)),
             Flags = i == 1800 ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
           }
         );
@@ -340,9 +342,9 @@ namespace MB.FramePacing.Charts.UnitTest
           : late ? 2 * Refresh
           : Refresh;
         long error =
-          hitch ? -700 * TimeSpan.TicksPerMillisecond
+          hitch ? -700 * NanosecondTimeSpan.NanosecondsPerMillisecond
           : late ? -Refresh
-          : i % 7 == 0 ? (i % 14 == 0 ? 5000 : -5000)
+          : i % 7 == 0 ? (i % 14 == 0 ? 500_000 : -500_000)
           : 0;
         if (i > 0)
           time += display;
@@ -351,27 +353,27 @@ namespace MB.FramePacing.Charts.UnitTest
           new PresentedFrame(
             0,
             (ulong)i,
-            new TimeSpan(time),
+            new NanosecondTimeSpan(time),
             i,
-            new TickCount64(time),
-            new TickCount64(time),
+            new NanosecondTickCount(time),
+            new NanosecondTickCount(time),
             1,
-            new TimeSpan(Refresh),
+            new NanosecondTimeSpan(Refresh),
             0,
-            first ? null : new TimeSpan(display),
-            first ? null : new TimeSpan(display + error),
-            first ? null : new TimeSpan(error),
-            TimeSpan.Zero,
+            first ? null : new NanosecondTimeSpan(display),
+            first ? null : new NanosecondTimeSpan(display + error),
+            first ? null : new NanosecondTimeSpan(error),
+            NanosecondTimeSpan.Zero,
             late ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
-            TargetFrameTime: first ? null : new TimeSpan(Refresh)
+            TargetFrameTime: first ? null : new NanosecondTimeSpan(Refresh)
           )
         );
       }
       int lateCount = frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
       var pacing = new RunPacing(
-        new TimeSpan(Refresh),
+        new NanosecondTimeSpan(Refresh),
         false,
-        new TimeSpan(Refresh),
+        new NanosecondTimeSpan(Refresh),
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(Count - 1),
@@ -387,12 +389,12 @@ namespace MB.FramePacing.Charts.UnitTest
         true,
         true,
         new RunCounts(Count, Count, 0, 0, 0, 0, 0, Count, 0, 0, 0, 1),
-        RunStatistics.From(frames, TimeSpan.FromMilliseconds(1), new TimeSpan(Refresh)),
+        RunStatistics.From(frames, NanosecondTimeSpan.FromMilliseconds(1), new NanosecondTimeSpan(Refresh)),
         frames,
         Array.Empty<string>(),
         Pacing: pacing
       );
-      return new ChartRun(analysis, new TimeSpan(Refresh), TimeSpan.FromMilliseconds(1), false);
+      return new ChartRun(analysis, new NanosecondTimeSpan(Refresh), NanosecondTimeSpan.FromMilliseconds(1), false);
     }
 
     private static int Count(string text, string part) => Regex.Matches(text, Regex.Escape(part)).Count;
@@ -527,12 +529,12 @@ namespace MB.FramePacing.Charts.UnitTest
       {
         Run = run.Run with
         {
-          Frames = run.Run.Frames.Select((f, i) => i % 50 == 25 ? f with { AnimationDelta = new TimeSpan(4 * Refresh) } : f).ToList(),
+          Frames = run.Run.Frames.Select((f, i) => i % 50 == 25 ? f with { AnimationDelta = new NanosecondTimeSpan(4 * Refresh) } : f).ToList(),
         },
       };
       double Top(ReportOptions options) =>
         ReportCard.Build(RunSection.Whole(longSteps), options).Plots.Single(p => p.Id == ReportItem.DisplayTimeStep).YTo;
-      double refreshMs = Refresh / (double)TimeSpan.TicksPerMillisecond;
+      double refreshMs = Refresh / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
       Assert.That(Top(ReportOptions.Default), Is.EqualTo(2.5 * refreshMs).Within(1e-9), "two refreshes and a half: the late frames' holds");
       Assert.That(Top(shown), Is.EqualTo(4.5 * refreshMs).Within(1e-9), "four refreshes and a half: the animation time steps too");
 
@@ -563,8 +565,8 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(ReportCard.Render(section, only), Does.Contain("render a section of at most"), "ten seconds at 240 Hz are too many cells");
 
       var drawing = ReportCard.Build(section, only with { StripSeconds = 1 });
-      // A refresh is a whole number of ticks, a little under 1/240 s: the frame that appears just before 1 s starts its cell at the edge
-      int shown = run.Run.Frames.Count(f => f.FirstSeenTime.Ticks < TimeSpan.TicksPerSecond);
+      // A refresh is cut to a whole number, a little under 1/240 s: the frame that appears just before 1 s starts its cell at the edge
+      int shown = run.Run.Frames.Count(f => f.FirstSeenTime.Nanoseconds < NanosecondTimeSpan.NanosecondsPerSecond);
       Assert.That(shown, Is.EqualTo(241));
       Assert.That(drawing.FlatShapes.OfType<RectShape>().Count(), Is.EqualTo(shown), "a cell per refresh of the first second");
       var plot = drawing.Plots.Single();
@@ -690,7 +692,8 @@ namespace MB.FramePacing.Charts.UnitTest
       var section = RunSection.Whole(run);
       var hover = new CardHover(section);
       var frames = run.Run.Frames;
-      double Seconds(int i) => (frames[i].FirstSeenTime.Ticks - frames[0].FirstSeenTime.Ticks) / (double)TimeSpan.TicksPerSecond;
+      double Seconds(int i) =>
+        (frames[i].FirstSeenTime.Nanoseconds - frames[0].FirstSeenTime.Nanoseconds) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
       Assert.That(hover.FrameAt(Seconds(100)), Is.SameAs(frames[100]));
       Assert.That(hover.FrameAt((Seconds(100) + Seconds(101)) / 2), Is.SameAs(frames[100]), "until the next frame appears");
       Assert.That(hover.FrameAt(-1), Is.SameAs(frames[0]));
@@ -729,23 +732,23 @@ namespace MB.FramePacing.Charts.UnitTest
           (f, i) =>
             i switch
             {
-              5 => f with { OnScreen = new TimeSpan(3 * Refresh) },
+              5 => f with { OnScreen = new NanosecondTimeSpan(3 * Refresh) },
               10 => f with
               {
-                FirstSeenTime = f.FirstSeenTime + new TimeSpan(2 * Refresh),
-                LastSeenTime = f.LastSeenTime + new TimeSpan(2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + new NanosecondTimeSpan(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + new NanosecondTimeSpan(2 * Refresh),
                 SkippedBefore = 2,
               },
               12 => f with
               {
-                FirstSeenTime = f.FirstSeenTime + new TimeSpan(2 * Refresh),
-                LastSeenTime = f.LastSeenTime + new TimeSpan(2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + new NanosecondTimeSpan(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + new NanosecondTimeSpan(2 * Refresh),
                 Flags = PresentedFrameFlags.Torn,
               },
               > 5 => f with
               {
-                FirstSeenTime = f.FirstSeenTime + new TimeSpan(2 * Refresh),
-                LastSeenTime = f.LastSeenTime + new TimeSpan(2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + new NanosecondTimeSpan(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + new NanosecondTimeSpan(2 * Refresh),
               },
               _ => f,
             }

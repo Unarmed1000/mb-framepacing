@@ -91,7 +91,7 @@ FM::ModuleMatrix matrix;
 std::array<uint32_t, FM::MaxIndexCount()> indices;
 
 // Every frame, last (after post effects and UI), without blending:
-const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime);   // an FP::TimeSpan
+const FM::Payload payload(FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime);   // an FP::NanosecondTimeSpan
 FM::GenerateModules(payload, matrix);                                      // encode once
 const std::size_t count = FM::ModulesToGridIndices(matrix, indices);       // only the indices change
 DrawIndexed(indices.data(), count);      // triangles over the static vertices
@@ -119,8 +119,9 @@ faster still.
   (4.294967294 s); a longer one is held as that, never an error.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
   (`GenerateModules(payload, matrix, {utcTicks, sequenceId})`), and a payload of kind `MarkerKind::SequenceEnd`, each shown for a few
-  frames. The sequence id is 16 opaque bytes unique to the run: a UUID's bytes, or a text tag of up to 16 printable ASCII characters
-  (`SequenceId::TryFromText`).
+  frames. The start time is the one time that is not in nanoseconds: C# `DateTime` UTC ticks of 100 ns (`ToDateTimeTicks` of
+  `core/time/ChronoConversion.hpp`). The sequence id is 16 opaque bytes unique to the run: a UUID's bytes, or a text tag of up to
+  16 printable ASCII characters (`SequenceId::TryFromText`).
 - **Sync marker (optional; required for camera capture):** a small second marker with only the run id and frame index, drawn
   bottom-left (`options.RecommendedOrigin(MarkerKind::Sync, …)`) with a payload of kind `MarkerKind::Sync`.
 - **Size:** every main marker (frame, start, end) is QR version 6, 41×41 modules, so it never changes size:
@@ -162,7 +163,7 @@ for (const FD::SummaryRun& run : summary.Runs)
 {
   for (const FD::FrameRow& frame : FD::ReadFrames(*analysis / run.FramesFile))
   {
-    // Points in time are TickCount64s, spans TimeSpans; an empty cell is an empty std::optional
+    // Every time is in nanoseconds (points in time NanosecondTickCounts, spans NanosecondTimeSpans); an empty cell is an empty std::optional
     if (frame.AnimationError)
     {
       std::printf("%llu: %.4f ms\n", static_cast<unsigned long long>(frame.FrameIndex), frame.AnimationError->TotalMilliseconds());
@@ -181,16 +182,22 @@ for (const FD::CaptureDataRecord& record : reader.ReadAll())
 }
 ```
 
-The times are typed: points in time are `TickCount64`s, on the capture's clock (a frame's `FirstSeenTime`, a record's `HostTime`
-and `DeviceTime`, empty when the device gave none) or the frame pacer's (`IntendedDisplayTime`, `CpuStartTime`); spans are
-`TimeSpan`s (`DisplayDelta`, `AnimationError`, ...); the marker's own 32-bit values (`MarkerTargetFrameTime`, `CpuBusy`) are
-`TimeSpan32`s.
+The times are typed, and every one is in nanoseconds: points in time are `NanosecondTickCount`s, on the capture's clock (a frame's
+`FirstSeenTime`, a record's `HostTime` and `DeviceTime`, empty when the device gave none) or the frame pacer's
+(`IntendedDisplayTime`, `CpuStartTime`); spans are `NanosecondTimeSpan`s (`DisplayDelta`, `AnimationError`, ...); the marker's own
+durations (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`: 32 bits in the marker and in the file) are
+`NanosecondTimeDuration`s, as the marker's `Payload` returns them, and a frame time of `Payload::OnDemandFrameTime` is a frame
+presented on demand.
 
 Reading allocates and throws: `FD::DataFormatError` for a file it cannot read (another kind of file, damaged content, or a newer format
 version, whose message says to update), `std::runtime_error` for a file it cannot open. In `MB::FramePacing::Data`, each type and
 each group of functions in its own header (`<mb/framepacing/data/…>`: `AnalysisSummary.hpp` has `ReadSummary`, `FramesCsv.hpp`
-`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names). The files hold every time as whole 100 ns
-ticks, in the integer type it has, so a value is read exactly as it was written:
+`ReadFrames`, `CapturesCsv.hpp` `ReadCaptures`, `AnalysisFiles.hpp` the file names). The files hold every time as whole
+nanoseconds (`…Ns` columns and fields), in the integer type it has, so a value is read exactly as it was written. A file from before
+the nanoseconds held ticks of 100 ns under `…Ticks` names: such a `summary.json` or frames CSV is refused (it lacks its required
+`…Ns` fields and columns), such a `captures.csv` reads as captures without times, and such a `captures.mbcd`, whose bytes did not
+change, reads without an error and a hundred times too small. Analyse such a capture again, or record it again when its markers
+counted in ticks too.
 
 | Function or type                                                                                                                            | What it does                                                                                                       |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -245,18 +252,19 @@ not use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/fram
 
 In `MB::FramePacing`, each in its own header (`<mb/framepacing/core/…>`, the time types in `core/time/`):
 
-| Function or type                                                                                        | What it does                                                                                                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp`                                               | The linked library's version; at compile time, for `#if` and `static_assert`                                                                                                                                            |
-| `TimeSpan`                                                                                              | An interval in ticks of 100 ns, C#'s `System.TimeSpan`: out of range throws, as in C#                                                                                                                                   |
-| `TickCount64`                                                                                           | A point on your steady clock in ticks (`FromNanoseconds`, `FromCounter` for QueryPerformanceCounter)                                                                                                                    |
-| `TickCount32`                                                                                           | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap                                                                                                                         |
-| `TimeSpan32`                                                                                            | An unsigned 32-bit interval of 0 to 429.5 s in ticks                                                                                                                                                                    |
-| `NanosecondTimeSpan`, `NanosecondTickCount`                                                             | An interval and a point on a clock in nanoseconds, kept as a platform that counts in nanoseconds gives them (`FromSeconds`, `FromCounter` for QueryPerformanceCounter); exact from ticks, to ticks the tick they are in |
-| `NanosecondTimeDuration`                                                                                | A length of time in nanoseconds that is never negative (a negative one becomes zero), as `TimeDuration` is in ticks: the marker's frame times and CPU busy                                                              |
-| `core/time/ChronoConversion.hpp` (optional): `TickDuration`, `NanosecondDuration`, `ToDateTimeTicks`, … | `std::chrono` conversions for the tick and the nanosecond types, and the wall clock as C# `DateTime` ticks                                                                                                              |
-| `Point`, `Rectangle`                                                                                    | A pixel position; an integer pixel rectangle, always valid (a negative size is 0)                                                                                                                                       |
-| `ByteSpanUtil`: `WriteLE`, `ReadLE<T>`                                                                  | Little-endian values in byte spans, the byte count from the type                                                                                                                                                        |
+| Function or type                                                                                        | What it does                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp`                                               | The linked library's version; at compile time, for `#if` and `static_assert`                                                                                                                                           |
+| `TimeSpan`                                                                                              | An interval in ticks of 100 ns, C#'s `System.TimeSpan`: out of range throws, as in C#                                                                                                                                  |
+| `TickCount64`                                                                                           | A point on your steady clock in ticks (`FromNanoseconds`, `FromCounter` for QueryPerformanceCounter)                                                                                                                   |
+| `TickCount32`                                                                                           | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap                                                                                                                        |
+| `TimeSpan32`                                                                                            | An unsigned 32-bit interval of 0 to 429.5 s in ticks                                                                                                                                                                   |
+| `TimeDuration`                                                                                          | A `TimeSpan` that is never negative (a negative one becomes zero)                                                                                                                                                      |
+| `NanosecondTimeSpan`, `NanosecondTickCount`                                                             | An interval and a point on a clock in nanoseconds, what the marker and the data module hold their times in (`FromSeconds`, `FromCounter` for QueryPerformanceCounter); exact from ticks, to ticks the tick they are in |
+| `NanosecondTimeDuration`                                                                                | A length of time in nanoseconds that is never negative (a negative one becomes zero), as `TimeDuration` is in ticks: the marker's frame times and CPU busy                                                             |
+| `core/time/ChronoConversion.hpp` (optional): `TickDuration`, `NanosecondDuration`, `ToDateTimeTicks`, … | `std::chrono` conversions for the tick and the nanosecond types, and the wall clock as C# `DateTime` ticks                                                                                                             |
+| `Point`, `Rectangle`                                                                                    | A pixel position; an integer pixel rectangle, always valid (a negative size is 0)                                                                                                                                      |
+| `ByteSpanUtil`: `WriteLE`, `ReadLE<T>`                                                                  | Little-endian values in byte spans, the byte count from the type                                                                                                                                                       |
 
 ## What it adds to your executable
 
@@ -274,7 +282,7 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 | Toolchain               | Compiler                   | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.0 KiB |            221.8 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.0 KiB |            221.7 KiB |
 | MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.5 KiB |            193.1 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.4 KiB |            215.7 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.2 KiB |            139.0 KiB |

@@ -31,7 +31,7 @@
                   <TextBox Grid.Column="1" Text="{Binding ImageFpsText}" PlaceholderText="240" />
                 </Grid>
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                  <TextBox Text="{Binding TimestampFile}" PlaceholderText="optional: exact times (CSV fileName,timeTicks)" />
+                  <TextBox Text="{Binding TimestampFile}" PlaceholderText="optional: exact times (CSV fileName,timeNs)" />
                   <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseTimestampsCommand}" />
                 </Grid>
               </StackPanel>

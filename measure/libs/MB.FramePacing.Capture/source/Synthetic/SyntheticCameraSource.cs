@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Capture source that records a SyntheticCamera: full camera frames with the camera's own (drifting) timestamps as device ticks. It runs as
+//* Capture source that records a SyntheticCamera: full camera frames with the camera's own (drifting) timestamps as device times. It runs as
 //* fast as it can render (not live), like importing a high speed camera clip.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS

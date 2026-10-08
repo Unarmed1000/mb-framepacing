@@ -47,7 +47,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Known_HasItsTime()
     {
-      var time = TickCount64.FromMilliseconds(1500);
+      var time = NanosecondTickCount.FromMilliseconds(1500);
       var value = new DeviceTimestamp(time);
 
       Assert.That(value.IsKnown, Is.True);
@@ -56,7 +56,7 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(value.ToNullable(), Is.EqualTo(time));
       Assert.That(value == new DeviceTimestamp(time), Is.True);
       Assert.That(value.GetHashCode(), Is.EqualTo(new DeviceTimestamp(time).GetHashCode()));
-      Assert.That(value, Is.Not.EqualTo(new DeviceTimestamp(TickCount64.FromMilliseconds(1501))));
+      Assert.That(value, Is.Not.EqualTo(new DeviceTimestamp(NanosecondTickCount.FromMilliseconds(1501))));
       Assert.That(value.ToString(), Is.EqualTo(time.ToString()));
     }
 
@@ -71,24 +71,24 @@ namespace MB.FramePacing.Capture.UnitTest
       Assert.That(value.Equals("0"), Is.False);
     }
 
-    /// <summary>The file's bytes: a time as its ticks, unknown as the capture data format's long.MinValue, pending (ring only) the next value.</summary>
+    /// <summary>The file's bytes: a time as its nanoseconds, unknown as the capture data format's long.MinValue, pending (ring only) the next value.</summary>
     [TestCase(0, long.MinValue)]
     [TestCase(1, long.MinValue + 1)]
     [TestCase(2, 123_456L)]
-    public void RecordHeader_WritesAndReadsEveryState(int state, long expectedTicks)
+    public void RecordHeader_WritesAndReadsEveryState(int state, long expectedNanoseconds)
     {
       var deviceTime = state switch
       {
         0 => DeviceTimestamp.Unknown,
         1 => DeviceTimestamp.Pending,
-        _ => new DeviceTimestamp(new TickCount64(expectedTicks)),
+        _ => new DeviceTimestamp(new NanosecondTickCount(expectedNanoseconds)),
       };
-      var header = new CaptureRecordHeader(7, new TickCount64(1000), deviceTime, 2, 32);
+      var header = new CaptureRecordHeader(7, new NanosecondTickCount(1000), deviceTime, 2, 32);
       Span<byte> bytes = stackalloc byte[CaptureFileHeader.RecordHeaderSize];
 
       header.Write(bytes);
 
-      Assert.That(BinaryPrimitives.ReadInt64LittleEndian(bytes.Slice(16)), Is.EqualTo(expectedTicks));
+      Assert.That(BinaryPrimitives.ReadInt64LittleEndian(bytes.Slice(16)), Is.EqualTo(expectedNanoseconds));
       Assert.That(CaptureRecordHeader.Read(bytes), Is.EqualTo(header));
     }
   }

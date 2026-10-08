@@ -29,12 +29,12 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>Histogram.From of positions <paramref name="start"/> to <paramref name="end"/> of <paramref name="values"/>: bin k covers [(k - 0.5) * width, (k + 0.5) * width).</summary>
-    public static Histogram FromMatrix(WaveletMatrix values, int start, int end, TimeSpan binWidth, int maxBins = Histogram.DefaultMaxBins)
+    public static Histogram FromMatrix(WaveletMatrix values, int start, int end, NanosecondTimeSpan binWidth, int maxBins = Histogram.DefaultMaxBins)
     {
       ArgumentOutOfRangeException.ThrowIfLessThan(maxBins, 1);
       if (end <= start)
         return Histogram.Empty;
-      long width = binWidth > TimeSpan.Zero ? binWidth.Ticks : TimeSpan.TicksPerMillisecond;
+      long width = binWidth > NanosecondTimeSpan.Zero ? binWidth.Nanoseconds : NanosecondTimeSpan.NanosecondsPerMillisecond;
       long min = values.KthSmallest(start, end, 0);
       long max = values.KthSmallest(start, end, end - start - 1);
       long first = BinOf(min, width);
@@ -48,7 +48,7 @@ namespace MB.FramePacing.Charts
       }
 
       var bins = new HistogramBin[last - first + 1];
-      double widthMs = width / (double)TimeSpan.TicksPerMillisecond;
+      double widthMs = width / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
       int below = values.CountBelow(start, end, LowestIn(first, width));
       for (long k = first; k <= last; ++k)
       {

@@ -19,7 +19,7 @@ namespace MB.FramePacing.Analysis.UnitTest
   [TestFixture]
   public class CameraTimelineTests
   {
-    private const long Period = TimeSpan.TicksPerMillisecond; // 1000 fps camera
+    private const long Period = NanosecondTimeSpan.NanosecondsPerMillisecond; // 1000 fps camera
     private const int CapturesPerFrame = 17;
     private const int Transition = 4; // undecodable captures while the scanout crosses the timing marker
     private const int SecondZoneDelay = 10; // captures
@@ -54,20 +54,26 @@ namespace MB.FramePacing.Analysis.UnitTest
       for (long c = CapturesPerFrame; c < end; ++c)
       {
         MarkerPayload? second = secondary.TryGetValue(c, out var s)
-          ? new MarkerPayload(MarkerKind.Sync, s.RunId, s.Index, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0))
+          ? new MarkerPayload(MarkerKind.Sync, s.RunId, s.Index, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(0))
           : null;
         rows.Add(
           primary.TryGetValue(c, out var p)
             ? new CaptureRow(
               c,
-              new TickCount64(c * Period),
+              new NanosecondTickCount(c * Period),
               CaptureStatus.Decoded,
-              new MarkerPayload(MarkerKind.Frame, 1, p, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan((long)(p - 100) * 16 * Period)),
+              new MarkerPayload(
+                MarkerKind.Frame,
+                1,
+                p,
+                MB.FramePacing.Marker.MarkerFlags.NoFlags,
+                new NanosecondTimeSpan((long)(p - 100) * 16 * Period)
+              ),
               null,
               0,
               second
             )
-            : new CaptureRow(c, new TickCount64(c * Period), CaptureStatus.Undecodable, default, null, 0, second)
+            : new CaptureRow(c, new NanosecondTickCount(c * Period), CaptureStatus.Undecodable, default, null, 0, second)
         );
       }
       return rows;

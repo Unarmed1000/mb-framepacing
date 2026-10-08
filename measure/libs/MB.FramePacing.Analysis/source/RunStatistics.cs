@@ -52,23 +52,23 @@ namespace MB.FramePacing.Analysis
     /// frame rates; every frame the drift and time on screen. <paramref name="threshold"/> is the error threshold,
     /// <paramref name="capturePeriod"/> the capture period (no frame counts as off without one).
     /// </summary>
-    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, TimeSpan threshold, TimeSpan capturePeriod)
+    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, NanosecondTimeSpan threshold, NanosecondTimeSpan capturePeriod)
     {
-      // One pass over the frames gathers each kind of value as ticks (in rented arrays: a run of an hour has a million frames), then each
-      // is sorted once and gives its statistics; the display time steps' sorted values give the lows too
-      var displaySteps = new TickList(frames.Count);
-      var animationSteps = new TickList(frames.Count);
-      var errors = new TickList(frames.Count);
-      var absoluteErrors = new TickList(frames.Count);
-      var drifts = new TickList(frames.Count);
-      var onScreen = new TickList(frames.Count);
-      var cpuBusy = new TickList();
-      var frameTimes = new TickList();
-      var cpuWaits = new TickList();
+      // One pass over the frames gathers each kind of value as nanoseconds (a run of an hour has a million frames), then each is sorted
+      // once and gives its statistics; the display time steps' sorted values give the lows too
+      var displaySteps = new NanosecondList(frames.Count);
+      var animationSteps = new NanosecondList(frames.Count);
+      var errors = new NanosecondList(frames.Count);
+      var absoluteErrors = new NanosecondList(frames.Count);
+      var drifts = new NanosecondList(frames.Count);
+      var onScreen = new NanosecondList(frames.Count);
+      var cpuBusy = new NanosecondList();
+      var frameTimes = new NanosecondList();
+      var cpuWaits = new NanosecondList();
       long visibleErrors = 0;
-      long absoluteErrorTicks = 0;
-      long errorDisplayTicks = 0;
-      long frameRateTicks = 0;
+      long absoluteErrorNanoseconds = 0;
+      long errorDisplayNanoseconds = 0;
+      long frameRateNanoseconds = 0;
       long excludedStatic = 0;
       long uncertain = 0;
       for (int i = 0; i < frames.Count; ++i)
@@ -80,20 +80,20 @@ namespace MB.FramePacing.Analysis
           animationSteps.Add(frame.AnimationDelta!.Value);
           errors.Add(error);
           absoluteErrors.Add(absolute);
-          if (capturePeriod > TimeSpan.Zero && absolute > threshold)
+          if (capturePeriod > NanosecondTimeSpan.Zero && absolute > threshold)
             ++visibleErrors;
-          absoluteErrorTicks += Math.Abs(error.Ticks);
-          errorDisplayTicks += frame.DisplayDelta!.Value.Ticks;
+          absoluteErrorNanoseconds += Math.Abs(error.Nanoseconds);
+          errorDisplayNanoseconds += frame.DisplayDelta!.Value.Nanoseconds;
         }
         if (CountsTowardFrameRate(frame))
         {
           displaySteps.Add(frame.DisplayDelta!.Value);
-          frameRateTicks += frame.DisplayDelta!.Value.Ticks;
+          frameRateNanoseconds += frame.DisplayDelta!.Value.Nanoseconds;
         }
         drifts.Add(frame.Drift);
         onScreen.Add(frame.OnScreen);
-        if (frame.CpuBusy != TimeSpan32.Zero)
-          cpuBusy.Add(frame.CpuBusy.ToTimeSpan());
+        if (frame.CpuBusy != NanosecondTimeDuration.Zero)
+          cpuBusy.Add(frame.CpuBusy);
         if (frame.FrameTime is { } frameTime)
           frameTimes.Add(frameTime);
         if (frame.CpuWait is { } cpuWait)
@@ -106,10 +106,10 @@ namespace MB.FramePacing.Analysis
             ++uncertain;
         }
       }
-      var (errorPerFrameMs, percentError) = ErrorSummary(absoluteErrorTicks, errorDisplayTicks, errors.Count);
+      var (errorPerFrameMs, percentError) = ErrorSummary(absoluteErrorNanoseconds, errorDisplayNanoseconds, errors.Count);
       displaySteps.Sort();
       return new RunStatistics(
-        Statistics.FromSortedTicks(displaySteps.Values),
+        Statistics.FromSortedNanoseconds(displaySteps.Values),
         Sorted(animationSteps),
         Sorted(errors),
         Sorted(absoluteErrors),
@@ -118,7 +118,7 @@ namespace MB.FramePacing.Analysis
         visibleErrors,
         errorPerFrameMs,
         percentError,
-        frameRateTicks > 0 ? displaySteps.Count * (double)TimeSpan.TicksPerSecond / frameRateTicks : 0,
+        AverageFramesPerSecond(displaySteps.Count, frameRateNanoseconds),
         LowFps(displaySteps.Values, 0.99, MinFramesForOnePercentLow),
         LowFps(displaySteps.Values, 0.999, MinFramesForPointOnePercentLow),
         Sorted(cpuBusy),
@@ -128,10 +128,10 @@ namespace MB.FramePacing.Analysis
         uncertain
       );
 
-      static Statistics Sorted(TickList ticks)
+      static Statistics Sorted(NanosecondList nanoseconds)
       {
-        ticks.Sort();
-        return Statistics.FromSortedTicks(ticks.Values);
+        nanoseconds.Sort();
+        return Statistics.FromSortedNanoseconds(nanoseconds.Values);
       }
     }
 
@@ -148,25 +148,47 @@ namespace MB.FramePacing.Analysis
     /// <summary>A 0.1 % low needs at least this many frames.</summary>
     public const int MinFramesForPointOnePercentLow = 1000;
 
-    /// <summary>The frame rate of the step that <paramref name="fraction"/> of the display time steps (ascending ticks) are at most as long as.</summary>
+    /// <summary>
+    /// The frame rate of the step that <paramref name="fraction"/> of the display time steps (ascending nanoseconds) are at most as long as.
+    /// </summary>
     private static double? LowFps(ReadOnlySpan<long> sortedSteps, double fraction, int minFrames)
     {
       if (sortedSteps.Length < minFrames)
         return null;
       long step = sortedSteps[Math.Max(0, (int)Math.Ceiling(fraction * sortedSteps.Length) - 1)];
-      return step > 0 ? TimeSpan.TicksPerSecond / (double)step : null;
+      return step > 0 ? NanosecondTimeSpan.NanosecondsPerSecond / (double)step : null;
     }
 
+    /// <summary><paramref name="count"/> frames over the time their display time steps cover; 0 when that is no time.</summary>
+    private static double AverageFramesPerSecond(int count, long nanoseconds) =>
+      // The frames times a second's nanoseconds is exact in a double (a 32-bit number times 5^9 * 2^9), so the one division rounds
+      nanoseconds > 0
+        ? count * (double)NanosecondTimeSpan.NanosecondsPerSecond / nanoseconds
+        : 0;
+
     /// <summary><see cref="ErrorPerFrameMs"/> and <see cref="PercentError"/> of frames' animation errors and display time steps.</summary>
-    public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(IReadOnlyCollection<(TimeSpan Error, TimeSpan DisplayStep)> frames)
+    public static (double ErrorPerFrameMs, double PercentError) ErrorSummary(
+      IReadOnlyCollection<(NanosecondTimeSpan Error, NanosecondTimeSpan DisplayStep)> frames
+    )
     {
       if (frames.Count == 0)
         return (0, 0);
-      return ErrorSummary(frames.Sum(f => Math.Abs(f.Error.Ticks)), frames.Sum(f => f.DisplayStep.Ticks), frames.Count);
+      return ErrorSummary(frames.Sum(f => Math.Abs(f.Error.Nanoseconds)), frames.Sum(f => f.DisplayStep.Nanoseconds), frames.Count);
     }
 
-    /// <summary>The same from the sums: the errors' absolute ticks and the display time steps' ticks of <paramref name="count"/> frames.</summary>
-    private static (double ErrorPerFrameMs, double PercentError) ErrorSummary(long absolute, long display, int count) =>
-      count == 0 ? (0, 0) : (absolute / (double)count / TimeSpan.TicksPerMillisecond, display > 0 ? absolute * 100.0 / display : 0);
+    /// <summary>
+    /// The same from the sums: the errors' absolute nanoseconds and the display time steps' nanoseconds of <paramref name="count"/> frames.
+    /// </summary>
+    private static (double ErrorPerFrameMs, double PercentError) ErrorSummary(long absoluteNanoseconds, long displayNanoseconds, int count)
+    {
+      if (count == 0)
+        return (0, 0);
+      // The mean error is two divisions (by the frames, then by the nanoseconds in a millisecond), the percentage a product, then a
+      // division
+      return (
+        absoluteNanoseconds / (double)count / NanosecondTimeSpan.NanosecondsPerMillisecond,
+        displayNanoseconds > 0 ? absoluteNanoseconds * 100.0 / displayNanoseconds : 0
+      );
+    }
   }
 }

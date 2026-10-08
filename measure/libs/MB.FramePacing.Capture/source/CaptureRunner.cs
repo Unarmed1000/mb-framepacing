@@ -101,11 +101,14 @@ namespace MB.FramePacing.Capture
 
       var preview = options.Preview != null ? new GrayImage(format.Width, format.Height) : null;
       long lastPreviewIndex = -1;
-      TickCount64? recordingStart = options.WaitForStart ? null : default(TickCount64);
-      TickCount64? stopAt = null;
+      NanosecondTickCount? recordingStart = options.WaitForStart ? null : default(NanosecondTickCount);
+      NanosecondTickCount? stopAt = null;
       string stopReason = "cancelled";
-      var lastReport = default(TickCount64);
+      var lastReport = default(NanosecondTickCount);
 
+      // The limits are .NET time spans (a duration the user gave, a report every 200 ms): against the capture clock they are nanoseconds
+      NanosecondTimeSpan? durationLimit = options.Duration is { } runFor ? NanosecondTimeSpan.FromTimeSpan(runFor) : null;
+      var reportInterval = NanosecondTimeSpan.FromMilliseconds(200);
       while (sourceThread.IsAlive)
       {
         sourceThread.Join(20);
@@ -136,7 +139,7 @@ namespace MB.FramePacing.Capture
           stopReason = "end marker";
         }
 
-        if (recordingStart is { } started && options.Duration is { } limit && stopAt == null && now - started >= limit)
+        if (recordingStart is { } started && durationLimit is { } limit && stopAt == null && now - started >= limit)
         {
           stopAt = now;
           stopReason = "duration";
@@ -144,14 +147,14 @@ namespace MB.FramePacing.Capture
         if (stopAt is { } stop && now >= stop && !stopSource.IsCancellationRequested)
           stopSource.Cancel();
 
-        if (progress != null && now - lastReport >= TimeSpan.FromMilliseconds(200))
+        if (progress != null && now - lastReport >= reportInterval)
         {
           lastReport = now;
           var phase =
             stopSource.IsCancellationRequested ? CapturePhase.Stopping
             : recorder.IsArmed ? CapturePhase.WaitingForStart
             : CapturePhase.Recording;
-          progress(new CaptureProgress(phase, now.ToTimeSpan(), recorder.Stats, source.SourceDroppedFrames, monitor.Last));
+          progress(new CaptureProgress(phase, now.ToNanosecondTimeSpan().ToTimeSpan(), recorder.Stats, source.SourceDroppedFrames, monitor.Last));
         }
       }
 
@@ -198,7 +201,9 @@ namespace MB.FramePacing.Capture
         Camera = options.Camera,
       };
       session.Save(options.OutputDirectory);
-      progress?.Invoke(new CaptureProgress(CapturePhase.Finished, clock.Now.ToTimeSpan(), stats, source.SourceDroppedFrames, monitor.Last));
+      progress?.Invoke(
+        new CaptureProgress(CapturePhase.Finished, clock.Now.ToNanosecondTimeSpan().ToTimeSpan(), stats, source.SourceDroppedFrames, monitor.Last)
+      );
 
       if (sourceError != null)
         throw new InvalidOperationException("Capture source failed: " + sourceError.Message, sourceError);

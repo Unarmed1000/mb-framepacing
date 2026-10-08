@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -19,19 +19,19 @@ namespace MB::FramePacing::Data
   struct CaptureCsvRow
   {
     int64_t CaptureIndex{0};
-    std::optional<TickCount64> CaptureTime;
+    std::optional<NanosecondTickCount> CaptureTime;
     //! Decoded, Undecodable, Torn or NotRecorded.
     std::string CaptureStatus;
     std::optional<std::string> Kind;
     std::optional<uint32_t> RunId;
     std::optional<uint64_t> FrameIndex;
-    std::optional<TimeSpan> AnimationTime;
+    std::optional<NanosecondTimeSpan> AnimationTime;
     int64_t SourceDropsBefore{0};
     int64_t MissedBefore{0};
     std::optional<uint32_t> SyncRunId;
     std::optional<uint64_t> SyncFrameIndex;
-    std::optional<TickCount64> HostTime;
-    std::optional<TickCount64> DeviceTime;
+    std::optional<NanosecondTickCount> HostTime;
+    std::optional<NanosecondTickCount> DeviceTime;
     std::vector<uint8_t> Payload;
   };
 }

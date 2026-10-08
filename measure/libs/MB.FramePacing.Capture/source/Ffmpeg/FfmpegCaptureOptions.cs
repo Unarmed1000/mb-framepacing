@@ -46,10 +46,10 @@ namespace MB.FramePacing.Capture.Ffmpeg
     public int RealTimeBufferMegabytes { get; init; } = 1024;
 
     /// <summary>
-    /// Known capture times (TimeSpan ticks) of the frames, in order. When set they replace ffmpeg's timestamps and the capture ends after the
+    /// Known capture times of the frames, in order. When set they replace ffmpeg's timestamps and the capture ends after the
     /// last one. Used for image sequences, where the times come from --fps or a timestamp file and ffmpeg's own are too coarse.
     /// </summary>
-    public IReadOnlyList<TickCount64>? FrameTimestamps { get; init; }
+    public IReadOnlyList<NanosecondTickCount>? FrameTimestamps { get; init; }
 
     /// <summary>
     /// The rate the frames were really recorded at, for a high speed camera clip stored at a slower playback rate. When set, frame n gets the

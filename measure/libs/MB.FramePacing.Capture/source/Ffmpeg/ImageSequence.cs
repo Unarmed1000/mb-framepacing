@@ -43,8 +43,9 @@ namespace MB.FramePacing.Capture.Ffmpeg
       if (files.Count == 0)
         throw new FileNotFoundException($"No images ({string.Join(", ", Extensions)}) found in '{folder}'");
 
-      double interval = TimeSpan.TicksPerSecond / fps.Value;
-      return files.Select((file, index) => new ImageSequenceFrame(file, new TickCount64((long)Math.Round(index * interval)))).ToList();
+      // An image's time at the frame rate, rounded to the nearest nanosecond
+      double interval = NanosecondTimeSpan.NanosecondsPerSecond / fps.Value;
+      return files.Select((file, index) => new ImageSequenceFrame(file, new NanosecondTickCount((long)Math.Round(index * interval)))).ToList();
     }
 
     /// <summary>Write the ffconcat list ffmpeg plays. Returns the nominal frame rate (median interval).</summary>
@@ -61,7 +62,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
         long duration;
         if (i + 1 < frames.Count)
         {
-          duration = (frames[i + 1].Time - frames[i].Time).Ticks;
+          duration = (frames[i + 1].Time - frames[i].Time).Nanoseconds;
           if (duration <= 0)
             throw new InvalidDataException(
               $"The image times must increase ('{Path.GetFileName(frames[i + 1].Path)}' is not later than the image before it)"
@@ -69,10 +70,11 @@ namespace MB.FramePacing.Capture.Ffmpeg
           intervals.Add(duration);
         }
         else
-          duration = intervals.Count > 0 ? intervals[^1] : TimeSpan.TicksPerSecond / 60;
+          // The last image is shown as long as the one before it; one image alone for a sixtieth of a second, cut to the nanosecond
+          duration = intervals.Count > 0 ? intervals[^1] : NanosecondTimeSpan.NanosecondsPerSecond / 60;
         builder
           .Append("duration ")
-          .Append((duration / (double)TimeSpan.TicksPerSecond).ToString("0.#########", CultureInfo.InvariantCulture))
+          .Append(new NanosecondTimeSpan(duration).TotalSeconds.ToString("0.#########", CultureInfo.InvariantCulture))
           .Append('\n');
       }
       // ffmpeg ignores the duration of the last entry unless the file is repeated
@@ -82,18 +84,19 @@ namespace MB.FramePacing.Capture.Ffmpeg
       if (intervals.Count == 0)
         return 0;
       intervals.Sort();
-      return TimeSpan.TicksPerSecond / (double)intervals[intervals.Count / 2];
+      return NanosecondTimeSpan.NanosecondsPerSecond / (double)intervals[intervals.Count / 2];
     }
 
     /// <summary>
-    /// The timestamp file: a header line that names the columns (fileName and timeTicks, found by name; others are ignored), then a line
-    /// per image in the order the frames were taken. A time is a whole number of 100 ns ticks, as every file's times are, so the unit is
-    /// in the file and nothing goes through a floating point number. Comments (#) and empty lines are skipped.
+    /// The timestamp file: a header line that names the columns (fileName and timeNs, found by name; others are ignored), then a line
+    /// per image in the order the frames were taken. A time is a whole number of nanoseconds, as every file's times are, so the unit is
+    /// in the file and nothing goes through a floating point number. Comments (#) and empty lines are skipped. A file from before the
+    /// nanoseconds (timeTicks, and timeMs before that) or without a header line is refused.
     /// </summary>
     private static List<ImageSequenceFrame> ReadTimestamps(string folder, string timestampFile)
     {
       const string FileNameColumn = "fileName";
-      const string TimeColumn = "timeTicks";
+      const string TimeColumn = "timeNs";
       var frames = new List<ImageSequenceFrame>();
       int fileNameIndex = -1;
       int timeIndex = -1;
@@ -112,8 +115,8 @@ namespace MB.FramePacing.Capture.Ffmpeg
           timeIndex = Array.IndexOf(cells, TimeColumn);
           if (fileNameIndex < 0 || timeIndex < 0)
             throw new InvalidDataException(
-              $"{timestampFile}:{lineNumber}: expected a header line with the columns {FileNameColumn} and {TimeColumn} (100 ns ticks). "
-                + "A file with timeMs is the old format: multiply its times by 10 000."
+              $"{timestampFile}:{lineNumber}: expected a header line with the columns {FileNameColumn} and {TimeColumn} (nanoseconds). "
+                + "A file with timeTicks or timeMs is an old format: multiply its times by 100 or by 1 000 000."
             );
           continue;
         }
@@ -122,16 +125,20 @@ namespace MB.FramePacing.Capture.Ffmpeg
         if (name.Length == 0)
           throw new InvalidDataException($"{timestampFile}:{lineNumber}: the line has no file name");
         // Digits, with a '-' in front when negative, as the analysis output's numbers (AllowLeadingSign takes a '+' too)
-        if (time.Length == 0 || time[0] == '+' || !long.TryParse(time, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long ticks))
-          throw new InvalidDataException($"{timestampFile}:{lineNumber}: '{time}' is not a whole number of ticks ({TimeColumn})");
+        if (
+          time.Length == 0
+          || time[0] == '+'
+          || !long.TryParse(time, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long nanoseconds)
+        )
+          throw new InvalidDataException($"{timestampFile}:{lineNumber}: '{time}' is not a whole number of nanoseconds ({TimeColumn})");
         var path = Path.IsPathRooted(name) ? name : Path.Combine(folder, name);
         if (!File.Exists(path))
           throw new FileNotFoundException($"{timestampFile}:{lineNumber}: '{path}' does not exist");
-        frames.Add(new ImageSequenceFrame(path, new TickCount64(ticks)));
+        frames.Add(new ImageSequenceFrame(path, new NanosecondTickCount(nanoseconds)));
       }
       if (timeIndex < 0)
         throw new InvalidDataException(
-          $"{timestampFile}:{lineNumber}: expected a header line with the columns {FileNameColumn} and {TimeColumn} (100 ns ticks)"
+          $"{timestampFile}:{lineNumber}: expected a header line with the columns {FileNameColumn} and {TimeColumn} (nanoseconds)"
         );
       if (frames.Count == 0)
         throw new InvalidDataException($"The timestamp file '{timestampFile}' lists no images");

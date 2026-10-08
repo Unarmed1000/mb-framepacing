@@ -26,7 +26,7 @@ namespace MB.FramePacing.Capture
       Known,
     }
 
-    private readonly TickCount64 m_time;
+    private readonly NanosecondTickCount m_time;
     private readonly State m_state;
 
     /// <summary>The device gave no timestamp. Also <c>default</c>.</summary>
@@ -35,7 +35,7 @@ namespace MB.FramePacing.Capture
     /// <summary>The timestamp arrives later, through <see cref="IDeviceTimestampSource"/>.</summary>
     public static readonly DeviceTimestamp Pending = new DeviceTimestamp(State.Pending);
 
-    public DeviceTimestamp(TickCount64 time)
+    public DeviceTimestamp(NanosecondTickCount time)
     {
       m_time = time;
       m_state = State.Known;
@@ -53,10 +53,10 @@ namespace MB.FramePacing.Capture
 
     /// <summary>The time on the device's clock.</summary>
     /// <exception cref="InvalidOperationException">The timestamp is unknown or pending.</exception>
-    public TickCount64 Time => IsKnown ? m_time : throw new InvalidOperationException($"The device timestamp is {this}");
+    public NanosecondTickCount Time => IsKnown ? m_time : throw new InvalidOperationException($"The device timestamp is {this}");
 
     /// <summary>The time, or null when it is unknown or pending.</summary>
-    public TickCount64? ToNullable() => IsKnown ? m_time : null;
+    public NanosecondTickCount? ToNullable() => IsKnown ? m_time : null;
 
     public bool Equals(DeviceTimestamp other) => m_state == other.m_state && m_time == other.m_time;
 

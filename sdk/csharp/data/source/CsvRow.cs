@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* One line of an analysis CSV, split on commas, read by column name so columns added later and columns an older file lacks both work.
-//* Every number is a whole one, written as its digits with a '-' in front when negative; times are 100 ns ticks. A cell that is anything
+//* Every number is a whole one, written as its digits with a '-' in front when negative; times are nanoseconds. A cell that is anything
 //* else, or outside its type's range, is an InvalidDataException. The row is a view of the line's characters (no string per cell): it
 //* is good as long as the line is.
 //*
@@ -56,20 +56,24 @@ namespace MB.FramePacing.Data
 
     public uint? UInt(int index) => Cell(index) is { Length: > 0 } text ? (uint)ParseULong(text, uint.MaxValue) : null;
 
-    /// <summary>A span's cell: its ticks.</summary>
-    public TimeSpan RequiredSpan(int index) => new TimeSpan(RequiredLong(index));
+    /// <summary>A span's cell: its nanoseconds.</summary>
+    public NanosecondTimeSpan RequiredSpan(int index) => new NanosecondTimeSpan(RequiredLong(index));
 
     /// <summary>A span's cell; null when it is empty.</summary>
-    public TimeSpan? Span(int index) => Long(index) is { } ticks ? new TimeSpan(ticks) : null;
+    public NanosecondTimeSpan? Span(int index) => Long(index) is { } nanoseconds ? new NanosecondTimeSpan(nanoseconds) : null;
 
-    /// <summary>A point in time's cell: the ticks since its clock's zero.</summary>
-    public TickCount64 RequiredTime(int index) => new TickCount64(RequiredLong(index));
+    /// <summary>A point in time's cell: the nanoseconds since its clock's zero.</summary>
+    public NanosecondTickCount RequiredTime(int index) => new NanosecondTickCount(RequiredLong(index));
 
     /// <summary>A point in time's cell; null when it is empty.</summary>
-    public TickCount64? Time(int index) => Long(index) is { } ticks ? new TickCount64(ticks) : null;
+    public NanosecondTickCount? Time(int index) => Long(index) is { } nanoseconds ? new NanosecondTickCount(nanoseconds) : null;
 
-    /// <summary>A marker's 32-bit span (0 to Payload.OnDemandFrameTime), as the marker carried it; null when the cell is empty.</summary>
-    public TimeSpan32? Span32(int index) => UInt(index) is { } ticks ? new TimeSpan32(ticks) : null;
+    /// <summary>
+    /// A marker's duration, a u32 in the file (0 to Payload.OnDemandFrameTime's 4294967295) as the marker carried it; null when the cell is
+    /// empty. A number beyond 32 bits is refused.
+    /// </summary>
+    public NanosecondTimeDuration? MarkerDuration(int index) =>
+      UInt(index) is { } nanoseconds ? NanosecondTimeDuration.FromNanoseconds(nanoseconds) : null;
 
     /// <summary>A whole number: digits, with a '-' in front when negative.</summary>
     public static long ParseLong(ReadOnlySpan<char> text)

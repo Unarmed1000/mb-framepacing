@@ -38,12 +38,13 @@ namespace MB.FramePacing.Capture.UnitTest
     /// <summary>The first capture whose exposure starts at least <paramref name="afterVsync"/> after a vsync, at or after <paramref name="seconds"/>.</summary>
     private static long CaptureAfterVsync(SyntheticCamera camera, double seconds, double afterVsync)
     {
-      double refresh = camera.Scenario.RefreshInterval.Ticks;
-      double vsync = Math.Ceiling(seconds * TimeSpan.TicksPerSecond / refresh) * refresh;
-      double target = vsync + (afterVsync * TimeSpan.TicksPerSecond);
+      // The camera's times with a fraction are doubles of nanoseconds (TrueNanoseconds)
+      double refresh = camera.Scenario.RefreshInterval.Nanoseconds;
+      double vsync = Math.Ceiling(seconds * NanosecondTimeSpan.NanosecondsPerSecond / refresh) * refresh;
+      double target = vsync + (afterVsync * NanosecondTimeSpan.NanosecondsPerSecond);
       for (long i = 0; i < camera.CaptureCount; ++i)
       {
-        if (camera.TrueTicks(i) >= target)
+        if (camera.TrueNanoseconds(i) >= target)
           return i;
       }
       throw new InvalidOperationException("The scenario is too short");
@@ -61,13 +62,15 @@ namespace MB.FramePacing.Capture.UnitTest
       var results = new MarkerDecoder(tryHarder: true).DecodeEach(frame, 2);
 
       Assert.That(results, Has.Count.EqualTo(2));
-      int shown = camera.Scenario.PresentedIndexAtTime(new TickCount64((long)camera.TrueTicks(capture)));
+      int shown = camera.Scenario.PresentedIndexAtTime(new NanosecondTickCount((long)camera.TrueNanoseconds(capture)));
       Assert.That(results[0].Payload, Is.EqualTo(camera.Scenario.PresentedFrames[shown].Payload));
       // The bottom zone is the sync marker: it only carries the run id and the frame index
       var older = camera.Scenario.PresentedFrames[shown - 1].Payload;
       Assert.That(
         results[1].Payload,
-        Is.EqualTo(new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(0)))
+        Is.EqualTo(
+          new MarkerPayload(MarkerKind.Sync, older.RunId, older.FrameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, NanosecondTimeSpan.Zero)
+        )
       );
     }
 
@@ -150,7 +153,7 @@ namespace MB.FramePacing.Capture.UnitTest
           if (!result.IsDecoded)
             continue;
           int zone = result.Bounds.Y < frame.Height / 2 ? 0 : 1;
-          firstSeen[zone].TryAdd(result.Payload.FrameIndex, camera.CameraTime(i).Ticks);
+          firstSeen[zone].TryAdd(result.Payload.FrameIndex, camera.CameraTime(i).Nanoseconds);
         }
       }
 
@@ -158,12 +161,12 @@ namespace MB.FramePacing.Capture.UnitTest
       foreach (var (frameIndex, top) in firstSeen[0])
       {
         if (firstSeen[1].TryGetValue(frameIndex, out long bottom))
-          delays.Add((bottom - top) / (double)TimeSpan.TicksPerMillisecond);
+          delays.Add(new NanosecondTimeSpan(bottom - top).TotalMilliseconds);
       }
       Assert.That(delays, Has.Count.GreaterThanOrEqualTo(5));
       delays.Sort();
       double median = delays[delays.Count / 2];
-      double expected = (camera.ZoneScanTicks(1) - camera.ZoneScanTicks(0)) / TimeSpan.TicksPerMillisecond;
+      double expected = (camera.ZoneScanNanoseconds(1) - camera.ZoneScanNanoseconds(0)) / NanosecondTimeSpan.NanosecondsPerMillisecond;
       Assert.That(median, Is.EqualTo(expected).Within(1.5), $"delays {string.Join(", ", delays)}");
     }
 

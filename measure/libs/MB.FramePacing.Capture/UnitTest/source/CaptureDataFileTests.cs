@@ -59,7 +59,7 @@ namespace MB.FramePacing.Capture.UnitTest
     [Test]
     public void Records_RoundTrip_WithTheLargestMarkers()
     {
-      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new TimeSpan(2)).Encode(
+      var start = new MarkerPayload(MarkerKind.SequenceStart, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200)).Encode(
         new StartMetadata(123, new MB.FramePacing.Marker.SequenceId(ulong.MaxValue, ulong.MaxValue))
       );
       Assert.That(start, Has.Length.EqualTo(MarkerPayload.MaxEncodedByteCount));
@@ -67,9 +67,9 @@ namespace MB.FramePacing.Capture.UnitTest
       sync.AsSpan().Fill(7);
       var records = new[]
       {
-        new CaptureDataRecord(0, new TickCount64(100), new TickCount64(200), 0, CaptureDataStatus.Decoded, start, sync),
-        new CaptureDataRecord(1, new TickCount64(300), null, 2, CaptureDataStatus.Undecodable, null, null),
-        new CaptureDataRecord(5, new TickCount64(500), new TickCount64(600), 0, CaptureDataStatus.Torn, null, sync),
+        new CaptureDataRecord(0, new NanosecondTickCount(100), new NanosecondTickCount(200), 0, CaptureDataStatus.Decoded, start, sync),
+        new CaptureDataRecord(1, new NanosecondTickCount(300), null, 2, CaptureDataStatus.Undecodable, null, null),
+        new CaptureDataRecord(5, new NanosecondTickCount(500), new NanosecondTickCount(600), 0, CaptureDataStatus.Torn, null, sync),
       };
 
       using var temp = new TempDirectory();
@@ -125,7 +125,7 @@ namespace MB.FramePacing.Capture.UnitTest
       {
         var buffer = new byte[2 * CaptureDataRecord.Size];
         for (int i = 0; i < 2; ++i)
-          new CaptureDataRecord(i, new TickCount64(i), new TickCount64(i), 0, CaptureDataStatus.Undecodable, null, null).Write(
+          new CaptureDataRecord(i, new NanosecondTickCount(i), new NanosecondTickCount(i), 0, CaptureDataStatus.Undecodable, null, null).Write(
             buffer.AsSpan(i * CaptureDataRecord.Size)
           );
         writer.WriteRecords(buffer);
