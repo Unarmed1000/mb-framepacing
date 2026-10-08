@@ -3,10 +3,15 @@
 #include "PacerSimulation.hpp"
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/pacer/FramePacer.hpp>
+#include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/frame/PresentPlan.hpp>
+#include <mb/framepacing/pacer/frame/PresentReport.hpp>
+#include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
+#include <mb/framepacing/pacer/tier/TierPacer.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -179,7 +184,11 @@ namespace MB::FramePacing::Pacer::Simulation
     PacerSettings settings(period);
     settings.SetSlowDown(rule);
     settings.SetAutoSwapInterval(scenario.AutoSwapInterval);
-    FramePacer pacer(settings);
+    // The frame model has a display that shows a frame at the first refresh after it is done and a loop that starts the next
+    // frame then: the baseline, a clock and the refresh period, with nothing made ahead and no pause of the pacer's own
+    settings.SetAim(PacerAim::LowLatency);
+    settings.SetStartupPauseRefreshes(0);
+    TierPacer pacer(settings, PacerCapabilities());
     SplitMix64 random(scenario.Seed);
 
     const std::size_t passFrames = scenario.Frames.size();
@@ -222,7 +231,13 @@ namespace MB::FramePacing::Pacer::Simulation
       const int64_t target = period.NearestRefreshes(NanosecondTimeSpan(intendedDisplayNanoseconds - StartNanoseconds));
       const int64_t done = now + source.WorkNanoseconds;
       const int64_t shown = std::max(target, FirstRefreshAtOrAfter(period, done - StartNanoseconds));
-      static_cast<void>(pacer.EndFrame(NanosecondTickCount(done), NanosecondTimeSpan(source.WorkNanoseconds)));
+      const PresentPlan plan = pacer.EndFrame(NanosecondTickCount(done));
+      // Presented when the work is done, and the present returns at once
+      PresentReport report;
+      report.FrameId = plan.FrameId;
+      report.CallTime = NanosecondTickCount(done);
+      report.ReturnTime = NanosecondTickCount(done);
+      pacer.AddPresent(report);
 
       out << frame << ',' << source.WorkNanoseconds << ',' << target << ',' << shown << ',' << (shown > target ? 1 : 0) << ','
           << schedule.SwapInterval << ',' << ChangeName(schedule.Change) << ',' << intendedDisplayNanoseconds << ','
