@@ -14,11 +14,14 @@
 //! text is a string literal: it is there for the life of the program, nothing is allocated, and its data() ends with a zero, so it
 //! can be given to a function that takes a C string. A value that is not one of the type's has no text: empty.
 //!
-//! A tier's number is its enumerator's value, 1 the best: "tier 4 of 4" is the value of PacerTier::TimerPeriodOnly of TierCount.
+//! A tier's number is its enumerator's value, 1 the best: "tier 8 of 8" is the value of PacerTier::TimerPeriodOnly of TierCount.
+//! A rating that reports display times (PacerRating::ReportsDisplayTimes) is shown with DisplayTimesMark after the number: "5+".
 namespace MB::FramePacing::Pacer::PacerTierText
 {
   //! The tiers there are: their numbers are 1 to this.
-  inline constexpr uint32_t TierCount = 4;
+  inline constexpr uint32_t TierCount = 8;
+  //! What follows a tier's number when the application reports display times.
+  inline constexpr std::string_view DisplayTimesMark = "+";
   //! The capabilities there are: capability number index is PacerCapability(1 << index), index from 0 to this less one.
   inline constexpr uint32_t CapabilityCount = 15;
 
@@ -30,6 +33,14 @@ namespace MB::FramePacing::Pacer::PacerTierText
   {
     switch (tier)
     {
+    case PacerTier::TimedVBlankWaitForPresent:
+      return "timed present, vertical blank times, wait for a present";
+    case PacerTier::TimedTimerWaitForPresent:
+      return "timed present, wait for a present";
+    case PacerTier::TimedVBlankPeriodOnly:
+      return "timed present, vertical blank times";
+    case PacerTier::TimedTimerPeriodOnly:
+      return "timed present";
     case PacerTier::VBlankWaitForPresent:
       return "vertical blank times, wait for a present";
     case PacerTier::VBlankPeriodOnly:
@@ -47,6 +58,23 @@ namespace MB::FramePacing::Pacer::PacerTierText
   {
     switch (tier)
     {
+    case PacerTier::TimedVBlankWaitForPresent:
+      return "The present takes a time, so the display's side shows every frame at the refresh it is for. The time is that of a "
+             "real refresh, from vertical blank times, and before a frame the loop waits until the display took an earlier "
+             "present: the frames that wait to be shown stay as few as asked for, and the pacer learns which refresh a frame "
+             "was shown at.";
+    case PacerTier::TimedTimerWaitForPresent:
+      return "The present takes a time, so the display's side shows every frame at the refresh it is for, counted in refresh "
+             "periods on the clock. Before a frame the loop waits until the display took an earlier present: the frames that "
+             "wait to be shown stay as few as asked for. Where in a refresh the loop is, is not known.";
+    case PacerTier::TimedVBlankPeriodOnly:
+      return "The present takes a time, so the display's side shows every frame at the refresh it is for. The time is that of a "
+             "real refresh, from vertical blank times, and nothing drifts. A frame that waits to be shown although it was "
+             "ready in time is not seen, and stays.";
+    case PacerTier::TimedTimerPeriodOnly:
+      return "The present takes a time, so the display's side shows every frame at the refresh it is for, counted in refresh "
+             "periods on the clock. Where in a refresh the loop is, is not known, and a frame that waits to be shown is not "
+             "seen, and stays.";
     case PacerTier::VBlankWaitForPresent:
       return "The pacer knows where the display's refreshes are from vertical blank times, and before a frame the loop waits "
              "until the display took an earlier present: every frame is for one refresh, the frames that wait to be shown stay "
@@ -69,6 +97,14 @@ namespace MB::FramePacing::Pacer::PacerTierText
   {
     switch (tier)
     {
+    case PacerTier::TimedVBlankWaitForPresent:
+      return "Timed present on real refreshes, and a wait.";
+    case PacerTier::TimedTimerWaitForPresent:
+      return "Timed present on a clock grid, and a wait.";
+    case PacerTier::TimedVBlankPeriodOnly:
+      return "Timed present on real refreshes; no wait.";
+    case PacerTier::TimedTimerPeriodOnly:
+      return "Timed present on a clock grid; no wait.";
     case PacerTier::VBlankWaitForPresent:
       return "On the refreshes; knows what was shown.";
     case PacerTier::VBlankPeriodOnly:
