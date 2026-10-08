@@ -1352,6 +1352,20 @@ stopped making the frames ahead again). Switching the wait for a present on stil
 smoothness, while the frames that wait come down to what may wait. The pause after start-up was made once over
 thirteen changes in each of two runs.
 
+**A start the system held, at the start of a run** (the same session; vertical blank times, no wait for a present,
+smoothness, one refresh per frame; two runs, alike). Up to the 16th frame the pacer's held presents paced the loop.
+Then the application's own wait for a frame slot held the loop, 6.6 ms before one frame and 20.6 ms before the next
+(its acquire took no time), and from there on that wait paced the loop, 3.8 to 3.9 ms a frame, with no present held.
+For the frame that started 21 ms after the one before it the pacer stepped the animation time five refreshes: it was
+for the first vertical blank it could make. The display showed it one refresh after the frame before it, as the frames
+before it were still on their way: a frame was on screen 35 ms after its start before those two waits and 12 ms after
+it from then on. So the animation jumped four refreshes with no frame held on screen, and the refreshes the pacer
+counts as behind the clock did not move. What the pacer did is what it is built to do without a wait for a present or
+display times: a start that comes late is time that passed. The pacer on the grid on the clock has a rule for this
+("A loop the system holds": where the application says that the system holds the loop, a wait of the display's side
+that held the loop lets the frame through and no step is lost); the pacers on vertical blanks are not told of the
+application's waits at all. Decision 17.
+
 A third value is the tier the pacer is **working at** this frame: the tier of the parts that are really pacing. It is lower
 than the active tier while something a capability promised is missing: no vertical blank time has come yet, the readings
 turned out to be no vertical blank times, the waits for a present stopped because none is shown, a present's time was not
@@ -1856,6 +1870,17 @@ checked. Four things are settled now, because they cost little now and a second 
     at every tier. Proposed: (b), by the list's own rule of who places the frame. What speaks against it: the duration
     is the only timed present that has been measured on a system. There it took the frames off their refresh away at
     two refreshes per frame and not at four ("The duration on one system").
+
+17. **A start the system held, on vertical blanks** (new, 2026-10-08; "A start the system held, at the start of a
+    run"). The options: (a) as it is: a late start is time that passed, and the animation time steps over it; (b) the
+    pacers on vertical blanks take the application's own waits as the pacer on the grid does, and a start that such a
+    wait held is not stepped over: the frame is for the vertical blank a swap interval after the last one, and the
+    refreshes are counted as behind the clock. What is not known, and decides between them: whether a wait for a frame
+    slot that holds the loop means frames that are still on their way (then (b) is right, and (a) made the jump that
+    was seen) or a GPU that does not keep up (then the display does hold a frame, and (a) is right). On the one system
+    it was the first, in two runs, and the wait was the frame slot's, not the acquire's, which the grid's rule would
+    not have let through either. The GPU's reported work on the frame would tell the two apart where it is reported.
+    Not proposed yet: one system, the start of a run.
 
 ## What changes for whom
 
