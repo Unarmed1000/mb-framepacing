@@ -278,11 +278,15 @@ namespace MB::FramePacing::Pacer
       // the previous frame was shown, or whether, is not known, and this start is late by the pacer's doing. Or another
       // pacer placed the frame before this one, and there is no step of this grid it was due at. Nothing is judged and the
       // frame window stays as it is; the grid goes on from this frame, and the frame window's times with it: the frame
-      // before this one would have left at step 0, and the newest frame of the frame window a swap interval before that
+      // before this one would have left at this frame's step, and the newest frame of the frame window a swap interval
+      // before that
       m_origin = cpuStartTime;
-      m_slot = 0;
+      // After another pacer placed the frames, those it made ahead of the display are still on their way. This frame is on
+      // the step it would be on had this grid made them: it starts where a frame of that step is due to start, so the next
+      // one is due a swap interval later, and none is made back to back with it
+      m_slot = m_takenOver ? Reserve() : 0;
       m_behind = 0;
-      m_rule.RebaseNewest(NanosecondTimeSpan(-period.TimeFor(m_swapInterval).Nanoseconds()));
+      m_rule.RebaseNewest(NanosecondTimeSpan(period.TimeFor(m_slot).Nanoseconds() - period.TimeFor(m_swapInterval).Nanoseconds()));
     }
     else
     {

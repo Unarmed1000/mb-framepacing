@@ -248,6 +248,65 @@ TEST(TierPacer, WhenAnotherPartPlacesTheFramesTheFramesTheAnimationTimeAndTheRul
   }
 }
 
+TEST(TierPacer, WithFramesMadeAheadAChangeOfWhatPlacesTheFramesMakesNoneAgain)
+{
+  // The aim of smoothness at one refresh per frame: a frame is made ahead of the display. A part that starts by itself makes
+  // it with two frames back to back. One that takes over does not: the frames made ahead are on their way already, and one
+  // more would wait behind them for good
+  const PC::PacerSettings settings = Settings(PC::PacerAim::Smoothness);
+  Loop fresh(settings, PacerCapabilities());
+  static_cast<void>(fresh.Frame());
+  const int64_t firstStart = fresh.StartNanoseconds;
+  static_cast<void>(fresh.Frame());
+  EXPECT_LT(fresh.StartNanoseconds - firstStart, Period / 2);
+
+  Loop loop(settings, PacerCapabilities(VBlank));
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities());
+  PC::FrameSchedule schedule;
+  for (int32_t frame = 0; frame < 40; ++frame)
+  {
+    schedule = loop.Frame();
+  }
+  for (int32_t change = 0; change < 6; ++change)
+  {
+    const bool toVBlanks = (change % 2) == 0;
+    loop.Pacer.SetActiveCapabilities(toVBlanks ? PacerCapabilities(VBlank) : PacerCapabilities());
+    int64_t previousStart = loop.StartNanoseconds;
+    int64_t previousPresent = loop.PresentNanoseconds;
+    for (int32_t frame = 0; frame < 30; ++frame)
+    {
+      const PC::FrameSchedule before = schedule;
+      schedule = loop.Frame();
+      ASSERT_EQ(schedule.AnimationStep.Nanoseconds(), Period) << change << ' ' << frame;
+      // No frame is made right after the one before it. On a grid a frame is presented when it is done, and it is the
+      // starts that are apart: at least half a period. On vertical blanks a frame starts when the one before it was
+      // presented and its own present is held, and it is the presents that are apart. From the third frame on the
+      // presents are a period apart
+      if (toVBlanks)
+      {
+        ASSERT_GE(loop.PresentNanoseconds - previousPresent, Period / 2) << change << ' ' << frame;
+      }
+      else
+      {
+        ASSERT_GE(loop.StartNanoseconds - previousStart, Period / 2) << change << ' ' << frame;
+      }
+      ASSERT_LE(loop.PresentNanoseconds - previousPresent, 2 * Period) << change << ' ' << frame;
+      if (frame >= 2)
+      {
+        ASSERT_EQ(loop.PresentNanoseconds - previousPresent, Period) << change << ' ' << frame;
+        ASSERT_EQ(schedule.IntendedDisplayTime.Nanoseconds(), before.IntendedDisplayTime.Nanoseconds() + Period) << change << ' ' << frame;
+      }
+      // Made ahead as before the change: for a refresh well over a period after its start, where a frame that is not
+      // made ahead is for the next one
+      ASSERT_GE(schedule.IntendedDisplayTime.Nanoseconds() - loop.StartNanoseconds, Period + (Period / 4)) << change << ' ' << frame;
+      previousStart = loop.StartNanoseconds;
+      previousPresent = loop.PresentNanoseconds;
+    }
+    EXPECT_EQ(loop.Pacer.FrameWindow().LateFrames, 0u) << change;
+    EXPECT_EQ(loop.Pacer.RefreshesBehindClock(), 0u) << change;
+  }
+}
+
 TEST(TierPacer, TheWaitForAPresentGoesOnAcrossAChangeOfWhatPlacesTheFrames)
 {
   Loop loop(Settings(), PacerCapabilities(VBlank | Wait));

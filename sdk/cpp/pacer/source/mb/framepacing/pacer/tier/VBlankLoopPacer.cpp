@@ -440,7 +440,9 @@ namespace MB::FramePacing::Pacer
     const uint32_t swapInterval = m_rule.SwapInterval();
     // The vertical blank this frame is for. A frame that starts too late for the one its swap interval gives is for the first
     // it can make: known now, so it is in the frame
-    const int64_t displaySlot = DisplaySlotFor(cpuStartTime, hasPrevious);
+    // After another pacer placed the frames, those it made ahead of the display are still on their way and are shown first:
+    // this frame is for the vertical blank after theirs, and none is made back to back with it to have them again
+    const int64_t displaySlot = DisplaySlotFor(cpuStartTime, hasPrevious) + (m_takenOver ? Reserve() : 0);
     m_startedLate = hasPrevious && displaySlot > previousShown + m_pauseSlots + int64_t{swapInterval};
     if (m_takenOver)
     {
