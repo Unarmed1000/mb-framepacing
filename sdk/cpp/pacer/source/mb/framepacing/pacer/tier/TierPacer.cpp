@@ -15,7 +15,7 @@ namespace MB::FramePacing::Pacer
   namespace
   {
     //! The tier of the three things a pacer uses: who puts a frame on its refresh, where the refreshes are, and what holds
-    //! the loop
+    //! the loop. Never a tier of the display that skips: no pacer is built for it
     constexpr PacerTier TierOf(const bool timedPresent, const bool onVBlanks, const bool waitsForPresent) noexcept
     {
       if (timedPresent)
@@ -78,7 +78,8 @@ namespace MB::FramePacing::Pacer
     // What is really pacing: the vertical blanks once one was read, and the wait while it is made
     const bool onVBlanks = m_onVBlanks && m_vblank.HasVBlankReading();
     const bool waits = m_active.Has(PacerCapability::WaitForPresent) && !PresentWaitsStopped();
-    return TierOf(DisplayPlacementUtil::TimingFor(m_active) != PresentTiming::Untimed, onVBlanks, waits);
+    // The display's side places a frame with a time before which it is not shown, and with nothing else
+    return TierOf(DisplayPlacementUtil::TimingFor(m_active) == PresentTiming::AtTime, onVBlanks, waits);
   }
 
   bool TierPacer::IsFrameOpen() const noexcept

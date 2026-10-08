@@ -23,7 +23,8 @@ namespace MB::FramePacing::Pacer
     PresentSwapInterval = 1u << 0u,
     //! The present takes a time before which the frame is not shown
     PresentAtTime = 1u << 1u,
-    //! The present takes a time the frame before it stays on screen at least
+    //! The present takes a time the frame before it stays on screen at least. It places no frame by itself (it counts from
+    //! wherever that frame was shown), so it makes no tier: it is given wherever it is active
     PresentAfterDuration = 1u << 2u,
 
     // What the calls do to the frame loop. A set has one of each pair or neither: with neither the call may wait, and the pacer goes
@@ -60,8 +61,16 @@ namespace MB::FramePacing::Pacer
     //! When a present was shown, or that it has a result without a time, frames later
     DisplayTimes = 1u << 14u,
 
+    // What the display's side does with presents that carry a time (PresentAtTime). A fact of the platform or of the present
+    // mode, not something a pacer switches
+
+    //! Of two presents whose times have both passed, the later is shown and the earlier never: a frame that is overdue is
+    //! left out. Without it every present is shown, in the order it was made, for a refresh at least. It is rated
+    //! (PacerMajorTier::DisplayPlacesAndSkips) and no pacer is built for it: a pacer takes every frame as shown
+    PresentSkipsOverdue = 1u << 15u,
+
     //! Every capability there is
-    AllCapabilities = (1u << 15u) - 1u,
+    AllCapabilities = (1u << 16u) - 1u,
   };
 
   constexpr PacerCapability operator|(const PacerCapability lhs, const PacerCapability rhs) noexcept

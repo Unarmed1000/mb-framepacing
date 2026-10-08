@@ -48,11 +48,15 @@ namespace MB::FramePacing::Pacer
   //! by itself) and AddDisplayReport (when an earlier frame was shown: statistics only, DisplayErrors).
   //!
   //! Which tier paces: where the refreshes are comes from vertical blank times when they are active and from a grid on the clock
-  //! when not, the loop is held by a wait for a present when that is active, and with a timed present active the present is
-  //! given a time: PresentPlan::NotBeforeTime where the present takes that, with which the display's side puts a frame on
-  //! its refresh and no present is held by the loop, else PresentPlan::MinimumDuration, which is given next to what the
-  //! loop does without one. Those are the eight tiers of PacerTier. The four with a timed present are built against the
-  //! simulation's display only: no system has been measured with them.
+  //! when not, the loop is held by a wait for a present when that is active, and where the present takes a time before which
+  //! the frame is not shown it is given PresentPlan::NotBeforeTime, with which the display's side puts a frame on its refresh
+  //! and no present is held by the loop. Those are the eight tiers of PacerTier that have a pacer (PacerMajorTier::DisplayPlaces
+  //! and LoopPlaces). The four where the display's side places the frame are built against the simulation's display only: no
+  //! system has been measured with them. A present that takes a time the frame before it stays is given
+  //! PresentPlan::MinimumDuration next to everything the loop does without it, at whatever tier.
+  //!
+  //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) rates the first
+  //! major tier and is paced as the second: every present is taken as shown, which one that was skipped is not.
   //!
   //! A change of the active set takes effect when the frame that is open has ended (at once when none is). The frames and
   //! their ids, the animation time, the swap interval with the rule's frame window, the GPU's work and the presents that can be
@@ -104,8 +108,9 @@ namespace MB::FramePacing::Pacer
     //! The rating of what is active: the active tier.
     [[nodiscard]] PacerRating ActiveRating() const noexcept;
 
-    //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing: no
-    //! vertical blank reading so far, waits for a present that stopped because none is shown.
+    //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing (no
+    //! vertical blank reading so far, waits for a present that stopped because none is shown), and where no pacer is built
+    //! for the active tier (PacerTierUtil::PacedAs).
     [[nodiscard]] PacerTier WorkingTier() const noexcept;
 
     //! A vertical blank of the display the window is on. Taken with PacerCapability::VBlankTimes active.

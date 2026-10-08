@@ -15,11 +15,10 @@ namespace MB::FramePacing::Pacer
   {
     PacerTier Tier{PacerTier::TimerPeriodOnly};
     //! The capabilities any one of which, added to the set, raises its tier; none at the best tier.
-    PacerCapability RaisesTier{PacerCapability::PresentAtTime | PacerCapability::PresentAfterDuration | PacerCapability::WaitForPresent |
-                               PacerCapability::VBlankTimes};
+    PacerCapability RaisesTier{PacerCapability::PresentAtTime | PacerCapability::WaitForPresent | PacerCapability::VBlankTimes};
     //! The present can hold a frame for two refreshes or more (a time, a minimum duration, or a swap interval of 2 or more).
-    //! True at every tier with a timed present; below them it says that a present's swap interval holds such a frame, where
-    //! without it the frame loop does.
+    //! True at every tier where the display's side places the frame; where the frame loop does, it says that a present's
+    //! minimum duration or swap interval holds such a frame, where without it the loop does.
     bool DisplaySideHolds{false};
     //! The application reports when its frames were shown (DisplayTimes), so the animation error can be worked out where the
     //! application runs: the "+" beside a tier's number. It changes no tier.
