@@ -1076,9 +1076,10 @@ paced, and a tier is one combination of them:
   less. And the
   aim of low latency knows when to start a frame (0.68 against 0.95 of a refresh from a frame's start to its display, in
   the runs of tiers 6 and 7).
-- **What a timed present does not do:** it does not shorten a queue. After a refresh the display lost by itself, tiers 3
-  and 4 do not learn of the frame that waits, where tier 5 does. So tiers 3 and 4 above tier 5 is the rule of the order
-  and nothing a run has shown.
+- **What a timed present does not do:** on a display that shows every frame in the order it was presented, it does not
+  shorten a queue. After a refresh the display lost by itself, tiers 3 and 4 do not learn of the frame that waits,
+  where tier 5 does. So tiers 3 and 4 above tier 5 is the rule of the order and nothing a run has shown. Some displays
+  do not show every frame: "A display that skips a frame that is overdue", below.
 - **What is measured of a timed present** (the first integration's own loop, Windows, the relative kind only, as that
   system has no absolute one; captures of 2026-10-05 as its documents have them, driver display times): at two refreshes
   per frame on 240 Hz, 4 of
@@ -1321,7 +1322,8 @@ frame of a run on its refresh, and the duration keeps the ones after it there.
 - **A grid on the clock that slides against the display** (60 frames a second, a display 0.05 % slower than its mode):
   with the time on the present there is no moment near a vertical blank, and a frame is on screen a refresh less once
   per refresh of sliding: 12 in 6,000 frames, never two within 300.
-- **It does not shorten a queue**: on a display 0.2 % slower than its mode a loop on a timer had six frames waiting
+- **It does not shorten a queue** (the simulation's display shows every frame, in order): on a display 0.2 % slower than
+  its mode a loop on a timer had six frames waiting
   after 3,000 with either timed present, as without one. With a wait for a present, one at most.
 - **After a refresh the display lost by itself**, at two refreshes per frame without a wait for a present: with the
   time, the next frame is shown at the vertical blank it was made for (one refresh after the late one), as without a
@@ -1346,6 +1348,41 @@ frame of a run on its refresh, and the duration keeps the ones after it there.
 
 **Not built:** seeing that a present's time was not kept (tiers 1 and 2 could, by their wait); a swap interval on the
 present.
+
+#### A display that skips a frame that is overdue
+
+Researched on 2026-10-09 from the platforms' own pages; **not built, not in the simulation, not run anywhere**. The
+question: two frames wait, the time of the first has passed and the second is due now. A display that shows every
+frame in order shows the first and is a refresh late from then on. One that skips shows the second, at the refresh it
+was made for: no frame is on screen with an animation time that is not its refresh's, nothing waits a refresh longer,
+and the one frame's work is lost. That is not the catching up this proposal keeps away from ("A lost refresh and game
+time"): no frame is given another time, a stale one is left out. Only a time before which a frame is not shown can do
+it. A time the frame before stays counts from the frame that was shown, and can not leave one out.
+
+| Where                                                               | What its documentation says                                                                                                                                                                                                                                                                                                                                                                                   | Skips    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Vulkan, `VK_PRESENT_MODE_FIFO_KHR`                                  | "one request is removed from the beginning of the queue and processed during each vertical blanking period in which the queue is non-empty"                                                                                                                                                                                                                                                                   | No       |
+| Vulkan, `VK_PRESENT_MODE_FIFO_LATEST_READY_KHR`                     | With a target present time from `VK_GOOGLE_display_timing` or the `presentAtAbsoluteTime` feature: "If the target present time is less-than or equal-to the current time, the presentation engine dequeues the image and checks the next one. The image of the last dequeued request is presented. The other dequeued requests are dropped."                                                                  | Yes      |
+| Windows 11, the composition swapchain's presents with a target time | "If there are multiple _ready_ presents, all but the latest (that is, the present with the greatest present identifier) will be _skipped_"; a present is ready when its drawing is done and its target time is met. Its status is then `PresentStatus_Skipped`                                                                                                                                                | Yes      |
+| Wayland, `commit-timing-v1`                                         | The content is "presented as closely as possible to, but not before, the specified time", and content updates are applied in the order they are received. `presentation-time` has an event for an update that "was never displayed to the user", and `fifo-v1` exists to keep an update on screen for a refresh. Whether two updates whose times have both passed are both shown is not said in what was read | Not said |
+| Android, `ASurfaceTransaction_setDesiredPresentTime`                | Presented at or after the time; a later transaction with an earlier time does not go before an earlier one. `EGL_ANDROID_presentation_time` says only that the time is passed along. Nothing on leaving a buffer out                                                                                                                                                                                          | Not said |
+| Metal, `present(at:)`                                               | Presented at the time when its drawing is done before it, and as soon as possible when it is done after. Nothing on another drawable that is due as well                                                                                                                                                                                                                                                      | Not said |
+
+Sources:
+[VkPresentModeKHR](https://docs.vulkan.org/refpages/latest/refpages/source/VkPresentModeKHR.html),
+[Composition swapchain programming guide](https://learn.microsoft.com/en-us/windows/win32/comp_swapchain/comp-swapchain),
+[PresentStatus](https://learn.microsoft.com/en-us/windows/win32/api/presentation/ne-presentation-presentstatus),
+[commit-timing-v1](https://wayland.app/protocols/commit-timing-v1),
+[presentation-time](https://wayland.app/protocols/presentation-time), [fifo-v1](https://wayland.app/protocols/fifo-v1),
+[Native Activity (NDK reference)](https://developer.android.com/ndk/reference/group/native-activity),
+[EGL_ANDROID_presentation_time](https://registry.khronos.org/EGL/extensions/ANDROID/EGL_ANDROID_presentation_time.txt),
+[MTLDrawable present(at:)](<https://developer.apple.com/documentation/metal/mtldrawable/present(at:)>).
+
+What it would take here, as an open point and nothing decided: it is something the application chooses (a present
+mode, an API), so it is a capability of its own next to `PresentAtTime`; the simulation's display would have to be able
+to skip; and a pacer has to take a frame that is never shown (a wait for its present runs out, its display report says
+so, and the frame after it is judged against the frame before it). The first integration's Windows system has no
+present that takes a time before which a frame is not shown, so it can not run it as it is.
 
 #### The duration on one system
 
