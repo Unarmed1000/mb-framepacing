@@ -18,6 +18,7 @@
 #include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
@@ -69,6 +70,8 @@ namespace
     int64_t StartNanoseconds{0};
     int64_t PresentNanoseconds{0};
     uint32_t WaitsAskedFor{0};
+    uint32_t GpuWaitsAskedFor{0};
+    uint64_t GpuWaitFrameId{0};
 
     Loop(const PC::PacerSettings& settings, const PacerCapabilities& capabilities)
       : Pacer(settings, capabilities)
@@ -97,6 +100,21 @@ namespace
         Pacer.AddPresentWait(wait);
         const PC::FrameStartPlan again = Pacer.PlanFrame(At(Now));
         EXPECT_FALSE(again.WaitsForPresent());
+        Plan.StartTime = again.StartTime;
+      }
+      GpuWaitFrameId = Plan.WaitForGpuWorkFrameId;
+      if (Plan.WaitsForGpuWork())
+      {
+        // The GPU is done with every frame it is asked about
+        ++GpuWaitsAskedFor;
+        PC::GpuWaitReport wait;
+        wait.FrameId = Plan.WaitForGpuWorkFrameId;
+        wait.BeginTime = At(Now);
+        Now += 20'000;
+        wait.EndTime = At(Now);
+        Pacer.AddGpuWait(wait);
+        const PC::FrameStartPlan again = Pacer.PlanFrame(At(Now));
+        EXPECT_FALSE(again.WaitsForGpuWork());
         Plan.StartTime = again.StartTime;
       }
       StartNanoseconds = Plan.WaitsForStartTime() ? Plan.StartTime.Nanoseconds() : Now;
@@ -778,4 +796,106 @@ TEST(TierPacer, DisplayReportsGoOnAcrossAChangeOfWhatPlacesTheFrames)
   EXPECT_EQ(state.Reports, 119u);
   EXPECT_EQ(state.JudgedFrames, 118u);
   EXPECT_EQ(state.ErrorFrames, 0u);
+}
+
+// The wait for the GPU's work on an earlier frame (a fence, a frame slot): what holds the loop where the application can make
+// it and there is no wait for a present. A mechanism of the tiers without that wait, and no tier of its own.
+
+TEST(TierPacer, TheWaitForTheGpusWorkIsAskedForWhereThereIsNoWaitForAPresent)
+{
+  constexpr PacerCapability GpuWait = PacerCapability::WaitForGpuWork;
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability named : {PacerCapability::NoCapabilities, VBlank, AtTime, VBlank | AtTime})
+    {
+      PC::PacerSettings settings = Settings(aim);
+      settings.SetMaxFramesInFlight(2);
+      // It changes no tier
+      Loop loop(settings, PacerCapabilities(named | GpuWait));
+      EXPECT_EQ(loop.Pacer.Rating().Tier, PC::TierPacer(settings, PacerCapabilities(named)).Rating().Tier);
+      // The frame before with the aim of low latency, the one before that with smoothness
+      const uint64_t back = aim == PC::PacerAim::Smoothness ? 2u : 1u;
+      for (int32_t frame = 0; frame < 40; ++frame)
+      {
+        const PC::FrameSchedule schedule = loop.Frame();
+        ASSERT_EQ(loop.GpuWaitFrameId, schedule.FrameId > back ? schedule.FrameId - back : 0u) << frame;
+        ASSERT_FALSE(loop.Plan.WaitsForPresent());
+      }
+      EXPECT_EQ(loop.GpuWaitsAskedFor, 40u - static_cast<uint32_t>(back));
+      EXPECT_EQ(loop.WaitsAskedFor, 0u);
+      EXPECT_EQ(loop.Pacer.GpuWaitTimeouts(), 0u);
+      EXPECT_EQ(loop.Pacer.FrameWindow().LateFrames, 0u);
+    }
+    for (const PacerCapability named : {Wait, VBlank | Wait})
+    {
+      // With a wait for a present that wait holds the loop, and the GPU's work is not waited for
+      Loop loop(Settings(aim), PacerCapabilities(named | GpuWait));
+      for (int32_t frame = 0; frame < 40; ++frame)
+      {
+        static_cast<void>(loop.Frame());
+      }
+      EXPECT_EQ(loop.GpuWaitsAskedFor, 0u);
+      EXPECT_GT(loop.WaitsAskedFor, 30u);
+      // A report the plan did not ask for is not taken
+      PC::GpuWaitReport stray;
+      stray.FrameId = 40;
+      stray.Done = false;
+      loop.Pacer.AddGpuWait(stray);
+      EXPECT_EQ(loop.Pacer.GpuWaitTimeouts(), 0u);
+
+      // The wait for a present left out of the active set: the wait for the GPU's work takes its place, and back
+      loop.Pacer.SetActiveCapabilities(PacerCapabilities((named | GpuWait) & VBlank).Capabilities() == VBlank ? PacerCapabilities(VBlank | GpuWait)
+                                                                                                              : PacerCapabilities(GpuWait));
+      const uint32_t presentWaits = loop.WaitsAskedFor;
+      for (int32_t frame = 0; frame < 20; ++frame)
+      {
+        static_cast<void>(loop.Frame());
+      }
+      EXPECT_EQ(loop.GpuWaitsAskedFor, 20u);
+      EXPECT_EQ(loop.WaitsAskedFor, presentWaits);
+      loop.Pacer.SetActiveCapabilities(PacerCapabilities(named | GpuWait));
+      for (int32_t frame = 0; frame < 20; ++frame)
+      {
+        static_cast<void>(loop.Frame());
+      }
+      EXPECT_EQ(loop.GpuWaitsAskedFor, 20u);
+      EXPECT_GT(loop.WaitsAskedFor, presentWaits + 15u);
+    }
+  }
+}
+
+TEST(TierPacer, AWaitForTheGpusWorkThatRanOutIsCountedAndTheFramesGoOn)
+{
+  constexpr PacerCapability GpuWait = PacerCapability::WaitForGpuWork;
+  PC::TierPacer pacer(Settings(), PacerCapabilities(GpuWait));
+  int64_t now = Start;
+  for (uint64_t frame = 1; frame <= 20; ++frame)
+  {
+    const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+    if (plan.WaitsForGpuWork())
+    {
+      // The GPU never finishes: every wait takes its whole time
+      ASSERT_EQ(plan.WaitForGpuWorkFrameId, frame - 1u);
+      PC::GpuWaitReport wait;
+      wait.FrameId = plan.WaitForGpuWorkFrameId;
+      wait.BeginTime = At(now);
+      now += plan.WaitForGpuWorkTimeout.Nanoseconds();
+      wait.EndTime = At(now);
+      wait.Done = false;
+      pacer.AddGpuWait(wait);
+      ASSERT_FALSE(pacer.PlanFrame(At(now)).WaitsForGpuWork());
+    }
+    const PC::FrameSchedule schedule = pacer.BeginFrame(At(now));
+    ASSERT_EQ(schedule.FrameId, frame);
+    const PC::PresentPlan present = pacer.EndFrame(At(now + Work));
+    PC::PresentReport report;
+    report.FrameId = present.FrameId;
+    report.CallTime = At(now + Work);
+    report.ReturnTime = At(now + Work);
+    pacer.AddPresent(report);
+    now += Work + 100'000;
+  }
+  EXPECT_EQ(pacer.GpuWaitTimeouts(), 19u);
+  // A loop held that long is late: its frames are late frames to the rule, as those of any loop that does not keep up
+  EXPECT_GT(pacer.FrameWindow().LateFrames, 15u);
 }

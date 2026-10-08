@@ -12,6 +12,7 @@
 #include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
@@ -68,6 +69,10 @@ namespace MB::FramePacing::Pacer::Simulation
       if (settings.ReportsDisplayTimes)
       {
         capabilities = capabilities | PacerCapability::DisplayTimes;
+      }
+      if (settings.HasGpuWait)
+      {
+        capabilities = capabilities | PacerCapability::WaitForGpuWork;
       }
       return PacerCapabilities(capabilities);
     }
@@ -372,6 +377,26 @@ namespace MB::FramePacing::Pacer::Simulation
         // Planned again: the wait may have taken long, and where the refreshes are may have moved
         startPlan = pacer.PlanFrame(NanosecondTickCount(now));
       }
+      if (startPlan.WaitsForGpuWork())
+      {
+        // The wait returns when the GPU is done with that frame, at once when it is already, or when its time runs out
+        const int64_t doneNanoseconds = frames[static_cast<std::size_t>(startPlan.WaitForGpuWorkFrameId) - 1].GpuEndNanoseconds;
+        const int64_t timeoutNanoseconds = now + startPlan.WaitForGpuWorkTimeout.Nanoseconds();
+        GpuWaitReport waitReport;
+        waitReport.FrameId = startPlan.WaitForGpuWorkFrameId;
+        waitReport.BeginTime = NanosecondTickCount(now);
+        waitReport.Done = doneNanoseconds <= timeoutNanoseconds;
+        frame.GpuWaitFrameId = waitReport.FrameId;
+        frame.GpuWaitBlockedNanoseconds = std::max(std::min(doneNanoseconds, timeoutNanoseconds) - now, int64_t{0});
+        now += frame.GpuWaitBlockedNanoseconds;
+        waitReport.EndTime = NanosecondTickCount(now);
+        pacer.AddGpuWait(waitReport);
+        if (hasVBlankTimes)
+        {
+          pacer.AddVBlank(ReadVBlank(display, now, random, settings));
+        }
+        startPlan = pacer.PlanFrame(NanosecondTickCount(now));
+      }
       if (startPlan.WaitsForStartTime())
       {
         if (!hasWaitForPresent)
@@ -382,8 +407,10 @@ namespace MB::FramePacing::Pacer::Simulation
         now = WaitUntil(now, frame.WaitTargetNanoseconds, random, settings.TimerLate);
       }
       // The application's own waits, which the pacer did not ask for: it is told of them where the loop says so
+      // Where the pacer's plans have the wait for the GPU's work, that is the wait for a frame slot, and the one wait
+      const bool pacerWaitsForGpuWork = !hasWaitForPresent && pacer.ActiveCapabilities().Has(PacerCapability::WaitForGpuWork);
       const int64_t frameSlotWaitBegin = now;
-      if (settings.WaitsForPreviousGpuWork)
+      if (settings.WaitsForPreviousGpuWork && !pacerWaitsForGpuWork)
       {
         now = std::max(now, previousGpuEndNanoseconds);
       }

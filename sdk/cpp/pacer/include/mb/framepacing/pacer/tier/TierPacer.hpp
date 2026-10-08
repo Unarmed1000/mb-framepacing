@@ -16,6 +16,7 @@
 #include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
@@ -38,6 +39,8 @@ namespace MB::FramePacing::Pacer
   //!   AddVBlank       a vertical blank's time, whenever the application has one (with PacerCapability::VBlankTimes active)
   //!   PlanFrame       before the frame takes anything: a present to wait for (with WaitForPresent active), then a time
   //!   AddPresentWait  after that wait: what became of it. PlanFrame is then called again
+  //!   AddGpuWait      the same for the wait for the GPU's work on an earlier frame, which the plan asks for where
+  //!                   WaitForGpuWork is active and WaitForPresent is not
   //!   BeginFrame      the frame starts: its swap interval, its animation time and the marker's values
   //!   EndFrame        the CPU's work is done: the time to wait until before the present, or the time to give the present
   //!   AddPresent      after the present, before the next frame is planned
@@ -114,6 +117,10 @@ namespace MB::FramePacing::Pacer
 
     //! What became of the wait for a present the plan asked for. The frame is then planned again.
     void AddPresentWait(const PresentWaitReport& report) noexcept;
+
+    //! What became of the wait for the GPU's work the plan asked for (PacerCapability::WaitForGpuWork active and no wait for
+    //! a present). The frame is then planned again.
+    void AddGpuWait(const GpuWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
     FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
@@ -216,6 +223,12 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] uint64_t PresentWaitTimeouts() const noexcept
     {
       return m_onVBlanks ? m_vblank.PresentWaitTimeouts() : m_grid.PresentWaitTimeouts();
+    }
+
+    //! The waits for the GPU's work that ended without the GPU done with the frame, since the pacer was made.
+    [[nodiscard]] uint64_t GpuWaitTimeouts() const noexcept
+    {
+      return m_onVBlanks ? m_vblank.GpuWaitTimeouts() : m_grid.GpuWaitTimeouts();
     }
 
     //! The frames whose start the display's side held for a share of a refresh period, on the grid on the clock.

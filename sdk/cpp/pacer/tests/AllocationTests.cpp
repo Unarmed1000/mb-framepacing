@@ -16,6 +16,7 @@
 #include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentFeedback.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
@@ -358,7 +359,7 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
     PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
     settings.SetAim(aim);
     const PacerCapabilities has(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent | PacerCapability::PresentAfterDuration |
-                                PacerCapability::PresentAtTime | PacerCapability::DisplayTimes);
+                                PacerCapability::PresentAtTime | PacerCapability::DisplayTimes | PacerCapability::WaitForGpuWork);
     PC::TierPacer pacer(settings, has);
 
     int64_t checked = 0;
@@ -372,14 +373,16 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
       for (int32_t frame = 0; frame < 2'000; ++frame)
       {
         // Every 50 frames another part of what the application has is active: all eight tiers, with either timed present and
-        // with both, in turn, the change made between two frames or while one is open
+        // with both, with the wait for the GPU's work and without it, in turn, the change made between two frames or while
+        // one is open
         if ((frame % 50) == 0)
         {
-          const int32_t turn = (frame / 50) % 16;
+          const int32_t turn = (frame / 50) % 32;
           pacer.SetActiveCapabilities(PacerCapabilities(((turn & 1) != 0 ? PacerCapability::VBlankTimes : PacerCapability::NoCapabilities) |
                                                         ((turn & 2) != 0 ? PacerCapability::WaitForPresent : PacerCapability::NoCapabilities) |
                                                         ((turn & 4) != 0 ? PacerCapability::PresentAtTime : PacerCapability::NoCapabilities) |
-                                                        ((turn & 8) != 0 ? PacerCapability::PresentAfterDuration : PacerCapability::NoCapabilities)));
+                                                        ((turn & 8) != 0 ? PacerCapability::PresentAfterDuration : PacerCapability::NoCapabilities) |
+                                                        ((turn & 16) != 0 ? PacerCapability::WaitForGpuWork : PacerCapability::NoCapabilities)));
         }
         reading.VBlankTime = FP::NanosecondTickCount(now - (now % period));
         reading.ReadTime = FP::NanosecondTickCount(now);
@@ -394,6 +397,18 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
           waitReport.Shown = (frame % 97) != 0;
           pacer.AddPresentWait(waitReport);
           plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
+        }
+        if (plan.WaitsForGpuWork())
+        {
+          PC::GpuWaitReport gpuWait;
+          gpuWait.FrameId = plan.WaitForGpuWorkFrameId;
+          gpuWait.BeginTime = FP::NanosecondTickCount(now);
+          now += (frame % 5) == 0 ? 3'000'000 : 20'000;
+          gpuWait.EndTime = FP::NanosecondTickCount(now);
+          gpuWait.Done = (frame % 89) != 0;
+          pacer.AddGpuWait(gpuWait);
+          plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
+          checked += 1;
         }
         now = plan.WaitsForStartTime() ? plan.StartTime.Nanoseconds() : now;
         const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(now));

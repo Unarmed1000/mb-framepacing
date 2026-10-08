@@ -43,6 +43,8 @@ namespace MB::FramePacing::Pacer
   {
     m_grid.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
     m_vblank.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
+    m_grid.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
+    m_vblank.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
   }
 
   void TierPacer::SetCapabilities(const PacerCapabilities& capabilities) noexcept
@@ -110,6 +112,9 @@ namespace MB::FramePacing::Pacer
     const bool waits = active.Has(PacerCapability::WaitForPresent);
     m_grid.SetWaitsForPresent(waits);
     m_vblank.SetWaitsForPresent(waits);
+    // The wait for the GPU's work holds the loop where no wait for a present does: the part knows which of the two it has
+    m_grid.SetWaitsForGpuWork(active.Has(PacerCapability::WaitForGpuWork));
+    m_vblank.SetWaitsForGpuWork(active.Has(PacerCapability::WaitForGpuWork));
     m_active = active;
   }
 
@@ -149,6 +154,23 @@ namespace MB::FramePacing::Pacer
     else
     {
       m_grid.AddPresentWait(report);
+    }
+  }
+
+  void TierPacer::AddGpuWait(const GpuWaitReport& report) noexcept
+  {
+    // A wait the plan did not ask for is not taken
+    if (!m_active.Has(PacerCapability::WaitForGpuWork) || m_active.Has(PacerCapability::WaitForPresent))
+    {
+      return;
+    }
+    if (m_onVBlanks)
+    {
+      m_vblank.AddGpuWait(report);
+    }
+    else
+    {
+      m_grid.AddGpuWait(report);
     }
   }
 

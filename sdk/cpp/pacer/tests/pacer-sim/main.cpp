@@ -31,6 +31,8 @@
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
 //   --system-holds      the loop tells the pacer of the lowest tier of its own waits and that the system holds it while its
 //                       queue is full; with --images the display has that many, and the pacer is told so
+//   --gpu-wait          a tier pacer's application can wait for the GPU's work on a frame: the plans of the pacers without a
+//                       wait for a present ask for it, and the loop makes no frame slot wait of its own
 //   --present-at-time   a tier pacer's present takes a time before which the frame is not shown: the tier with a timed present
 //   --present-after-duration  the same with a time the frame before it stays on screen at least
 //   --smooth            a tier pacer with the aim of smoothness (a reserve of frames that wait); low latency without it.
@@ -65,7 +67,7 @@ namespace
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
                  "          [--startup-pause <refreshes>] [--smooth] [--vblank-pacer] [--ready-place <percent>]\n"
                  "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds] [--vblank-wait-pacer]\n"
-                 "          [--present-at-time] [--present-after-duration]\n";
+                 "          [--present-at-time] [--present-after-duration] [--gpu-wait]\n";
     return 2;
   }
 
@@ -120,6 +122,11 @@ namespace
       if (name == "--smooth")
       {
         settings.Aim = MB::FramePacing::Pacer::PacerAim::Smoothness;
+        continue;
+      }
+      if (name == "--gpu-wait")
+      {
+        settings.HasGpuWait = true;
         continue;
       }
       if (name == "--present-at-time")

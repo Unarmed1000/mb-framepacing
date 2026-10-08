@@ -68,6 +68,19 @@ namespace MB::FramePacing::Pacer
     return TimeOfBlank(slot) < time ? slot + 1 : slot;
   }
 
+  uint32_t VBlankLoopPacer::FramesInFlightNow() const noexcept
+  {
+    // The frames in flight a frame's work is judged by: what the pacer's own wait for the GPU's work makes them, where
+    // that wait is made, and else what the application says it lets be in flight
+    const PacerSettings& settings = m_rule.Settings();
+    return (!m_waitsForPresent && m_waitsForGpuWork) ? GpuWaitRule::FramesInFlight(settings) : settings.MaxFramesInFlight();
+  }
+
+  void VBlankLoopPacer::AddGpuWait(const GpuWaitReport& report) noexcept
+  {
+    m_gpuWait.AddGpuWait(report, m_rule.Refresh());
+  }
+
   int64_t VBlankLoopPacer::Reserve() const noexcept
   {
     // The frames that are ready ahead of the display: with the aim of smoothness, and at one refresh per frame only (at more
@@ -250,6 +263,11 @@ namespace MB::FramePacing::Pacer
   {
     // The wait for a present, where the loop has one
     FrameStartPlan plan = m_waitsForPresent ? m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval()) : FrameStartPlan();
+    if (!m_waitsForPresent && m_waitsForGpuWork)
+    {
+      // Without a wait for a present: the wait for the GPU's work on an earlier frame, where the application can make it
+      plan = m_gpuWait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval());
+    }
     if (m_takenOver)
     {
       // The first frame after another pacer placed the frames: it starts when the frame before it said the next one would
@@ -414,7 +432,7 @@ namespace MB::FramePacing::Pacer
       }
       const int64_t lost = previousShown - m_displaySlot;
       const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : NanosecondTimeDuration(cpuStartTime - m_startTime).Value();
-      const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
+      const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, FramesInFlightNow()) : cpuWork;
       const bool late = lost > 0 || m_startedLate || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       // How long before the time it was given this frame began (low latency: it is given none with the aim of smoothness)
       const NanosecondTimeSpan startAhead =
@@ -480,6 +498,7 @@ namespace MB::FramePacing::Pacer
     m_hasShownCeiling = false;
     m_hasFrame = true;
     m_wait.BeginFrame();
+    m_gpuWait.BeginFrame();
     m_pauseHeldByWait = m_pauseHeldByWait || m_waitsForPresent;
     m_takenOver = false;
     ++m_frameId;
@@ -559,6 +578,7 @@ namespace MB::FramePacing::Pacer
       ArmStartupPause();
     }
     m_wait.AddPresent(report);
+    m_gpuWait.AddPresent(report);
   }
 
   void VBlankLoopPacer::AddGpuWork(const GpuWorkReport& report) noexcept
@@ -570,6 +590,7 @@ namespace MB::FramePacing::Pacer
   {
     ArmStartupPause();
     m_wait.ForgetPresents();
+    m_gpuWait.ForgetPresents();
   }
 
   PacerHandover VBlankLoopPacer::GiveOver() const noexcept
@@ -601,6 +622,7 @@ namespace MB::FramePacing::Pacer
     handover.RefreshesBehindClock = m_refreshesBehindClock;
     handover.FrameWork = m_frameWork;
     handover.Wait = m_wait;
+    handover.GpuWait = m_gpuWait;
     handover.PausePending = m_pausePending;
     handover.PauseHeldByWait = m_pauseHeldByWait;
     handover.HasPauseFirstFrame = m_pauseHasFirstFrame;
@@ -614,6 +636,7 @@ namespace MB::FramePacing::Pacer
     m_rule.TakeOver(rule);
     m_frameWork = handover.FrameWork;
     m_wait = handover.Wait;
+    m_gpuWait = handover.GpuWait;
     // The pause after start-up is the swap chain's, whichever part places the frames: made once, or still to be made
     m_pausePending = handover.PausePending;
     m_pauseHeldByWait = handover.PauseHeldByWait;
@@ -689,5 +712,6 @@ namespace MB::FramePacing::Pacer
     m_pauseSlots = 0;
     ArmStartupPause();
     m_wait.Reset();
+    m_gpuWait.Reset();
   }
 }

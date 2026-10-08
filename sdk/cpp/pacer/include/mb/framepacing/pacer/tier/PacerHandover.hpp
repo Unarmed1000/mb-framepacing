@@ -6,6 +6,7 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
+#include <mb/framepacing/pacer/hold/GpuWaitRule.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <cstdint>
@@ -40,6 +41,7 @@ namespace MB::FramePacing::Pacer
     uint64_t RefreshesBehindClock{0};
     FrameWorkRule FrameWork;
     PresentWaitRule Wait;
+    GpuWaitRule GpuWait;
     //! The pause after start-up: still to be made, whether a wait for a present held a frame since it was asked for, the
     //! first frame's start since then (when HasPauseFirstFrame), and whether the system took a present since.
     bool PausePending{true};

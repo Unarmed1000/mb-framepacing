@@ -65,6 +65,10 @@ namespace MB::FramePacing::Pacer::Simulation
     //! The loop tells a tier pacer of its own waits (for a frame slot, for an image), says that the system holds it while its
     //! queue is full, and gives the display's images as the swap chain's (where the display has a number of them)
     bool SystemHoldsLoop{false};
+    //! For the tier pacers: the application can wait until the GPU finished a frame (PacerCapability::WaitForGpuWork). The
+    //! loop then makes that wait where a plan asks for it, and no wait for a frame slot of its own next to it
+    //! (WaitsForPreviousGpuWork has no part in such a frame)
+    bool HasGpuWait{false};
     //! For the tier pacers: the platform reports when a frame was shown (PacerCapability::DisplayTimes), and the loop gives
     //! the pacer every frame's display time once it has passed
     bool ReportsDisplayTimes{false};

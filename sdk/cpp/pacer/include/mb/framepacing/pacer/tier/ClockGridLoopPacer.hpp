@@ -12,11 +12,13 @@
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
+#include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
+#include <mb/framepacing/pacer/hold/GpuWaitRule.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/placement/PresentTiming.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
@@ -60,6 +62,9 @@ namespace MB::FramePacing::Pacer
     // does by when it presents
     PresentTiming m_presentTiming{PresentTiming::Untimed};
     PresentWaitRule m_wait;
+    // Without a wait for a present: a wait for the GPU's work on an earlier frame, where the application can make one
+    bool m_waitsForGpuWork{false};
+    GpuWaitRule m_gpuWait;
     // The grid on the clock: step 0 is at m_origin, the frame that started last is on m_slot and the next is due at m_nextSlot
     NanosecondTickCount m_origin;
     int64_t m_slot{0};
@@ -137,6 +142,10 @@ namespace MB::FramePacing::Pacer
     //! are shown again. While it is stopped the report is the answer to what the plan asked, and a frame the asking held is
     //! not judged either.
     void AddPresentWait(const PresentWaitReport& report) noexcept;
+
+    //! What became of the wait for the GPU's work the plan asked for. One that ended without the GPU done is counted
+    //! (GpuWaitTimeouts). The frame is then planned again.
+    void AddGpuWait(const GpuWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
     FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
@@ -252,6 +261,19 @@ namespace MB::FramePacing::Pacer
       return m_wait.Timeouts();
     }
 
+    //! Whether the frame start plan asks for a wait for the GPU's work on an earlier frame, from the next frame on. It
+    //! does where there is no wait for a present.
+    void SetWaitsForGpuWork(const bool waitsForGpuWork) noexcept
+    {
+      m_waitsForGpuWork = waitsForGpuWork;
+    }
+
+    //! The waits for the GPU's work that ended without the GPU done, since the pacer was made.
+    [[nodiscard]] uint64_t GpuWaitTimeouts() const noexcept
+    {
+      return m_gpuWait.Timeouts();
+    }
+
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
     [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
@@ -304,6 +326,7 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] int64_t SlotFor(NanosecondTickCount time) const noexcept;
     [[nodiscard]] int64_t SlotAfterPresent() const noexcept;
     [[nodiscard]] int64_t Reserve() const noexcept;
+    [[nodiscard]] uint32_t FramesInFlightNow() const noexcept;
     [[nodiscard]] bool LetsTheSystemPace() const noexcept;
     [[nodiscard]] bool HeldByTheDisplaysSide() const noexcept;
     [[nodiscard]] bool LetThroughByTheDisplay() const noexcept;

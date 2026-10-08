@@ -1122,7 +1122,22 @@ paced, and a tier is one combination of them:
   the one before with the aim of low latency, the one before that with smoothness. It keeps the loop from running ahead of
   the GPU and says nothing of the display, so it is no tier. The one run there is of it (the first integration's own wait
   of that kind, with smoothness on tier 8) had every frame on screen for one refresh, 2.83 refreshes after its start: it
-  paces at a full queue. Not built as something the pacer asks for.
+  paces at a full queue.
+  **Built on 2026-10-08** (`GpuWaitRule`, `FrameStartPlan::WaitForGpuWorkFrameId`, `GpuWaitReport`,
+  `TierPacer::AddGpuWait`; the simulation and unit tests only). Where `WaitForGpuWork` is active and `WaitForPresent`
+  is not, the frame start plan asks for the wait before the wait for the start time: for the frame before the one
+  that is about to be made with the aim of low latency (one frame in flight), and for the frame before that with
+  smoothness where the application lets two frames be in flight (`MaxFramesInFlight`; one otherwise). It is the
+  application's one wait for a frame slot: the pacer names the frame, the application makes no such wait of its own next
+  to it, reports what became of the wait and asks for the plan again. A wait may take a few of the frame's swap
+  intervals, and one that runs out is counted (`GpuWaitTimeouts`). A frame's work is judged by the frames in flight the
+  wait makes. In the simulation, with GPU work of 130 % of a refresh that nobody reports: a loop without any wait had
+  more than 20 frames the GPU had not got to, and with the wait none (low latency) or one (smoothness). The wait says
+  that the GPU is done with a frame, not how long it worked: the rule stays at two refreshes per frame only where the
+  GPU's work is reported too. And what the aim of low latency costs a loop whose CPU and GPU each work 72 % of a
+  refresh: with smoothness the two are side by side and a frame a refresh holds; with low latency they come one after
+  the other, and it is two refreshes per frame. Nothing finer than the frame before and the one before that is decided
+  until it is measured under a real GPU load, with and without the wait, with both aims.
 
 **What reaches no tier and is no fact of a rating.** `WaitForImage` fills the queue where it works, and `FrameCallback`
 is not built anywhere and can stop or come late. `GpuWorkTimes` and what a present does to the loop (`PresentWaits` and the
@@ -1330,7 +1345,7 @@ frame of a run on its refresh, and the duration keeps the ones after it there.
   next present that gets the time or does not any more.
 
 **Not built:** seeing that a present's time was not kept (tiers 1 and 2 could, by their wait); a swap interval on the
-present; the fence wait of tiers 3 and 4.
+present.
 
 #### The duration on one system
 
@@ -1882,9 +1897,12 @@ checked. Four things are settled now, because they cost little now and a second 
     present"). The other way, to learn nothing for a time after a start, was not taken: a display that does take its
     frames early then shows every frame late for that time, and the swap interval rule may slow down before the place
     has moved. Not measured: whether the first try on that system holds, which would give back the quarter of a refresh.
-15. **A wait for the GPU's work as a hold of the loop**: decided on 2026-10-08, not built: a mechanism the tiers without
-    a wait for a present use where the application has it, and no tier ("Tiers"). To be measured with and without it
-    before anything is said of what it is worth.
+15. **A wait for the GPU's work as a hold of the loop**: decided on 2026-10-08 and built: a mechanism the tiers without
+    a wait for a present use where the application has it, and no tier ("Tiers"). Which frame: the one before with
+    low latency, the one before that with smoothness, as it was proposed (confirmed on 2026-10-08). To be measured with
+    and without it under a real GPU load, with both aims, before anything is said of what it is worth or anything
+    finer is decided. One thing to watch then: on the one system the wait for a frame slot held the loop while the
+    GPU's work itself was short (decision 17), so there it brakes from the display's side.
 
 16. **Which timed present puts a set in the top four** (new, 2026-10-08). The list has either; as built, only a time
     before which a frame is not shown moves the placing to the display's side ("The timed present, as built"). The

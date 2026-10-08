@@ -38,6 +38,10 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t TargetFrameTimeNanoseconds{0};
     uint32_t WindowFrames{0};
     uint32_t WindowLateFrames{0};
+    //! For a tier pacer's loop: the frame whose GPU work a plan had the loop wait for before this frame (0: none), and how
+    //! long that wait held the loop
+    uint64_t GpuWaitFrameId{0};
+    int64_t GpuWaitBlockedNanoseconds{0};
     //! For a tier pacer's loop: what was active when the frame was made (PacerCapability's bits), and how far the pacer's
     //! animation time was behind the clock by then, in refreshes
     uint32_t ActiveCapabilities{0};
