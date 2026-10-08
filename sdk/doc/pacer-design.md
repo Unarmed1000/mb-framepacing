@@ -1223,7 +1223,13 @@ together from the parts:
     again at the next frame;
   - the pause after start-up is the swap chain's: made once, whichever part places the frames when it is due.
     Found with it: with low latency on vertical blanks a frame that was done early was presented at the vertical blank
-    itself, where a display may still take it for that blank. It is presented the frame margin into the refresh now.
+    itself, where a display may still take it for that blank. It is presented the frame margin into the refresh now. On
+    the first integration's system that changed the start of the runs with vertical blank times, the wait and low
+    latency (three runs each way, the second handover block's conditions): the place a frame is to be ready at was
+    learnt one step earlier in a run's first dozen frames than before (a quarter of a refresh against an eighth, the
+    eighth being taken back by frame 11 before), and went back a step about every 490 frames, as it is built to: to
+    where it began by frame 492, 490 and 990. Until then a frame was on screen up to 1 ms later after its start (a
+    median of 2.84, 2.84 and 3.34 ms against 2.82). Every frame was on screen one refresh either way.
 - **As built** there are two ways a frame is placed, each a class with the wait and the timed present as options: on a
   grid on the clock (`ClockGridLoopPacer`, tiers 2, 4, 7 and 8) and on the display's vertical blanks (`VBlankLoopPacer`,
   tiers 1, 3, 5 and 6). The wait (`PresentWaitRule`), the vertical blanks from readings (`VBlankTimeline`) and the values
@@ -1245,9 +1251,14 @@ together from the parts:
   clock rose at two changes only: where the wait for a present is switched on over a timer (one long frame start while
   the frames that wait come down, 5 of 6 times when the change was the first of a run, 3 of 3 with smoothness and 2 of 3
   with low latency, and not once of 6 later in it), and from a timer to vertical blanks with the wait with low latency
-  (by one within seven frames, 3 of 3: not understood yet). With low latency the frame starts move at a change between a
-  timer and vertical blanks, by up to three and a half refreshes at four refreshes per frame, as the two start a frame
-  at different places before its refresh; no frame was on screen longer or shorter for it.
+  (by one at the second frame, 3 of 3). The frame rows say what that one is: on the timer a frame was on screen 6.8 ms
+  after its start, a refresh later than a pacer without a wait or display times has it, so the first frame on vertical
+  blanks was made for a refresh a frame was still on its way to; the wait then said so, the second frame started 8.2 ms
+  after the first, and from it on a frame was on screen 2.8 ms after its start. On screen every frame followed the one
+  before it by one refresh. It is the wait finding a frame that waited, which the timer could not know of, and letting
+  it through once: nothing to fix in the handover. With low latency the frame starts move at a change between a timer
+  and vertical blanks, by up to three and a half refreshes at four refreshes per frame, as the two start a frame at
+  different places before its refresh; no frame was on screen longer or shorter for it.
 - **Each tier is still a pacer from the outside**: its own tests, and its own statement of what it promises and what it
   can not do. The four class names of tiers 5 to 8 stay, each the one pacer with its capabilities fixed.
 - **Each part has both aims** where the aim bears on it: how many presents may wait and which frame's GPU work is waited
