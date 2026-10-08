@@ -53,7 +53,8 @@ namespace MB::FramePacing::Pacer
   //! and no present is held by the loop. Those are the eight tiers of PacerTier that have a pacer (PacerMajorTier::DisplayPlaces
   //! and LoopPlaces). The four where the display's side places the frame are built against the simulation's display only: no
   //! system has been measured with them. A present that takes a time the frame before it stays is given
-  //! PresentPlan::MinimumDuration next to everything the loop does without it, at whatever tier.
+  //! PresentPlan::MinimumDuration next to everything the loop does without it, at whatever tier, and one that takes a swap
+  //! interval is given PresentPlan::SwapInterval the same way.
   //!
   //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) rates the first
   //! major tier and is paced as the second: every present is taken as shown, which one that was skipped is not.

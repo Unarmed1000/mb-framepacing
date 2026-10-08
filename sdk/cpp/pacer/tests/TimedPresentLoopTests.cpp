@@ -353,3 +353,63 @@ TEST(TimedPresentLoop, TheAnimationErrorCountedFromDisplayReportsIsWhatTheDispla
     EXPECT_EQ(unreported.back().DisplayStartToDisplayFrames, 0u);
   }
 }
+
+TEST(TimedPresentLoop, ASwapIntervalOnThePresentKeepsAFrameOnItsRefreshesWhereTheLoopsHoldFallsOnBothSides)
+{
+  // The loop on a timer whose held present is at the edge of what the display takes, at two and at four refreshes per frame:
+  // without anything on the present the frames are on screen for a refresh more or less. A present that takes the frame's
+  // swap interval has every frame on screen for its refreshes, as one that takes a minimum duration has
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const uint32_t swapInterval : {2u, 4u})
+    {
+      Sim::LoopSettings settings = LightLoop(aim, Timed::No);
+      settings.PreferredSwapInterval = swapInterval;
+      settings.TimerLate = {0, 100'000};
+      const int64_t period = PeriodNanoseconds(settings);
+      settings.Display.LatchLeadNanoseconds = (period * 85) / 100;
+      const std::vector<Sim::LoopFrame> untimed = Sim::SimulateTimerPeriodOnlyLoop(settings);
+      EXPECT_GT(OffTheSwapInterval(untimed, period), 100) << swapInterval;
+
+      settings.MaxPresentSwapInterval = 4;
+      const std::vector<Sim::LoopFrame> held = Sim::SimulateTimerPeriodOnlyLoop(settings);
+      EXPECT_EQ(OffTheSwapInterval(held, period), 0) << swapInterval;
+      // The same frames as with a minimum duration: the two say the same to the display
+      settings.MaxPresentSwapInterval = 0;
+      settings.PresentsAfterDuration = true;
+      const std::vector<Sim::LoopFrame> duration = Sim::SimulateTimerPeriodOnlyLoop(settings);
+      ASSERT_EQ(held.size(), duration.size());
+      for (std::size_t index = 0; index < held.size(); ++index)
+      {
+        ASSERT_EQ(held[index].ShownNanoseconds, duration[index].ShownNanoseconds) << swapInterval << ' ' << index;
+      }
+    }
+  }
+}
+
+TEST(TimedPresentLoop, ASwapIntervalOnThePresentChangesNothingAtOneRefreshPerFrameAndTakesNoMoreThanItsLongest)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    // One refresh per frame: the present's swap interval is 1, which is what the display does anyway
+    Sim::LoopSettings settings = LightLoop(aim, Timed::No);
+    const std::vector<Sim::LoopFrame> plain = Sim::SimulateVBlankWaitForPresentLoop(settings);
+    settings.MaxPresentSwapInterval = 4;
+    const std::vector<Sim::LoopFrame> withOne = Sim::SimulateVBlankWaitForPresentLoop(settings);
+    ASSERT_EQ(plain.size(), withOne.size());
+    for (std::size_t index = 0; index < plain.size(); ++index)
+    {
+      ASSERT_EQ(plain[index].ShownNanoseconds, withOne[index].ShownNanoseconds) << index;
+      ASSERT_EQ(plain[index].StartNanoseconds, withOne[index].StartNanoseconds) << index;
+    }
+
+    // Four refreshes per frame on a present that takes two at the most: the loop holds the frame for the rest, and where
+    // nothing goes wrong every frame is on screen for its four
+    Sim::LoopSettings four = LightLoop(aim, Timed::No);
+    four.PreferredSwapInterval = 4;
+    four.MaxPresentSwapInterval = 2;
+    const int64_t period = PeriodNanoseconds(four);
+    EXPECT_EQ(OffTheSwapInterval(Sim::SimulateVBlankPeriodOnlyLoop(four), period), 0);
+    EXPECT_EQ(OffTheSwapInterval(Sim::SimulateVBlankWaitForPresentLoop(four), period), 0);
+  }
+}

@@ -18,7 +18,10 @@ namespace MB::FramePacing::Pacer
     uint64_t FrameId{0};
     //! The time to wait until before the present, on the application's steady clock; NanosecondTickCount(): none, present at once.
     NanosecondTickCount PresentTime;
-    //! The swap interval for a present that takes one (PacerCapability::PresentSwapInterval active); 1 otherwise.
+    //! The swap interval for a present that takes one (PacerCapability::PresentSwapInterval active): the frame is shown no
+    //! sooner than this many refreshes after the frame before it. The frame's own swap interval, or the longest the present
+    //! takes where that is less (the loop holds the frame for the rest). 1 otherwise, and where the present is given a time
+    //! before which the frame is not shown.
     uint32_t SwapInterval{1};
     //! The time before which the frame is not to be shown, for a present that takes one (PacerCapability::PresentAtTime
     //! active); NanosecondTickCount(): none.

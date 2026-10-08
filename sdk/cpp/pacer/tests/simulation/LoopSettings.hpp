@@ -80,6 +80,9 @@ namespace MB::FramePacing::Pacer::Simulation
     //! For the tier pacers: the present takes a time the frame before it stays on screen at least
     //! (PacerCapability::PresentAfterDuration), and the loop gives it the plan's
     bool PresentsAfterDuration{false};
+    //! For the tier pacers: the present takes a swap interval up to this (PacerCapability::PresentSwapInterval), and the
+    //! display shows such a frame no sooner than that many refreshes after the frame before it. 0: it takes none
+    uint32_t MaxPresentSwapInterval{0};
     //! For the tier pacers (SimulateTierLoop): changes of the active set in the run, by frame, ascending
     std::vector<LoopActiveSetChange> ActiveSetChanges;
     //! For the tier pacers (SimulateTierLoop): changes of the frames' work in the run, by time, ascending

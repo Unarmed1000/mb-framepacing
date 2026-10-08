@@ -80,6 +80,10 @@ namespace MB::FramePacing::Pacer::Simulation
       {
         capabilities = capabilities | PacerCapability::WaitForGpuWork;
       }
+      if (settings.MaxPresentSwapInterval > 0)
+      {
+        return PacerCapabilities(capabilities | PacerCapability::PresentSwapInterval, settings.MaxPresentSwapInterval);
+      }
       return PacerCapabilities(capabilities);
     }
 
@@ -480,8 +484,16 @@ namespace MB::FramePacing::Pacer::Simulation
       }
       frame.PresentNanoseconds = now;
       // The present, with the time the plan gives where the present takes one
-      frame.ShownNanoseconds =
-        display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), presentPlan.MinimumDuration.Nanoseconds());
+      // A swap interval on the present: no sooner than that many of the display's refreshes after the frame before it, which
+      // to the display is a time that frame stays of half a refresh less
+      int64_t minimumDuration = presentPlan.MinimumDuration.Nanoseconds();
+      if (presentPlan.SwapInterval > 1u)
+      {
+        const RefreshPeriod displayPeriod = DisplayPeriod(settings);
+        minimumDuration = std::max(minimumDuration, displayPeriod.TimeFor(int64_t{presentPlan.SwapInterval}).Nanoseconds() -
+                                                      (displayPeriod.ToNanosecondTimeSpan().Nanoseconds() / 2));
+      }
+      frame.ShownNanoseconds = display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), minimumDuration);
       report.FrameId = presentPlan.FrameId;
       report.CallTime = NanosecondTickCount(now);
       report.ReturnTime = NanosecondTickCount(now);

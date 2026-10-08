@@ -187,7 +187,9 @@ namespace MB::FramePacing::Pacer
 
   PresentPlan TierPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
   {
-    const PresentPlan plan = m_onVBlanks ? m_vblank.EndFrame(workDoneTime) : m_grid.EndFrame(workDoneTime);
+    PresentPlan plan = m_onVBlanks ? m_vblank.EndFrame(workDoneTime) : m_grid.EndFrame(workDoneTime);
+    // The present's own swap interval, where it takes one: given next to what the loop does, as a minimum duration is
+    plan.SwapInterval = DisplayPlacementUtil::PresentSwapIntervalFor(m_active, SwapInterval());
     // The frame has ended: a change of the active set takes effect now, for the frame after it
     ApplyPending();
     return plan;

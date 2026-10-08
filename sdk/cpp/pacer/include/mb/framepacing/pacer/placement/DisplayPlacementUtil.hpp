@@ -11,6 +11,7 @@
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/placement/PresentTiming.hpp>
+#include <algorithm>
 #include <cstdint>
 
 //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built; the simulation only, no system has
@@ -36,6 +37,20 @@ namespace MB::FramePacing::Pacer::DisplayPlacementUtil
       return PresentTiming::AtTime;
     }
     return active.Has(PacerCapability::PresentAfterDuration) ? PresentTiming::AfterDuration : PresentTiming::Untimed;
+  }
+
+  //! PresentPlan::SwapInterval for a frame of that swap interval. Where the present takes a swap interval
+  //! (PacerCapability::PresentSwapInterval) it is the frame's, up to the longest the present takes: the display's side then
+  //! shows the frame no sooner than that many refreshes after the frame before it, whenever the loop presents it. Like a
+  //! time the frame before it stays, it places nothing by itself, and it is given next to what the loop does. 1 where the
+  //! present takes none, and where it takes a time before which the frame is not shown: that time says the refresh.
+  [[nodiscard]] constexpr uint32_t PresentSwapIntervalFor(const PacerCapabilities& active, const uint32_t swapInterval) noexcept
+  {
+    if (!active.Has(PacerCapability::PresentSwapInterval) || active.Has(PacerCapability::PresentAtTime))
+    {
+      return 1u;
+    }
+    return std::max(std::min(swapInterval, active.MaxPresentSwapInterval()), 1u);
   }
 
   //! How long before the refresh a frame is for it may be shown.

@@ -81,3 +81,26 @@ TEST(DisplayPlacementUtil, ThePlanGetsTheOneValueOfItsTiming)
   EXPECT_EQ(afterDuration.PresentTime, FP::NanosecondTickCount());
   EXPECT_EQ(afterDuration.SwapInterval, 1u);
 }
+
+TEST(DisplayPlacementUtil, ThePresentsSwapIntervalIsTheFramesUpToTheLongestThePresentTakes)
+{
+  using PC::PacerCapabilities;
+  using PC::PacerCapability;
+  // A present that takes none: 1, whatever the frame's swap interval
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(), 3), 1u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentAfterDuration), 3), 1u);
+  // One that takes up to four: the frame's own, and four for a frame of more (the loop holds it for the rest)
+  const PacerCapabilities four(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 4);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(four, 1), 1u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(four, 2), 2u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(four, 4), 4u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(four, 6), 4u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(four, 0), 1u);
+  // A longest one of 1 holds nothing
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentSwapInterval, 1), 3), 1u);
+  // With a time before which the frame is not shown, that time says the refresh: 1
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::PresentAtTime, 4), 2), 1u);
+  // With a time the frame before stays, both say the same and both are given
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::PresentAfterDuration, 4), 2),
+            2u);
+}

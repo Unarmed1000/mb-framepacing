@@ -190,3 +190,62 @@ TEST(VBlankTimeline, ClearedTheNextReadingIsTheFirst)
   timeline.StartAt(At(Start + (9 * Period)));
   EXPECT_EQ(TimeOf(timeline, 0), Start + (9 * Period));
 }
+
+// Readings that stop and come back: a loop that paused, or a source that goes quiet while nothing is presented. The
+// display's period is a little off the one the pacer was given, so the vertical blanks slide while nothing is read.
+
+TEST(VBlankTimeline, ReadingsThatComeBackAfterAGapAreTakenWhileTheVerticalBlanksSlidLessThanAnEighthOfAPeriod)
+{
+  // A display 20 parts in a million slower than its mode: 200 ns a refresh
+  constexpr int64_t RealPeriod = Period + 200;
+  PC::VBlankTimeline timeline;
+  for (int64_t blank = 0; blank <= 100; ++blank)
+  {
+    Read(timeline, Start + (blank * RealPeriod));
+  }
+  ASSERT_EQ(timeline.Jumps(), 0u);
+  // Read every refresh, the vertical blanks follow the display to well under a microsecond
+  ASSERT_NEAR(static_cast<double>(TimeOf(timeline, 100)), static_cast<double>(Start + (100 * RealPeriod)), 1'000.0);
+
+  // Thirty seconds without a reading: the display is 0.6 ms from where the period that was given puts it, which is less than
+  // an eighth of a period. The first reading after the gap is taken, as the same vertical blank it is on the display, and the
+  // ones after it bring the vertical blanks back onto the display's
+  constexpr int64_t After = 3'100;
+  EXPECT_NEAR(static_cast<double>(TimeOf(timeline, After)), static_cast<double>(Start + (After * RealPeriod) - 600'000), 2'000.0);
+  for (int64_t blank = After; blank <= After + 40; ++blank)
+  {
+    Read(timeline, Start + (blank * RealPeriod));
+  }
+  EXPECT_EQ(timeline.Jumps(), 0u);
+  EXPECT_EQ(timeline.BlankAtOrBefore(At(Start + ((After + 40) * RealPeriod) + 1'000), g_hz100), After + 40);
+  EXPECT_NEAR(static_cast<double>(TimeOf(timeline, After + 40)), static_cast<double>(Start + ((After + 40) * RealPeriod)), 1'000.0);
+}
+
+TEST(VBlankTimeline, AfterAGapInWhichTheVerticalBlanksSlidFurtherEightReadingsPutThemOnTheDisplaysAgain)
+{
+  constexpr int64_t RealPeriod = Period + 200;
+  PC::VBlankTimeline timeline;
+  for (int64_t blank = 0; blank <= 100; ++blank)
+  {
+    Read(timeline, Start + (blank * RealPeriod));
+  }
+  // Two hundred seconds without a reading: 4 ms off, which is more than an eighth of a period. The readings are off where
+  // the ones before the gap put the vertical blanks, so they are counted and not taken one by one
+  constexpr int64_t After = 20'100;
+  for (int64_t blank = After; blank < After + 7; ++blank)
+  {
+    Read(timeline, Start + (blank * RealPeriod));
+  }
+  EXPECT_EQ(timeline.Jumps(), 7u);
+  // The eighth of them in a row on one grid is the display's: the vertical blanks are on it again
+  const int64_t eighth = Start + ((After + 7) * RealPeriod);
+  Read(timeline, eighth);
+  EXPECT_EQ(timeline.Jumps(), 8u);
+  EXPECT_EQ(TimeOf(timeline, timeline.BlankAtOrBefore(At(eighth), g_hz100)), eighth);
+  // And the readings after it are taken as before
+  for (int64_t blank = After + 8; blank <= After + 20; ++blank)
+  {
+    Read(timeline, Start + (blank * RealPeriod));
+  }
+  EXPECT_EQ(timeline.Jumps(), 8u);
+}

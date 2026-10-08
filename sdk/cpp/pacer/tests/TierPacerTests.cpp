@@ -1107,3 +1107,37 @@ TEST(TierPacer, OnVerticalBlanksAWaitForTheGpusWorkThatTheGpuDidNotWorkForIsTheD
   EXPECT_EQ(pacer.RefreshesBehindClock(), 3u);
   EXPECT_EQ(pacer.GpuWaitTimeouts(), 0u);
 }
+
+TEST(TierPacer, AfterALoopPausedOnVerticalBlanksTheFramesAreOnTheVerticalBlanksAgainAtOnce)
+{
+  // A loop that stops for half a minute (a window that is not shown, an application that is paused) gives no vertical blank
+  // reading in that time. When it goes on, with a reading before its first frame, every frame is for a vertical blank again
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability named : {VBlank, VBlank | Wait})
+    {
+      Loop loop(Settings(aim), PacerCapabilities(named));
+      for (int32_t frame = 0; frame < 60; ++frame)
+      {
+        static_cast<void>(loop.Frame());
+      }
+      const uint64_t behind = loop.Pacer.RefreshesBehindClock();
+      // Half a minute, and a part of a refresh
+      loop.Now += (3'000 * Period) + 3'700'000;
+      PC::FrameSchedule before = loop.Frame();
+      for (int32_t frame = 0; frame < 60; ++frame)
+      {
+        const PC::FrameSchedule schedule = loop.Frame();
+        // On a vertical blank of the loop's display, a refresh after the frame before it
+        ASSERT_EQ((schedule.IntendedDisplayTime.Nanoseconds() - Start) % Period, 0) << frame;
+        ASSERT_EQ(schedule.IntendedDisplayTime.Nanoseconds() - before.IntendedDisplayTime.Nanoseconds(), Period) << frame;
+        ASSERT_EQ(schedule.AnimationStep.Nanoseconds(), Period) << frame;
+        before = schedule;
+      }
+      EXPECT_EQ(loop.Pacer.VBlankJumps(), 0u);
+      EXPECT_EQ(loop.Pacer.WorkingTier(), named == VBlank ? PacerTier::VBlankPeriodOnly : PacerTier::VBlankWaitForPresent);
+      // The pause is no refresh the animation time fell behind by: the frames started again
+      EXPECT_LE(loop.Pacer.RefreshesBehindClock(), behind + 2u);
+    }
+  }
+}
