@@ -14,12 +14,6 @@ namespace MB::FramePacing::Pacer
 {
   namespace
   {
-    //! A reading is off where the readings before it put the vertical blanks when it is more than the period divided by this
-    constexpr int64_t JumpDivisor = 8;
-    //! A reading near where the pacer has a vertical blank moves it this share of the way to the reading: one in this many
-    constexpr int64_t FollowDivisor = 4;
-    //! The readings in a row, off the pacer's grid and on one of their own, that move the pacer's grid to theirs
-    constexpr uint32_t ReadingsToMoveGrid = 8;
     //! The most refreshes an animation step is counted in: far more than a frame window holds
     constexpr int64_t MaxStepRefreshes = int64_t{1} << 20;
   }
@@ -44,15 +38,12 @@ namespace MB::FramePacing::Pacer
 
   NanosecondTickCount VBlankPeriodOnlyPacer::TimeOfBlank(const int64_t slot) const noexcept
   {
-    const int64_t steps = slot - m_anchorSlot;
-    return steps >= 0 ? m_anchorTime + m_rule.Refresh().TimeFor(steps) : m_anchorTime - m_rule.Refresh().TimeFor(-steps);
+    return m_timeline.TimeOfBlank(slot, m_rule.Refresh());
   }
 
   int64_t VBlankPeriodOnlyPacer::BlankAtOrBefore(const NanosecondTickCount time) const noexcept
   {
-    const int64_t nanoseconds = (time - m_anchorTime).Nanoseconds();
-    return nanoseconds >= 0 ? m_anchorSlot + m_rule.Refresh().FloorRefreshes(NanosecondTimeSpan(nanoseconds))
-                            : m_anchorSlot - m_rule.Refresh().RefreshesToFit(NanosecondTimeSpan(-nanoseconds));
+    return m_timeline.BlankAtOrBefore(time, m_rule.Refresh());
   }
 
   int64_t VBlankPeriodOnlyPacer::FirstBlankAfterReadyAt(const NanosecondTickCount readyTime) const noexcept
@@ -202,52 +193,7 @@ namespace MB::FramePacing::Pacer
 
   void VBlankPeriodOnlyPacer::AddVBlank(const VBlankReading& reading) noexcept
   {
-    if (m_hasReadTime && reading.ReadTime < m_lastReadTime)
-    {
-      // Read before the one the pacer has
-      return;
-    }
-    m_lastReadTime = reading.ReadTime;
-    m_hasReadTime = true;
-    NanosecondTickCount blankTime = reading.VBlankTime;
-    if (m_hasAnchor)
-    {
-      // The vertical blank it is, by where the pacer has them: the nearest one. The frames keep the blanks they are for
-      const RefreshPeriod period = m_rule.Refresh();
-      const int64_t periodNanoseconds = period.ToNanosecondTimeSpan().Nanoseconds();
-      int64_t slot = BlankAtOrBefore(reading.VBlankTime);
-      slot += ((reading.VBlankTime - TimeOfBlank(slot)).Nanoseconds() * 2) >= periodNanoseconds ? 1 : 0;
-      const int64_t offNanoseconds = (reading.VBlankTime - TimeOfBlank(slot)).Nanoseconds();
-      if (m_hasReading && (offNanoseconds >= 0 ? offNanoseconds : -offNanoseconds) > (periodNanoseconds / JumpDivisor))
-      {
-        // Off where the readings before it put the vertical blanks: counted, and not taken by itself, as a reading that is not
-        // exact is not to move the frames. Readings in a row that are on one grid of their own are the display's, which has
-        // changed: the last of them moves the pacer's grid to it, whole
-        ++m_vblankJumps;
-        const int64_t apart = (reading.VBlankTime - m_offGridTime).Nanoseconds();
-        const int64_t distance = apart >= 0 ? apart : -apart;
-        const int64_t onItsGrid = distance - period.TimeFor(period.NearestRefreshes(NanosecondTimeSpan(distance))).Nanoseconds();
-        const bool agrees = m_offGridReadings > 0 && distance >= (periodNanoseconds / 2) &&
-                            (onItsGrid >= 0 ? onItsGrid : -onItsGrid) <= (periodNanoseconds / JumpDivisor);
-        m_offGridReadings = agrees ? m_offGridReadings + 1u : 1u;
-        m_offGridTime = reading.VBlankTime;
-        if (m_offGridReadings < ReadingsToMoveGrid)
-        {
-          return;
-        }
-      }
-      else if (m_hasReading)
-      {
-        // Near where the pacer has that vertical blank: it is moved a part of the way to the reading. One reading is not exact,
-        // and the next one moves it again, so a display that is a little off its period is followed all the same
-        blankTime = TimeOfBlank(slot) + NanosecondTimeSpan(offNanoseconds / FollowDivisor);
-      }
-      m_anchorSlot = slot;
-    }
-    m_offGridReadings = 0;
-    m_anchorTime = blankTime;
-    m_hasAnchor = true;
-    m_hasReading = true;
+    m_timeline.AddVBlank(reading, m_rule.Refresh());
   }
 
   FrameStartPlan VBlankPeriodOnlyPacer::PlanFrame(const NanosecondTickCount now) const noexcept
@@ -271,13 +217,8 @@ namespace MB::FramePacing::Pacer
     const bool isLowLatency = m_rule.Settings().Aim() == PacerAim::LowLatency;
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
     const bool isFirstFrame = m_frameId == 0;
-    if (!m_hasAnchor)
-    {
-      // No vertical blank reading yet: the frame's start is taken as one
-      m_anchorTime = cpuStartTime;
-      m_anchorSlot = 0;
-      m_hasAnchor = true;
-    }
+    // No vertical blank reading yet: the frame's start is taken as one
+    m_timeline.StartAt(cpuStartTime);
 
     const bool hasPrevious = !StartsAgainAt(cpuStartTime);
     int64_t previousShown = 0;
@@ -418,8 +359,7 @@ namespace MB::FramePacing::Pacer
     {
       m_rule.SetRefreshPeriod(period);
       m_hasFrame = false;
-      m_hasAnchor = false;
-      m_hasReading = false;
+      m_timeline.Clear();
     }
   }
 
@@ -430,8 +370,10 @@ namespace MB::FramePacing::Pacer
       const bool samePeriod = settings.Refresh() == m_rule.Refresh();
       m_rule.SetSettings(settings);
       m_hasFrame = false;
-      m_hasAnchor = m_hasAnchor && samePeriod;
-      m_hasReading = m_hasReading && samePeriod;
+      if (!samePeriod)
+      {
+        m_timeline.Clear();
+      }
     }
   }
 

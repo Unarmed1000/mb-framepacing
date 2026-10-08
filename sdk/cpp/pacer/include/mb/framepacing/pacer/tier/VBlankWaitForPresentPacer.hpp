@@ -22,6 +22,7 @@
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
+#include <mb/framepacing/pacer/timeline/VBlankTimeline.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -91,18 +92,8 @@ namespace MB::FramePacing::Pacer
 
     SwapIntervalRule m_rule;
     FrameWorkRule m_frameWork;
-    // The display's refreshes: vertical blank m_anchorSlot is at m_anchorTime. From the newest reading, and from the first frame's
-    // start until there is one
-    NanosecondTickCount m_anchorTime;
-    int64_t m_anchorSlot{0};
-    bool m_hasAnchor{false};
-    bool m_hasReading{false};
-    NanosecondTickCount m_lastReadTime;
-    bool m_hasReadTime{false};
-    uint64_t m_vblankJumps{0};
-    // The readings in a row that were off the grid and on one of their own, and the last of them
-    uint32_t m_offGridReadings{0};
-    NanosecondTickCount m_offGridTime;
+    // Where the display's refreshes are: the vertical blanks, from the readings
+    VBlankTimeline m_timeline;
     // The frame between BeginFrame and the next BeginFrame: the vertical blank it is for, and the one it is shown at as far as
     // that is known (later than the one it is for once its present or a wait says so)
     bool m_hasFrame{false};
@@ -207,7 +198,7 @@ namespace MB::FramePacing::Pacer
     //! True once a vertical blank reading was given for the display the pacer is on: until then the refreshes are a guess.
     [[nodiscard]] bool HasVBlankReading() const noexcept
     {
-      return m_hasReading;
+      return m_timeline.HasReading();
     }
 
     //! The readings that were more than an eighth of a refresh period off where the readings before them put the vertical
@@ -217,7 +208,7 @@ namespace MB::FramePacing::Pacer
     //! source is no vertical blank time, and the pacer is then a pacer on a timer.
     [[nodiscard]] uint64_t VBlankJumps() const noexcept
     {
-      return m_vblankJumps;
+      return m_timeline.Jumps();
     }
 
     //! How far the animation time is behind the display, in refreshes, since the pacer was made: the refreshes frames were
