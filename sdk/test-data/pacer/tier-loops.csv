@@ -1,5 +1,6 @@
 run,frames,bytes,crc32
-timer-low-latency-light,200,37252,2348845766
+timer-low-latency-light,200,37252,3191077698
+timer-low-latency-gpu-90-unreported,200,37252,2348845766
 timer-low-latency-gpu-90,200,38440,2477508589
 timer-low-latency-gpu-130,200,41345,3774239183
 timer-low-latency-long-frame,200,37254,87113434
@@ -14,7 +15,8 @@ timer-low-latency-gpu-wait,200,42639,3730845249
 timer-low-latency-display-reports,200,41372,4107229515
 timer-low-latency-active-set-changes,200,38487,3617166820
 timer-low-latency-60-hz,200,37811,1628673585
-timer-smoothness-light,200,37234,2983413582
+timer-smoothness-light,200,37234,812317410
+timer-smoothness-gpu-90-unreported,200,37234,2983413582
 timer-smoothness-gpu-90,200,38422,3073984834
 timer-smoothness-gpu-130,200,40894,4199461838
 timer-smoothness-long-frame,200,37128,1169248753
@@ -29,7 +31,8 @@ timer-smoothness-gpu-wait,200,41388,3954227936
 timer-smoothness-display-reports,200,41418,283601341
 timer-smoothness-active-set-changes,200,37803,2327547874
 timer-smoothness-60-hz,200,37793,3444340471
-timer-wait-low-latency-light,200,36725,2177688180
+timer-wait-low-latency-light,200,37661,937284289
+timer-wait-low-latency-gpu-90-unreported,200,36725,2177688180
 timer-wait-low-latency-gpu-90,200,37913,3557307367
 timer-wait-low-latency-gpu-130,200,41610,3639982113
 timer-wait-low-latency-long-frame,200,36763,2541774772
@@ -44,7 +47,8 @@ timer-wait-low-latency-gpu-wait,200,41453,1586182930
 timer-wait-low-latency-display-reports,200,40496,2306329172
 timer-wait-low-latency-active-set-changes,200,37136,1100700415
 timer-wait-low-latency-60-hz,200,38220,2902714730
-timer-wait-smoothness-light,200,35870,3798948655
+timer-wait-smoothness-light,200,35870,3800729104
+timer-wait-smoothness-gpu-90-unreported,200,35870,3798948655
 timer-wait-smoothness-gpu-90,200,37058,1966245269
 timer-wait-smoothness-gpu-130,200,41342,3993273497
 timer-wait-smoothness-long-frame,200,35872,2071278876
@@ -59,7 +63,8 @@ timer-wait-smoothness-gpu-wait,200,41268,3979109836
 timer-wait-smoothness-display-reports,200,39630,1354073598
 timer-wait-smoothness-active-set-changes,200,36866,4109546337
 timer-wait-smoothness-60-hz,200,37257,1161140522
-vblank-low-latency-light,200,37871,327168397
+vblank-low-latency-light,200,37871,2744786835
+vblank-low-latency-gpu-90-unreported,200,37871,327168397
 vblank-low-latency-gpu-90,200,39059,2671514781
 vblank-low-latency-gpu-130,200,39411,1465978693
 vblank-low-latency-long-frame,200,38035,1807931401
@@ -74,7 +79,8 @@ vblank-low-latency-gpu-wait,200,40163,2243924970
 vblank-low-latency-display-reports,200,41448,2313127925
 vblank-low-latency-active-set-changes,200,37457,193764871
 vblank-low-latency-60-hz,200,38433,3214534361
-vblank-smoothness-light,200,37725,1187319835
+vblank-smoothness-light,200,37851,2119342193
+vblank-smoothness-gpu-90-unreported,200,37725,1187319835
 vblank-smoothness-gpu-90,200,38715,3704690199
 vblank-smoothness-gpu-130,200,38206,2315880113
 vblank-smoothness-long-frame,200,37619,1151845820
@@ -89,7 +95,8 @@ vblank-smoothness-gpu-wait,200,38807,3893777435
 vblank-smoothness-display-reports,200,41509,1006315480
 vblank-smoothness-active-set-changes,200,37294,1574755221
 vblank-smoothness-60-hz,200,38410,1269259859
-vblank-wait-low-latency-light,200,41227,868360021
+vblank-wait-low-latency-light,200,37879,2404459814
+vblank-wait-low-latency-gpu-90-unreported,200,41227,868360021
 vblank-wait-low-latency-gpu-90,200,38626,2923603985
 vblank-wait-low-latency-gpu-130,200,39150,2440636325
 vblank-wait-low-latency-long-frame,200,41218,1720091263
@@ -104,7 +111,8 @@ vblank-wait-low-latency-gpu-wait,200,41549,4144270399
 vblank-wait-low-latency-display-reports,200,44756,1337075571
 vblank-wait-low-latency-active-set-changes,200,39641,299804068
 vblank-wait-low-latency-60-hz,200,38438,1108997835
-vblank-wait-smoothness-light,200,38859,1862901895
+vblank-wait-smoothness-light,200,39003,325131600
+vblank-wait-smoothness-gpu-90-unreported,200,38859,1862901895
 vblank-wait-smoothness-gpu-90,200,37257,3420022830
 vblank-wait-smoothness-gpu-130,200,40006,4932507
 vblank-wait-smoothness-long-frame,200,38789,542757637

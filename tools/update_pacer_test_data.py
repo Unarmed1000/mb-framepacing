@@ -11,7 +11,7 @@
    C++ tool; a port's tests must produce the same bytes).
 3. tier-loops.csv and tier-loop-<run>.csv: pacer-sim --golden too, the tier pacer in a simulated frame loop on a display model: every way
    of pacing that has a pacer, both aims and a list of cases. A line per run with the length and the CRC-32 of its frames as text, and
-   for the runs with light work the frames themselves, to read a difference in.
+   for the runs with GPU work that nobody reports the frames themselves, to read a difference in.
 
     python tools/update_pacer_test_data.py [--pacer-sim <path to pacer-sim>]
 

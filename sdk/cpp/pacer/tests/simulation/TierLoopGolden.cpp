@@ -49,7 +49,13 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
       return {(period * percent) / 100, (period * percent) / 100};
     }
 
-    void Light(LoopSettings& /*rSettings*/, const int64_t /*period*/, const PacerCapability /*named*/)
+    void Light(LoopSettings& rSettings, const int64_t period, const PacerCapability /*named*/)
+    {
+      rSettings.GpuWork = Share(period, 20);
+    }
+
+    //! The loop as LoopSettings makes it: GPU work of 90 % of a refresh at 240 Hz, which nobody tells the pacer of
+    void Gpu90Unreported(LoopSettings& /*rSettings*/, const int64_t /*period*/, const PacerCapability /*named*/)
     {
     }
 
@@ -140,7 +146,8 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
       rSettings.GpuWork = {3'300'000, 3'300'000};
     }
 
-    constexpr std::array<Case, 15> Cases = {{{"light", Light},
+    constexpr std::array<Case, 16> Cases = {{{"light", Light},
+                                             {"gpu-90-unreported", Gpu90Unreported},
                                              {"gpu-90", Gpu90},
                                              {"gpu-130", Gpu130},
                                              {"long-frame", LongFrame},
@@ -181,7 +188,7 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
           TierLoopGoldenRun run;
           run.Name = std::string(way.Name) + (aim == PacerAim::Smoothness ? "-smoothness-" : "-low-latency-") + std::string(item.Name);
           run.Named = way.Named;
-          run.WritesFrames = item.Name == "light";
+          run.WritesFrames = item.Name == "gpu-90-unreported";
           run.Settings.Frames = Frames;
           run.Settings.Aim = aim;
           const int64_t period =
