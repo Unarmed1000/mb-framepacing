@@ -17,7 +17,7 @@ namespace MB::FramePacing::Pacer
     constexpr int64_t OffTargetDivisor = 2;
   }
 
-  void DisplayErrorCounter::AddFrame(const uint64_t frameId, const NanosecondTimeSpan animationStep) noexcept
+  void DisplayErrorCounter::AddFrame(const uint64_t frameId, const NanosecondTimeSpan animationStep, const NanosecondTickCount startTime) noexcept
   {
     if (frameId != m_newestId + 1u)
     {
@@ -31,6 +31,7 @@ namespace MB::FramePacing::Pacer
       ++m_oldestId;
     }
     m_steps[static_cast<std::size_t>(frameId % Capacity)] = animationStep;
+    m_starts[static_cast<std::size_t>(frameId % Capacity)] = startTime;
   }
 
   void DisplayErrorCounter::AddDisplayReport(const DisplayReport& report, const RefreshPeriod period) noexcept
@@ -49,6 +50,29 @@ namespace MB::FramePacing::Pacer
       ++m_state.NotShown;
       return;
     }
+    // The part of the last second the frame was shown in
+    const int64_t index = report.DisplayTime.Nanoseconds() / BucketNanoseconds;
+    Bucket& bucket = m_buckets[static_cast<std::size_t>(static_cast<uint64_t>(index) % RecentBuckets)];
+    if (bucket.Index != index)
+    {
+      bucket = Bucket{};
+      bucket.Index = index;
+    }
+    m_newestBucket = std::max(m_newestBucket, index);
+
+    // From its start to its display: of every frame that was shown, whatever became of the frame before it. A display time
+    // before the frame's start is no time a frame took
+    const int64_t startToDisplay = report.DisplayTime.Nanoseconds() - m_starts[static_cast<std::size_t>(frameId % Capacity)].Nanoseconds();
+    if (startToDisplay >= 0)
+    {
+      ++bucket.StartToDisplayFrames;
+      bucket.StartToDisplayTotal += startToDisplay;
+      bucket.StartToDisplayLongest = std::max(bucket.StartToDisplayLongest, startToDisplay);
+      ++m_state.StartToDisplayFrames;
+      m_startToDisplayTotal += startToDisplay;
+      m_startToDisplayLongest = std::max(m_startToDisplayLongest, startToDisplay);
+    }
+
     // Judged against the frame before it, when that one was reported as shown: a step across a frame without a display time
     // says nothing of either frame
     if (m_shownId != 0 && frameId == m_shownId + 1u)
@@ -62,14 +86,6 @@ namespace MB::FramePacing::Pacer
       // Shown later than its animation time step put it: the display time step is the longer of the two
       const bool isLate = error <= -offTarget;
 
-      // The part of the last second the frame was shown in
-      const int64_t index = report.DisplayTime.Nanoseconds() / BucketNanoseconds;
-      Bucket& bucket = m_buckets[static_cast<std::size_t>(static_cast<uint64_t>(index) % RecentBuckets)];
-      if (bucket.Index != index)
-      {
-        bucket = Bucket{index, 0, 0, 0, 0};
-      }
-      m_newestBucket = std::max(m_newestBucket, index);
       ++bucket.Judged;
       bucket.Errors += isError ? 1u : 0u;
       bucket.OffTarget += isOffTarget ? 1u : 0u;
@@ -94,6 +110,10 @@ namespace MB::FramePacing::Pacer
   DisplayErrorState DisplayErrorCounter::State() const noexcept
   {
     DisplayErrorState state = m_state;
+    state.StartToDisplayTotal = NanosecondTimeDuration::FromNanoseconds(m_startToDisplayTotal);
+    state.StartToDisplayLongest = NanosecondTimeDuration::FromNanoseconds(m_startToDisplayLongest);
+    int64_t recentTotal = 0;
+    int64_t recentLongest = 0;
     for (const Bucket& bucket : m_buckets)
     {
       // The parts of the second that ends with the newest display time
@@ -103,8 +123,13 @@ namespace MB::FramePacing::Pacer
         state.RecentErrorFrames += bucket.Errors;
         state.RecentOffTargetFrames += bucket.OffTarget;
         state.RecentLateFrames += bucket.Late;
+        state.RecentStartToDisplayFrames += bucket.StartToDisplayFrames;
+        recentTotal += bucket.StartToDisplayTotal;
+        recentLongest = std::max(recentLongest, bucket.StartToDisplayLongest);
       }
     }
+    state.RecentStartToDisplayTotal = NanosecondTimeDuration::FromNanoseconds(recentTotal);
+    state.RecentStartToDisplayLongest = NanosecondTimeDuration::FromNanoseconds(recentLongest);
     return state;
   }
 }

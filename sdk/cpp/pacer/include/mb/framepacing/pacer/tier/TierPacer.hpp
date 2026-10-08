@@ -153,7 +153,8 @@ namespace MB::FramePacing::Pacer
     void AddDisplayReport(const DisplayReport& report) noexcept;
 
     //! What the display reports said of the frames so far: the animation error where the application runs (the "+" beside
-    //! a tier). A pause the pacer did not ask for shows in it as one frame shown late.
+    //! a tier), and how long a frame took from its start to its display. A pause the pacer did not ask for shows in it as
+    //! one frame shown late.
     [[nodiscard]] DisplayErrorState DisplayErrors() const noexcept
     {
       return m_display.State();

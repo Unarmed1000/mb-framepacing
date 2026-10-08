@@ -24,6 +24,8 @@ namespace MB::FramePacing::Pacer
   //! for; and a step next to a frame without a display time (never shown, no report) is not judged. What differs: the times are
   //! the platform's word, where the tools read them off the display.
   //!
+  //! Next to that it adds up how long a frame took from its start to its display, of every frame reported as shown.
+  //!
   //! Values in, values out: no clock is read and nothing is allocated.
   class DisplayErrorCounter
   {
@@ -46,10 +48,14 @@ namespace MB::FramePacing::Pacer
       uint32_t Errors{0};
       uint32_t OffTarget{0};
       uint32_t Late{0};
+      uint32_t StartToDisplayFrames{0};
+      int64_t StartToDisplayTotal{0};
+      int64_t StartToDisplayLongest{0};
     };
 
-    // The animation time step of every frame kept, by its id
+    // The animation time step and the start of every frame kept, by its id
     std::array<NanosecondTimeSpan, Capacity> m_steps{};
+    std::array<NanosecondTickCount, Capacity> m_starts{};
     // The newest frame begun (0: none), the oldest one kept, and the newest one a report came for
     uint64_t m_newestId{0};
     uint64_t m_oldestId{1};
@@ -59,12 +65,15 @@ namespace MB::FramePacing::Pacer
     NanosecondTickCount m_shownTime;
     std::array<Bucket, RecentBuckets> m_buckets{};
     int64_t m_newestBucket{-1};
+    // From start to display, in nanoseconds: of all the frames, and the longest
+    int64_t m_startToDisplayTotal{0};
+    int64_t m_startToDisplayLongest{0};
     DisplayErrorState m_state;
 
   public:
-    //! A frame begins: its id (FrameSchedule::FrameId, one more than the frame before) and its animation time step. An id that
-    //! is not the next one starts again from it.
-    void AddFrame(uint64_t frameId, NanosecondTimeSpan animationStep) noexcept;
+    //! A frame begins: its id (FrameSchedule::FrameId, one more than the frame before), its animation time step and the time
+    //! it starts at. An id that is not the next one starts again from it.
+    void AddFrame(uint64_t frameId, NanosecondTimeSpan animationStep, NanosecondTickCount startTime) noexcept;
 
     //! A display report for a frame that was begun: oldest first, at most once a frame. period is the display's refresh period.
     void AddDisplayReport(const DisplayReport& report, RefreshPeriod period) noexcept;

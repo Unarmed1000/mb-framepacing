@@ -181,7 +181,7 @@ namespace MB::FramePacing::Pacer
     ApplyPending();
     const FrameSchedule schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
     // Kept for the display report that comes for it later
-    m_display.AddFrame(schedule.FrameId, schedule.AnimationStep);
+    m_display.AddFrame(schedule.FrameId, schedule.AnimationStep, cpuStartTime);
     return schedule;
   }
 

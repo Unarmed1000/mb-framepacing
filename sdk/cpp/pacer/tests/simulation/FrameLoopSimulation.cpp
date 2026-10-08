@@ -130,6 +130,9 @@ namespace MB::FramePacing::Pacer::Simulation
       rFrame.DisplayErrorFrames = state.ErrorFrames;
       rFrame.DisplayOffTargetFrames = state.OffTargetFrames;
       rFrame.DisplayLateFrames = state.LateFrames;
+      rFrame.DisplayStartToDisplayFrames = state.StartToDisplayFrames;
+      rFrame.DisplayStartToDisplayTotalNanoseconds = state.StartToDisplayTotal.Nanoseconds();
+      rFrame.DisplayStartToDisplayLongestNanoseconds = state.StartToDisplayLongest.Nanoseconds();
     }
 
     //! The frame log is the first integration's, which counts in ticks of 100 ns

@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -14,6 +15,9 @@ namespace MB::FramePacing::Pacer
   //!
   //! A frame is judged when it and the frame before it were both reported as shown. Its animation error is its animation time
   //! step less the time between the two display times.
+  //!
+  //! The time from a frame's start to its display is of every frame that was reported as shown, judged or not: it is how far
+  //! behind the frame loop the screen is, and it grows by a refresh for every frame more that waits to be shown.
   struct DisplayErrorState
   {
     //! Reports that were taken: for a frame the counter keeps, newer than the report before.
@@ -31,6 +35,13 @@ namespace MB::FramePacing::Pacer
     uint64_t OffTargetFrames{0};
     //! Of those, the frames shown later: the frame before them was on screen a refresh or more longer than it was made for.
     uint64_t LateFrames{0};
+    //! Frames reported as shown at or after the time they started (BeginFrame's): the frames the two below are of. A report
+    //! with a display time before its frame's start is not one of them.
+    uint64_t StartToDisplayFrames{0};
+    //! The time from a frame's start to its display, of those frames added up: divided by their number it is the mean.
+    NanosecondTimeDuration StartToDisplayTotal;
+    //! The longest of them.
+    NanosecondTimeDuration StartToDisplayLongest;
 
     //! The same four of the frames shown in about the last second up to the newest display time (the newest
     //! DisplayErrorCounter::RecentBuckets eighths of a second).
@@ -38,6 +49,10 @@ namespace MB::FramePacing::Pacer
     uint32_t RecentErrorFrames{0};
     uint32_t RecentOffTargetFrames{0};
     uint32_t RecentLateFrames{0};
+    //! And the same three from a frame's start to its display, of that last second.
+    uint32_t RecentStartToDisplayFrames{0};
+    NanosecondTimeDuration RecentStartToDisplayTotal;
+    NanosecondTimeDuration RecentStartToDisplayLongest;
 
     constexpr bool operator==(const DisplayErrorState&) const noexcept = default;
   };

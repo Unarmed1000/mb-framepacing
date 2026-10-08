@@ -1131,6 +1131,13 @@ Inside a major tier a sub tier is a rank, from two capabilities:
   the pacer was made and for about the last second (eight eighths of a second), over the last 64 frames at most, with
   nothing allocated. A pause the pacer did not ask for shows as one late frame. What it is not: the tools read the
   display, and this reads what the platform says.
+  **Added on 2026-10-09** (the simulation and unit tests only): the time from a frame's start to its display, of every
+  frame reported as shown, as their number, the times added up and the longest, since the pacer was made and for the
+  last second (`DisplayErrorState::StartToDisplayFrames`, `StartToDisplayTotal`, `StartToDisplayLongest` and the three
+  with `Recent`). It is the number every table of measurements here has, worked out by the application's own script
+  until now, and the one that shows frames coming to wait: it grows by a refresh for each. Android's frame pacing
+  library keeps the same time as a count of refreshes per frame, and its optional answer to too many frames waiting
+  reads it. Here it paces nothing.
   **On one system** (the first integration, 2026-10-08, the conditions of "The duration on one system"): 16 runs of
   1,200 frames with the driver's first pixel times reported. The pacer's five counts were the first integration's own
   script's, number for number, in all 16, a run with 134 frames off their swap interval among them; no report was

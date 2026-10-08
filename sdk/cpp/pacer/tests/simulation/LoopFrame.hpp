@@ -52,6 +52,9 @@ namespace MB::FramePacing::Pacer::Simulation
     uint64_t DisplayErrorFrames{0};
     uint64_t DisplayOffTargetFrames{0};
     uint64_t DisplayLateFrames{0};
+    uint64_t DisplayStartToDisplayFrames{0};
+    int64_t DisplayStartToDisplayTotalNanoseconds{0};
+    int64_t DisplayStartToDisplayLongestNanoseconds{0};
   };
 }
 

@@ -8,6 +8,7 @@
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -315,6 +316,19 @@ TEST(TimedPresentLoop, TheAnimationErrorCountedFromDisplayReportsIsWhatTheDispla
     EXPECT_EQ(last.DisplayOffTargetFrames, off) << static_cast<int32_t>(timed);
     EXPECT_EQ(last.DisplayErrorFrames, off) << static_cast<int32_t>(timed);
     EXPECT_EQ(last.DisplayLateFrames, late) << static_cast<int32_t>(timed);
+    // And the time from a frame's start to its display is the display's, frame for frame
+    int64_t startToDisplay = 0;
+    int64_t longest = 0;
+    for (std::size_t index = 0; index < reported; ++index)
+    {
+      const int64_t took = frames[index].ShownNanoseconds - frames[index].StartNanoseconds;
+      ASSERT_GT(took, 0) << index;
+      startToDisplay += took;
+      longest = std::max(longest, took);
+    }
+    EXPECT_EQ(last.DisplayStartToDisplayFrames, reported) << static_cast<int32_t>(timed);
+    EXPECT_EQ(last.DisplayStartToDisplayTotalNanoseconds, startToDisplay) << static_cast<int32_t>(timed);
+    EXPECT_EQ(last.DisplayStartToDisplayLongestNanoseconds, longest) << static_cast<int32_t>(timed);
     if (timed == Timed::No)
     {
       EXPECT_GT(off, 500u);
@@ -336,5 +350,6 @@ TEST(TimedPresentLoop, TheAnimationErrorCountedFromDisplayReportsIsWhatTheDispla
       ASSERT_EQ(unreported[index].StartNanoseconds, frames[index].StartNanoseconds) << index;
     }
     EXPECT_EQ(unreported.back().DisplayJudgedFrames, 0u);
+    EXPECT_EQ(unreported.back().DisplayStartToDisplayFrames, 0u);
   }
 }
