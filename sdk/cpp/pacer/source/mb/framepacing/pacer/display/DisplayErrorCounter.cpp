@@ -26,7 +26,8 @@ namespace MB::FramePacing::Pacer
       Restart();
     }
     m_newestId = frameId;
-    if (m_newestId - m_oldestId >= Capacity)
+    // The oldest frame kept is the newest after a start: no frame is older than it then
+    if (m_newestId >= m_oldestId && (m_newestId - m_oldestId) >= Capacity)
     {
       ++m_oldestId;
     }

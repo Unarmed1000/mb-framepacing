@@ -31,6 +31,7 @@
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
 namespace FP = MB::FramePacing;
@@ -1139,5 +1140,153 @@ TEST(TierPacer, AfterALoopPausedOnVerticalBlanksTheFramesAreOnTheVerticalBlanksA
       // The pause is no refresh the animation time fell behind by: the frames started again
       EXPECT_LE(loop.Pacer.RefreshesBehindClock(), behind + 2u);
     }
+  }
+}
+
+TEST(TierPacer, AWaitThatIsNotActiveIsNotTakenAndWaitsThatStoppedLowerTheTierThatPaces)
+{
+  // Reports of waits no plan asked for, as the waits are not active: not taken
+  PC::TierPacer plain(Settings(), PacerCapabilities());
+  static_cast<void>(plain.BeginFrame(At(Start)));
+  static_cast<void>(plain.EndFrame(At(Start + Work)));
+  PC::PresentWaitReport notShown;
+  notShown.FrameId = 1;
+  notShown.BeginTime = At(Start + Period);
+  notShown.EndTime = At(Start + (5 * Period));
+  notShown.Shown = false;
+  plain.AddPresentWait(notShown);
+  EXPECT_EQ(plain.PresentWaitTimeouts(), 0u);
+  PC::GpuWaitReport notDone;
+  notDone.FrameId = 1;
+  notDone.BeginTime = At(Start + Period);
+  notDone.EndTime = At(Start + (5 * Period));
+  notDone.Done = false;
+  plain.AddGpuWait(notDone);
+  EXPECT_EQ(plain.GpuWaitTimeouts(), 0u);
+  // With a wait for a present active the wait for the GPU's work is not the one that holds the loop: not taken either
+  PC::TierPacer both(Settings(), PacerCapabilities(Wait | PacerCapability::WaitForGpuWork));
+  both.AddGpuWait(notDone);
+  EXPECT_EQ(both.GpuWaitTimeouts(), 0u);
+
+  // Waits for a present that run out stop the waits (a window that is not shown): the tier that paces is the one without
+  // the wait, while the active tier is the one with it
+  PC::TierPacer pacer(Settings(), PacerCapabilities(Wait));
+  int64_t now = Start;
+  for (int32_t frame = 0; frame < 6; ++frame)
+  {
+    const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+    if (plan.WaitsForPresent())
+    {
+      PC::PresentWaitReport wait;
+      wait.FrameId = plan.WaitForPresentFrameId;
+      wait.BeginTime = At(now);
+      now += plan.WaitForPresentTimeout.Nanoseconds();
+      wait.EndTime = At(now);
+      wait.Shown = false;
+      pacer.AddPresentWait(wait);
+    }
+    static_cast<void>(pacer.BeginFrame(At(now)));
+    const PC::PresentPlan present = pacer.EndFrame(At(now + Work));
+    PC::PresentReport report;
+    report.FrameId = present.FrameId;
+    report.CallTime = At(now + Work);
+    report.ReturnTime = At(now + Work + 60'000);
+    pacer.AddPresent(report);
+    now += Period;
+  }
+  EXPECT_TRUE(pacer.PresentWaitsStopped());
+  EXPECT_EQ(pacer.ActiveRating().Tier, PacerTier::TimerWaitForPresent);
+  EXPECT_EQ(pacer.WorkingTier(), PacerTier::TimerPeriodOnly);
+}
+
+TEST(TierPacer, ChangesOfTheActiveSetAtAnyMomentKeepTheFramesGoingOn)
+{
+  // What is active changed before the first frame, twice in a row with no frame between, and before a frame that starts
+  // long after the change: every way of pacing to every other, with both aims. The frames go on by one, the animation time
+  // goes forward, and the swap interval stays
+  const std::array<PacerCapability, 4> sets = {PacerCapability::NoCapabilities, Wait, VBlank, VBlank | Wait};
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability first : sets)
+    {
+      for (const PacerCapability second : sets)
+      {
+        for (const PacerCapability third : sets)
+        {
+          Loop loop(Settings(aim), PacerCapabilities(VBlank | Wait));
+          uint64_t frameId = 0;
+          const auto frames = [&loop, &frameId](const int32_t count)
+          {
+            for (int32_t frame = 0; frame < count; ++frame)
+            {
+              const PC::FrameSchedule schedule = loop.Frame();
+              ASSERT_EQ(schedule.FrameId, ++frameId);
+              ASSERT_EQ(schedule.SwapInterval, 1u) << frameId;
+              // The first frame of a run has no frame before it to step from
+              ASSERT_TRUE(frameId == 1u || schedule.AnimationStep.Nanoseconds() > 0) << frameId;
+            }
+          };
+          // Before the first frame, twice
+          loop.Pacer.SetActiveCapabilities(PacerCapabilities(first));
+          loop.Pacer.SetActiveCapabilities(PacerCapabilities(second));
+          frames(6);
+          // Twice in a row with no frame between, and the next frame starts seven refreshes and a part of one later
+          loop.Pacer.SetActiveCapabilities(PacerCapabilities(third));
+          loop.Pacer.SetActiveCapabilities(PacerCapabilities(first));
+          loop.Now += (7 * Period) + 1'300'000;
+          frames(6);
+          // A change, one frame, and the next change
+          loop.Pacer.SetActiveCapabilities(PacerCapabilities(second));
+          frames(1);
+          loop.Pacer.SetActiveCapabilities(PacerCapabilities(third));
+          frames(6);
+          EXPECT_EQ(loop.Pacer.ActiveCapabilities(), PacerCapabilities(third));
+        }
+      }
+    }
+  }
+}
+
+TEST(TierPacer, AWaitOfTheSystemsAndAFrameBegunAtOnceRightAfterTheGridTookTheFramesOver)
+{
+  // The frames go from vertical blanks to the grid on the clock, and before the grid's first frame the application reports
+  // a wait of its own (for an image) and then begins the frame at once, before the time the plan gave it. The frames go
+  // on: their ids by one, the animation time forward
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    PC::PacerSettings settings = Settings(aim);
+    settings.SetSystemHoldsLoop(true);
+    Loop loop(settings, PacerCapabilities(VBlank));
+    PC::FrameSchedule before;
+    for (int32_t frame = 0; frame < 30; ++frame)
+    {
+      before = loop.Frame();
+    }
+    loop.Pacer.SetActiveCapabilities(PacerCapabilities());
+    PC::SystemWaitReport wait;
+    wait.Kind = PC::SystemWaitKind::Acquire;
+    wait.BeginTime = At(loop.Now);
+    wait.EndTime = At(loop.Now + 2'000'000);
+    loop.Pacer.AddSystemWait(wait);
+    // Begun at once: an application that does not wait for the time it was given
+    const PC::FrameSchedule early = loop.Pacer.BeginFrame(At(loop.Now));
+    EXPECT_EQ(early.FrameId, before.FrameId + 1u);
+    EXPECT_GT(early.AnimationStep.Nanoseconds(), 0);
+    const PC::PresentPlan present = loop.Pacer.EndFrame(At(loop.Now + Work));
+    PC::PresentReport report;
+    report.FrameId = present.FrameId;
+    report.CallTime = At(loop.Now + Work);
+    report.ReturnTime = At(loop.Now + Work + 60'000);
+    loop.Pacer.AddPresent(report);
+    loop.Now += Work + 100'000;
+    before = early;
+    for (int32_t frame = 0; frame < 30; ++frame)
+    {
+      const PC::FrameSchedule schedule = loop.Frame();
+      ASSERT_EQ(schedule.FrameId, before.FrameId + 1u) << frame;
+      ASSERT_GT(schedule.AnimationStep.Nanoseconds(), 0) << frame;
+      before = schedule;
+    }
+    EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::TimerPeriodOnly);
   }
 }

@@ -312,3 +312,19 @@ TEST(DisplayErrorCounter, TheLastSecondsTimeFromStartToDisplayIsItsOwn)
   EXPECT_EQ(state.RecentStartToDisplayTotal.Nanoseconds(), int64_t{state.RecentStartToDisplayFrames} * Period);
   EXPECT_EQ(state.RecentStartToDisplayLongest.Nanoseconds(), Period);
 }
+
+TEST(DisplayErrorCounter, AFrameIdOfZeroStartsAgainAsAnyIdThatIsNotTheNextOne)
+{
+  PC::DisplayErrorCounter counter;
+  Begin(counter, 1, 3);
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  // No frame has the id 0: given all the same, it starts again and keeps nothing from before
+  counter.AddFrame(0, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(0));
+  counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
+  EXPECT_EQ(counter.State().Refused, 1u);
+  Begin(counter, 1, 2);
+  counter.AddDisplayReport(Shown(1, Start + (10 * Period)), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + (11 * Period)), g_hz100);
+  EXPECT_EQ(counter.State().JudgedFrames, 1u);
+  EXPECT_EQ(counter.State().ErrorFrames, 0u);
+}

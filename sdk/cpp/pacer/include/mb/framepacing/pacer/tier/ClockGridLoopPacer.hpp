@@ -120,16 +120,6 @@ namespace MB::FramePacing::Pacer
     //! waitsForPresent: the application can wait until a present was shown, and the frame start plan asks for it.
     ClockGridLoopPacer(const PacerSettings& settings, bool waitsForPresent);
 
-    //! The tier this pacer paces as: with the wait or without it, and with a timed present or without one.
-    [[nodiscard]] PacerTier Tier() const noexcept
-    {
-      if (m_presentTiming != PresentTiming::Untimed)
-      {
-        return m_waitsForPresent ? PacerTier::TimedTimerWaitForPresent : PacerTier::TimedTimerPeriodOnly;
-      }
-      return m_waitsForPresent ? PacerTier::TimerWaitForPresent : PacerTier::TimerPeriodOnly;
-    }
-
     //! Before a frame takes anything, at now on the application's steady clock: the time of the step the frame is due at, when
     //! that is still to come. It changes nothing, so a frame may be planned again.
     [[nodiscard]] FrameStartPlan PlanFrame(NanosecondTickCount now) const noexcept;
@@ -225,12 +215,6 @@ namespace MB::FramePacing::Pacer
     void SetPresentTiming(const PresentTiming timing) noexcept
     {
       m_presentTiming = timing;
-    }
-
-    //! The time the presents are given.
-    [[nodiscard]] PresentTiming Timing() const noexcept
-    {
-      return m_presentTiming;
     }
 
     //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and

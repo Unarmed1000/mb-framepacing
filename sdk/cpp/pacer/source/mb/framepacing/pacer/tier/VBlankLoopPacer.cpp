@@ -657,7 +657,8 @@ namespace MB::FramePacing::Pacer
       // without the wait would start its first frames back to back to catch up with a time that has passed
       handover.NextFrameStartTime = std::max(handover.NextFrameStartTime, m_startTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval}));
     }
-    if (m_hasFrame && m_hasPresentTime && !m_takenOver)
+    // A present time is this part's own: taking frames over forgets it
+    if (m_hasFrame && m_hasPresentTime)
     {
       handover.HasPresentTime = true;
       handover.LastPresentTime = m_presentTime;

@@ -470,7 +470,8 @@ namespace MB::FramePacing::Pacer
   PacerHandover ClockGridLoopPacer::GiveOver() const noexcept
   {
     PacerHandover handover;
-    handover.HasFrame = m_hasGrid && m_frameId != 0;
+    // A grid there is has had a frame: its own, or the one it took over
+    handover.HasFrame = m_hasGrid;
     handover.FrameId = m_frameId;
     handover.StartTime = m_startTime;
     handover.NextFrameStartTime = m_takenOver ? m_takeOverStartTime : m_nextFrameStartTime;
@@ -559,7 +560,7 @@ namespace MB::FramePacing::Pacer
   {
     const bool givenUp = m_waitsForPresent && !waitsForPresent;
     m_pausePending = m_pausePending && (!givenUp || !m_pauseHeldByWait);
-    if (givenUp && m_hasGrid && !m_takenOver && m_frameId != 0)
+    if (givenUp && m_hasGrid && !m_takenOver)
     {
       // With the wait a frame starts when the display took an earlier one, which with the aim of smoothness is a step after
       // the grid has it due: the frames that would be made ahead are the ones the wait keeps from waiting. Without the wait

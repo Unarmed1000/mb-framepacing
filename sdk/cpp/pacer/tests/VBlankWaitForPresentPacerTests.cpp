@@ -709,3 +709,111 @@ TEST(VBlankWaitForPresentPacer, TheRestIsThePacerOfVerticalBlankTimes)
   pacer.SetSettings(other);
   EXPECT_FALSE(pacer.HasVBlankReading());
 }
+
+TEST(VBlankWaitForPresentPacer, AWaitThatRunsOutRightAfterThePlaceWasForgottenTakesNoStepBack)
+{
+  PC::VBlankWaitForPresentPacer pacer(Settings(PC::PacerAim::LowLatency));
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 1'000'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(1) + 2'000'000, true});
+  // Two frames shown a vertical blank later than they were made for: the place is an eighth of a period earlier
+  for (int32_t count = 0; count < 2; ++count)
+  {
+    const int64_t shownAt = BlankOf(frame) + 1;
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(shownAt) + 2'000'000, true});
+  }
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  // Other settings: the place is the settings' again, and what was learnt is forgotten
+  PC::PacerSettings other = Settings(PC::PacerAim::LowLatency);
+  other.SetReadyPlacePercent(40);
+  pacer.SetSettings(other);
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(4'000'000));
+  // A wait that runs out in the frames right after: there is no step to take back, and the place stays the settings'
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {frame.PresentNanoseconds + 100'000 + (4 * Period), false});
+  EXPECT_EQ(pacer.PresentWaitTimeouts(), 1u);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(4'000'000));
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(4'000'000));
+}
+
+TEST(VBlankWaitForPresentPacer, ThePlaceIsNotTriedLaterWhileAFrameShownLaterIsStillCounted)
+{
+  PC::PacerSettings settings = Settings(PC::PacerAim::LowLatency);
+  // A short frame window, so that a try would be due within these frames
+  settings.SetFrameWindowLength(FP::NanosecondTimeSpan(4 * Period));
+  PC::VBlankWaitForPresentPacer pacer(settings);
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 1'000'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(1) + 2'000'000, true});
+  const auto shownLate = [&pacer, &frame]()
+  {
+    const int64_t shownAt = BlankOf(frame) + 1;
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(shownAt) + 2'000'000, true});
+  };
+  shownLate();
+  shownLate();
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  // One more frame shown later, and then frames in time: while that one is still counted (a second within a few frames
+  // would move the place again) the place is not tried a step later
+  shownLate();
+  for (int32_t count = 0; count < 3; ++count)
+  {
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+    EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8))) << count;
+  }
+  EXPECT_EQ(pacer.ReadyPlaceTries(), 0u);
+}
+
+TEST(VBlankWaitForPresentPacer, OfTwoWaitsBeforeAFrameThatBothHeldTheLoopTheLaterVerticalBlankCounts)
+{
+  PC::VBlankWaitForPresentPacer pacer(Settings(PC::PacerAim::LowLatency));
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 1'000'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(1) + 2'000'000, true});
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+  // The application waited twice for the frame last made, and each wait held the loop: the first to the vertical blank the
+  // frame was made for, the second to the one after it. The frame was shown at the later one
+  const int64_t madeFor = BlankOf(frame);
+  const int64_t begin = frame.PresentNanoseconds + 100'000;
+  PC::PresentWaitReport wait;
+  wait.FrameId = frame.Schedule.FrameId;
+  wait.BeginTime = At(begin);
+  wait.EndTime = At(Blank(madeFor) + 2'000'000);
+  pacer.AddPresentWait(wait);
+  wait.BeginTime = wait.EndTime;
+  wait.EndTime = At(Blank(madeFor + 1) + 2'000'000);
+  pacer.AddPresentWait(wait);
+  frame = Frame(pacer, Blank(madeFor + 1) + 2'000'000);
+  EXPECT_EQ(pacer.ShownLaterByWaits(), 1u);
+}
+
+TEST(VBlankWaitForPresentPacer, ThePlaceIsNotTriedLaterInTheFramesAfterAWaitRanOut)
+{
+  PC::VBlankWaitForPresentPacer pacer(Settings(PC::PacerAim::LowLatency));
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 1'000'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(1) + 2'000'000, true});
+  for (int32_t count = 0; count < 2; ++count)
+  {
+    const int64_t shownAt = BlankOf(frame) + 1;
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(shownAt) + 2'000'000, true});
+  }
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  // Ten frames in time: the step is no recent one any more, so a wait that runs out now does not take it back
+  for (int32_t count = 0; count < 10; ++count)
+  {
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+  }
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {frame.PresentNanoseconds + 100'000 + (4 * Period), false});
+  EXPECT_EQ(pacer.PresentWaitTimeouts(), 1u);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  // And in the frames after it the display is not yet taken to show the window's frames: the place is not tried a step
+  // later, however long ago it was moved
+  for (int32_t count = 0; count < 4; ++count)
+  {
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+    EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8))) << count;
+  }
+  EXPECT_EQ(pacer.ReadyPlaceTries(), 0u);
+}

@@ -266,3 +266,49 @@ TEST(PresentWaitRule, APresentThatWasRefusedAndASwapChainMadeAnewAreNotWaitedFor
   EXPECT_FALSE(rule.Stopped());
   EXPECT_EQ(rule.Timeouts(), 3u);
 }
+
+TEST(PresentWaitRule, WaitsReportedTwiceBeforeAFrameThatBothHeldTheLoopAreOneLateStart)
+{
+  PC::PresentWaitRule rule;
+  Present(rule, 1);
+  // Two waits that ran out before one frame, each after holding the loop: both are counted, and the second one stops the
+  // waits
+  static_cast<void>(rule.AddPresentWait(Wait(1, 4 * Period, false), g_hz100));
+  EXPECT_TRUE(rule.WaitRanOut());
+  static_cast<void>(rule.AddPresentWait(Wait(1, 4 * Period, false), g_hz100));
+  EXPECT_TRUE(rule.WaitRanOut());
+  EXPECT_TRUE(rule.Stopped());
+  // And an answer while stopped that held the loop as well
+  static_cast<void>(rule.AddPresentWait(Wait(1, 4 * Period, false), g_hz100));
+  EXPECT_TRUE(rule.WaitRanOut());
+  EXPECT_EQ(rule.Timeouts(), 3u);
+  rule.BeginFrame();
+  EXPECT_FALSE(rule.WaitRanOut());
+}
+
+TEST(PresentWaitRule, WhileStoppedNoPresentFromBeforeTheFirstWaitThatRanOutIsAskedAfter)
+{
+  const PC::PacerSettings settings = Settings(1);
+  PC::PresentWaitRule rule;
+  for (uint64_t frame = 1; frame <= 4; ++frame)
+  {
+    Present(rule, frame);
+    static_cast<void>(rule.AddPresentWait(Wait(frame, 1'000, true), g_hz100));
+    rule.BeginFrame();
+  }
+  // The waits for the presents 5 and 6 run out: stopped, and 5 is the first present the display did not show
+  Present(rule, 5);
+  static_cast<void>(rule.AddPresentWait(Wait(5, 4 * Period, false), g_hz100));
+  rule.BeginFrame();
+  Present(rule, 6);
+  static_cast<void>(rule.AddPresentWait(Wait(6, 4 * Period, false), g_hz100));
+  ASSERT_TRUE(rule.Stopped());
+  // Frames that are not presented (a swap chain that takes none): when it is time to ask again, the present the plan would
+  // ask after is one from before the stop, which says nothing of the window now. It is not asked after
+  for (uint32_t frame = 0; frame < PC::PresentWaitRule::FramesBetweenAsks + 2u; ++frame)
+  {
+    rule.BeginFrame();
+    ASSERT_EQ(AskedFor(rule, settings), 0u) << frame;
+  }
+  EXPECT_TRUE(rule.Stopped());
+}

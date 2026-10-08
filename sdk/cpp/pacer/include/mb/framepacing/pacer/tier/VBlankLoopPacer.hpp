@@ -157,16 +157,6 @@ namespace MB::FramePacing::Pacer
     //! waitsForPresent: the application can wait until a present was shown, and the frame start plan asks for it.
     VBlankLoopPacer(const PacerSettings& settings, bool waitsForPresent);
 
-    //! The tier this pacer paces as: with the wait or without it, and with a timed present or without one.
-    [[nodiscard]] PacerTier Tier() const noexcept
-    {
-      if (m_presentTiming != PresentTiming::Untimed)
-      {
-        return m_waitsForPresent ? PacerTier::TimedVBlankWaitForPresent : PacerTier::TimedVBlankPeriodOnly;
-      }
-      return m_waitsForPresent ? PacerTier::VBlankWaitForPresent : PacerTier::VBlankPeriodOnly;
-    }
-
     //! Where the display's refreshes are: the time of a vertical blank of the display the window is on, a recent one or the next.
     //! Given whenever the application has one; the newest by its ReadTime counts. The frames go on from where they are. The
     //! first reading is taken whole. One after it moves the vertical blanks a quarter of the way to it (one reading is not
@@ -268,12 +258,6 @@ namespace MB::FramePacing::Pacer
     void SetPresentTiming(const PresentTiming timing) noexcept
     {
       m_presentTiming = timing;
-    }
-
-    //! The time the presents are given.
-    [[nodiscard]] PresentTiming Timing() const noexcept
-    {
-      return m_presentTiming;
     }
 
     //! The vertical blanks are not known any more: the next reading is the first. For a pacer that takes the times up again

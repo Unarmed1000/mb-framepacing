@@ -163,3 +163,16 @@ TEST(GpuWaitRule, AFrameOfASwapChainThatIsGoneIsNotWaitedFor)
   EXPECT_FALSE(rule.HeldTheLoop());
   EXPECT_FALSE(rule.Plan(settings, g_hz100, 1).WaitsForGpuWork());
 }
+
+TEST(GpuWaitRule, AWaitThatHeldTheLoopStaysSoForItsFrameWhateverIsReportedAfterIt)
+{
+  PC::GpuWaitRule rule;
+  Present(rule, 1);
+  rule.AddGpuWait(Waited(1, 2'000'000), g_hz100);
+  EXPECT_TRUE(rule.HeldTheLoop());
+  // A second report before the frame starts, of a wait that took no time: the loop was held all the same
+  rule.AddGpuWait(Waited(1, 0), g_hz100);
+  EXPECT_TRUE(rule.HeldTheLoop());
+  rule.BeginFrame();
+  EXPECT_FALSE(rule.HeldTheLoop());
+}
