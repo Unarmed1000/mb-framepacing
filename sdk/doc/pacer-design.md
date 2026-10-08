@@ -1226,7 +1226,11 @@ the frame's intended display time less half a refresh period. Otherwise, where `
 `MinimumDuration`: the frame's swap interval in refreshes less half a period. Half a period is as far from the refresh
 before as from the frame's own, so neither a grid on the clock that is off the display's refreshes nor a period that is
 a little off puts a frame on another refresh. With both active the time is given: it says which refresh. An application
-that wants the duration leaves `PresentAtTime` out of the active set.
+that wants the duration leaves `PresentAtTime` out of the active set. One platform's own answer to a time that aims at a
+vertical blank is a flag that lets a frame be shown at the start of the refresh its time falls in the first half of,
+recommended "to compensate for small precision errors that may cause an image to be displayed one refresh cycle later
+than intended" (the second page linked below). The half period is this proposal's way to the same end where there is
+no such flag; neither has been run on a system.
 
 **What the loop does**, by the kind and the aim:
 
@@ -1302,8 +1306,14 @@ runs, counted from frame 240. **Driver display times, not a measurement by the t
   those runs the present was called 0.10 to 0.18 of a refresh before the frame's display time, so a frame made or missed
   that refresh. And in the worse run 60 of 959 frames were shown 12.499 ms after the frame before them although
   their present was given 14.582 ms: on this system a relative target time did not keep a frame from being shown
-  sooner than that after the display time the driver reports for the frame before. What the time is counted from
-  there is not known.
+  sooner than that after the display time the driver reports for the frame before. The specification counts such a time "from the previous presentation's
+  `VK_PRESENT_STAGE_IMAGE_FIRST_PIXEL_VISIBLE_BIT_EXT` stage"
+  ([VkPresentTimingInfoFlagBitsEXT](https://docs.vulkan.org/refpages/latest/refpages/source/VkPresentTimingInfoFlagBitsEXT.html)),
+  and says that the implementation "attempts to align" a frame with its time and that the application "would strictly
+  prefer the image to not be visible before" it
+  ([VkPresentTimingInfoEXT](https://docs.vulkan.org/refpages/latest/refpages/source/VkPresentTimingInfoEXT.html)): a
+  preference, and no promise. This driver reported no time for that stage in any of the run's 960 frames (it reports
+  the stage before it, first pixel out, which is the display time used here), so what it counted from is not known.
 - The frames that waited and the refreshes the animation time fell behind the clock did not differ with the duration.
 
 The same session ran the changes of the active set again (84 changes, three runs an aim): the frame id, the swap
