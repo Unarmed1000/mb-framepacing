@@ -1234,8 +1234,20 @@ together from the parts:
   simulation's display: each of the twelve changes between the four ways of pacing, with both aims, at one, two and
   four refreshes per frame, leaves every frame on screen for its swap interval, the animation time no further behind
   the clock, and no frame more waiting than a run of the new way has (`tests/ActiveSetChangeLoopTests.cpp`; the four
-  simulated loops are one loop now, which changes its active set in a run). On one system 84 changes were run before
-  the last of these fixes ("The duration on one system"); not since.
+  simulated loops are one loop now, which changes its active set in a run).
+  **On one system, after these fixes** (the first integration, 2026-10-08; the conditions of "The duration on one
+  system", with every other session on the machine asked to pause first and 1.9 to 6.9 % of the CPU in use by other
+  programs; driver display times): 140 changes, 84 at one refresh per frame (three runs an aim) and 28 each at two and
+  at four (one run an aim). In all of them the frame id, the swap interval and the animation step went on, and all 1,538
+  intervals on screen around the changes were the swap interval. With smoothness no more presents waited after a change
+  than in a run of the new way by itself, and for the two ways without a wait one fewer (1 against 2: such a run makes
+  its frame ahead at its start, and a part that takes over does not). The refreshes the animation time is behind the
+  clock rose at two changes only: where the wait for a present is switched on over a timer (one long frame start while
+  the frames that wait come down, 5 of 6 times when the change was the first of a run, 3 of 3 with smoothness and 2 of 3
+  with low latency, and not once of 6 later in it), and from a timer to vertical blanks with the wait with low latency
+  (by one within seven frames, 3 of 3: not understood yet). With low latency the frame starts move at a change between a
+  timer and vertical blanks, by up to three and a half refreshes at four refreshes per frame, as the two start a frame
+  at different places before its refresh; no frame was on screen longer or shorter for it.
 - **Each tier is still a pacer from the outside**: its own tests, and its own statement of what it promises and what it
   can not do. The four class names of tiers 5 to 8 stay, each the one pacer with its capabilities fixed.
 - **Each part has both aims** where the aim bears on it: how many presents may wait and which frame's GPU work is waited
@@ -1879,8 +1891,14 @@ checked. Four things are settled now, because they cost little now and a second 
     slot that holds the loop means frames that are still on their way (then (b) is right, and (a) made the jump that
     was seen) or a GPU that does not keep up (then the display does hold a frame, and (a) is right). On the one system
     it was the first, in two runs, and the wait was the frame slot's, not the acquire's, which the grid's rule would
-    not have let through either. The GPU's reported work on the frame would tell the two apart where it is reported.
-    Not proposed yet: one system, the start of a run.
+    not have let through either. The GPU's reported work on the frame tells the two apart where it is reported, and
+    there it did: the GPU's work on a frame took 0.10 ms, and it did not begin the two frames until 10 and 21 ms after
+    they were submitted, the second half a millisecond after the first frame of the run was shown. The frame slot came
+    free when the GPU had ended the frame before. So the slot was held while the GPU waited to start, not while it
+    worked: frames on their way. That makes a rule possible that needs no guess: a wait of the application's that held
+    the loop while the GPU did no work on the frame it waited for is the display's side holding the loop, whatever
+    the wait is called. Proposed with that condition: (b), for an application that reports its waits and the GPU's
+    work. Still one system and the start of a run.
 
 ## What changes for whom
 
