@@ -99,7 +99,8 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   # With it: a frame loop on a display that queues what a present gives it (DisplayModel, FrameLoopSimulation), for what the first
   # integration's logs show and that model can not
   add_library(mb_framepacing_pacer_simulation STATIC EXCLUDE_FROM_ALL tests/simulation/PacerSimulation.cpp tests/simulation/DisplayModel.cpp
-                                                                      tests/simulation/FrameLoopSimulation.cpp tests/simulation/FrameLogReplay.cpp)
+                                                                      tests/simulation/FrameLoopSimulation.cpp tests/simulation/FrameLogReplay.cpp
+                                                                      tests/simulation/TierLoopGolden.cpp)
   target_include_directories(mb_framepacing_pacer_simulation PUBLIC tests/simulation)
   target_link_libraries(mb_framepacing_pacer_simulation PUBLIC mb_framepacing::pacer)
   target_compile_options(mb_framepacing_pacer_simulation PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})

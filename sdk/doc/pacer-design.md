@@ -2028,9 +2028,10 @@ measured only where a section above says so.
    that its display's refresh rate is variable ("Variable refresh"). With both timed presents active the absolute time
    alone is given, which after a lost refresh brings a frame back at two refreshes per frame without a wait.
 3. **Decisions that are open** ("Decisions needed"): 1, 3, 4, 7, the setting of 9, and what is open of 10.
-4. **Checked as today's pacer is.** The tier loops have no golden data in the repository: the stored runs the changes
-   are compared with are kept outside it. The monitor rates from 50 to 540 Hz run today's pacer only. Coverage is not
-   measured, and only one compiler has built it.
+4. **Checked as today's pacer is**, as far as one machine can (2026-10-09): the tier loops have golden data in the
+   repository (120 runs of the simulated loop, `tier-loops.csv`, the same bytes from two compilers); the monitor rates
+   from 50 to 540 Hz run the tier pacer too; every line and branch of the module is run by a test (llvm-cov, without
+   asserts). Still missing: the build with sanitizers, and the compilers of the other platforms.
 5. **Today's pacer replaced**: `FramePacer` and what only it uses, the four classes of one tier each, the consumer and
    package checks, the simulation's golden files, the frame log's pacer chunks.
 6. **The documents**: the guide written anew from this proposal, with how an application makes each wait and each report

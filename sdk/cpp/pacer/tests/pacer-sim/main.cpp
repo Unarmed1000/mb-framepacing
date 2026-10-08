@@ -51,6 +51,8 @@
 #include <vector>
 #include "FrameLoopSimulation.hpp"
 #include "PacerSimulation.hpp"
+#include "TierLoopGolden.hpp"
+#include "TierLoopGoldenRun.hpp"
 
 namespace Sim = MB::FramePacing::Pacer::Simulation;
 using MB::FramePacing::Pacer::SlowDownRule;
@@ -274,6 +276,24 @@ namespace
         const std::filesystem::path path = folder / Sim::ResultFileName(scenario, rule);
         std::ofstream file(path, std::ios::binary);
         file << Sim::Simulate(scenario, rule);
+        std::cout << path.string() << '\n';
+      }
+    }
+    // The tier pacer's simulated loop: a line per run in the digest file, and the runs that are written whole
+    const std::vector<Sim::TierLoopGoldenRun> runs = Sim::TierLoopGolden::Runs();
+    {
+      const std::filesystem::path path = folder / Sim::TierLoopGolden::DigestFileName;
+      std::ofstream file(path, std::ios::binary);
+      file << Sim::TierLoopGolden::Digests(runs);
+      std::cout << path.string() << '\n';
+    }
+    for (const Sim::TierLoopGoldenRun& run : runs)
+    {
+      if (run.WritesFrames)
+      {
+        const std::filesystem::path path = folder / Sim::TierLoopGolden::FileNameOf(run);
+        std::ofstream file(path, std::ios::binary);
+        file << Sim::TierLoopGolden::Simulate(run);
         std::cout << path.string() << '\n';
       }
     }

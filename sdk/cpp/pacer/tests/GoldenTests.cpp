@@ -16,6 +16,8 @@
 #include <string_view>
 #include <vector>
 #include "PacerSimulation.hpp"
+#include "TierLoopGolden.hpp"
+#include "TierLoopGoldenRun.hpp"
 
 namespace PC = MB::FramePacing::Pacer;
 namespace Sim = MB::FramePacing::Pacer::Simulation;
@@ -192,4 +194,49 @@ TEST(Golden, TheLateCountFixSlowsDownNoLaterThanTheFullWindowRule)
   const Sim::Scenario& stages = Named(scenarios, "100-stages");
   EXPECT_LT(LateFrames(Parse(Sim::Simulate(stages, PC::SlowDownRule::LateCount))),
             LateFrames(Parse(Sim::Simulate(stages, PC::SlowDownRule::FullWindow))));
+}
+
+// The tier pacer's simulated loop (test-data/pacer/tier-loops.csv and tier-loop-*.csv): every way of pacing that has a pacer,
+// both aims and a list of cases, on the display model. A change in how a frame is paced shows here as a line of the digest
+// file that differs, and for the runs that are written whole as the frames that differ.
+
+TEST(Golden, EveryRunOfTheTierPacersLoopGivesTheBytesOfItsGoldenFile)
+{
+  const std::optional<std::filesystem::path> folder = FindTestData();
+  if (!folder.has_value())
+  {
+    GTEST_SKIP() << "test-data/pacer not found";
+  }
+  const std::vector<Sim::TierLoopGoldenRun> runs = Sim::TierLoopGolden::Runs();
+  // Four ways of pacing, two aims, fifteen cases
+  ASSERT_EQ(runs.size(), 120u);
+  uint32_t whole = 0;
+  for (const Sim::TierLoopGoldenRun& run : runs)
+  {
+    if (run.WritesFrames)
+    {
+      ++whole;
+      const std::string expected = ReadText(*folder / Sim::TierLoopGolden::FileNameOf(run));
+      ASSERT_FALSE(expected.empty()) << run.Name;
+      EXPECT_TRUE(Sim::TierLoopGolden::Simulate(run) == expected) << run.Name;
+    }
+  }
+  EXPECT_EQ(whole, 8u);
+
+  // The digest file, line by line, so that a difference names its run
+  const std::string expected = ReadText(*folder / Sim::TierLoopGolden::DigestFileName);
+  const std::string digests = Sim::TierLoopGolden::Digests(runs);
+  std::stringstream expectedLines(expected);
+  std::stringstream lines(digests);
+  std::string expectedLine;
+  std::string line;
+  uint32_t count = 0;
+  while (std::getline(lines, line))
+  {
+    ASSERT_TRUE(static_cast<bool>(std::getline(expectedLines, expectedLine))) << line;
+    EXPECT_EQ(line, expectedLine);
+    ++count;
+  }
+  EXPECT_EQ(count, 121u);
+  EXPECT_TRUE(digests == expected);
 }
