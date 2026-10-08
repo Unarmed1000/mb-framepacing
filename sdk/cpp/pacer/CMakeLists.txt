@@ -32,6 +32,7 @@ target_sources(mb_framepacing_pacer
     FILES
       include/mb/framepacing/pacer/capability/PacerCapabilities.hpp
       include/mb/framepacing/pacer/capability/PacerCapability.hpp
+      include/mb/framepacing/pacer/capability/PacerMajorTier.hpp
       include/mb/framepacing/pacer/capability/PacerRating.hpp
       include/mb/framepacing/pacer/capability/PacerTier.hpp
       include/mb/framepacing/pacer/capability/PacerTierText.hpp
