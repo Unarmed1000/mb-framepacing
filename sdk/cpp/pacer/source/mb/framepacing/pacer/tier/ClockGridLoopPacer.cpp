@@ -83,7 +83,8 @@ namespace MB::FramePacing::Pacer
   NanosecondTimeDuration ClockGridLoopPacer::HeldPastTheTimer(const NanosecondTickCount beginTime, const NanosecondTickCount endTime) const noexcept
   {
     // Before there is a grid the pacer holds the loop to no time, and the whole wait counts
-    const int64_t from = m_hasGrid ? std::max(beginTime.Nanoseconds(), StartTimeOf(m_nextSlot).Nanoseconds()) : beginTime.Nanoseconds();
+    const bool hasGrid = m_hasGrid && !m_takenOver;
+    const int64_t from = hasGrid ? std::max(beginTime.Nanoseconds(), StartTimeOf(m_nextSlot).Nanoseconds()) : beginTime.Nanoseconds();
     return NanosecondTimeDuration::FromNanoseconds(std::max(endTime.Nanoseconds() - from, int64_t{0}));
   }
 
@@ -192,6 +193,15 @@ namespace MB::FramePacing::Pacer
   {
     // The wait for a present, where the loop has one, and after it the time the frame is due at
     FrameStartPlan plan = m_waitsForPresent ? m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval()) : FrameStartPlan();
+    if (m_takenOver)
+    {
+      // The first frame after another pacer placed the frames: it starts when the frame before it said the next one would
+      if (m_takeOverStartTime > now)
+      {
+        plan.StartTime = m_takeOverStartTime;
+      }
+      return plan;
+    }
     // A present that waited for the display past the time the loop is held to has let the loop through: the frame starts now
     if (!StartsAgainAt(now) && !(LetsTheSystemPace() && LetThroughByTheDisplay()))
     {
@@ -229,7 +239,7 @@ namespace MB::FramePacing::Pacer
     }
     // A wait that returned at once says nothing: the present was shown some time before. One that held the loop ended when the
     // display took a frame: the grid's step nearest to its end is moved a quarter of the way towards it
-    if (!m_hasGrid || StartsAgainAt(report.EndTime) || !PresentWaitRule::HeldTheLoop(report, period))
+    if (!m_hasGrid || m_takenOver || StartsAgainAt(report.EndTime) || !PresentWaitRule::HeldTheLoop(report, period))
     {
       return;
     }
@@ -260,14 +270,17 @@ namespace MB::FramePacing::Pacer
       m_behind = 0;
       m_hasGrid = true;
     }
-    else if (m_wait.WaitRanOut())
+    else if (m_takenOver || m_wait.WaitRanOut())
     {
       // The pacer's own wait held this frame's start until it ran out: the display is not taking the window's frames, so when
-      // the previous frame was shown, or whether, is not known, and this start is late by the pacer's doing. Nothing is
-      // judged and the frame window stays as it is; the grid goes on from this frame
+      // the previous frame was shown, or whether, is not known, and this start is late by the pacer's doing. Or another
+      // pacer placed the frame before this one, and there is no step of this grid it was due at. Nothing is judged and the
+      // frame window stays as it is; the grid goes on from this frame, and the frame window's times with it: the frame
+      // before this one would have left at step 0, and the newest frame of the frame window a swap interval before that
       m_origin = cpuStartTime;
       m_slot = 0;
       m_behind = 0;
+      m_rule.RebaseNewest(NanosecondTimeSpan(-period.TimeFor(m_swapInterval).Nanoseconds()));
     }
     else
     {
@@ -306,6 +319,7 @@ namespace MB::FramePacing::Pacer
     m_displayHeldPastTimer = NanosecondTimeSpan();
     m_frameSlotHeld = NanosecondTimeSpan();
     m_wait.BeginFrame();
+    m_takenOver = false;
     m_swapInterval = m_rule.SwapInterval();
     m_startTime = cpuStartTime;
     m_work = NanosecondTimeSpan();
@@ -344,6 +358,7 @@ namespace MB::FramePacing::Pacer
     schedule.PreferredFrameTime = NanosecondTimeDuration(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
+    m_nextFrameStartTime = schedule.NextFrameStartTime;
     return schedule;
   }
 
@@ -411,6 +426,51 @@ namespace MB::FramePacing::Pacer
   {
     ArmStartupPause();
     m_wait.ForgetPresents();
+  }
+
+  PacerHandover ClockGridLoopPacer::GiveOver() const noexcept
+  {
+    PacerHandover handover;
+    handover.HasFrame = m_hasGrid && m_frameId != 0;
+    handover.FrameId = m_frameId;
+    handover.StartTime = m_startTime;
+    handover.NextFrameStartTime = m_takenOver ? m_takeOverStartTime : m_nextFrameStartTime;
+    handover.AnimationTime = m_animationTime;
+    handover.LastAnimationTime = m_lastAnimationTime;
+    handover.RefreshesBehindClock = m_refreshesBehindClock;
+    handover.FrameWork = m_frameWork;
+    handover.Wait = m_wait;
+    return handover;
+  }
+
+  void ClockGridLoopPacer::TakeOver(const PacerHandover& handover, const SwapIntervalRule& rule) noexcept
+  {
+    m_rule.TakeOver(rule);
+    m_frameWork = handover.FrameWork;
+    m_wait = handover.Wait;
+    m_frameId = handover.FrameId;
+    m_animationTime = handover.AnimationTime;
+    m_lastAnimationTime = handover.LastAnimationTime;
+    m_refreshesBehindClock = handover.RefreshesBehindClock;
+    // The grid starts at the next frame. Until then the frame before it stands in for a frame of this grid, so that a pause
+    // before the next frame is still seen
+    m_hasGrid = handover.HasFrame;
+    m_takenOver = handover.HasFrame;
+    m_takeOverStartTime = handover.NextFrameStartTime;
+    m_startTime = handover.StartTime;
+    m_swapInterval = m_rule.SwapInterval();
+    m_slot = 0;
+    m_dueSlot = int64_t{m_swapInterval};
+    m_nextSlot = m_dueSlot;
+    m_lost = 0;
+    m_behind = 0;
+    m_work = NanosecondTimeSpan();
+    m_frameOpen = false;
+    m_frameEnded = false;
+    m_hasPresentTime = false;
+    m_displayHeld = NanosecondTimeSpan();
+    m_displayHeldPastTimer = NanosecondTimeSpan();
+    m_frameSlotHeld = NanosecondTimeSpan();
   }
 
   void ClockGridLoopPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept

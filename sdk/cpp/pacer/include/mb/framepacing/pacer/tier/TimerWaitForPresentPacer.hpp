@@ -7,6 +7,8 @@
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
@@ -15,7 +17,7 @@
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
-#include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
+#include <mb/framepacing/pacer/tier/TierPacer.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -64,17 +66,18 @@ namespace MB::FramePacing::Pacer
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
   //!
-  //! The class is ClockGridLoopPacer with the wait for a present: the rules and the calculations are there.
+  //! The class is TierPacer with this tier's capabilities and no others: the rules and the calculations are in the parts it is
+  //! put together from.
   class TimerWaitForPresentPacer
   {
-    ClockGridLoopPacer m_pacer;
+    TierPacer m_pacer;
 
   public:
     //! The tier this pacer is for.
     static constexpr PacerTier Tier = PacerTier::TimerWaitForPresent;
 
     explicit TimerWaitForPresentPacer(const PacerSettings& settings)
-      : m_pacer(settings, true)
+      : m_pacer(settings, PacerCapabilities(PacerCapability::WaitForPresent))
     {
     }
 

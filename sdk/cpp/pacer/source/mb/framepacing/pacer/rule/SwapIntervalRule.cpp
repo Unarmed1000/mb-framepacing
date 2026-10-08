@@ -163,6 +163,36 @@ namespace MB::FramePacing::Pacer
     m_startsAhead = NanosecondTimeSpan();
   }
 
+  void SwapIntervalRule::TakeOver(const SwapIntervalRule& other) noexcept
+  {
+    m_swapInterval = std::clamp(other.m_swapInterval, m_preferredSwapInterval, PacerSettings::MaxSwapInterval);
+    if (m_entries.size() != other.m_entries.size())
+    {
+      Clear();
+      return;
+    }
+    std::copy(other.m_entries.begin(), other.m_entries.end(), m_entries.begin());
+    m_first = other.m_first;
+    m_count = other.m_count;
+    m_workSum = other.m_workSum;
+    m_lateCount = other.m_lateCount;
+    m_startsAhead = other.m_startsAhead;
+  }
+
+  void SwapIntervalRule::RebaseNewest(const NanosecondTimeSpan displayTime) noexcept
+  {
+    if (m_count == 0)
+    {
+      return;
+    }
+    const int64_t shift = displayTime.Nanoseconds() - At(m_count - 1).DisplayTime.Nanoseconds();
+    for (std::size_t index = 0; index < m_count; ++index)
+    {
+      Entry& rEntry = m_entries[(m_first + index) % m_entries.size()];
+      rEntry.DisplayTime = NanosecondTimeSpan(rEntry.DisplayTime.Nanoseconds() + shift);
+    }
+  }
+
   FrameWindowState SwapIntervalRule::FrameWindow() const noexcept
   {
     if (m_count == 0)

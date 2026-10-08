@@ -477,6 +477,84 @@ TEST(SwapIntervalRule, TheLateCountFixSlowsDownAtAFullWindowsShareOfLateFrames)
   EXPECT_EQ(rule.SwapInterval(), 3u);
 }
 
+TEST(SwapIntervalRule, AnotherRuleIsTakenOverWithItsSwapIntervalAndItsFrameWindow)
+{
+  // A rule that slowed down, with late frames in its frame window
+  PC::SwapIntervalRule rule(Settings());
+  const PC::RefreshPeriod period = rule.Refresh();
+  for (int64_t frame = 0; frame < 400 && rule.SwapInterval() == 1; ++frame)
+  {
+    static_cast<void>(rule.AddFrame(period.TimeFor(2 * frame), Span(20'000'000), true));
+  }
+  ASSERT_EQ(rule.SwapInterval(), 2u);
+  for (int64_t frame = 0; frame < 30; ++frame)
+  {
+    static_cast<void>(rule.AddFrame(period.TimeFor(1'000 + (2 * frame)), Span(9'000'000), (frame % 7) == 0, Span(1'000)));
+  }
+  const PC::FrameWindowState window = rule.FrameWindow();
+  ASSERT_EQ(window.Frames, 30u);
+  ASSERT_EQ(window.LateFrames, 5u);
+
+  // A rule with the same settings goes on from it: the same swap interval, the same frame window, and the same decisions after
+  PC::SwapIntervalRule other(Settings());
+  other.TakeOver(rule);
+  EXPECT_EQ(other.SwapInterval(), 2u);
+  EXPECT_EQ(other.FrameWindow(), window);
+  for (int64_t frame = 30; frame < 200; ++frame)
+  {
+    const PC::SwapIntervalChange expected = rule.AddFrame(period.TimeFor(1'000 + (2 * frame)), Span(3'000'000), false);
+    ASSERT_EQ(other.AddFrame(period.TimeFor(1'000 + (2 * frame)), Span(3'000'000), false), expected) << frame;
+    ASSERT_EQ(other.FrameWindow(), rule.FrameWindow()) << frame;
+  }
+  EXPECT_EQ(other.SwapInterval(), rule.SwapInterval());
+
+  // A rule with a frame window of another size takes the swap interval and starts with an empty frame window; and a swap
+  // interval below the one its own settings prefer is not taken
+  static_cast<void>(rule.AddFrame(period.TimeFor(2'000), Span(3'000'000), false));
+  PC::PacerSettings longer = Settings();
+  longer.SetFrameWindowLength(Span(8 * FP::NanosecondTimeSpan::NanosecondsPerSecond));
+  PC::SwapIntervalRule larger(longer);
+  rule.Reset(3);
+  static_cast<void>(rule.AddFrame(period.TimeFor(3'000), Span(3'000'000), false));
+  larger.TakeOver(rule);
+  EXPECT_EQ(larger.SwapInterval(), 3u);
+  EXPECT_EQ(larger.FrameWindow().Frames, 0u);
+  longer.SetPreferredSwapInterval(4);
+  PC::SwapIntervalRule slower(longer);
+  slower.TakeOver(rule);
+  EXPECT_EQ(slower.SwapInterval(), 4u);
+}
+
+TEST(SwapIntervalRule, TheFrameWindowIsMovedOntoAnotherClockAndGoesOn)
+{
+  PC::SwapIntervalRule rule(Settings());
+  const PC::RefreshPeriod period = rule.Refresh();
+  // Nothing to move in an empty frame window
+  rule.RebaseNewest(Span(5));
+  EXPECT_EQ(rule.FrameWindow().Frames, 0u);
+
+  // Half a frame window of frames on a clock that is at an hour
+  const int64_t hour = int64_t{3'600} * FP::NanosecondTimeSpan::NanosecondsPerSecond;
+  for (int64_t frame = 0; frame < 60; ++frame)
+  {
+    static_cast<void>(rule.AddFrame(Span(hour + period.TimeFor(frame).Nanoseconds()), Span(3'000'000), (frame % 10) == 0));
+  }
+  const PC::FrameWindowState before = rule.FrameWindow();
+  ASSERT_EQ(before.Frames, 60u);
+  // The frames to come count from zero: the frame window is moved, the newest of it to one refresh before zero, and it is
+  // what it was
+  rule.RebaseNewest(Span(-period.TimeFor(1).Nanoseconds()));
+  EXPECT_EQ(rule.FrameWindow(), before);
+  // The frames that come are counted on from it, and the old ones leave the frame window when they are its length old: not
+  // one stays beyond that, as it would with times an hour apart
+  for (int64_t frame = 0; frame < 400; ++frame)
+  {
+    static_cast<void>(rule.AddFrame(period.TimeFor(frame), Span(3'000'000), false));
+    ASSERT_LE(rule.FrameWindow().Span, Span(rule.Settings().FrameWindowLength().Nanoseconds() + period.TimeFor(1).Nanoseconds())) << frame;
+  }
+  EXPECT_EQ(rule.FrameWindow().LateFrames, 0u);
+}
+
 TEST(SwapIntervalRule, TheShareIsRoundedAsTheSimulationRoundsIt)
 {
   // A 10 kHz display and a window of 198.5 refreshes: a full window holds exactly 200 frames

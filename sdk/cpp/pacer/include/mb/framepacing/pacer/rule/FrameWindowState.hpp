@@ -28,6 +28,8 @@ namespace MB::FramePacing::Pacer
     //! the refresh period given is longer than the display's). Below zero by as much: the loop falls behind its times (a wait that
     //! wakes late every frame adds up).
     NanosecondTimeSpan StartsAhead;
+
+    constexpr bool operator==(const FrameWindowState& other) const noexcept = default;
   };
 }
 

@@ -82,6 +82,15 @@ namespace MB::FramePacing::Pacer
     //! Empty the window, keeping the swap interval.
     void Clear() noexcept;
 
+    //! Go on from another rule with the same settings: its swap interval and its window, frame for frame. Never allocates: with
+    //! a window of another size (other settings) the swap interval is taken and the window starts empty.
+    void TakeOver(const SwapIntervalRule& other) noexcept;
+
+    //! The frames to come are given display times on another clock (a grid of refreshes that starts anew, another pacer's
+    //! times): the window's frames are moved onto it, the newest of them to displayTime, so that their distances stay what
+    //! they were and the frames to come are counted on from them. An empty window has nothing to move.
+    void RebaseNewest(NanosecondTimeSpan displayTime) noexcept;
+
     [[nodiscard]] FrameWindowState FrameWindow() const noexcept;
 
     //! The settings the rule decides with: the ones it was made with, or was given since, with the refresh period it is on.

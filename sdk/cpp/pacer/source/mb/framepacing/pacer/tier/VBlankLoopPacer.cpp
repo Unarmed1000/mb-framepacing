@@ -221,6 +221,15 @@ namespace MB::FramePacing::Pacer
   {
     // The wait for a present, where the loop has one
     FrameStartPlan plan = m_waitsForPresent ? m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval()) : FrameStartPlan();
+    if (m_takenOver)
+    {
+      // The first frame after another pacer placed the frames: it starts when the frame before it said the next one would
+      if (m_takeOverStartTime > now)
+      {
+        plan.StartTime = m_takeOverStartTime;
+      }
+      return plan;
+    }
     // With the aim of smoothness a frame starts at once (when the wait is over), and its present is held
     if (m_rule.Settings().Aim() == PacerAim::LowLatency && !StartsAgainAt(now))
     {
@@ -242,7 +251,7 @@ namespace MB::FramePacing::Pacer
     }
     // What the wait says of where frames were shown: nothing before there is a frame, across a pause, or of a frame that is not
     // one of the pacer's
-    if (!m_hasFrame || StartsAgainAt(report.EndTime) || report.FrameId == 0 || report.FrameId > m_frameId)
+    if (!m_hasFrame || m_takenOver || StartsAgainAt(report.EndTime) || report.FrameId == 0 || report.FrameId > m_frameId)
     {
       return;
     }
@@ -277,7 +286,8 @@ namespace MB::FramePacing::Pacer
     // A frame that the pacer's own wait held until it ran out is not judged: the display is not taking the window's frames, so
     // when the frame before it was shown, or whether, is not known, and this start is late by the pacer's doing
     const bool startsAgain = StartsAgainAt(cpuStartTime);
-    const bool hasPrevious = !startsAgain && !m_wait.WaitRanOut();
+    // Nor is a frame that another pacer placed: it was for no vertical blank of this one
+    const bool hasPrevious = !startsAgain && !m_wait.WaitRanOut() && !m_takenOver;
     // Where a frame has to be ready is learnt from a display that shows the window's frames. Around a wait that ran out and
     // while the waits are stopped it does not: a frame shown later then is counted and teaches nothing, and a place that was
     // moved in the frames just before is moved back
@@ -344,6 +354,13 @@ namespace MB::FramePacing::Pacer
     // it can make: known now, so it is in the frame
     const int64_t displaySlot = DisplaySlotFor(cpuStartTime, hasPrevious);
     m_startedLate = hasPrevious && displaySlot > previousShown + m_pauseSlots + int64_t{swapInterval};
+    if (m_takenOver)
+    {
+      // Another pacer placed the frames up to this one: the frame window's times go on on the vertical blanks, the frame
+      // before this one a swap interval before this frame's blank and the newest of the frame window one more before that
+      const int64_t blankNanoseconds = (TimeOfBlank(displaySlot) - NanosecondTickCount()).Nanoseconds();
+      m_rule.RebaseNewest(NanosecondTimeSpan(blankNanoseconds - period.TimeFor(int64_t{2} * swapInterval).Nanoseconds()));
+    }
 
     // The animation time: the first frame's is where the pacer starts, every other frame's is the refreshes from the frame
     // before it to the vertical blank it is for. A refresh the frame before it lost after its animation time was fixed is not
@@ -366,6 +383,7 @@ namespace MB::FramePacing::Pacer
     m_hasShownCeiling = false;
     m_hasFrame = true;
     m_wait.BeginFrame();
+    m_takenOver = false;
     ++m_frameId;
     m_frameWork.AddFrameStart(m_frameId, cpuStartTime);
     // The one pause after start-up (low latency, no wait for a present): the frame after this one is for a vertical blank
@@ -385,6 +403,7 @@ namespace MB::FramePacing::Pacer
     schedule.PreferredFrameTime = NanosecondTimeDuration(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
+    m_nextFrameStartTime = schedule.NextFrameStartTime;
     return schedule;
   }
 
@@ -446,6 +465,50 @@ namespace MB::FramePacing::Pacer
   {
     ArmStartupPause();
     m_wait.ForgetPresents();
+  }
+
+  PacerHandover VBlankLoopPacer::GiveOver() const noexcept
+  {
+    PacerHandover handover;
+    handover.HasFrame = m_hasFrame;
+    handover.FrameId = m_frameId;
+    handover.StartTime = m_startTime;
+    handover.NextFrameStartTime = m_takenOver ? m_takeOverStartTime : m_nextFrameStartTime;
+    handover.AnimationTime = m_animationTime;
+    handover.LastAnimationTime = m_lastAnimationTime;
+    handover.RefreshesBehindClock = m_refreshesBehindClock;
+    handover.FrameWork = m_frameWork;
+    handover.Wait = m_wait;
+    return handover;
+  }
+
+  void VBlankLoopPacer::TakeOver(const PacerHandover& handover, const SwapIntervalRule& rule) noexcept
+  {
+    m_rule.TakeOver(rule);
+    m_frameWork = handover.FrameWork;
+    m_wait = handover.Wait;
+    m_frameId = handover.FrameId;
+    m_animationTime = handover.AnimationTime;
+    m_lastAnimationTime = handover.LastAnimationTime;
+    m_refreshesBehindClock = handover.RefreshesBehindClock;
+    // The next frame is the first that is for a vertical blank. Until then the frame before it stands in for one, so that a
+    // pause before the next frame is still seen
+    m_hasFrame = handover.HasFrame;
+    m_takenOver = handover.HasFrame;
+    m_takeOverStartTime = handover.NextFrameStartTime;
+    m_startTime = handover.StartTime;
+    m_swapInterval = m_rule.SwapInterval();
+    m_pauseSlots = 0;
+    m_displaySlot = 0;
+    m_startedLate = false;
+    m_work = NanosecondTimeSpan();
+    m_frameOpen = false;
+    m_frameEnded = false;
+    m_hasPresentTime = false;
+    m_hasShownFloor = false;
+    m_hasShownCeiling = false;
+    m_leadCount = 0;
+    m_shownLaterCount = 0;
   }
 
   void VBlankLoopPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept

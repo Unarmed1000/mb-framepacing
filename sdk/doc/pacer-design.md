@@ -1172,9 +1172,20 @@ together from the parts:
 - **The active capabilities pick the parts, and nothing else does.** No part tries a mechanism and falls back on another
   inside its own rules: a wait that stops because a window is not shown is that part's rule, and the tier the pacer is
   working at says so.
-- **One pacer holds the parts** and takes the capability sets. A change of the active set takes effect at a frame's start,
-  and it changes one part: the animation time, the rule's frame window and the frames in flight are where they were. That
-  is the handover between tiers, and there is no state to copy from one class to another.
+- **One pacer holds the parts** and takes the capability sets: what the application has, and what of it is active
+  (`TierPacer`; built for tiers 5 to 8). A change of the active set takes effect when the frame that is open has ended.
+  The wait for a present is switched on or off where it is. Where the change is in who places the frames (the grid on the
+  clock, the vertical blanks), the frames and their ids, the animation time, the swap interval with the rule's frame
+  window, the GPU's work on the frames in flight and the presents that can be waited for are handed over; the first frame
+  after it starts when the frame before it said the next one would, and is not judged against a place it never had. A
+  vertical blank reading from before is not kept: the times are read anew. Nothing is allocated for it.
+- **As built** there are two ways a frame is placed, each a class with the wait as an option: on a grid on the clock
+  (`ClockGridLoopPacer`, tiers 7 and 8) and on the display's vertical blanks (`VBlankLoopPacer`, tiers 5 and 6). The wait
+  (`PresentWaitRule`) and the vertical blanks from readings (`VBlankTimeline`) are parts of their own, with their own
+  tests. What every tier has (the frames, the work, the rule, the animation time) is still in both of the two, and is
+  handed from one to the other, not shared. Checked by the tiers' own tests, by 280 runs of the simulation that came out
+  byte for byte as before the pacers were taken apart, and by the first integration against its last pin; the handover is
+  checked by unit tests only, and has not run on the simulation's loop or on a system.
 - **Each tier is still a pacer from the outside**: its own tests, and its own statement of what it promises and what it
   can not do. The four class names of tiers 5 to 8 stay, each the one pacer with its capabilities fixed.
 - **Each part has both aims** where the aim bears on it: how many presents may wait and which frame's GPU work is waited

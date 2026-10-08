@@ -21,6 +21,7 @@
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
+#include <mb/framepacing/pacer/tier/PacerHandover.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -90,6 +91,11 @@ namespace MB::FramePacing::Pacer
     NanosecondTickCount m_pauseFirstFrameTime;
     bool m_presentTaken{false};
     uint64_t m_startupPauses{0};
+    // Another pacer placed the frames before this one took over: the next frame is the first it places, held to the time
+    // the frame before it gave. And the time each frame gives for the one after it
+    bool m_takenOver{false};
+    NanosecondTickCount m_takeOverStartTime;
+    NanosecondTickCount m_nextFrameStartTime;
 
   public:
     //! waitsForPresent: the application can wait until a present was shown, and the frame start plan asks for it.
@@ -159,6 +165,34 @@ namespace MB::FramePacing::Pacer
     //! interval the preferred one, the GPU's work is forgotten, and the pause after start-up is made once more. The animation
     //! time goes on.
     void Reset() noexcept;
+
+    //! True between a frame's start and its end: a change of what paces waits for the end.
+    [[nodiscard]] bool IsFrameOpen() const noexcept
+    {
+      return m_frameOpen && !m_frameEnded;
+    }
+
+    //! The swap interval rule, for a pacer that takes over.
+    [[nodiscard]] const SwapIntervalRule& Rule() const noexcept
+    {
+      return m_rule;
+    }
+
+    //! What goes on when another pacer takes over: the frames, the animation time, the GPU's work and the presents.
+    [[nodiscard]] PacerHandover GiveOver() const noexcept;
+
+    //! Go on from another pacer, which has the same settings: its frames and their ids, its animation time, its swap interval
+    //! and the rule's frame window. Where the frames are placed starts with the next frame, which is held to the time the frame
+    //! before it gave for it and is not judged against it. Never allocates.
+    void TakeOver(const PacerHandover& handover, const SwapIntervalRule& rule) noexcept;
+
+    //! Whether the frame start plan asks for a wait for a present, from the next frame on. A loop that such a wait held has
+    //! no frames piled up behind its first presents, so giving the wait up starts no pause after start-up.
+    void SetWaitsForPresent(const bool waitsForPresent) noexcept
+    {
+      m_pausePending = m_pausePending && (!m_waitsForPresent || waitsForPresent);
+      m_waitsForPresent = waitsForPresent;
+    }
 
     //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and
     //! that it was not moved over, and the pauses after start-up.
