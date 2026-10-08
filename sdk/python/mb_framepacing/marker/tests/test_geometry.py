@@ -106,7 +106,7 @@ class GeometryTests(unittest.TestCase):
     def test_every_main_marker_kind_is_version_6(self) -> None:
         for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
             with self.subTest(kind):
-                self.assertEqual(generate_modules(Payload(kind, 3, 1, MarkerFlags.NO_FLAGS, 2, target_frame_ticks=5, intended_display_ticks=4)).size, 41)
+                self.assertEqual(generate_modules(Payload(kind, 3, 1, MarkerFlags.NO_FLAGS, 2, target_frame_ns=5, intended_display_ns=4)).size, 41)
         start = Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NO_FLAGS, 2)
         self.assertEqual(generate_modules(start, StartMetadata(-1, SequenceId(bytes([0xFF]) * 16))).size, QR_MODULE_COUNT)
         with self.assertRaises(ValueError):
@@ -114,7 +114,7 @@ class GeometryTests(unittest.TestCase):
 
     def test_sync_markers_are_version_2(self) -> None:
         self.assertEqual(
-            generate_modules(Payload(MarkerKind.SYNC, 3, 1, MarkerFlags.NO_FLAGS, 2, target_frame_ticks=5, intended_display_ticks=4)).size, SYNC_QR_MODULE_COUNT
+            generate_modules(Payload(MarkerKind.SYNC, 3, 1, MarkerFlags.NO_FLAGS, 2, target_frame_ns=5, intended_display_ns=4)).size, SYNC_QR_MODULE_COUNT
         )
         self.assertEqual(generate_modules(Payload(MarkerKind.SYNC, 0, 0xFFFF_FFFF_FFFF_FFFF, MarkerFlags.NO_FLAGS, 0)).size, 25)
         # The background quad follows the symbol size, in every output
@@ -126,7 +126,7 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(generate_indexed(payload, options, origin, 5), to_indexed(quads, 5))
         # Only the run id and the frame index are encoded: the same symbol whatever the other fields hold
         self.assertEqual(
-            generate_quads(Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NO_FLAGS, 123, target_frame_ticks=6, intended_display_ticks=5), options, origin), quads
+            generate_quads(Payload(MarkerKind.SYNC, 0, 7, MarkerFlags.NO_FLAGS, 123, target_frame_ns=6, intended_display_ns=5), options, origin), quads
         )
         self.assertNotEqual(generate_quads(Payload(MarkerKind.SYNC, 4, 7, MarkerFlags.NO_FLAGS, 0), options, origin), quads)
 
@@ -191,9 +191,9 @@ class GeometryTests(unittest.TestCase):
                 9,
                 frame * 7919,
                 MarkerFlags.NO_FLAGS,
-                frame * 166_667,
-                target_frame_ticks=166_667,
-                intended_display_ticks=frame * 166_700,
+                frame * 16_666_667,
+                target_frame_ns=16_666_667,
+                intended_display_ns=frame * 16_670_000,
             )
             self.assertLessEqual(len(generate_quads(payload, Options(), Point(0, 0))), MAX_QUAD_COUNT)
 
@@ -243,10 +243,10 @@ class BitmapTests(unittest.TestCase):
                     0xFFFF_FFFF_FFFF_FFFF,
                     MarkerFlags.NO_FLAGS,
                     1,
-                    target_frame_ticks=4,
-                    intended_display_ticks=3,
-                    cpu_start_ticks=5,
-                    cpu_busy_ticks=6,
+                    target_frame_ns=4,
+                    intended_display_ns=3,
+                    cpu_start_ns=5,
+                    cpu_busy_ns=6,
                 ),
                 Options(2, 1),
                 Point(-9, -4),

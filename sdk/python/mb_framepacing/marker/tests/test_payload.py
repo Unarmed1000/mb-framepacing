@@ -14,8 +14,11 @@ from typing import cast
 from .. import (
     CRC_BYTE_COUNT,
     HEADER_BYTE_COUNT,
+    MAX_CPU_BUSY_NS,
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
-    ON_DEMAND_FRAME_TICKS,
+    MAX_FRAME_NS,
+    NS_PER_SECOND,
+    ON_DEMAND_FRAME_NS,
     PAYLOAD_BYTE_COUNT,
     SEQUENCE_ID_BYTE_COUNT,
     START_PAYLOAD_BYTE_COUNT,
@@ -26,7 +29,7 @@ from .. import (
     SequenceId,
     StartMetadata,
     encode_payload,
-    seconds_to_ticks,
+    seconds_to_ns,
     to_date_time_ticks,
     try_decode_payload,
 )
@@ -49,7 +52,10 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(PAYLOAD_BYTE_COUNT, 57)
         self.assertEqual(SEQUENCE_ID_BYTE_COUNT, 16)
         self.assertEqual(START_PAYLOAD_BYTE_COUNT, 81)
-        self.assertEqual(ON_DEMAND_FRAME_TICKS, U32_MAX)
+        self.assertEqual(ON_DEMAND_FRAME_NS, U32_MAX)
+        self.assertEqual(MAX_FRAME_NS, U32_MAX - 1)
+        self.assertEqual(MAX_CPU_BUSY_NS, U32_MAX)
+        self.assertEqual(NS_PER_SECOND, 1_000_000_000)
         self.assertEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, START_PAYLOAD_BYTE_COUNT)
         self.assertEqual(SYNC_PAYLOAD_BYTE_COUNT, 20)
 
@@ -60,11 +66,11 @@ class PayloadTests(unittest.TestCase):
             0x0102030405060708,
             MarkerFlags.STATIC_AFTER,
             0x1112131415161718,
-            preferred_frame_ticks=0x71727374,
-            target_frame_ticks=0x41424344,
-            intended_display_ticks=0x3132333435363738,
-            cpu_start_ticks=0x5152535455565758,
-            cpu_busy_ticks=0x61626364,
+            preferred_frame_ns=0x71727374,
+            target_frame_ns=0x41424344,
+            intended_display_ns=0x3132333435363738,
+            cpu_start_ns=0x5152535455565758,
+            cpu_busy_ns=0x61626364,
         )
         data = encode_payload(payload)
         expected = (
@@ -90,11 +96,11 @@ class PayloadTests(unittest.TestCase):
             1,
             MarkerFlags.STATIC_AFTER,
             2,
-            preferred_frame_ticks=9,
-            target_frame_ticks=5,
-            intended_display_ticks=4,
-            cpu_start_ticks=6,
-            cpu_busy_ticks=7,
+            preferred_frame_ns=9,
+            target_frame_ns=5,
+            intended_display_ns=4,
+            cpu_start_ns=6,
+            cpu_busy_ns=7,
         )
         sequence_id = SequenceId(bytes(range(0xA0, 0xB0)))
         data = encode_payload(payload, StartMetadata(0x0102030405060708, sequence_id))
@@ -112,20 +118,20 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(data[61:77], bytes(range(0xA0, 0xB0)))
         self.assertEqual(data[77:], struct.pack("<I", binascii.crc32(data[:77])))
 
-    def test_negative_ticks_are_stored_as_twos_complement(self) -> None:
+    def test_a_negative_time_is_stored_as_twos_complement(self) -> None:
         self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, -1))[17:25], b"\xff" * 8)
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ticks=-2))[33:41], b"\xfe" + (b"\xff" * 7))
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ticks=-3))[41:49], b"\xfd" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ns=-2))[33:41], b"\xfe" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ns=-3))[41:49], b"\xfd" + (b"\xff" * 7))
 
     def test_the_optional_fields_default_to_unknown(self) -> None:
         payload = Payload(MarkerKind.SEQUENCE_END, 3, 1, MarkerFlags.NO_FLAGS, 2)
         self.assertEqual(
             (
-                payload.intended_display_ticks,
-                payload.target_frame_ticks,
-                payload.cpu_start_ticks,
-                payload.cpu_busy_ticks,
-                payload.preferred_frame_ticks,
+                payload.intended_display_ns,
+                payload.target_frame_ns,
+                payload.cpu_start_ns,
+                payload.cpu_busy_ns,
+                payload.preferred_frame_ns,
                 payload.flags,
             ),
             (0, 0, 0, 0, 0, MarkerFlags.NO_FLAGS),
@@ -143,10 +149,10 @@ class PayloadTests(unittest.TestCase):
                 U64_MAX,
                 MarkerFlags.NO_FLAGS,
                 I64_MAX,
-                target_frame_ticks=U32_MAX,
-                intended_display_ticks=I64_MAX,
-                cpu_start_ticks=I64_MAX,
-                cpu_busy_ticks=U32_MAX,
+                target_frame_ns=U32_MAX,
+                intended_display_ns=I64_MAX,
+                cpu_start_ns=I64_MAX,
+                cpu_busy_ns=U32_MAX,
             ),
             Payload(
                 MarkerKind.SEQUENCE_START,
@@ -154,10 +160,10 @@ class PayloadTests(unittest.TestCase):
                 7,
                 MarkerFlags.NO_FLAGS,
                 I64_MIN,
-                target_frame_ticks=0,
-                intended_display_ticks=I64_MIN,
-                cpu_start_ticks=I64_MIN,
-                cpu_busy_ticks=0,
+                target_frame_ns=0,
+                intended_display_ns=I64_MIN,
+                cpu_start_ns=I64_MIN,
+                cpu_busy_ns=0,
             ),
             Payload(
                 MarkerKind.SEQUENCE_END,
@@ -165,16 +171,16 @@ class PayloadTests(unittest.TestCase):
                 42,
                 MarkerFlags.NO_FLAGS,
                 -1,
-                target_frame_ticks=333_333,
-                intended_display_ticks=-1,
-                cpu_start_ticks=-1,
-                cpu_busy_ticks=1,
+                target_frame_ns=33_333_333,
+                intended_display_ns=-1,
+                cpu_start_ns=-1,
+                cpu_busy_ns=1,
             ),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, target_frame_ticks=166_667),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_start_ticks=123_456_789_012),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_busy_ticks=81_234),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_busy_ticks=U32_MAX),
-            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_start_ticks=123_456_789_012, cpu_busy_ticks=500_000),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, target_frame_ns=16_666_667),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_start_ns=123_456_789_012),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_busy_ns=81_234),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_busy_ns=U32_MAX),
+            Payload(MarkerKind.FRAME, 7, 5, MarkerFlags.NO_FLAGS, 6, cpu_start_ns=123_456_789_012, cpu_busy_ns=500_000),
         ):
             with self.subTest(payload):
                 decoded = try_decode_payload(encode_payload(payload))
@@ -189,10 +195,10 @@ class PayloadTests(unittest.TestCase):
             0x0102030405060708,
             MarkerFlags.NO_FLAGS,
             123,
-            target_frame_ticks=6,
-            intended_display_ticks=5,
-            cpu_start_ticks=7,
-            cpu_busy_ticks=8,
+            target_frame_ns=6,
+            intended_display_ns=5,
+            cpu_start_ns=7,
+            cpu_busy_ns=8,
         )
         data = encode_payload(payload, StartMetadata(7, SequenceId.from_text("ignored")))
         # The header's first 16 bytes and their CRC (0xC0A3D4F2, the same bytes the C++ and C# tests expect)
@@ -226,10 +232,10 @@ class PayloadTests(unittest.TestCase):
                         0,
                         MarkerFlags.NO_FLAGS,
                         I64_MAX + 1,
-                        target_frame_ticks=-1,
-                        intended_display_ticks=I64_MIN - 1,
-                        cpu_start_ticks=I64_MAX + 1,
-                        cpu_busy_ticks=U32_MAX + 1,
+                        target_frame_ns=-1,
+                        intended_display_ns=I64_MIN - 1,
+                        cpu_start_ns=I64_MAX + 1,
+                        cpu_busy_ns=-1,
                     )
                 )
             ),
@@ -241,7 +247,7 @@ class PayloadTests(unittest.TestCase):
 
     def test_start_metadata_round_trips(self) -> None:
         payload = Payload(
-            MarkerKind.SEQUENCE_START, 30, 10, MarkerFlags.NO_FLAGS, 20, target_frame_ticks=50, intended_display_ticks=40, cpu_start_ticks=60, cpu_busy_ticks=70
+            MarkerKind.SEQUENCE_START, 30, 10, MarkerFlags.NO_FLAGS, 20, target_frame_ns=50, intended_display_ns=40, cpu_start_ns=60, cpu_busy_ns=70
         )
         for metadata in (
             StartMetadata(638_000_000_000_000_000, SequenceId.from_text("benchmark-run-01")),
@@ -270,22 +276,75 @@ class PayloadTests(unittest.TestCase):
             Payload(MarkerKind.FRAME, 0, U64_MAX + 1, MarkerFlags.NO_FLAGS, 0),
             Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, I64_MAX + 1),
             Payload(MarkerKind.FRAME, U32_MAX + 1, 0, MarkerFlags.NO_FLAGS, 0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ticks=I64_MAX + 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ticks=I64_MIN - 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=-1, intended_display_ticks=0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=U32_MAX + 1, intended_display_ticks=0),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=0, intended_display_ticks=0, cpu_start_ticks=I64_MAX + 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ticks=0, intended_display_ticks=0, cpu_start_ticks=I64_MIN - 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=-1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=U32_MAX + 1),
-            Payload(MarkerKind.SEQUENCE_START, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=U32_MAX + 1),
-            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ticks=-1),
-            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ticks=I64_MAX + 1),
-            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, preferred_frame_ticks=U32_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ns=I64_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ns=I64_MIN - 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, I64_MIN - 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ns=-1, intended_display_ns=0),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ns=0, intended_display_ns=0, cpu_start_ns=I64_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ns=0, intended_display_ns=0, cpu_start_ns=I64_MIN - 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ns=-1),
+            Payload(MarkerKind.SEQUENCE_START, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ns=-1),
+            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ns=-1),
+            Payload(MarkerKind.SEQUENCE_END, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ns=I64_MAX + 1),
+            Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, preferred_frame_ns=-1),
             Payload(MarkerKind.FRAME, 0, 0, MarkerFlags(0x100), 0),
         ):
             with self.subTest(payload), self.assertRaises(ValueError):
                 _ = encode_payload(payload)
+        # A negative duration is kept as given (the payload shows what was wrong): it is encode that refuses it
+        self.assertEqual(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ns=-1).cpu_busy_ns, -1)
+        # A duration longer than its four bytes is no error: the payload holds the longest a marker carries, in every kind
+        for kind in (MarkerKind.FRAME, MarkerKind.SEQUENCE_START, MarkerKind.SEQUENCE_END):
+            for payload in (
+                Payload(kind, 0, 0, MarkerFlags.NO_FLAGS, 0, preferred_frame_ns=U32_MAX + 1),
+                Payload(kind, 0, 0, MarkerFlags.NO_FLAGS, 0, target_frame_ns=U32_MAX + 1),
+                Payload(kind, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_busy_ns=U32_MAX + 1),
+                Payload(kind, 0, 0, MarkerFlags.NO_FLAGS, 0, preferred_frame_ns=I64_MAX, target_frame_ns=I64_MAX, cpu_busy_ns=I64_MAX),
+                Payload(kind, 0, 0, MarkerFlags.NO_FLAGS, 0, preferred_frame_ns=1 << 80, target_frame_ns=1 << 80, cpu_busy_ns=1 << 80),
+            ):
+                with self.subTest(payload):
+                    decoded = try_decode_payload(encode_payload(payload))
+                    assert decoded is not None
+                    self.assertEqual(decoded[0], payload)
+
+    def test_a_duration_longer_than_its_four_bytes_is_held_as_the_longest_a_marker_carries(self) -> None:
+        # The marker's three durations are four unsigned bytes of nanoseconds each: 4.294967295 s at most
+        self.assertEqual((MAX_CPU_BUSY_NS, ON_DEMAND_FRAME_NS, MAX_FRAME_NS), (0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFE))
+        ten_seconds = 10 * NS_PER_SECOND
+        longest = I64_MAX  # the longest duration the C++ and C# libraries hold
+
+        # A longer one is capped where the payload is made (never an error: this runs in a frame loop), so a payload holds what a marker can
+        capped = Payload(MarkerKind.FRAME, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=ten_seconds, target_frame_ns=longest, cpu_busy_ns=ten_seconds)
+        self.assertEqual((capped.preferred_frame_ns, capped.target_frame_ns, capped.cpu_busy_ns), (MAX_FRAME_NS, MAX_FRAME_NS, MAX_CPU_BUSY_NS))
+        self.assertEqual(capped.cpu_busy_ns, 4_294_967_295)
+        self.assertEqual((capped.kind, capped.run_id, capped.frame_index, capped.animation_ns), (MarkerKind.FRAME, 1, 2, 3), "nothing else changes")
+        self.assertEqual((capped.intended_display_ns, capped.cpu_start_ns), (0, 0))
+
+        # The longest that fit are kept, and so is on demand: only on demand reads as on demand
+        kept = Payload(
+            MarkerKind.FRAME, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=MAX_FRAME_NS, target_frame_ns=ON_DEMAND_FRAME_NS, cpu_busy_ns=MAX_CPU_BUSY_NS
+        )
+        self.assertEqual((kept.preferred_frame_ns, kept.target_frame_ns, kept.cpu_busy_ns), (MAX_FRAME_NS, ON_DEMAND_FRAME_NS, MAX_CPU_BUSY_NS))
+        # One nanosecond past on demand is a frame time again, and too long
+        past_on_demand = Payload(MarkerKind.FRAME, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=4_294_967_296)
+        self.assertEqual(past_on_demand.preferred_frame_ns, MAX_FRAME_NS)
+        # Another kind of the same payload holds the same values
+        end = Payload(
+            MarkerKind.SEQUENCE_END, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=MAX_FRAME_NS, target_frame_ns=MAX_FRAME_NS, cpu_busy_ns=MAX_CPU_BUSY_NS
+        )
+        self.assertEqual(capped.with_kind(MarkerKind.SEQUENCE_END), end)
+
+        # On the wire: 0xFFFFFFFE for a capped frame time, 0xFFFFFFFF for on demand and for a capped CPU busy
+        one_below = bytes([0xFE, 0xFF, 0xFF, 0xFF])
+        largest = bytes([0xFF, 0xFF, 0xFF, 0xFF])
+        capped_bytes = encode_payload(capped)
+        self.assertEqual((capped_bytes[25:29], capped_bytes[29:33], capped_bytes[49:53]), (one_below, one_below, largest))
+        kept_bytes = encode_payload(kept)
+        self.assertEqual((kept_bytes[25:29], kept_bytes[29:33], kept_bytes[49:53]), (one_below, largest, largest))
+
+        # So a payload decodes to exactly what was encoded, a capped one too
+        self.assertEqual(try_decode_payload(capped_bytes), (capped, None))
+        self.assertEqual(try_decode_payload(kept_bytes), (kept, None))
 
     def test_try_decode_rejects_bad_input(self) -> None:
         payload = encode_payload(Payload(MarkerKind.FRAME, 0, 1, MarkerFlags.NO_FLAGS, 2))
@@ -339,11 +398,11 @@ class PayloadTests(unittest.TestCase):
             0x0102030405060708,
             MarkerFlags.STATIC_AFTER,
             0x1112131415161718,
-            preferred_frame_ticks=0x71727374,
-            target_frame_ticks=0x41424344,
-            intended_display_ticks=0x3132333435363738,
-            cpu_start_ticks=0x5152535455565758,
-            cpu_busy_ticks=0x61626364,
+            preferred_frame_ns=0x71727374,
+            target_frame_ns=0x41424344,
+            intended_display_ns=0x3132333435363738,
+            cpu_start_ns=0x5152535455565758,
+            cpu_busy_ns=0x61626364,
         )
         metadata = StartMetadata(638_000_000_000_000_000, SequenceId.from_text("a changed bit"))
         for kind in MarkerKind:
@@ -373,11 +432,11 @@ class PayloadTests(unittest.TestCase):
                 1,
                 MarkerFlags.NO_FLAGS,
                 2,
-                preferred_frame_ticks=166_667,
-                target_frame_ticks=333_333,
-                intended_display_ticks=4,
-                cpu_start_ticks=6,
-                cpu_busy_ticks=7,
+                preferred_frame_ns=16_666_667,
+                target_frame_ns=33_333_333,
+                intended_display_ns=4,
+                cpu_start_ns=6,
+                cpu_busy_ns=7,
             ),
             Payload(
                 MarkerKind.FRAME,
@@ -385,11 +444,11 @@ class PayloadTests(unittest.TestCase):
                 1,
                 MarkerFlags.STATIC_AFTER,
                 2,
-                preferred_frame_ticks=ON_DEMAND_FRAME_TICKS,
-                target_frame_ticks=ON_DEMAND_FRAME_TICKS,
-                intended_display_ticks=0,
-                cpu_start_ticks=0,
-                cpu_busy_ticks=0,
+                preferred_frame_ns=ON_DEMAND_FRAME_NS,
+                target_frame_ns=ON_DEMAND_FRAME_NS,
+                intended_display_ns=0,
+                cpu_start_ns=0,
+                cpu_busy_ns=0,
             ),
             Payload(
                 MarkerKind.SEQUENCE_END,
@@ -397,11 +456,11 @@ class PayloadTests(unittest.TestCase):
                 1,
                 MarkerFlags.STATIC_AFTER,
                 2,
-                preferred_frame_ticks=10_000_000,
-                target_frame_ticks=5,
-                intended_display_ticks=4,
-                cpu_start_ticks=6,
-                cpu_busy_ticks=7,
+                preferred_frame_ns=10_000_000,
+                target_frame_ns=5,
+                intended_display_ns=4,
+                cpu_start_ns=6,
+                cpu_busy_ns=7,
             ),
             Payload(
                 MarkerKind.FRAME,
@@ -409,11 +468,11 @@ class PayloadTests(unittest.TestCase):
                 1,
                 MarkerFlags.STATIC_BEFORE,
                 2,
-                preferred_frame_ticks=166_667,
-                target_frame_ticks=5,
-                intended_display_ticks=4,
-                cpu_start_ticks=6,
-                cpu_busy_ticks=7,
+                preferred_frame_ns=16_666_667,
+                target_frame_ns=5,
+                intended_display_ns=4,
+                cpu_start_ns=6,
+                cpu_busy_ns=7,
             ),
             Payload(
                 MarkerKind.FRAME,
@@ -421,11 +480,11 @@ class PayloadTests(unittest.TestCase):
                 1,
                 MarkerFlags.STATIC_AFTER | MarkerFlags.STATIC_BEFORE,
                 2,
-                preferred_frame_ticks=166_667,
-                target_frame_ticks=5,
-                intended_display_ticks=4,
-                cpu_start_ticks=6,
-                cpu_busy_ticks=7,
+                preferred_frame_ns=16_666_667,
+                target_frame_ns=5,
+                intended_display_ns=4,
+                cpu_start_ns=6,
+                cpu_busy_ns=7,
             ),
             # A reserved bit survives the round trip
             Payload(MarkerKind.FRAME, 3, 1, MarkerFlags(0x81), 2),
@@ -437,22 +496,24 @@ class PayloadTests(unittest.TestCase):
                 self.assertEqual(decoded[0], payload)
                 self.assertEqual(int(decoded[0].flags), int(payload.flags))
 
-    def test_ticks_match_date_time_and_time_span(self) -> None:
+    def test_the_start_time_is_in_date_time_ticks(self) -> None:
         time = datetime(2026, 1, 1, tzinfo=UTC)
         self.assertEqual(to_date_time_ticks(time), 639_028_224_000_000_000)
         self.assertEqual(to_date_time_ticks(time + timedelta(microseconds=1)), 639_028_224_000_000_010)
         self.assertEqual(to_date_time_ticks(datetime(2026, 1, 1)), to_date_time_ticks(datetime(2026, 1, 1).astimezone()), "a naive time is local")
 
-    def test_seconds_are_truncated_to_a_tick_as_in_cpp_and_csharp(self) -> None:
-        self.assertEqual(seconds_to_ticks(1.5), 15_000_000)
-        self.assertEqual(seconds_to_ticks(1.0 / 60), 166_666, "TimeSpan::FromSeconds and TimeSpanUtil.FromSeconds give this tick")
-        self.assertEqual(seconds_to_ticks(-1.0 / 60), -166_666, "toward zero")
-        self.assertEqual(seconds_to_ticks(0.999_999_99e-7), 0)
-        self.assertEqual(seconds_to_ticks(2), 20_000_000)
+    def test_seconds_are_truncated_to_a_nanosecond_as_in_cpp_and_csharp(self) -> None:
+        self.assertEqual(seconds_to_ns(1.5), 1_500_000_000)
+        self.assertEqual(seconds_to_ns(1.0 / 60), 16_666_666, "NanosecondTimeSpan's FromSeconds gives this nanosecond in C++ and C#")
+        self.assertEqual(seconds_to_ns(-1.0 / 60), -16_666_666, "toward zero")
+        self.assertEqual(seconds_to_ns(0.999_999_99e-9), 0)
+        self.assertEqual(seconds_to_ns(-0.999_999_99e-9), 0)
+        self.assertEqual(seconds_to_ns(2), 2_000_000_000)
+        self.assertIs(type(seconds_to_ns(0.25)), int)
         with self.assertRaises(ValueError):
-            _ = seconds_to_ticks(float("nan"))
+            _ = seconds_to_ns(float("nan"))
         with self.assertRaises(OverflowError):
-            _ = seconds_to_ticks(float("inf"))
+            _ = seconds_to_ns(float("inf"))
 
     def test_a_kind_that_is_not_a_marker_kind_is_not_encoded(self) -> None:
         def with_kind(kind: int) -> Payload:

@@ -40,7 +40,8 @@ namespace MB.FramePacing.Marker
     public const int CrcByteCount = 4;
 
     // The header every kind starts with (a sync marker has its first SyncFieldsByteCount bytes: which run and frame), little endian,
-    // grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work.
+    // grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work. Every time is in nanoseconds: the
+    // animation, intended display and CPU start time eight bytes, the two frame times and CPU busy four (unsigned).
     public const int OffsetMagic0 = 0;
     public const int OffsetMagic1 = 1;
     public const int OffsetVersion = 2;
@@ -48,12 +49,12 @@ namespace MB.FramePacing.Marker
     public const int OffsetRunId = 4;
     public const int OffsetFrameIndex = 8;
     public const int OffsetFlags = 16;
-    public const int OffsetAnimationTicks = 17;
-    public const int OffsetPreferredFrameTicks = 25;
-    public const int OffsetTargetFrameTicks = 29;
-    public const int OffsetIntendedDisplayTicks = 33;
-    public const int OffsetCpuStartTicks = 41;
-    public const int OffsetCpuBusyTicks = 49;
+    public const int OffsetAnimationTime = 17;
+    public const int OffsetPreferredFrameTime = 25;
+    public const int OffsetTargetFrameTime = 29;
+    public const int OffsetIntendedDisplayTime = 33;
+    public const int OffsetCpuStartTime = 41;
+    public const int OffsetCpuBusy = 49;
     public const int HeaderByteCount = 53;
     public const int SyncFieldsByteCount = 16;
 

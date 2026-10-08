@@ -60,12 +60,12 @@ namespace MB.FramePacing.Marker.UnitTest
           7,
           (ulong)frame,
           MarkerFlags.StaticAfter,
-          TimeSpanUtil.FromSeconds(frame / 60.0),
-          preferredFrameTime: new TimeSpan32(166_667),
-          targetFrameTime: new TimeSpan32(166_667),
-          intendedDisplayTime: new TickCount64(1000 + frame),
-          cpuStartTime: new TickCount64(900 + frame),
-          cpuBusy: new TimeSpan32(80_000)
+          NanosecondTimeSpan.FromSeconds(frame / 60.0),
+          preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(16_666_667),
+          targetFrameTime: NanosecondTimeDuration.FromNanoseconds(16_666_667),
+          intendedDisplayTime: new NanosecondTickCount(100_000 + frame),
+          cpuStartTime: new NanosecondTickCount(90_000 + frame),
+          cpuBusy: NanosecondTimeDuration.FromNanoseconds(8_000_000)
         );
         if (m_generator.TryGenerateModules(payload, m_bits, out var matrix))
         {

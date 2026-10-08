@@ -34,22 +34,36 @@ show) and the CPU's work:
 | 4      | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                                  |
 | 8      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                                       |
 | 16     | 1    | Flags                 | Bit 0 = **static after**, bit 1 = **static before**: nothing animates while this frame, or the frame before it, is on screen (see below). Bits 2 to 7 are reserved: write `0`; decoders ignore them. |
-| 17     | 8    | Animation time        | `i64` two's complement, C# `TimeSpan` ticks (100 ns). The time the frame's animation was evaluated for.                                                                                              |
-| 25     | 4    | Preferred frame time  | `u32` ticks (100 ns), `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `166'667` for 60 fps, also while the pacer runs slower (see below).                     |
-| 29     | 4    | Target frame time     | `u32` ticks (100 ns), `0` = unknown. The interval the pacer aims for between the previous frame and this one: `166'667` for 60 fps, `333'333` for 30 fps.                                            |
-| 33     | 8    | Intended display time | `i64` ticks (100 ns) on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                |
-| 41     | 8    | CPU start time        | `i64` ticks (100 ns) on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                   |
-| 49     | 4    | CPU busy              | `u32` ticks (100 ns), `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                    |
+| 17     | 8    | Animation time        | `i64` two's complement, nanoseconds. The time the frame's animation was evaluated for.                                                                                                               |
+| 25     | 4    | Preferred frame time  | `u32` nanoseconds, `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `16'666'667` for 60 fps, also while the pacer runs slower (see below).                     |
+| 29     | 4    | Target frame time     | `u32` nanoseconds, `0` = unknown. The interval the pacer aims for between the previous frame and this one: `16'666'667` for 60 fps, `33'333'333` for 30 fps.                                         |
+| 33     | 8    | Intended display time | `i64` nanoseconds on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                   |
+| 41     | 8    | CPU start time        | `i64` nanoseconds on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                      |
+| 49     | 4    | CPU busy              | `u32` nanoseconds, `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                       |
+
+**Every time is a whole number of nanoseconds**, so a platform that counts in nanoseconds (Vulkan and EGL present times,
+`CLOCK_MONOTONIC`) writes its values as they are, and one that counts in ticks of 100 ns multiplies by 100:
+
+- **The three `i64` times** reach about 292 years either way. A steady clock counted from its own epoch fits; a clock whose epoch is
+  further away than that does not, and its count wraps. The libraries hold a point on a clock as a `NanosecondTickCount`, which still
+  compares and subtracts correctly across the wrap while two times are less than 292 years apart.
+- **The three `u32` durations** hold up to 4.294967295 s. The libraries take and return them as a 64-bit duration that is never
+  negative (`NanosecondTimeDuration`), and a payload holds a longer one as the longest its field carries, never as an error:
+  `0xFFFFFFFF` for CPU busy (`Payload.MaxCpuBusy`), and `0xFFFFFFFE` (4.294967294 s, slower than 0.233 fps: `Payload.MaxFrameTime`)
+  for the two frame times, where `0xFFFFFFFF` means on demand. So a payload decodes to exactly what was encoded.
+- **A marker written by a library from before this change** counted in ticks of 100 ns in the same bytes, under the same format
+  version. A recording of one reads without an error and every time in it is a hundred times too small: record it again with the
+  current library.
 
 Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
 carries the same frame index. A frame or end marker is these 53 bytes and the CRC (below), 57 bytes. A **start marker** appends
 its metadata before the CRC, 81 bytes in all:
 
-| Offset | Size | Field       | Notes                                                                                                                                                     |
-| ------ | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. |
-| 61     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).   |
-| 77     | 4    | CRC         | `u32`, the CRC-32 of the 77 bytes before it (see below).                                                                                                  |
+| Offset | Size | Field       | Notes                                                                                                                                                                                                                                            |
+| ------ | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. The one time that is not in nanoseconds: a calendar time does not fit 64 bits of them. |
+| 61     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).                                                                                          |
+| 77     | 4    | CRC         | `u32`, the CRC-32 of the 77 bytes before it (see below).                                                                                                                                                                                         |
 
 The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
 8-4-4-4-12 form of a UUID.
@@ -81,10 +95,9 @@ Decoders reject a payload with the wrong length for its kind, the wrong magic or
 not match its bytes.
 
 The animation time must come from the same clock the application's animation uses (its "game time"), not from a separate
-wall clock. Examples: `TimeSpanUtil.FromSeconds(t)` in C# (not `TimeSpan.FromSeconds`, which Unity's runtime rounds to a
-millisecond), `MB::FramePacing::TimeSpan::FromSeconds(t)` in C++, or
-`MB::FramePacing::ToTimeSpan(d)` from `core/time/ChronoConversion.hpp` for a `std::chrono` duration (a finer one than
-ticks, such as nanoseconds, through `std::chrono::floor<MB::FramePacing::TickDuration>(d)` first).
+wall clock. Examples: `NanosecondTimeSpan.FromSeconds(t)` in C#, `MB::FramePacing::NanosecondTimeSpan::FromSeconds(t)` in C++ and
+`seconds_to_ns(t)` in Python, which all cut the fraction of a nanosecond off, or
+`MB::FramePacing::ToNanosecondTimeSpan(d)` from `core/time/ChronoConversion.hpp` for a `std::chrono` duration.
 
 ### Frame pacing: intended display time, target frame time and preferred frame time
 
@@ -98,22 +111,22 @@ pacing fields tell the analysis:
   `VK_EXT_present_timing`, `EGL_ANDROID_presentation_time`), or the **predicted display time** the platform gives it and it
   adopts (OpenXR `predictedDisplayTime`, Android Choreographer's expected presentation time, `CADisplayLink.targetTimestamp`). It is the
   pacer's plan; what the game animated the frame for is its animation time, and in a well paced game the two agree. Use a steady clock
-  (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) converted to 100 ns ticks; its epoch does not matter, only the
+  (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) in nanoseconds; its epoch does not matter, only the
   differences between frames. The analysis lines the clock up with the capture clock itself. A frame shown half a refresh or more
   after its intended time is **late**; that also finds frames that stay late after a hitch.
 - **Target frame time:** the interval the pacer aims for before this frame (`1 / target frame rate`). Fill it even without an
   intended display time, for example from a frame limiter. It changes on the frame where the pacer changes its rate.
 - **Preferred frame time:** the interval the application wants to run at: what it would aim for if nothing held it back. It differs
   from the target frame time only while the pacer runs slower than it wants:
-  - A game locked to 30 fps: preferred and target `333'333`. It runs as it wants.
-  - An adaptive pacer that drops from 60 to 30 fps for a busy stretch: preferred `166'667`, target `333'333` while
+  - A game locked to 30 fps: preferred and target `33'333'333`. It runs as it wants.
+  - An adaptive pacer that drops from 60 to 30 fps for a busy stretch: preferred `16'666'667`, target `33'333'333` while
     lowered. The analysis shows that stretch as below its preferred rate.
-  - A device that saves power while idle and presents 1 frame per second: preferred and target `10'000'000` while idle. Idle at the
+  - A device that saves power while idle and presents 1 frame per second: preferred and target `1'000'000'000` while idle. Idle at the
     rate it wants is not a problem.
   - A renderer that presents only when something changes: `0xFFFFFFFF` (**on demand**) in both. There is no interval to aim for, so
     no wait for the next frame is late. The value is allowed in the target frame time too.
   - With variable refresh (VRR) the rates need not be whole refreshes: a pacer on a 144 Hz display can drop from 60 to 48 fps
-    (`208'333`) or cap at 117 fps. The fields are intervals, so nothing changes.
+    (`20'833'333`) or cap at 117 fps. The fields are intervals, so nothing changes.
 - Without a target frame time the analysis measures each frame against the preferred frame time: a game that writes only that it
   wants 30 fps on a 60 Hz display is measured against two refreshes, not one.
 - Leave the fields `0` when the application does not pace its frames. The analysis then measures against a target frame rate given
@@ -354,13 +367,13 @@ FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, after all post-processing and UI
-// Pacing: when the pacer intends this frame to be shown (steady clock ticks), its target frame time and the frame time the
+// Pacing: when the pacer intends this frame to be shown (steady clock nanoseconds), its target frame time and the frame time the
 // application wants to run at. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
 // marker is drawn last, just before Present). 0 = unknown. MarkerFlags::StaticAfter when nothing animates while this frame is
 // on screen, MarkerFlags::StaticBefore when the application only now knows nothing animated while the previous frame was
 // The fields in the order of the wire format
-// The animation time is an FP::TimeSpan, the frame times and CPU busy FP::TimeSpan32, the intended display and CPU start time
-// FP::TickCount64 (all in 100 ns ticks)
+// The animation time is an FP::NanosecondTimeSpan, the frame times and CPU busy FP::NanosecondTimeDuration, the intended display and
+// CPU start time FP::NanosecondTickCount
 const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime, preferredFrameTime, targetFrameTime,
                           intendedDisplayTime, cpuStartTime, cpuBusy);
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =

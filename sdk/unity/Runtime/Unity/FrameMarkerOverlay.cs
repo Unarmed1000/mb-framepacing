@@ -4,8 +4,8 @@
 //* Add this component to any GameObject and every frame shows the marker: drawn at the end of the frame (after post processing, upscaling
 //* and UI) straight into the output, pixel exact, in pure black and white. The frame index is Time.frameCount and the animation time is
 //* Time.timeAsDouble unless AnimationTimeProvider supplies the game's own clock; the CPU start time and CPU busy come from Unity's clock
-//* unless the game supplies its pacer's. BeginRun / EndRun (or the RunFor coroutine) bracket the part to measure with the
-//* start and end markers. Nothing is allocated per frame.
+//* unless the game supplies its pacer's. Every time a provider gives is in nanoseconds, in the SDK core's types. BeginRun / EndRun (or
+//* the RunFor coroutine) bracket the part to measure with the start and end markers. Nothing is allocated per frame.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -101,21 +101,22 @@ namespace MB.FramePacing.Marker.Unity
       set => m_renderMode = value;
     }
 
-    /// <summary>The game's animation clock in seconds. Null = Time.timeAsDouble.</summary>
+    /// <summary>The game's animation clock in seconds (the marker carries it cut to the nanosecond). Null = Time.timeAsDouble.</summary>
     public Func<double> AnimationTimeProvider { get; set; }
 
     /// <summary>
-    /// When the game's frame pacer intends the frame to become visible, on a steady clock, for example the present time a pacing plugin
-    /// schedules. Null (or 0) = unknown: Unity does not expose it.
+    /// When the game's frame pacer intends the frame to become visible, on a steady clock in nanoseconds, for example the present time a
+    /// pacing plugin schedules. Null (or 0) = unknown: Unity does not expose it.
     /// </summary>
-    public Func<TickCount64> IntendedDisplayTimeProvider { get; set; }
+    public Func<NanosecondTickCount> IntendedDisplayTimeProvider { get; set; }
 
     /// <summary>
     /// The interval the game aims for between frames. Null = what Unity's settings aim for: on Android and iOS
     /// Application.targetFrameRate (30 fps when unset); elsewhere the refresh rate divided by QualitySettings.vSyncCount while vsync is on,
-    /// else Application.targetFrameRate; 0 when unknown (XR platforms: give the XR display's rate here).
+    /// else Application.targetFrameRate; 0 when unknown (XR platforms: give the XR display's rate here). A marker carries at most
+    /// <see cref="Payload.MaxFrameTime"/>: a longer one is held as that.
     /// </summary>
-    public Func<TimeSpan32> TargetFrameTimeProvider { get; set; }
+    public Func<NanosecondTimeDuration> TargetFrameTimeProvider { get; set; }
 
     /// <summary>
     /// The interval the game wants to run at: what it would aim for if nothing held it back. It differs from the target
@@ -123,7 +124,7 @@ namespace MB.FramePacing.Marker.Unity
     /// when something changes. Null = the same default as the target frame time (Unity's Application.targetFrameRate is the rate the game
     /// asks for, and Unity does not lower it on its own).
     /// </summary>
-    public Func<TimeSpan32> PreferredFrameTimeProvider { get; set; }
+    public Func<NanosecondTimeDuration> PreferredFrameTimeProvider { get; set; }
 
     /// <summary>
     /// True when nothing animates while this frame is on screen, until the next frame (no pending work after it: an idle screen, a paused
@@ -142,13 +143,14 @@ namespace MB.FramePacing.Marker.Unity
     /// <see cref="IntendedDisplayTimeProvider"/>. Null = Unity's unscaled time at the beginning of the frame while no
     /// IntendedDisplayTimeProvider is set (its clock is the game's own), otherwise 0 (unknown).
     /// </summary>
-    public Func<TickCount64> CpuStartTimeProvider { get; set; }
+    public Func<NanosecondTickCount> CpuStartTimeProvider { get; set; }
 
     /// <summary>
     /// CPU busy: how long the CPU worked on the frame before presenting it. Null = Unity's real time when the marker
-    /// is drawn (the end of the frame, just before Present) minus the time at the beginning of the frame.
+    /// is drawn (the end of the frame, just before Present) minus the time at the beginning of the frame. A marker carries at most
+    /// <see cref="Payload.MaxCpuBusy"/>: a longer one is held as that.
     /// </summary>
-    public Func<TimeSpan32> CpuBusyProvider { get; set; }
+    public Func<NanosecondTimeDuration> CpuBusyProvider { get; set; }
 
     /// <summary>
     /// Draw frame markers (run id 0) while no run is active (the Inspector's Draw When Idle). Turn it off to show markers only during
@@ -277,7 +279,8 @@ namespace MB.FramePacing.Marker.Unity
         (ulong)Time.frameCount,
         (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.NoFlags)
           | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.NoFlags),
-        TimeSpanUtil.FromSeconds(AnimationTime()),
+        // Cut to the nanosecond by the SDK's own code, so no runtime rounds it another way
+        NanosecondTimeSpan.FromSeconds(AnimationTime()),
         preferredFrameTime: PreferredFrameTimeProvider != null ? PreferredFrameTimeProvider() : DefaultTargetFrameTime(),
         targetFrameTime: TargetFrameTimeProvider != null ? TargetFrameTimeProvider() : DefaultTargetFrameTime(),
         intendedDisplayTime: IntendedDisplayTimeProvider != null ? IntendedDisplayTimeProvider() : default,
@@ -340,34 +343,32 @@ namespace MB.FramePacing.Marker.Unity
 
     private double AnimationTime() => AnimationTimeProvider != null ? AnimationTimeProvider() : Time.timeAsDouble;
 
-    /// <summary>Unity's real time now (the marker is drawn at the end of the frame) minus the time at the beginning of the frame.</summary>
-    private static TimeSpan32 UnityCpuBusy()
-    {
-      double seconds = Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble;
-      if (seconds <= 0)
-        return TimeSpan32.Zero;
-      TimeSpan busy = TimeSpanUtil.FromSeconds(seconds);
-      return busy > TimeSpan32.MaxValue.ToTimeSpan() ? TimeSpan32.MaxValue : TimeSpan32.FromTimeSpan(busy);
-    }
+    /// <summary>
+    /// Unity's real time now (the marker is drawn at the end of the frame) minus the time at the beginning of the frame. A duration is
+    /// never negative (a difference below zero is zero), and the payload holds one too long for a marker as the longest it carries.
+    /// </summary>
+    private static NanosecondTimeDuration UnityCpuBusy() =>
+      new NanosecondTimeDuration(NanosecondTimeSpan.FromSeconds(Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble));
 
-    private TickCount64 CpuStartTime()
+    private NanosecondTickCount CpuStartTime()
     {
       if (CpuStartTimeProvider != null)
         return CpuStartTimeProvider();
       if (IntendedDisplayTimeProvider != null)
         return default;
-      // The time at the beginning of this frame; 0 means unknown, so the very first frame reports 1 tick
-      long ticks = TimeSpanUtil.FromSeconds(Time.unscaledTimeAsDouble).Ticks;
-      return new TickCount64(ticks > 0 ? ticks : 1);
+      // The time at the beginning of this frame; 0 means unknown, so the very first frame reports 1 ns
+      long nanoseconds = NanosecondTimeSpan.FromSeconds(Time.unscaledTimeAsDouble).Nanoseconds;
+      return new NanosecondTickCount(nanoseconds > 0 ? nanoseconds : 1);
     }
 
     /// <summary>
     /// The frame interval Unity aims for, as the Application.targetFrameRate documentation describes it: on Android and iOS the
     /// targetFrameRate (they ignore vSyncCount; unset, they run at 30 fps); elsewhere the refresh rate divided by QualitySettings.vSyncCount
     /// while vsync is on (targetFrameRate is then ignored), else the targetFrameRate, else on the web the refresh rate. 0 if unknown: a
-    /// desktop without either renders as fast as it can, and XR platforms ignore both (their SDK sets the rate).
+    /// desktop without either renders as fast as it can, and XR platforms ignore both (their SDK sets the rate). The rate's frame time
+    /// is rounded to the nearest nanosecond.
     /// </summary>
-    private static TimeSpan32 DefaultTargetFrameTime()
+    private static NanosecondTimeDuration DefaultTargetFrameTime()
     {
 #if UNITY_2022_2_OR_NEWER
       double refreshHz = Screen.currentResolution.refreshRateRatio.value;
@@ -390,7 +391,13 @@ namespace MB.FramePacing.Marker.Unity
             : 0;
           break;
       }
-      return fps > 0 ? new TimeSpan32((uint)Math.Round(TimeSpan.TicksPerSecond / fps)) : TimeSpan32.Zero;
+      // No rate (or one that is no number, as a refresh rate Unity does not know divides to) is unknown
+      if (!(fps > 0))
+        return NanosecondTimeDuration.Zero;
+      // A rate too low for a marker (under 0.233 fps; next to zero its frame time is an infinity) is the longest frame time a marker
+      // carries, so nothing outside a long is cast and a rate never reads as on demand
+      double nanoseconds = Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / fps);
+      return nanoseconds < Payload.MaxFrameTime.Nanoseconds ? NanosecondTimeDuration.FromNanoseconds((long)nanoseconds) : Payload.MaxFrameTime;
     }
 
     private MarkerKind Kind()

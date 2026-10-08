@@ -38,7 +38,8 @@ namespace MB::FramePacing::Marker::WireFormat
   inline constexpr std::size_t CrcByteCount = 4;
 
   //! The header every kind starts with (a sync marker has its first SyncFieldsByteCount bytes: which run and frame), little endian,
-  //! grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work.
+  //! grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work. Every time is in nanoseconds:
+  //! the animation, intended display and CPU start time eight bytes, the two frame times and CPU busy four (unsigned).
   inline constexpr std::size_t OffsetMagic0 = 0;
   inline constexpr std::size_t OffsetMagic1 = 1;
   inline constexpr std::size_t OffsetVersion = 2;
@@ -46,12 +47,12 @@ namespace MB::FramePacing::Marker::WireFormat
   inline constexpr std::size_t OffsetRunId = 4;
   inline constexpr std::size_t OffsetFrameIndex = 8;
   inline constexpr std::size_t OffsetFlags = 16;
-  inline constexpr std::size_t OffsetAnimationTicks = 17;
-  inline constexpr std::size_t OffsetPreferredFrameTicks = 25;
-  inline constexpr std::size_t OffsetTargetFrameTicks = 29;
-  inline constexpr std::size_t OffsetIntendedDisplayTicks = 33;
-  inline constexpr std::size_t OffsetCpuStartTicks = 41;
-  inline constexpr std::size_t OffsetCpuBusyTicks = 49;
+  inline constexpr std::size_t OffsetAnimationTime = 17;
+  inline constexpr std::size_t OffsetPreferredFrameTime = 25;
+  inline constexpr std::size_t OffsetTargetFrameTime = 29;
+  inline constexpr std::size_t OffsetIntendedDisplayTime = 33;
+  inline constexpr std::size_t OffsetCpuStartTime = 41;
+  inline constexpr std::size_t OffsetCpuBusy = 49;
   inline constexpr std::size_t HeaderByteCount = 53;
   inline constexpr std::size_t SyncFieldsByteCount = 16;
 
@@ -68,13 +69,13 @@ namespace MB::FramePacing::Marker::WireFormat
   static_assert(OffsetRunId + 4 == OffsetFrameIndex);
   static_assert(OffsetFrameIndex + 8 == SyncFieldsByteCount);
   static_assert(SyncFieldsByteCount == OffsetFlags);
-  static_assert(OffsetFlags + 1 == OffsetAnimationTicks);
-  static_assert(OffsetAnimationTicks + 8 == OffsetPreferredFrameTicks);
-  static_assert(OffsetPreferredFrameTicks + 4 == OffsetTargetFrameTicks);
-  static_assert(OffsetTargetFrameTicks + 4 == OffsetIntendedDisplayTicks);
-  static_assert(OffsetIntendedDisplayTicks + 8 == OffsetCpuStartTicks);
-  static_assert(OffsetCpuStartTicks + 8 == OffsetCpuBusyTicks);
-  static_assert(OffsetCpuBusyTicks + 4 == HeaderByteCount);
+  static_assert(OffsetFlags + 1 == OffsetAnimationTime);
+  static_assert(OffsetAnimationTime + 8 == OffsetPreferredFrameTime);
+  static_assert(OffsetPreferredFrameTime + 4 == OffsetTargetFrameTime);
+  static_assert(OffsetTargetFrameTime + 4 == OffsetIntendedDisplayTime);
+  static_assert(OffsetIntendedDisplayTime + 8 == OffsetCpuStartTime);
+  static_assert(OffsetCpuStartTime + 8 == OffsetCpuBusy);
+  static_assert(OffsetCpuBusy + 4 == HeaderByteCount);
   static_assert(PayloadByteCount == 57u && SyncPayloadByteCount == 20u && StartPayloadByteCount == 81u);
   static_assert(StartPayloadByteCount == Payload::MaxEncodedByteCount);
   static_assert(Payload::MaxEncodedByteCount <= QrCapacityBytes);

@@ -13,6 +13,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 
 namespace MB.FramePacing.Marker
 {
@@ -54,18 +55,28 @@ namespace MB.FramePacing.Marker
       if (payload.Kind == MarkerKind.Sync)
         return WithCrc(destination, byteCount);
       destination[WireFormat.OffsetFlags] = (byte)payload.Flags;
-      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetAnimationTicks), payload.AnimationTime.Ticks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetPreferredFrameTicks), payload.PreferredFrameTime.Ticks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetTargetFrameTicks), payload.TargetFrameTime.Ticks);
-      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetIntendedDisplayTicks), payload.IntendedDisplayTime.UnsignedTicks);
-      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetCpuStartTicks), payload.CpuStartTime.UnsignedTicks);
-      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetCpuBusyTicks), payload.CpuBusy.Ticks);
+      BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetAnimationTime), payload.AnimationTime.Nanoseconds);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetPreferredFrameTime), DurationField(payload.PreferredFrameTime));
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetTargetFrameTime), DurationField(payload.TargetFrameTime));
+      BinaryPrimitives.WriteUInt64LittleEndian(
+        destination.Slice(WireFormat.OffsetIntendedDisplayTime),
+        payload.IntendedDisplayTime.UnsignedNanoseconds
+      );
+      BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(WireFormat.OffsetCpuStartTime), payload.CpuStartTime.UnsignedNanoseconds);
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetCpuBusy), DurationField(payload.CpuBusy));
       if (isStart)
       {
         BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetStartUtcTicks), metadata.UtcTicks);
         metadata.SequenceId.TryCopyTo(destination.Slice(WireFormat.OffsetSequenceId));
       }
       return WithCrc(destination, byteCount);
+    }
+
+    // A duration as its four bytes hold it. A payload holds none longer than they do (Payload's constructor caps it).
+    private static uint DurationField(NanosecondTimeDuration duration)
+    {
+      Debug.Assert(duration.UnsignedNanoseconds <= uint.MaxValue, "A payload's duration fits its four bytes");
+      return (uint)duration.UnsignedNanoseconds;
     }
 
     // Every kind ends with the CRC of all the bytes before it
@@ -113,7 +124,7 @@ namespace MB.FramePacing.Marker
           BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetRunId)),
           BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetFrameIndex)),
           MarkerFlags.NoFlags,
-          TimeSpan.Zero
+          NanosecondTimeSpan.Zero
         );
         return true;
       }
@@ -131,12 +142,12 @@ namespace MB.FramePacing.Marker
         BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetFrameIndex)),
         // Every value is accepted: bits without a name are reserved and kept
         (MarkerFlags)source[WireFormat.OffsetFlags],
-        new TimeSpan(BinaryPrimitives.ReadInt64LittleEndian(source.Slice(WireFormat.OffsetAnimationTicks))),
-        new TimeSpan32(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetPreferredFrameTicks))),
-        new TimeSpan32(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetTargetFrameTicks))),
-        TickCount64.FromUnsignedTicks(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetIntendedDisplayTicks))),
-        TickCount64.FromUnsignedTicks(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetCpuStartTicks))),
-        new TimeSpan32(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetCpuBusyTicks)))
+        new NanosecondTimeSpan(BinaryPrimitives.ReadInt64LittleEndian(source.Slice(WireFormat.OffsetAnimationTime))),
+        NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetPreferredFrameTime))),
+        NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetTargetFrameTime))),
+        NanosecondTickCount.FromUnsignedNanoseconds(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetIntendedDisplayTime))),
+        NanosecondTickCount.FromUnsignedNanoseconds(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetCpuStartTime))),
+        NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetCpuBusy)))
       );
       return true;
     }

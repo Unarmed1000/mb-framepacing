@@ -14,7 +14,7 @@ _MAX_NANOSECONDS = 2**63 - 1
 class NanosecondTimeSpan:
     """A signed time interval in nanoseconds: what a platform that counts in nanoseconds reports, kept as it is given.
 
-    The SDK's other times are whole ticks of 100 ns, so a value that goes through ticks loses up to 99 ns: a refresh period of
+    The data module's times are whole ticks of 100 ns, so a value that goes through ticks loses up to 99 ns: a refresh period of
     4,166,389 ns is 41,663 ticks, 21 parts in a million short. The range is that of a signed 64-bit count (about 292 years either
     way), as in C++ and C#; a value outside it raises OverflowError. The count is a whole number, an int, as in C++ and C#: a
     float (or a bool) raises TypeError, so no fraction of a nanosecond and no rounding of a large value gets in.

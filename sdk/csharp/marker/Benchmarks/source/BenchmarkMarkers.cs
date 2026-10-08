@@ -14,7 +14,7 @@ namespace MB.FramePacing.Marker.Benchmarks
 {
   internal static class BenchmarkMarkers
   {
-    private static readonly TimeSpan32 g_frameTime = new TimeSpan32(166_667);
+    private static readonly NanosecondTimeDuration g_frameTime = NanosecondTimeDuration.FromNanoseconds(16_666_667);
 
     /// <summary>A start marker's metadata: a start time and a text sequence id.</summary>
     public static StartMetadata Metadata
@@ -30,18 +30,18 @@ namespace MB.FramePacing.Marker.Benchmarks
     /// <summary>Frame <paramref name="frameIndex"/> of a 60 fps run: every field set, the times advancing one frame time per frame.</summary>
     public static Payload FramePayload(ulong frameIndex)
     {
-      long offset = (long)frameIndex * g_frameTime.Ticks;
+      long offset = (long)frameIndex * g_frameTime.Nanoseconds;
       return new Payload(
         MarkerKind.Frame,
         0x12345678,
         frameIndex,
         MarkerFlags.NoFlags,
-        new TimeSpan(offset),
+        new NanosecondTimeSpan(offset),
         g_frameTime,
         g_frameTime,
-        new TickCount64(36_000_000_000 + offset),
-        new TickCount64(35_999_900_000 + offset),
-        new TimeSpan32(80_000)
+        new NanosecondTickCount(3_600_000_000_000 + offset),
+        new NanosecondTickCount(3_599_990_000_000 + offset),
+        NanosecondTimeDuration.FromNanoseconds(8_000_000)
       );
     }
 

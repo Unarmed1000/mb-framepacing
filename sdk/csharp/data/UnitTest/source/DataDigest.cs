@@ -70,7 +70,7 @@ namespace MB.FramePacing.Data.UnitTest
       var header = reader.Header;
       var records = reader.ReadAll();
       long frameIndexSum = 0;
-      long animationTicksSum = 0;
+      long animationNsSum = 0;
       int decodedPayloads = 0;
       foreach (var record in records)
       {
@@ -78,7 +78,7 @@ namespace MB.FramePacing.Data.UnitTest
         {
           ++decodedPayloads;
           frameIndexSum += (long)payload.FrameIndex;
-          animationTicksSum += payload.AnimationTime.Ticks;
+          animationNsSum += payload.AnimationTime.Nanoseconds;
         }
       }
       return new JsonObject
@@ -110,7 +110,7 @@ namespace MB.FramePacing.Data.UnitTest
         ["secondByteCount"] = records.Sum(r => r.SecondBytes?.Length ?? 0),
         ["decodedMainPayloads"] = decodedPayloads,
         ["frameIndexSum"] = frameIndexSum,
-        ["animationTicksSum"] = animationTicksSum,
+        ["animationNsSum"] = animationNsSum,
       };
     }
 

@@ -29,9 +29,12 @@ Readers refuse a newer format ("update the tools or the library"). Within a form
 - **Text:** UTF-8 without a byte order mark. Lines end with the writing platform's line ending (`\n`, or `\r\n` on Windows); readers
   accept both.
 - **Times are whole ticks** (`...Ticks`): 100 ns ticks (TimeSpan ticks), written as a whole number in the integer type the value has
-  where it comes from. A marker's value is in the file exactly as the marker carried it (`animationTicks` is the marker's `i64`,
+  where it comes from. A marker's value is in the file in the marker's integer type (`animationTicks` is the marker's `i64`,
   `markerTargetTicks` its `u32`), and nothing on the way to the file or back goes through a floating point number. A millisecond is
   10 000 ticks: divide when you want to show one.
+- **A marker's times are the nearest tick, for now.** The [marker](marker-format.md) counts in nanoseconds; these files still count
+  in ticks, so each of a marker's times is written as the tick nearest to it (up to 50 ns from what the marker carried, a tie to the
+  even tick), and `4294967295` still means on demand. The files move to nanoseconds with the tools; this paragraph goes then.
 - **Whole numbers** are digits, with a `-` in front when negative: no `+`, no spaces, no decimal point, no exponent, no digit
   separators. The tables give each column's type (`i32`, `i64`, `u32`, `u64`: signed and unsigned, 32 and 64 bits); a number outside
   its type's range is refused, as is a fraction (`166667.5`, and `166667.0` in `summary.json`) where a whole number belongs.

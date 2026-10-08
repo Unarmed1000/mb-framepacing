@@ -68,12 +68,12 @@ def _payload(row: dict[str, str]) -> Payload:
         int(row["runId"]),
         int(row["frameIndex"]),
         MarkerFlags(int(row["flags"])),
-        int(row["animationTicks"]),
-        preferred_frame_ticks=int(row["preferredFrameTicks"]),
-        target_frame_ticks=int(row["targetFrameTicks"]),
-        intended_display_ticks=int(row["intendedDisplayTicks"]),
-        cpu_start_ticks=int(row["cpuStartTicks"]),
-        cpu_busy_ticks=int(row["cpuBusyTicks"]),
+        int(row["animationNs"]),
+        preferred_frame_ns=int(row["preferredFrameNs"]),
+        target_frame_ns=int(row["targetFrameNs"]),
+        intended_display_ns=int(row["intendedDisplayNs"]),
+        cpu_start_ns=int(row["cpuStartNs"]),
+        cpu_busy_ns=int(row["cpuBusyNs"]),
     )
 
 

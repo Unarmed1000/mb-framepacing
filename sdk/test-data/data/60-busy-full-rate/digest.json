@@ -35,7 +35,7 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostTicksSum": 1274051618,
+    "hostTicksSum": 1227553897,
     "deviceTicksCount": 486,
     "deviceTicksSum": 19642500000,
     "sourceDropsSum": 0,
@@ -46,7 +46,7 @@
     "secondByteCount": 0,
     "decodedMainPayloads": 486,
     "frameIndexSum": 280133,
-    "animationTicksSum": 19359000001
+    "animationNsSum": 1935900000001
   },
   "summary": {
     "formatVersion": 1,
@@ -179,7 +179,7 @@
         },
         "cpuBusyTicks": {
           "count": 388,
-          "sum": 53484094
+          "sum": 53484092
         },
         "frameTimeTicks": {
           "count": 385,
@@ -187,7 +187,7 @@
         },
         "cpuWaitTicks": {
           "count": 385,
-          "sum": 26378375
+          "sum": 26378377
         },
         "mainMarkerFirstSeenTicks": {
           "count": 0,
@@ -217,7 +217,7 @@
     },
     "captureTicksSum": 19642500000,
     "frameIndexSum": 280133,
-    "hostTicksSum": 1274051618,
+    "hostTicksSum": 1227553897,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,

@@ -213,18 +213,18 @@ namespace MB.FramePacing.Marker.UnitTest
             // A running frame index and times, or anything at all
             bool running = random.Below(4) != 0;
             frameIndex = running ? frameIndex + 1 : random.Next();
-            long ticks = running ? (long)(frameIndex * 166_667) : (long)random.Next();
+            long time = running ? (long)(frameIndex * 16_666_667) : (long)random.Next();
             var payload = new Payload(
               kind,
               running ? 0x12345678u : (uint)random.Next(),
               frameIndex,
               (MarkerFlags)(running ? random.Below(4) : random.Below(256)),
-              new TimeSpan(running ? ticks : ticks / 4),
-              new TimeSpan32(running ? 166_667u : (uint)random.Next()),
-              new TimeSpan32(running ? 166_667u : (uint)random.Next()),
-              new TickCount64(running ? 36_000_000_000 + ticks : ticks),
-              new TickCount64(running ? 35_999_900_000 + ticks : ticks / 2),
-              new TimeSpan32((uint)random.Below(400_000))
+              new NanosecondTimeSpan(running ? time : time / 4),
+              NanosecondTimeDuration.FromNanoseconds(running ? 16_666_667u : (uint)random.Next()),
+              NanosecondTimeDuration.FromNanoseconds(running ? 16_666_667u : (uint)random.Next()),
+              new NanosecondTickCount(running ? 3_600_000_000_000 + time : time),
+              new NanosecondTickCount(running ? 3_599_990_000_000 + time : time / 2),
+              NanosecondTimeDuration.FromNanoseconds((uint)random.Below(40_000_000))
             );
             for (int k = 0; k < sequenceId.Length; ++k)
               sequenceId[k] = (byte)random.Next();

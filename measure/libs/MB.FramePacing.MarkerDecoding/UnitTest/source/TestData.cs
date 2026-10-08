@@ -1,7 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* Locates sdk/test-data/markers (golden images written by sdk/cpp/marker/tools/marker-render --golden) and parses its manifest.
+//* Locates sdk/test-data/markers (golden images written by sdk/cpp/marker/tools/marker-render --golden) and parses its manifest. The
+//* manifest's times are nanoseconds, as the markers carry them; the tools count in ticks, so a golden payload is the marker library's
+//* payload as MarkerPayload.FromFrameMarker gives it: what decoding the image gives.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -33,17 +35,19 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         string Field(string name) => fields[Array.IndexOf(header, name)];
 
         var kind = (MarkerKind)byte.Parse(Field("kind"), CultureInfo.InvariantCulture);
-        var payload = new MarkerPayload(
-          kind,
-          uint.Parse(Field("runId"), CultureInfo.InvariantCulture),
-          ulong.Parse(Field("frameIndex"), CultureInfo.InvariantCulture),
-          (MB.FramePacing.Marker.MarkerFlags)byte.Parse(Field("flags"), CultureInfo.InvariantCulture),
-          new TimeSpan(long.Parse(Field("animationTicks"), CultureInfo.InvariantCulture)),
-          PreferredFrameTime: new TimeSpan32(uint.Parse(Field("preferredFrameTicks"), CultureInfo.InvariantCulture)),
-          TargetFrameTime: new TimeSpan32(uint.Parse(Field("targetFrameTicks"), CultureInfo.InvariantCulture)),
-          IntendedDisplayTime: new TickCount64(long.Parse(Field("intendedDisplayTicks"), CultureInfo.InvariantCulture)),
-          CpuStartTime: new TickCount64(long.Parse(Field("cpuStartTicks"), CultureInfo.InvariantCulture)),
-          CpuBusy: new TimeSpan32(uint.Parse(Field("cpuBusyTicks"), CultureInfo.InvariantCulture))
+        var payload = MarkerPayload.FromFrameMarker(
+          new MB.FramePacing.Marker.Payload(
+            (MB.FramePacing.Marker.MarkerKind)kind,
+            uint.Parse(Field("runId"), CultureInfo.InvariantCulture),
+            ulong.Parse(Field("frameIndex"), CultureInfo.InvariantCulture),
+            (MB.FramePacing.Marker.MarkerFlags)byte.Parse(Field("flags"), CultureInfo.InvariantCulture),
+            new NanosecondTimeSpan(long.Parse(Field("animationNs"), CultureInfo.InvariantCulture)),
+            preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("preferredFrameNs"), CultureInfo.InvariantCulture)),
+            targetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("targetFrameNs"), CultureInfo.InvariantCulture)),
+            intendedDisplayTime: new NanosecondTickCount(long.Parse(Field("intendedDisplayNs"), CultureInfo.InvariantCulture)),
+            cpuStartTime: new NanosecondTickCount(long.Parse(Field("cpuStartNs"), CultureInfo.InvariantCulture)),
+            cpuBusy: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("cpuBusyNs"), CultureInfo.InvariantCulture))
+          )
         );
         StartMetadata? start = null;
         if (kind == MarkerKind.SequenceStart)

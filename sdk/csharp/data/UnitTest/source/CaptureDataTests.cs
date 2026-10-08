@@ -219,12 +219,12 @@ namespace MB.FramePacing.Data.UnitTest
     {
       var main = new byte[Payload.MaxEncodedByteCount];
       int mainLength = FrameMarker.EncodePayload(
-        new Payload(MarkerKind.SequenceStart, 7, 12, MarkerFlags.StaticAfter, new TimeSpan(34)),
+        new Payload(MarkerKind.SequenceStart, 7, 12, MarkerFlags.StaticAfter, new NanosecondTimeSpan(34)),
         default,
         main
       );
       var sync = new byte[Payload.MaxEncodedByteCount];
-      int syncLength = FrameMarker.EncodePayload(new Payload(MarkerKind.Sync, 7, 11, MarkerFlags.NoFlags, TimeSpan.Zero), default, sync);
+      int syncLength = FrameMarker.EncodePayload(new Payload(MarkerKind.Sync, 7, 11, MarkerFlags.NoFlags, NanosecondTimeSpan.Zero), default, sync);
       Assert.That((mainLength, syncLength), Is.EqualTo((81, 20)), "the longest and the shortest marker");
       Assert.That(mainLength, Is.LessThanOrEqualTo(CaptureDataRecord.MainCapacity), "any marker fits a slot");
 
@@ -250,7 +250,7 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(record.TryDecodeMain(out var payload, out _), Is.True);
       Assert.That(
         (payload.Kind, payload.RunId, payload.FrameIndex, payload.AnimationTime),
-        Is.EqualTo((MarkerKind.SequenceStart, 7u, 12UL, new TimeSpan(34)))
+        Is.EqualTo((MarkerKind.SequenceStart, 7u, 12UL, new NanosecondTimeSpan(34)))
       );
       Assert.That(record.TryDecodeSecond(out var second), Is.True);
       Assert.That((second.Kind, second.RunId, second.FrameIndex), Is.EqualTo((MarkerKind.Sync, 7u, 11UL)));

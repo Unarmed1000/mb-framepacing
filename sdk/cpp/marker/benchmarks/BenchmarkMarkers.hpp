@@ -5,9 +5,9 @@
 //
 // The markers the benchmarks measure: a frame marker with every field set, as a paced application writes it every frame.
 
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
@@ -28,18 +28,18 @@ namespace MB::FramePacing::Marker::BenchmarkMarkers
   //! Frame frameIndex of a 60 fps run: every field set, the times advancing one frame time per frame.
   inline Payload FramePayload(const uint64_t frameIndex)
   {
-    constexpr TimeSpan32 FrameTime(166'667u);
-    const auto offset = static_cast<int64_t>(frameIndex) * FrameTime.Ticks();
+    constexpr NanosecondTimeDuration FrameTime = NanosecondTimeDuration::FromNanoseconds(16'666'667);
+    const auto offset = static_cast<int64_t>(frameIndex) * FrameTime.Nanoseconds();
     return {MarkerKind::Frame,
             0x12345678u,
             frameIndex,
             MarkerFlags::NoFlags,
-            TimeSpan(offset),
+            NanosecondTimeSpan(offset),
             FrameTime,
             FrameTime,
-            TickCount64(36'000'000'000 + offset),
-            TickCount64(35'999'900'000 + offset),
-            TimeSpan32(80'000u)};
+            NanosecondTickCount(3'600'000'000'000 + offset),
+            NanosecondTickCount(3'599'990'000'000 + offset),
+            NanosecondTimeDuration::FromNanoseconds(8'000'000)};
   }
 
   //! A start marker's metadata: a start time and a text sequence id.

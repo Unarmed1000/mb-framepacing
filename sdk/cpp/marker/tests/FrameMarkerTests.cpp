@@ -3,9 +3,9 @@
 #include <mb/framepacing/core/Crc32Util.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -38,9 +38,10 @@ namespace MB::FramePacing::Marker
   // Readable gtest failure output for the value types
   void PrintTo(const Payload& value, std::ostream* os)
   {
-    *os << "{frame " << value.FrameIndex() << ", ticks " << value.AnimationTime().Ticks() << ", run " << value.RunId() << ", kind "
-        << static_cast<uint32_t>(value.Kind()) << ", intended " << value.IntendedDisplayTime().Ticks() << ", target "
-        << value.TargetFrameTime().Ticks() << ", cpu start " << value.CpuStartTime().Ticks() << ", cpu busy " << value.CpuBusy().Ticks() << "}";
+    *os << "{frame " << value.FrameIndex() << ", animation " << value.AnimationTime().Nanoseconds() << ", run " << value.RunId() << ", kind "
+        << static_cast<uint32_t>(value.Kind()) << ", intended " << value.IntendedDisplayTime().Nanoseconds() << ", target "
+        << value.TargetFrameTime().Nanoseconds() << ", cpu start " << value.CpuStartTime().Nanoseconds() << ", cpu busy "
+        << value.CpuBusy().Nanoseconds() << "}";
   }
 
   void PrintTo(const SequenceId& value, std::ostream* os)
@@ -71,16 +72,17 @@ namespace MB::FramePacing::Marker
 
 namespace
 {
-  // Typed payload values the tests share (every time is in 100 ns ticks)
-  constexpr FP::TimeSpan32 UnknownFrameTime{};
-  constexpr FP::TickCount64 UnknownTime{};
-  constexpr FP::TimeSpan32 FrameTime60{166'667u};
-  constexpr FP::TimeSpan32 FrameTime30{333'333u};
-  constexpr FP::TimeSpan32 MaxFrameTime = FP::TimeSpan32::MaxValue();
-  constexpr FP::TimeSpan MinAnimation = FP::TimeSpan::MinValue();
-  constexpr FP::TimeSpan MaxAnimation = FP::TimeSpan::MaxValue();
-  constexpr FP::TickCount64 MinClock{std::numeric_limits<int64_t>::min()};
-  constexpr FP::TickCount64 MaxClock{std::numeric_limits<int64_t>::max()};
+  // Typed payload values the tests share (every time is in nanoseconds)
+  constexpr FP::NanosecondTimeDuration UnknownFrameTime{};
+  constexpr FP::NanosecondTickCount UnknownTime{};
+  constexpr FP::NanosecondTimeDuration FrameTime60 = FP::NanosecondTimeDuration::FromNanoseconds(16'666'667);
+  constexpr FP::NanosecondTimeDuration FrameTime30 = FP::NanosecondTimeDuration::FromNanoseconds(33'333'333);
+  // The largest value a duration's four bytes hold: on demand in a frame time, the longest CPU busy
+  constexpr FP::NanosecondTimeDuration LargestField = FP::NanosecondTimeDuration::FromNanoseconds(4'294'967'295);
+  constexpr FP::NanosecondTimeSpan MinAnimation = FP::NanosecondTimeSpan::MinValue();
+  constexpr FP::NanosecondTimeSpan MaxAnimation = FP::NanosecondTimeSpan::MaxValue();
+  constexpr FP::NanosecondTickCount MinClock{std::numeric_limits<int64_t>::min()};
+  constexpr FP::NanosecondTickCount MaxClock{std::numeric_limits<int64_t>::max()};
 
   //! The payload's bytes (the header and the CRC for frame and end markers), through the one EncodePayload.
   std::vector<uint8_t> PayloadBytes(const FM::Payload& payload, const FM::StartMetadata& metadata = {})
@@ -222,12 +224,12 @@ TEST(Payload, EncodeProducesTheDocumentedLittleEndianLayout)
                             0x21222324u,
                             0x0102030405060708u,
                             FM::MarkerFlags::StaticAfter,
-                            FP::TimeSpan{0x1112131415161718},
-                            FP::TimeSpan32{0x71727374u},
-                            FP::TimeSpan32{0x41424344u},
-                            FP::TickCount64{0x3132333435363738},
-                            FP::TickCount64{0x5152535455565758},
-                            FP::TimeSpan32{0x61626364u}};
+                            FP::NanosecondTimeSpan{0x1112131415161718},
+                            FP::NanosecondTimeDuration::FromNanoseconds(0x71727374),
+                            FP::NanosecondTimeDuration::FromNanoseconds(0x41424344),
+                            FP::NanosecondTickCount{0x3132333435363738},
+                            FP::NanosecondTickCount{0x5152535455565758},
+                            FP::NanosecondTimeDuration::FromNanoseconds(0x61626364)};
   const auto bytes = PayloadBytes(payload);
   // magic, version, kind | run id | frame index | flags | animation time | preferred, target frame time | intended display time |
   // CPU start time | CPU busy | CRC (0x7ED16A3D: what Python's binascii.crc32 gives for the 53 bytes before it)
@@ -245,12 +247,12 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
                             3u,
                             1u,
                             FM::MarkerFlags::NoFlags,
-                            FP::TimeSpan{2},
+                            FP::NanosecondTimeSpan{2},
                             UnknownFrameTime,
-                            FP::TimeSpan32{5u},
-                            FP::TickCount64{4},
-                            FP::TickCount64{6},
-                            FP::TimeSpan32{7u}};
+                            FP::NanosecondTimeDuration::FromNanoseconds(5),
+                            FP::NanosecondTickCount{4},
+                            FP::NanosecondTickCount{6},
+                            FP::NanosecondTimeDuration::FromNanoseconds(7)};
   FM::StartMetadata metadata{0x6162636465666768, {}};
   for (std::size_t i = 0; i < FM::SequenceId::ByteCount; ++i)
   {
@@ -275,9 +277,9 @@ TEST(Payload, StartMarkerAppendsTheStartTimeAndTheSequenceIdInOrder)
   EXPECT_TRUE(std::equal(crc.begin(), crc.end(), buffer.begin() + 77));
 }
 
-TEST(Payload, NegativeTicksAreStoredAsTwosComplement)
+TEST(Payload, ANegativeAnimationTimeIsStoredAsTwosComplement)
 {
-  const auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-1}});
+  const auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{-1}});
   for (std::size_t i = 17; i < 25; ++i)
   {
     EXPECT_EQ(bytes[i], 0xFFu) << "byte " << i;
@@ -288,38 +290,43 @@ TEST(Payload, RoundTrips)
 {
   constexpr uint32_t U32Max = std::numeric_limits<uint32_t>::max();
   const std::array<FM::Payload, 18> payloads{{
-    {FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}},
-    {FM::MarkerKind::Frame, 7u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{166'667}},
-    {FM::MarkerKind::Frame, 7u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{333'334}, UnknownFrameTime, FrameTime60,
-     FP::TickCount64{1'234'567'890'123}},
-    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::NoFlags, FP::TimeSpan{500'001}, UnknownFrameTime, FrameTime60,
-     FP::TickCount64{1'234'568'056'790}, FP::TickCount64{1'234'567'723'456}},
-    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::NoFlags, FP::TimeSpan{500'001}, UnknownFrameTime, FrameTime60,
-     FP::TickCount64{1'234'568'056'790}, FP::TickCount64{1'234'567'723'456}, FP::TimeSpan32{80'000u}},
-    {FM::MarkerKind::Frame, U32Max, std::numeric_limits<uint64_t>::max(), FM::MarkerFlags::NoFlags, MaxAnimation, UnknownFrameTime, MaxFrameTime,
-     MinClock, MaxClock, MaxFrameTime},
-    {FM::MarkerKind::Frame, 2u, 8u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
-     FP::TickCount64{5}, MaxFrameTime},
-    {FM::MarkerKind::SequenceEnd, 2u, 4u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
-     MinClock, MaxFrameTime},
-    {FM::MarkerKind::SequenceStart, 2u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u}, FP::TickCount64{3},
-     FP::TickCount64{-5}, FP::TimeSpan32{80'000u}},
+    {FM::MarkerKind::Frame, 0u, 0u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}},
+    {FM::MarkerKind::Frame, 7u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{166'667}},
+    {FM::MarkerKind::Frame, 7u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{333'334}, UnknownFrameTime, FrameTime60,
+     FP::NanosecondTickCount{1'234'567'890'123}},
+    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{500'001}, UnknownFrameTime, FrameTime60,
+     FP::NanosecondTickCount{1'234'568'056'790}, FP::NanosecondTickCount{1'234'567'723'456}},
+    {FM::MarkerKind::Frame, 7u, 3u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{500'001}, UnknownFrameTime, FrameTime60,
+     FP::NanosecondTickCount{1'234'568'056'790}, FP::NanosecondTickCount{1'234'567'723'456}, FP::NanosecondTimeDuration::FromNanoseconds(80'000)},
+    {FM::MarkerKind::Frame, U32Max, std::numeric_limits<uint64_t>::max(), FM::MarkerFlags::NoFlags, MaxAnimation, UnknownFrameTime, LargestField,
+     MinClock, MaxClock, LargestField},
+    {FM::MarkerKind::Frame, 2u, 8u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1}, UnknownFrameTime,
+     FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3}, FP::NanosecondTickCount{5}, LargestField},
+    {FM::MarkerKind::SequenceEnd, 2u, 4u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1}, UnknownFrameTime,
+     FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3}, MinClock, LargestField},
+    {FM::MarkerKind::SequenceStart, 2u, 5u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1}, UnknownFrameTime,
+     FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3}, FP::NanosecondTickCount{-5},
+     FP::NanosecondTimeDuration::FromNanoseconds(80'000)},
     {FM::MarkerKind::SequenceStart, 1u, 7u, FM::MarkerFlags::NoFlags, MinAnimation},
-    {FM::MarkerKind::SequenceEnd, 3u, 42u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-1}},
-    {FM::MarkerKind::SequenceStart, 0u, 0u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}},
-    {FM::MarkerKind::Frame, 2u, 9u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, FrameTime60, FrameTime30, FP::TickCount64{3}, FP::TickCount64{5},
-     FP::TimeSpan32{6u}},
-    {FM::MarkerKind::Frame, 2u, 10u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{1}, FM::Payload::OnDemandFrameTime, FM::Payload::OnDemandFrameTime,
-     UnknownTime, UnknownTime, UnknownFrameTime},
-    {FM::MarkerKind::SequenceStart, 2u, 11u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{1}, FP::TimeSpan32{10'000'000u}, FP::TimeSpan32{4u},
-     FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
-    {FM::MarkerKind::Frame, 2u, 13u, FM::MarkerFlags::StaticBefore, FP::TimeSpan{1}, FP::TimeSpan32{7u}, FP::TimeSpan32{4u}, FP::TickCount64{3},
-     FP::TickCount64{5}, FP::TimeSpan32{6u}},
-    {FM::MarkerKind::SequenceEnd, 2u, 14u, FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, FP::TimeSpan{1}, FP::TimeSpan32{7u},
-     FP::TimeSpan32{4u}, FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
+    {FM::MarkerKind::SequenceEnd, 3u, 42u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{-1}},
+    {FM::MarkerKind::SequenceStart, 0u, 0u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}},
+    {FM::MarkerKind::Frame, 2u, 9u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1}, FrameTime60, FrameTime30, FP::NanosecondTickCount{3},
+     FP::NanosecondTickCount{5}, FP::NanosecondTimeDuration::FromNanoseconds(6)},
+    {FM::MarkerKind::Frame, 2u, 10u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{1}, FM::Payload::OnDemandFrameTime,
+     FM::Payload::OnDemandFrameTime, UnknownTime, UnknownTime, UnknownFrameTime},
+    {FM::MarkerKind::SequenceStart, 2u, 11u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{1},
+     FP::NanosecondTimeDuration::FromNanoseconds(10'000'000), FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3},
+     FP::NanosecondTickCount{5}, FP::NanosecondTimeDuration::FromNanoseconds(6)},
+    {FM::MarkerKind::Frame, 2u, 13u, FM::MarkerFlags::StaticBefore, FP::NanosecondTimeSpan{1}, FP::NanosecondTimeDuration::FromNanoseconds(7),
+     FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3}, FP::NanosecondTickCount{5},
+     FP::NanosecondTimeDuration::FromNanoseconds(6)},
+    {FM::MarkerKind::SequenceEnd, 2u, 14u, FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, FP::NanosecondTimeSpan{1},
+     FP::NanosecondTimeDuration::FromNanoseconds(7), FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3},
+     FP::NanosecondTickCount{5}, FP::NanosecondTimeDuration::FromNanoseconds(6)},
     // A reserved bit survives the round trip
-    {FM::MarkerKind::SequenceEnd, 2u, 12u, static_cast<FM::MarkerFlags>(0x81u), FP::TimeSpan{1}, FP::TimeSpan32{7u}, FP::TimeSpan32{4u},
-     FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
+    {FM::MarkerKind::SequenceEnd, 2u, 12u, static_cast<FM::MarkerFlags>(0x81u), FP::NanosecondTimeSpan{1},
+     FP::NanosecondTimeDuration::FromNanoseconds(7), FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3},
+     FP::NanosecondTickCount{5}, FP::NanosecondTimeDuration::FromNanoseconds(6)},
   }};
   for (const FM::Payload& payload : payloads)
   {
@@ -333,6 +340,51 @@ TEST(Payload, RoundTrips)
   }
 }
 
+TEST(Payload, ADurationLongerThanItsFourBytesIsHeldAsTheLongestAMarkerCarries)
+{
+  // The marker's three durations are four unsigned bytes of nanoseconds each: 4.294967295 s at most
+  static_assert(FM::Payload::MaxCpuBusy.Nanoseconds() == 0xFFFFFFFF);
+  static_assert(FM::Payload::OnDemandFrameTime.Nanoseconds() == 0xFFFFFFFF);
+  static_assert(FM::Payload::MaxFrameTime.Nanoseconds() == 0xFFFFFFFE);
+  constexpr auto TenSeconds = FP::NanosecondTimeDuration::FromNanoseconds(10'000'000'000);
+  constexpr auto Longest = FP::NanosecondTimeDuration::MaxValue();
+
+  // A longer one is capped where the payload is made (never an error: this runs in a frame loop), so a payload holds what a marker can
+  constexpr FM::Payload Capped(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{3}, TenSeconds, Longest, UnknownTime,
+                               UnknownTime, TenSeconds);
+  static_assert(Capped.PreferredFrameTime() == FM::Payload::MaxFrameTime && Capped.TargetFrameTime() == FM::Payload::MaxFrameTime);
+  static_assert(Capped.CpuBusy() == FM::Payload::MaxCpuBusy);
+  EXPECT_EQ(Capped.CpuBusy().Nanoseconds(), 4'294'967'295);
+
+  // The longest that fit are kept, and so is on demand: only on demand reads as on demand
+  constexpr FM::Payload Kept(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{3}, FM::Payload::MaxFrameTime,
+                             FM::Payload::OnDemandFrameTime, UnknownTime, UnknownTime, FM::Payload::MaxCpuBusy);
+  static_assert(Kept.PreferredFrameTime() == FM::Payload::MaxFrameTime && Kept.TargetFrameTime() == FM::Payload::OnDemandFrameTime);
+  static_assert(Kept.CpuBusy() == FM::Payload::MaxCpuBusy);
+  // One nanosecond past on demand is a frame time again, and too long
+  constexpr FM::Payload PastOnDemand(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{3},
+                                     FP::NanosecondTimeDuration::FromNanoseconds(4'294'967'296));
+  static_assert(PastOnDemand.PreferredFrameTime() == FM::Payload::MaxFrameTime);
+
+  // On the wire: 0xFFFFFFFE for a capped frame time, 0xFFFFFFFF for on demand and for a capped CPU busy
+  const auto capped = PayloadBytes(Capped);
+  const std::array<uint8_t, 4> oneBelow{0xFEu, 0xFFu, 0xFFu, 0xFFu};
+  const std::array<uint8_t, 4> largest{0xFFu, 0xFFu, 0xFFu, 0xFFu};
+  EXPECT_TRUE(std::equal(oneBelow.begin(), oneBelow.end(), capped.begin() + 25));
+  EXPECT_TRUE(std::equal(oneBelow.begin(), oneBelow.end(), capped.begin() + 29));
+  EXPECT_TRUE(std::equal(largest.begin(), largest.end(), capped.begin() + 49));
+  const auto kept = PayloadBytes(Kept);
+  EXPECT_TRUE(std::equal(oneBelow.begin(), oneBelow.end(), kept.begin() + 25));
+  EXPECT_TRUE(std::equal(largest.begin(), largest.end(), kept.begin() + 29));
+
+  // So a payload decodes to exactly what was encoded, a capped one too
+  FM::Payload decoded{};
+  ASSERT_TRUE(FM::TryDecodePayload(capped, decoded));
+  EXPECT_EQ(decoded, Capped);
+  ASSERT_TRUE(FM::TryDecodePayload(kept, decoded));
+  EXPECT_EQ(decoded, Kept);
+}
+
 TEST(Payload, ConstructorsKeepItPlainData)
 {
   static_assert(std::is_trivially_copyable_v<FM::Payload>);
@@ -340,23 +392,26 @@ TEST(Payload, ConstructorsKeepItPlainData)
   constexpr FM::Payload Empty;
   static_assert(Empty.Kind() == FM::MarkerKind::Frame && Empty.FrameIndex() == 0u && Empty.Flags() == FM::MarkerFlags::NoFlags);
   // The fields in the order of the wire format; the timing fields default to 0 (unknown)
-  constexpr FM::Payload Required(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticBefore, FP::TimeSpan{3});
-  static_assert(Required == FM::Payload(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticBefore, FP::TimeSpan{3}, UnknownFrameTime,
-                                        UnknownFrameTime, UnknownTime, UnknownTime, UnknownFrameTime));
-  constexpr FM::Payload All(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{3}, FP::TimeSpan32{4u}, FP::TimeSpan32{5u},
-                            FP::TickCount64{6}, FP::TickCount64{7}, FP::TimeSpan32{8u});
-  static_assert(All.PreferredFrameTime().Ticks() == 4u && All.TargetFrameTime().Ticks() == 5u && All.IntendedDisplayTime().Ticks() == 6 &&
-                All.CpuStartTime().Ticks() == 7 && All.CpuBusy().Ticks() == 8u);
+  constexpr FM::Payload Required(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticBefore, FP::NanosecondTimeSpan{3});
+  static_assert(Required == FM::Payload(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticBefore, FP::NanosecondTimeSpan{3},
+                                        UnknownFrameTime, UnknownFrameTime, UnknownTime, UnknownTime, UnknownFrameTime));
+  constexpr FM::Payload All(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{3},
+                            FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTimeDuration::FromNanoseconds(5),
+                            FP::NanosecondTickCount{6}, FP::NanosecondTickCount{7}, FP::NanosecondTimeDuration::FromNanoseconds(8));
+  static_assert(All.PreferredFrameTime().Nanoseconds() == 4 && All.TargetFrameTime().Nanoseconds() == 5 &&
+                All.IntendedDisplayTime().Nanoseconds() == 6 && All.CpuStartTime().Nanoseconds() == 7 && All.CpuBusy().Nanoseconds() == 8);
   EXPECT_EQ(All.RunId(), 1u);
 }
 
 TEST(Payload, WithKindKeepsEveryOtherValue)
 {
-  constexpr FM::Payload Frame(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::StaticAfter, FP::TimeSpan{3}, FP::TimeSpan32{4u}, FP::TimeSpan32{5u},
-                              FP::TickCount64{6}, FP::TickCount64{7}, FP::TimeSpan32{8u});
-  static_assert(Frame.WithKind(FM::MarkerKind::SequenceEnd) == FM::Payload(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticAfter,
-                                                                           FP::TimeSpan{3}, FP::TimeSpan32{4u}, FP::TimeSpan32{5u},
-                                                                           FP::TickCount64{6}, FP::TickCount64{7}, FP::TimeSpan32{8u}));
+  constexpr FM::Payload Frame(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{3},
+                              FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTimeDuration::FromNanoseconds(5),
+                              FP::NanosecondTickCount{6}, FP::NanosecondTickCount{7}, FP::NanosecondTimeDuration::FromNanoseconds(8));
+  static_assert(Frame.WithKind(FM::MarkerKind::SequenceEnd) ==
+                FM::Payload(FM::MarkerKind::SequenceEnd, 1u, 2u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{3},
+                            FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTimeDuration::FromNanoseconds(5),
+                            FP::NanosecondTickCount{6}, FP::NanosecondTickCount{7}, FP::NanosecondTimeDuration::FromNanoseconds(8)));
   static_assert(Frame.WithKind(FM::MarkerKind::Frame) == Frame);
 }
 
@@ -365,14 +420,14 @@ TEST(Payload, AnUnknownKindIsAsserted)
   constexpr auto Unknown = static_cast<FM::MarkerKind>(4u);
 #ifdef NDEBUG
   // Without asserts nothing encodes it
-  const FM::Payload payload(Unknown, 1u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{3});
+  const FM::Payload payload(Unknown, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{3});
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
   EXPECT_EQ(FM::EncodePayload(payload, {}, buffer), 0u);
   FM::ModuleMatrix matrix;
   EXPECT_FALSE(FM::GenerateModules(payload, matrix));
   EXPECT_EQ(FM::EncodePayload(FM::Payload().WithKind(Unknown), {}, buffer), 0u);
 #elif GTEST_HAS_DEATH_TEST
-  EXPECT_DEATH(static_cast<void>(FM::Payload(Unknown, 1u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{3})), "");
+  EXPECT_DEATH(static_cast<void>(FM::Payload(Unknown, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{3})), "");
   EXPECT_DEATH(static_cast<void>(FM::Payload().WithKind(Unknown)), "");
 #else
   GTEST_SKIP() << "asserts are on and death tests are not available";
@@ -388,7 +443,7 @@ TEST(Payload, MarkerFlagsCombine)
   static_assert(!FM::HasFlag(FM::MarkerFlags::StaticAfter, FM::MarkerFlags::StaticBefore));
   static_assert(FM::HasFlag(FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore, FM::MarkerFlags::StaticBefore));
   EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticBefore), 0x02u);
-  static_assert(FM::Payload::OnDemandFrameTime.Ticks() == std::numeric_limits<uint32_t>::max());
+  static_assert(FM::Payload::OnDemandFrameTime.Nanoseconds() == std::numeric_limits<uint32_t>::max());
   EXPECT_EQ(static_cast<uint8_t>(FM::MarkerFlags::StaticAfter | Reserved), 0x81u);
   // At run time too
   const FM::MarkerFlags both = FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore;
@@ -399,7 +454,7 @@ TEST(Payload, MarkerFlagsCombine)
 
 TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 {
-  auto header = PayloadBytes({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
+  auto header = PayloadBytes({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   header.resize(FM::WireFormat::PayloadByteCount);
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(header, decoded));
@@ -407,7 +462,7 @@ TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 
 TEST(Payload, TryDecodeRejectsBadInput)
 {
-  auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
+  auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   FM::Payload decoded{};
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::PayloadByteCount - 1), decoded));
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::SyncPayloadByteCount - 1), decoded));
@@ -439,12 +494,12 @@ TEST(Payload, AChangedBitIsRefused)
                            0x21222324u,
                            0x0102030405060708u,
                            FM::MarkerFlags::StaticAfter,
-                           FP::TimeSpan{0x1112131415161718},
-                           FP::TimeSpan32{0x71727374u},
-                           FP::TimeSpan32{0x41424344u},
-                           FP::TickCount64{0x3132333435363738},
-                           FP::TickCount64{0x5152535455565758},
-                           FP::TimeSpan32{0x61626364u}};
+                           FP::NanosecondTimeSpan{0x1112131415161718},
+                           FP::NanosecondTimeDuration::FromNanoseconds(0x71727374),
+                           FP::NanosecondTimeDuration::FromNanoseconds(0x41424344),
+                           FP::NanosecondTickCount{0x3132333435363738},
+                           FP::NanosecondTickCount{0x5152535455565758},
+                           FP::NanosecondTimeDuration::FromNanoseconds(0x61626364)};
   FM::SequenceId id;
   ASSERT_TRUE(FM::SequenceId::TryFromText("a changed bit", id));
   for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::SequenceStart, FM::MarkerKind::SequenceEnd, FM::MarkerKind::Sync})
@@ -467,7 +522,7 @@ TEST(Payload, AFieldChangedWithoutItsCrcIsRefused)
 {
   // What a QR decoder's error correction can hand back for a symbol that mixes two frames: a well-formed payload of bytes that were
   // never drawn. Only the CRC tells
-  std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Frame, 7u, 1'000u, FM::MarkerFlags::NoFlags, FP::TimeSpan{166'667}});
+  std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Frame, 7u, 1'000u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{166'667}});
   FM::Payload decoded{};
   ASSERT_TRUE(FM::TryDecodePayload(bytes, decoded));
   bytes[FM::WireFormat::OffsetFrameIndex] = 0xE9u;
@@ -479,7 +534,7 @@ TEST(Payload, AFieldChangedWithoutItsCrcIsRefused)
 
 TEST(Payload, DecodingASyncMarkerResetsTheMetadata)
 {
-  const std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{}});
+  const std::vector<uint8_t> bytes = PayloadBytes({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{}});
   FM::Payload decoded{};
   FM::StartMetadata metadata{9, FM::SequenceId{{1u, 2u, 3u}}};
   ASSERT_TRUE(FM::TryDecodePayload(bytes, decoded, &metadata));
@@ -493,8 +548,9 @@ TEST(Payload, TryDecodeRejectsWrongLengths)
   FM::Payload decoded{};
   for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::SequenceEnd})
   {
-    ASSERT_EQ(FM::EncodePayload({kind, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4},
-                                 FP::TickCount64{6}, FP::TimeSpan32{7u}},
+    ASSERT_EQ(FM::EncodePayload({kind, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}, UnknownFrameTime,
+                                 FP::NanosecondTimeDuration::FromNanoseconds(5), FP::NanosecondTickCount{4}, FP::NanosecondTickCount{6},
+                                 FP::NanosecondTimeDuration::FromNanoseconds(7)},
                                 {}, buffer),
               57u);
     EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(57), decoded));
@@ -503,8 +559,9 @@ TEST(Payload, TryDecodeRejectsWrongLengths)
     // The header alone, as a payload was before it had a CRC
     EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(53), decoded));
   }
-  ASSERT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u},
-                               FP::TickCount64{4}, FP::TickCount64{6}, FP::TimeSpan32{7u}},
+  ASSERT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}, UnknownFrameTime,
+                               FP::NanosecondTimeDuration::FromNanoseconds(5), FP::NanosecondTickCount{4}, FP::NanosecondTickCount{6},
+                               FP::NanosecondTimeDuration::FromNanoseconds(7)},
                               {9, {}}, buffer),
             81u);
   EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(81), decoded));
@@ -532,12 +589,12 @@ TEST(Payload, StartMetadataRoundTrips)
                             30u,
                             10u,
                             FM::MarkerFlags::NoFlags,
-                            FP::TimeSpan{20},
+                            FP::NanosecondTimeSpan{20},
                             UnknownFrameTime,
-                            FP::TimeSpan32{50u},
-                            FP::TickCount64{40},
-                            FP::TickCount64{60},
-                            FP::TimeSpan32{70u}};
+                            FP::NanosecondTimeDuration::FromNanoseconds(50),
+                            FP::NanosecondTickCount{40},
+                            FP::NanosecondTickCount{60},
+                            FP::NanosecondTimeDuration::FromNanoseconds(70)};
   for (const FM::StartMetadata& expected : cases)
   {
     SCOPED_TRACE(testing::PrintToString(expected.Id));
@@ -559,9 +616,9 @@ TEST(Payload, StartMetadataRoundTrips)
 
   // Frame and end payloads ignore the metadata and stay PayloadByteCount bytes, and decoding them resets the metadata
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
-  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, {5, textId}, buffer),
+  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}, {5, textId}, buffer),
             FM::WireFormat::PayloadByteCount);
-  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, {5, textId}, buffer),
+  EXPECT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}, {5, textId}, buffer),
             FM::WireFormat::PayloadByteCount);
   FM::Payload decoded{};
   FM::StartMetadata metadata{5, textId};
@@ -667,14 +724,16 @@ TEST(Geometry, TooSmallDestinationGeneratesNothing)
 TEST(Symbol, SyncMarkersAreVersion2)
 {
   FM::ModuleMatrix matrix;
-  ASSERT_TRUE(FM::GenerateModules(
-    {FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime, FP::TimeSpan32{5u}, FP::TickCount64{4}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}, UnknownFrameTime,
+                                   FP::NanosecondTimeDuration::FromNanoseconds(5), FP::NanosecondTickCount{4}},
+                                  matrix));
   EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::SyncSize);
   EXPECT_EQ(matrix.Size(), 25);
 
   const FM::Options options{3, 4};
   std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
-  const std::size_t count = GenerateQuads({FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, options, {10, 20}, quads);
+  const std::size_t count =
+    GenerateQuads({FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}, options, {10, 20}, quads);
   ASSERT_GT(count, 0u);
   EXPECT_EQ(quads.front(), (FM::MarkerQuad{FP::Rectangle(10, 20, 99, 99), false}));
 }
@@ -682,11 +741,16 @@ TEST(Symbol, SyncMarkersAreVersion2)
 TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 {
   std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
-  const FM::Payload payload{FM::MarkerKind::Sync, 4u,
-                            0x0102030405060708u,  FM::MarkerFlags::NoFlags,
-                            FP::TimeSpan{123},    UnknownFrameTime,
-                            FP::TimeSpan32{6u},   FP::TickCount64{5},
-                            FP::TickCount64{7},   FP::TimeSpan32{8u}};
+  const FM::Payload payload{FM::MarkerKind::Sync,
+                            4u,
+                            0x0102030405060708u,
+                            FM::MarkerFlags::NoFlags,
+                            FP::NanosecondTimeSpan{123},
+                            UnknownFrameTime,
+                            FP::NanosecondTimeDuration::FromNanoseconds(6),
+                            FP::NanosecondTickCount{5},
+                            FP::NanosecondTickCount{7},
+                            FP::NanosecondTimeDuration::FromNanoseconds(8)};
   const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
   ASSERT_EQ(byteCount, FM::WireFormat::SyncPayloadByteCount);
   // The header's first 16 bytes and their CRC (0xC0A3D4F2 by Python's binascii.crc32)
@@ -697,9 +761,9 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 
   FM::Payload decoded{};
   ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
-  EXPECT_EQ(decoded, (FM::Payload{FM::MarkerKind::Sync, payload.RunId(), payload.FrameIndex(), FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}));
-  EXPECT_EQ(decoded.CpuStartTime().Ticks(), 0);
-  EXPECT_EQ(decoded.CpuBusy().Ticks(), 0u);
+  EXPECT_EQ(decoded, (FM::Payload{FM::MarkerKind::Sync, payload.RunId(), payload.FrameIndex(), FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}));
+  EXPECT_EQ(decoded.CpuStartTime().Nanoseconds(), 0);
+  EXPECT_EQ(decoded.CpuBusy().Nanoseconds(), 0);
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded));
   EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::WireFormat::SyncFieldsByteCount), decoded));
@@ -708,17 +772,18 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
 TEST(Symbol, EveryMarkerIsVersion6)
 {
   FM::ModuleMatrix matrix;
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}, matrix));
   EXPECT_EQ(matrix.Size(), 41);
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceEnd, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}, matrix));
   EXPECT_EQ(matrix.Size(), 41);
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, matrix, {}));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}, matrix, {}));
   EXPECT_EQ(matrix.Size(), 41);
 
   FM::SequenceId id;
   ASSERT_TRUE(FM::SequenceId::TryFromText("0123456789abcdef", id));
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}, UnknownFrameTime,
-                                   FP::TimeSpan32{5u}, FP::TickCount64{4}, FP::TickCount64{6}, FP::TimeSpan32{7u}},
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}, UnknownFrameTime,
+                                   FP::NanosecondTimeDuration::FromNanoseconds(5), FP::NanosecondTickCount{4}, FP::NanosecondTickCount{6},
+                                   FP::NanosecondTimeDuration::FromNanoseconds(7)},
                                   matrix, {123, id}));
   EXPECT_EQ(matrix.Size(), FM::ModuleMatrix::MainSize);
 
@@ -735,7 +800,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
   const FP::Point origin{32, 32};
   std::vector<FM::MarkerQuad> quads(FM::MaxQuadCount());
   const std::size_t count =
-    GenerateStartQuads({FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{6}}, {99, id}, options, origin, quads);
+    GenerateStartQuads({FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{6}}, {99, id}, options, origin, quads);
   ASSERT_GT(count, 0u);
   ASSERT_LE(count, FM::MaxQuadCount());
   const FM::MarkerQuad& background = quads.front();
@@ -751,7 +816,7 @@ TEST(Geometry, StartQuadsStayWithinTheMarkerSizeAndMaxQuadCount)
 
 TEST(Geometry, QuadsArePixelAlignedAndReproduceTheModuleMatrix)
 {
-  const FM::Payload payload{FM::MarkerKind::Frame, 0u, 123'456'789u, FM::MarkerFlags::NoFlags, FP::TimeSpan{36'000'000'000}};
+  const FM::Payload payload{FM::MarkerKind::Frame, 0u, 123'456'789u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{36'000'000'000}};
   for (const int32_t moduleSize : {1, 2, 3, 6})
   {
     for (const int32_t quiet : {0, 1, 4})
@@ -830,15 +895,15 @@ TEST(Symbol, DifferentPayloadsGiveDifferentSymbols)
 {
   FM::ModuleMatrix a;
   FM::ModuleMatrix b;
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, a));
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 2u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, b));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}, a));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}, b));
   EXPECT_NE(a, b);
 }
 
 TEST(Symbol, FinderPatternsArePresent)
 {
   FM::ModuleMatrix matrix;
-  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 99u, FM::MarkerFlags::NoFlags, FP::TimeSpan{99}}, matrix));
+  ASSERT_TRUE(FM::GenerateModules({FM::MarkerKind::Frame, 0u, 99u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{99}}, matrix));
   // Top-left finder: 7x7 dark ring with a dark 3x3 centre.
   for (int32_t i = 0; i < 7; ++i)
   {
@@ -859,7 +924,7 @@ TEST(Symbol, FinderPatternsArePresent)
 
 TEST(Vertices, TheBackgroundQuadIsDrawnInTheDocumentedOrder)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   const FM::Options options{2, 4};
   const int32_t size = options.MarkerSizePx();
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
@@ -900,19 +965,20 @@ namespace
       for (const int32_t quietZone : {0, 4})
       {
         const FM::Options options{moduleSize, quietZone};
-        cases.push_back({{FM::MarkerKind::Frame, 3u, 42u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1'234'567}, UnknownFrameTime, FrameTime60,
-                          FP::TickCount64{987'654'321}, FP::TickCount64{987'487'654}},
+        cases.push_back({{FM::MarkerKind::Frame, 3u, 42u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1'234'567}, UnknownFrameTime, FrameTime60,
+                          FP::NanosecondTickCount{987'654'321}, FP::NanosecondTickCount{987'487'654}},
                          {},
                          options,
                          {5, 7}});
-        cases.push_back({{FM::MarkerKind::SequenceEnd, 3u, 43u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1'400'234}}, {}, options, {0, 0}});
+        cases.push_back({{FM::MarkerKind::SequenceEnd, 3u, 43u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1'400'234}}, {}, options, {0, 0}});
         FM::SequenceId textId;
         FM::SequenceId::TryFromText("triangle-case", textId);
         FM::SequenceId fullId;
         fullId.Bytes.fill(0xFFu);
         for (const FM::SequenceId& id : {FM::SequenceId{}, textId, fullId})
         {
-          cases.push_back({{FM::MarkerKind::SequenceStart, 3u, 41u, FM::MarkerFlags::NoFlags, FP::TimeSpan{1'067'890}}, id, options, {32, 64}});
+          cases.push_back(
+            {{FM::MarkerKind::SequenceStart, 3u, 41u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1'067'890}}, id, options, {32, 64}});
         }
       }
     }
@@ -1064,7 +1130,7 @@ TEST(Triangles, FrameMarkersFitTheBufferSizes)
   for (uint64_t frame = 0; frame < 500u; ++frame)
   {
     const FM::Payload payload{FM::MarkerKind::Frame, 9u, frame * 7919u, FM::MarkerFlags::NoFlags,
-                              FP::TimeSpan{static_cast<int64_t>(frame) * 166'667}};
+                              FP::NanosecondTimeSpan{static_cast<int64_t>(frame) * 166'667}};
     EXPECT_GT(GenerateTriangles(payload, {}, {0, 0}, vertices), 0u) << "frame " << frame;
     EXPECT_GT(GenerateIndexed(payload, {}, {0, 0}, indexedVertices, indices).IndexCount, 0u) << "frame " << frame;
   }
@@ -1072,7 +1138,7 @@ TEST(Triangles, FrameMarkersFitTheBufferSizes)
 
 TEST(Triangles, SmallBuffersGenerateNothing)
 {
-  const FM::Payload payload{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}};
+  const FM::Payload payload{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}};
   std::vector<FM::Vertex> vertices(FM::MaxTriangleVertexCount());
   std::vector<FM::Vertex> tooFew(12);
   EXPECT_EQ(GenerateTriangles(payload, {}, {0, 0}, tooFew), 0u);
@@ -1144,7 +1210,7 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
 {
   for (const FM::MarkerKind kind : {FM::MarkerKind::Frame, FM::MarkerKind::Sync})
   {
-    const FM::ModuleMatrix matrix = Encode({kind, 9u, 12345u, FM::MarkerFlags::NoFlags, FP::TimeSpan{678}});
+    const FM::ModuleMatrix matrix = Encode({kind, 9u, 12345u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{678}});
     const int32_t size = matrix.Size();
     const auto bits = matrix.Bits();
     ASSERT_EQ(bits.size(), FM::ModuleMatrix::PackedModuleByteCount(size));
@@ -1166,7 +1232,7 @@ TEST(ModuleMatrix, BitsArePackedRowMajorMostSignificantBitFirst)
 
 TEST(ModuleMatrix, TryFromBitsTakesTheMarkerSizesAndIgnoresThePadding)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   std::array<uint8_t, FM::ModuleMatrix::MaxPackedModuleByteCount> bits{};
   std::copy(matrix.Bits().begin(), matrix.Bits().end(), bits.begin());
   bits[FM::ModuleMatrix::PackedModuleByteCount(25) - 1u] |= 0x7Fu;    // 625 modules: the last byte uses 1 bit
@@ -1188,7 +1254,7 @@ TEST(ModuleMatrix, TryFromBitsTakesTheMarkerSizesAndIgnoresThePadding)
   EXPECT_EQ(copy, matrix) << "a refused call leaves the matrix unchanged";
   EXPECT_NE(copy, FM::ModuleMatrix{});
 
-  const FM::ModuleMatrix main = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
+  const FM::ModuleMatrix main = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   ASSERT_TRUE(FM::ModuleMatrix::TryFromBits(FM::ModuleMatrix::MainSize, main.Bits(), copy));
   EXPECT_EQ(copy, main);
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(FM::ModuleMatrix::MainSize, main.Bits().first(210), copy));
@@ -1218,14 +1284,15 @@ namespace
   };
 
   const std::array<BitmapCase, 5> g_bitmapCases{{
-    {{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}, FM::Options(3, 4), {5, 7}},
-    {{FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-5}}, FM::Options(1, 0), {0, 0}},
-    {{FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}}, FM::Options(2, 4), {3, 1}},
-    {{FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u},
-      FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
+    {{FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}, FM::Options(3, 4), {5, 7}},
+    {{FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{-5}}, FM::Options(1, 0), {0, 0}},
+    {{FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}, FM::Options(2, 4), {3, 1}},
+    {{FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1}, UnknownFrameTime,
+      FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3}, FP::NanosecondTickCount{5},
+      FP::NanosecondTimeDuration::FromNanoseconds(6)},
      FM::Options(2, 1),
      {-9, -4}},
-    {{FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{6}}, FM::Options(4, 2), {100, 60}},
+    {{FM::MarkerKind::Frame, 7u, 5u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{6}}, FM::Options(4, 2), {100, 60}},
   }};
 }
 
@@ -1283,7 +1350,7 @@ TEST(Bitmap, EqualsTheRasterizedQuadsInEveryPixelFormat)
 
 TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 59u, 31u, FM::MarkerFlags::NoFlags, FP::TimeSpan{41}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 59u, 31u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{41}});
   constexpr int32_t ModuleSize = 3;
   const FM::Options small{1, 4};
   const FM::Options large{ModuleSize, 4};
@@ -1306,7 +1373,7 @@ TEST(Bitmap, AModuleResolutionImageScaledUpEqualsTheFullSizeOne)
 
 TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
 {
-  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}});
+  const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   std::vector<uint8_t> pixels(std::size_t{64} * 64u * 4u, 128u);
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, 64, 64, FM::PixelFormat::R8G8B8, 64u * 3u - 1u)) << "short stride";
   EXPECT_FALSE(
@@ -1355,12 +1422,13 @@ TEST(Grid, ResolvedIndicesEqualTheIndexedTrianglesTriangleByTriangle)
 {
   constexpr uint32_t BaseVertex = 100u;
   const std::array<FM::Payload, 5> payloads{{
-    {FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}},
-    {FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::NoFlags, FP::TimeSpan{-5}},
-    {FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::TimeSpan{0}},
-    {FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::NoFlags, FP::TimeSpan{1}, UnknownFrameTime, FP::TimeSpan32{4u},
-     FP::TickCount64{3}, FP::TickCount64{5}, FP::TimeSpan32{6u}},
-    {FM::MarkerKind::SequenceStart, 7u, 5u, FM::MarkerFlags::NoFlags, FP::TimeSpan{6}},
+    {FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}},
+    {FM::MarkerKind::SequenceEnd, 1u, 99u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{-5}},
+    {FM::MarkerKind::Sync, 0u, 7u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}},
+    {FM::MarkerKind::Frame, 2u, 0xFFFFFFFFFFFFFFFFu, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{1}, UnknownFrameTime,
+     FP::NanosecondTimeDuration::FromNanoseconds(4), FP::NanosecondTickCount{3}, FP::NanosecondTickCount{5},
+     FP::NanosecondTimeDuration::FromNanoseconds(6)},
+    {FM::MarkerKind::SequenceStart, 7u, 5u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{6}},
   }};
   for (const FM::Payload& payload : payloads)
   {
@@ -1394,9 +1462,9 @@ TEST(Grid, SmallBuffersGiveNothing)
   EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {}, {}, std::span<FM::Vertex>(grid).first(1767)), 0u);
   EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Sync, {}, {}, std::span<FM::Vertex>(grid).first(680)), 680u);
   std::array<uint32_t, 12> indices{};
-  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}), indices), 0u);
+  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}), indices), 0u);
   EXPECT_EQ(FM::ModulesToGridIndices(FM::ModuleMatrix{}, indices), 0u);
-  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::TimeSpan{2}}),
+  EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}),
                                      std::span<uint32_t>(indices).first(5)),
             0u)
     << "not even the background";

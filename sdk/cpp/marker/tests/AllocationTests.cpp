@@ -5,9 +5,9 @@
 // new/delete (mb_framepacing_test_support) and checks that every generate / encode / convert call stays at zero allocations.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -33,7 +33,7 @@ namespace FM = MB::FramePacing::Marker;
 
 namespace
 {
-  constexpr FP::TimeSpan32 FrameTime60{166'667u};
+  constexpr FP::NanosecondTimeDuration FrameTime60 = FP::NanosecondTimeDuration::FromNanoseconds(16'666'667);
 }
 
 namespace
@@ -71,19 +71,19 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
     const FT::AllocationCounter counter;
     for (uint64_t frame = 0; frame < 200u; ++frame)
     {
-      const auto ticks = static_cast<int64_t>(frame) * (MB::FramePacing::TimeSpan::TicksPerSecond / 60);
+      const auto time = static_cast<int64_t>(frame) * (FP::NanosecondTimeSpan::NanosecondsPerSecond / 60);
       const FM::Payload framePayload{FM::MarkerKind::Frame,
                                      7u,
                                      frame,
                                      FM::MarkerFlags::StaticAfter,
-                                     FP::TimeSpan{ticks},
+                                     FP::NanosecondTimeSpan{time},
                                      FrameTime60,
                                      FrameTime60,
-                                     FP::TickCount64{ticks + 50'000},
-                                     FP::TickCount64{ticks - 10'000},
-                                     FP::TimeSpan32{80'000u}};
-      const FM::Payload endPayload{FM::MarkerKind::SequenceEnd, 7u, frame, FM::MarkerFlags::NoFlags, FP::TimeSpan{ticks}};
-      const FM::Payload startPayload{FM::MarkerKind::SequenceStart, 7u, frame, FM::MarkerFlags::NoFlags, FP::TimeSpan{ticks}};
+                                     FP::NanosecondTickCount{time + 5'000'000},
+                                     FP::NanosecondTickCount{time - 1'000'000},
+                                     FP::NanosecondTimeDuration::FromNanoseconds(8'000'000)};
+      const FM::Payload endPayload{FM::MarkerKind::SequenceEnd, 7u, frame, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{time}};
+      const FM::Payload startPayload{FM::MarkerKind::SequenceStart, 7u, frame, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{time}};
       written += FM::SequenceId::TryFromText("allocation-test", metadata.Id) ? 1u : 0u;
 
       written += FM::GenerateModules(framePayload, g_matrix) ? 1u : 0u;

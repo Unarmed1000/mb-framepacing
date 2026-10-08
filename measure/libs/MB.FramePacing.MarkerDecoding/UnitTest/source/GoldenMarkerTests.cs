@@ -106,13 +106,23 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var frameLock = new MarkerLock(new PixelRect(32, 32, MarkerRenderer.MarkerSizePx(6), MarkerRenderer.MarkerSizePx(6)), 6);
       foreach (var golden in TestData.LoadGoldenMarkers().Where(g => g.ModuleSizePx == 6))
       {
+        // The tools count in ticks. One golden marker's intended display time is the first nanosecond a marker holds, which is inside a
+        // tick that starts before it: the tools can not draw that tick, so they draw the first one whose nanoseconds a marker holds
+        var payload = golden.Payload with
+        {
+          IntendedDisplayTime = FirstDrawable(golden.Payload.IntendedDisplayTime),
+          CpuStartTime = FirstDrawable(golden.Payload.CpuStartTime),
+        };
         var image = new GrayImage(400, 400, 128);
-        MarkerRenderer.Render(image, golden.Payload, 32, 32, 6, metadata: golden.Start);
+        MarkerRenderer.Render(image, payload, 32, 32, 6, metadata: golden.Start);
         var result = new MarkerDecoder().DecodeLocked(image, frameLock);
-        Assert.That(result.Payload, Is.EqualTo(golden.Payload), golden.ToString());
+        Assert.That(result.Payload, Is.EqualTo(payload), golden.ToString());
         Assert.That(result.Start, Is.EqualTo(golden.Start), golden.ToString());
       }
     }
+
+    private static TickCount64 FirstDrawable(TickCount64 time) =>
+      time.Ticks < NanosecondTickCount.MinTicks ? new TickCount64(NanosecondTickCount.MinTicks) : time;
 
     /// <summary>Locked decoding must read every payload, including the rare module patterns that defeat the finder pattern detector.</summary>
     [TestCase(2)]
@@ -132,7 +142,8 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
           (uint)random.Next(),
           (ulong)random.NextInt64(),
           MB.FramePacing.Marker.MarkerFlags.NoFlags,
-          new TimeSpan(random.NextInt64())
+          // Any time a marker's nanoseconds hold (a TimeSpan reaches a hundred times as far)
+          new TimeSpan(random.NextInt64(long.MaxValue / NanosecondTimeSpan.NanosecondsPerTick))
         );
         var image = new GrayImage(size + 80, size + 80, 128);
         MarkerRenderer.Render(image, payload, 32, 32, moduleSize);

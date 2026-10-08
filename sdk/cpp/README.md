@@ -104,13 +104,19 @@ faster still.
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Flags (optional):** `MarkerFlags::StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags::StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame).
-- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`MB::FramePacing::TimeSpan::TicksPerSecond`).
-- **Frame pacing (optional):** `PreferredFrameTime` (a `TimeSpan32`: the interval the application wants to run at; it differs from the target only
-  while the pacer runs slower than wanted), `TargetFrameTime` (a `TimeSpan32`: the interval the pacer aims for, `166'667` ticks for 60 fps) and
-  `IntendedDisplayTime` (a `TickCount64`: when the pacer intends the frame to be shown on its steady clock, any epoch; the SDK never
-  reads a clock: `TickCount64::FromNanoseconds`, `TickCount64::FromCounter` or `core/time/ChronoConversion.hpp` convert yours). `0` = unknown, `Payload::OnDemandFrameTime` = frames only when something changes.
-- **CPU start time and CPU busy (optional):** `CpuStartTime` (a `TickCount64`: when the CPU started working on the frame, on the same clock,
-  PresentMon's `CPUStartTime`) and `CpuBusy` (a `TimeSpan32`: how long until Present, PresentMon's `MsCPUBusy`). `0` = unknown.
+- **Animation time:** the moment the frame shows, as the application animated it, a `NanosecondTimeSpan` (`FromSeconds(seconds)` from
+  an animation clock in seconds). Every time in the payload is in nanoseconds.
+- **Frame pacing (optional):** `PreferredFrameTime` (a `NanosecondTimeDuration`: the interval the application wants to run at; it differs
+  from the target only while the pacer runs slower than wanted), `TargetFrameTime` (a `NanosecondTimeDuration`: the interval the pacer aims
+  for, `16'666'667` ns for 60 fps) and `IntendedDisplayTime` (a `NanosecondTickCount`: when the pacer intends the frame to be shown on its
+  steady clock, any epoch; the SDK never reads a clock: `NanosecondTickCount::FromNanoseconds`, `NanosecondTickCount::FromCounter` or
+  `core/time/ChronoConversion.hpp` convert yours). `0` = unknown, `Payload::OnDemandFrameTime` = frames only when something changes.
+- **CPU start time and CPU busy (optional):** `CpuStartTime` (a `NanosecondTickCount`: when the CPU started working on the frame, on the
+  same clock, PresentMon's `CPUStartTime`) and `CpuBusy` (a `NanosecondTimeDuration`: how long until Present, PresentMon's `MsCPUBusy`).
+  `0` = unknown.
+- **A duration is never negative and never too long for the marker:** the marker carries its three durations in four bytes each, so a
+  payload holds a CPU busy of at most `Payload::MaxCpuBusy` (4.294967295 s) and a frame time of at most `Payload::MaxFrameTime`
+  (4.294967294 s); a longer one is held as that, never an error.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
   (`GenerateModules(payload, matrix, {utcTicks, sequenceId})`), and a payload of kind `MarkerKind::SequenceEnd`, each shown for a few
   frames. The sequence id is 16 opaque bytes unique to the run: a UUID's bytes, or a text tag of up to 16 printable ASCII characters
@@ -242,12 +248,12 @@ In `MB::FramePacing`, each in its own header (`<mb/framepacing/core/…>`, the t
 | Function or type                                                                                        | What it does                                                                                                                                                                                                            |
 | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GetLibraryVersion`, `LibraryVersion`; `core/Version.hpp`                                               | The linked library's version; at compile time, for `#if` and `static_assert`                                                                                                                                            |
-| `TimeSpan`                                                                                              | An interval in 100 ns ticks (the SDK's unit), C#'s `System.TimeSpan`: out of range throws, as in C#                                                                                                                     |
+| `TimeSpan`                                                                                              | An interval in ticks of 100 ns, C#'s `System.TimeSpan`: out of range throws, as in C#                                                                                                                                   |
 | `TickCount64`                                                                                           | A point on your steady clock in ticks (`FromNanoseconds`, `FromCounter` for QueryPerformanceCounter)                                                                                                                    |
 | `TickCount32`                                                                                           | A point on a 32-bit clock of ticks that wraps every 429.5 s; compares correctly across the wrap                                                                                                                         |
-| `TimeSpan32`                                                                                            | An unsigned 32-bit interval of 0 to 429.5 s: the form of the marker's 32-bit intervals                                                                                                                                  |
+| `TimeSpan32`                                                                                            | An unsigned 32-bit interval of 0 to 429.5 s in ticks                                                                                                                                                                    |
 | `NanosecondTimeSpan`, `NanosecondTickCount`                                                             | An interval and a point on a clock in nanoseconds, kept as a platform that counts in nanoseconds gives them (`FromSeconds`, `FromCounter` for QueryPerformanceCounter); exact from ticks, to ticks the tick they are in |
-| `NanosecondTimeDuration`                                                                                | A length of time in nanoseconds that is never negative (a negative one becomes zero), as `TimeDuration` is in ticks                                                                                                     |
+| `NanosecondTimeDuration`                                                                                | A length of time in nanoseconds that is never negative (a negative one becomes zero), as `TimeDuration` is in ticks: the marker's frame times and CPU busy                                                              |
 | `core/time/ChronoConversion.hpp` (optional): `TickDuration`, `NanosecondDuration`, `ToDateTimeTicks`, … | `std::chrono` conversions for the tick and the nanosecond types, and the wall clock as C# `DateTime` ticks                                                                                                              |
 | `Point`, `Rectangle`                                                                                    | A pixel position; an integer pixel rectangle, always valid (a negative size is 0)                                                                                                                                       |
 | `ByteSpanUtil`: `WriteLE`, `ReadLE<T>`                                                                  | Little-endian values in byte spans, the byte count from the type                                                                                                                                                        |
@@ -268,8 +274,8 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 | Toolchain               | Compiler                   | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      20.8 KiB |            221.3 KiB |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.3 KiB |            192.8 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.0 KiB |            221.8 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.5 KiB |            193.1 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.4 KiB |            215.7 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.2 KiB |            139.0 KiB |
 | Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      20.0 KiB |            189.6 KiB |

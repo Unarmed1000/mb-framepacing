@@ -47,10 +47,10 @@ def cases() -> Iterator[tuple[int, MarkerKind, ModuleMatrix, Options, Point]]:
             rng.randrange(1 << 40),
             MarkerFlags.NO_FLAGS,
             rng.randrange(1 << 50),
-            target_frame_ticks=166_667,
-            intended_display_ticks=rng.randrange(1 << 50),
-            cpu_start_ticks=rng.randrange(1 << 50),
-            cpu_busy_ticks=rng.randrange(1 << 20),
+            target_frame_ns=16_666_667,
+            intended_display_ns=rng.randrange(1 << 50),
+            cpu_start_ns=rng.randrange(1 << 50),
+            cpu_busy_ns=rng.randrange(1 << 20),
         )
         if kind == MarkerKind.SEQUENCE_START:
             matrix = generate_modules(payload, StartMetadata(rng.randrange(1 << 60), SequenceId.from_text("shader-check")))

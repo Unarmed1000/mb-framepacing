@@ -10,8 +10,8 @@ Only the frame index and the animation time are required. Every other field make
 
 ## The clocks
 
-Every time is in **ticks of 100 ns** (C# `TimeSpan` ticks, 10'000'000 per second). The fields come from three clocks; keep each field
-on its clock for the whole run:
+Every time is a whole number of **nanoseconds** (1'000'000'000 per second), except the start marker's start time. The fields come
+from three clocks; keep each field on its clock for the whole run:
 
 | Clock                                     | Fields                                | What it is                                                                                                              |
 | ----------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -19,31 +19,31 @@ on its clock for the whole run:
 | The **pacer's steady clock**              | Intended display time, CPU start time | A monotonic clock (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`, `time.monotonic_ns`), any epoch |
 | **UTC**                                   | Start time (start marker only)        | The wall clock, as C# `DateTime` UTC ticks (100 ns since 0001-01-01)                                                    |
 
-The three frame times (target, preferred, CPU busy) are intervals, not points in time, so they have no clock of their own.
+The three frame times (target, preferred, CPU busy) are intervals, not points in time, so they have no clock of their own. The
+libraries type them as durations (`NanosecondTimeDuration`), which are never negative.
 
 `0` means **unknown** in every time field but the animation time. A steady clock whose epoch could make a real value
 exactly `0` (a counter that starts at the process start, say) must be offset, or that frame reads as unknown.
 
-Steady clock ticks in each language:
+The steady clock in each language:
 
 ```cpp
-// C++: your steady clock in ticks (MB::FramePacing::TickDuration, core/time/ChronoConversion.hpp, is the 100 ns std::chrono duration)
-const int64_t nowTicks =
-  std::chrono::duration_cast<MB::FramePacing::TickDuration>(std::chrono::steady_clock::now().time_since_epoch()).count();
+// C++: your steady clock (core/time/ChronoConversion.hpp has the optional std::chrono conversions)
+const MB::FramePacing::NanosecondTickCount now = MB::FramePacing::ToNanosecondTickCount(std::chrono::steady_clock::now());
 ```
 
 ```csharp
-// C#: Stopwatch's frequency differs between platforms; convert through double so a long uptime cannot overflow
-long nowTicks = (long)(Stopwatch.GetTimestamp() * ((double)TimeSpan.TicksPerSecond / Stopwatch.Frequency));
+// C#: Stopwatch's frequency differs between platforms; FromCounter converts the whole seconds and the rest apart, so no uptime overflows
+NanosecondTickCount now = NanosecondTickCount.FromCounter(Stopwatch.GetTimestamp(), Stopwatch.Frequency);
 ```
 
 ```python
 # Python
-now_ticks = time.monotonic_ns() // 100
+now_ns = time.monotonic_ns()
 ```
 
-An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to the tick on every runtime), `seconds_to_ticks` (Python) or
-`MB::FramePacing::TimeSpan::FromSeconds(seconds)` (C++).
+An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#), `seconds_to_ns` (Python) or
+`MB::FramePacing::NanosecondTimeSpan::FromSeconds(seconds)` (C++): each cuts the fraction of a nanosecond off.
 
 ## The fields
 
@@ -114,7 +114,7 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 
 - **Means:** the time the frame's animation was evaluated for: what the frame shows, from the clock the application's animation
   uses. It is not a measurement of when the frame reaches the screen; the capture measures that.
-- **Value:** the same value the frame's animation used, converted to ticks. Negative values are allowed.
+- **Value:** the same value the frame's animation used, in nanoseconds. Negative values are allowed.
 - **Changes:** every frame, by the application's animation time step (its delta time).
 - **What the analysis does:** the **animation error** of a step is the animation time step minus the display time step: how far the
   motion on screen moved off real time. It is the report's main number; the drift sums it over the run.
@@ -129,8 +129,10 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 
 - **Means:** the interval the application **wants** to run at: what it would aim for if nothing held it back. It differs from the
   target frame time only while the pacer runs slower than the application wants.
-- **Value:** `u32` ticks: `166'667` for 60 fps, `333'333` for 30 fps, `10'000'000` for 1 fps. `0xFFFFFFFF` (**on demand**,
-  `Payload.OnDemandFrameTime` in C++ and C#) for an application that presents only when something changes.
+- **Value:** a duration, `u32` nanoseconds in the marker: `16'666'667` for 60 fps, `33'333'333` for 30 fps, `1'000'000'000` for
+  1 fps. `0xFFFFFFFF` (**on demand**, `Payload.OnDemandFrameTime` in C++ and C#, `ON_DEMAND_FRAME_NS` in Python) for an application
+  that presents only when something changes. The libraries take a 64-bit duration and hold a longer frame time as the longest a
+  marker carries (`Payload.MaxFrameTime`: `0xFFFFFFFE`, 4.294967294 s), so only on demand reads as on demand.
 - **Changes:** when the application's own wish changes (a menu that wants 30 fps, an idle state that wants 1 fps); not when a pacer
   lowers the rate on its own.
 - **Unknown (`0`):** the analysis assumes the application wants the target frame rate given to the tools (`--target-fps`), else the
@@ -147,8 +149,8 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 ### Target frame time
 
 - **Means:** the interval the pacer aims for **now**, between the previous frame and this one: `1 / target frame rate`.
-- **Value:** `u32` ticks, as the preferred frame time. `0xFFFFFFFF` (on demand) is allowed here too.
-- **Changes:** on the frame where the pacer changes its rate (an adaptive pacer dropping from 60 to 30 fps writes `333'333` from the first
+- **Value:** as the preferred frame time. `0xFFFFFFFF` (on demand) is allowed here too.
+- **Changes:** on the frame where the pacer changes its rate (an adaptive pacer dropping from 60 to 30 fps writes `33'333'333` from the first
   frame it paces at 30).
 - **Unknown (`0`):** the preferred frame time stands in, then `--target-fps`, then one refresh.
 - **What the analysis does:** without the pacer's schedule, every frame is measured against the frame before it: it is **late**
@@ -162,7 +164,7 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
   timing API (`desiredPresentTime` in `VK_GOOGLE_display_timing`, the target present time of `VK_EXT_present_timing`,
   `EGL_ANDROID_presentation_time`), or the predicted display time the platform gives it and it adopts (OpenXR
   `predictedDisplayTime`, Android Choreographer's expected presentation time, `CADisplayLink.targetTimestamp`).
-- **Value:** `i64` ticks on the pacer's steady clock, the same clock for the whole run and the same one as the CPU start time. It is
+- **Value:** `i64` nanoseconds on the pacer's steady clock, the same clock for the whole run and the same one as the CPU start time. It is
   the plan, known before the frame is presented, not a measurement taken afterwards.
 - **Changes:** every frame, usually by the target frame time.
 - **Unknown (`0`):** the frame has no schedule. The analysis uses the schedule only when at least half the run's frames carry one.
@@ -184,7 +186,7 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 - **Means:** when the CPU started working on this frame (input, simulation, building the render commands); PresentMon's
   `CPUStartTime`. It can be anywhere inside a refresh, and with several frames in flight the next frame can start before this one
   is presented.
-- **Value:** `i64` ticks on the same steady clock as the intended display time.
+- **Value:** `i64` nanoseconds on the same steady clock as the intended display time.
 - **What the analysis does:** the **frametime** is the step from this frame's CPU start time to the next frame's (PresentMon's
   `MsBetweenAppStart`), known where frame index + 1 was captured too and both values are known. The report draws it in the
   frametime panel; the frame timeline card draws each frame's CPU work as a box.
@@ -195,13 +197,14 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 - **Means:** how long the CPU worked on this frame before presenting it: from the CPU start time until Present is called
   (PresentMon's `MsCPUBusy`). The marker is drawn last, just before Present, so measure it as you draw the marker. It does not
   include the GPU's work or time blocked inside Present.
-- **Value:** `u32` ticks. It can span several refreshes; clamp it at `0xFFFFFFFF` (about 429 s).
+- **Value:** a duration, `u32` nanoseconds in the marker. It can span several refreshes; the libraries take a 64-bit duration and
+  hold one longer than 4.294967295 s as that (`Payload.MaxCpuBusy`, `0xFFFFFFFF`).
 - **What the analysis does:** the frametime panel draws it under the frametime, the frame timeline card as the length of the CPU
   box, and the **CPU wait** is the frametime minus CPU busy (PresentMon's `MsCPUWait`).
 
 ### Start time and sequence id (start marker only)
 
-- **Start time:** when the run started, as C# `DateTime` UTC ticks (`ToDateTimeTicks(std::chrono::system_clock::now())` from `core/time/ChronoConversion.hpp` in C++,
+- **Start time:** when the run started, as C# `DateTime` UTC ticks of 100 ns, the one time that is not in nanoseconds (`ToDateTimeTicks(std::chrono::system_clock::now())` from `core/time/ChronoConversion.hpp` in C++,
   `DateTime.UtcNow.Ticks` in C#). Read it once when the run starts, not per frame. The reports show it (`startTimeUtc` in
   `summary.json`); no measurement uses it.
 - **Sequence id:** 16 bytes unique to the run: a new UUID, or a text tag of at most 16 printable ASCII characters. The reports show it
@@ -221,33 +224,34 @@ An animation clock in seconds converts with `TimeSpanUtil.FromSeconds` (C#, to t
 
 ## Worked examples
 
-Ticks are 100 ns. `0` = unknown; "on demand" = `0xFFFFFFFF`.
+Times are nanoseconds. `0` = unknown; "on demand" = `0xFFFFFFFF`.
 
-**A fixed 60 fps loop with vsync on a 60 Hz display, without a present timing API.** Preferred and target frame time `166'667` on
+**A fixed 60 fps loop with vsync on a 60 Hz display, without a present timing API.** Preferred and target frame time `16'666'667` on
 every frame, intended display time `0`. The analysis measures every frame against the one before it: a step of two refreshes or
 more is late, unless the frame index shows that frames between were dropped.
 
-**A 30 fps lock on a 60 Hz display.** Preferred and target frame time `333'333`. Steps of two refreshes are on target; a step of three
+**A 30 fps lock on a 60 Hz display.** Preferred and target frame time `33'333'333`. Steps of two refreshes are on target; a step of three
 is late. Nothing is amber: the game runs at the rate it wants. Without the preferred frame time every frame would be amber.
 
-**An adaptive pacer lowering from 60 to 30 fps for a busy stretch.** The preferred frame time stays `166'667`; the target frame time is
-`166'667`, then `333'333` from the first frame paced at 30; the intended display times are the present times the pacer requests:
+**An adaptive pacer lowering from 60 to 30 fps for a busy stretch.** The preferred frame time stays `16'666'667`; the target frame time
+is `16'666'667`, then `33'333'333` from the first frame paced at 30; the intended display times are the present times the pacer
+requests:
 
-| Frame | Target    | Preferred | Intended display time | Report                                   |
-| ----- | --------- | --------- | --------------------- | ---------------------------------------- |
-| 100   | `166'667` | `166'667` | T                     | on time                                  |
-| 101   | `333'333` | `166'667` | T + `333'333`         | on time, amber: below its preferred rate |
-| 102   | `333'333` | `166'667` | T + `666'667`         | shown a refresh after its plan: late     |
+| Frame | Target       | Preferred    | Intended display time | Report                                   |
+| ----- | ------------ | ------------ | --------------------- | ---------------------------------------- |
+| 100   | `16'666'667` | `16'666'667` | T                     | on time                                  |
+| 101   | `33'333'333` | `16'666'667` | T + `33'333'333`      | on time, amber: below its preferred rate |
+| 102   | `33'333'333` | `16'666'667` | T + `66'666'667`      | shown a refresh after its plan: late     |
 
 The late share shows the lowered stretch in amber and the frames shown after their plan in red.
 
-**A frame rate cap just under the refresh rate (117 fps on 120 Hz).** Preferred and target frame time `85'470`. A capture card needs a
-fixed refresh rate, so the display refreshes every `83'333`: the target rounds up to one refresh (5 % slack), and the refreshes
+**A frame rate cap just under the refresh rate (117 fps on 120 Hz).** Preferred and target frame time `8'547'009`. A capture card needs
+a fixed refresh rate, so the display refreshes every `8'333'333`: the target rounds up to one refresh (5 % slack), and the refreshes
 where the cap makes a frame wait a second refresh are measured as late.
 
-**An idle device at 1 fps.** While idle, preferred and target frame time `10'000'000`, and static after on the idle frames when
+**An idle device at 1 fps.** While idle, preferred and target frame time `1'000'000'000`, and static after on the idle frames when
 nothing moves. Steps of one second are on target and not amber; the idle frames' time is left out of the frame rates and drawn in
-violet. Back to 60 fps, both fields return to `166'667` on the first frame paced at 60.
+violet. Back to 60 fps, both fields return to `16'666'667` on the first frame paced at 60.
 
 **An on-demand renderer (an editor, a UI that redraws on input).** Preferred and target frame time on demand on every frame, no
 intended display time. No wait for the next frame is late and nothing is amber; the animation errors of the frames it does present
@@ -259,18 +263,18 @@ that frame. When it only knows on waking, it sets static before on the first fra
 step: left out of the frame rates, not judged, violet. The wait had no interval to meet, so that first frame also writes target frame
 time on demand, or it is late by the length of the wait.
 
-**A static menu in a game that keeps rendering at 60 fps.** Preferred and target frame time `166'667`, and static after on every
+**A static menu in a game that keeps rendering at 60 fps.** Preferred and target frame time `16'666'667`, and static after on every
 frame of the menu while nothing in it moves (it knows each frame has no pending work). The animation clock may pause after the last
 frame that moves; the steps out of the menu's frames are not judged, and their time is left out of the frame rates ("excluding N
 static frames").
 
 **Several frames in flight.** The CPU starts frame 11 before frame 10 is presented; CPU busy runs from each frame's own start:
 
-| Frame | CPU start time | CPU busy  | Frametime (from the markers)    |
-| ----- | -------------- | --------- | ------------------------------- |
-| 10    | C              | `200'000` | `166'667`                       |
-| 11    | C + `166'667`  | `190'000` | `166'667`                       |
-| 12    | C + `333'333`  | `210'000` | known once frame 13 is captured |
+| Frame | CPU start time   | CPU busy     | Frametime (from the markers)    |
+| ----- | ---------------- | ------------ | ------------------------------- |
+| 10    | C                | `20'000'000` | `16'666'667`                    |
+| 11    | C + `16'666'667` | `19'000'000` | `16'666'667`                    |
+| 12    | C + `33'333'333` | `21'000'000` | known once frame 13 is captured |
 
 The frame timeline card draws the overlapping CPU boxes in further lanes.
 
@@ -287,4 +291,4 @@ The frame timeline card draws the overlapping CPU boxes in further lanes.
   frame index, flags and animation time, then the optional preferred frame time, target frame time, intended display time, CPU start
   time and CPU busy). Name the optional ones where the language can (C# named arguments, Python keywords); in C++ check their order against the
   constructor.
-- CPU busy not clamped to `u32`.
+- A time written in ticks of 100 ns or in milliseconds: every time in the payload is nanoseconds.

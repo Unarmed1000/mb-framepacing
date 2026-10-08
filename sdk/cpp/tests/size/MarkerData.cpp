@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // Size probe: the marker's per-frame path plus the data module as a reader uses it: summary.json, the frames CSVs and captures.mbcd.
-#include <mb/framepacing/core/time/TimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/data/analysis/FramesCsv.hpp>
@@ -53,7 +53,8 @@ namespace
 int main(int argc, char* argv[])
 {
   const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
-  const FM::Payload payload(FM::MarkerKind::Frame, 1u, static_cast<uint64_t>(argc), FM::MarkerFlags::NoFlags, FP::TimeSpan::FromSeconds(argc / 60.0));
+  const FM::Payload payload(FM::MarkerKind::Frame, 1u, static_cast<uint64_t>(argc), FM::MarkerFlags::NoFlags,
+                            FP::NanosecondTimeSpan::FromSeconds(argc / 60.0));
   FM::ModuleMatrix matrix;
   std::size_t count = 0;
   if (FM::GenerateModules(payload, matrix))

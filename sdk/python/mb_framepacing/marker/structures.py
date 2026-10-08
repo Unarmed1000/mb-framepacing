@@ -17,6 +17,15 @@ from ..rectangle import Rectangle
 SEQUENCE_ID_BYTE_COUNT = 16
 """A sequence id is 16 opaque bytes."""
 
+ON_DEMAND_FRAME_NS = 0xFFFF_FFFF
+"""The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for. The
+largest value the field's four bytes hold, so no frame time is that long: see MAX_FRAME_NS."""
+MAX_FRAME_NS = 0xFFFF_FFFE
+"""The longest target and preferred frame time a marker carries, 4.294967294 s (slower than 0.233 fps): one below ON_DEMAND_FRAME_NS. A
+longer one is held as this."""
+MAX_CPU_BUSY_NS = 0xFFFF_FFFF
+"""The longest CPU busy a marker carries, 4.294967295 s. A longer one is held as this."""
+
 
 class MarkerKind(IntEnum):
     """What a marker marks: a frame of a run, or the start or end of a run (a test sequence). SYNC is the small second marker for
@@ -43,35 +52,58 @@ class MarkerFlags(IntFlag):
 
 @dataclass(frozen=True, slots=True)
 class Payload:
-    """What a marker carries, its fields in the order of the wire format: the kind, the run id (u32), the frame index (u64), the flags
-    and the animation time in TimeSpan ticks (100 ns, i64), then, when the application paces its frames, the preferred frame time and
-    the target frame time (u32 ticks, 166_667 for 60 fps) and the intended display time (i64 ticks on the frame pacer's steady clock, any
-    epoch, the same clock for the whole run), then the CPU start time (i64 ticks on the same steady clock) and CPU busy (u32 ticks); 0 =
-    unknown for the timing fields. A sync marker only carries the kind, run id and frame index."""
+    """The data every marker carries, its fields in the order of the wire format (doc/marker-format.md). The kind, run id (u32), frame
+    index (u64), flags and animation time are required; the timing fields are optional (0 = unknown). Every time is a whole number of
+    nanoseconds, an int: a span (the animation time, i64), a point on the frame pacer's steady clock (the intended display and CPU start
+    time, i64) or a duration, which is never negative (the preferred and target frame time and CPU busy, u32). A sync marker only carries
+    the kind, run id and frame index.
+
+    The marker holds its three durations in four bytes each, so a payload holds none longer than a marker can carry: making one caps a
+    longer CPU busy at MAX_CPU_BUSY_NS and a longer frame time at MAX_FRAME_NS (never an error: this runs in a frame loop). So a payload
+    decodes to exactly what was encoded. Nothing else is checked here: encode_payload raises ValueError for a negative duration and for
+    any other field outside its range. The flags are kept as given, reserved bits included."""
 
     kind: MarkerKind
     run_id: int
+    """Identifies one test run. The start marker, every frame marker and the end marker of a run carry the same id."""
     frame_index: int
+    """The application's own rendered-frame counter. Unrelated to the capture card's frame counter."""
     flags: MarkerFlags
     """MarkerFlags.STATIC_AFTER when nothing animates while this frame is on screen, MarkerFlags.STATIC_BEFORE when nothing animated while
-    the frame before it was; the other bits are reserved (0)."""
-    animation_ticks: int
-    preferred_frame_ticks: int = 0
-    """The interval the application wants to run at, in ticks (100 ns, u32): what it would aim for if nothing held it back. It differs
-    from target_frame_ticks only while the pacer runs slower than it wants (a pacer lowered to 30 fps: preferred 166_667, target 333_333). A
-    30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, ON_DEMAND_FRAME_TICKS = frames only when something
-    changes (also allowed in target_frame_ticks)."""
-    target_frame_ticks: int = 0
-    intended_display_ticks: int = 0
-    cpu_start_ticks: int = 0
-    """CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in ticks (100 ns) on the same steady clock
-    as the intended display time. Anywhere inside a refresh; frames can overlap. 0 = unknown."""
-    cpu_busy_ticks: int = 0
-    """CPU busy: how long the CPU worked on this frame before presenting it (PresentMon's MsCPUBusy), from the CPU start time until
-    Present is called, in ticks (100 ns, u32). The marker is drawn last, so the application measures it as it draws the marker. It does
-    not include the GPU's work. May span several refreshes. 0 = unknown."""
+    the frame before it was; the other bits are reserved (write 0, a decoded payload keeps them)."""
+    animation_ns: int
+    """The animation time: the time on the application's animation clock the frame's animation was evaluated for, in nanoseconds."""
+    preferred_frame_ns: int = 0
+    """The interval the application wants to run at, in nanoseconds: what it would aim for if nothing held it back. It differs from
+    target_frame_ns only while the pacer runs slower than it wants (a pacer lowered to 30 fps: preferred 16_666_667, target 33_333_333). A
+    30 fps lock or a device idle at 1 fps prefers what it runs at. 0 = unknown, ON_DEMAND_FRAME_NS = frames only when something changes;
+    at most MAX_FRAME_NS otherwise."""
+    target_frame_ns: int = 0
+    """The interval the frame pacer aims for between the previous frame and this one, in nanoseconds: 16_666_667 for 60 fps. 0 = unknown,
+    ON_DEMAND_FRAME_NS = frames only when something changes; at most MAX_FRAME_NS otherwise."""
+    intended_display_ns: int = 0
+    """When the frame pacer intends this frame to become visible, in nanoseconds on its steady clock (any epoch, the same clock for the
+    whole run). 0 = unknown."""
+    cpu_start_ns: int = 0
+    """CPU start time: when the CPU started working on this frame (PresentMon's CPUStartTime), in nanoseconds on the same steady clock as
+    intended_display_ns. Anywhere inside a refresh; frames can overlap. 0 = unknown."""
+    cpu_busy_ns: int = 0
+    """CPU busy: how long the CPU worked on this frame before presenting it (PresentMon's MsCPUBusy), from cpu_start_ns until Present is
+    called, in nanoseconds. The marker is drawn last, so the application measures it as it draws the marker. It does not include the GPU's
+    work. May span several refreshes. 0 = unknown; at most MAX_CPU_BUSY_NS."""
+
+    def __post_init__(self) -> None:
+        # The class is frozen for its users: this is the one place a value is put in
+        if self.preferred_frame_ns > MAX_FRAME_NS and self.preferred_frame_ns != ON_DEMAND_FRAME_NS:
+            object.__setattr__(self, "preferred_frame_ns", MAX_FRAME_NS)
+        if self.target_frame_ns > MAX_FRAME_NS and self.target_frame_ns != ON_DEMAND_FRAME_NS:
+            object.__setattr__(self, "target_frame_ns", MAX_FRAME_NS)
+        if self.cpu_busy_ns > MAX_CPU_BUSY_NS:
+            object.__setattr__(self, "cpu_busy_ns", MAX_CPU_BUSY_NS)
 
     def with_kind(self, kind: MarkerKind) -> Self:
+        """The same payload with another kind: a start or end marker carries the values of the frame that shows it, a sync marker its run
+        id and frame index."""
         return replace(self, kind=kind)
 
 

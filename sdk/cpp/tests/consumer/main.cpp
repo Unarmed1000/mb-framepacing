@@ -6,7 +6,11 @@
 // MB_CONSUMER_PACER it also paces a frame with the experimental pacer module and fills the frame's marker from it.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
+#include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
@@ -45,21 +49,25 @@ namespace
     const FP::TickCount64 cpuStartTime = FP::TickCount64::FromSeconds(10);
     const PC::FrameSchedule schedule = pacer.BeginFrame(cpuStartTime);
     const FP::TimeSpan32 cpuBusy = pacer.EndFrame(cpuStartTime + FP::TimeSpan::FromMilliseconds(4));
+    // This pacer counts in ticks of 100 ns and the marker in nanoseconds: its values are converted here, exactly (a tick is 100 ns),
+    // until the pacer counts in nanoseconds too
+    const auto duration = [](const FP::TimeSpan32 ticks) { return FP::NanosecondTimeDuration::FromTimeDuration(FP::TimeDuration::From(ticks)); };
     const FM::Payload payload{FM::MarkerKind::Frame,
                               1u,
                               frameIndex,
                               FM::MarkerFlags::NoFlags,
-                              schedule.AnimationTime,
-                              schedule.PreferredFrameTime,
-                              schedule.TargetFrameTime,
-                              schedule.IntendedDisplayTime,
-                              cpuStartTime,
-                              cpuBusy};
+                              FP::NanosecondTimeSpan::FromTimeSpan(schedule.AnimationTime),
+                              duration(schedule.PreferredFrameTime),
+                              duration(schedule.TargetFrameTime),
+                              FP::NanosecondTickCount::FromTickCount64(schedule.IntendedDisplayTime),
+                              FP::NanosecondTickCount::FromTickCount64(cpuStartTime),
+                              duration(cpuBusy)};
     FM::ModuleMatrix matrix;
     const bool encoded = FM::GenerateModules(payload, matrix);
-    std::printf("the pacer (experimental): swap interval %u, a %u tick frame, %u ticks busy\n", static_cast<unsigned>(schedule.SwapInterval),
-                static_cast<unsigned>(payload.TargetFrameTime().Ticks()), static_cast<unsigned>(cpuBusy.Ticks()));
-    return encoded && schedule.SwapInterval == 2u && payload.TargetFrameTime().Ticks() == 333'333u && cpuBusy.Ticks() == 40'000u;
+    std::printf("the pacer (experimental): swap interval %u, a %lld ns frame, %lld ns busy\n", static_cast<unsigned>(schedule.SwapInterval),
+                static_cast<long long>(payload.TargetFrameTime().Nanoseconds()), static_cast<long long>(payload.CpuBusy().Nanoseconds()));
+    return encoded && schedule.SwapInterval == 2u && payload.TargetFrameTime().Nanoseconds() == 33'333'300 &&
+           payload.CpuBusy().Nanoseconds() == 4'000'000;
   }
 }
 #endif
@@ -68,25 +76,23 @@ int main()
 {
   // The application's own frame counter and animation time: frame 60 of an animation at 60 fps
   const uint64_t frameIndex = 60;
-  const int64_t animationTicks = FP::TimeSpan::FromSeconds(1).Ticks();
-  const uint32_t frameTicks = 166'667;
+  const FP::NanosecondTimeSpan animationTime = FP::NanosecondTimeSpan::FromSeconds(1);
+  const FP::NanosecondTimeDuration frameTime = FP::NanosecondTimeDuration::FromNanoseconds(16'666'667);
   std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices{};
   const FM::Options options{};
   const FP::Point origin = options.RecommendedOrigin(FM::MarkerKind::Frame, 1080);
   FM::ModuleMatrix matrix;
-  const FM::Payload payload{
-    FM::MarkerKind::Frame,     1u, frameIndex, FM::MarkerFlags::NoFlags, FP::TimeSpan{animationTicks}, FP::TimeSpan32{frameTicks},
-    FP::TimeSpan32{frameTicks}};
+  const FM::Payload payload{FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime, frameTime, frameTime};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
   const int64_t ticks = FP::Data::ParseSummary(R"({ "capturePeriodTicks": 166667, "errorThresholdTicks": 10000 })").CapturePeriod.Ticks();
   const std::string_view version = FP::GetLibraryVersion().Text;
-  std::printf("mb_framepacing %.*s: %zu vertices, %lld ticks, a %u tick frame\n", static_cast<int>(version.size()), version.data(), count,
-              static_cast<long long>(ticks), static_cast<unsigned>(payload.TargetFrameTime().Ticks()));
+  std::printf("mb_framepacing %.*s: %zu vertices, a capture period of %lld ticks, a %lld ns frame\n", static_cast<int>(version.size()),
+              version.data(), count, static_cast<long long>(ticks), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()));
 #ifdef MB_CONSUMER_PACER
   const bool paced = PaceOneFrame(frameIndex);
 #else
   const bool paced = true;
 #endif
-  return count > 0 && ticks == 166'667 && payload.TargetFrameTime().Ticks() == 166'667u && paced ? 0 : 1;
+  return count > 0 && ticks == 166'667 && payload.TargetFrameTime().Nanoseconds() == 16'666'667 && paced ? 0 : 1;
 }

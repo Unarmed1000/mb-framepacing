@@ -8,11 +8,11 @@ time and intended display time, the CPU start time and CPU busy into every frame
 error on the real display output. It draws exactly the same pixels as the C++ and C# libraries: the tests check
 it against the golden images the C++ library writes (test-data/markers). The format is specified in doc/marker-format.md.
 
-    from mb_framepacing.marker import MarkerFlags, MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, seconds_to_ticks
+    from mb_framepacing.marker import MarkerFlags, MarkerKind, Options, Payload, PixelFormat, generate_modules, modules_to_bitmap, seconds_to_ns
 
     options = Options(module_size_px=3)
     origin = options.recommended_origin(MarkerKind.FRAME, height)
-    matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NO_FLAGS, seconds_to_ticks(animation_seconds)))   # encode once
+    matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NO_FLAGS, seconds_to_ns(animation_seconds)))   # encode once
     modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)       # draw it
 
     # Optional (required for camera capture): the small sync marker, bottom-left, with the same run id and frame index
@@ -37,7 +37,7 @@ from .constants import (
     MAX_QUAD_COUNT,
     MAX_QUIET_ZONE_MODULES,
     MIN_MODULE_SIZE_PX,
-    ON_DEMAND_FRAME_TICKS,
+    NS_PER_SECOND,
     PAYLOAD_BYTE_COUNT,
     PAYLOAD_FORMAT_VERSION,
     PAYLOAD_MAGIC,
@@ -50,7 +50,6 @@ from .constants import (
     SYNC_PAYLOAD_BYTE_COUNT,
     SYNC_QR_MODULE_COUNT,
     SYNC_QR_VERSION,
-    TICKS_PER_SECOND,
     UNIX_EPOCH_DATE_TIME_TICKS,
     qr_module_count_for,
 )
@@ -63,12 +62,15 @@ from .marker import (
     modules_to_indexed,
     modules_to_quads,
     modules_to_triangles,
-    seconds_to_ticks,
+    seconds_to_ns,
     to_date_time_ticks,
     try_decode_payload,
 )
 from .options import Options
 from .structures import (
+    MAX_CPU_BUSY_NS,
+    MAX_FRAME_NS,
+    ON_DEMAND_FRAME_NS,
     SEQUENCE_ID_BYTE_COUNT,
     MarkerFlags,
     MarkerKind,
@@ -86,14 +88,17 @@ __all__ = [
     "CRC_BYTE_COUNT",
     "DEFAULT_MODULE_SIZE_PX",
     "HEADER_BYTE_COUNT",
+    "MAX_CPU_BUSY_NS",
     "MAX_ENCODED_PAYLOAD_BYTE_COUNT",
+    "MAX_FRAME_NS",
     "MAX_GRID_VERTEX_COUNT",
     "MAX_MODULE_SIZE_PX",
     "MAX_PACKED_MODULE_BYTE_COUNT",
     "MAX_QUAD_COUNT",
     "MAX_QUIET_ZONE_MODULES",
     "MIN_MODULE_SIZE_PX",
-    "ON_DEMAND_FRAME_TICKS",
+    "NS_PER_SECOND",
+    "ON_DEMAND_FRAME_NS",
     "PAYLOAD_BYTE_COUNT",
     "PAYLOAD_FORMAT_VERSION",
     "PAYLOAD_MAGIC",
@@ -107,7 +112,6 @@ __all__ = [
     "SYNC_PAYLOAD_BYTE_COUNT",
     "SYNC_QR_MODULE_COUNT",
     "SYNC_QR_VERSION",
-    "TICKS_PER_SECOND",
     "UNIX_EPOCH_DATE_TIME_TICKS",
     "MarkerFlags",
     "MarkerKind",
@@ -132,7 +136,7 @@ __all__ = [
     "modules_to_triangles",
     "packed_module_byte_count",
     "qr_module_count_for",
-    "seconds_to_ticks",
+    "seconds_to_ns",
     "to_date_time_ticks",
     "try_decode_payload",
 ]

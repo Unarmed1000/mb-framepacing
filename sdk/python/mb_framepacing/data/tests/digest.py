@@ -103,7 +103,7 @@ def _capture_data(path: Path) -> dict[str, JsonValue]:
         "secondByteCount": sum(len(r.second_bytes or b"") for r in records),
         "decodedMainPayloads": len(decoded),
         "frameIndexSum": sum(payload.frame_index for payload, _ in decoded),
-        "animationTicksSum": sum(payload.animation_ticks for payload, _ in decoded),
+        "animationNsSum": sum(payload.animation_ns for payload, _ in decoded),
     }
 
 

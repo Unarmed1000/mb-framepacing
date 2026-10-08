@@ -19,6 +19,7 @@ from ..rectangle import Rectangle
 from .constants import (
     CRC_BYTE_COUNT,
     HEADER_BYTE_COUNT,
+    NS_PER_SECOND,
     PAYLOAD_BYTE_COUNT,
     PAYLOAD_FORMAT_VERSION,
     PAYLOAD_MAGIC,
@@ -26,7 +27,6 @@ from .constants import (
     START_PAYLOAD_BYTE_COUNT,
     SYNC_PAYLOAD_BYTE_COUNT,
     SYNC_QR_VERSION,
-    TICKS_PER_SECOND,
     qr_module_count_for,
 )
 from .options import Options
@@ -44,7 +44,8 @@ from .structures import (
 )
 from .third_party.qrcodegen import encode as _encode_qr
 
-# Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work
+# Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work. Every time is in nanoseconds: the
+# animation, intended display and CPU start time eight bytes (signed), the two frame times and CPU busy four (unsigned)
 _HEADER = struct.Struct("<2sBBIQBqIIqqI")
 _SYNC = struct.Struct("<2sBBIQ")
 _START_FIELDS = struct.Struct(f"<q{SEQUENCE_ID_BYTE_COUNT}s")
@@ -58,11 +59,11 @@ def to_date_time_ticks(time: datetime) -> int:
     return (time.astimezone(UTC) - _DATE_TIME_EPOCH) // timedelta(microseconds=1) * 10
 
 
-def seconds_to_ticks(seconds: float) -> int:
-    """Convert seconds (for example an animation clock) to TimeSpan ticks, truncated toward zero to a tick: 1.0 / 60 is 166_666 ticks,
-    the tick the C++ library's TimeSpan::FromSeconds and the C# library's TimeSpanUtil.FromSeconds give. Raises ValueError for NaN and
-    OverflowError for an infinite value."""
-    return int(seconds * TICKS_PER_SECOND)
+def seconds_to_ns(seconds: float) -> int:
+    """Convert seconds (for example an animation clock) to nanoseconds, truncated toward zero to a nanosecond: 1.0 / 60 is 16_666_666 ns,
+    what NanosecondTimeSpan::FromSeconds in the C++ library and NanosecondTimeSpan.FromSeconds in the C# library give. Raises ValueError
+    for NaN and OverflowError for an infinite value."""
+    return int(seconds * NS_PER_SECOND)
 
 
 def _with_crc(fields: bytes) -> bytes:
@@ -73,8 +74,8 @@ def _with_crc(fields: bytes) -> bytes:
 def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> bytes:
     """Serialize the payload. Start markers append the metadata, other kinds ignore it; a sync marker is SYNC_PAYLOAD_BYTE_COUNT bytes
     (the start of the header: the run id and the frame index) and ignores the other fields. Every kind ends with the CRC-32 of the
-    bytes before it. Raises ValueError when an encoded field is out of its range, or the kind is not a MarkerKind (try_decode_payload
-    would refuse the bytes)."""
+    bytes before it. Raises ValueError when an encoded field is out of its range (a negative duration, a time outside 64 bits; a payload
+    holds no duration longer than its four bytes), or the kind is not a MarkerKind (try_decode_payload would refuse the bytes)."""
     if payload.kind not in _KINDS:
         raise ValueError(f"not a marker kind: {payload.kind!r}")
     if payload.kind == MarkerKind.SYNC:
@@ -90,12 +91,12 @@ def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> b
             payload.run_id,
             payload.frame_index,
             payload.flags,
-            payload.animation_ticks,
-            payload.preferred_frame_ticks,
-            payload.target_frame_ticks,
-            payload.intended_display_ticks,
-            payload.cpu_start_ticks,
-            payload.cpu_busy_ticks,
+            payload.animation_ns,
+            payload.preferred_frame_ns,
+            payload.target_frame_ns,
+            payload.intended_display_ns,
+            payload.cpu_start_ns,
+            payload.cpu_busy_ns,
         )
     except struct.error as error:
         raise ValueError(f"payload out of range: {payload}") from error
@@ -126,19 +127,19 @@ def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | No
     if kind == MarkerKind.SYNC:
         return Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0), None
     fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))
-    _, _, _, _, _, flags, animation_ticks, preferred, target_frame_ticks, intended_display_ticks, cpu_start_ticks, cpu_busy_ticks = fields
+    _, _, _, _, _, flags, animation_ns, preferred_frame_ns, target_frame_ns, intended_display_ns, cpu_start_ns, cpu_busy_ns = fields
     payload = Payload(
         MarkerKind(kind),
         run_id,
         frame_index,
         # Every value is accepted: bits without a name are reserved and kept
         MarkerFlags(flags),
-        animation_ticks,
-        preferred_frame_ticks=preferred,
-        target_frame_ticks=target_frame_ticks,
-        intended_display_ticks=intended_display_ticks,
-        cpu_start_ticks=cpu_start_ticks,
-        cpu_busy_ticks=cpu_busy_ticks,
+        animation_ns,
+        preferred_frame_ns=preferred_frame_ns,
+        target_frame_ns=target_frame_ns,
+        intended_display_ns=intended_display_ns,
+        cpu_start_ns=cpu_start_ns,
+        cpu_busy_ns=cpu_busy_ns,
     )
     if payload.kind != MarkerKind.SEQUENCE_START:
         return payload, None

@@ -16,7 +16,7 @@ _MAX_NANOSECONDS = _HALF - 1
 class NanosecondTickCount:
     """A point on a clock that counts in nanoseconds, any epoch (the same clock for the whole run), kept as a platform gives it.
 
-    The SDK's other times are whole ticks of 100 ns; to_ticks() is the tick a point is in. The count is kept as an unsigned 64-bit
+    The data module's times are whole ticks of 100 ns; to_ticks() is the tick a point is in. The count is kept as an unsigned 64-bit
     number, as in C++ and C#, so adding and subtracting wrap around and nanoseconds is its signed view. Two counts compare and
     subtract correctly while they are less than 2^63 nanoseconds apart (about 292 years), across the wrap too, so the order is
     not a total one. A value outside the range raises OverflowError; adding and subtracting never do. The count is a whole

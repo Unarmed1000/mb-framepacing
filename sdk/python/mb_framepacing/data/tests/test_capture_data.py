@@ -125,7 +125,7 @@ class CaptureDataTests(unittest.TestCase):
         decoded = record.try_decode_main()
         assert decoded is not None
         payload, metadata = decoded
-        self.assertEqual((payload.kind, payload.run_id, payload.frame_index, payload.animation_ticks), (MarkerKind.SEQUENCE_START, 7, 12, 34))
+        self.assertEqual((payload.kind, payload.run_id, payload.frame_index, payload.animation_ns), (MarkerKind.SEQUENCE_START, 7, 12, 34))
         assert metadata is not None
         self.assertEqual((metadata.utc_ticks, str(metadata.sequence_id)), (5, "run 7"))
         second = record.try_decode_second()

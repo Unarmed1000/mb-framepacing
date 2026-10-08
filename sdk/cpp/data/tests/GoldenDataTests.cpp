@@ -99,7 +99,7 @@ namespace
     int64_t secondByteCount = 0;
     int64_t decodedPayloads = 0;
     int64_t frameIndexSum = 0;
-    int64_t animationTicksSum = 0;
+    int64_t animationNsSum = 0;
     std::vector<std::string> statuses;
     for (const auto& record : records)
     {
@@ -119,7 +119,7 @@ namespace
       {
         ++decodedPayloads;
         frameIndexSum += static_cast<int64_t>(payload.FrameIndex());
-        animationTicksSum += payload.AnimationTime().Ticks();
+        animationNsSum += payload.AnimationTime().Nanoseconds();
       }
     }
     return {
@@ -146,7 +146,7 @@ namespace
       {"secondByteCount", secondByteCount},
       {"decodedMainPayloads", decodedPayloads},
       {"frameIndexSum", frameIndexSum},
-      {"animationTicksSum", animationTicksSum},
+      {"animationNsSum", animationNsSum},
     };
   }
 

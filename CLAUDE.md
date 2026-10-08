@@ -196,7 +196,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `TimeSpan` (named for what they are: `DisplayDelta`, `Drift`,
     `TargetFrameTime`), the marker's own 32-bit values `TimeSpan32` (`MarkerTargetFrameTime`, `CpuBusy`).
   - **The files hold times as whole ticks** (`…Ticks` columns and fields), in the integer type the value has: a marker's value is in
-    the CSV exactly as the marker carried it (`animationTicks` an `i64`, `markerTargetTicks` a `u32`, 4294967295 = on demand), and
+    the CSV in the marker's integer type (`animationTicks` an `i64`, `markerTargetTicks` a `u32`, 4294967295 = on demand), **as the
+    nearest tick for now**: the marker counts in nanoseconds (below) and the tools still count in ticks, converted in one place,
+    `MarkerPayload`. To a marker it is exact, with the types' own helpers (`FromTimeSpan`, `FromTickCount64`: never `* 100` or `/ 100`
+    at a call site). From a marker it is the nearest tick, a tie the even one, written there (`NearestTick`, the user's choice of
+    2026-10-08, the one exception to "the type's own helper"): the helpers cut to the tick, so 16 666 667 ns became 166 666 ticks
+    while the tools' own times round the recording's to 166 667, and every report of a frame shown on time had errors of a tick
+    (a "too late" key, 20 % larger SVGs). With the nearest tick the tools' output on the 22 clips is what it was before the marker
+    changed unit. All of it goes when the tools and their files move to nanoseconds too (`…Ns` names), and
     `summary.json`'s settings too (`capturePeriodTicks`, `errorThresholdTicks`, `pacing.refreshPeriodTicks`, `targetFrameTicks`).
     Nothing between a marker and a file goes through a floating point number: never add a milliseconds column or field for a time.
     Only `summary.json`'s statistics and histograms are milliseconds (`…Ms`): a mean or an interpolated percentile is no whole tick.
@@ -580,6 +587,18 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     core's `Crc32Util` (`core/Crc32Util.hpp`: a 16-entry table, for the executable size; its 256-entry form with the same result is for
     callers that want speed), in C# a private `Crc32.cs` with the 16-entry table, in Python `binascii.crc32`. The tests' expected
     CRC bytes come from Python's `binascii`, never from our own code.
+  - **Times are nanoseconds** (the user, 2026-10-07 and 08; the bytes did not move, the unit did): the animation time an `i64`
+    (`NanosecondTimeSpan`), the intended display and CPU start time points on the pacer's clock (`NanosecondTickCount`), the two frame
+    times and CPU busy four unsigned bytes each. **A length of time is the duration type**, never negative by construction
+    (`NanosecondTimeDuration`, 64-bit: what the code computes with and what a decoded payload returns), never a signed span and
+    never a 32-bit time type (`NanosecondTimeSpan32` existed for a day and was removed: the four bytes are the marker's business).
+    `Payload` caps a duration that is too long for its four bytes where it is made, never an error (it runs in a frame loop): CPU
+    busy at `Payload::MaxCpuBusy` (`0xFFFFFFFF`, 4.294967295 s), a frame time at `Payload::MaxFrameTime` (`0xFFFFFFFE`), since
+    `0xFFFFFFFF` there is `Payload::OnDemandFrameTime`, a duration of exactly 4294967295 ns. So every payload is valid on the wire
+    and decodes to exactly what was encoded. Python keeps plain `int`s named `*_ns` (`ON_DEMAND_FRAME_NS`, `MAX_FRAME_NS`,
+    `MAX_CPU_BUSY_NS`, `seconds_to_ns`). The start marker's start time stays C# `DateTime` UTC ticks: a calendar time does not fit
+    64 bits of nanoseconds. The format version stayed 1 (changed in place): a marker from before reads without an error and a
+    hundred times too small, and every recording and capture from before is invalid (the user's decision: no migration).
   - **Pacing terms:** the intended display time is the pacer's aim; the animation time is the predicted display time the game
     animated for (`sdk/doc/vocabulary.md`). The target frame time is what the pacer aims for now, the **preferred frame time** what the
     application wants (it differs only while the pacer runs slower); `0xFFFFFFFF` in both = on demand. Never call the preferred frame
@@ -724,8 +743,9 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   GPU; `VULKAN_SDK` for DXC and SPIRV-Cross) draws every one and compares every pixel with `modules_to_bitmap`. Run it after touching
   a shader, and `check_in_unity.py` (also `--graphics glcore|gles|vulkan`) after touching the Unity ones.
 - **A matrix is a marker's:** `ModuleMatrix::TryFromBits` (C#, and Python's `ModuleMatrix(size, bits)`) takes the two marker sizes only (41 and
-  25), the ones the drawing functions and the grid know. **Seconds to ticks truncate** in every language (`TimeSpan::FromSeconds`,
-  `TimeSpanUtil.FromSeconds`, Python's `seconds_to_ticks`: 1/60 s is 166 666 ticks).
+  25), the ones the drawing functions and the grid know. **Seconds truncate** toward zero in every language: to the nanosecond for the
+  marker (`NanosecondTimeSpan::FromSeconds`, Python's `seconds_to_ns`: 1/60 s is 16 666 666 ns), to the tick for the tick types
+  (`TimeSpan::FromSeconds`, `TimeSpanUtil.FromSeconds`: 166 666 ticks).
 - **Encode once, draw from the modules:** every marker library encodes a marker once (`GenerateModules` / C# `TryGenerateModules`: the
   `ModuleMatrix`, 1 bit per module, packed exactly as `modules.csv`) and draws it with `ModulesToQuads`, `ModulesToTriangles`,
   `ModulesToIndexed`, `ModulesToBitmap` or the static grid (`GridVertices` once, `ModulesToGridIndices` per frame). A drawn rectangle is a

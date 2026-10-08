@@ -8,9 +8,9 @@
 //   mb_framepacing_marker_qr_stress [--payloads N] [--lines N] [--symbols N] [--threads N] [--seed N] [--no-exhaustive]
 //
 // The run is deterministic for a seed and a thread count. It stops at the first difference, prints what differed and exits with 1.
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
@@ -250,13 +250,14 @@ namespace
     // A running frame index and times, or anything at all
     const bool running = rRandom.Below(4) != 0;
     rFrameIndex = running ? rFrameIndex + 1 : rRandom.Next();
-    const auto ticks = static_cast<int64_t>(running ? rFrameIndex * 166'667u : rRandom.Next());
+    const auto time = static_cast<int64_t>(running ? rFrameIndex * 16'666'667u : rRandom.Next());
     const FM::Payload payload(
       kind, static_cast<uint32_t>(running ? 0x12345678u : rRandom.Next()), rFrameIndex,
-      static_cast<FM::MarkerFlags>(running ? rRandom.Below(4) : rRandom.Below(256)), FP::TimeSpan(running ? ticks : ticks / 4),
-      FP::TimeSpan32(static_cast<uint32_t>(running ? 166'667u : rRandom.Next())),
-      FP::TimeSpan32(static_cast<uint32_t>(running ? 166'667u : rRandom.Next())), FP::TickCount64(running ? 36'000'000'000 + ticks : ticks),
-      FP::TickCount64(running ? 35'999'900'000 + ticks : ticks / 2), FP::TimeSpan32(static_cast<uint32_t>(rRandom.Below(400'000))));
+      static_cast<FM::MarkerFlags>(running ? rRandom.Below(4) : rRandom.Below(256)), FP::NanosecondTimeSpan(running ? time : time / 4),
+      FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(running ? 16'666'667u : rRandom.Next())),
+      FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(running ? 16'666'667u : rRandom.Next())),
+      FP::NanosecondTickCount(running ? 3'600'000'000'000 + time : time), FP::NanosecondTickCount(running ? 3'599'990'000'000 + time : time / 2),
+      FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(rRandom.Below(40'000'000))));
     FM::StartMetadata metadata;
     metadata.UtcTicks = static_cast<int64_t>(rRandom.Next() >> 2u);
     for (uint8_t& rByte : metadata.Id.Bytes)

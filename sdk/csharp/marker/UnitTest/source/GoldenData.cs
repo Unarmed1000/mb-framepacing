@@ -93,12 +93,13 @@ namespace MB.FramePacing.Marker.UnitTest
         uint.Parse(row.Text("runId"), CultureInfo.InvariantCulture),
         ulong.Parse(row.Text("frameIndex"), CultureInfo.InvariantCulture),
         (MarkerFlags)byte.Parse(row.Text("flags"), CultureInfo.InvariantCulture),
-        new TimeSpan(row.Long("animationTicks")),
-        preferredFrameTime: new TimeSpan32(uint.Parse(row.Text("preferredFrameTicks"), CultureInfo.InvariantCulture)),
-        targetFrameTime: new TimeSpan32(uint.Parse(row.Text("targetFrameTicks"), CultureInfo.InvariantCulture)),
-        intendedDisplayTime: new TickCount64(row.Long("intendedDisplayTicks")),
-        cpuStartTime: new TickCount64(row.Long("cpuStartTicks")),
-        cpuBusy: new TimeSpan32(uint.Parse(row.Text("cpuBusyTicks"), CultureInfo.InvariantCulture))
+        new NanosecondTimeSpan(row.Long("animationNs")),
+        // The three durations as a marker holds them, four unsigned bytes: a value that does not fit is a fault in the golden data
+        preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("preferredFrameNs"), CultureInfo.InvariantCulture)),
+        targetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("targetFrameNs"), CultureInfo.InvariantCulture)),
+        intendedDisplayTime: new NanosecondTickCount(row.Long("intendedDisplayNs")),
+        cpuStartTime: new NanosecondTickCount(row.Long("cpuStartNs")),
+        cpuBusy: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("cpuBusyNs"), CultureInfo.InvariantCulture))
       );
 
     private static StartMetadata Start(Row row) =>

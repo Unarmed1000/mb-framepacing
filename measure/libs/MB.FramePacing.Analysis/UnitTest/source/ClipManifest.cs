@@ -5,6 +5,11 @@
 //* follow from it: every video frame's marker, and per presented frame its display time step, animation time step, animation error,
 //* lateness, target, preferred frame time and drift, all in whole ticks. The VideoClip tests of the analysis and of the charts compare with it.
 //*
+//* The manifest and the clips' markers count in nanoseconds; the tools still count in ticks and take a marker's times to the nearest tick
+//* where they decode it (MarkerPayload.FromFrameMarker). So every marker time here is the manifest's nanoseconds through that same
+//* conversion, and the video's own times (when a refresh is shown) are ticks as the tools read them from the file. This goes when the tools
+//* count in nanoseconds.
+//*
 //* Two views: every rendered frame of the clip (the markers: a frame index, animation time, pacing fields and flags each), and the presented
 //* frames, the ones the analysis counts. A frame is presented when it first appears with an index above every frame shown before it:
 //* dropped frames never appear, and a frame shown out of order after a later one is not presented again. The per-frame methods take a
@@ -33,19 +38,19 @@ namespace MB.FramePacing.Analysis.UnitTest
   public sealed record ClipManifest(
     int Fps,
     int RefreshCount,
-    long DurationTicks,
+    long DurationNs,
     int VideoFrameCount,
     int LeadIn,
     uint RunId,
     ulong FirstFrameIndex,
     string SequenceId,
     long?[] RenderedRefresh,
-    long[] RenderedAnimationTicks,
+    long[] RenderedAnimationNs,
     int?[] RenderedLate,
     long?[] RenderedSwapInterval,
     long?[] RenderedPreferredInterval,
-    long[] RenderedCpuStartTicks,
-    long[] RenderedCpuBusyTicks,
+    long[] RenderedCpuStartNs,
+    long[] RenderedCpuBusyNs,
     bool[] RenderedStaticAfter,
     bool[] RenderedStaticBefore,
     int[] Screen,
@@ -96,19 +101,19 @@ namespace MB.FramePacing.Analysis.UnitTest
       return new ClipManifest(
         (int)fps,
         refreshCount,
-        WholeTicks(video.GetProperty("durationSeconds").GetDecimal() * TimeSpan.TicksPerSecond),
+        WholeNumber(video.GetProperty("durationSeconds").GetDecimal() * NanosecondTimeSpan.NanosecondsPerSecond, "nanoseconds"),
         video.GetProperty("videoFrameCount").GetInt32(),
         marker.GetProperty("leadInRefreshes").GetInt32(),
         marker.GetProperty("runId").GetUInt32(),
         video.GetProperty("markerFirstFrameIndex").GetUInt64(),
         video.GetProperty("sequenceId").GetString()!,
         refresh,
-        Array("animationMs", e => WholeTicks(e.GetDecimal() * TimeSpan.TicksPerMillisecond)),
+        Array("animationNs", e => e.GetInt64()),
         Array("late", e => Nullable(e, x => x.GetInt32())),
         Array("targetFps", e => Nullable(e, x => WholeNumber(fps / x.GetDecimal(), "swap interval"))),
         Array("preferredFps", e => Nullable(e, x => WholeNumber(fps / x.GetDecimal(), "preferred swap interval"))),
-        Array("cpuStartTicks", e => e.GetInt64()),
-        Array("cpuBusyTicks", e => e.GetInt64()),
+        Array("cpuStartNs", e => e.GetInt64()),
+        Array("cpuBusyNs", e => e.GetInt64()),
         Flags("staticAfter"),
         Flags("staticBefore"),
         screen,
@@ -137,20 +142,26 @@ namespace MB.FramePacing.Analysis.UnitTest
         refresh < 0 ? MarkerKind.SequenceStart
         : refresh >= RefreshCount ? MarkerKind.SequenceEnd
         : MarkerKind.Frame;
-      return new MarkerPayload(
-        kind,
-        RunId,
-        ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
-        (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.NoFlags)
-          | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.NoFlags),
-        new TimeSpan(RenderedAnimationTicks[frame] + (loop * DurationTicks)),
-        PreferredFrameTime: new TimeSpan32(FrameTicks(RenderedPreferredInterval[frame])),
-        TargetFrameTime: new TimeSpan32(FrameTicks(RenderedSwapInterval[frame])),
-        IntendedDisplayTime: new TickCount64(RefreshTicks(intendedRefresh)),
-        CpuStartTime: new TickCount64(RenderedCpuStartTicks[frame] + (loop * DurationTicks)),
-        CpuBusy: new TimeSpan32((uint)RenderedCpuBusyTicks[frame])
+      // The marker as the generator wrote it, in nanoseconds, then as the tools hold it
+      return MarkerPayload.FromFrameMarker(
+        new MB.FramePacing.Marker.Payload(
+          (MB.FramePacing.Marker.MarkerKind)kind,
+          RunId,
+          ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
+          (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.NoFlags)
+            | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.NoFlags),
+          new NanosecondTimeSpan(RenderedAnimationNs[frame] + (loop * DurationNs)),
+          MarkerFrameTime(RenderedPreferredInterval[frame]),
+          MarkerFrameTime(RenderedSwapInterval[frame]),
+          new NanosecondTickCount(MarkerRefreshNs(intendedRefresh)),
+          new NanosecondTickCount(RenderedCpuStartNs[frame] + (loop * DurationNs)),
+          NanosecondTimeDuration.FromNanoseconds(RenderedCpuBusyNs[frame])
+        )
       );
     }
+
+    /// <summary>The animation time rendered frame <paramref name="rendered"/> shows, as the tools hold it.</summary>
+    private long AnimationTicks(int rendered) => SpanTicks(RenderedAnimationNs[rendered]);
 
     /// <summary>The frame index of presented frame <paramref name="frame"/> in the clip's first loop.</summary>
     public ulong FrameIndex(int frame) => FirstFrameIndex + (ulong)Presented[frame];
@@ -173,7 +184,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>The display time step in refreshes.</summary>
     public long DisplayStepRefreshes(int frame) => FirstRefresh(frame) - FirstRefresh(frame - 1);
 
-    public long AnimationStepTicks(int frame) => RenderedAnimationTicks[Presented[frame]] - RenderedAnimationTicks[Presented[frame - 1]];
+    public long AnimationStepTicks(int frame) => AnimationTicks(Presented[frame]) - AnimationTicks(Presented[frame - 1]);
 
     /// <summary>
     /// Nothing animates while presented frame <paramref name="frame"/> is on screen, by the flags alone: its own StaticAfter, or StaticBefore on
@@ -236,12 +247,12 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>How many refreshes after the one it was rendered for the frame is first shown (negative: early, out of order).</summary>
     public int LateRefreshes(int frame) => RenderedLate[Presented[frame]]!.Value;
 
-    public long CpuStartTicks(int frame) => RenderedCpuStartTicks[Presented[frame]];
+    public long CpuStartTicks(int frame) => PointTicks(RenderedCpuStartNs[Presented[frame]]);
 
-    public long CpuBusyTicks(int frame) => RenderedCpuBusyTicks[Presented[frame]];
+    public long CpuBusyTicks(int frame) => DurationTicks(RenderedCpuBusyNs[Presented[frame]]);
 
     /// <summary>The intended display time the frame's marker carries (the pacer's clock starts at the clip's first refresh; 0 = unknown).</summary>
-    public long IntendedTicks(int frame) => RefreshTicks(FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value);
+    public long IntendedTicks(int frame) => PointTicks(MarkerRefreshNs(FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value));
 
     /// <summary>The intended step to <paramref name="frame"/>, when both markers carry an intended display time.</summary>
     public long? IntendedStepTicks(int frame) =>
@@ -303,14 +314,39 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>The judged animation errors up to the frame, since the clip's first frame (animation minus display time without static steps).</summary>
     public long DriftTicks(int frame) => Enumerable.Range(1, frame).Sum(f => AnimationErrorTicks(f) ?? 0);
 
-    /// <summary><paramref name="refreshes"/> refreshes in whole ticks, rounded half to even like the generator.</summary>
+    /// <summary>When the video shows a frame <paramref name="refreshes"/> refreshes in: whole ticks, as the tools read the file's times.</summary>
     private long RefreshTicks(long refreshes) => RoundedDivision(refreshes * TimeSpan.TicksPerSecond, Fps);
 
-    /// <summary>A marker's target or preferred frame time: whole refreshes in ticks, or on demand.</summary>
-    private uint FrameTicks(long? refreshes) => refreshes is { } count ? (uint)RefreshTicks(count) : MarkerPayload.OnDemandFrameTime.Ticks;
+    /// <summary><paramref name="refreshes"/> refreshes as a marker carries them: whole nanoseconds, rounded half to even like the generator.</summary>
+    private long MarkerRefreshNs(long refreshes) => RoundedDivision(refreshes * NanosecondTimeSpan.NanosecondsPerSecond, Fps);
 
-    /// <summary>A manifest time that must be a whole number of ticks, as the marker stores it.</summary>
-    private static long WholeTicks(decimal ticks) => WholeNumber(ticks, "ticks");
+    // A marker's time in nanoseconds as the tools hold it, in ticks: through the tools' own conversion, so the two can not differ
+    private static long SpanTicks(long nanoseconds) => FromMarker(animationTime: new NanosecondTimeSpan(nanoseconds)).AnimationTime.Ticks;
+
+    private static long PointTicks(long nanoseconds) => FromMarker(cpuStartTime: new NanosecondTickCount(nanoseconds)).CpuStartTime.Ticks;
+
+    private static long DurationTicks(long nanoseconds) => FromMarker(cpuBusy: NanosecondTimeDuration.FromNanoseconds(nanoseconds)).CpuBusy.Ticks;
+
+    private static MarkerPayload FromMarker(
+      NanosecondTimeSpan animationTime = default,
+      NanosecondTickCount cpuStartTime = default,
+      NanosecondTimeDuration cpuBusy = default
+    ) =>
+      MarkerPayload.FromFrameMarker(
+        new MB.FramePacing.Marker.Payload(
+          MB.FramePacing.Marker.MarkerKind.Frame,
+          0,
+          0,
+          MB.FramePacing.Marker.MarkerFlags.NoFlags,
+          animationTime,
+          cpuStartTime: cpuStartTime,
+          cpuBusy: cpuBusy
+        )
+      );
+
+    /// <summary>A marker's target or preferred frame time: whole refreshes in nanoseconds, or on demand.</summary>
+    private NanosecondTimeDuration MarkerFrameTime(long? refreshes) =>
+      refreshes is { } count ? NanosecondTimeDuration.FromNanoseconds(MarkerRefreshNs(count)) : MB.FramePacing.Marker.Payload.OnDemandFrameTime;
 
     private static long WholeNumber(decimal value, string what) =>
       value == decimal.Truncate(value) ? (long)value : throw new InvalidDataException($"{value} {what} is not a whole number");

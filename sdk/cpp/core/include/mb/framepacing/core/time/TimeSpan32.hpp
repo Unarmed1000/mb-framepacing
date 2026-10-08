@@ -11,9 +11,9 @@
 
 namespace MB::FramePacing
 {
-  //! A time interval of 0 to 429.4967295 s in ticks of 100 ns, unsigned 32-bit: the form of the marker's 32-bit intervals (preferred frame
-  //! time, target frame time, CPU busy). In the marker, 0 means unknown and MaxValue() (0xFFFF'FFFF ticks) is Payload::OnDemandFrameTime. It has
-  //! no arithmetic: compute with TimeSpan and convert the result.
+  //! A time interval of 0 to 429.4967295 s in ticks of 100 ns, unsigned 32-bit: an interval as four bytes of a file or a message hold it
+  //! in ticks (the tools' data still does; the marker's own durations are nanoseconds, a NanosecondTimeDuration). It has no arithmetic:
+  //! compute with TimeSpan and convert the result.
   class TimeSpan32
   {
     uint32_t m_ticks{0};

@@ -10,7 +10,7 @@ one folder per scenario, each with its `video.mp4` and the generator's `manifest
 - the animation error (PresentMon's definition, the raw value);
 - how many refreshes late it was (negative: early, shown out of order);
 - the target frame rate and the preferred frame rate (`targetFps`, `preferredFps`; `null` on demand);
-- the frame's CPU start time and CPU busy (`cpuStartTicks`, `cpuBusyTicks`);
+- the frame's CPU start time and CPU busy (`cpuStartNs`, `cpuBusyNs`);
 - in the idle clips, its static flags (`staticAfter`: nothing animates while it is on screen; `staticBefore`: nothing animated while
   the frame before it was, said one frame later), as its marker carries them.
 

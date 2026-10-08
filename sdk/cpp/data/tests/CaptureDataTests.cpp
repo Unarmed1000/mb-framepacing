@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // captures.mbcd: header fields at their offsets, newer and foreign files refused, records read back, a partial last record ignored.
 #include <mb/framepacing/core/Rectangle.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/capture/CaptureDataHeader.hpp>
 #include <mb/framepacing/data/capture/CaptureDataReader.hpp>
@@ -226,9 +227,9 @@ TEST(CaptureData, ARecordsMarkersDecode)
   FM::StartMetadata start;
   start.UtcTicks = 5;
   const std::size_t mainSize =
-    FM::EncodePayload({FM::MarkerKind::SequenceStart, 7u, 12u, FM::MarkerFlags::StaticAfter, FP::TimeSpan(34)}, start, buffer);
+    FM::EncodePayload({FM::MarkerKind::SequenceStart, 7u, 12u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan(34)}, start, buffer);
   const std::vector<uint8_t> main(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(mainSize));
-  const std::size_t syncSize = FM::EncodePayload({FM::MarkerKind::Sync, 7u, 11u, FM::MarkerFlags::NoFlags, FP::TimeSpan(0)}, {}, buffer);
+  const std::size_t syncSize = FM::EncodePayload({FM::MarkerKind::Sync, 7u, 11u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(0)}, {}, buffer);
   const std::vector<uint8_t> sync(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(syncSize));
   ASSERT_EQ(main.size(), 81u) << "the longest marker";
   ASSERT_EQ(sync.size(), 20u) << "the shortest";
@@ -240,7 +241,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
   EXPECT_EQ(payload.Kind(), FM::MarkerKind::SequenceStart);
   EXPECT_EQ(payload.RunId(), 7u);
   EXPECT_EQ(payload.FrameIndex(), 12u);
-  EXPECT_EQ(payload.AnimationTime(), FP::TimeSpan(34));
+  EXPECT_EQ(payload.AnimationTime(), FP::NanosecondTimeSpan(34));
   EXPECT_EQ(metadata.UtcTicks, 5);
   FM::Payload withoutMetadata;
   EXPECT_TRUE(record.TryDecodeMain(withoutMetadata));
@@ -253,7 +254,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
 
   // A record without markers, and bytes that are no marker
   const auto none = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 0, {}, {}));
-  FM::Payload untouched{FM::MarkerKind::Frame, 99u, 98u, FM::MarkerFlags::NoFlags, FP::TimeSpan(97)};
+  FM::Payload untouched{FM::MarkerKind::Frame, 99u, 98u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(97)};
   EXPECT_FALSE(none.TryDecodeMain(untouched));
   EXPECT_FALSE(none.TryDecodeSecond(untouched));
   const auto garbage = FD::CaptureDataRecord::Parse(RecordBytes(5, 200, 1, std::vector<uint8_t>(57), {1, 2, 3}));

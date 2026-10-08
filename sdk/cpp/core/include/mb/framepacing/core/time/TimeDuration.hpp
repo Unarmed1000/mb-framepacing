@@ -55,7 +55,7 @@ namespace MB::FramePacing
       return TimeDuration(TimeSpan(ticks));
     }
 
-    //! The marker's 32-bit interval, which every TimeDuration can hold.
+    //! A 32-bit interval in ticks, which every TimeDuration can hold.
     static constexpr TimeDuration From(const TimeSpan32 value) noexcept
     {
       return UncheckedCreate(value.ToTimeSpan());

@@ -7,9 +7,9 @@
 #include <mb/framepacing/core/Crc32Util.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
-#include <mb/framepacing/core/time/TickCount64.hpp>
-#include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <mb/framepacing/core/time/TimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -27,6 +27,7 @@
 #include <array>
 #include <bit>
 #include <cassert>
+#include <limits>
 #include "detail/QrEncoder.hpp"
 #include "detail/QrSymbol.hpp"
 #include "detail/WireFormat.hpp"
@@ -35,6 +36,13 @@ namespace MB::FramePacing::Marker
 {
   namespace
   {
+
+    //! A duration as its four bytes hold it. A payload holds none longer than they do (Payload's constructor caps it).
+    constexpr uint32_t DurationField(const NanosecondTimeDuration duration) noexcept
+    {
+      assert(duration.UnsignedNanoseconds() <= std::numeric_limits<uint32_t>::max());
+      return static_cast<uint32_t>(duration.UnsignedNanoseconds());
+    }
 
     //! The 53 byte header every kind starts with (a sync marker has its first 16 bytes: which run and frame).
     std::array<uint8_t, WireFormat::HeaderByteCount> EncodeHeader(const Payload& payload) noexcept
@@ -48,12 +56,12 @@ namespace MB::FramePacing::Marker
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetFrameIndex, payload.FrameIndex());
       bytes[WireFormat::OffsetFlags] = static_cast<uint8_t>(payload.Flags());
       // Two's complement, identical to C# BinaryPrimitives.WriteInt64LittleEndian
-      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetAnimationTicks, payload.AnimationTime().Ticks());
-      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetPreferredFrameTicks, payload.PreferredFrameTime().Ticks());
-      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetTargetFrameTicks, payload.TargetFrameTime().Ticks());
-      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetIntendedDisplayTicks, payload.IntendedDisplayTime().UnsignedTicks());
-      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuStartTicks, payload.CpuStartTime().UnsignedTicks());
-      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuBusyTicks, payload.CpuBusy().Ticks());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetAnimationTime, payload.AnimationTime().Nanoseconds());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetPreferredFrameTime, DurationField(payload.PreferredFrameTime()));
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetTargetFrameTime, DurationField(payload.TargetFrameTime()));
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetIntendedDisplayTime, payload.IntendedDisplayTime().UnsignedNanoseconds());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuStartTime, payload.CpuStartTime().UnsignedNanoseconds());
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuBusy, DurationField(payload.CpuBusy()));
       return bytes;
     }
 
@@ -301,7 +309,7 @@ namespace MB::FramePacing::Marker
     if (kind == MarkerKind::Sync)
     {
       rPayload = Payload{kind, ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRunId),
-                         ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex), MarkerFlags::NoFlags, TimeSpan()};
+                         ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex), MarkerFlags::NoFlags, NanosecondTimeSpan()};
       if (pMetadata != nullptr)
       {
         *pMetadata = StartMetadata{};
@@ -320,12 +328,12 @@ namespace MB::FramePacing::Marker
                        ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRunId),
                        ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetFrameIndex),
                        static_cast<MarkerFlags>(bytes[WireFormat::OffsetFlags]),
-                       TimeSpan(ByteSpanUtil::ReadLE<int64_t>(bytes, WireFormat::OffsetAnimationTicks)),
-                       TimeSpan32(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetPreferredFrameTicks)),
-                       TimeSpan32(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetTargetFrameTicks)),
-                       TickCount64::FromUnsignedTicks(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetIntendedDisplayTicks)),
-                       TickCount64::FromUnsignedTicks(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetCpuStartTicks)),
-                       TimeSpan32(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetCpuBusyTicks))};
+                       NanosecondTimeSpan(ByteSpanUtil::ReadLE<int64_t>(bytes, WireFormat::OffsetAnimationTime)),
+                       NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetPreferredFrameTime)),
+                       NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetTargetFrameTime)),
+                       NanosecondTickCount::FromUnsignedNanoseconds(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetIntendedDisplayTime)),
+                       NanosecondTickCount::FromUnsignedNanoseconds(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetCpuStartTime)),
+                       NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetCpuBusy))};
     if (pMetadata != nullptr)
     {
       *pMetadata = metadata;

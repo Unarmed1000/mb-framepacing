@@ -9,7 +9,7 @@ It has modules:
 - **data**: reads what the mb-framepacing tools capture and analyse.
 - **pacer** (C++, **experimental**, off by default): paces a frame loop with only a steady clock and vsync. It holds a target frame
   rate, adapts the swap interval to how the frames do, and hands the application its animation time and the values the marker carries.
-- **core**: what the modules share: `Point` and `Rectangle` in every language, the time types (`TickCount64`, `TickCount32`, `TimeSpan32`) in C++ and C#, and in C++ the
+- **core**: what the modules share: `Point` and `Rectangle` in every language, the time types in nanoseconds (`NanosecondTimeSpan`, `NanosecondTickCount`, `NanosecondTimeDuration`: the marker's) in every language and in ticks of 100 ns (`TickCount64`, `TickCount32`, `TimeSpan32`) in C++ and C#, and in C++ the
   library version.
 
 Everything here is under the BSD 3-Clause License. The measuring tools themselves (capture, analysis, GUI) are in

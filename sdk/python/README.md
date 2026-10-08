@@ -20,13 +20,16 @@ subpackages. Standard library only, Python 3.12 or later.
 
 ## Times in nanoseconds
 
-The package's times are whole ticks of 100 ns, as plain integers. Two types hold what a platform reports in nanoseconds
-without losing the last two digits: `NanosecondTimeSpan` (a signed interval) and `NanosecondTickCount` (a point on a clock,
-kept as an unsigned 64-bit count that compares across its wrap), both as the C++ and C# cores have them. Each holds a whole number
-of nanoseconds, an `int`: a float is refused, so nothing is rounded on the way in. `from_ticks` is
-exact, and `to_ticks()` gives ticks (truncated toward zero for an interval, the tick it is in for a point).
-`NanosecondTimeDuration` is a length of time that is never negative (a negative count becomes zero): two added are a duration,
-and one less another is a `NanosecondTimeSpan`.
+The marker's times are whole nanoseconds, as plain integers (a payload's `…_ns` fields): `time.monotonic_ns()` is a steady clock
+that counts in them, and `seconds_to_ns` converts an animation clock's seconds. The data module still reads whole ticks of 100 ns
+(its `…_ticks` fields), as the tools' files hold them, until the tools move to nanoseconds.
+
+Three types hold a count of nanoseconds as what it is, as the C++ and C# cores have them: `NanosecondTimeSpan` (a signed
+interval), `NanosecondTickCount` (a point on a clock, kept as an unsigned 64-bit count that compares across its wrap) and
+`NanosecondTimeDuration` (a length of time that is never negative: a negative count becomes zero, two added are a duration, and
+one less another is a `NanosecondTimeSpan`). Each holds a whole number of nanoseconds, an `int` (its `nanoseconds`, which is what
+a payload's field takes): a float is refused, so nothing is rounded on the way in. `from_ticks` is exact, and `to_ticks()` gives
+ticks (truncated toward zero for an interval, the tick it is in for a point).
 
 ```python
 from mb_framepacing import NanosecondTickCount, NanosecondTimeSpan
@@ -47,36 +50,64 @@ from mb_framepacing.marker import (
     PixelFormat,
     generate_modules,
     modules_to_bitmap,
-    seconds_to_ticks,
+    seconds_to_ns,
 )
 
 options = Options(module_size_px=3)
 origin = options.recommended_origin(MarkerKind.FRAME, height)
 
 # Every frame, last (after post effects and UI), without blending:
-matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NO_FLAGS, seconds_to_ticks(animation_seconds)))  # encode once
+matrix = generate_modules(Payload(MarkerKind.FRAME, 1, frame_index, MarkerFlags.NO_FLAGS, seconds_to_ns(animation_seconds)))  # encode once
 modules_to_bitmap(matrix, options, origin, rgb_frame, width, height, PixelFormat.R8G8B8)  # draw it
+```
+
+An application that paces its frames fills the optional fields too, every time in nanoseconds and the two points in time on one
+steady clock:
+
+```python
+import time
+
+cpu_start_ns = time.monotonic_ns()  # when the CPU starts working on the frame
+# ... update and draw the frame; the marker is drawn last ...
+payload = Payload(
+    MarkerKind.FRAME,
+    1,
+    frame_index,
+    MarkerFlags.NO_FLAGS,
+    seconds_to_ns(animation_seconds),
+    preferred_frame_ns=16_666_667,  # the application wants 60 fps
+    target_frame_ns=33_333_333,  # the pacer runs at 30 fps for now
+    intended_display_ns=intended_display_ns,  # the pacer's aim, on time.monotonic_ns()'s clock
+    cpu_start_ns=cpu_start_ns,
+    cpu_busy_ns=time.monotonic_ns() - cpu_start_ns,
+)
 ```
 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Flags:** `MarkerFlags.NO_FLAGS`, or `MarkerFlags.STATIC_AFTER` on a frame when nothing animates while it is on screen, or
   `MarkerFlags.STATIC_BEFORE` on the next frame when that is only known then (the analysis does not judge the step out of the static
   frame).
-- **Animation time:** the moment the frame shows, as the application animated it, in 100 ns ticks (`seconds_to_ticks`).
-- **Frame pacing (optional):** when the application paces its frames, `Payload(..., preferred_frame_ticks=..., target_frame_ticks=...,
-intended_display_ticks=...)` carries the interval the application wants to run at (it differs from the target only while the pacer
-  runs slower than wanted), the interval the pacer aims for (`166_667` for 60 fps) and when it intends the frame to be shown (100 ns
-  ticks on its steady clock, any epoch). All default to `0` (unknown); `ON_DEMAND_FRAME_TICKS` = frames only when something changes.
-- **CPU start time and CPU busy (optional):** `Payload(..., cpu_start_ticks=..., cpu_busy_ticks=...)` carries when the CPU started
-  working on the frame (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on
-  it before presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's
-  `MsCPUBusy`; it may span several refreshes and does not include the GPU's work), in 100 ns ticks. CPU busy is `u32`; both default
-  to `0` (unknown).
+- **Animation time:** the moment the frame shows, as the application animated it, in nanoseconds (`seconds_to_ns` for a clock in
+  seconds, truncated to the nanosecond: 1/60 s is `16_666_666`).
+- **Frame pacing (optional):** when the application paces its frames, `preferred_frame_ns`, `target_frame_ns` and
+  `intended_display_ns` carry the interval the application wants to run at (it differs from the target only while the pacer runs
+  slower than wanted), the interval the pacer aims for (`16_666_667` for 60 fps) and when it intends the frame to be shown
+  (nanoseconds on its steady clock, any epoch). All default to `0` (unknown); `ON_DEMAND_FRAME_NS` = frames only when something
+  changes.
+- **CPU start time and CPU busy (optional):** `cpu_start_ns` and `cpu_busy_ns` carry when the CPU started working on the frame
+  (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on it before
+  presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's `MsCPUBusy`; it
+  may span several refreshes and does not include the GPU's work), in nanoseconds. Both default to `0` (unknown).
+- **The longest durations:** the marker holds the two frame times and CPU busy in four bytes each, so a `Payload` holds none
+  longer than a marker can carry: a longer frame time becomes `MAX_FRAME_NS` (4.294967294 s) and a longer CPU busy
+  `MAX_CPU_BUSY_NS` (4.294967295 s), never an error, and a payload decodes to exactly what was encoded. A negative duration, or a
+  time outside signed 64 bits, is a `ValueError` when the payload is encoded.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind.SEQUENCE_START`, encoded with its metadata
   (`generate_modules(payload, StartMetadata(utc_ticks, sequence_id))`), and a payload of kind `MarkerKind.SEQUENCE_END`, each shown
-  for a few frames. The sequence id is 16 opaque bytes unique to the run: `SequenceId.from_uuid(uuid.uuid4())` or a text tag of up to
-  16 printable ASCII characters, `SequenceId.from_text("run-42")`. `str(sequence_id)` shows it as the text, or as the UUID's
-  8-4-4-4-12 form.
+  for a few frames. The start time is the one time that is not in nanoseconds: C# `DateTime` UTC ticks of 100 ns
+  (`to_date_time_ticks(datetime.now(UTC))`). The sequence id is 16 opaque bytes unique to the run:
+  `SequenceId.from_uuid(uuid.uuid4())` or a text tag of up to 16 printable ASCII characters, `SequenceId.from_text("run-42")`.
+  `str(sequence_id)` shows it as the text, or as the UUID's 8-4-4-4-12 form.
 - **Size:** every main marker (frame, start and end) is QR version 6, 41×41 modules, so it never changes size:
   `options.marker_size_px()` is `49 × module_size_px` with the default quiet zone (294 px for the default 6 px modules).
 - **Sync marker (optional; required for camera capture):** a small second marker that carries only the run id and frame index, drawn
@@ -125,7 +156,7 @@ The same API as the C# marker module (`MB.FramePacing.Marker`), in Python's nami
 | `modules_to_indexed`, `modules_to_triangles` (`Vertex`)                                                                         | Draw it as indexed triangles or a triangle list, for a GPU                              |
 | `modules_to_quads`, `MarkerQuad` (`rect`, a `Rectangle`: `x`, `y`, `width`, `height`, `left`, `right`, `top`, `bottom`; `dark`) | Draw it as rectangles: the light background, then one dark rectangle per run of modules |
 | `qr_module_count_for`                                                                                                           | Modules per side of a kind's symbol                                                     |
-| `encode_payload`, `try_decode_payload`, `seconds_to_ticks`, `to_date_time_ticks`                                                | The wire format and its time units                                                      |
+| `encode_payload`, `try_decode_payload`, `seconds_to_ns`, `to_date_time_ticks`                                                   | The wire format and its time units                                                      |
 
 A Python caller usually has a pixel buffer: `modules_to_bitmap` draws into it (a `bytearray`, PIL's `Image.tobytes`, a numpy array's
 memory). `PixelFormat` gives the byte layout: `R8G8B8` is `[R, G, B]`, `R8G8B8A8` `[R, G, B, A]` with A 255; the marker is black

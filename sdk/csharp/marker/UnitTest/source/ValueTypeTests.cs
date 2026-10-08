@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* The marker's value types compare by value, hash alike when equal and write themselves: Payload, MarkerQuad, Vertex, SequenceId and
-//* Options. Payload also keeps itself valid: a kind that is not a MarkerKind throws.
+//* Options. Payload also keeps itself valid: a kind that is not a MarkerKind throws (PayloadTests has the durations it caps).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -21,21 +21,24 @@ namespace MB.FramePacing.Marker.UnitTest
       1,
       2,
       MarkerFlags.StaticAfter,
-      new TimeSpan(3),
-      new TimeSpan32(4),
-      new TimeSpan32(5),
-      new TickCount64(6),
-      new TickCount64(7),
-      new TimeSpan32(8)
+      new NanosecondTimeSpan(3),
+      NanosecondTimeDuration.FromNanoseconds(4),
+      NanosecondTimeDuration.FromNanoseconds(5),
+      new NanosecondTickCount(6),
+      new NanosecondTickCount(7),
+      NanosecondTimeDuration.FromNanoseconds(8)
     );
 
     [Test]
     public void Payload_AKindThatIsNotAMarkerKindThrows()
     {
       const MarkerKind Unknown = (MarkerKind)4;
-      Assert.That(() => new Payload(Unknown, 1, 2, MarkerFlags.NoFlags, new TimeSpan(3)), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => new Payload(Unknown, 1, 2, MarkerFlags.NoFlags, new NanosecondTimeSpan(3)), Throws.TypeOf<ArgumentOutOfRangeException>());
       Assert.That(() => g_payload.WithKind(Unknown), Throws.TypeOf<ArgumentOutOfRangeException>());
-      Assert.That(() => new Payload((MarkerKind)255, 1, 2, MarkerFlags.NoFlags, TimeSpan.Zero), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(
+        () => new Payload((MarkerKind)255, 1, 2, MarkerFlags.NoFlags, NanosecondTimeSpan.Zero),
+        Throws.TypeOf<ArgumentOutOfRangeException>()
+      );
       // Every MarkerKind is taken, and a default payload is a frame marker
       foreach (MarkerKind kind in Enum.GetValues(typeof(MarkerKind)))
         Assert.That(g_payload.WithKind(kind).Kind, Is.EqualTo(kind));
@@ -54,12 +57,12 @@ namespace MB.FramePacing.Marker.UnitTest
             1,
             2,
             MarkerFlags.StaticAfter,
-            new TimeSpan(3),
-            new TimeSpan32(4),
-            new TimeSpan32(5),
-            new TickCount64(6),
-            new TickCount64(7),
-            new TimeSpan32(8)
+            new NanosecondTimeSpan(3),
+            NanosecondTimeDuration.FromNanoseconds(4),
+            NanosecondTimeDuration.FromNanoseconds(5),
+            new NanosecondTickCount(6),
+            new NanosecondTickCount(7),
+            NanosecondTimeDuration.FromNanoseconds(8)
           )
         )
       );
@@ -70,13 +73,15 @@ namespace MB.FramePacing.Marker.UnitTest
     public void Payload_TheFlagsAreKeptAsGiven()
     {
       var reserved = (MarkerFlags)0xFF;
-      Assert.That(new Payload(MarkerKind.Frame, 1, 2, reserved, TimeSpan.Zero).Flags, Is.EqualTo(reserved));
+      Assert.That(new Payload(MarkerKind.Frame, 1, 2, reserved, NanosecondTimeSpan.Zero).Flags, Is.EqualTo(reserved));
     }
 
     [Test]
-    public void Payload_OnDemandIsTheLargestFrameTime_AndTheStartMarkerTheLongestPayload()
+    public void Payload_OnDemandIsTheLargestValueOfAFrameTimesFourBytes_AndTheStartMarkerTheLongestPayload()
     {
-      Assert.That(Payload.OnDemandFrameTime, Is.EqualTo(TimeSpan32.MaxValue));
+      Assert.That(Payload.OnDemandFrameTime.Nanoseconds, Is.EqualTo(uint.MaxValue));
+      Assert.That(Payload.MaxFrameTime.Nanoseconds, Is.EqualTo(uint.MaxValue - 1));
+      Assert.That(Payload.MaxCpuBusy.Nanoseconds, Is.EqualTo(uint.MaxValue));
       Assert.That(Payload.MaxEncodedByteCount, Is.EqualTo(WireFormat.StartPayloadByteCount));
       Assert.That(Payload.MaxEncodedByteCount, Is.LessThanOrEqualTo(WireFormat.QrCapacityBytes));
       Assert.That(WireFormat.SyncPayloadByteCount, Is.LessThanOrEqualTo(WireFormat.SyncQrCapacityBytes));
@@ -136,7 +141,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.RunId,
           p.FrameIndex,
           p.Flags,
-          new TimeSpan(9),
+          new NanosecondTimeSpan(9),
           p.PreferredFrameTime,
           p.TargetFrameTime,
           p.IntendedDisplayTime,
@@ -149,7 +154,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.FrameIndex,
           p.Flags,
           p.AnimationTime,
-          new TimeSpan32(9),
+          NanosecondTimeDuration.FromNanoseconds(9),
           p.TargetFrameTime,
           p.IntendedDisplayTime,
           p.CpuStartTime,
@@ -162,7 +167,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.Flags,
           p.AnimationTime,
           p.PreferredFrameTime,
-          new TimeSpan32(9),
+          NanosecondTimeDuration.FromNanoseconds(9),
           p.IntendedDisplayTime,
           p.CpuStartTime,
           p.CpuBusy
@@ -175,7 +180,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
-          new TickCount64(9),
+          new NanosecondTickCount(9),
           p.CpuStartTime,
           p.CpuBusy
         ),
@@ -188,7 +193,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.PreferredFrameTime,
           p.TargetFrameTime,
           p.IntendedDisplayTime,
-          new TickCount64(9),
+          new NanosecondTickCount(9),
           p.CpuBusy
         ),
         new Payload(
@@ -201,7 +206,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.TargetFrameTime,
           p.IntendedDisplayTime,
           p.CpuStartTime,
-          new TimeSpan32(9)
+          NanosecondTimeDuration.FromNanoseconds(9)
         ),
       };
       foreach (Payload other in others)
@@ -213,11 +218,13 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
-    public void Payload_WritesEveryFieldWithItsTimesInTicks()
+    public void Payload_WritesEveryFieldWithItsTimesInNanoseconds()
     {
       Assert.That(
         g_payload.ToString(),
-        Is.EqualTo("{Frame, run 1, frame 2, flags StaticAfter, ticks 3, preferred 4, target 5, intended 6, cpu start 7, cpu busy 8}")
+        Is.EqualTo(
+          "{Frame, run 1, frame 2, flags StaticAfter, animation 3 ns, preferred 4 ns, target 5 ns, intended 6 ns, cpu start 7 ns, cpu busy 8 ns}"
+        )
       );
     }
 

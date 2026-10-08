@@ -83,7 +83,7 @@ What your project gets:
 
 - A static library target per module in every way above: **`mb_framepacing::marker`** for the marker (it links
   `mb_framepacing::core`), and `mb_framepacing::data` for reading the tools' data. Each type has its own header (`<mb/framepacing/marker/payload/Payload.hpp>`,
-  `<mb/framepacing/core/time/TimeSpan.hpp>`, ...) and the marker's functions are in `<mb/framepacing/marker/FrameMarker.hpp>`.
+  `<mb/framepacing/core/time/NanosecondTimeSpan.hpp>`, ...) and the marker's functions are in `<mb/framepacing/marker/FrameMarker.hpp>`.
 - When the library is not the top-level project, its tests, tools, install rules and warnings-as-errors are off, so GoogleTest is
   never downloaded and your project's `cmake --install` installs your files only.
   The options, if you want to change them:
@@ -163,7 +163,7 @@ std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;   // once
 
 void DrawFrameMarker(uint64_t frameIndex, double animationSeconds, uint32_t runId)
 {
-  const FP::TimeSpan animationTime = FP::TimeSpan::FromSeconds(animationSeconds); // the time your animation used
+  const FP::NanosecondTimeSpan animationTime = FP::NanosecondTimeSpan::FromSeconds(animationSeconds); // the time your animation used
   FM::GenerateModules({FM::MarkerKind::Frame, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime}, matrix);
   const std::size_t count = FM::ModulesToTriangles(matrix, options, origin, vertices);
   DrawTriangles(vertices.data(), count);   // your renderer: (X, Y) in pixels, color (Luma, Luma, Luma)
@@ -217,7 +217,7 @@ work after it: an idle screen, a paused menu). An application that only knows it
 the static frame, so an animation clock that pauses while idle does not look like a huge error ([the flags](marker-fields.md#flags-static-after-and-static-before)).
 
 **Frame pacing (recommended).** If your game paces its frames, put what the pacer aims for into the payload: the **preferred frame time**, the rate
-the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock ticks, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
+the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock nanoseconds, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
 does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
 presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. The SDK's own
@@ -231,8 +231,9 @@ in the order of the wire format: the kind, run id, frame index, flags and animat
 
 ```cpp
 // Kind, run id, frame index, flags, animation time; then preferred and target frame time, intended display time, CPU start and busy
-// The animation time is an FP::TimeSpan, the frame times and CPU busy FP::TimeSpan32, the intended display and CPU start time
-// FP::TickCount64 (all in 100 ns ticks)
+// Every time is in nanoseconds: the animation time is an FP::NanosecondTimeSpan, the frame times and CPU busy an
+// FP::NanosecondTimeDuration (never negative; the payload holds at most the 4.29 s a marker carries), the intended display and CPU
+// start time an FP::NanosecondTickCount (FromCounter, or ToNanosecondTickCount of core/time/ChronoConversion.hpp, from your clock)
 const FM::Payload payload(FM::MarkerKind::Frame, runId, frameIndex, nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::NoFlags,
                           animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime, cpuBusy);
 ```
@@ -279,7 +280,7 @@ void OnFrame(Phase phase, uint64_t frameIndex, double animationSeconds)
   const FM::MarkerKind kind = phase == Phase::Start ? FM::MarkerKind::SequenceStart
                               : phase == Phase::End ? FM::MarkerKind::SequenceEnd
                                                     : FM::MarkerKind::Frame;
-  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::NoFlags, FP::TimeSpan::FromSeconds(animationSeconds));
+  const FM::Payload payload(kind, 7u, frameIndex, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan::FromSeconds(animationSeconds));
   FM::GenerateModules(payload, matrix, {startUtc, sequenceId});   // the metadata only goes into the start marker
   DrawTriangles(vertices.data(), FM::ModulesToTriangles(matrix, options, origin, vertices));
 }

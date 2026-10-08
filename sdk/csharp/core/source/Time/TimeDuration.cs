@@ -48,7 +48,7 @@ namespace MB.FramePacing
     /// <summary>A negative count becomes zero.</summary>
     public static TimeDuration FromTicks(long ticks) => new TimeDuration(new TimeSpan(ticks));
 
-    /// <summary>The marker's 32-bit span, which is never negative, as a duration.</summary>
+    /// <summary>A 32-bit span in ticks, which is never negative, as a duration.</summary>
     public static TimeDuration From(TimeSpan32 value) => new TimeDuration(value.ToTimeSpan(), true);
 
     /// <summary>A duration is a TimeSpan that is not negative, so it is one wherever a TimeSpan is asked for.</summary>

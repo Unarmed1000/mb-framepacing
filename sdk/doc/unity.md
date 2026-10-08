@@ -83,11 +83,11 @@ steady clock, and may give its own CPU busy:
 ```csharp
 overlay.StaticAfterProvider = () => nothingPending; // optional: nothing animates while this frame is on screen
 overlay.StaticBeforeProvider = () => wokeFromIdle; // optional: nothing animated while the previous frame was
-overlay.PreferredFrameTimeProvider = () => pacer.PreferredFrameTime; // a TimeSpan32: the rate the game wants; default: as the target
-overlay.TargetFrameTimeProvider = () => pacer.TargetFrameTime; // a TimeSpan32: the interval it aims for now; default: Unity's settings (below)
-overlay.IntendedDisplayTimeProvider = () => pacer.IntendedDisplayTime; // a TickCount64 on the pacer's steady clock
-overlay.CpuStartTimeProvider = () => pacer.CpuStartTime; // a TickCount64 on the same clock
-overlay.CpuBusyProvider = () => pacer.CpuBusy; // optional, a TimeSpan32
+overlay.PreferredFrameTimeProvider = () => pacer.PreferredFrameTime; // a NanosecondTimeDuration: the rate the game wants; default: as the target
+overlay.TargetFrameTimeProvider = () => pacer.TargetFrameTime; // a NanosecondTimeDuration: the interval it aims for now; default: Unity's settings (below)
+overlay.IntendedDisplayTimeProvider = () => pacer.IntendedDisplayTime; // a NanosecondTickCount on the pacer's steady clock
+overlay.CpuStartTimeProvider = () => pacer.CpuStartTime; // a NanosecondTickCount on the same clock
+overlay.CpuBusyProvider = () => pacer.CpuBusy; // optional, a NanosecondTimeDuration
 ```
 
 The **target frame time** without a provider is what Unity's settings aim for: on Android and iOS `Application.targetFrameRate`
@@ -152,7 +152,7 @@ var material = FrameMarkerGL.CreateMaterial();            // once, or your own u
 // every frame, as the last thing drawn into the output
 var options = Options.Recommended(Screen.height, 540);
 var origin = options.RecommendedOrigin(MarkerKind.Frame, Screen.height);
-var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.NoFlags, TimeSpanUtil.FromSeconds(Time.timeAsDouble));
+var payload = new Payload(MarkerKind.Frame, runId, (ulong)Time.frameCount, MarkerFlags.NoFlags, NanosecondTimeSpan.FromSeconds(Time.timeAsDouble));
 if (generator.TryGenerateModules(payload, modules, out var matrix))
   markerMesh.Update(matrix, options, origin, Screen.height);
 commands.SetViewProjectionMatrices(Matrix4x4.identity, PixelSpace.Projection(Screen.width, Screen.height));
