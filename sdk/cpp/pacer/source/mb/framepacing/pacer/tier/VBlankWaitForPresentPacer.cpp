@@ -22,8 +22,6 @@ namespace MB::FramePacing::Pacer
     constexpr uint32_t ReadingsToMoveGrid = 8;
     //! The most refreshes an animation step is counted in: far more than a frame window holds
     constexpr int64_t MaxStepRefreshes = int64_t{1} << 20;
-    //! A wait held the loop when it took this share of a refresh period or more: one in this many
-    constexpr int64_t BlockedDivisor = 8;
     //! The place a frame is to be ready at is moved earlier by this share of a refresh period at a time: one in this many
     constexpr int64_t ReadyPlaceStepDivisor = 8;
     //! The frames shown later than worked out that move it: one by itself is a refresh the display lost
@@ -237,25 +235,11 @@ namespace MB::FramePacing::Pacer
 
   FrameStartPlan VBlankWaitForPresentPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
-    FrameStartPlan plan;
-    // The present to wait for: the one WaitingPresents back from the frame that is about to be made. While the waits run out
-    // nothing is waited for: once in a number of frames the plan asks after a present that many frames older, which has had
-    // the time a wait would give (asking is not free everywhere)
-    const bool stopped = PresentWaitsStopped();
-    const uint64_t back = (uint64_t{m_rule.Settings().WaitingPresents()} - 1u) + (stopped ? m_rule.Settings().PresentWaitSwapIntervals() : 0u);
-    const bool asks = !stopped || m_framesSinceAsk >= FramesBetweenAsks;
-    if (asks && !m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId &&
-        (m_lastAcceptedId - back) != m_waitedForId && (!stopped || (m_lastAcceptedId - back) >= m_runOutFromId))
-    {
-      plan.WaitForPresentFrameId = m_lastAcceptedId - back;
-      // As long as a few of the frame's own swap intervals: a present that is never shown holds the loop no longer
-      const int64_t refreshes = int64_t{m_rule.Settings().PresentWaitSwapIntervals()} * m_rule.SwapInterval();
-      plan.WaitForPresentTimeout = stopped ? NanosecondTimeDuration() : NanosecondTimeDuration(m_rule.Refresh().TimeFor(refreshes));
-    }
+    FrameStartPlan plan = m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval());
     // With the aim of smoothness a frame starts when the wait is over, and its present is held
     if (m_rule.Settings().Aim() == PacerAim::LowLatency && !StartsAgainAt(now))
     {
-      const NanosecondTickCount start = StartTimeFor(DisplaySlotFor(now, !m_waitRanOut));
+      const NanosecondTickCount start = StartTimeFor(DisplaySlotFor(now, !m_wait.WaitRanOut()));
       if (start > now)
       {
         plan.StartTime = start;
@@ -266,37 +250,11 @@ namespace MB::FramePacing::Pacer
 
   void VBlankWaitForPresentPacer::AddPresentWait(const PresentWaitReport& report) noexcept
   {
-    m_waitedForId = report.FrameId;
-    m_waitReported = true;
-    const bool heldTheLoop = report.Blocked().Nanoseconds() >= (m_rule.Refresh().ToNanosecondTimeSpan().Nanoseconds() / BlockedDivisor);
-    // A wait that ran out, and every answer while the waits are stopped: the window is not shown, or was not a moment ago
-    m_waitDisturbed = m_waitDisturbed || !report.Shown || PresentWaitsStopped();
-    if (PresentWaitsStopped())
+    // A wait that ran out, or an answer while the waits are stopped, says nothing of where a frame was shown
+    if (!m_wait.AddPresentWait(report, m_rule.Refresh()))
     {
-      // The answer to what the plan asked. Answers in a row that say shown end the stop: one by itself can be a frame of a
-      // window that is still covered, shown in passing. An ask that held the loop is the pacer's doing as a wait is
-      m_framesSinceAsk = 0;
-      m_presentWaitTimeouts += report.Shown ? 0u : 1u;
-      m_shownAsks = report.Shown ? m_shownAsks + 1u : 0u;
-      m_waitRanOut = m_waitRanOut || heldTheLoop;
-      if (m_shownAsks >= AsksShownToWait)
-      {
-        m_waitsRunOut = 0;
-      }
       return;
     }
-    if (!report.Shown)
-    {
-      ++m_presentWaitTimeouts;
-      m_runOutFromId = m_waitsRunOut == 0 ? report.FrameId : m_runOutFromId;
-      m_waitsRunOut = std::min(m_waitsRunOut + 1u, WaitsRunOutToStop);
-      m_framesSinceAsk = 0;
-      m_shownAsks = 0;
-      // The frame that starts after a wait that held the loop until it ran out starts late because the pacer asked for the wait
-      m_waitRanOut = m_waitRanOut || heldTheLoop;
-      return;
-    }
-    m_waitsRunOut = 0;
     // What the wait says of where frames were shown: nothing before there is a frame, across a pause, or of a frame that is not
     // one of the pacer's
     if (!m_hasFrame || StartsAgainAt(report.EndTime) || report.FrameId == 0 || report.FrameId > m_frameId)
@@ -305,7 +263,7 @@ namespace MB::FramePacing::Pacer
     }
     const int64_t blank = BlankAtOrBefore(report.EndTime);
     const auto newer = static_cast<int64_t>(m_frameId - report.FrameId);
-    if (heldTheLoop)
+    if (PresentWaitRule::HeldTheLoop(report, m_rule.Refresh()))
     {
       // The wait ended when the display took that frame: it was shown at the vertical blank before the wait's end. The display
       // takes one frame per refresh, so the frame last made is shown as many blanks later as it was made frames later, at the
@@ -339,17 +297,16 @@ namespace MB::FramePacing::Pacer
     // A frame that the pacer's own wait held until it ran out is not judged: the display is not taking the window's frames, so
     // when the frame before it was shown, or whether, is not known, and this start is late by the pacer's doing
     const bool startsAgain = StartsAgainAt(cpuStartTime);
-    const bool hasPrevious = !startsAgain && !m_waitRanOut;
+    const bool hasPrevious = !startsAgain && !m_wait.WaitRanOut();
     // Where a frame has to be ready is learnt from a display that shows the window's frames. Around a wait that ran out and
     // while the waits are stopped it does not: a frame shown later then is counted and teaches nothing, and a place that was
     // moved in the frames just before is moved back
-    if (m_waitDisturbed || PresentWaitsStopped())
+    if (m_wait.Disturbed())
     {
       m_readyPlaceSteps -= (m_framesSincePlaceStep < ShownLaterFramesApart && m_readyPlaceSteps > 0) ? 1u : 0u;
       m_framesSincePlaceStep = ShownLaterFramesApart;
       m_framesSinceDisturbed = 0;
       m_shownLaterCount = 0;
-      m_waitDisturbed = false;
     }
     else
     {
@@ -427,9 +384,7 @@ namespace MB::FramePacing::Pacer
     m_hasShownFloor = false;
     m_hasShownCeiling = false;
     m_hasFrame = true;
-    m_waitRanOut = false;
-    m_waitReported = false;
-    m_framesSinceAsk = PresentWaitsStopped() ? std::min(m_framesSinceAsk + 1u, FramesBetweenAsks) : 0u;
+    m_wait.BeginFrame();
     ++m_frameId;
     m_frameWork.AddFrameStart(m_frameId, cpuStartTime);
 
@@ -486,17 +441,7 @@ namespace MB::FramePacing::Pacer
     {
       m_presentTime = report.CallTime;
     }
-    if (report.Accepted)
-    {
-      m_lastAcceptedId = report.FrameId;
-      // A frame presented again after its first present was not taken: this present is one to wait for
-      m_oldestWaitableId = std::min(m_oldestWaitableId, report.FrameId);
-    }
-    else
-    {
-      // The present will not be shown, and the swap chain it was made for is gone with the presents before it
-      m_oldestWaitableId = report.FrameId + 1u;
-    }
+    m_wait.AddPresent(report);
   }
 
   void VBlankWaitForPresentPacer::AddGpuWork(const GpuWorkReport& report) noexcept
@@ -506,10 +451,7 @@ namespace MB::FramePacing::Pacer
 
   void VBlankWaitForPresentPacer::ForgetPresents() noexcept
   {
-    m_oldestWaitableId = m_lastAcceptedId + 1u;
-    // And with them the waits that ran out: a new swap chain's presents are waited for again
-    m_waitsRunOut = 0;
-    m_shownAsks = 0;
+    m_wait.ForgetPresents();
   }
 
   void VBlankWaitForPresentPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
@@ -547,13 +489,11 @@ namespace MB::FramePacing::Pacer
     m_hasPresentTime = false;
     m_hasShownFloor = false;
     m_hasShownCeiling = false;
-    m_waitRanOut = false;
     m_leadCount = 0;
     m_readyPlaceSteps = 0;
     m_shownLaterCount = 0;
-    m_waitDisturbed = false;
     m_framesSinceDisturbed = ShownLaterFramesApart;
     m_framesSincePlaceStep = ShownLaterFramesApart;
-    ForgetPresents();
+    m_wait.Reset();
   }
 }

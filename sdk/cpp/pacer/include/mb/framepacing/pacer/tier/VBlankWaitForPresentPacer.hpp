@@ -18,6 +18,7 @@
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
+#include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
@@ -70,7 +71,7 @@ namespace MB::FramePacing::Pacer
   //! PacerAim::LowLatency: after the wait a frame's start is held so that it is ready at its place and no sooner, and it is
   //! presented when it is done, though never before the refresh it is to be ready in begins.
   //!
-  //! A wait that runs out is the pacer's own doing: the frame it held is not judged. After WaitsRunOutToStop of them in a row
+  //! A wait that runs out is the pacer's own doing: the frame it held is not judged. After PresentWaitRule::WaitsRunOutToStop of them in a row
   //! the display is not taking the window's frames (a window that is covered or minimised) and the pacer stops waiting, all as
   //! TimerWaitForPresentPacer does (PresentWaitsStopped).
   //!
@@ -126,9 +127,8 @@ namespace MB::FramePacing::Pacer
     uint32_t m_shownLaterCount{0};
     uint32_t m_framesSinceShownLater{0};
     uint32_t m_readyPlaceSteps{0};
-    // A window that is not shown says nothing of where a display takes a frame: a wait ran out or the waits were stopped since
-    // the last frame began, the frames since one of those, and the frames since the place was last moved (each counted to a few)
-    bool m_waitDisturbed{false};
+    // A window that is not shown says nothing of where a display takes a frame: the frames since a wait ran out or the waits
+    // were stopped, and the frames since the place was last moved (each counted to a few)
     uint32_t m_framesSinceDisturbed{UINT32_MAX};
     uint32_t m_framesSincePlaceStep{UINT32_MAX};
     // How long the last frames took from their start to the end of their CPU work
@@ -138,32 +138,10 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
     NanosecondTimeDuration m_lastPresentBlocked;
-    // The presents: the last one the system took, and the first that can still be waited for (0: none yet)
-    uint64_t m_lastAcceptedId{0};
-    uint64_t m_oldestWaitableId{1};
-    uint64_t m_presentWaitTimeouts{0};
-    // The present the wait before the next frame was made for: it is not asked for again
-    uint64_t m_waitedForId{0};
-    // The waits in a row that ran out (no more than it takes to stop waiting), and whether one held the loop before the frame
-    // that is about to start
-    uint32_t m_waitsRunOut{0};
-    bool m_waitRanOut{false};
-    // The present the first of those waits was for: one made before it was shown, and says nothing of the display now
-    uint64_t m_runOutFromId{0};
-    // While the waits are stopped: the frames since the pacer last asked after a present, and the answers in a row that said
-    // shown
-    uint32_t m_framesSinceAsk{0};
-    uint32_t m_shownAsks{0};
-    // A wait was reported since the last frame started: a frame has one wait for a present, not two
-    bool m_waitReported{false};
+    // What holds the loop: the wait for a present
+    PresentWaitRule m_wait;
 
   public:
-    //! The waits in a row that run out before the pacer stops waiting, the frames between two asks while it is stopped, and the
-    //! answers in a row that say shown before it waits again: as TimerWaitForPresentPacer's.
-    static constexpr uint32_t WaitsRunOutToStop = 2;
-    static constexpr uint32_t FramesBetweenAsks = 16;
-    static constexpr uint32_t AsksShownToWait = 2;
-
     //! The tier this pacer is for.
     static constexpr PacerTier Tier = PacerTier::VBlankWaitForPresent;
 
@@ -185,7 +163,7 @@ namespace MB::FramePacing::Pacer
     //! What became of the wait for a present the plan asked for. A wait that held the loop and ended with the present shown
     //! says which vertical blank that frame was shown at; one that returned at once says that it was shown by then. One that
     //! ended without the present shown is counted (PresentWaitTimeouts) and the frame it held is not judged; after
-    //! WaitsRunOutToStop of them in a row the pacer stops waiting (PresentWaitsStopped) until presents are shown again.
+    //! PresentWaitRule::WaitsRunOutToStop of them in a row the pacer stops waiting (PresentWaitsStopped) until presents are shown again.
     void AddPresentWait(const PresentWaitReport& report) noexcept;
 
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
@@ -265,17 +243,17 @@ namespace MB::FramePacing::Pacer
       return ReadyPlace();
     }
 
-    //! True while the pacer does not wait for presents, because its waits ran out: every FramesBetweenAsks frames the plan asks,
-    //! with no time to wait, whether an older present was shown, and AsksShownToWait answers in a row that say shown end it.
+    //! True while the pacer does not wait for presents, because its waits ran out: every PresentWaitRule::FramesBetweenAsks frames the plan asks,
+    //! with no time to wait, whether an older present was shown, and PresentWaitRule::AsksShownToWait answers in a row that say shown end it.
     [[nodiscard]] bool PresentWaitsStopped() const noexcept
     {
-      return m_waitsRunOut >= WaitsRunOutToStop;
+      return m_wait.Stopped();
     }
 
     //! The waits for a present that ended without the present being shown, since the pacer was made.
     [[nodiscard]] uint64_t PresentWaitTimeouts() const noexcept
     {
-      return m_presentWaitTimeouts;
+      return m_wait.Timeouts();
     }
 
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
