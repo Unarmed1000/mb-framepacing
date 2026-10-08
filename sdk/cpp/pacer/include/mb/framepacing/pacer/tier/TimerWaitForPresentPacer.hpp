@@ -5,7 +5,6 @@
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
@@ -104,7 +103,7 @@ namespace MB::FramePacing::Pacer
     }
 
     //! The CPU busy time of the open frame up to now, for a marker drawn before the frame's end.
-    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(const NanosecondTickCount now) const noexcept
+    [[nodiscard]] NanosecondTimeDuration CpuBusyAt(const NanosecondTickCount now) const noexcept
     {
       return m_pacer.CpuBusyAt(now);
     }

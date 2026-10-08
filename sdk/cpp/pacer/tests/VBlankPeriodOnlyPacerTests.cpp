@@ -7,7 +7,6 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -117,8 +116,8 @@ TEST(VBlankPeriodOnlyPacer, UntilAReadingTheFirstFramesStartIsTakenAsAVerticalBl
   EXPECT_EQ(schedule.AnimationTime, Span(0));
   EXPECT_EQ(schedule.AnimationStep, Span(0));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Blank(1)));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
   EXPECT_EQ(pacer.Refresh(), g_hz100);
 }
@@ -324,7 +323,7 @@ TEST(VBlankPeriodOnlyPacer, AFrameThatStartsTooLateForItsVerticalBlankIsForTheFi
   // Known before the frame is made: its animation step is the four refreshes to the vertical blank it is shown at, and the
   // animation time is not behind
   EXPECT_EQ(frame.Schedule.AnimationStep, Span(4 * Period));
-  EXPECT_EQ(frame.Schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
+  EXPECT_EQ(frame.Schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 
@@ -573,7 +572,7 @@ TEST(VBlankPeriodOnlyPacer, FramesOfMoreThanOneRefreshAreForEveryNthVerticalBlan
   AddBlank(pacer, Blank(0));
   FrameResult frame = Frame(pacer, Blank(0) + 100'000);
   EXPECT_EQ(frame.Schedule.SwapInterval, 4u);
-  EXPECT_EQ(frame.Schedule.TargetFrameTime, FP::NanosecondTimeSpan32(4 * Period));
+  EXPECT_EQ(frame.Schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(4 * Period));
   for (int64_t number = 1; number < 20; ++number)
   {
     frame = Frame(pacer, frame.PresentNanoseconds + 60'000);
@@ -662,13 +661,13 @@ TEST(VBlankPeriodOnlyPacer, AFrameWithoutAnEndOrAPresentReportIsJudgedByWhatIsKn
   const PC::PresentPlan nothing = pacer.EndFrame(At(Start));
   EXPECT_EQ(nothing.FrameId, 0u);
   EXPECT_FALSE(nothing.WaitsForPresentTime());
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeDuration());
   EXPECT_EQ(pacer.LastPresentBlocked(), FP::NanosecondTimeDuration::Zero());
 
   // No EndFrame: the frame is taken as shown at its vertical blank, and its work is the time to the next start
   static_cast<void>(pacer.BeginFrame(At(Blank(0) + 100'000)));
-  EXPECT_EQ(pacer.CpuBusyAt(At(Blank(0) + 1'300'000)), FP::NanosecondTimeSpan32(1'200'000));
-  EXPECT_EQ(pacer.CpuBusyAt(At(Blank(0))), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Blank(0) + 1'300'000)), FP::NanosecondTimeDuration::FromNanoseconds(1'200'000));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Blank(0))), FP::NanosecondTimeDuration());
   PC::FrameSchedule schedule = pacer.BeginFrame(At(Blank(0) + 14'100'000));
   EXPECT_EQ(pacer.FrameWindow().Frames, 1u);
   EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(14'000'000));
@@ -678,7 +677,7 @@ TEST(VBlankPeriodOnlyPacer, AFrameWithoutAnEndOrAPresentReportIsJudgedByWhatIsKn
   // An end and no present report: presented when the pacer said, or when the work was done
   PC::PresentPlan present = pacer.EndFrame(At(Blank(0) + 14'400'000));
   EXPECT_EQ(present.PresentTime, At(Blank(1) + Place));
-  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeSpan32(300'000));
+  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(300'000));
   // A report of another frame says nothing of this one; the report of this frame says when it was
   PC::PresentReport report;
   report.FrameId = present.FrameId + 5u;

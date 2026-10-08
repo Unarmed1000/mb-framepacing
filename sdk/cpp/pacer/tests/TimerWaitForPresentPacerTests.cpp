@@ -8,7 +8,6 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -195,7 +194,7 @@ TEST(TimerWaitForPresentPacer, AFramePresentedAgainOnANewSwapChainCanBeWaitedFor
   EXPECT_FALSE(pacer.PlanFrame(At(Start + Period + 3'100'000)).WaitsForPresent());
   const PC::PresentPlan again = pacer.EndFrame(At(Start + Period + 5'000'000));
   EXPECT_EQ(again.FrameId, 2u);
-  EXPECT_EQ(again.CpuBusy, FP::NanosecondTimeSpan32(5'000'000));
+  EXPECT_EQ(again.CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(5'000'000));
   PC::PresentReport report;
   report.FrameId = 2;
   report.CallTime = At(Start + Period + 5'000'000);
@@ -229,13 +228,13 @@ TEST(TimerWaitForPresentPacer, ForgettingThePresentsLeavesTheGridTheFrameWindowA
 TEST(TimerWaitForPresentPacer, TheCpuBusyTimeCanBeAskedForWhileTheFrameIsOpen)
 {
   PC::TimerWaitForPresentPacer pacer(Settings(1));
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeDuration());
   static_cast<void>(pacer.BeginFrame(At(Start)));
   // Where a marker is drawn before the frame's work is done
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeSpan32(1'200'000));
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeDuration::FromNanoseconds(1'200'000));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::NanosecondTimeDuration());
   pacer.Reset();
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeDuration());
 }
 
 TEST(TimerWaitForPresentPacer, AWaitThatHeldTheLoopMovesTheGridAQuarterOfTheWayToItsEnd)
@@ -317,7 +316,7 @@ TEST(TimerWaitForPresentPacer, TheRestIsTheLowestPairsPacer)
   EXPECT_EQ(first.NextFrameStartTime, At(Start + (4 * Period)));
   const PC::PresentPlan present = pacer.EndFrame(At(Start + 3'000'000));
   EXPECT_EQ(present.PresentTime, At(Start + (3 * Period) + 1'000'000));
-  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeSpan32(3'000'000));
+  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(3'000'000));
   EXPECT_EQ(pacer.LastPresentBlocked(), FP::NanosecondTimeDuration::Zero());
   EXPECT_EQ(pacer.SwapInterval(), 4u);
   EXPECT_EQ(pacer.Refresh(), g_hz100);

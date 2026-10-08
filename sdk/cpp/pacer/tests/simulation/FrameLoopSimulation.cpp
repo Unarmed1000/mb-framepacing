@@ -153,7 +153,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
       frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
       frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
-      frame.TargetFrameTimeNanoseconds = static_cast<int64_t>(schedule.TargetFrameTime.Nanoseconds());
+      frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
 
@@ -305,7 +305,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
       frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
       frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
-      frame.TargetFrameTimeNanoseconds = static_cast<int64_t>(schedule.TargetFrameTime.Nanoseconds());
+      frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
 
@@ -408,7 +408,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
       frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
       frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
-      frame.TargetFrameTimeNanoseconds = static_cast<int64_t>(schedule.TargetFrameTime.Nanoseconds());
+      frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
 
@@ -501,7 +501,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
       frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
       frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
-      frame.TargetFrameTimeNanoseconds = static_cast<int64_t>(schedule.TargetFrameTime.Nanoseconds());
+      frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
 
@@ -614,7 +614,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
       frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
       frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
-      frame.TargetFrameTimeNanoseconds = static_cast<int64_t>(schedule.TargetFrameTime.Nanoseconds());
+      frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
 

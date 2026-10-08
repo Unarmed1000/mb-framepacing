@@ -5,8 +5,8 @@
 // paced by vsync, with frames on time, a display a little off its nominal rate, target frame rates, a load that comes and goes (with
 // the default frame margin, which follows the refresh period, and with one set to 1 ms), and a loop the GPU limits.
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -119,7 +119,7 @@ TEST(MonitorRates, FramesOnTimeAreOneRefreshEachAndTheAnimationDoesNotDrift)
         schedule.IntendedDisplayTime.Nanoseconds() - (StartNanoseconds + period.TimeFor(frame).Nanoseconds() + WakeUp(period, frame).Nanoseconds());
       const bool right = schedule.SwapInterval == 1u && schedule.Change == PC::SwapIntervalChange::Unchanged &&
                          schedule.AnimationTime == period.TimeFor(frame) && std::abs(aimedAfter - period.ToNanosecondTimeSpan().Nanoseconds()) <= 1 &&
-                         schedule.TargetFrameTime == FP::NanosecondTimeSpan32::FromNanosecondTimeSpan(period.ToNanosecondTimeSpan());
+                         schedule.TargetFrameTime == FP::NanosecondTimeDuration(period.ToNanosecondTimeSpan());
       wrongFrames += right ? 0 : 1;
     }
     EXPECT_EQ(wrongFrames, 0);
@@ -193,7 +193,7 @@ TEST(MonitorRates, ATargetFrameRateIsTheSmallestSwapIntervalThatReachesIt)
       {
         schedule = loop.Frame(Share(period, 300), WakeUp(period, frame));
         const bool right = schedule.SwapInterval == swapInterval && schedule.AnimationTime == period.TimeFor(frame * swapInterval) &&
-                           schedule.TargetFrameTime == FP::NanosecondTimeSpan32::FromNanosecondTimeSpan(period.TimeFor(swapInterval)) &&
+                           schedule.TargetFrameTime == FP::NanosecondTimeDuration(period.TimeFor(swapInterval)) &&
                            schedule.PreferredFrameTime == schedule.TargetFrameTime;
         wrongFrames += right ? 0 : 1;
       }

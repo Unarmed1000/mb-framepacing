@@ -5,7 +5,6 @@
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -28,8 +27,8 @@ namespace MB::FramePacing::Pacer
     //! (PacerCapability::PresentAfterDuration active); zero: none.
     NanosecondTimeDuration MinimumDuration;
     //! The marker's CPU busy time: from the frame's start to the end of its CPU work, waits the plans asked for left out. Zero:
-    //! not known, or it does not fit the marker's field.
-    NanosecondTimeSpan32 CpuBusy;
+    //! not known. The marker's payload caps a time its field does not hold.
+    NanosecondTimeDuration CpuBusy;
 
     //! True when there is a time to wait until before the present.
     [[nodiscard]] constexpr bool WaitsForPresentTime() const noexcept

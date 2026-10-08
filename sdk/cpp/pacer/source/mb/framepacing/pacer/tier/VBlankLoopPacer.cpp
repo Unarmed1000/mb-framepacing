@@ -9,7 +9,6 @@
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
 #include <algorithm>
-#include "../detail/MarkerValue.hpp"
 
 namespace MB::FramePacing::Pacer
 {
@@ -315,7 +314,7 @@ namespace MB::FramePacing::Pacer
         m_framesSincePlaceStep = 0;
       }
       const int64_t lost = previousShown - m_displaySlot;
-      const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : MarkerValue::Duration(cpuStartTime - m_startTime).ToNanosecondTimeSpan();
+      const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : NanosecondTimeDuration(cpuStartTime - m_startTime).Value();
       const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
       const bool late = lost > 0 || m_startedLate || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       // How long before the time it was given this frame began (low latency: it is given none with the aim of smoothness)
@@ -382,8 +381,8 @@ namespace MB::FramePacing::Pacer
     // When the frame after this one starts: at its time with the aim of low latency, and when this frame's present is made
     // with the aim of smoothness, as it starts when the wait after that is over
     schedule.NextFrameStartTime = isLowLatency ? StartTimeFor(displaySlot + m_pauseSlots + int64_t{swapInterval}) : PresentTimeFor(displaySlot);
-    schedule.TargetFrameTime = MarkerValue::FrameTime(period.TimeFor(swapInterval));
-    schedule.PreferredFrameTime = MarkerValue::FrameTime(period.TimeFor(m_rule.PreferredSwapInterval()));
+    schedule.TargetFrameTime = NanosecondTimeDuration(period.TimeFor(swapInterval));
+    schedule.PreferredFrameTime = NanosecondTimeDuration(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
     return schedule;
@@ -396,8 +395,8 @@ namespace MB::FramePacing::Pacer
     {
       return plan;
     }
-    const NanosecondTimeSpan32 busy = MarkerValue::Duration(workDoneTime - m_startTime);
-    m_work = busy.ToNanosecondTimeSpan();
+    const NanosecondTimeDuration busy = NanosecondTimeDuration(workDoneTime - m_startTime);
+    m_work = busy.Value();
     m_frameEnded = true;
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
@@ -414,9 +413,9 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  NanosecondTimeSpan32 VBlankLoopPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
+  NanosecondTimeDuration VBlankLoopPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
   {
-    return m_frameOpen ? MarkerValue::Duration(now - m_startTime) : NanosecondTimeSpan32();
+    return m_frameOpen ? NanosecondTimeDuration(now - m_startTime) : NanosecondTimeDuration();
   }
 
   void VBlankLoopPacer::AddPresent(const PresentReport& report) noexcept

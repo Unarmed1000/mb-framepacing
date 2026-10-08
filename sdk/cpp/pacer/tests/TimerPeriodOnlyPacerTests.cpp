@@ -7,7 +7,6 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -106,13 +105,13 @@ TEST(TimerPeriodOnlyPacer, TheFirstFrameStartsAtOnceAndStartsTheGrid)
   EXPECT_EQ(schedule.AnimationStep, Span(0));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + Period));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + Period));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
 
   const PC::PresentPlan present = pacer.EndFrame(At(Start + 3'000'000));
   EXPECT_EQ(present.FrameId, 1u);
-  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeSpan32(3'000'000));
+  EXPECT_EQ(present.CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(3'000'000));
   // A frame of one refresh is presented when it is done, with nothing for a present that takes values
   EXPECT_FALSE(present.WaitsForPresentTime());
   EXPECT_EQ(present.SwapInterval, 1u);
@@ -323,7 +322,7 @@ TEST(TimerPeriodOnlyPacer, AFrameOfMoreThanOneRefreshIsHeldByAWaitBeforeItsPrese
   const PC::FrameSchedule first = pacer.BeginFrame(At(Start));
   EXPECT_EQ(first.SwapInterval, 4u);
   EXPECT_EQ(first.NextFrameStartTime, At(Start + (4 * Period)));
-  EXPECT_EQ(first.TargetFrameTime, FP::NanosecondTimeSpan32(4 * Period));
+  EXPECT_EQ(first.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(4 * Period));
   // Presented in the period before the step the next frame is due at, the frame margin (1 ms here) into it
   const PC::PresentPlan present = pacer.EndFrame(At(Start + 3'000'000));
   EXPECT_EQ(settings.FrameMargin(), Span(1'000'000));
@@ -404,13 +403,13 @@ TEST(TimerPeriodOnlyPacer, EndFrameWithoutAFrameIsNothingAndAPresentReportIsKept
 TEST(TimerPeriodOnlyPacer, TheCpuBusyTimeCanBeAskedForWhileTheFrameIsOpen)
 {
   PC::TimerPeriodOnlyPacer pacer{LowLatencySettings()};
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start)), FP::NanosecondTimeDuration());
   static_cast<void>(pacer.BeginFrame(At(Start)));
   // Where a marker is drawn before the frame's work is done
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeSpan32(1'200'000));
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeDuration::FromNanoseconds(1'200'000));
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start - 1)), FP::NanosecondTimeDuration());
   pacer.Reset();
-  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.CpuBusyAt(At(Start + 1'200'000)), FP::NanosecondTimeDuration());
 }
 
 TEST(TimerPeriodOnlyPacer, AnotherRefreshPeriodOrOtherSettingsStartTheGridAgainAndTheAnimationTimeGoesOn)
@@ -481,7 +480,7 @@ TEST(TimerPeriodOnlyPacer, HalfASecondAfterStartUpTheLoopPausesOnceAndTheFrameOn
   EXPECT_EQ(schedule.AnimationStep, Span(Period));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + (51 * Period)));
   EXPECT_EQ(schedule.NextFrameStartTime, At(Start + (55 * Period)));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(pacer.StartupPauses(), 1u);
   EXPECT_EQ(pacer.PlanFrame(At(start + 3'060'000)).StartTime, At(Start + (55 * Period)));
 
@@ -699,7 +698,7 @@ TEST(TimerPeriodOnlyPacer, ALossThatRepeatsIsInTheAnimationStepAndALossThatDoesN
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
   schedule = pacer.BeginFrame(At(Start + (6 * Period)));
   EXPECT_EQ(schedule.AnimationStep, Span(2 * Period));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(Period));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 1u);
 
   // A frame on time ends it at once

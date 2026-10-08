@@ -74,16 +74,15 @@ TEST(Allocations, PacingFramesDoesNotAllocate)
       const bool busy = (frame / 600) % 2 == 1;
       const int64_t work = busy && frame % 3 == 0 ? 22'000'000 : 9'000'000;
       const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(now));
-      written += static_cast<int64_t>(pacer.EndFrame(FP::NanosecondTickCount(now + work), FP::NanosecondTimeSpan(work)).Nanoseconds());
+      written += pacer.EndFrame(FP::NanosecondTickCount(now + work), FP::NanosecondTimeSpan(work)).Nanoseconds();
       const PC::FrameSchedule other = fullWindowPacer.BeginFrame(FP::NanosecondTickCount(now));
-      written += static_cast<int64_t>(fullWindowPacer.EndFrame(FP::NanosecondTickCount(now + work)).Nanoseconds());
+      written += fullWindowPacer.EndFrame(FP::NanosecondTickCount(now + work)).Nanoseconds();
       written +=
         clock.Advance(FP::NanosecondTickCount(now), schedule.SwapInterval).Step.Nanoseconds() + (clock.DisplayTimeAfter(1).Nanoseconds() % 3);
       written += static_cast<int64_t>(pacer.FrameWindow().Frames) + (other.IntendedDisplayTime.Nanoseconds() % 7);
       // Present feedback three frames after each frame: on time, late, off the grid, not shown, and none at all
       const PC::FrameSchedule measured = feedbackPacer.BeginFrame(FP::NanosecondTickCount(now));
-      written += static_cast<int64_t>(feedbackPacer.EndFrame(FP::NanosecondTickCount(now + work)).Nanoseconds()) +
-                 (measured.IntendedDisplayTime.Nanoseconds() % 5);
+      written += feedbackPacer.EndFrame(FP::NanosecondTickCount(now + work)).Nanoseconds() + (measured.IntendedDisplayTime.Nanoseconds() % 5);
       if (measured.FrameId > 3u && frame % 7 != 0)
       {
         const FP::NanosecondTickCount shown(now + (frame % 11 == 0 ? 25'000'000 : 0) + (frame % 13 == 0 ? 7'000'000 : 0));

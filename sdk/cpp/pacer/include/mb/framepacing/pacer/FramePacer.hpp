@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
@@ -64,8 +64,8 @@ namespace MB::FramePacing::Pacer
     //! is late, whenever the next frame starts (a swap chain with a buffer to spare does not hold the loop to the display). An
     //! application the GPU limits must put the GPU's time in (the last frame's that was measured will do): without it the pacer does
     //! not see that, and the rule speeds up again after every frame window without a late frame. Returns the CPU busy time
-    //! (presentTime - the frame's start) for the marker, zero (unknown) when it does not fit it.
-    NanosecondTimeSpan32 EndFrame(NanosecondTickCount presentTime, NanosecondTimeSpan work = {}) noexcept;
+    //! (presentTime - the frame's start) for the marker, zero (unknown) for a present time before the frame's start.
+    NanosecondTimeDuration EndFrame(NanosecondTickCount presentTime, NanosecondTimeSpan work = {}) noexcept;
 
     //! What the platform measured for an earlier frame (its FrameSchedule::FrameId): any number of calls between two BeginFrames,
     //! oldest frame first. Nothing while PacerSettings::UsePresentFeedback is off. It changes no swap interval and no animation

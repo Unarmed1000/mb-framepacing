@@ -227,7 +227,7 @@ PC::FramePacer pacer(settings);                                // allocates its 
 
 // Every frame: the time it starts on your steady clock (an FP::NanosecondTickCount) in, the plan out
 const PC::FrameSchedule schedule = pacer.BeginFrame(now);      // SwapInterval, AnimationTime, IntendedDisplayTime, ...
-const FP::NanosecondTimeSpan32 cpuBusy = pacer.EndFrame(presentTime);    // as you draw the marker, just before Present
+const FP::NanosecondTimeDuration cpuBusy = pacer.EndFrame(presentTime);  // as you draw the marker, just before Present
 ```
 
 The pacer needs a steady clock and a `Present` that waits for vsync, nothing else: a baseline for any platform. Where the platform

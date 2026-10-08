@@ -887,9 +887,9 @@ anything (a platform that counts in ticks of 100 ns multiplies by 100; one that 
 every value it put into ticks, and for a refresh period that is a rate error: 21 parts in a million for the measured
 display's 4,166,389 ns when cut to a tick).
 
-- A point on the application's steady clock is a `NanosecondTickCount`, a span a `NanosecondTimeSpan`, a length of time
-  that can not be negative a `NanosecondTimeDuration`, and a value for one of the marker's 32-bit fields a
-  `NanosecondTimeSpan32`.
+- A point on the application's steady clock is a `NanosecondTickCount`, a span a `NanosecondTimeSpan`, and a length of
+  time that can not be negative a `NanosecondTimeDuration`: a frame time and the CPU busy time are durations, as the
+  marker's payload takes them, and the payload caps what its four bytes do not hold.
 - `RefreshPeriod` is exact to 2^-32 of a nanosecond: from a rate (`FromRate`), or from a period in whole nanoseconds as a
   platform gives one (`FromNanosecondTimeSpan`).
 - A value that does not fit a 32-bit field of the marker (4.29 s) is capped, never cut and never an error: the CPU busy

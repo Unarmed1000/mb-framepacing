@@ -6,7 +6,6 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
@@ -122,8 +121,8 @@ namespace MB::FramePacing::Pacer
     PresentPlan EndFrame(NanosecondTickCount workDoneTime) noexcept;
 
     //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
-    //! frame's start to now. Zero: no frame is open, or it does not fit the marker's field.
-    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(NanosecondTickCount now) const noexcept;
+    //! frame's start to now. Zero: no frame is open.
+    [[nodiscard]] NanosecondTimeDuration CpuBusyAt(NanosecondTickCount now) const noexcept;
 
     //! After the present, before the next frame is planned: when it was called is what the next frame's step is kept away
     //! from when the frame ran long (without the report it is taken as made when EndFrame said). A present the system did not

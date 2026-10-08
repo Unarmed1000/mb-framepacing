@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <cstdint>
 
@@ -37,9 +37,9 @@ namespace MB::FramePacing::Pacer
     //! presents no earlier than one refresh before it. Not a display time: with presents queued the frame is shown later.
     NanosecondTickCount NextFrameStartTime;
     //! The marker's target frame time: SwapInterval refreshes, rounded to a nanosecond.
-    NanosecondTimeSpan32 TargetFrameTime;
+    NanosecondTimeDuration TargetFrameTime;
     //! The marker's preferred frame time: the preferred swap interval's refreshes (PacerSettings::PreferredSwapIntervalAt).
-    NanosecondTimeSpan32 PreferredFrameTime;
+    NanosecondTimeDuration PreferredFrameTime;
     //! What the swap interval rule decided from the previous frame; this frame is the first at the new interval.
     SwapIntervalChange Change{SwapIntervalChange::Unchanged};
   };

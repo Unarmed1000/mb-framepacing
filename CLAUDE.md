@@ -335,10 +335,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `IsStep`/`IsStepRate`; functions of the refresh period alone), a frame every 1, 2, 3, … refreshes down to 20 frames a
     second, judged with the same slack (`PacerSettings::FrameRateSlackAt`) through the settings' own rounding, so the two
     never disagree. The steps are what to offer: the settings still take a slower rate.
-  - **Typed, in nanoseconds** (the user, 2026-10-07; the marker's payload still takes tick types, so an application converts where it
-    fills one): points in time `NanosecondTickCount`, spans `NanosecondTimeSpan`, lengths that can not be negative
-    `NanosecondTimeDuration` (C++ only), the marker's values `NanosecondTimeSpan32`, capped where they do not fit
-    (`source/.../detail/MarkerValue.hpp`: the CPU busy time at the largest value, a frame time one below it). `RefreshPeriod`'s 2⁻³²
+  - **Typed, in nanoseconds** (the user, 2026-10-07; the marker's payload takes the same types, so a schedule's values go into
+    one as they are): points in time `NanosecondTickCount`, spans `NanosecondTimeSpan`, lengths that can not be negative
+    `NanosecondTimeDuration` (a schedule's frame times, the CPU busy time). The pacer caps nothing: what a marker's four bytes
+    do not hold is capped by the payload. `RefreshPeriod`'s 2⁻³²
     nanoseconds are private (`FromRate`, `FromNanosecondTimeSpan`, `TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`).
     The pacer's own golden files are in nanoseconds (`workNanoseconds`, …); the first integration's frame logs (the simulation's
     `ToFrameLog`, `ReadFrameLog`, the two real logs in `sdk/test-data/pacer`) stay in ticks and are converted where they are read or written. **Always valid:** `RefreshPeriod` (100 µs

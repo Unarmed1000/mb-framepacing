@@ -5,8 +5,8 @@
 // their edges, the refresh clock (measuring frame starts, catching up, pauses, no drift, a display off its nominal rate) and the pacer
 // (planning, late frames, pauses, a change of refresh period).
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -900,10 +900,10 @@ TEST(FramePacer, TheFirstFrameIsAimedOneSwapIntervalAfterItStarts)
   EXPECT_EQ(schedule.AnimationTime, Span(0));
   EXPECT_EQ(schedule.AnimationStep, Span(0));
   EXPECT_EQ(schedule.IntendedDisplayTime, At((10 * Second) + 16'666'667));
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(16'666'667u));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(16'666'667u));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
-  EXPECT_EQ(pacer.EndFrame(At((10 * Second) + 9'000'000)), FP::NanosecondTimeSpan32(9'000'000u));
+  EXPECT_EQ(pacer.EndFrame(At((10 * Second) + 9'000'000)), FP::NanosecondTimeDuration::FromNanoseconds(9'000'000));
 }
 
 TEST(FramePacer, FramesOnTimeFollowTheRefreshesForAnHourWithoutDrift)
@@ -945,38 +945,38 @@ TEST(FramePacer, EndFrameGivesTheCpuBusyTimeAndTheWorkTheRuleCounts)
 {
   PC::FramePacer pacer(Settings());
   // Before any frame there is nothing to end
-  EXPECT_EQ(pacer.EndFrame(At(Second)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.EndFrame(At(Second)), FP::NanosecondTimeDuration());
   const int64_t start = 3'600 * Second;
   static_cast<void>(pacer.BeginFrame(At(start)));
   // The application's own work time goes to the rule; the CPU busy time is the marker's
-  EXPECT_EQ(pacer.EndFrame(At(start + (4 * Ms)), Span(12 * Ms)), FP::NanosecondTimeSpan32(4'000'000u));
+  EXPECT_EQ(pacer.EndFrame(At(start + (4 * Ms)), Span(12 * Ms)), FP::NanosecondTimeDuration::FromNanoseconds(4'000'000));
   static_cast<void>(pacer.BeginFrame(At(start + 16'666'667)));
   EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(12 * Ms));
   // A present time before the frame's start (0, another clock's time) is unknown: no CPU busy time, and no work counted
-  EXPECT_EQ(pacer.EndFrame(At(start)), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.EndFrame(At(start)), FP::NanosecondTimeDuration());
   static_cast<void>(pacer.BeginFrame(At(start + (2 * 16'666'667))));
   EXPECT_EQ(pacer.FrameWindow().AverageWork, Span(6 * Ms));
-  EXPECT_EQ(pacer.EndFrame(At(0)), FP::NanosecondTimeSpan32());
-  // The marker holds up to 4.29 s: that is known, and a longer time is that long in it
-  EXPECT_EQ(pacer.EndFrame(At(start * 100)), FP::NanosecondTimeSpan32::MaxValue());
-  EXPECT_EQ(pacer.EndFrame(At(start + (2 * 16'666'667) + int64_t{0xFFFF'FFFF})), FP::NanosecondTimeSpan32::MaxValue());
+  EXPECT_EQ(pacer.EndFrame(At(0)), FP::NanosecondTimeDuration());
+  // A long time is as long as it was: the marker's payload caps what its field does not hold, the pacer caps nothing
+  const int64_t frameStart = start + (2 * 16'666'667);
+  EXPECT_EQ(pacer.EndFrame(At(start * 100)), FP::NanosecondTimeDuration::FromNanoseconds((start * 100) - frameStart));
+  EXPECT_EQ(pacer.EndFrame(At(frameStart + int64_t{0xFFFF'FFFF} + 5)), FP::NanosecondTimeDuration::FromNanoseconds(int64_t{0xFFFF'FFFF} + 5));
 }
 
-TEST(FramePacer, AFrameTimeLongerThanTheMarkerHoldsIsTheLongestThatIsNotOnDemand)
+TEST(FramePacer, AFrameTimeLongerThanTheMarkerHoldsIsGivenAsItIs)
 {
-  // One refresh a second and five of them per frame: 5 s, where the marker's 32-bit fields hold 4.29 s and their largest value says
-  // "on demand". The frame times are one below it
+  // One refresh a second and five of them per frame: 5 s, where the marker's 32-bit fields hold 4.29 s. The pacer gives the frame
+  // times as they are, and the marker's payload caps them at the longest it carries
   PC::PacerSettings settings(PC::RefreshPeriod::FromRate(1));
   settings.SetPreferredSwapInterval(5);
   PC::FramePacer pacer(settings);
   const PC::FrameSchedule schedule = pacer.BeginFrame(At(100 * Second));
   EXPECT_EQ(schedule.SwapInterval, 5u);
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(0xFFFF'FFFEu));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(0xFFFF'FFFEu));
-  // Four of them fit
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(5 * Second));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(5 * Second));
   settings.SetPreferredSwapInterval(4);
   PC::FramePacer fits(settings);
-  EXPECT_EQ(fits.BeginFrame(At(100 * Second)).TargetFrameTime, FP::NanosecondTimeSpan32(4'000'000'000u));
+  EXPECT_EQ(fits.BeginFrame(At(100 * Second)).TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(4 * Second));
 }
 
 TEST(FramePacer, WithoutEndFrameTheFrameCountsAsPresentedWhenTheNextOneStarts)
@@ -1003,8 +1003,8 @@ TEST(FramePacer, TheScheduleCarriesTheRulesChangeAndTheNewInterval)
       changedAt.push_back(frame);
       EXPECT_EQ(schedules[frame].Change, PC::SwapIntervalChange::Slower);
       EXPECT_EQ(schedules[frame].SwapInterval, 2u);
-      EXPECT_EQ(schedules[frame].TargetFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
-      EXPECT_EQ(schedules[frame].PreferredFrameTime, FP::NanosecondTimeSpan32(16'666'667u));
+      EXPECT_EQ(schedules[frame].TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
+      EXPECT_EQ(schedules[frame].PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
     }
   }
   // 13 late frames (the 13th is measured when the 14th begins) slow it down; at 30 fps they fit
@@ -1024,8 +1024,8 @@ TEST(FramePacer, ATargetFrameRateIsHeldAsAFixedSwapInterval)
   for (const PC::FrameSchedule& schedule : fast)
   {
     EXPECT_EQ(schedule.SwapInterval, 2u);
-    EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
-    EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
+    EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
+    EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
   }
   EXPECT_EQ(fast.back().AnimationTime, g_hz60.TimeFor(2 * 199));
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
@@ -1085,7 +1085,7 @@ TEST(FramePacer, ResetPlansTheNextFrameAsTheFirstAtThePreferredInterval)
   EXPECT_EQ(pacer.SwapInterval(), 1u);
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
   // An EndFrame for the frame from before the reset is nothing
-  EXPECT_EQ(pacer.EndFrame(At(before.back().IntendedDisplayTime.Nanoseconds())), FP::NanosecondTimeSpan32());
+  EXPECT_EQ(pacer.EndFrame(At(before.back().IntendedDisplayTime.Nanoseconds())), FP::NanosecondTimeDuration());
   const int64_t later = before.back().IntendedDisplayTime.Nanoseconds() + 12'300;
   const PC::FrameSchedule schedule = pacer.BeginFrame(At(later));
   EXPECT_EQ(schedule.IntendedDisplayTime, At(later + 16'666'667));
@@ -1112,8 +1112,8 @@ TEST(FramePacer, ANewRefreshPeriodStartsAgainAtTheSwapIntervalTheTargetFrameRate
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
   const PC::FrameSchedule schedule = pacer.BeginFrame(At(start + 33'333'333 + (5 * Ms)));
   EXPECT_EQ(schedule.SwapInterval, 4u);
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
   EXPECT_LE(std::abs(schedule.IntendedDisplayTime.Nanoseconds() - (start + 33'333'333 + (5 * Ms) + 33'333'333)), 1);
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
 }
@@ -1160,8 +1160,8 @@ TEST(FramePacer, OtherSettingsStartAgainAndTheAnimationTimeGoesOn)
   const int64_t next = lastStart + 16'666'667;
   const PC::FrameSchedule schedule = pacer.BeginFrame(At(next));
   EXPECT_EQ(schedule.SwapInterval, 2u);
-  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
-  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeSpan32(33'333'333u));
+  EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
+  EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'333));
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
   // The animation time goes on from where it was, by the new swap interval; the frame before the change is not in the new window
   EXPECT_EQ(schedule.AnimationTime, Span(before.back().AnimationTime.Nanoseconds() + schedule.AnimationStep.Nanoseconds()));
@@ -1233,7 +1233,7 @@ TEST(FramePacer, AFrameOpenWhenTheSettingsChangeIsEndedAsUsual)
   PC::PacerSettings settings = pacer.Settings();
   settings.SetAutoSwapInterval(false);
   pacer.SetSettings(settings);
-  EXPECT_EQ(pacer.EndFrame(At(start + (4 * Ms))), FP::NanosecondTimeSpan32(4'000'000u));
+  EXPECT_EQ(pacer.EndFrame(At(start + (4 * Ms))), FP::NanosecondTimeDuration::FromNanoseconds(4'000'000));
   // It was paced by the old settings: it is not in the new window
   static_cast<void>(pacer.BeginFrame(At(start + 16'666'667)));
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);

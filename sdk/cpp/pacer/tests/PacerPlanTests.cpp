@@ -7,7 +7,6 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
@@ -67,7 +66,7 @@ TEST(PacerPlan, APresentPlanWithNothingInItPresentsAtOnceWithASwapIntervalOfOne)
   EXPECT_EQ(plan.SwapInterval, 1u);
   EXPECT_EQ(plan.NotBeforeTime, FP::NanosecondTickCount());
   EXPECT_EQ(plan.MinimumDuration, FP::NanosecondTimeDuration::Zero());
-  EXPECT_EQ(plan.CpuBusy, FP::NanosecondTimeSpan32());
+  EXPECT_EQ(plan.CpuBusy, FP::NanosecondTimeDuration());
 
   PC::PresentPlan held;
   held.PresentTime = At(1'002'700'000);

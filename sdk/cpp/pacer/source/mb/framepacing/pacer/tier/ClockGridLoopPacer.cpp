@@ -6,11 +6,10 @@
 // repeats. With a wait for a present the loop is held until the display took an earlier frame and the grid follows the ends of
 // the waits that held it; without one there is a pause after start-up, a whole period after a late present, and the system's
 // own waits.
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
 #include <algorithm>
-#include "../detail/MarkerValue.hpp"
 
 namespace MB::FramePacing::Pacer
 {
@@ -289,7 +288,7 @@ namespace MB::FramePacing::Pacer
       {
         m_presentPlace = m_presentTime - TimeOfSlot(period.FloorRefreshes(m_presentTime - m_origin));
       }
-      const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : MarkerValue::Duration(cpuStartTime - m_startTime).ToNanosecondTimeSpan();
+      const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : NanosecondTimeDuration(cpuStartTime - m_startTime).Value();
       const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, m_rule.Settings().MaxFramesInFlight()) : cpuWork;
       const bool late = lost > 0 || (m_frameEnded && work > period.TimeFor(m_swapInterval));
       change = m_rule.AddFrame(period.TimeFor(slot), work, late, StartTimeOf(m_nextSlot) - cpuStartTime);
@@ -341,8 +340,8 @@ namespace MB::FramePacing::Pacer
     // is the pacer's aim for the frame. The next frame starts there, or a pause later
     schedule.NextFrameStartTime = StartTimeOf(m_nextSlot);
     schedule.IntendedDisplayTime = TimeOfSlot(m_dueSlot);
-    schedule.TargetFrameTime = MarkerValue::FrameTime(period.TimeFor(m_swapInterval));
-    schedule.PreferredFrameTime = MarkerValue::FrameTime(period.TimeFor(m_rule.PreferredSwapInterval()));
+    schedule.TargetFrameTime = NanosecondTimeDuration(period.TimeFor(m_swapInterval));
+    schedule.PreferredFrameTime = NanosecondTimeDuration(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
     return schedule;
@@ -355,8 +354,8 @@ namespace MB::FramePacing::Pacer
     {
       return plan;
     }
-    const NanosecondTimeSpan32 busy = MarkerValue::Duration(workDoneTime - m_startTime);
-    m_work = busy.ToNanosecondTimeSpan();
+    const NanosecondTimeDuration busy = NanosecondTimeDuration(workDoneTime - m_startTime);
+    m_work = busy.Value();
     m_frameEnded = true;
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
@@ -376,9 +375,9 @@ namespace MB::FramePacing::Pacer
     return plan;
   }
 
-  NanosecondTimeSpan32 ClockGridLoopPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
+  NanosecondTimeDuration ClockGridLoopPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
   {
-    return m_frameOpen ? MarkerValue::Duration(now - m_startTime) : NanosecondTimeSpan32();
+    return m_frameOpen ? NanosecondTimeDuration(now - m_startTime) : NanosecondTimeDuration();
   }
 
   void ClockGridLoopPacer::AddPresent(const PresentReport& report) noexcept

@@ -6,7 +6,6 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/core/time/NanosecondTimeSpan32.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
@@ -141,7 +140,7 @@ namespace MB::FramePacing::Pacer
 
     //! The frame's CPU busy time so far, at now, for a marker that is drawn while the frame's work is still going on: from the
     //! frame's start to now. Zero: no frame is open.
-    [[nodiscard]] NanosecondTimeSpan32 CpuBusyAt(NanosecondTickCount now) const noexcept;
+    [[nodiscard]] NanosecondTimeDuration CpuBusyAt(NanosecondTickCount now) const noexcept;
 
     //! After the present, before the next frame is planned: when it was called says which vertical blank the frame is shown at
     //! (without the report it is taken as made when EndFrame said), and whether the system took it says whether it can be

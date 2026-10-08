@@ -68,7 +68,8 @@ and "the second session". They are the display times a driver reports on one mac
 - **A steady clock**, read by the application and passed in as a `NanosecondTickCount` (the core's time types: nanoseconds as
   the platform gives them with `NanosecondTickCount::FromNanoseconds`, a clock that counts in ticks of 100 ns through
   `NanosecondTickCount::FromTickCount64`). Every time the pacer takes and gives is in nanoseconds: `NanosecondTickCount` for a
-  point on the clock, `NanosecondTimeSpan` for a span, `NanosecondTimeSpan32` for the marker's 32-bit values.
+  point on the clock, `NanosecondTimeSpan` for a span, `NanosecondTimeDuration` for a length of time (a frame time, the CPU
+  busy time), as the marker's payload takes them.
 - **A loop paced by vsync**: vsync on, a fixed refresh rate, and frames that start a swap interval apart, on a refresh or close
   to one. A `Present` (or a wait for a free buffer) that waits for the display gives that by itself. Not every one does: on the
   first integration's Vulkan FIFO swap chain neither the present nor the acquire ever waited. So the application holds the next
@@ -114,7 +115,7 @@ PC::FramePacer pacer(settings);
 // Every frame
 const PC::FrameSchedule schedule = pacer.BeginFrame(Now());     // your steady clock, as an FP::NanosecondTickCount
 UpdateAndDraw(schedule.AnimationTime);                          // render the frame for this time
-const FP::NanosecondTimeSpan32 cpuBusy = pacer.EndFrame(Now()); // as you draw the marker, last, just before Present
+const FP::NanosecondTimeDuration cpuBusy = pacer.EndFrame(Now()); // as you draw the marker, last, just before Present
 DrawMarker(schedule, cpuBusy);
 Present(schedule.SwapInterval);                                 // hold the frame for that many refreshes
 WaitUntil(schedule.NextFrameStartTime);                         // yours: the next frame begins no earlier, at any swap interval
