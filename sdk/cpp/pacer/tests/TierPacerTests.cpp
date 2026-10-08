@@ -216,8 +216,12 @@ TEST(TierPacer, WhenAnotherPartPlacesTheFramesTheFramesTheAnimationTimeAndTheRul
       loop.Pacer.SetActiveCapabilities(toVBlanks ? PacerCapabilities(VBlank) : PacerCapabilities());
       const int64_t now = loop.Now;
       schedule = loop.Frame();
-      // It starts when the frame before it said the next one would, or at once when that has passed
-      EXPECT_EQ(loop.StartNanoseconds, std::max(now, before.NextFrameStartTime.Nanoseconds())) << change;
+      // It starts when the frame before it said the next one would, or at once when that has passed. From vertical blanks
+      // with the aim of smoothness, where the presents were held, to the grid: a refresh before the next present would
+      // have been made and the frame margin, as the grid holds a present of two refreshes for one and the margin
+      const bool presentsWereHeld = !toVBlanks && aim == PC::PacerAim::Smoothness;
+      const int64_t held = presentsWereHeld ? Period - settings.FrameMargin().Nanoseconds() : 0;
+      EXPECT_EQ(loop.StartNanoseconds, std::max(now, before.NextFrameStartTime.Nanoseconds() + held)) << change;
       // Its id is the next one, its swap interval is the same, its animation time is a step of two refreshes on
       EXPECT_EQ(schedule.FrameId, before.FrameId + 1u) << change;
       EXPECT_EQ(schedule.SwapInterval, 2u) << change;

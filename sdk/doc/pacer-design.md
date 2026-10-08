@@ -1105,6 +1105,13 @@ paced, and a tier is one combination of them:
   the pacer was made and for about the last second (eight eighths of a second), over the last 64 frames at most, with
   nothing allocated. A pause the pacer did not ask for shows as one late frame. What it is not: the tools read the
   display, and this reads what the platform says.
+  **On one system** (the first integration, 2026-10-08, the conditions of "The duration on one system"): 16 runs of
+  1,200 frames with the driver's first pixel times reported. The pacer's five counts were the first integration's own
+  script's, number for number, in all 16, a run with 134 frames off their swap interval among them; no report was
+  refused; and the runs with reports were the runs without them (the same times from start to display, the same frames
+  waiting). No frame had an error over 1 ms and under half a refresh, and none of those within half a refresh was off
+  by more than 0.01 ms: that driver's times are on the refresh grid to a few microseconds, which does not say whether
+  they are measured or worked out.
 - **A swap interval on the present** (`PresentSwapInterval` of two or more, `DisplaySideHolds`): the display's side holds a
   frame of more than one refresh for exactly its refreshes, whenever the loop presents it. Below tier 4 that is the one way
   the display's side holds a frame, and it does nothing at one refresh per frame, so it changes no tier. A frame the
@@ -1202,13 +1209,33 @@ together from the parts:
   window, the GPU's work on the frames in flight and the presents that can be waited for are handed over; the first frame
   after it starts when the frame before it said the next one would, and is not judged against a place it never had. A
   vertical blank reading from before is not kept: the times are read anew. Nothing is allocated for it.
+- **A handover keeps what is on its way.** The part that takes over is to end up where a run of its own would be, with no
+  frame on screen a refresh more or less for it and no frame more waiting. Each of these was a fault first, found on
+  the first integration's system or on the simulation's display, and is now what a handover does:
+  - the frames that were made ahead (smoothness, one refresh per frame) are not made again: the first frame is placed as
+    if this part had made them;
+  - the presents go on a swap interval apart: the part that hands over says when its last present is made and when the
+    next would be, the grid on the clock puts its step for the first frame where that makes its present, and the
+    vertical blanks take the first frame for no blank sooner than a swap interval after the one the last frame was
+    ready for;
+  - a loop that a wait for a present held starts its next frame a swap interval after the last one, not at a time the
+    wait had kept it from: this holds too where only the wait is given up on the grid on the clock, which then starts
+    again at the next frame;
+  - the pause after start-up is the swap chain's: made once, whichever part places the frames when it is due.
+    Found with it: with low latency on vertical blanks a frame that was done early was presented at the vertical blank
+    itself, where a display may still take it for that blank. It is presented the frame margin into the refresh now.
 - **As built** there are two ways a frame is placed, each a class with the wait and the timed present as options: on a
   grid on the clock (`ClockGridLoopPacer`, tiers 2, 4, 7 and 8) and on the display's vertical blanks (`VBlankLoopPacer`,
   tiers 1, 3, 5 and 6). The wait (`PresentWaitRule`), the vertical blanks from readings (`VBlankTimeline`) and the values
-  a timed present is given (`DisplayPlacementUtil`) are parts of their own, with their own tests. What every tier has (the frames, the work, the rule, the animation time) is still in both of the two, and is
-  handed from one to the other, not shared. Checked by the tiers' own tests, by 280 runs of the simulation that came out
-  byte for byte as before the pacers were taken apart, and by the first integration against its last pin; the handover is
-  checked by unit tests only, and has not run on the simulation's loop or on a system.
+  a timed present is given (`DisplayPlacementUtil`) are parts of their own, with their own tests. What every tier has (the
+  frames, the work, the rule, the animation time) is still in both of the two, and is handed from one to the other, not
+  shared. Checked by the tiers' own tests, by 280 runs of the simulation that came out byte for byte as before the
+  pacers were taken apart, and by the first integration against its last pin. The handover is checked on the
+  simulation's display: each of the twelve changes between the four ways of pacing, with both aims, at one, two and
+  four refreshes per frame, leaves every frame on screen for its swap interval, the animation time no further behind
+  the clock, and no frame more waiting than a run of the new way has (`tests/ActiveSetChangeLoopTests.cpp`; the four
+  simulated loops are one loop now, which changes its active set in a run). On one system 84 changes were run before
+  the last of these fixes ("The duration on one system"); not since.
 - **Each tier is still a pacer from the outside**: its own tests, and its own statement of what it promises and what it
   can not do. The four class names of tiers 5 to 8 stay, each the one pacer with its capabilities fixed.
 - **Each part has both aims** where the aim bears on it: how many presents may wait and which frame's GPU work is waited
@@ -1286,7 +1313,8 @@ present; the fence wait of tiers 3 and 4.
 
 The first integration carried the duration out on 2026-10-08, at the commit after the one that built it: Windows, Vulkan,
 one driver, a window on a 240 Hz display with a second display at 120 Hz on, variable refresh off on both, a machine
-with no input for an hour. Its present takes a relative target time and nothing else, so the time before which a
+with no input for an hour and 1.5 to 8.5 % of its CPU in use by other programs (other work on the machine was not
+stopped for the runs, but for this repository's builds). Its present takes a relative target time and nothing else, so the time before which a
 frame is not shown was not run. Each of the four kinds without a timed present, with both aims, at one, two and four
 refreshes per frame, a run without the duration and one with it right after, 1,200 frames each, three rounds: 144
 runs, counted from frame 240. **Driver display times, not a measurement by the tools, and three runs a setting.**

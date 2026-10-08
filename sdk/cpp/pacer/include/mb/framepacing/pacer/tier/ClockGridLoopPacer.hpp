@@ -106,6 +106,9 @@ namespace MB::FramePacing::Pacer
     // the frame before it gave. And the time each frame gives for the one after it
     bool m_takenOver{false};
     NanosecondTickCount m_takeOverStartTime;
+    // Where the grid's step for that frame is, when the part before said when the next present would be made
+    bool m_hasTakeOverOrigin{false};
+    NanosecondTickCount m_takeOverOrigin;
     NanosecondTickCount m_nextFrameStartTime;
 
   public:
@@ -204,11 +207,9 @@ namespace MB::FramePacing::Pacer
     //! Whether the frame start plan asks for a wait for a present, from the next frame on. A loop that such a wait held has
     //! no frames piled up behind its first presents, so giving the wait up then starts no pause after start-up. Given up
     //! before it held a frame (before the first one, or the first of a new swap chain), the pause is still to be made.
-    void SetWaitsForPresent(const bool waitsForPresent) noexcept
-    {
-      m_pausePending = m_pausePending && (!m_waitsForPresent || waitsForPresent || !m_pauseHeldByWait);
-      m_waitsForPresent = waitsForPresent;
-    }
+    //! The wait held the loop, not the grid's times: when it is given up the grid starts again at the next frame, which
+    //! begins a swap interval after the last one and is not judged, as after a handover.
+    void SetWaitsForPresent(bool waitsForPresent) noexcept;
 
     //! The time the presents are given, from the next frame on: none (the loop presents at the right moment), or the one the
     //! display's side places the frame by.

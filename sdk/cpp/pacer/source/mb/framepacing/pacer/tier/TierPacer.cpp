@@ -86,6 +86,10 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::Apply(const PacerCapabilities& active) noexcept
   {
+    // Who puts a frame on its refresh, from the next present on: known to the part that takes the frames over
+    const PresentTiming timing = DisplayPlacementUtil::TimingFor(active);
+    m_grid.SetPresentTiming(timing);
+    m_vblank.SetPresentTiming(timing);
     const bool onVBlanks = active.Has(PacerCapability::VBlankTimes);
     if (onVBlanks != m_onVBlanks)
     {
@@ -106,10 +110,6 @@ namespace MB::FramePacing::Pacer
     const bool waits = active.Has(PacerCapability::WaitForPresent);
     m_grid.SetWaitsForPresent(waits);
     m_vblank.SetWaitsForPresent(waits);
-    // Who puts a frame on its refresh, from the next present on
-    const PresentTiming timing = DisplayPlacementUtil::TimingFor(active);
-    m_grid.SetPresentTiming(timing);
-    m_vblank.SetPresentTiming(timing);
     m_active = active;
   }
 

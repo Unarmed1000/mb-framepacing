@@ -38,6 +38,10 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t TargetFrameTimeNanoseconds{0};
     uint32_t WindowFrames{0};
     uint32_t WindowLateFrames{0};
+    //! For a tier pacer's loop: what was active when the frame was made (PacerCapability's bits), and how far the pacer's
+    //! animation time was behind the clock by then, in refreshes
+    uint32_t ActiveCapabilities{0};
+    uint64_t RefreshesBehindClock{0};
     //! For a tier pacer's loop that reports display times: what the pacer counted from them when this frame started
     //! (DisplayErrorState)
     uint64_t DisplayJudgedFrames{0};

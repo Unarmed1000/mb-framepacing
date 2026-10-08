@@ -27,6 +27,14 @@ namespace MB::FramePacing::Pacer
     //! When the frame after it is to start, as that frame's schedule said (FrameSchedule::NextFrameStartTime): the first frame
     //! of the part that takes over is held to it.
     NanosecondTickCount NextFrameStartTime;
+    //! When the last frame's present is made (as far as it is known when the handover is made), and when the present of
+    //! the frame after it would be: a swap interval later, or where the part that hands over holds its presents to a place
+    //! in a refresh, that place. With HasPresentTime only. The part that takes over keeps that cadence: its first present
+    //! is made where the next one would have been, and its first frame is for no refresh sooner than a swap interval
+    //! after the last frame's.
+    bool HasPresentTime{false};
+    NanosecondTickCount LastPresentTime;
+    NanosecondTickCount NextPresentTime;
     RefreshTime AnimationTime;
     NanosecondTimeSpan LastAnimationTime;
     uint64_t RefreshesBehindClock{0};

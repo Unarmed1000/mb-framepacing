@@ -175,8 +175,9 @@ namespace MB::FramePacing::Pacer
     if (m_rule.Settings().Aim() == PacerAim::LowLatency)
     {
       // Low latency: presented when it is done, and never so soon that it is ready before the refresh it is to be ready in
-      // begins
-      return TimeOfBlank(displaySlot - 1) - GpuLead();
+      // begins. Ready at the vertical blank itself is too soon as well: a display may take a frame for the blank it is
+      // ready at, so it is the frame margin into the refresh
+      return TimeOfBlank(displaySlot - 1) + m_rule.Settings().FrameMargin() - GpuLead();
     }
     // Smoothness: presented so that it is ready at its place, the reserve's refreshes before the refresh before its vertical blank
     return TimeOfBlank(displaySlot - 1 - Reserve()) + ReadyPlace() - GpuLead();
@@ -441,8 +442,14 @@ namespace MB::FramePacing::Pacer
     // The vertical blank this frame is for. A frame that starts too late for the one its swap interval gives is for the first
     // it can make: known now, so it is in the frame
     // After another pacer placed the frames, those it made ahead of the display are still on their way and are shown first:
-    // this frame is for the vertical blank after theirs, and none is made back to back with it to have them again
-    const int64_t displaySlot = DisplaySlotFor(cpuStartTime, hasPrevious) + (m_takenOver ? Reserve() : 0);
+    // this frame is for the vertical blank after theirs, and none is made back to back with it to have them again. And it
+    // is for no vertical blank sooner than its swap interval after the one the last frame was ready for, by its present
+    int64_t displaySlot = DisplaySlotFor(cpuStartTime, hasPrevious) + (m_takenOver ? Reserve() : 0);
+    if (m_takenOver && m_hasTakeOverPresent)
+    {
+      displaySlot = std::max(displaySlot, FirstBlankAfterReadyAt(m_takeOverPresentTime + GpuLead()) + int64_t{swapInterval});
+    }
+    m_hasTakeOverPresent = false;
     m_startedLate = hasPrevious && displaySlot > previousShown + m_pauseSlots + int64_t{swapInterval};
     if (m_takenOver)
     {
@@ -572,6 +579,23 @@ namespace MB::FramePacing::Pacer
     handover.FrameId = m_frameId;
     handover.StartTime = m_startTime;
     handover.NextFrameStartTime = m_takenOver ? m_takeOverStartTime : m_nextFrameStartTime;
+    if (m_waitsForPresent && !m_takenOver)
+    {
+      // A wait for a present held this loop, not the time the frames were given: with the wait a frame starts when the
+      // display took an earlier one, a swap interval after the frame before it, and that can be later than its time (with
+      // the aim of smoothness it is, by the frames that are not made ahead while the wait holds). A part that takes over
+      // without the wait would start its first frames back to back to catch up with a time that has passed
+      handover.NextFrameStartTime = std::max(handover.NextFrameStartTime, m_startTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval}));
+    }
+    if (m_hasFrame && m_hasPresentTime && !m_takenOver)
+    {
+      handover.HasPresentTime = true;
+      handover.LastPresentTime = m_presentTime;
+      // A swap interval after this one's, or where the presents are held to their place, the next frame's place
+      const bool holdsPresents = m_presentTiming != PresentTiming::AtTime && m_rule.Settings().Aim() == PacerAim::Smoothness;
+      handover.NextPresentTime = holdsPresents ? PresentTimeFor(m_displaySlot + m_pauseSlots + int64_t{m_rule.SwapInterval()})
+                                               : m_presentTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval});
+    }
     handover.AnimationTime = m_animationTime;
     handover.LastAnimationTime = m_lastAnimationTime;
     handover.RefreshesBehindClock = m_refreshesBehindClock;
@@ -605,6 +629,8 @@ namespace MB::FramePacing::Pacer
     m_hasFrame = handover.HasFrame;
     m_takenOver = handover.HasFrame;
     m_takeOverStartTime = handover.NextFrameStartTime;
+    m_hasTakeOverPresent = handover.HasFrame && handover.HasPresentTime;
+    m_takeOverPresentTime = handover.LastPresentTime;
     m_startTime = handover.StartTime;
     m_swapInterval = m_rule.SwapInterval();
     m_pauseSlots = 0;

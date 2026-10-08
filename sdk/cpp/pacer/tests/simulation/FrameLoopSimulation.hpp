@@ -14,6 +14,7 @@
 // present. That is the state the pacer's redesign starts from: what such a loop does when the display falls behind is what the
 // tests pin here.
 
+#include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <string>
 #include <vector>
 #include "LoopFrame.hpp"
@@ -42,7 +43,14 @@ namespace MB::FramePacing::Pacer::Simulation
   //! also carries out the wait until a present was shown and reports what became of it.
   std::vector<LoopFrame> SimulateVBlankWaitForPresentLoop(const LoopSettings& settings);
 
-  //! In all four the present takes a time where the settings say so (PresentsAtTime, PresentsAfterDuration): the pacer is then
+  //! The four above are one loop, with what the application has of vertical blank times and the wait for a present named:
+  //! the application gives the pacer a vertical blank reading before a frame while those are active, carries out the wait
+  //! for a present when a plan asks for one, and otherwise only does what it is given. The settings' changes of the active
+  //! set (LoopSettings::ActiveSetChanges) are made before their frames: the loop then does what the new set asks, on the
+  //! same display and with the frames that are on their way.
+  std::vector<LoopFrame> SimulateTierLoop(const LoopSettings& settings, PacerCapability named);
+
+  //! In all of them the present takes a time where the settings say so (PresentsAtTime, PresentsAfterDuration): the pacer is then
   //! the one of the tier with a timed present, and the loop gives the display the time of the plan.
   //!
   //! The frames as a frame log with the column names of the first integration's logs (the ones tools/frame_stages_chart.py draws),

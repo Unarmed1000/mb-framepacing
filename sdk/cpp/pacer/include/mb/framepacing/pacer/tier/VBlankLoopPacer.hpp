@@ -130,6 +130,9 @@ namespace MB::FramePacing::Pacer
     // the frame before it gave. And the time each frame gives for the one after it
     bool m_takenOver{false};
     NanosecondTickCount m_takeOverStartTime;
+    // When the last frame of the part before was presented, when that part said so
+    bool m_hasTakeOverPresent{false};
+    NanosecondTickCount m_takeOverPresentTime;
     NanosecondTickCount m_nextFrameStartTime;
 
   public:

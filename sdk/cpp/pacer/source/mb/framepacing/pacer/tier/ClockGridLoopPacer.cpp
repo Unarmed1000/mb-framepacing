@@ -280,7 +280,12 @@ namespace MB::FramePacing::Pacer
       // frame window stays as it is; the grid goes on from this frame, and the frame window's times with it: the frame
       // before this one would have left at this frame's step, and the newest frame of the frame window a swap interval
       // before that
-      m_origin = cpuStartTime;
+      // The grid goes on from this frame's start, or from where the part before had the next present: a frame that starts
+      // a little after its step is on that step all the same, and its present is made where the next one was due
+      const bool keepsCadence = m_takenOver && m_hasTakeOverOrigin && m_takeOverOrigin <= cpuStartTime &&
+                                (cpuStartTime - m_takeOverOrigin) < period.TimeFor(m_rule.SwapInterval());
+      m_origin = keepsCadence ? m_takeOverOrigin : cpuStartTime;
+      m_hasTakeOverOrigin = false;
       // After another pacer placed the frames, those it made ahead of the display are still on their way. This frame is on
       // the step it would be on had this grid made them: it starts where a frame of that step is due to start, so the next
       // one is due a swap interval later, and none is made back to back with it
@@ -446,6 +451,20 @@ namespace MB::FramePacing::Pacer
     handover.FrameId = m_frameId;
     handover.StartTime = m_startTime;
     handover.NextFrameStartTime = m_takenOver ? m_takeOverStartTime : m_nextFrameStartTime;
+    if (m_waitsForPresent && !m_takenOver)
+    {
+      // A wait for a present held this loop, not the time the frames were given: with the wait a frame starts when the
+      // display took an earlier one, a swap interval after the frame before it, and that can be later than its time (with
+      // the aim of smoothness it is, by the frames that are not made ahead while the wait holds). A part that takes over
+      // without the wait would start its first frames back to back to catch up with a time that has passed
+      handover.NextFrameStartTime = std::max(handover.NextFrameStartTime, m_startTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval}));
+    }
+    if (m_hasGrid && m_hasPresentTime && !m_takenOver)
+    {
+      handover.HasPresentTime = true;
+      handover.LastPresentTime = m_presentTime;
+      handover.NextPresentTime = m_presentTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval});
+    }
     handover.AnimationTime = m_animationTime;
     handover.LastAnimationTime = m_lastAnimationTime;
     handover.RefreshesBehindClock = m_refreshesBehindClock;
@@ -479,6 +498,22 @@ namespace MB::FramePacing::Pacer
     m_hasGrid = handover.HasFrame;
     m_takenOver = handover.HasFrame;
     m_takeOverStartTime = handover.NextFrameStartTime;
+    m_hasTakeOverOrigin = handover.HasFrame && handover.HasPresentTime;
+    if (m_hasTakeOverOrigin)
+    {
+      // The presents go on a swap interval apart. A frame of this grid is presented when it is done, or at two refreshes per
+      // frame and more the frame margin into the period before its step: the grid's step for the first frame is where that
+      // puts its present on the next one the other part would have made. The frame starts there and no sooner (a present
+      // at once after the last one would leave a frame more waiting), or later when the other part said so
+      const bool holdsPresents = m_presentTiming != PresentTiming::AtTime && m_rule.SwapInterval() > 1;
+      // A swap interval's time and a frame margin: far inside the range
+      const int64_t heldNanoseconds =
+        holdsPresents ? m_rule.Refresh().TimeFor(int64_t{m_rule.SwapInterval()} - 1).Nanoseconds() + m_rule.Settings().FrameMargin().Nanoseconds()
+                      : 0;
+      const NanosecondTimeSpan held(heldNanoseconds);
+      m_takeOverOrigin = handover.NextPresentTime - held;
+      m_takeOverStartTime = std::max(m_takeOverStartTime, m_takeOverOrigin);
+    }
     m_startTime = handover.StartTime;
     m_swapInterval = m_rule.SwapInterval();
     m_slot = 0;
@@ -493,6 +528,23 @@ namespace MB::FramePacing::Pacer
     m_displayHeld = NanosecondTimeSpan();
     m_displayHeldPastTimer = NanosecondTimeSpan();
     m_frameSlotHeld = NanosecondTimeSpan();
+  }
+
+  void ClockGridLoopPacer::SetWaitsForPresent(const bool waitsForPresent) noexcept
+  {
+    const bool givenUp = m_waitsForPresent && !waitsForPresent;
+    m_pausePending = m_pausePending && (!givenUp || !m_pauseHeldByWait);
+    if (givenUp && m_hasGrid && !m_takenOver && m_frameId != 0)
+    {
+      // With the wait a frame starts when the display took an earlier one, which with the aim of smoothness is a step after
+      // the grid has it due: the frames that would be made ahead are the ones the wait keeps from waiting. Without the wait
+      // the loop would make that step up with a frame back to back, and one frame more would wait from then on. So the
+      // grid starts again at the next frame, a swap interval after the last one, with the frames that wait as they are
+      m_takeOverStartTime = std::max(m_nextFrameStartTime, m_startTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval}));
+      m_takenOver = true;
+      m_hasTakeOverOrigin = false;
+    }
+    m_waitsForPresent = waitsForPresent;
   }
 
   void ClockGridLoopPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept

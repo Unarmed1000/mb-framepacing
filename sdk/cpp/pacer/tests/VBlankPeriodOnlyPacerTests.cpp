@@ -254,8 +254,9 @@ TEST(VBlankPeriodOnlyPacer, AFrameThatMissedItsVerticalBlankIsNotCaughtUpWith)
   EXPECT_EQ(frame.Schedule.AnimationStep, Span(Period));
   EXPECT_EQ(pacer.RefreshesBehindClock(), 2u);
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 1u);
-  // Done before the refresh it is to be ready in begins, its present waits for that refresh
-  EXPECT_EQ(frame.PresentNanoseconds, Blank(8));
+  // Done before the refresh it is to be ready in begins, its present waits for that refresh, and the frame margin into it:
+  // a display may take a frame that is ready at a vertical blank for that blank
+  EXPECT_EQ(frame.PresentNanoseconds, Blank(8) + Margin);
 
   // Eight frames later the long frame is forgotten, and a frame starts as late as before it
   for (int32_t count = 0; count < 9; ++count)
