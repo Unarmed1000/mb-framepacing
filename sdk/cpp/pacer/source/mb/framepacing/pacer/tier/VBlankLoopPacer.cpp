@@ -206,6 +206,7 @@ namespace MB::FramePacing::Pacer
   void VBlankLoopPacer::ArmStartupPause() noexcept
   {
     m_pausePending = true;
+    m_pauseHeldByWait = false;
     m_pauseHasFirstFrame = false;
     m_presentTaken = false;
   }
@@ -470,6 +471,7 @@ namespace MB::FramePacing::Pacer
     m_hasShownCeiling = false;
     m_hasFrame = true;
     m_wait.BeginFrame();
+    m_pauseHeldByWait = m_pauseHeldByWait || m_waitsForPresent;
     m_takenOver = false;
     ++m_frameId;
     m_frameWork.AddFrameStart(m_frameId, cpuStartTime);
@@ -573,6 +575,11 @@ namespace MB::FramePacing::Pacer
     handover.RefreshesBehindClock = m_refreshesBehindClock;
     handover.FrameWork = m_frameWork;
     handover.Wait = m_wait;
+    handover.PausePending = m_pausePending;
+    handover.PauseHeldByWait = m_pauseHeldByWait;
+    handover.HasPauseFirstFrame = m_pauseHasFirstFrame;
+    handover.PauseFirstFrameTime = m_pauseFirstFrameTime;
+    handover.PresentTaken = m_presentTaken;
     return handover;
   }
 
@@ -581,6 +588,12 @@ namespace MB::FramePacing::Pacer
     m_rule.TakeOver(rule);
     m_frameWork = handover.FrameWork;
     m_wait = handover.Wait;
+    // The pause after start-up is the swap chain's, whichever part places the frames: made once, or still to be made
+    m_pausePending = handover.PausePending;
+    m_pauseHeldByWait = handover.PauseHeldByWait;
+    m_pauseHasFirstFrame = handover.HasPauseFirstFrame;
+    m_pauseFirstFrameTime = handover.PauseFirstFrameTime;
+    m_presentTaken = handover.PresentTaken;
     m_frameId = handover.FrameId;
     m_animationTime = handover.AnimationTime;
     m_lastAnimationTime = handover.LastAnimationTime;

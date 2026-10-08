@@ -94,9 +94,10 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_displayHeldPastTimer;
     uint64_t m_systemHeldFrames{0};
     uint64_t m_frameSlotHeldFrames{0};
-    // The pause after start-up: still to be made, the first frame's start since it was asked for, and whether the system
-    // took a present since
+    // The pause after start-up: still to be made, whether a wait for a present held a frame since it was asked for, the
+    // first frame's start since then, and whether the system took a present since
     bool m_pausePending{true};
+    bool m_pauseHeldByWait{false};
     bool m_pauseHasFirstFrame{false};
     NanosecondTickCount m_pauseFirstFrameTime;
     bool m_presentTaken{false};
@@ -201,10 +202,11 @@ namespace MB::FramePacing::Pacer
     void TakeOver(const PacerHandover& handover, const SwapIntervalRule& rule) noexcept;
 
     //! Whether the frame start plan asks for a wait for a present, from the next frame on. A loop that such a wait held has
-    //! no frames piled up behind its first presents, so giving the wait up starts no pause after start-up.
+    //! no frames piled up behind its first presents, so giving the wait up then starts no pause after start-up. Given up
+    //! before it held a frame (before the first one, or the first of a new swap chain), the pause is still to be made.
     void SetWaitsForPresent(const bool waitsForPresent) noexcept
     {
-      m_pausePending = m_pausePending && (!m_waitsForPresent || waitsForPresent);
+      m_pausePending = m_pausePending && (!m_waitsForPresent || waitsForPresent || !m_pauseHeldByWait);
       m_waitsForPresent = waitsForPresent;
     }
 

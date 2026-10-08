@@ -540,3 +540,85 @@ TEST(TierPacer, ATimedPresentIsSwitchedOnAndOffWhileTheFramesGoOn)
     }
   }
 }
+
+// The pause after start-up (low latency, no wait for a present) is the swap chain's: made once, whatever the active set was
+// when the pacer was made and whichever part places the frames when it is due.
+
+TEST(TierPacer, AWaitThatIsLeftOutBeforeItHeldAFrameLeavesThePauseAfterStartUpToBeMade)
+{
+  PC::PacerSettings pausing = Settings();
+  pausing.SetStartupPauseRefreshes(4);
+
+  // Made with what the application has, and the wait taken out of the active set before the first frame
+  Loop loop(pausing, PacerCapabilities(Wait | VBlank));
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities());
+  for (int32_t frame = 0; frame < 200; ++frame)
+  {
+    static_cast<void>(loop.Frame());
+  }
+  EXPECT_EQ(loop.WaitsAskedFor, 0u);
+  EXPECT_EQ(loop.Pacer.StartupPauses(), 1u);
+  EXPECT_EQ(loop.Pacer.RefreshesBehindClock(), 4u);
+
+  // A new swap chain's presents pile up as a new window's do: the wait given up before it held one of its frames
+  Loop again(pausing, PacerCapabilities(Wait));
+  for (int32_t frame = 0; frame < 20; ++frame)
+  {
+    static_cast<void>(again.Frame());
+  }
+  again.Pacer.ForgetPresents();
+  again.Pacer.SetActiveCapabilities(PacerCapabilities());
+  for (int32_t frame = 0; frame < 200; ++frame)
+  {
+    static_cast<void>(again.Frame());
+  }
+  EXPECT_EQ(again.Pacer.StartupPauses(), 1u);
+}
+
+TEST(TierPacer, ThePauseAfterStartUpIsMadeOnceWhicheverPartPlacesTheFrames)
+{
+  PC::PacerSettings pausing = Settings();
+  pausing.SetStartupPauseRefreshes(4);
+
+  // Made on the grid on the clock, and the vertical blanks taken up long after: no second pause
+  Loop late(pausing, PacerCapabilities(VBlank));
+  late.Pacer.SetActiveCapabilities(PacerCapabilities());
+  for (int32_t frame = 0; frame < 200; ++frame)
+  {
+    static_cast<void>(late.Frame());
+  }
+  ASSERT_EQ(late.Pacer.StartupPauses(), 1u);
+  late.Pacer.SetActiveCapabilities(PacerCapabilities(VBlank));
+  for (int32_t frame = 0; frame < 200; ++frame)
+  {
+    static_cast<void>(late.Frame());
+  }
+  late.Pacer.SetActiveCapabilities(PacerCapabilities());
+  for (int32_t frame = 0; frame < 200; ++frame)
+  {
+    static_cast<void>(late.Frame());
+  }
+  EXPECT_EQ(late.Pacer.StartupPauses(), 1u);
+  EXPECT_EQ(late.Pacer.RefreshesBehindClock(), 4u);
+
+  // The vertical blanks taken up before the pause was due: it is made on them, once, and counted from the first frame
+  Loop early(pausing, PacerCapabilities(VBlank));
+  early.Pacer.SetActiveCapabilities(PacerCapabilities());
+  for (int32_t frame = 0; frame < 10; ++frame)
+  {
+    static_cast<void>(early.Frame());
+  }
+  ASSERT_EQ(early.Pacer.StartupPauses(), 0u);
+  early.Pacer.SetActiveCapabilities(PacerCapabilities(VBlank));
+  const int64_t first = Start;
+  int64_t pausedAt = 0;
+  for (int32_t frame = 0; frame < 200; ++frame)
+  {
+    static_cast<void>(early.Frame());
+    pausedAt = (pausedAt == 0 && early.Pacer.StartupPauses() == 1u) ? early.StartNanoseconds : pausedAt;
+  }
+  EXPECT_EQ(early.Pacer.StartupPauses(), 1u);
+  // Half a second after the first frame, not after the first on the vertical blanks
+  EXPECT_GE(pausedAt, first + pausing.StartupPauseDelay().Nanoseconds());
+  EXPECT_LT(pausedAt, first + pausing.StartupPauseDelay().Nanoseconds() + (3 * Period));
+}

@@ -14,7 +14,8 @@ namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built). What goes on when the active
   //! capabilities change and another part places the frames: the frames and their ids, the animation time, the GPU's work on the
-  //! frames in flight and the presents that can be waited for. The swap interval rule goes with it (SwapIntervalRule::TakeOver).
+  //! frames in flight, the presents that can be waited for and the pause after start-up, made or still to be made. The swap
+  //! interval rule goes with it (SwapIntervalRule::TakeOver).
   //! What does not go on is where the frames were placed: the part that takes over places them from its first frame.
   struct PacerHandover
   {
@@ -31,6 +32,13 @@ namespace MB::FramePacing::Pacer
     uint64_t RefreshesBehindClock{0};
     FrameWorkRule FrameWork;
     PresentWaitRule Wait;
+    //! The pause after start-up: still to be made, whether a wait for a present held a frame since it was asked for, the
+    //! first frame's start since then (when HasPauseFirstFrame), and whether the system took a present since.
+    bool PausePending{true};
+    bool PauseHeldByWait{false};
+    bool HasPauseFirstFrame{false};
+    NanosecondTickCount PauseFirstFrameTime;
+    bool PresentTaken{false};
   };
 }
 
