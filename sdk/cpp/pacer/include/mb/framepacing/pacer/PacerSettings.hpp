@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
@@ -31,6 +32,7 @@ namespace MB::FramePacing::Pacer
     PacerAim m_aim{PacerAim::Smoothness};
     uint32_t m_waitingPresents{0};
     uint32_t m_presentWaitSwapIntervals{4};
+    NanosecondTimeDuration m_minWaitTimeout{NanosecondTimeDuration::FromNanoseconds(50 * NanosecondTimeSpan::NanosecondsPerMillisecond)};
     uint32_t m_maxFramesInFlight{1};
     uint32_t m_startupPauseRefreshes{4};
     NanosecondTimeSpan m_startupPauseDelay{500 * NanosecondTimeSpan::NanosecondsPerMillisecond};
@@ -57,6 +59,10 @@ namespace MB::FramePacing::Pacer
     static constexpr uint32_t PickedWaitingPresents = 2;
     static constexpr uint32_t MaxSwapChainImages = 64;
     static constexpr uint32_t MaxPresentWaitSwapIntervals = 64;
+    //! The least time a wait may take, unless it was set: 50 ms
+    static constexpr NanosecondTimeDuration DefaultMinWaitTimeout{
+      NanosecondTimeDuration::FromNanoseconds(50 * NanosecondTimeSpan::NanosecondsPerMillisecond)};
+    static constexpr NanosecondTimeDuration MaxMinWaitTimeout{NanosecondTimeDuration::FromNanoseconds(10 * NanosecondTimeSpan::NanosecondsPerSecond)};
     static constexpr uint32_t MaxMaxFramesInFlight = 8;
     static constexpr uint32_t MaxStartupPauseRefreshes = 64;
     static constexpr NanosecondTimeSpan MaxStartupPauseDelay{10 * NanosecondTimeSpan::NanosecondsPerSecond};
@@ -249,13 +255,30 @@ namespace MB::FramePacing::Pacer
     //! The longest a wait for a present may take, in swap intervals of the frame that waits (1 to MaxPresentWaitSwapIntervals;
     //! 4 by default): some presents are never shown (the first ones of a new window, those of a window that is hidden), and
     //! the loop stands for this long when it waits for one. Counted in the frame's own time, so a slow loop is given as
-    //! many of its frames as a fast one.
+    //! many of its frames as a fast one. A wait may always take MinWaitTimeout: the longer of the two is its longest
+    //! (WaitTimeoutAt). The wait for the GPU's work goes by the same two.
     [[nodiscard]] uint32_t PresentWaitSwapIntervals() const noexcept
     {
       return m_presentWaitSwapIntervals;
     }
 
     void SetPresentWaitSwapIntervals(uint32_t swapIntervals) noexcept;
+
+    //! The least time a wait for a present or for the GPU's work may take before it runs out (0 to MaxMinWaitTimeout;
+    //! DefaultMinWaitTimeout, 50 ms, by default; 0: the swap intervals alone). A few swap intervals are short on a fast
+    //! display, 16.7 ms at 240 Hz, and what a wait is for can take longer than that without anything being wrong: a swap
+    //! chain's first frames, a GPU that was given a long frame. A wait that runs out is counted and its frame is not
+    //! held to it, so a least time costs a loop nothing while its waits end by themselves.
+    [[nodiscard]] NanosecondTimeDuration MinWaitTimeout() const noexcept
+    {
+      return m_minWaitTimeout;
+    }
+
+    void SetMinWaitTimeout(NanosecondTimeDuration timeout) noexcept;
+
+    //! The longest a wait may take for a frame of that swap interval on a display of that refresh period: the longer of
+    //! PresentWaitSwapIntervals of the frame's swap interval and MinWaitTimeout.
+    [[nodiscard]] NanosecondTimeDuration WaitTimeoutAt(RefreshPeriod period, uint32_t swapInterval) const noexcept;
 
     //! The frames the application lets be in flight at once (1 to MaxMaxFramesInFlight; 1 by default). 1: a frame starts
     //! when the GPU is done with the one before it, so the CPU's and the GPU's work on a frame come one after the other and

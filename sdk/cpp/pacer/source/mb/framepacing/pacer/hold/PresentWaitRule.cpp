@@ -22,9 +22,9 @@ namespace MB::FramePacing::Pacer
         (m_lastAcceptedId - back) != m_waitedForId && (!stopped || (m_lastAcceptedId - back) >= m_runOutFromId))
     {
       plan.WaitForPresentFrameId = m_lastAcceptedId - back;
-      // As long as a few of the frame's own swap intervals: a present that is never shown holds the loop no longer
-      const int64_t refreshes = int64_t{settings.PresentWaitSwapIntervals()} * swapInterval;
-      plan.WaitForPresentTimeout = stopped ? NanosecondTimeDuration() : NanosecondTimeDuration(period.TimeFor(refreshes));
+      // As long as a few of the frame's own swap intervals, and the least time a wait is given: a present that is never
+      // shown holds the loop no longer
+      plan.WaitForPresentTimeout = stopped ? NanosecondTimeDuration() : settings.WaitTimeoutAt(period, swapInterval);
     }
     return plan;
   }

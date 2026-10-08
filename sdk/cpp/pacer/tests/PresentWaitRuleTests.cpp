@@ -31,6 +31,8 @@ namespace
   {
     PC::PacerSettings settings(g_hz100);
     settings.SetWaitingPresents(waitingPresents);
+    // The swap intervals alone say how long a wait may take: these tests count in them (the least time has its own tests)
+    settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
     return settings;
   }
 
@@ -81,6 +83,14 @@ TEST(PresentWaitRule, ThePlanAsksForThePresentSoManyBackThatThePresentsThatMayWa
   PC::PacerSettings longer = two;
   longer.SetPresentWaitSwapIntervals(6);
   EXPECT_EQ(rule.Plan(longer, g_hz100, 2).WaitForPresentTimeout.Nanoseconds(), 12 * Period);
+  // And never less than the least time a wait is given, which is 50 ms unless it was set: four refreshes of 10 ms are less,
+  // twelve are more
+  PC::PacerSettings least = two;
+  least.SetMinWaitTimeout(PC::PacerSettings::DefaultMinWaitTimeout);
+  EXPECT_EQ(rule.Plan(least, g_hz100, 1).WaitForPresentTimeout.Nanoseconds(), 50'000'000);
+  EXPECT_EQ(rule.Plan(least, g_hz100, 3).WaitForPresentTimeout.Nanoseconds(), 12 * Period);
+  least.SetMinWaitTimeout(FP::NanosecondTimeDuration::FromNanoseconds(200'000'000));
+  EXPECT_EQ(rule.Plan(least, g_hz100, 3).WaitForPresentTimeout.Nanoseconds(), 200'000'000);
   // One may wait: the present just made is waited for. Three: the one three back
   EXPECT_EQ(AskedFor(rule, Settings(1)), 2u);
   EXPECT_EQ(AskedFor(rule, Settings(3)), 0u);

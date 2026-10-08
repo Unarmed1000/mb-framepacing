@@ -8,6 +8,7 @@
 // to 5 refreshes over a run); what makes a display hold a frame there is not understood, so the model is told at which blanks.
 //
 // When the pacer handles a missed refresh, the tests named "Today..." are the ones that change.
+#include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -429,17 +430,19 @@ TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
 
   ASSERT_EQ(frames.size(), 200u);
-  // Two waits run out, each after four of the frame's swap intervals. Then the pacer stops waiting: the loop goes on at a
-  // refresh per frame, at the swap interval it had, and no frame of it is late by the pacer's count
+  // Two waits run out, each after the longest a wait may take: four of the frame's swap intervals, and 50 ms at the least.
+  // Then the pacer stops waiting: the loop goes on at a refresh per frame, at the swap interval it had, and no frame of it
+  // is late by the pacer's count
   const int64_t period = PeriodNanoseconds(settings);
+  const int64_t longestWait = std::max(4 * period, PC::PacerSettings::DefaultMinWaitTimeout.Nanoseconds());
   int32_t held = 0;
   std::size_t lastHeld = 0;
   for (std::size_t index = 1; index < frames.size(); ++index)
   {
     const int64_t step = frames[index].StartNanoseconds - frames[index - 1].StartNanoseconds;
-    if (step >= 4 * period)
+    if (step >= longestWait)
     {
-      EXPECT_LE(step, 5 * period) << index;
+      EXPECT_LE(step, longestWait + period) << index;
       ++held;
       lastHeld = index;
     }

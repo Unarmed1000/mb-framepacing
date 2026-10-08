@@ -1982,7 +1982,11 @@ checked. Four things are settled now, because they cost little now and a second 
 11. **The lowest tier at start-up**: decided on 2026-10-07 and built: one pause after start-up, its length and its delay
     settings that are named as a guess, never before a present was taken.
 12. **A wait for a present that is never shown**: decided on 2026-10-07 and built: the longest a wait may take is counted in
-    the frame's own swap intervals, four by default.
+    the frame's own swap intervals, four by default. Decided on 2026-10-09 and built: and never less than a least time,
+    50 ms unless it is set (`PacerSettings::MinWaitTimeout`, `WaitTimeoutAt`), for the wait for a present and the wait
+    for the GPU's work alike. Four refreshes are 16.7 ms at 240 Hz, and on the one system measured the wait for the
+    GPU's work ran out once at the start of every run with that. Android's frame pacing library gives its wait 50 ms
+    too, and takes one that ran out as done.
 13. **Names**: the capability and call names above are proposals.
 14. **Where a frame has to be ready, at the start of a run** (the pacers of tiers 3.1 and 3.2, where the loop places the
     frame). On the one system measured the learning was moved by a swap chain's first frames in every run, and never by

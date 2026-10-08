@@ -31,6 +31,8 @@ namespace
     PC::PacerSettings settings(g_hz100);
     settings.SetAim(aim);
     settings.SetMaxFramesInFlight(maxFramesInFlight);
+    // The swap intervals alone say how long a wait may take: these tests count in them (the least time has its own tests)
+    settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
     return settings;
   }
 
@@ -98,6 +100,11 @@ TEST(GpuWaitRule, AFrameHasOneWaitAndTheWaitMayTakeAFewOfItsSwapIntervals)
   EXPECT_EQ(rule.Plan(settings, g_hz100, 3).WaitForGpuWorkTimeout.Nanoseconds(), int64_t{settings.PresentWaitSwapIntervals()} * 3 * Period);
   settings.SetPresentWaitSwapIntervals(2);
   EXPECT_EQ(rule.Plan(settings, g_hz100, 1).WaitForGpuWorkTimeout.Nanoseconds(), 2 * Period);
+  // And never less than the least time a wait is given
+  settings.SetMinWaitTimeout(PC::PacerSettings::DefaultMinWaitTimeout);
+  EXPECT_EQ(rule.Plan(settings, g_hz100, 1).WaitForGpuWorkTimeout.Nanoseconds(), 50'000'000);
+  EXPECT_EQ(rule.Plan(settings, g_hz100, 3).WaitForGpuWorkTimeout.Nanoseconds(), 6 * Period);
+  settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
 
   // Once it is reported the frame is planned again, and no second wait is asked for
   rule.AddGpuWait(Waited(1, 2'000'000), g_hz100);

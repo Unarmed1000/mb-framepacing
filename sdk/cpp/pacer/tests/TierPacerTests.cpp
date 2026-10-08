@@ -59,6 +59,8 @@ namespace
     settings.SetAim(aim);
     // No pause after start-up: these tests are of the handover
     settings.SetStartupPauseRefreshes(0);
+    // The swap intervals alone say how long a wait may take: these tests count in them (the least time has its own tests)
+    settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
     return settings;
   }
 
@@ -456,6 +458,27 @@ TEST(TierPacer, WithATimeOnThePresentTheTierThatPacesIsOneOfTheFourWithOne)
     all.Pacer.SetActiveCapabilities(PacerCapabilities(VBlank | Wait));
     EXPECT_EQ(all.Pacer.WorkingTier(), PacerTier::VBlankWaitForPresent);
   }
+}
+
+TEST(TierPacer, AWaitThePlanAsksForMayTakeFiftyMillisecondsAtTheLeast)
+{
+  // The settings an application gets when it sets nothing: at 100 Hz four swap intervals are 40 ms, so a wait for a
+  // present and a wait for the GPU's work may each take 50 ms
+  PC::PacerSettings settings(g_hz100);
+  settings.SetStartupPauseRefreshes(0);
+  Loop waits(settings, PacerCapabilities(Wait));
+  Loop gpu(settings, PacerCapabilities(PacerCapability::WaitForGpuWork));
+  for (int32_t frame = 0; frame < 4; ++frame)
+  {
+    static_cast<void>(waits.Frame());
+    static_cast<void>(gpu.Frame());
+  }
+  const PC::FrameStartPlan waitPlan = waits.Pacer.PlanFrame(FP::NanosecondTickCount(waits.Now));
+  ASSERT_TRUE(waitPlan.WaitsForPresent());
+  EXPECT_EQ(waitPlan.WaitForPresentTimeout.Nanoseconds(), 50'000'000);
+  const PC::FrameStartPlan gpuPlan = gpu.Pacer.PlanFrame(FP::NanosecondTickCount(gpu.Now));
+  ASSERT_TRUE(gpuPlan.WaitsForGpuWork());
+  EXPECT_EQ(gpuPlan.WaitForGpuWorkTimeout.Nanoseconds(), 50'000'000);
 }
 
 TEST(TierPacer, ATimeTheFrameBeforeStaysMakesNoTierAndIsGivenAllTheSame)

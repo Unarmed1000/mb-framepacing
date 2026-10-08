@@ -128,6 +128,19 @@ namespace MB::FramePacing::Pacer
     m_presentWaitSwapIntervals = std::clamp(swapIntervals, 1u, MaxPresentWaitSwapIntervals);
   }
 
+  void PacerSettings::SetMinWaitTimeout(const NanosecondTimeDuration timeout) noexcept
+  {
+    assert(timeout <= MaxMinWaitTimeout);
+    m_minWaitTimeout = NanosecondTimeDuration::Min(timeout, MaxMinWaitTimeout);
+  }
+
+  NanosecondTimeDuration PacerSettings::WaitTimeoutAt(const RefreshPeriod period, const uint32_t swapInterval) const noexcept
+  {
+    // A few of the frame's own swap intervals, and never less than the least time
+    const int64_t refreshes = int64_t{m_presentWaitSwapIntervals} * swapInterval;
+    return NanosecondTimeDuration::Max(NanosecondTimeDuration(period.TimeFor(refreshes)), m_minWaitTimeout);
+  }
+
   void PacerSettings::SetMaxFramesInFlight(const uint32_t frames) noexcept
   {
     assert(frames >= 1 && frames <= MaxMaxFramesInFlight);

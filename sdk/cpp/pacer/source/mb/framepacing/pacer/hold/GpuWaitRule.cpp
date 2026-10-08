@@ -24,10 +24,8 @@ namespace MB::FramePacing::Pacer
     if (!m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId && (m_lastAcceptedId - back) != m_waitedForId)
     {
       plan.WaitForGpuWorkFrameId = m_lastAcceptedId - back;
-      // As long as a few of the frame's own swap intervals, as the wait for a present: a GPU that never finishes a frame
-      // holds the loop no longer
-      const int64_t refreshes = int64_t{settings.PresentWaitSwapIntervals()} * swapInterval;
-      plan.WaitForGpuWorkTimeout = NanosecondTimeDuration(period.TimeFor(refreshes));
+      // As long as the wait for a present may take: a GPU that never finishes a frame holds the loop no longer
+      plan.WaitForGpuWorkTimeout = settings.WaitTimeoutAt(period, swapInterval);
     }
     return plan;
   }

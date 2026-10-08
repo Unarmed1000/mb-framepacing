@@ -48,6 +48,8 @@ namespace
   {
     PC::PacerSettings settings(g_hz100);
     settings.SetAim(PC::PacerAim::LowLatency);
+    // The swap intervals alone say how long a wait may take: these tests count in them (the least time has its own tests)
+    settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
     return settings;
   }
 
@@ -365,6 +367,29 @@ TEST(TimerWaitForPresentPacer, AFrameWithoutAnEndIsNotJudgedByItsWorkAndAStartTh
   EXPECT_EQ(pacer.FrameWindow().Frames, 0u);
 }
 
+TEST(PacerSettings, AWaitMayTakeAFewSwapIntervalsAndALeastTime)
+{
+  // Four swap intervals unless set, and 50 ms at the least: at 240 Hz four refreshes are 16.7 ms, so it is the 50 ms
+  const PC::RefreshPeriod hz240 = PC::RefreshPeriod::FromRate(240);
+  const PC::RefreshPeriod hz60 = PC::RefreshPeriod::FromRate(60);
+  PC::PacerSettings settings(hz240);
+  EXPECT_EQ(settings.WaitTimeoutAt(hz240, 1).Nanoseconds(), 50'000'000);
+  EXPECT_EQ(settings.WaitTimeoutAt(hz240, 2).Nanoseconds(), 50'000'000);
+  // Sixteen refreshes at 240 Hz are 66.7 ms, and four at 60 Hz are too: the swap intervals are the longer
+  EXPECT_EQ(settings.WaitTimeoutAt(hz240, 4), FP::NanosecondTimeDuration(hz240.TimeFor(16)));
+  EXPECT_EQ(settings.WaitTimeoutAt(hz60, 1), FP::NanosecondTimeDuration(hz60.TimeFor(4)));
+  EXPECT_GT(settings.WaitTimeoutAt(hz60, 1).Nanoseconds(), 66'600'000);
+  EXPECT_LT(settings.WaitTimeoutAt(hz60, 1).Nanoseconds(), 66'700'000);
+  // Both are settings: a longer least time, and none
+  settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::FromNanoseconds(100'000'000));
+  EXPECT_EQ(settings.WaitTimeoutAt(hz240, 4).Nanoseconds(), 100'000'000);
+  settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
+  EXPECT_EQ(settings.WaitTimeoutAt(hz240, 1), FP::NanosecondTimeDuration(hz240.TimeFor(4)));
+  settings.SetPresentWaitSwapIntervals(2);
+  EXPECT_EQ(settings.WaitTimeoutAt(hz240, 3), FP::NanosecondTimeDuration(hz240.TimeFor(6)));
+  EXPECT_NE(settings, PC::PacerSettings(hz240));
+}
+
 TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
 {
   PC::PacerSettings settings(g_hz100);
@@ -374,6 +399,8 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   settings.SetAim(PC::PacerAim::Smoothness);
   EXPECT_EQ(settings.WaitingPresents(), 2u);
   EXPECT_EQ(settings.PresentWaitSwapIntervals(), 4u);
+  EXPECT_EQ(settings.MinWaitTimeout(), FP::NanosecondTimeDuration::FromNanoseconds(50'000'000));
+  EXPECT_EQ(settings.MinWaitTimeout(), PC::PacerSettings::DefaultMinWaitTimeout);
   EXPECT_EQ(settings.MaxFramesInFlight(), 1u);
   EXPECT_EQ(settings.StartupPauseRefreshes(), 4u);
   EXPECT_EQ(settings.StartupPauseDelay(), Span(500'000'000));
@@ -382,6 +409,8 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   settings.SetMaxFramesInFlight(2);
   settings.SetStartupPauseRefreshes(0);
   settings.SetStartupPauseDelay(Span(0));
+  settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
+  EXPECT_EQ(settings.MinWaitTimeout(), FP::NanosecondTimeDuration::Zero());
   EXPECT_EQ(settings.WaitingPresents(), 1u);
   EXPECT_EQ(settings.PresentWaitSwapIntervals(), 1u);
   EXPECT_EQ(settings.MaxFramesInFlight(), 2u);
@@ -392,6 +421,8 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   settings.SetMaxFramesInFlight(PC::PacerSettings::MaxMaxFramesInFlight);
   settings.SetStartupPauseRefreshes(PC::PacerSettings::MaxStartupPauseRefreshes);
   settings.SetStartupPauseDelay(PC::PacerSettings::MaxStartupPauseDelay);
+  settings.SetMinWaitTimeout(PC::PacerSettings::MaxMinWaitTimeout);
+  EXPECT_EQ(settings.MinWaitTimeout(), FP::NanosecondTimeDuration::FromNanoseconds(10'000'000'000));
   EXPECT_EQ(settings.WaitingPresents(), 8u);
   EXPECT_EQ(settings.PresentWaitSwapIntervals(), 64u);
   EXPECT_EQ(settings.MaxFramesInFlight(), 8u);
@@ -417,6 +448,8 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   EXPECT_EQ(settings.StartupPauseDelay(), Span(0));
   settings.SetStartupPauseDelay(Span(20'000'000'000));
   EXPECT_EQ(settings.StartupPauseDelay(), PC::PacerSettings::MaxStartupPauseDelay);
+  settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::FromNanoseconds(20'000'000'000));
+  EXPECT_EQ(settings.MinWaitTimeout(), PC::PacerSettings::MaxMinWaitTimeout);
 #elif GTEST_HAS_DEATH_TEST
   EXPECT_DEATH(settings.SetAim(static_cast<PC::PacerAim>(7)), "");
   EXPECT_DEATH(settings.SetWaitingPresents(9), "");
@@ -427,6 +460,7 @@ TEST(PacerSettings, TheSettingsOfTheTierPacersKeepToTheirRange)
   EXPECT_DEATH(settings.SetStartupPauseRefreshes(65), "");
   EXPECT_DEATH(settings.SetStartupPauseDelay(Span(-1)), "");
   EXPECT_DEATH(settings.SetStartupPauseDelay(Span(20'000'000'000)), "");
+  EXPECT_DEATH(settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::FromNanoseconds(20'000'000'000)), "");
 #else
   GTEST_SKIP() << "asserts are on and death tests are not available";
 #endif

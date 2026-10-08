@@ -61,6 +61,8 @@ namespace
     PC::PacerSettings settings(g_hz100);
     settings.SetAim(aim);
     settings.SetWaitingPresents(waitingPresents);
+    // The swap intervals alone say how long a wait may take: these tests count in them (the least time has its own tests)
+    settings.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
     return settings;
   }
 
