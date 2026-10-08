@@ -36,15 +36,17 @@ namespace MB::FramePacing::Pacer
   //!   PlanFrame       before the frame takes anything: a present to wait for (with WaitForPresent active), then a time
   //!   AddPresentWait  after that wait: what became of it. PlanFrame is then called again
   //!   BeginFrame      the frame starts: its swap interval, its animation time and the marker's values
-  //!   EndFrame        the CPU's work is done: the time to wait until before the present
+  //!   EndFrame        the CPU's work is done: the time to wait until before the present, or the time to give the present
   //!   AddPresent      after the present, before the next frame is planned
   //! and, where the application has them, AddGpuWork (the GPU's work on an earlier frame) and AddSystemWait (a wait it made
   //! by itself).
   //!
   //! Which tier paces: where the refreshes are comes from vertical blank times when they are active and from a grid on the clock
-  //! when not, and the loop is held by a wait for a present when that is active. Those are tiers 5 to 8 of PacerTier. A timed
-  //! present is rated (tiers 1 to 4) and not used yet: a set that has one is paced as the same set without it, and
-  //! WorkingTier says which tier that is.
+  //! when not, the loop is held by a wait for a present when that is active, and with a timed present active the present is
+  //! given a time: PresentPlan::NotBeforeTime where the present takes that, with which the display's side puts a frame on
+  //! its refresh and no present is held by the loop, else PresentPlan::MinimumDuration, which is given next to what the
+  //! loop does without one. Those are the eight tiers of PacerTier. The four with a timed present are built against the
+  //! simulation's display only: no system has been measured with them.
   //!
   //! A change of the active set takes effect when the frame that is open has ended (at once when none is). The frames and
   //! their ids, the animation time, the swap interval with the rule's frame window, the GPU's work and the presents that can be
@@ -94,8 +96,8 @@ namespace MB::FramePacing::Pacer
     //! The rating of what is active: the active tier.
     [[nodiscard]] PacerRating ActiveRating() const noexcept;
 
-    //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing: a timed
-    //! present (not used yet), no vertical blank reading so far, waits for a present that stopped because none is shown.
+    //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing: no
+    //! vertical blank reading so far, waits for a present that stopped because none is shown.
     [[nodiscard]] PacerTier WorkingTier() const noexcept;
 
     //! A vertical blank of the display the window is on. Taken with PacerCapability::VBlankTimes active.
@@ -111,7 +113,8 @@ namespace MB::FramePacing::Pacer
     //! The frame starts, at cpuStartTime: the previous frame is judged, the rule decides, and this frame is planned.
     FrameSchedule BeginFrame(NanosecondTickCount cpuStartTime) noexcept;
 
-    //! The frame's CPU work is done, at workDoneTime: the time to wait until before the present, and the marker's CPU busy time.
+    //! The frame's CPU work is done, at workDoneTime: the time to wait until before the present or the time to give it, and
+    //! the marker's CPU busy time.
     PresentPlan EndFrame(NanosecondTickCount workDoneTime) noexcept;
 
     //! The frame's CPU busy time so far, for a marker that is drawn while the frame's work is still going on.

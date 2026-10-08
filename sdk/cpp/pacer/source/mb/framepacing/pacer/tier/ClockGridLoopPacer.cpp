@@ -7,6 +7,7 @@
 // the waits that held it; without one there is a pause after start-up, a whole period after a late present, and the system's
 // own waits.
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/pacer/placement/DisplayPlacementUtil.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
 #include <algorithm>
@@ -374,7 +375,11 @@ namespace MB::FramePacing::Pacer
     m_frameEnded = true;
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
-    if (m_swapInterval > 1)
+    // The time the present is given, where it takes one. With a time before which the frame is not shown the display's side
+    // shows it at the refresh nearest to the step it is due at, however many refreshes that is after the frame before it,
+    // and the frame is presented when it is done
+    DisplayPlacementUtil::Place(plan, m_presentTiming, TimeOfSlot(m_dueSlot), m_swapInterval, m_rule.Refresh());
+    if (m_presentTiming != PresentTiming::AtTime && m_swapInterval > 1)
     {
       // The present holds a frame for one refresh. A frame of more is held by the loop: presented in the period before the step
       // the next frame is due at, the margin into it

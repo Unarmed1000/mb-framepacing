@@ -91,6 +91,56 @@ TEST(DisplayModel, AFrameStaysItsSwapIntervalBehindTheFrameBeforeIt)
   EXPECT_EQ(other.Present(now, now, 4), Blank(1));
 }
 
+TEST(DisplayModel, APresentWithATimeIsNotShownBeforeIt)
+{
+  Sim::DisplayModel display(g_hz100, {});
+  const int64_t now = Blank0 + 1'000'000;
+
+  // Without a time it is a present at a swap interval of 1
+  EXPECT_EQ(display.PresentTimed(now, now, 0, 0), Blank(1));
+  EXPECT_EQ(display.PresentTimed(now, now, 0, 0), Blank(2));
+  // The first blank at or after the time, whenever the present was made
+  EXPECT_EQ(display.PresentTimed(now, now, Blank(5) - (Period / 2), 0), Blank(5));
+  EXPECT_EQ(display.PresentTimed(now, now, Blank(7), 0), Blank(7));
+  EXPECT_EQ(display.PresentTimed(now, now, Blank(7) + 1, 0), Blank(8));
+  // A time that has passed holds nothing: the first blank the frame is ready for, after the frame before it
+  EXPECT_EQ(display.PresentTimed(now, now, Blank(3), 0), Blank(9));
+  EXPECT_EQ(display.PresentTimed(Blank(11) + 1, Blank(12) + 1, Blank(3), 0), Blank(13));
+}
+
+TEST(DisplayModel, APresentWithAMinimumDurationKeepsTheFrameBeforeItOnScreenThatLong)
+{
+  Sim::DisplayModel display(g_hz100, {});
+  const int64_t now = Blank0 + 1'000'000;
+
+  // The first frame has no frame before it
+  EXPECT_EQ(display.PresentTimed(now, now, 0, 4 * Period), Blank(1));
+  // Half a period less than its refreshes, as a pacer gives it: one refresh is what the display does by itself
+  EXPECT_EQ(display.PresentTimed(now, now, 0, Period / 2), Blank(2));
+  EXPECT_EQ(display.PresentTimed(now, now, 0, (2 * Period) - (Period / 2)), Blank(4));
+  EXPECT_EQ(display.PresentTimed(now, now, 0, 3 * Period), Blank(7));
+  // Counted from when the frame before it was shown, not from when it was to be: a frame that is late moves the next one
+  EXPECT_EQ(display.PresentTimed(Blank(9) + 1, Blank(9) + 1, 0, Period / 2), Blank(10));
+  EXPECT_EQ(display.PresentTimed(Blank(9) + 2, Blank(9) + 2, 0, (2 * Period) - (Period / 2)), Blank(12));
+  // With both, the later of the two
+  EXPECT_EQ(display.PresentTimed(Blank(9) + 3, Blank(9) + 3, Blank(20), Period / 2), Blank(20));
+  EXPECT_EQ(display.PresentTimed(Blank(9) + 4, Blank(9) + 4, Blank(20), 3 * Period), Blank(23));
+}
+
+TEST(DisplayModel, ATimeOnAPresentIsTheTimeTheFrameIsShownAtBehindACompositor)
+{
+  Sim::DisplayModelSettings settings;
+  settings.PipelineRefreshes = 1;
+  Sim::DisplayModel display(g_hz100, settings);
+  const int64_t now = Blank0 + 1'000'000;
+
+  // Taken for the blank before the one it is shown at
+  EXPECT_EQ(display.PresentTimed(now, now, Blank(5) - (Period / 2), 0), Blank(5));
+  EXPECT_EQ(display.PresentTimed(now, now, 0, (2 * Period) - (Period / 2)), Blank(7));
+  // And no sooner than it can be: a frame is shown a refresh after the blank it was ready for
+  EXPECT_EQ(display.PresentTimed(Blank(9) + 1, Blank(9) + 1, Blank(9), 0), Blank(11));
+}
+
 TEST(DisplayModel, AVerticalBlankThatTakesNoFramePutsEveryFramePresentedAtTheDisplaysRateOneBehind)
 {
   Sim::DisplayModelSettings settings;

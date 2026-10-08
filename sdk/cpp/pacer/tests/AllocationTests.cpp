@@ -356,7 +356,8 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
   {
     PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
     settings.SetAim(aim);
-    const PacerCapabilities has(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent | PacerCapability::PresentAfterDuration);
+    const PacerCapabilities has(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent | PacerCapability::PresentAfterDuration |
+                                PacerCapability::PresentAtTime);
     PC::TierPacer pacer(settings, has);
 
     int64_t checked = 0;
@@ -369,13 +370,15 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
       PC::VBlankReading reading;
       for (int32_t frame = 0; frame < 2'000; ++frame)
       {
-        // Every 50 frames another part of what the application has is active: all four tiers that pace today, in turn, the
-        // change made between two frames or while one is open
+        // Every 50 frames another part of what the application has is active: all eight tiers, with either timed present and
+        // with both, in turn, the change made between two frames or while one is open
         if ((frame % 50) == 0)
         {
-          const int32_t turn = (frame / 50) % 4;
+          const int32_t turn = (frame / 50) % 16;
           pacer.SetActiveCapabilities(PacerCapabilities(((turn & 1) != 0 ? PacerCapability::VBlankTimes : PacerCapability::NoCapabilities) |
-                                                        ((turn & 2) != 0 ? PacerCapability::WaitForPresent : PacerCapability::NoCapabilities)));
+                                                        ((turn & 2) != 0 ? PacerCapability::WaitForPresent : PacerCapability::NoCapabilities) |
+                                                        ((turn & 4) != 0 ? PacerCapability::PresentAtTime : PacerCapability::NoCapabilities) |
+                                                        ((turn & 8) != 0 ? PacerCapability::PresentAfterDuration : PacerCapability::NoCapabilities)));
         }
         reading.VBlankTime = FP::NanosecondTickCount(now - (now % period));
         reading.ReadTime = FP::NanosecondTickCount(now);

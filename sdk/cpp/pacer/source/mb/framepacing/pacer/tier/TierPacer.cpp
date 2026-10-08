@@ -5,6 +5,8 @@
 // capabilities pick how the frames are placed and what holds the loop, and a change of them is a handover at a frame's start.
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/capability/PacerTierUtil.hpp>
+#include <mb/framepacing/pacer/placement/DisplayPlacementUtil.hpp>
+#include <mb/framepacing/pacer/placement/PresentTiming.hpp>
 #include <mb/framepacing/pacer/tier/PacerHandover.hpp>
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
 
@@ -12,9 +14,18 @@ namespace MB::FramePacing::Pacer
 {
   namespace
   {
-    //! The tier of the two things a pacer can use today: where the refreshes are, and what holds the loop
-    constexpr PacerTier TierOf(const bool onVBlanks, const bool waitsForPresent) noexcept
+    //! The tier of the three things a pacer uses: who puts a frame on its refresh, where the refreshes are, and what holds
+    //! the loop
+    constexpr PacerTier TierOf(const bool timedPresent, const bool onVBlanks, const bool waitsForPresent) noexcept
     {
+      if (timedPresent)
+      {
+        if (onVBlanks)
+        {
+          return waitsForPresent ? PacerTier::TimedVBlankWaitForPresent : PacerTier::TimedVBlankPeriodOnly;
+        }
+        return waitsForPresent ? PacerTier::TimedTimerWaitForPresent : PacerTier::TimedTimerPeriodOnly;
+      }
       if (onVBlanks)
       {
         return waitsForPresent ? PacerTier::VBlankWaitForPresent : PacerTier::VBlankPeriodOnly;
@@ -30,6 +41,8 @@ namespace MB::FramePacing::Pacer
     , m_vblank(settings, capabilities.Has(PacerCapability::WaitForPresent))
     , m_onVBlanks(capabilities.Has(PacerCapability::VBlankTimes))
   {
+    m_grid.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
+    m_vblank.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
   }
 
   void TierPacer::SetCapabilities(const PacerCapabilities& capabilities) noexcept
@@ -63,7 +76,7 @@ namespace MB::FramePacing::Pacer
     // What is really pacing: the vertical blanks once one was read, and the wait while it is made
     const bool onVBlanks = m_onVBlanks && m_vblank.HasVBlankReading();
     const bool waits = m_active.Has(PacerCapability::WaitForPresent) && !PresentWaitsStopped();
-    return TierOf(onVBlanks, waits);
+    return TierOf(DisplayPlacementUtil::TimingFor(m_active) != PresentTiming::Untimed, onVBlanks, waits);
   }
 
   bool TierPacer::IsFrameOpen() const noexcept
@@ -93,6 +106,10 @@ namespace MB::FramePacing::Pacer
     const bool waits = active.Has(PacerCapability::WaitForPresent);
     m_grid.SetWaitsForPresent(waits);
     m_vblank.SetWaitsForPresent(waits);
+    // Who puts a frame on its refresh, from the next present on
+    const PresentTiming timing = DisplayPlacementUtil::TimingFor(active);
+    m_grid.SetPresentTiming(timing);
+    m_vblank.SetPresentTiming(timing);
     m_active = active;
   }
 

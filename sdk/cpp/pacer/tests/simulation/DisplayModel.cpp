@@ -26,20 +26,41 @@ namespace MB::FramePacing::Pacer::Simulation
              : m_period.FloorRefreshes(NanosecondTimeSpan(nanoseconds - m_settings.FirstBlankNanoseconds));
   }
 
+  int64_t DisplayModel::BlankAtOrAfter(const int64_t nanoseconds) const noexcept
+  {
+    const int64_t blank = BlankAtOrBefore(nanoseconds);
+    return BlankNanoseconds(blank) < nanoseconds ? blank + 1 : blank;
+  }
+
   int64_t DisplayModel::Present(const int64_t presentNanoseconds, const int64_t gpuEndNanoseconds, const uint32_t swapInterval)
   {
-    // The first blank the frame is ready for in time
-    const int64_t latchNanoseconds = std::max(presentNanoseconds, gpuEndNanoseconds) + m_settings.LatchLeadNanoseconds;
-    int64_t blank = BlankAtOrBefore(latchNanoseconds);
-    if (BlankNanoseconds(blank) < latchNanoseconds)
-    {
-      ++blank;
-    }
     // One frame per blank, in the order of the presents, and no sooner after the frame before it than its swap interval
-    if (m_anyTaken)
+    const int64_t earliestBlank = m_anyTaken ? m_lastTakenBlank + static_cast<int64_t>(std::max(swapInterval, 1u)) : 0;
+    return Take(presentNanoseconds, gpuEndNanoseconds, earliestBlank);
+  }
+
+  int64_t DisplayModel::PresentTimed(const int64_t presentNanoseconds, const int64_t gpuEndNanoseconds, const int64_t notBeforeNanoseconds,
+                                     const int64_t minimumDurationNanoseconds)
+  {
+    // One frame per blank, in the order of the presents
+    int64_t earliestBlank = m_anyTaken ? m_lastTakenBlank + 1 : 0;
+    if (notBeforeNanoseconds != 0)
     {
-      blank = std::max(blank, m_lastTakenBlank + static_cast<int64_t>(std::max(swapInterval, 1u)));
+      // Not shown before the time: taken for the first blank whose frame is shown at or after it
+      earliestBlank = std::max(earliestBlank, BlankAtOrAfter(notBeforeNanoseconds) - m_settings.PipelineRefreshes);
     }
+    if (m_anyTaken && minimumDurationNanoseconds > 0)
+    {
+      // The frame before it stays that long: as long from the blank it was taken for, as the two are shown as much later
+      earliestBlank = std::max(earliestBlank, BlankAtOrAfter(BlankNanoseconds(m_lastTakenBlank) + minimumDurationNanoseconds));
+    }
+    return Take(presentNanoseconds, gpuEndNanoseconds, earliestBlank);
+  }
+
+  int64_t DisplayModel::Take(const int64_t presentNanoseconds, const int64_t gpuEndNanoseconds, const int64_t earliestBlank)
+  {
+    // The first blank the frame is ready for in time
+    int64_t blank = std::max(BlankAtOrAfter(std::max(presentNanoseconds, gpuEndNanoseconds) + m_settings.LatchLeadNanoseconds), earliestBlank);
     while (std::binary_search(m_settings.HeldBlanks.begin(), m_settings.HeldBlanks.end(), blank))
     {
       ++blank;

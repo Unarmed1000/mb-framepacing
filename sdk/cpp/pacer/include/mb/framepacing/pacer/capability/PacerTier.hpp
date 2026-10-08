@@ -23,8 +23,8 @@ namespace MB::FramePacing::Pacer
   //! vertical blank times come before the wait, as they are what makes the loop's placing good. Every order here is a proposal
   //! until the tiers have been measured against each other (the proposal has what is measured).
   //!
-  //! Tiers 1 to 4 have no pacer yet: a set that reaches one of them is paced by the pacer of the tier it reaches without its
-  //! timed present.
+  //! Tiers 1 to 4 are paced by TierPacer and built against the simulation's display only: no system has been measured with
+  //! them.
   enum class PacerTier : uint8_t
   {
     //! A timed present, vertical blank times and a wait for a present

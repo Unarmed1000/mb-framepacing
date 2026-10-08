@@ -6,6 +6,7 @@
 // What each tier does with a fixed set is tested in the tier's own file, through the tier's class, which is this pacer.
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
@@ -62,7 +63,9 @@ namespace
     int64_t Now{Start};
     //! What the last frame's calls gave
     PC::FrameStartPlan Plan;
+    PC::PresentPlan Present;
     int64_t StartNanoseconds{0};
+    int64_t PresentNanoseconds{0};
     uint32_t WaitsAskedFor{0};
 
     Loop(const PC::PacerSettings& settings, const PacerCapabilities& capabilities)
@@ -96,20 +99,22 @@ namespace
       }
       StartNanoseconds = Plan.WaitsForStartTime() ? Plan.StartTime.Nanoseconds() : Now;
       const PC::FrameSchedule schedule = Pacer.BeginFrame(At(StartNanoseconds));
-      const PC::PresentPlan present = Pacer.EndFrame(At(StartNanoseconds + Work));
-      const int64_t presentNanoseconds = present.WaitsForPresentTime() ? present.PresentTime.Nanoseconds() : StartNanoseconds + Work;
+      Present = Pacer.EndFrame(At(StartNanoseconds + Work));
+      PresentNanoseconds = Present.WaitsForPresentTime() ? Present.PresentTime.Nanoseconds() : StartNanoseconds + Work;
       PC::PresentReport report;
-      report.FrameId = present.FrameId;
-      report.CallTime = At(presentNanoseconds);
-      report.ReturnTime = At(presentNanoseconds + 60'000);
+      report.FrameId = Present.FrameId;
+      report.CallTime = At(PresentNanoseconds);
+      report.ReturnTime = At(PresentNanoseconds + 60'000);
       Pacer.AddPresent(report);
-      Now = presentNanoseconds + 100'000;
+      Now = PresentNanoseconds + 100'000;
       return schedule;
     }
   };
 
   constexpr PacerCapability Wait = PacerCapability::WaitForPresent;
   constexpr PacerCapability VBlank = PacerCapability::VBlankTimes;
+  constexpr PacerCapability AtTime = PacerCapability::PresentAtTime;
+  constexpr PacerCapability AfterDuration = PacerCapability::PresentAfterDuration;
 }
 
 TEST(TierPacer, TheCapabilitySetsGiveTheRatingsAndTheTierThatPaces)
@@ -134,11 +139,11 @@ TEST(TierPacer, TheCapabilitySetsGiveTheRatingsAndTheTierThatPaces)
   EXPECT_TRUE(loop.Pacer.HasVBlankReading());
   EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::VBlankWaitForPresent);
 
-  // A timed present is rated and not used yet: the set is paced as it is without one
-  PC::TierPacer timed(Settings(), PacerCapabilities(PacerCapability::PresentAfterDuration | Wait | PacerCapability::DisplayTimes));
+  // A timed present: the tier above the same set without one
+  PC::TierPacer timed(Settings(), PacerCapabilities(AfterDuration | Wait | PacerCapability::DisplayTimes));
   EXPECT_EQ(timed.Rating().Tier, PacerTier::TimedTimerWaitForPresent);
   EXPECT_TRUE(timed.Rating().ReportsDisplayTimes);
-  EXPECT_EQ(timed.WorkingTier(), PacerTier::TimerWaitForPresent);
+  EXPECT_EQ(timed.WorkingTier(), PacerTier::TimedTimerWaitForPresent);
 
   // What is active is a part of what the application has: a capability it does not have is left out
   timed.SetActiveCapabilities(PacerCapabilities(VBlank | Wait));
@@ -335,4 +340,203 @@ TEST(TierPacer, SettingsAndAResetReachBothParts)
   EXPECT_EQ(loop.Pacer.FrameSlotHeldFrames(), 0u);
   EXPECT_FALSE(loop.Pacer.PresentWaitsStopped());
   EXPECT_GT(loop.Pacer.ReadyPlaceNow().Nanoseconds(), 0);
+}
+
+// The timed present (tiers 1 to 4): the present is given a time. With a time before which the frame is not shown the display's
+// side puts the frame on its refresh and the loop holds no present; a time the frame before it stays is given next to what the
+// loop does without one.
+
+TEST(TierPacer, WithATimedPresentTheTierThatPacesIsOneOfTheFourWithOne)
+{
+  for (const PacerCapability timed : {AtTime, AfterDuration, AtTime | AfterDuration})
+  {
+    const PC::TierPacer timer(Settings(), PacerCapabilities(timed));
+    EXPECT_EQ(timer.WorkingTier(), PacerTier::TimedTimerPeriodOnly);
+    const PC::TierPacer waits(Settings(), PacerCapabilities(timed | Wait));
+    EXPECT_EQ(waits.WorkingTier(), PacerTier::TimedTimerWaitForPresent);
+
+    // Until a vertical blank is read the pacer is on a timer, and says so
+    Loop vblank(Settings(), PacerCapabilities(timed | VBlank));
+    EXPECT_EQ(vblank.Pacer.ActiveRating().Tier, PacerTier::TimedVBlankPeriodOnly);
+    EXPECT_EQ(vblank.Pacer.WorkingTier(), PacerTier::TimedTimerPeriodOnly);
+    static_cast<void>(vblank.Frame());
+    EXPECT_EQ(vblank.Pacer.WorkingTier(), PacerTier::TimedVBlankPeriodOnly);
+
+    Loop all(Settings(), PacerCapabilities(timed | VBlank | Wait));
+    static_cast<void>(all.Frame());
+    EXPECT_EQ(all.Pacer.WorkingTier(), PacerTier::TimedVBlankWaitForPresent);
+    // Left out of the active set, the tier is the one without it
+    all.Pacer.SetActiveCapabilities(PacerCapabilities(VBlank | Wait));
+    EXPECT_EQ(all.Pacer.WorkingTier(), PacerTier::VBlankWaitForPresent);
+  }
+}
+
+TEST(TierPacer, ATimeOnThePresentIsHalfAPeriodBeforeTheFramesRefreshAndTheLoopHoldsNoPresent)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability named : {PacerCapability::NoCapabilities, Wait, VBlank, VBlank | Wait})
+    {
+      for (const uint32_t swapInterval : {1u, 2u})
+      {
+        PC::PacerSettings settings = Settings(aim);
+        settings.SetPreferredSwapInterval(swapInterval);
+        // The same loop without a timed present holds presents: on vertical blanks every one with the aim of smoothness (with
+        // low latency it is the start that is held), and on a grid those of two refreshes
+        Loop untimed(settings, PacerCapabilities(named));
+        Loop timed(settings, PacerCapabilities(named | AtTime));
+        uint32_t held = 0;
+        for (int32_t frame = 0; frame < 60; ++frame)
+        {
+          static_cast<void>(untimed.Frame());
+          held += untimed.Present.WaitsForPresentTime() ? 1u : 0u;
+          ASSERT_EQ(untimed.Present.NotBeforeTime, FP::NanosecondTickCount());
+          ASSERT_EQ(untimed.Present.MinimumDuration, FP::NanosecondTimeDuration());
+
+          const PC::FrameSchedule schedule = timed.Frame();
+          ASSERT_FALSE(timed.Present.WaitsForPresentTime()) << frame;
+          ASSERT_EQ(timed.Present.NotBeforeTime.Nanoseconds(), schedule.IntendedDisplayTime.Nanoseconds() - (Period / 2)) << frame;
+          ASSERT_EQ(timed.Present.MinimumDuration, FP::NanosecondTimeDuration()) << frame;
+          ASSERT_EQ(timed.Present.FrameId, schedule.FrameId);
+          ASSERT_EQ(schedule.SwapInterval, swapInterval);
+          if (frame > 10)
+          {
+            // One frame per swap interval, each for the refresh that is its swap interval after the one before it
+            ASSERT_EQ(schedule.AnimationStep.Nanoseconds(), int64_t{swapInterval} * Period) << frame;
+          }
+        }
+        const bool holds = PacerCapabilities(named).Has(VBlank) ? aim == PC::PacerAim::Smoothness : swapInterval > 1;
+        EXPECT_EQ(held > 30u, holds) << static_cast<uint32_t>(named) << ' ' << swapInterval;
+        EXPECT_EQ(timed.Pacer.FrameWindow().LateFrames, 0u);
+        EXPECT_EQ(timed.Pacer.RefreshesBehindClock(), untimed.Pacer.RefreshesBehindClock());
+      }
+    }
+  }
+}
+
+TEST(TierPacer, WithATimeOnThePresentSmoothnessHoldsTheNextFramesStartWhereItHeldThePresent)
+{
+  // Vertical blank times and no wait for a present: without a timed present every present waits for its time, and the next
+  // frame starts right after it. With one the frame is presented when it is done, and the next frame's start waits for that time
+  const PC::PacerSettings settings = Settings(PC::PacerAim::Smoothness);
+  Loop untimed(settings, PacerCapabilities(VBlank));
+  Loop timed(settings, PacerCapabilities(VBlank | AtTime));
+  PC::FrameSchedule before;
+  for (int32_t frame = 0; frame < 80; ++frame)
+  {
+    const PC::FrameSchedule plain = untimed.Frame();
+    const PC::FrameSchedule schedule = timed.Frame();
+    if (frame > 10)
+    {
+      ASSERT_TRUE(untimed.Present.WaitsForPresentTime()) << frame;
+      ASSERT_FALSE(untimed.Plan.WaitsForStartTime()) << frame;
+      // The time the untimed loop presents at is the time the frame after it is said to start at
+      ASSERT_EQ(untimed.Present.PresentTime, plain.NextFrameStartTime) << frame;
+
+      ASSERT_TRUE(timed.Plan.WaitsForStartTime()) << frame;
+      ASSERT_EQ(timed.Plan.StartTime, before.NextFrameStartTime) << frame;
+      ASSERT_EQ(timed.PresentNanoseconds, timed.StartNanoseconds + Work) << frame;
+      // A frame a refresh, for the same refresh as without the time, and as far ahead of it
+      ASSERT_EQ(schedule.IntendedDisplayTime.Nanoseconds(), before.IntendedDisplayTime.Nanoseconds() + Period) << frame;
+      ASSERT_EQ(schedule.NextFrameStartTime.Nanoseconds(), before.NextFrameStartTime.Nanoseconds() + Period) << frame;
+      ASSERT_EQ(schedule.IntendedDisplayTime.Nanoseconds() - schedule.NextFrameStartTime.Nanoseconds(),
+                plain.IntendedDisplayTime.Nanoseconds() - plain.NextFrameStartTime.Nanoseconds())
+        << frame;
+    }
+    before = schedule;
+  }
+  EXPECT_EQ(timed.Pacer.FrameWindow().LateFrames, 0u);
+
+  // With the aim of low latency the start is held with a timed present as without one
+  Loop lowLatency(Settings(), PacerCapabilities(VBlank));
+  Loop lowLatencyTimed(Settings(), PacerCapabilities(VBlank | AtTime));
+  for (int32_t frame = 0; frame < 40; ++frame)
+  {
+    const PC::FrameSchedule plain = lowLatency.Frame();
+    const PC::FrameSchedule schedule = lowLatencyTimed.Frame();
+    ASSERT_EQ(lowLatencyTimed.StartNanoseconds, lowLatency.StartNanoseconds) << frame;
+    ASSERT_EQ(schedule.IntendedDisplayTime, plain.IntendedDisplayTime) << frame;
+  }
+}
+
+TEST(TierPacer, ATimeTheFrameBeforeStaysIsGivenNextToWhatTheLoopDoesWithoutOne)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability named : {PacerCapability::NoCapabilities, Wait, VBlank, VBlank | Wait})
+    {
+      for (const uint32_t swapInterval : {1u, 2u, 3u})
+      {
+        PC::PacerSettings settings = Settings(aim);
+        settings.SetPreferredSwapInterval(swapInterval);
+        Loop untimed(settings, PacerCapabilities(named));
+        Loop timed(settings, PacerCapabilities(named | AfterDuration));
+        for (int32_t frame = 0; frame < 60; ++frame)
+        {
+          const PC::FrameSchedule plain = untimed.Frame();
+          const PC::FrameSchedule schedule = timed.Frame();
+          // The frame is the one the loop makes without the time, started and presented when that one is
+          ASSERT_EQ(timed.StartNanoseconds, untimed.StartNanoseconds) << frame;
+          ASSERT_EQ(timed.Present.PresentTime, untimed.Present.PresentTime) << frame;
+          ASSERT_EQ(schedule.IntendedDisplayTime, plain.IntendedDisplayTime) << frame;
+          ASSERT_EQ(schedule.AnimationTime, plain.AnimationTime) << frame;
+          ASSERT_EQ(schedule.NextFrameStartTime, plain.NextFrameStartTime) << frame;
+          // And its present says how long the frame before it stays: its refreshes, less half of one
+          ASSERT_EQ(timed.Present.MinimumDuration.Nanoseconds(), (int64_t{swapInterval} * Period) - (Period / 2)) << frame;
+          ASSERT_EQ(timed.Present.NotBeforeTime, FP::NanosecondTickCount()) << frame;
+        }
+      }
+    }
+  }
+}
+
+TEST(TierPacer, WithBothTimedPresentsTheTimeBeforeWhichAFrameIsNotShownIsGiven)
+{
+  Loop loop(Settings(), PacerCapabilities(AtTime | AfterDuration));
+  const PC::FrameSchedule schedule = loop.Frame();
+  EXPECT_EQ(loop.Present.NotBeforeTime.Nanoseconds(), schedule.IntendedDisplayTime.Nanoseconds() - (Period / 2));
+  EXPECT_EQ(loop.Present.MinimumDuration, FP::NanosecondTimeDuration());
+  // The application leaves it out of the active set to have the other
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(AfterDuration));
+  static_cast<void>(loop.Frame());
+  EXPECT_EQ(loop.Present.NotBeforeTime, FP::NanosecondTickCount());
+  EXPECT_EQ(loop.Present.MinimumDuration.Nanoseconds(), Period / 2);
+}
+
+TEST(TierPacer, ATimedPresentIsSwitchedOnAndOffWhileTheFramesGoOn)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const PacerCapability named : {PacerCapability::NoCapabilities, VBlank, VBlank | Wait})
+    {
+      PC::PacerSettings settings = Settings(aim);
+      settings.SetPreferredSwapInterval(2);
+      Loop loop(settings, PacerCapabilities(named | AtTime));
+      loop.Pacer.SetActiveCapabilities(PacerCapabilities(named));
+      PC::FrameSchedule schedule;
+      for (int32_t frame = 0; frame < 30; ++frame)
+      {
+        schedule = loop.Frame();
+      }
+      for (int32_t change = 0; change < 6; ++change)
+      {
+        const bool on = (change % 2) == 0;
+        // Made while a frame is open, it is the next frame's present that gets the time, or does not any more
+        static_cast<void>(loop.Pacer.PlanFrame(At(loop.Now)));
+        loop.Pacer.SetActiveCapabilities(on ? PacerCapabilities(named | AtTime) : PacerCapabilities(named));
+        for (int32_t frame = 0; frame < 20; ++frame)
+        {
+          const PC::FrameSchedule before = schedule;
+          schedule = loop.Frame();
+          ASSERT_EQ(schedule.FrameId, before.FrameId + 1u) << change;
+          ASSERT_EQ(schedule.SwapInterval, 2u) << change;
+          ASSERT_EQ(schedule.AnimationStep.Nanoseconds(), 2 * Period) << change << ' ' << frame;
+          ASSERT_EQ(schedule.IntendedDisplayTime.Nanoseconds(), before.IntendedDisplayTime.Nanoseconds() + (2 * Period)) << change << ' ' << frame;
+          ASSERT_EQ(loop.Present.NotBeforeTime != FP::NanosecondTickCount(), on) << change << ' ' << frame;
+        }
+        EXPECT_EQ(loop.Pacer.FrameWindow().LateFrames, 0u) << change;
+        EXPECT_EQ(loop.Pacer.RefreshesBehindClock(), 0u) << change;
+      }
+    }
+  }
 }

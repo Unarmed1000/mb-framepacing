@@ -18,6 +18,7 @@
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
+#include <mb/framepacing/pacer/placement/PresentTiming.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
@@ -30,14 +31,21 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built). The frame loop places every frame
-  //! on a vertical blank of the display: what the tiers with vertical blank times and no timed present have in common, with
-  //! the wait for a present as an option. VBlankPeriodOnlyPacer is this without the wait and VBlankWaitForPresentPacer with
-  //! it, and what each of them promises is said there.
+  //! on a vertical blank of the display: what the tiers with vertical blank times have in common, with the wait for a
+  //! present and the timed present as options. VBlankPeriodOnlyPacer is this without the wait and VBlankWaitForPresentPacer
+  //! with it, and what each of them promises is said there.
   //!
   //! Every frame is for one vertical blank, the one of the frame before it and its swap interval later. A frame is shown
   //! at a blank when it is ready the frame margin before it, and a frame is aimed to be ready at
   //! PacerSettings::ReadyPlacePercent of the refresh before its blank. With the aim of smoothness a frame starts at once and
   //! its present is held; with low latency its start is held and it is presented when it is done.
+  //!
+  //! With a timed present (SetPresentTiming; the simulation only, not measured) the present is given a time
+  //! (DisplayPlacementUtil). A time before which the frame is not shown has the display's side show it at the vertical
+  //! blank it is for: the loop holds no present, and a frame is presented when it is done. With the aim of smoothness
+  //! what held the present then holds the next frame's start; with low latency the start is held as without one, and the
+  //! time keeps a frame that is done early from being shown early. A time the frame before it stays on screen at least
+  //! is given next to what the loop does without one.
   //!
   //! Without the wait: one pause after start-up with the aim of low latency (StartupPauses), for the frames that pile up
   //! behind a new swap chain's first presents. With the wait: the loop is held until the present so many back was shown,
@@ -55,6 +63,9 @@ namespace MB::FramePacing::Pacer
     SwapIntervalRule m_rule;
     // What holds the loop: a wait for a present, or nothing but the times the pacer gives
     bool m_waitsForPresent;
+    // The time a present is given. With PresentTiming::AtTime the display's side puts a frame on its vertical blank, else
+    // the loop does by when it presents
+    PresentTiming m_presentTiming{PresentTiming::Untimed};
     FrameWorkRule m_frameWork;
     // Where the display's refreshes are: the vertical blanks, from the readings
     VBlankTimeline m_timeline;
@@ -123,9 +134,13 @@ namespace MB::FramePacing::Pacer
     //! waitsForPresent: the application can wait until a present was shown, and the frame start plan asks for it.
     VBlankLoopPacer(const PacerSettings& settings, bool waitsForPresent);
 
-    //! The tier this pacer is for: with the wait, or without it.
+    //! The tier this pacer paces as: with the wait or without it, and with a timed present or without one.
     [[nodiscard]] PacerTier Tier() const noexcept
     {
+      if (m_presentTiming != PresentTiming::Untimed)
+      {
+        return m_waitsForPresent ? PacerTier::TimedVBlankWaitForPresent : PacerTier::TimedVBlankPeriodOnly;
+      }
       return m_waitsForPresent ? PacerTier::VBlankWaitForPresent : PacerTier::VBlankPeriodOnly;
     }
 
@@ -212,6 +227,19 @@ namespace MB::FramePacing::Pacer
     {
       m_pausePending = m_pausePending && (!m_waitsForPresent || waitsForPresent);
       m_waitsForPresent = waitsForPresent;
+    }
+
+    //! The time the presents are given, from the next frame on: none (the loop presents at the right moment), or the one the
+    //! display's side places the frame by.
+    void SetPresentTiming(const PresentTiming timing) noexcept
+    {
+      m_presentTiming = timing;
+    }
+
+    //! The time the presents are given.
+    [[nodiscard]] PresentTiming Timing() const noexcept
+    {
+      return m_presentTiming;
     }
 
     //! The vertical blanks are not known any more: the next reading is the first. For a pacer that takes the times up again

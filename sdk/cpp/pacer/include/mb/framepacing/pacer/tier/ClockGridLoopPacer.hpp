@@ -18,6 +18,7 @@
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
+#include <mb/framepacing/pacer/placement/PresentTiming.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/rule/FrameWorkRule.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
@@ -27,14 +28,20 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built). The frame loop places every frame
-  //! on a step of a grid of refresh periods on the clock: what the tiers without vertical blank times and without a timed
-  //! present have in common, with the wait for a present as an option. TimerPeriodOnlyPacer is this without the wait and
+  //! on a step of a grid of refresh periods on the clock: what the tiers without vertical blank times have in common, with
+  //! the wait for a present and the timed present as options. TimerPeriodOnlyPacer is this without the wait and
   //! TimerWaitForPresentPacer with it, and what each of them promises is said there.
   //!
   //! A frame starts at its step of the grid, its swap interval after the one before it. A frame that ran long costs whole
   //! steps, and the loop is then where it was against the display. Where the grid sits in a refresh is not known. With the
   //! aim of smoothness a reserve of frames is made ahead of the display at one refresh per frame; with low latency none is.
   //! A frame of more than one refresh is presented in the period before the step the next frame is due at.
+  //!
+  //! With a timed present (SetPresentTiming; the simulation only, not measured) the present is given a time
+  //! (DisplayPlacementUtil). A time before which the frame is not shown has the display's side show it at the refresh
+  //! nearest to the step it is due at: the loop holds no present, and a frame is presented when it is done. A time the
+  //! frame before it stays on screen at least is given next to what the loop does without one: it keeps a present that
+  //! lands on the wrong side of a refresh from being shown a refresh early. Where the frames start is as without one.
   //!
   //! Without the wait: one pause after start-up with the aim of low latency (StartupPauses), a whole period after a present
   //! that was made late, and the system's own waits (AddSystemWait): where the application says that the system holds the
@@ -49,6 +56,9 @@ namespace MB::FramePacing::Pacer
     SwapIntervalRule m_rule;
     // What holds the loop: a wait for a present, or nothing but the times the pacer gives
     bool m_waitsForPresent;
+    // The time a present is given. With PresentTiming::AtTime the display's side puts a frame on its refresh, else the loop
+    // does by when it presents
+    PresentTiming m_presentTiming{PresentTiming::Untimed};
     PresentWaitRule m_wait;
     // The grid on the clock: step 0 is at m_origin, the frame that started last is on m_slot and the next is due at m_nextSlot
     NanosecondTickCount m_origin;
@@ -101,9 +111,13 @@ namespace MB::FramePacing::Pacer
     //! waitsForPresent: the application can wait until a present was shown, and the frame start plan asks for it.
     ClockGridLoopPacer(const PacerSettings& settings, bool waitsForPresent);
 
-    //! The tier this pacer is for: with the wait, or without it.
+    //! The tier this pacer paces as: with the wait or without it, and with a timed present or without one.
     [[nodiscard]] PacerTier Tier() const noexcept
     {
+      if (m_presentTiming != PresentTiming::Untimed)
+      {
+        return m_waitsForPresent ? PacerTier::TimedTimerWaitForPresent : PacerTier::TimedTimerPeriodOnly;
+      }
       return m_waitsForPresent ? PacerTier::TimerWaitForPresent : PacerTier::TimerPeriodOnly;
     }
 
@@ -192,6 +206,19 @@ namespace MB::FramePacing::Pacer
     {
       m_pausePending = m_pausePending && (!m_waitsForPresent || waitsForPresent);
       m_waitsForPresent = waitsForPresent;
+    }
+
+    //! The time the presents are given, from the next frame on: none (the loop presents at the right moment), or the one the
+    //! display's side places the frame by.
+    void SetPresentTiming(const PresentTiming timing) noexcept
+    {
+      m_presentTiming = timing;
+    }
+
+    //! The time the presents are given.
+    [[nodiscard]] PresentTiming Timing() const noexcept
+    {
+      return m_presentTiming;
     }
 
     //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and

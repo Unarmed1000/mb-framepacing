@@ -6,6 +6,7 @@
 // With a wait for a present the loop is held until the display took an earlier frame, and the wait says which vertical blank
 // a frame was shown at; without one there is a pause after start-up.
 #include <mb/framepacing/pacer/PacerAim.hpp>
+#include <mb/framepacing/pacer/placement/DisplayPlacementUtil.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
 #include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
 #include <algorithm>
@@ -256,8 +257,11 @@ namespace MB::FramePacing::Pacer
       }
       return plan;
     }
-    // With the aim of smoothness a frame starts at once (when the wait is over), and its present is held
-    if (m_rule.Settings().Aim() == PacerAim::LowLatency && !StartsAgainAt(now))
+    if (StartsAgainAt(now))
+    {
+      return plan;
+    }
+    if (m_rule.Settings().Aim() == PacerAim::LowLatency)
     {
       const NanosecondTickCount start = StartTimeFor(DisplaySlotFor(now, !m_wait.WaitRanOut()));
       if (start > now)
@@ -265,6 +269,14 @@ namespace MB::FramePacing::Pacer
         plan.StartTime = start;
       }
     }
+    else if (m_presentTiming == PresentTiming::AtTime && m_nextFrameStartTime > now)
+    {
+      // Smoothness with a time on the present: the frame before this one was presented when it was done, and the display's side
+      // holds it. What would have held its present holds this frame's start: the loop makes its frames as far ahead of the
+      // display as without one, whatever else holds it (a wait for a present does, later, while the window is shown)
+      plan.StartTime = m_nextFrameStartTime;
+    }
+    // Smoothness without such a time: a frame starts at once (when the wait is over), and its present is held
     return plan;
   }
 
@@ -472,7 +484,8 @@ namespace MB::FramePacing::Pacer
     schedule.AnimationStep = NanosecondTimeSpan(animationTime.Nanoseconds() - m_lastAnimationTime.Nanoseconds());
     schedule.IntendedDisplayTime = TimeOfBlank(displaySlot);
     // When the frame after this one starts: at its time with the aim of low latency, and when this frame's present is made
-    // with the aim of smoothness, as it starts when the wait after that is over
+    // with the aim of smoothness, as it starts when the wait after that is over. With a time on the present that is the
+    // time the present would have been made at, which the next frame's start is held to
     schedule.NextFrameStartTime = isLowLatency ? StartTimeFor(displaySlot + m_pauseSlots + int64_t{swapInterval}) : PresentTimeFor(displaySlot);
     schedule.TargetFrameTime = NanosecondTimeDuration(period.TimeFor(swapInterval));
     schedule.PreferredFrameTime = NanosecondTimeDuration(period.TimeFor(m_rule.PreferredSwapInterval()));
@@ -494,12 +507,18 @@ namespace MB::FramePacing::Pacer
     m_frameEnded = true;
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
-    // Smoothness: made early, and the present waits for the time that has the frame ready at its place. Low latency: presented
-    // at once, unless it is done before its refresh begins
-    const NanosecondTickCount presentTime = PresentTimeFor(m_displaySlot);
-    if (presentTime > workDoneTime)
+    // The time the present is given, where it takes one. With a time before which the frame is not shown the display's side
+    // shows it at the vertical blank it is for, and the frame is presented when it is done
+    DisplayPlacementUtil::Place(plan, m_presentTiming, TimeOfBlank(m_displaySlot), m_swapInterval, m_rule.Refresh());
+    if (m_presentTiming != PresentTiming::AtTime)
     {
-      plan.PresentTime = presentTime;
+      // Smoothness: made early, and the present waits for the time that has the frame ready at its place. Low latency:
+      // presented at once, unless it is done before its refresh begins
+      const NanosecondTickCount presentTime = PresentTimeFor(m_displaySlot);
+      if (presentTime > workDoneTime)
+      {
+        plan.PresentTime = presentTime;
+      }
     }
     // When the present is made, as far as it is known here: AddPresent says when it was
     m_presentTime = plan.WaitsForPresentTime() ? plan.PresentTime : workDoneTime;

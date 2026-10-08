@@ -6,6 +6,8 @@
 #include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
@@ -16,10 +18,7 @@
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
-#include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
-#include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
-#include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
-#include <mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.hpp>
+#include <mb/framepacing/pacer/tier/TierPacer.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -50,6 +49,21 @@ namespace MB::FramePacing::Pacer::Simulation
     {
       const bool isLong = std::find(settings.LongFrames.begin(), settings.LongFrames.end(), index) != settings.LongFrames.end();
       return random.Draw(settings.CpuWork.MinNanoseconds, settings.CpuWork.MaxNanoseconds) + (isLong ? settings.LongFrameCpuNanoseconds : 0);
+    }
+
+    //! What a tier pacer's loop can do: what its pacer is named for, and the timed presents the settings give it
+    PacerCapabilities CapabilitiesOf(const LoopSettings& settings, const PacerCapability named) noexcept
+    {
+      PacerCapability capabilities = named;
+      if (settings.PresentsAtTime)
+      {
+        capabilities = capabilities | PacerCapability::PresentAtTime;
+      }
+      if (settings.PresentsAfterDuration)
+      {
+        capabilities = capabilities | PacerCapability::PresentAfterDuration;
+      }
+      return PacerCapabilities(capabilities);
     }
 
     //! The display's own refresh period: the one the loop was given, and DisplayPeriodPpm longer
@@ -252,7 +266,7 @@ namespace MB::FramePacing::Pacer::Simulation
     {
       pacerSettings.SetSwapChainImages(static_cast<uint32_t>(settings.Display.Images));
     }
-    TimerPeriodOnlyPacer pacer(pacerSettings);
+    TierPacer pacer(pacerSettings, CapabilitiesOf(settings, PacerCapability::NoCapabilities));
     DisplayModel display(DisplayPeriod(settings), settings.Display);
     SplitMix64 random(settings.Seed);
 
@@ -327,7 +341,9 @@ namespace MB::FramePacing::Pacer::Simulation
         now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
       }
       frame.PresentNanoseconds = now;
-      frame.ShownNanoseconds = display.Present(now, frame.GpuEndNanoseconds);
+      // The present, with the time the plan gives where the present takes one
+      frame.ShownNanoseconds =
+        display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), presentPlan.MinimumDuration.Nanoseconds());
       report.FrameId = presentPlan.FrameId;
       report.CallTime = NanosecondTickCount(now);
       report.ReturnTime = NanosecondTickCount(now);
@@ -346,7 +362,7 @@ namespace MB::FramePacing::Pacer::Simulation
     pacerSettings.SetPreferredSwapInterval(settings.PreferredSwapInterval);
     pacerSettings.SetWaitingPresents(settings.WaitingPresents);
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
-    TimerWaitForPresentPacer pacer(pacerSettings);
+    TierPacer pacer(pacerSettings, CapabilitiesOf(settings, PacerCapability::WaitForPresent));
     DisplayModel display(DisplayPeriod(settings), settings.Display);
     SplitMix64 random(settings.Seed);
 
@@ -429,7 +445,9 @@ namespace MB::FramePacing::Pacer::Simulation
         now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
       }
       frame.PresentNanoseconds = now;
-      frame.ShownNanoseconds = display.Present(now, frame.GpuEndNanoseconds);
+      // The present, with the time the plan gives where the present takes one
+      frame.ShownNanoseconds =
+        display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), presentPlan.MinimumDuration.Nanoseconds());
       report.FrameId = presentPlan.FrameId;
       report.CallTime = NanosecondTickCount(now);
       report.ReturnTime = NanosecondTickCount(now);
@@ -450,7 +468,7 @@ namespace MB::FramePacing::Pacer::Simulation
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
     pacerSettings.SetReadyPlacePercent(settings.ReadyPlacePercent);
-    VBlankPeriodOnlyPacer pacer(pacerSettings);
+    TierPacer pacer(pacerSettings, CapabilitiesOf(settings, PacerCapability::VBlankTimes));
     DisplayModel display(DisplayPeriod(settings), settings.Display);
     SplitMix64 random(settings.Seed);
 
@@ -523,7 +541,9 @@ namespace MB::FramePacing::Pacer::Simulation
         now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
       }
       frame.PresentNanoseconds = now;
-      frame.ShownNanoseconds = display.Present(now, frame.GpuEndNanoseconds);
+      // The present, with the time the plan gives where the present takes one
+      frame.ShownNanoseconds =
+        display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), presentPlan.MinimumDuration.Nanoseconds());
       report.FrameId = presentPlan.FrameId;
       report.CallTime = NanosecondTickCount(now);
       report.ReturnTime = NanosecondTickCount(now);
@@ -544,7 +564,7 @@ namespace MB::FramePacing::Pacer::Simulation
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
     pacerSettings.SetReadyPlacePercent(settings.ReadyPlacePercent);
-    VBlankWaitForPresentPacer pacer(pacerSettings);
+    TierPacer pacer(pacerSettings, CapabilitiesOf(settings, PacerCapability::VBlankTimes | PacerCapability::WaitForPresent));
     DisplayModel display(DisplayPeriod(settings), settings.Display);
     SplitMix64 random(settings.Seed);
 
@@ -636,7 +656,9 @@ namespace MB::FramePacing::Pacer::Simulation
         now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
       }
       frame.PresentNanoseconds = now;
-      frame.ShownNanoseconds = display.Present(now, frame.GpuEndNanoseconds);
+      // The present, with the time the plan gives where the present takes one
+      frame.ShownNanoseconds =
+        display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), presentPlan.MinimumDuration.Nanoseconds());
       report.FrameId = presentPlan.FrameId;
       report.CallTime = NanosecondTickCount(now);
       report.ReturnTime = NanosecondTickCount(now);

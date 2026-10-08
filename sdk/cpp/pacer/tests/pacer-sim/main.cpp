@@ -31,6 +31,8 @@
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
 //   --system-holds      the loop tells the pacer of the lowest tier of its own waits and that the system holds it while its
 //                       queue is full; with --images the display has that many, and the pacer is told so
+//   --present-at-time   a tier pacer's present takes a time before which the frame is not shown: the tier with a timed present
+//   --present-after-duration  the same with a time the frame before it stays on screen at least
 //   --smooth            a tier pacer with the aim of smoothness (a reserve of frames that wait); low latency without it.
 //                       With --tier-pacer the reserve is the --wait-for-present number less one, and the wait is not made
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -62,7 +64,8 @@ namespace
                  "          [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]\n"
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
                  "          [--startup-pause <refreshes>] [--smooth] [--vblank-pacer] [--ready-place <percent>]\n"
-                 "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds] [--vblank-wait-pacer]\n";
+                 "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds] [--vblank-wait-pacer]\n"
+                 "          [--present-at-time] [--present-after-duration]\n";
     return 2;
   }
 
@@ -117,6 +120,16 @@ namespace
       if (name == "--smooth")
       {
         settings.Aim = MB::FramePacing::Pacer::PacerAim::Smoothness;
+        continue;
+      }
+      if (name == "--present-at-time")
+      {
+        settings.PresentsAtTime = true;
+        continue;
+      }
+      if (name == "--present-after-duration")
+      {
+        settings.PresentsAfterDuration = true;
         continue;
       }
       if (name == "--system-holds")

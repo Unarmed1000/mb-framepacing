@@ -64,6 +64,12 @@ namespace MB::FramePacing::Pacer::Simulation
     //! The loop tells a tier pacer of its own waits (for a frame slot, for an image), says that the system holds it while its
     //! queue is full, and gives the display's images as the swap chain's (where the display has a number of them)
     bool SystemHoldsLoop{false};
+    //! For the tier pacers: the present takes a time before which the frame is not shown (PacerCapability::PresentAtTime),
+    //! and the loop gives it the plan's
+    bool PresentsAtTime{false};
+    //! For the tier pacers: the present takes a time the frame before it stays on screen at least
+    //! (PacerCapability::PresentAfterDuration), and the loop gives it the plan's
+    bool PresentsAfterDuration{false};
     //! false: paced at a fixed swap interval of 1, the rule off
     bool AutoSwapInterval{true};
     DisplayModelSettings Display;
