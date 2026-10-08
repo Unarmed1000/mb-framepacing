@@ -1043,14 +1043,23 @@ TEST(FrameLoop, WithVerticalBlankTimesAndAWaitThePacerFindsWhereAFrameHasToBeRea
     EXPECT_EQ(HalfRefreshesToDisplay(blind.back(), period), 3) << tenth;
 
     // With it the first frames are shown late, the place moves, and from then on every frame is on screen for one refresh a
-    // refresh after its start, at the swap interval it had
+    // refresh after its start, at the swap interval it had. But for the tries: after a frame window's length without a
+    // frame shown later the place is tried one step later again, which this display answers with frames shown a refresh
+    // late, and the try is taken back. The next one comes after twice as long, which is after the end of this run
     const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankWaitForPresentLoop(settings);
+    std::size_t tried = 0;
+    std::size_t firstTried = 0;
     for (std::size_t index = 100; index < frames.size(); ++index)
     {
-      ASSERT_EQ(frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds, DisplayPeriodOf(frames, index)) << tenth << ' ' << index;
-      ASSERT_EQ(HalfRefreshesToDisplay(frames[index], period), 2) << tenth << ' ' << index;
+      const bool asWorkedOut = (frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds) == DisplayPeriodOf(frames, index) &&
+                               HalfRefreshesToDisplay(frames[index], period) == 2;
+      firstTried = (!asWorkedOut && tried == 0) ? index : firstTried;
+      tried += asWorkedOut ? 0u : 1u;
       ASSERT_EQ(frames[index].SwapInterval, 1u) << tenth << ' ' << index;
     }
+    // One try in this run: four frames that are not shown as worked out, around the two that are a refresh late
+    EXPECT_EQ(tried, 4u) << tenth;
+    EXPECT_GE(firstTried, 400u) << tenth;
     EXPECT_LE(frames.back().WindowLateFrames, 12u) << tenth;
   }
 }
@@ -1065,13 +1074,21 @@ TEST(FrameLoop, WithVerticalBlankTimesAndAWaitGpuWorkNobodyReportsIsFoundOut)
   const std::vector<Sim::LoopFrame> blind = Sim::SimulateVBlankPeriodOnlyLoop(settings);
   EXPECT_GE(blind.back().PendingAtStart, 1);
 
+  // With the wait it is found out, and nothing waits. The place is tried one step later after a frame window's length, as on
+  // a display that takes its frames early, and the try is taken back
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateVBlankWaitForPresentLoop(settings);
+  std::size_t tried = 0;
+  std::size_t firstTried = 0;
   for (std::size_t index = 100; index < frames.size(); ++index)
   {
-    ASSERT_EQ(frames[index].PendingAtStart, 0) << index;
-    ASSERT_EQ(frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds, DisplayPeriodOf(frames, index)) << index;
+    const bool asWorkedOut =
+      frames[index].PendingAtStart == 0 && (frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds) == DisplayPeriodOf(frames, index);
+    firstTried = (!asWorkedOut && tried == 0) ? index : firstTried;
+    tried += asWorkedOut ? 0u : 1u;
     ASSERT_EQ(frames[index].SwapInterval, 1u) << index;
   }
+  EXPECT_EQ(tried, 4u);
+  EXPECT_GE(firstTried, 400u);
 }
 
 TEST(FrameLoop, WithVerticalBlankTimesAndAWaitSmoothnessKeepsItsReserveWhereverTheDisplayTakesAFrame)

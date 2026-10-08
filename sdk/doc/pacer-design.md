@@ -817,8 +817,17 @@ may wait, the longest wait counted in the frame's swap intervals, and what it do
   slows down without end (a swap interval of 13 in the simulation). So: one frame shown later than worked out is a refresh
   the display lost. A second one within eight frames is a display that takes a frame sooner than that (or a GPU whose time
   nobody reported), and the place a frame is to be ready at is moved an eighth of a refresh period earlier
-  (`ReadyPlaceNow`), down to the start of the refresh. It is never moved later again until the pacer is reset or gets other
-  settings. What is still late with a frame ready when its refresh begins is late by its work, and the rule answers it.
+  (`ReadyPlaceNow`), down to the start of the refresh. What is still late with a frame ready when its refresh begins is
+  late by its work, and the rule answers it.
+- **The place goes back** (built on 2026-10-08, after the first runs below; the simulation only). What moved it may have
+  passed: a swap chain's first frames did, in every run on the one system measured. So after a frame window's length
+  without a frame shown later the place is tried one step later (`ReadyPlaceTries`). If no frame is shown later in the
+  sixteen frames after that, the try holds, and the next step is tried after another frame window's length. If one is,
+  the try is taken back at once (`ReadyPlaceTriesTakenBack`) and the next one comes after twice as long, doubled up to
+  ten times. A window that stops being shown during a try puts the place where it was before the try, uncounted. What
+  it costs where the place was right: in the simulation's display, which does take a frame earlier than the settings'
+  place, a try is answered by two frames on screen a refresh longer; with a frame window of two seconds that was eight
+  such frames in 8,000 (the tries at 2, 6, 14 and 30 s), and ever fewer after.
   A frame shown later around a wait that ran out, or while the waits are stopped, moves nothing ("A window that is not
   shown", above).
 
@@ -872,7 +881,7 @@ error over 1 ms. Two things in the numbers:
   the first 13 frames (the first at frame 2 or 3, the last at frame 10 to 13), where the display times have a frame on
   screen for two refreshes every third frame or so. Not one came in the 1,387 frames after. So on this system the
   learning took a swap chain's first frames for a display that takes its frames early, and paid up to a quarter of a
-  refresh for the rest of the run. What to do about it is in "Decisions needed": it is not changed yet.
+  refresh for the rest of the run. Changed since: the place goes back (above). Not measured again.
 - **One present that may wait** did not give frames for one and for two refreshes in turn, as it does in the simulation:
   every frame was on screen for one. One run, light work.
 
@@ -1686,12 +1695,10 @@ checked. Four things are settled now, because they cost little now and a second 
 13. **Names**: the capability and call names above are proposals.
 14. **Where a frame has to be ready, at the start of a run** (the pacers of tiers 5 and 6, where the loop places the
     frame). On the one system measured the learning was moved by a swap chain's first frames in every run, and never by
-    anything after them. Decided on 2026-10-08, not built: the place goes back. After a stretch without a frame shown
-    later it is moved one step later again, and if a frame is then shown later it is moved back at once and the stretch
-    before the next try is twice as long. That heals what a start or anything else taught wrongly, and costs a display
-    that does take its frames early one late frame a try, ever more rarely. The tries are counted, so a log shows them.
-    The other way (to learn nothing for a time after a start) was not taken: a display that does take its frames early
-    then shows every frame late for that time, and the swap interval rule may slow down before the place has moved.
+    anything after them. Decided on 2026-10-08 and built: the place goes back ("Vertical blank times with a wait for a
+    present"). The other way, to learn nothing for a time after a start, was not taken: a display that does take its
+    frames early then shows every frame late for that time, and the swap interval rule may slow down before the place
+    has moved. Not measured: whether the first try on that system holds, which would give back the quarter of a refresh.
 15. **A wait for the GPU's work as a hold of the loop**: decided on 2026-10-08, not built: a mechanism the tiers without
     a wait for a present use where the application has it, and no tier ("Tiers"). To be measured with and without it
     before anything is said of what it is worth.

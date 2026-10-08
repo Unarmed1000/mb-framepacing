@@ -322,6 +322,106 @@ TEST(VBlankWaitForPresentPacer, WithTheAimOfSmoothnessAFrameStartsWhenTheWaitIsO
   EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
 }
 
+TEST(VBlankWaitForPresentPacer, ThePlaceAFrameIsToBeReadyAtGoesBack)
+{
+  // A frame window of 20 refreshes, so that a stretch without a frame shown later is short here
+  PC::PacerSettings settings = Settings(PC::PacerAim::LowLatency);
+  settings.SetFrameWindowLength(Span(20 * Period));
+  PC::VBlankWaitForPresentPacer pacer(settings);
+  AddBlank(pacer, Blank(0));
+  FrameResult frame = Frame(pacer, Blank(0) + 1'000'000);
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(1) + 2'000'000, true});
+  const auto shownLate = [&pacer, &frame]()
+  {
+    const int64_t shownAt = BlankOf(frame) + 1;
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {Blank(shownAt) + 2'000'000, true});
+  };
+  //! Frames shown where they were worked out to be, until the place was tried so many times: the refresh periods it took
+  //! (the swap interval rule has its say in a frame window this short, so frames are not counted), 2,000 for "never"
+  const auto periodsUntilTries = [&pacer, &frame](const uint64_t tries)
+  {
+    const int64_t from = frame.StartNanoseconds;
+    for (int32_t frames = 0; frames < 1'000; ++frames)
+    {
+      if (pacer.ReadyPlaceTries() >= tries)
+      {
+        return static_cast<int32_t>((frame.StartNanoseconds - from) / Period);
+      }
+      frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+    }
+    return 2'000;
+  };
+
+  // Two frames shown later, as a swap chain's first frames are: the place is an eighth of a period earlier
+  shownLate();
+  shownLate();
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  EXPECT_EQ(pacer.ReadyPlaceTries(), 0u);
+
+  // The display shows the frames where they were worked out to be: after a frame window's length the place is tried one step
+  // later, which is the settings' place here
+  const int32_t periods = periodsUntilTries(1);
+  EXPECT_GE(periods, 19);
+  EXPECT_LE(periods, 23);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+  // No frame is shown later after it: the try holds, and with no step left there is nothing more to try
+  EXPECT_EQ(periodsUntilTries(2), 2'000);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+  EXPECT_EQ(pacer.ReadyPlaceTries(), 1u);
+  EXPECT_EQ(pacer.ReadyPlaceTriesTakenBack(), 0u);
+
+  // A display that does take its frames early: two steps earlier, and every try is answered by a frame shown later. It is
+  // taken back at once, and the next try comes after twice as long each time
+  shownLate();
+  shownLate();
+  shownLate();
+  shownLate();
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(Place - (2 * Period / 8)));
+  int32_t expected = 20;
+  for (uint64_t tries = 2; tries <= 5; ++tries)
+  {
+    const int32_t quiet = periodsUntilTries(tries);
+    EXPECT_GE(quiet, expected - 1) << tries;
+    EXPECT_LE(quiet, expected + 4) << tries;
+    EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8))) << tries;
+    shownLate();
+    EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (2 * Period / 8))) << tries;
+    EXPECT_EQ(pacer.ReadyPlaceTriesTakenBack(), tries - 1u) << tries;
+    expected *= 2;
+  }
+  // One frame shown later answered each try, and moved the place no further than it was
+  EXPECT_EQ(pacer.ShownLaterByWaits(), 2u + 4u + 4u);
+
+  // A try that holds starts the count again: the step after it is tried after one frame window's length
+  static_cast<void>(periodsUntilTries(6));
+  for (int32_t count = 0; count < 16; ++count)
+  {
+    frame = Frame(pacer, frame.PresentNanoseconds + 100'000);
+  }
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  const int32_t next = periodsUntilTries(7);
+  EXPECT_GE(next, 19);
+  EXPECT_LE(next, 24);
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+
+  // A window that stops being shown during a try: the try can not be judged, the place is where it was before it, and it is
+  // not counted as taken back
+  shownLate();
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  const uint64_t takenBack = pacer.ReadyPlaceTriesTakenBack();
+  const uint64_t triesBefore = pacer.ReadyPlaceTries();
+  static_cast<void>(periodsUntilTries(triesBefore + 1u));
+  ASSERT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+  frame = Frame(pacer, frame.PresentNanoseconds + 100'000, {frame.PresentNanoseconds + 100'000 + (4 * Period), false});
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place - (Period / 8)));
+  EXPECT_EQ(pacer.ReadyPlaceTriesTakenBack(), takenBack);
+
+  // A reset forgets the place and the tries that were doubled; the counts are of the pacer's life
+  pacer.Reset();
+  EXPECT_EQ(pacer.ReadyPlaceNow(), Span(Place));
+  EXPECT_EQ(pacer.ReadyPlaceTries(), triesBefore + 1u);
+}
+
 TEST(VBlankWaitForPresentPacer, AWindowThatIsNotShownTeachesNothingOfWhereAFrameIsToBeReady)
 {
   PC::VBlankWaitForPresentPacer pacer(Settings(PC::PacerAim::LowLatency));

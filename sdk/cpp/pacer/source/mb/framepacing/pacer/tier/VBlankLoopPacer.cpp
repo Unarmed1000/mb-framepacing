@@ -23,6 +23,11 @@ namespace MB::FramePacing::Pacer
     //! They count together while no more than this many frames pass between them: what a wait says of a frame comes a frame or
     //! two after it
     constexpr uint32_t ShownLaterFramesApart = 8;
+    //! A place that was tried one step later holds when no frame was shown later in this many frames after the try
+    constexpr uint32_t PlaceTrialFrames = 16;
+    //! The stretch without a frame shown later before a try is the frame window's length, and twice as long after each try
+    //! that was taken back: doubled no more often than this
+    constexpr uint32_t MaxPlaceTryDoublings = 10;
   }
 
   VBlankLoopPacer::VBlankLoopPacer(const PacerSettings& settings, const bool waitsForPresent)
@@ -176,6 +181,27 @@ namespace MB::FramePacing::Pacer
     return TimeOfBlank(displaySlot - 1 - Reserve()) + ReadyPlace() - GpuLead();
   }
 
+  bool VBlankLoopPacer::TriesTheReadyPlaceAt(const NanosecondTickCount time) const noexcept
+  {
+    // A step to take back, a display that shows the window's frames, and long enough without a frame shown later: the frame
+    // window's length, doubled for each try that was taken back
+    if (m_readyPlaceSteps == 0 || m_framesSinceDisturbed < ShownLaterFramesApart || m_shownLaterCount != 0)
+    {
+      return false;
+    }
+    const int64_t quiet = m_rule.Settings().FrameWindowLength().Nanoseconds() << m_placeTryDoublings;
+    return (time - m_placeQuietSince).Nanoseconds() >= quiet;
+  }
+
+  void VBlankLoopPacer::ForgetReadyPlace() noexcept
+  {
+    m_readyPlaceSteps = 0;
+    m_shownLaterCount = 0;
+    m_placeOnTrial = false;
+    m_placeTryDoublings = 0;
+    m_hasPlaceQuietSince = false;
+  }
+
   void VBlankLoopPacer::ArmStartupPause() noexcept
   {
     m_pausePending = true;
@@ -293,6 +319,10 @@ namespace MB::FramePacing::Pacer
     // moved in the frames just before is moved back
     if (m_wait.Disturbed())
     {
+      // A try can not be judged then either: the place is where it was before the try, which is not counted as taken back
+      m_readyPlaceSteps += m_placeOnTrial ? 1u : 0u;
+      m_placeOnTrial = false;
+      m_hasPlaceQuietSince = false;
       m_readyPlaceSteps -= (m_framesSincePlaceStep < ShownLaterFramesApart && m_readyPlaceSteps > 0) ? 1u : 0u;
       m_framesSincePlaceStep = ShownLaterFramesApart;
       m_framesSinceDisturbed = 0;
@@ -303,6 +333,11 @@ namespace MB::FramePacing::Pacer
       m_framesSinceDisturbed = std::min(m_framesSinceDisturbed, ShownLaterFramesApart - 1u) + 1u;
     }
     m_framesSincePlaceStep = std::min(m_framesSincePlaceStep, ShownLaterFramesApart - 1u) + 1u;
+    if (!m_hasPlaceQuietSince)
+    {
+      m_placeQuietSince = cpuStartTime;
+      m_hasPlaceQuietSince = true;
+    }
     int64_t previousShown = 0;
     if (hasPrevious)
     {
@@ -315,13 +350,53 @@ namespace MB::FramePacing::Pacer
       const int64_t shownLater = std::max(previousShown - ShownSlotByPresent(), int64_t{0});
       m_shownLaterByWaits += static_cast<uint64_t>(shownLater);
       const bool teaches = shownLater > 0 && m_framesSinceDisturbed >= ShownLaterFramesApart;
-      m_framesSinceShownLater = teaches ? 0u : std::min(m_framesSinceShownLater + 1u, ShownLaterFramesApart);
-      m_shownLaterCount = teaches ? m_shownLaterCount + 1u : (m_framesSinceShownLater >= ShownLaterFramesApart ? 0u : m_shownLaterCount);
-      if (m_shownLaterCount >= ShownLaterToMovePlace && ReadyPlace() > NanosecondTimeSpan())
+      if (m_placeOnTrial && teaches)
       {
+        // The place was one step later on trial, and a frame was shown later: back at once, and the next try comes after
+        // twice as long
         ++m_readyPlaceSteps;
+        m_placeOnTrial = false;
+        ++m_readyPlaceTriesTakenBack;
+        m_placeTryDoublings = std::min(m_placeTryDoublings + 1u, MaxPlaceTryDoublings);
         m_shownLaterCount = 0;
-        m_framesSincePlaceStep = 0;
+        m_framesSinceShownLater = ShownLaterFramesApart;
+        m_placeQuietSince = cpuStartTime;
+      }
+      else
+      {
+        m_framesSinceShownLater = teaches ? 0u : std::min(m_framesSinceShownLater + 1u, ShownLaterFramesApart);
+        m_shownLaterCount = teaches ? m_shownLaterCount + 1u : (m_framesSinceShownLater >= ShownLaterFramesApart ? 0u : m_shownLaterCount);
+        if (m_shownLaterCount >= ShownLaterToMovePlace && ReadyPlace() > NanosecondTimeSpan())
+        {
+          ++m_readyPlaceSteps;
+          m_shownLaterCount = 0;
+          m_framesSincePlaceStep = 0;
+        }
+        if (teaches)
+        {
+          m_placeQuietSince = cpuStartTime;
+        }
+        if (m_placeOnTrial)
+        {
+          // The try holds once enough frames after it were shown where they were worked out to be: the next one, if there
+          // is a step left to take back, comes after a frame window's length again
+          ++m_placeTrialFrames;
+          if (m_placeTrialFrames >= PlaceTrialFrames)
+          {
+            m_placeOnTrial = false;
+            m_placeTryDoublings = 0;
+            m_placeQuietSince = cpuStartTime;
+          }
+        }
+        else if (TriesTheReadyPlaceAt(cpuStartTime))
+        {
+          // The place goes back: what moved it earlier may have passed (a swap chain's first frames, a display that was
+          // busy with something else), so it is tried one step later
+          --m_readyPlaceSteps;
+          m_placeOnTrial = true;
+          m_placeTrialFrames = 0;
+          ++m_readyPlaceTries;
+        }
       }
       const int64_t lost = previousShown - m_displaySlot;
       const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : NanosecondTimeDuration(cpuStartTime - m_startTime).Value();
@@ -508,7 +583,7 @@ namespace MB::FramePacing::Pacer
     m_hasShownFloor = false;
     m_hasShownCeiling = false;
     m_leadCount = 0;
-    m_shownLaterCount = 0;
+    ForgetReadyPlace();
   }
 
   void VBlankLoopPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
@@ -518,7 +593,7 @@ namespace MB::FramePacing::Pacer
       m_rule.SetRefreshPeriod(period);
       m_hasFrame = false;
       m_timeline.Clear();
-      m_readyPlaceSteps = 0;
+      ForgetReadyPlace();
     }
   }
 
@@ -529,7 +604,7 @@ namespace MB::FramePacing::Pacer
       const bool samePeriod = settings.Refresh() == m_rule.Refresh();
       m_rule.SetSettings(settings);
       m_hasFrame = false;
-      m_readyPlaceSteps = 0;
+      ForgetReadyPlace();
       if (!samePeriod)
       {
         m_timeline.Clear();
@@ -548,8 +623,7 @@ namespace MB::FramePacing::Pacer
     m_hasShownFloor = false;
     m_hasShownCeiling = false;
     m_leadCount = 0;
-    m_readyPlaceSteps = 0;
-    m_shownLaterCount = 0;
+    ForgetReadyPlace();
     m_framesSinceDisturbed = ShownLaterFramesApart;
     m_framesSincePlaceStep = ShownLaterFramesApart;
     m_pauseSlots = 0;

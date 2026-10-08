@@ -175,6 +175,18 @@ namespace MB::FramePacing::Pacer
       return m_vblank.ReadyPlaceNow();
     }
 
+    //! The times the place a frame is to be ready at was tried one step later again, since the pacer was made.
+    [[nodiscard]] uint64_t ReadyPlaceTries() const noexcept
+    {
+      return m_vblank.ReadyPlaceTries();
+    }
+
+    //! The tries that were taken back, because a frame was shown later in the frames after one.
+    [[nodiscard]] uint64_t ReadyPlaceTriesTakenBack() const noexcept
+    {
+      return m_vblank.ReadyPlaceTriesTakenBack();
+    }
+
     //! True while no wait for a present is made because the waits ran out (PresentWaitRule).
     [[nodiscard]] bool PresentWaitsStopped() const noexcept
     {

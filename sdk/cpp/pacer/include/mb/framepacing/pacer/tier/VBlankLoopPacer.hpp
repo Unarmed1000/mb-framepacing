@@ -42,7 +42,8 @@ namespace MB::FramePacing::Pacer
   //! Without the wait: one pause after start-up with the aim of low latency (StartupPauses), for the frames that pile up
   //! behind a new swap chain's first presents. With the wait: the loop is held until the present so many back was shown,
   //! what the waits say of where a frame was shown is taken (ShownLaterByWaits), the place a frame is to be ready at is
-  //! learnt from it (ReadyPlaceNow), and a window that is not shown stops the waits (PresentWaitsStopped).
+  //! learnt from it and tried later again (ReadyPlaceNow, ReadyPlaceTries), and a window that is not shown stops the waits
+  //! (PresentWaitsStopped).
   //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame window); pacing
   //! frames never allocates.
@@ -85,6 +86,15 @@ namespace MB::FramePacing::Pacer
     // were stopped, and the frames since the place was last moved (each counted to a few)
     uint32_t m_framesSinceDisturbed{UINT32_MAX};
     uint32_t m_framesSincePlaceStep{UINT32_MAX};
+    // The place going back: since when no frame was shown later, whether the place is one step later on trial and for how
+    // many frames, how often the stretch before the next try was doubled, and the tries made and taken back
+    NanosecondTickCount m_placeQuietSince;
+    bool m_hasPlaceQuietSince{false};
+    bool m_placeOnTrial{false};
+    uint32_t m_placeTrialFrames{0};
+    uint32_t m_placeTryDoublings{0};
+    uint64_t m_readyPlaceTries{0};
+    uint64_t m_readyPlaceTriesTakenBack{0};
     // How long the last frames took from their start to the end of their CPU work
     std::array<NanosecondTimeSpan, LeadFrames> m_leads{};
     std::size_t m_leadCount{0};
@@ -244,10 +254,26 @@ namespace MB::FramePacing::Pacer
     //! Where in the refresh before its vertical blank a frame is to be ready now: PacerSettings::ReadyPlacePercent of the
     //! refresh period at first, and earlier by an eighth of a period each time two frames within a few that were ready there
     //! were shown a vertical blank late (the display takes a frame sooner before a vertical blank than that, or the GPU needs time
-    //! nobody reported). Never later again until the pacer starts again with other settings or is reset.
+    //! nobody reported). It goes back: after a frame window's length without a frame shown later the place is tried one
+    //! step later (ReadyPlaceTries). A frame shown later in the frames after that takes the try back at once
+    //! (ReadyPlaceTriesTakenBack), and the next one comes after twice as long. So a place that a start, or anything else that
+    //! passes, moved is the settings' again after a while, and a display that does take its frames early costs one late
+    //! frame a try, ever more rarely.
     [[nodiscard]] NanosecondTimeSpan ReadyPlaceNow() const noexcept
     {
       return ReadyPlace();
+    }
+
+    //! The times the place was tried one step later, since the pacer was made.
+    [[nodiscard]] uint64_t ReadyPlaceTries() const noexcept
+    {
+      return m_readyPlaceTries;
+    }
+
+    //! The tries that were taken back, because a frame was shown later in the frames after one.
+    [[nodiscard]] uint64_t ReadyPlaceTriesTakenBack() const noexcept
+    {
+      return m_readyPlaceTriesTakenBack;
     }
 
     //! The pauses after start-up that were made, since the pacer was made.
@@ -318,6 +344,8 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] NanosecondTickCount StartTimeFor(int64_t displaySlot) const noexcept;
     [[nodiscard]] NanosecondTickCount PresentTimeFor(int64_t displaySlot) const noexcept;
     void ArmStartupPause() noexcept;
+    void ForgetReadyPlace() noexcept;
+    [[nodiscard]] bool TriesTheReadyPlaceAt(NanosecondTickCount time) const noexcept;
     [[nodiscard]] int64_t StartupPauseAt(NanosecondTickCount cpuStartTime) noexcept;
   };
 }
