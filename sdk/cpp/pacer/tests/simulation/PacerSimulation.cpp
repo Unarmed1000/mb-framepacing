@@ -86,7 +86,7 @@ namespace MB::FramePacing::Pacer::Simulation
     {
       line.erase(0, 3);
     }
-    if (line != "workNanoseconds,referenceSwapInterval,referenceShownRefresh")
+    if (line != "workNs,referenceSwapInterval,referenceShownRefresh")
     {
       throw std::runtime_error(path.string() + ": not a scenario frames file");
     }

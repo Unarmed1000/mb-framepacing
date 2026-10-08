@@ -340,7 +340,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `NanosecondTimeDuration` (a schedule's frame times, the CPU busy time). The pacer caps nothing: what a marker's four bytes
     do not hold is capped by the payload. `RefreshPeriod`'s 2⁻³²
     nanoseconds are private (`FromRate`, `FromNanosecondTimeSpan`, `TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`).
-    The pacer's own golden files are in nanoseconds (`workNanoseconds`, …); the first integration's frame logs (the simulation's
+    The pacer's own golden files are in nanoseconds (`workNs`, …); the first integration's frame logs (the simulation's
     `ToFrameLog`, `ReadFrameLog`, the two real logs in `sdk/test-data/pacer`) stay in ticks and are converted where they are read or written. **Always valid:** `RefreshPeriod` (100 µs
     to 1 s, no default: the application gives its display's period) and `PacerSettings` (constructed from the period; setters
     assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer, and so does `SetSettings` with other settings

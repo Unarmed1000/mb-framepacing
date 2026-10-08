@@ -22,8 +22,8 @@ namespace MB::FramePacing::Pacer::Simulation
 {
   //! The columns of a replay's rows
   inline constexpr std::string_view ReplayHeader =
-    "frameIndex,startNanoseconds,swapInterval,loggedSwapInterval,animationStepNanoseconds,loggedAnimationStepNanoseconds,nextFrameStartNanoseconds,"
-    "loggedNextFrameStartNanoseconds,intendedDisplayNanoseconds,shownNanoseconds,shownMinusIntendedNanoseconds,refreshesToDisplay,pendingAtStart";
+    "frameIndex,startNs,swapInterval,loggedSwapInterval,animationStepNs,loggedAnimationStepNs,nextFrameStartNs,"
+    "loggedNextFrameStartNs,intendedDisplayNs,shownNs,shownMinusIntendedNs,refreshesToDisplay,pendingAtStart";
 
   //! The rows of a frame log, from its text: the columns are found by name, and one the log does not have is 0 in every frame.
   //! Throws std::runtime_error for a text without the frameIndex and frameStartNanoseconds columns, and for a log with a frame's start

@@ -4,7 +4,7 @@
 """Regenerate the pacer module's golden data (sdk/test-data/pacer).
 
 1. <scenario>-frames.csv: a busy test clip of measure/test-data/videos (made by mb-framepacing-explained's simulations) frame by frame:
-   each frame's render time in nanoseconds (the manifest's cpuBusyTicks, ticks of 100 ns, times 100) and, as the reference, the swap interval it was paced at (60 fps: 1, 30 fps:
+   each frame's render time in nanoseconds (the manifest's cpuBusyNs) and, as the reference, the swap interval it was paced at (60 fps: 1, 30 fps:
    2) and the refresh it was shown on. 60-busy is the busy stretch of the 60-busy-adaptive clip (the full-window rule), 60-busy-full-rate the clip of that name (every
    refresh, no adapting).
 2. <scenario>-<rule>.csv: pacer-sim --golden, every golden scenario paced with its rules (both, or -Fixed at a fixed swap interval; the
@@ -28,8 +28,6 @@ VIDEOS = ROOT / "measure" / "test-data" / "videos"
 CLIPS = {"60-busy": "60-busy-adaptive", "60-busy-full-rate": "60-busy-full-rate"}
 TARGET = ROOT / "sdk" / "test-data" / "pacer"
 REFRESH_HZ = 60
-# The clips' manifests count in ticks of 100 ns; the pacer's files in nanoseconds
-NANOSECONDS_PER_TICK = 100
 
 
 class Arguments(argparse.Namespace):
@@ -54,14 +52,14 @@ def write_frames(scenario: str, clip: str) -> Path:
     videos = cast(list[dict[str, object]], manifest["videos"])
     box = cast(dict[str, object], videos[0]["box"])
     frames = cast(dict[str, list[int]], box["frames"])
-    work, target_fps, shown = frames["cpuBusyTicks"], frames["targetFps"], frames["refresh"]
+    work, target_fps, shown = frames["cpuBusyNs"], frames["targetFps"], frames["refresh"]
     if not len(work) == len(target_fps) == len(shown):
         sys.exit(f"{manifest_path}: the frame lists differ in length")
-    lines = ["workNanoseconds,referenceSwapInterval,referenceShownRefresh"]
+    lines = ["workNs,referenceSwapInterval,referenceShownRefresh"]
     for busy, fps, refresh in zip(work, target_fps, shown, strict=True):
         if REFRESH_HZ % fps != 0:
             sys.exit(f"{manifest_path}: a target of {fps} fps is not a whole swap interval at {REFRESH_HZ} Hz")
-        lines.append(f"{busy * NANOSECONDS_PER_TICK},{REFRESH_HZ // fps},{refresh}")
+        lines.append(f"{busy},{REFRESH_HZ // fps},{refresh}")
     TARGET.mkdir(parents=True, exist_ok=True)
     path = TARGET / f"{scenario}-frames.csv"
     _ = path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")

@@ -1,4 +1,4 @@
-frame,workNanoseconds,targetRefresh,shownRefresh,late,swapInterval,change,intendedDisplayNanoseconds,animationNanoseconds,windowFrames,windowLateFrames,referenceSwapInterval,referenceShownRefresh
+frame,workNs,targetRefresh,shownRefresh,late,swapInterval,change,intendedDisplayNs,animationNs,windowFrames,windowLateFrames,referenceSwapInterval,referenceShownRefresh
 0,11862200,1,1,0,1,None,1016666667,0,0,0,0,-1
 1,10897200,2,2,0,1,None,1033333333,16666667,1,0,0,-1
 2,12551900,3,3,0,1,None,1050000000,33333333,2,0,0,-1

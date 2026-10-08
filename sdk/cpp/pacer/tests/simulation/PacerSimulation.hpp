@@ -23,10 +23,10 @@ namespace MB::FramePacing::Pacer::Simulation
 
   //! The columns of a result: one row per frame
   inline constexpr std::string_view ResultHeader =
-    "frame,workNanoseconds,targetRefresh,shownRefresh,late,swapInterval,change,intendedDisplayNanoseconds,"
-    "animationNanoseconds,windowFrames,windowLateFrames,referenceSwapInterval,referenceShownRefresh";
+    "frame,workNs,targetRefresh,shownRefresh,late,swapInterval,change,intendedDisplayNs,"
+    "animationNs,windowFrames,windowLateFrames,referenceSwapInterval,referenceShownRefresh";
 
-  //! A scenario's frames from a CSV file with the columns workNanoseconds, referenceSwapInterval and referenceShownRefresh.
+  //! A scenario's frames from a CSV file with the columns workNs, referenceSwapInterval and referenceShownRefresh.
   std::vector<ScenarioFrame> ReadFrames(const std::filesystem::path& path);
 
   //! The golden scenarios: 60-busy (test-data/pacer/60-busy-frames.csv, twice), 60-busy-full-rate (its frames file, at a fixed swap
