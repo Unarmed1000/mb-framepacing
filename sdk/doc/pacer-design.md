@@ -2017,15 +2017,101 @@ checked. Four things are settled now, because they cost little now and a second 
   refresh grid in it: the frames in flight, the work as two stretches of time, the animation time. The wait for a present
   asks nothing about the refresh rate and is expected to carry over as it is.
 
+## The capture session of 2026-10-09
+
+The first integration ran the pacer as it was at the commit that installs `PacerMajorTier.hpp` (the rating in major and sub
+tiers, the waits' least time of 50 ms, the time from start to display in the display reports). **Driver display times, not a
+measurement by the tools; one system; three runs a setting unless said.** Numbers, and nothing here is advice.
+
+Conditions: Windows, Vulkan, one driver, a FIFO swap chain in a window on a 240 Hz display with a second display at 120 Hz on,
+variable refresh off on both at every one of 29 reads; 274 runs of 1,200 frames in 72 minutes through the first integration's
+capture tool, every step without a warning; every other session on the machine asked to pause first, nobody at the machine, the
+power plan "High performance" (not the system's default); other programs used 3 % of the CPU in the median run and 10 % at the
+most (two runs), with 3 to 8 % in the first twelve runs, which began minutes after the pause was asked for. Counts leave out the
+first 240 frames of a run. The best this system rates is 3.1+: its present takes a minimum duration and no time before which a
+frame is not shown.
+
+**The four ways of pacing, with and without a minimum duration** (a light scene: 0.15 ms of GPU work and 0.13 ms of CPU work a
+frame; both aims; three runs a setting, six for a timer with a wait and low latency at four refreshes per frame):
+
+| Refreshes per frame | Frames not on screen for their swap interval, without | With the duration |
+| ------------------- | ----------------------------------------------------- | ----------------- |
+| 1                   | 0 of 22,970                                           | 1 of 22,969       |
+| 2                   | 272 of 22,984                                         | 0 of 22,972       |
+| 4                   | 107 of 25,859                                         | 318 of 25,858     |
+
+- **At one refresh per frame, without the duration: no frame off in any of the 24 runs**, of all four ways and both aims.
+- **On vertical blanks (tiers 3.1 and 3.2): one frame off in 68,930**, with and without the duration, at one, two and four
+  refreshes per frame. All the others are of the two ways on a timer.
+- **On a timer the frames off come as whole runs.** Without the duration: 271 in one run of three (a wait, low latency, two
+  refreshes), 101 in one of three (no wait, low latency, four), 4 in one of six, 2 in one. With it: 81 and 211 in two runs of
+  six (a wait, low latency, four refreshes), 26 in one of three (the same with smoothness), 1 in one. The setting with the
+  most, a timer with a wait and low latency at four refreshes with the duration, ran four more times with display reports: 147,
+  0, 0 and 26. So four runs of ten with frames off with the duration, and one of six without (4 frames). It is the setting the
+  session of 2026-10-08 had 144 frames off in, and it is not understood; what that session saw of it is under "The duration on one system".
+- **At two refreshes per frame the duration had no frame off**, and showed frames later on vertical blanks without a wait: 2.82
+  ms from a frame's start to its display without it and 6.97 to 6.99 ms with it (low latency), 10.26 and 14.41 to 14.43 ms
+  (smoothness). With a wait on vertical blanks it was the same with and without. On a timer it differed from run to run either
+  way.
+- **A wait for a present ran out once at the start of a run** in four runs of 78 with a wait, and in none after its first 60
+  frames.
+
+**Display reports** (12 runs, the four ways at one refresh per frame and the timer with a wait at four): the pacer's five
+counts were the first integration's own script's in all 12, no report was refused, and the time from a frame's start to its
+display was the script's to the nanosecond in all 12: the number of frames, the total and the longest. A frame was on screen
+11.9 ms after its start with a timer or vertical blanks alone and 6.7 to 7.2 ms with a wait (smoothness, each run's mean), and 19 to 39 ms at the longest.
+
+**The wait for the GPU's work, under a GPU load** (a scene with GPU work of 5.37 ms a frame, 129 % of a refresh, and one with
+2.84 to 2.89 ms, 68 to 69 %, and 3.1 ms of CPU work; the GPU's work reported; the pacer's wait against the application's own
+wait for a frame slot; the two ways without a wait for a present, both aims, one and two frames in flight; 96 runs):
+
+- **No wait ran out**: none in 48 runs with the pacer's wait, after 60 frames and at the end. At the commit before, with a
+  longest wait of 16.7 ms, one ran out at the start of every run.
+- **The frame waited for** was the frame before with low latency and with one frame in flight, and the one before that with
+  smoothness and two in flight, in every run.
+- **With GPU work of 129 % of a refresh the swap interval went to two** in all 16 settings.
+- **With 68 % GPU work and 3.1 ms of CPU work** it went to two with one frame in flight, in all eight settings. With two in
+  flight and smoothness it stayed at one, with three presents waiting and 17.4 ms from a frame's start to its display. With two
+  in flight and low latency it stayed at one with the application's own wait and went to two with the pacer's: with the
+  application's wait every frame started while the GPU had not finished the frame before it (959 of 959), with the pacer's none
+  did. That is the aim as built: one frame in flight.
+- **Frames off their swap interval**: none in the eight settings on vertical blanks with low latency, with either wait. On
+  vertical blanks with smoothness at two refreshes per frame, 10 to 20 of about 2,870 in each of the three settings, with either
+  wait (0 to 10 a run). On a timer none in most settings, and 137, 14 and 12 in one run each. Not understood.
+- **Where the wait is for the frame before, on vertical blanks with low latency, it took as long as the GPU worked**: 2.83 ms
+  in the median at 2.85 ms of GPU work, 5.36 ms at 5.37.
+- The refreshes the animation time was behind the clock at a run's end were 18 to 33 on a timer at two refreshes per frame
+  under either load, and 2 to 12 on vertical blanks, but for smoothness with two in flight at 129 % (20 to 25, of which 17 to 19
+  were starts the display's side held).
+
+**A start the system held, on vertical blanks** (decision 17; smoothness, one refresh per frame, no wait for a present, from
+the start of a run): in three runs with the application's waits reported, the wait for a frame slot held the loop for 27.7,
+20.7 and 20.5 ms before frame 12, 16 and 17. That frame's animation step was one refresh in all three, and 5, 4 and 4 refreshes
+were counted as held. In the one run without the waits reported the wait was 20.9 ms and the step five refreshes. The frames
+were on screen the same either way, a refresh after one another, 11.7 ms after their start from the held frame on and 35 to 39
+ms before it. With a wait for a present no frame slot wait was longer than 0.2 ms.
+
+**A present mode that skips, a first look and no test of the pacer** (Vulkan's `FIFO_LATEST_READY`; one run a setting; the set
+was given without `PresentSkipsOverdue`, and this system's present takes no time before which a frame is not shown):
+
+- With smoothness at one refresh per frame no present waited where two wait in FIFO, and a frame was on screen 2.6 ms (a timer)
+  and 6.1 ms (vertical blanks) after its start where FIFO has 11.8 ms. Every frame was on screen for one refresh after the
+  first 240.
+- With a timer and low latency at one refresh per frame 11 presents after the first 240 frames had no display time and four
+  frames were on screen for two refreshes; no other of the nine runs had either after the first 240 frames.
+- A present without a display time is not by itself a present that was dropped on this system: the FIFO runs have them too, 1
+  to 6 a run, in the first 20 frames and at frames 114 and 115.
+- With a wait for a present every one of 1,190 waits returned with the present shown.
+
 ## What is still missing
 
 As of 2026-10-09, in the order it is planned. What is built is built against the simulation and unit tests, and
 measured only where a section above says so.
 
-1. **A capture session of the first integration** on the pacer as it is now: the minimum duration again, by the
-   measurement rules; display reports with the time from start to display held against its own script; a baseline with
-   a fixed set; the wait for the GPU's work under a real GPU load with both aims; a start the system held on vertical
-   blanks; and, as a first look only, the present mode that skips.
+1. **A capture session of the first integration** on the pacer as it is now: done ("The capture session of 2026-10-09").
+   What it leaves open: the runs on a timer that have frames off their swap interval as a whole run, most of them at four
+   refreshes per frame with a wait, low latency and the minimum duration; the 10 to 20 frames off with smoothness on
+   vertical blanks at two refreshes per frame under a GPU load; and a second system, as all of it is one.
 2. **Gaps in what is built.** In major tier 3 on vertical blanks a
    frame that is shown earlier than the pacer placed it is not taken, so the pacer is then a refresh ahead of what it
    says. That a present's time was not kept is not seen (major tier 2 with a wait could). An application can not say
