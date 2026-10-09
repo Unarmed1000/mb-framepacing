@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.Charts
 {
@@ -51,7 +52,10 @@ namespace MB.FramePacing.Charts
         case ReportItem.Events:
           return Events(plot, x);
         default:
-          return FrameAt(x) is { } shown ? Describe(shown) : null;
+        {
+          int index = IndexAt(x);
+          return index >= 0 ? Describe(m_section.Data.Frames[index], m_section.Data.TraceFrames?[index]) : null;
+        }
       }
     }
 
@@ -92,17 +96,37 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>The section's frame shown at <paramref name="seconds"/> (since the run's first frame): the last one first seen by then.</summary>
-    public PresentedFrame? FrameAt(double seconds)
+    public PresentedFrame? FrameAt(double seconds) => IndexAt(seconds) is >= 0 and var index ? m_section.Data.Frames[index] : null;
+
+    /// <summary>Where that frame is in the run's prepared data; -1 for a section without frames.</summary>
+    private int IndexAt(double seconds)
     {
       if (m_section.FrameCount == 0)
-        return null;
+        return -1;
       var frames = m_section.Data.Frames;
       var time = m_section.Data.TimeAt(seconds);
       int after = RunChartData.FirstWhere(m_section.Start, m_section.End, i => frames[i].FirstSeenTime > time);
-      return frames[Math.Max(m_section.Start, after - 1)];
+      return Math.Max(m_section.Start, after - 1);
     }
 
-    private string Describe(PresentedFrame frame)
+    /// <summary>
+    /// EXPERIMENTAL: what a Perfetto trace of the run says of the frame, a line for each thing it says. Values and the system's own words
+    /// only: nothing that names a program or a device.
+    /// </summary>
+    private static void DescribeTrace(List<string> lines, TraceFrame trace)
+    {
+      if (trace.SurfaceFrameToken != null)
+        lines.Add($"trace, the system's frame timeline: {trace.PresentType ?? "no present type"}, jank {trace.JankType ?? "not said"}");
+      if (trace.DisplayMinusSystemPresentNs is { } difference)
+        lines.Add($"trace, display time minus the system's present time {Ms(NanosecondTimeSpan.FromNanoseconds(difference), sign: true)} ms");
+      if (trace.CpuRunningNs is { } running && trace.CpuRunnableNs is { } runnable && trace.CpuSleepingNs is { } sleeping)
+        lines.Add(
+          $"trace, CPU busy on its thread: running {Ms(NanosecondTimeSpan.FromNanoseconds(running))} ms, waiting for a CPU "
+            + $"{Ms(NanosecondTimeSpan.FromNanoseconds(runnable))} ms, neither {Ms(NanosecondTimeSpan.FromNanoseconds(sleeping))} ms"
+        );
+    }
+
+    private string Describe(PresentedFrame frame, TraceFrame? trace)
     {
       var lines = new List<string> { Heading(frame) };
       if (frame.DisplayDelta is { } display)
@@ -124,6 +148,8 @@ namespace MB.FramePacing.Charts
         lines.Add(
           $"preferred {Ms(frame.MarkerPreferredFrameTime)} ms ({Invariant(NanosecondTimeSpan.NanosecondsPerSecond / (double)frame.MarkerPreferredFrameTime.Nanoseconds, "0.#")} fps)"
         );
+      if (trace != null)
+        DescribeTrace(lines, trace);
       return string.Join('\n', lines);
     }
 

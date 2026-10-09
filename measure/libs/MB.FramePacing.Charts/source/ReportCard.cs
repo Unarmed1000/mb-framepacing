@@ -21,6 +21,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Trace;
 using static MB.FramePacing.Charts.SvgMarkup;
 
 namespace MB.FramePacing.Charts
@@ -139,6 +140,9 @@ namespace MB.FramePacing.Charts
                 : "."
             )
         );
+      // Experimental: a Perfetto trace of the run was joined. What it has for these frames, and what its times rest on
+      if (section.Data.TraceFrames is { } trace)
+        description.AddRange(TraceLines(trace, section.Start, section.End));
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
       // The section's own numbers only when a tile shows them
@@ -1353,6 +1357,28 @@ namespace MB.FramePacing.Charts
     /// <summary>The section's time on the capture's clock, for its events: from its start to its end, and the last frame's refresh.</summary>
     private static (NanosecondTickCount From, NanosecondTickCount To) EventTimes(RunSection section) =>
       (section.Data.TimeAt(section.FromSeconds), section.Data.TimeAt(section.ToSeconds) + section.Data.Run.CapturePeriod);
+
+    /// <summary>
+    /// EXPERIMENTAL: the description's lines for a run that was joined with a Perfetto trace: that it was, what the trace's times rest on,
+    /// and for how many of the frames from <paramref name="start"/> up to <paramref name="end"/> the trace has each thing. Counts only:
+    /// nothing of the trace that names a program or a device.
+    /// </summary>
+    private static IEnumerable<string> TraceLines(IReadOnlyList<TraceFrame> trace, int start, int end)
+    {
+      int account = 0;
+      int scheduling = 0;
+      int vblank = 0;
+      for (int i = start; i < end; ++i)
+      {
+        account += trace[i].SurfaceFrameToken != null ? 1 : 0;
+        scheduling += trace[i].CpuRunningNs != null ? 1 : 0;
+        vblank += trace[i].VBlankTraceNs != null ? 1 : 0;
+      }
+      string Count(int count) => count.ToString("N0", CultureInfo.InvariantCulture);
+      yield return "A Perfetto trace of the run was joined (experimental): its times are tied to the capture's by the frames only.";
+      yield return $"Of these {Count(end - start)} frames the trace has the system's own account of {Count(account)}, its thread's scheduling "
+        + $"for {Count(scheduling)} and a vertical blank for {Count(vblank)}.";
+    }
 
     /// <summary>What the capture missed in the section, by kind ("2 not decoded, 1 missed"); empty when nothing, or the rows are not known.</summary>
     private static string CaptureGaps(RunSection section)

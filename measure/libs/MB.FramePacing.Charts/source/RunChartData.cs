@@ -17,6 +17,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.Charts
 {
@@ -66,6 +67,15 @@ namespace MB.FramePacing.Charts
       for (int i = 1; i < frames.Count && sorted; ++i)
         sorted = frames[i].FirstSeenTime >= frames[i - 1].FirstSeenTime;
       Frames = sorted ? frames : frames.OrderBy(f => f.FirstSeenTime.Nanoseconds).ToArray();
+      if (run.Trace is { } trace)
+      {
+        if (trace.Count != frames.Count)
+          throw new ArgumentException($"The trace has {trace.Count} rows where the run has {frames.Count} frames", nameof(run));
+        // In the frames' order, also where that is a sorted copy (the sort keeps equal times in their order)
+        TraceFrames = sorted
+          ? trace
+          : Enumerable.Range(0, frames.Count).OrderBy(i => frames[i].FirstSeenTime.Nanoseconds).Select(i => trace[i]).ToArray();
+      }
       Origin = run.Run.Frames.Count > 0 ? run.Run.Frames[0].FirstSeenTime : default;
       int count = Frames.Count;
 
@@ -268,6 +278,12 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The run's frames in display order.</summary>
     public IReadOnlyList<PresentedFrame> Frames { get; }
+
+    /// <summary>
+    /// EXPERIMENTAL: what a Perfetto trace of the run says of each of <see cref="Frames"/>, in their order; null when the run was not
+    /// joined with one.
+    /// </summary>
+    public IReadOnlyList<TraceFrame>? TraceFrames { get; }
 
     /// <summary>The time at 0 s: the run's first frame.</summary>
     public NanosecondTickCount Origin { get; }

@@ -104,7 +104,12 @@ namespace MB.FramePacing.Charts
         },
         Pacing = Run.Run.Pacing is { } pacing ? SectionPacing(pacing, frames) : null,
       };
-      return Run with { Run = analysis };
+      // What a trace says of the section's frames, with them
+      return Run with
+      {
+        Run = analysis,
+        Trace = Data.TraceFrames is { } trace ? Enumerable.Range(Start, FrameCount).Select(i => trace[i]).ToArray() : null,
+      };
     }
 
     /// <summary>The run's pacing with the late frames, their share and the worst 2 s of the section's frames.</summary>

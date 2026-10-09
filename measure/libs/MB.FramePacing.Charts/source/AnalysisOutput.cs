@@ -15,6 +15,7 @@ using System.IO;
 using System.Linq;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Data;
+using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.Charts
 {
@@ -48,9 +49,29 @@ namespace MB.FramePacing.Charts
         string prefix = run.FramesFile.EndsWith("-frames.csv", StringComparison.Ordinal)
           ? run.FramesFile[..^"-frames.csv".Length]
           : $"run-{analysis.RunId}";
-        runs.Add(new AnalysisOutputRun(new ChartRun(analysis, capturePeriod, threshold, camera) { Captures = captures }, prefix));
+        runs.Add(
+          new AnalysisOutputRun(
+            new ChartRun(analysis, capturePeriod, threshold, camera) { Captures = captures, Trace = ReadTrace(directory, prefix, frames.Count) },
+            prefix
+          )
+        );
       }
       return runs;
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL: what a Perfetto trace says of a run's frames, when the analysis joined one (run-&lt;id&gt;-trace.csv next to the run's
+    /// frames); null without the file. A file that does not have a row per frame is of another analysis: an InvalidDataException.
+    /// </summary>
+    private static IReadOnlyList<TraceFrame>? ReadTrace(string directory, string prefix, int frameCount)
+    {
+      string path = Path.Combine(directory, TraceFramesCsv.FileName(prefix));
+      if (!File.Exists(path))
+        return null;
+      var rows = TraceFramesCsv.Read(path);
+      if (rows.Count != frameCount)
+        throw new InvalidDataException($"{path}: {rows.Count} rows where the run has {frameCount} frames: analyse the capture again");
+      return rows;
     }
 
     /// <summary>The presented frames of a run-&lt;id&gt;-frames.csv, by column name.</summary>
