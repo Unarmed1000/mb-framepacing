@@ -1,0 +1,908 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1692" height="723" viewBox="0 0 1692 723" role="img" aria-label="Frame stages: sim-loop">
+<title>Frame stages: sim-loop</title>
+<style>
+  text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+         font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
+  .card { fill: #1f242b; stroke: #8b949e; stroke-opacity: 0.25; stroke-width: 1; }
+  .title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { fill: #8b949e; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; fill: #8b949e; }
+  .axis { font-size: 12px; fill: #c9d1d9; }
+  .value { font-size: 11px; fill: #c9d1d9; }
+  .grid { stroke: #ffffff; stroke-opacity: 0.1; stroke-width: 1; }
+  .zero-line { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; }
+  .band { fill: #ffffff; fill-opacity: 0.06; }
+  .green { fill: #2ea043; }
+  .green-faint { fill: #2ea043; fill-opacity: 0.45; }
+  .blue { fill: #58a6ff; }
+  .blue-faint { fill: #58a6ff; fill-opacity: 0.45; }
+  .red { fill: #e5534b; }
+  .amber { fill: #d29922; }
+  .line { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+  .line-blue { stroke: #58a6ff; }
+  .line-green { stroke: #2ea043; }
+  .line-amber { stroke: #d29922; }
+  .line-pink { stroke: #db61a2; }
+  .threshold { stroke: #e5534b; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  .threshold-text { fill: #ff7b72; font-size: 12px; }
+  .mark { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; stroke-dasharray: 2 4; }
+
+  text { pointer-events: none; }
+  .row-line { stroke: #ffffff; stroke-opacity: 0.06; stroke-width: 1; }
+  .vsync { stroke: #ffffff; stroke-opacity: 0.3; stroke-width: 1; stroke-dasharray: 3 4; }
+  .vsync-n { font-size: 11px; fill: #6e7681; letter-spacing: 0.04em; }
+  .frame-label { font-size: 12px; font-weight: 600; fill: #c9d1d9; }
+  .lane-label { font-size: 10px; fill: #6e7681; }
+  .update { fill: #58a6ff; fill-opacity: 0.5; }
+  .draw { fill: #58a6ff; }
+  .acquire { fill: #a371f7; }
+  .present { fill: #d29922; }
+  .gpu { fill: #2ea043; }
+  .gpu-bound { fill: #2ea043; fill-opacity: 0.3; stroke: #2ea043; stroke-width: 1; stroke-dasharray: 3 3; }
+  .wait { fill: url(#hatch); }
+  .wait-vsync { fill: url(#bars); }
+  .wait-slot { fill: url(#dots); }
+  .dot { fill: #8b949e; }
+  .timed-call { fill: #db61a2; stroke: #f0f6fc; stroke-width: 1.2; }
+  .timed-arrow { fill: #db61a2; stroke: #0d1117; stroke-width: 0.8; }
+  .unlogged { fill: #8b949e; fill-opacity: 0.1; stroke: #8b949e; stroke-width: 1; stroke-dasharray: 3 3; }
+  .queue { fill: url(#cross); }
+  .hatch-line { stroke: #8b949e; stroke-width: 1.4; }
+  .screen-a { fill: #6e7681; }
+  .screen-b { fill: #adbac7; }
+  .screen-long { fill: #e5534b; }
+  .marker-tick { stroke: #ffffff; stroke-opacity: 0.75; stroke-width: 1; }
+  .present-arrow { fill: #d29922; stroke: #0d1117; stroke-width: 0.8; }
+  .present-line { stroke: #d29922; stroke-width: 1.4; fill: none; pointer-events: none; }
+  .join-line { stroke: #8b949e; stroke-width: 1; fill: none; pointer-events: none; }
+  .expected { fill: #f0f6fc; fill-opacity: 0.9; }
+  .timed { fill: #db61a2; }
+  .numbers { font-size: 11px; fill: #c9d1d9; }
+  .not-shown { font-size: 11px; font-weight: 600; fill: #d29922; }
+  .no-time { fill: #d29922; fill-opacity: 0.25; stroke: #d29922; stroke-width: 1.4; }
+  .unknown { fill: #8b949e; fill-opacity: 0.1; stroke: #8b949e; stroke-width: 1; stroke-dasharray: 2 3; }
+  .unknown-text { font-size: 12px; font-weight: 600; fill: #8b949e; }
+  .err { font-size: 10px; font-weight: 600; fill: #0d1117; }
+  .err-big { font-size: 10px; font-weight: 700; fill: #ff7b72; }
+  .err-back { fill: #0d1117; fill-opacity: 0.85; pointer-events: none; }
+  .lane { fill: #ffffff; fill-opacity: 0.035; }
+  .lane-name { font-size: 12px; fill: #c9d1d9; }
+  .soft { fill-opacity: 0.5; }
+  .call { stroke: #f0f6fc; stroke-width: 1.2; }
+  .submit { fill: #0d1117; fill-opacity: 0.6; }
+  .long { stroke: #e5534b; stroke-width: 2; }
+  .on { font-size: 11px; font-weight: 600; fill: #0d1117; }
+  .id-in { font-size: 10px; font-weight: 600; fill: #0d1117; }
+  .id-by { font-size: 10px; font-weight: 600; fill: #8b949e; }
+  .slot { fill: none; stroke: #8b949e; stroke-opacity: 0.55; stroke-width: 1; }
+  .over { fill: #e5534b; }
+  .late-low { fill: #8b949e; }
+  .late-high { fill: #d29922; }
+  .late-full { fill: #e5534b; }
+  .limit-text { font-size: 11px; fill: #ff7b72; }
+  .change { stroke: #f0f6fc; stroke-width: 1.5; }
+  .change-text { font-size: 11px; font-weight: 600; fill: #f0f6fc; }
+  .f0 { fill: #58a6ff; }
+  .t0 { font-size: 11px; font-weight: 600; fill: #58a6ff; }
+  .e0 { fill: #58a6ff; fill-opacity: 0.12; stroke: #58a6ff; stroke-width: 1; }
+  .l0 { stroke: #58a6ff; stroke-opacity: 0.6; stroke-width: 1; fill: none; pointer-events: none; }
+  .q0 { fill: url(#cross0); }
+  .x0 { stroke: #58a6ff; stroke-width: 1.4; }
+  .p0 { stroke: #58a6ff; stroke-width: 1.6; fill: none; }
+  .u0 { fill: #58a6ff; fill-opacity: 0.1; stroke: #58a6ff; stroke-width: 1; stroke-dasharray: 3 3; }
+  .s0 { fill: #58a6ff; fill-opacity: 0.85; }
+  .f1 { fill: #3fb950; }
+  .t1 { font-size: 11px; font-weight: 600; fill: #3fb950; }
+  .e1 { fill: #3fb950; fill-opacity: 0.12; stroke: #3fb950; stroke-width: 1; }
+  .l1 { stroke: #3fb950; stroke-opacity: 0.6; stroke-width: 1; fill: none; pointer-events: none; }
+  .q1 { fill: url(#cross1); }
+  .x1 { stroke: #3fb950; stroke-width: 1.4; }
+  .p1 { stroke: #3fb950; stroke-width: 1.6; fill: none; }
+  .u1 { fill: #3fb950; fill-opacity: 0.1; stroke: #3fb950; stroke-width: 1; stroke-dasharray: 3 3; }
+  .s1 { fill: #3fb950; fill-opacity: 0.85; }
+  .f2 { fill: #d29922; }
+  .t2 { font-size: 11px; font-weight: 600; fill: #d29922; }
+  .e2 { fill: #d29922; fill-opacity: 0.12; stroke: #d29922; stroke-width: 1; }
+  .l2 { stroke: #d29922; stroke-opacity: 0.6; stroke-width: 1; fill: none; pointer-events: none; }
+  .q2 { fill: url(#cross2); }
+  .x2 { stroke: #d29922; stroke-width: 1.4; }
+  .p2 { stroke: #d29922; stroke-width: 1.6; fill: none; }
+  .u2 { fill: #d29922; fill-opacity: 0.1; stroke: #d29922; stroke-width: 1; stroke-dasharray: 3 3; }
+  .s2 { fill: #d29922; fill-opacity: 0.85; }
+  .f3 { fill: #a371f7; }
+  .t3 { font-size: 11px; font-weight: 600; fill: #a371f7; }
+  .e3 { fill: #a371f7; fill-opacity: 0.12; stroke: #a371f7; stroke-width: 1; }
+  .l3 { stroke: #a371f7; stroke-opacity: 0.6; stroke-width: 1; fill: none; pointer-events: none; }
+  .q3 { fill: url(#cross3); }
+  .x3 { stroke: #a371f7; stroke-width: 1.4; }
+  .p3 { stroke: #a371f7; stroke-width: 1.6; fill: none; }
+  .u3 { fill: #a371f7; fill-opacity: 0.1; stroke: #a371f7; stroke-width: 1; stroke-dasharray: 3 3; }
+  .s3 { fill: #a371f7; fill-opacity: 0.85; }
+  .f4 { fill: #39c5cf; }
+  .t4 { font-size: 11px; font-weight: 600; fill: #39c5cf; }
+  .e4 { fill: #39c5cf; fill-opacity: 0.12; stroke: #39c5cf; stroke-width: 1; }
+  .l4 { stroke: #39c5cf; stroke-opacity: 0.6; stroke-width: 1; fill: none; pointer-events: none; }
+  .q4 { fill: url(#cross4); }
+  .x4 { stroke: #39c5cf; stroke-width: 1.4; }
+  .p4 { stroke: #39c5cf; stroke-width: 1.6; fill: none; }
+  .u4 { fill: #39c5cf; fill-opacity: 0.1; stroke: #39c5cf; stroke-width: 1; stroke-dasharray: 3 3; }
+  .s4 { fill: #39c5cf; fill-opacity: 0.85; }
+  .f5 { fill: #db61a2; }
+  .t5 { font-size: 11px; font-weight: 600; fill: #db61a2; }
+  .e5 { fill: #db61a2; fill-opacity: 0.12; stroke: #db61a2; stroke-width: 1; }
+  .l5 { stroke: #db61a2; stroke-opacity: 0.6; stroke-width: 1; fill: none; pointer-events: none; }
+  .q5 { fill: url(#cross5); }
+  .x5 { stroke: #db61a2; stroke-width: 1.4; }
+  .p5 { stroke: #db61a2; stroke-width: 1.6; fill: none; }
+  .u5 { fill: #db61a2; fill-opacity: 0.1; stroke: #db61a2; stroke-width: 1; stroke-dasharray: 3 3; }
+  .s5 { fill: #db61a2; fill-opacity: 0.85; }
+</style>
+<defs>
+<pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="5"/></pattern>
+<pattern id="cross" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="5"/><line class="hatch-line" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="bars" width="4" height="4" patternUnits="userSpaceOnUse"><line class="hatch-line" x1="1" y1="0" x2="1" y2="4"/></pattern>
+<pattern id="dots" width="4" height="4" patternUnits="userSpaceOnUse"><circle class="dot" cx="2" cy="2" r="1"/></pattern>
+<pattern id="cross0" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="x0" x1="0" y1="0" x2="0" y2="5"/><line class="x0" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="cross1" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="x1" x1="0" y1="0" x2="0" y2="5"/><line class="x1" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="cross2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="x2" x1="0" y1="0" x2="0" y2="5"/><line class="x2" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="cross3" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="x3" x1="0" y1="0" x2="0" y2="5"/><line class="x3" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="cross4" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="x4" x1="0" y1="0" x2="0" y2="5"/><line class="x4" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="cross5" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="x5" x1="0" y1="0" x2="0" y2="5"/><line class="x5" x1="0" y1="0" x2="5" y2="0"/></pattern>
+</defs>
+<rect class="card" x="0.5" y="0.5" width="1691" height="722" rx="10"/>
+<text class="title" x="28" y="40">Frame stages: sim-loop</text>
+<text class="sub" x="28" y="62">Frames 120 to 131 on a display at 240.00 Hz (4.17 ms a refresh), swap interval 1. A lane per resource, a colour per frame; times on the application's CPU clock.</text>
+<text class="axis" x="46" y="92">one colour per frame</text>
+<rect class="f0" x="28" y="82" width="12" height="12"/>
+<text class="axis" x="228" y="92">update, acquire</text>
+<rect class="f0 soft" x="210" y="82" width="12" height="12"/>
+<text class="axis" x="374" y="92">a sleep, or a wait the log does not name</text>
+<rect class="wait" x="356" y="82" width="12" height="12"/>
+<text class="axis" x="700" y="92">a vertical blank wait</text>
+<rect class="wait-vsync" x="682" y="82" width="12" height="12"/>
+<text class="axis" x="889.2" y="92">a frame slot wait</text>
+<rect class="wait-slot" x="871.2" y="82" width="12" height="12"/>
+<text class="axis" x="1049.6" y="92">held, not logged</text>
+<rect class="u0" x="1031.6" y="82" width="12" height="12"/>
+<text class="axis" x="1202.8" y="92">submit</text>
+<rect class="submit" x="1184.8" y="82" width="12" height="12"/>
+<text class="axis" x="1284" y="92">the present call</text>
+<line class="p0" x1="1271" y1="78" x2="1271" y2="93"/>
+<polygon class="f0 call" points="1266,92 1276,92 1271,98"/>
+<text class="axis" x="1437.2" y="92">a timed present</text>
+<polygon class="timed-call" points="1419.2,86 1429.2,86 1424.2,92"/>
+<text class="axis" x="46" y="114">waiting to be shown</text>
+<rect class="q0" x="28" y="104" width="12" height="12"/>
+<text class="axis" x="220.8" y="114">on screen longer than asked</text>
+<rect class="f0 long" x="202.8" y="104" width="12" height="12"/>
+<text class="axis" x="453.2" y="114">not known who was on screen</text>
+<rect class="unknown" x="435.2" y="104" width="12" height="12"/>
+<text class="axis" x="685.6" y="114">no display time reported</text>
+<rect class="no-time" x="667.6" y="104" width="12" height="12"/>
+<text class="axis" x="896.4" y="114">animation error of 1 ms or more</text>
+<rect class="err-back" x="876.4" y="103" width="16" height="13" rx="3"/>
+<text class="err-big" x="884.4" y="113" text-anchor="middle">±</text>
+<text class="axis" x="1157.6" y="114">the time a timed present asked for</text>
+<polygon class="timed" points="1140.6,106 1150.6,106 1145.6,114"/>
+<text class="axis" x="1440.4" y="114">marker recorded (CPU)</text>
+<line class="marker-tick" x1="1428.4" y1="104" x2="1428.4" y2="116"/>
+<rect class="lane" x="168" y="190" width="1496" height="12"/>
+<text class="lane-name" x="156" y="200" text-anchor="end">Pacer: expected</text>
+<rect class="lane" x="168" y="208" width="1496" height="16"/>
+<text class="lane-name" x="156" y="220" text-anchor="end">Pacer: work it was given</text>
+<rect class="lane" x="168" y="230" width="1496" height="16"/>
+<text class="lane-name" x="156" y="242" text-anchor="end">Pacer: late frames in window</text>
+<rect class="lane" x="168" y="288" width="1496" height="26"/>
+<text class="lane-name" x="156" y="305" text-anchor="end">CPU, main thread</text>
+<rect class="lane" x="168" y="336" width="1496" height="26"/>
+<text class="lane-name" x="156" y="353" text-anchor="end">GPU</text>
+<rect class="lane" x="168" y="370" width="1496" height="33"/>
+<text class="lane-name" x="156" y="390.5" text-anchor="end">Waiting to be shown</text>
+<rect class="lane" x="168" y="413" width="1496" height="34"/>
+<text class="lane-name" x="156" y="434" text-anchor="end">Display</text>
+<rect class="lane" x="168" y="455" width="1496" height="18"/>
+<text class="lane-name" x="156" y="468" text-anchor="end">By its animation time</text>
+<line class="vsync" x1="181.9" y1="182" x2="181.9" y2="481"/>
+<text class="vsync-n" x="181.9" y="176" text-anchor="middle">-2</text>
+<line class="vsync" x1="263.3" y1="182" x2="263.3" y2="481"/>
+<text class="vsync-n" x="263.3" y="176" text-anchor="middle">-1</text>
+<line class="vsync" x1="344.6" y1="182" x2="344.6" y2="481"/>
+<text class="vsync-n" x="344.6" y="176" text-anchor="middle">0</text>
+<line class="vsync" x1="425.9" y1="182" x2="425.9" y2="481"/>
+<text class="vsync-n" x="425.9" y="176" text-anchor="middle">1</text>
+<line class="vsync" x1="507.2" y1="182" x2="507.2" y2="481"/>
+<text class="vsync-n" x="507.2" y="176" text-anchor="middle">2</text>
+<line class="vsync" x1="588.6" y1="182" x2="588.6" y2="481"/>
+<text class="vsync-n" x="588.6" y="176" text-anchor="middle">3</text>
+<line class="vsync" x1="669.9" y1="182" x2="669.9" y2="481"/>
+<text class="vsync-n" x="669.9" y="176" text-anchor="middle">4</text>
+<line class="vsync" x1="751.2" y1="182" x2="751.2" y2="481"/>
+<text class="vsync-n" x="751.2" y="176" text-anchor="middle">5</text>
+<line class="vsync" x1="832.5" y1="182" x2="832.5" y2="481"/>
+<text class="vsync-n" x="832.5" y="176" text-anchor="middle">6</text>
+<line class="vsync" x1="913.9" y1="182" x2="913.9" y2="481"/>
+<text class="vsync-n" x="913.9" y="176" text-anchor="middle">7</text>
+<line class="vsync" x1="995.2" y1="182" x2="995.2" y2="481"/>
+<text class="vsync-n" x="995.2" y="176" text-anchor="middle">8</text>
+<line class="vsync" x1="1076.5" y1="182" x2="1076.5" y2="481"/>
+<text class="vsync-n" x="1076.5" y="176" text-anchor="middle">9</text>
+<line class="vsync" x1="1157.8" y1="182" x2="1157.8" y2="481"/>
+<text class="vsync-n" x="1157.8" y="176" text-anchor="middle">10</text>
+<line class="vsync" x1="1239.2" y1="182" x2="1239.2" y2="481"/>
+<text class="vsync-n" x="1239.2" y="176" text-anchor="middle">11</text>
+<line class="vsync" x1="1320.5" y1="182" x2="1320.5" y2="481"/>
+<text class="vsync-n" x="1320.5" y="176" text-anchor="middle">12</text>
+<line class="vsync" x1="1401.8" y1="182" x2="1401.8" y2="481"/>
+<text class="vsync-n" x="1401.8" y="176" text-anchor="middle">13</text>
+<line class="vsync" x1="1483.1" y1="182" x2="1483.1" y2="481"/>
+<text class="vsync-n" x="1483.1" y="176" text-anchor="middle">14</text>
+<line class="vsync" x1="1564.4" y1="182" x2="1564.4" y2="481"/>
+<text class="vsync-n" x="1564.4" y="176" text-anchor="middle">15</text>
+<line class="vsync" x1="1645.8" y1="182" x2="1645.8" y2="481"/>
+<text class="vsync-n" x="1645.8" y="176" text-anchor="middle">16</text>
+<text class="vsync-n" x="160" y="176" text-anchor="end">refresh</text>
+<line class="zero-line" x1="264.4" y1="481" x2="264.4" y2="486"/>
+<text class="axis" x="264.4" y="501" text-anchor="middle">0</text>
+<line class="zero-line" x1="459.6" y1="481" x2="459.6" y2="486"/>
+<text class="axis" x="459.6" y="501" text-anchor="middle">10</text>
+<line class="zero-line" x1="654.8" y1="481" x2="654.8" y2="486"/>
+<text class="axis" x="654.8" y="501" text-anchor="middle">20</text>
+<line class="zero-line" x1="850" y1="481" x2="850" y2="486"/>
+<text class="axis" x="850" y="501" text-anchor="middle">30</text>
+<line class="zero-line" x1="1045.1" y1="481" x2="1045.1" y2="486"/>
+<text class="axis" x="1045.1" y="501" text-anchor="middle">40</text>
+<line class="zero-line" x1="1240.3" y1="481" x2="1240.3" y2="486"/>
+<text class="axis" x="1240.3" y="501" text-anchor="middle">50</text>
+<line class="zero-line" x1="1435.5" y1="481" x2="1435.5" y2="486"/>
+<text class="axis" x="1435.5" y="501" text-anchor="middle">60</text>
+<line class="zero-line" x1="1630.7" y1="481" x2="1630.7" y2="486"/>
+<text class="axis" x="1630.7" y="501" text-anchor="middle">70</text>
+<text class="axis" x="160" y="501" text-anchor="end">ms</text>
+<rect class="e0" x="264.4" y="190" width="81.3" height="12"><title>#120 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 0.000 to 4.167 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="264.4" y="208" width="81.3" height="16"/>
+<rect class="f0" x="264.4" y="211" width="2" height="10"><title>#120: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 0.000 to 0.100 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="264.4" y="245" width="406.6" height="1"><title>#120: 0 late frames in the pacer's frame window of 120 frames
+at 0.000 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="186.2" y="295" width="78.2" height="12"><title>#120 wait for its frame start
+4.007 ms: from -4.007 to 0.000 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 0.000 ms and woke exactly at that.</title></rect>
+<rect class="s0" x="186.2" y="284" width="80.2" height="3"><title>#120 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from -4.007 to 0.100 ms</title></rect>
+<rect class="f0" x="264.4" y="288" width="2" height="26"><title>#120 draw: frame start to work done
+0.100 ms: from 0.000 to 0.100 ms
+Animation time 500.000 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="266.4" y="288" width="1.4" height="26"><title>#120 submit of its GPU work (call to return)
+0.000 ms: from 0.100 to 0.100 ms</title></rect>
+<rect class="f0 call" x="266.4" y="288" width="1.4" height="26"><title>#120 present call (call to return)
+0.000 ms: from 0.100 to 0.100 ms</title></rect>
+<line class="p0" x1="266.4" y1="282" x2="266.4" y2="318"/>
+<polygon class="f0 call" points="260.9,317 271.9,317 266.4,325"><title>#120 present call (call to return)
+0.000 ms: from 0.100 to 0.100 ms</title></polygon>
+<text class="t0" x="264.4" y="282" text-anchor="middle">#120</text>
+<rect class="f0" x="266.4" y="336" width="58.6" height="26"><title>#120 GPU work
+3.000 ms: from 0.100 to 3.100 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="295.7" y="353" text-anchor="middle">#120</text>
+<polyline class="l0" points="266.4,314 266.4,336"/>
+<rect class="q0" x="324.9" y="371" width="19.6" height="9"><title>#120 waiting to be shown
+1.007 ms: from 3.100 to 4.107 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l0" points="324.9,362 324.9,371"/>
+<polyline class="l0" points="266.4,325 266.4,375.5 324.9,375.5"/>
+<rect class="f0 long" x="344.6" y="413" width="406.6" height="34"><title>#120 on screen
+20.833 ms: from 4.107 to 24.940 ms
+5.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="547.9" y="427" text-anchor="middle">#120</text>
+<text class="err" x="547.9" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l0" points="344.6,380 344.6,413"/>
+<rect class="e0" x="344.6" y="455" width="81.3" height="18"><title>#120 by its animation time: when the animation expected it on screen
+4.167 ms: from 4.107 to 8.273 ms
+Shown exactly at this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t0" x="385.3" y="468" text-anchor="middle">#120</text>
+<rect class="e1" x="671.1" y="190" width="81.3" height="12"><title>#121 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 20.833 to 25.000 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="671.1" y="208" width="81.3" height="16"/>
+<rect class="f1" x="671.1" y="211" width="2" height="10"><title>#121: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 20.833 to 20.933 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="671.1" y="245" width="81.3" height="1"><title>#121: 0 late frames in the pacer's frame window of 121 frames
+at 20.833 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="267.6" y="295" width="403.5" height="12"><title>#121 wait for its frame start
+20.673 ms: from 0.160 to 20.833 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 20.833 ms and woke exactly at that.</title></rect>
+<rect class="s1" x="267.6" y="284" width="405.4" height="3"><title>#121 on the CPU thread, from the first thing done for it to the last
+20.773 ms: from 0.160 to 20.933 ms</title></rect>
+<rect class="f1" x="671.1" y="288" width="2" height="26"><title>#121 draw: frame start to work done
+0.100 ms: from 20.833 to 20.933 ms
+Animation time 504.167 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="673" y="288" width="1.4" height="26"><title>#121 submit of its GPU work (call to return)
+0.000 ms: from 20.933 to 20.933 ms</title></rect>
+<rect class="f1 call" x="673" y="288" width="1.4" height="26"><title>#121 present call (call to return)
+0.000 ms: from 20.933 to 20.933 ms</title></rect>
+<line class="p1" x1="673" y1="282" x2="673" y2="318"/>
+<polygon class="f1 call" points="667.5,317 678.5,317 673,325"><title>#121 present call (call to return)
+0.000 ms: from 20.933 to 20.933 ms</title></polygon>
+<text class="t1" x="671.1" y="282" text-anchor="middle">#121</text>
+<rect class="f1" x="673" y="336" width="58.6" height="26"><title>#121 GPU work
+3.000 ms: from 20.933 to 23.933 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="702.3" y="353" text-anchor="middle">#121</text>
+<polyline class="l1" points="673,314 673,336"/>
+<rect class="q1" x="731.6" y="371" width="19.6" height="9"><title>#121 waiting to be shown
+1.007 ms: from 23.933 to 24.940 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l1" points="731.6,362 731.6,371"/>
+<polyline class="l1" points="673,325 673,375.5 731.6,375.5"/>
+<rect class="f1" x="751.2" y="413" width="81.3" height="34"><title>#121 on screen
+4.167 ms: from 24.940 to 29.107 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error -16.667 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="791.9" y="427" text-anchor="middle">#121</text>
+<rect class="err-back" x="760.9" y="431" width="62" height="13" rx="3"/>
+<text class="err-big" x="791.9" y="441" text-anchor="middle">-16.67 ms</text>
+<polyline class="l1" points="751.2,380 751.2,413"/>
+<rect class="e1" x="425.9" y="455" width="81.3" height="18"><title>#121 by its animation time: when the animation expected it on screen
+4.167 ms: from 8.273 to 12.440 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t1" x="466.6" y="468" text-anchor="middle">#121</text>
+<rect class="e2" x="752.4" y="190" width="81.3" height="12"><title>#122 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 25.000 to 29.167 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="752.4" y="208" width="81.3" height="16"/>
+<rect class="f2" x="752.4" y="211" width="2" height="10"><title>#122: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 25.000 to 25.100 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="752.4" y="245" width="81.3" height="1"><title>#122: 0 late frames in the pacer's frame window of 122 frames
+at 25.000 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="674.2" y="295" width="78.2" height="12"><title>#122 wait for its frame start
+4.007 ms: from 20.993 to 25.000 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 25.000 ms and woke exactly at that.</title></rect>
+<rect class="s2" x="674.2" y="284" width="80.2" height="3"><title>#122 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 20.993 to 25.100 ms</title></rect>
+<rect class="f2" x="752.4" y="288" width="2" height="26"><title>#122 draw: frame start to work done
+0.100 ms: from 25.000 to 25.100 ms
+Animation time 508.333 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="754.3" y="288" width="1.4" height="26"><title>#122 submit of its GPU work (call to return)
+0.000 ms: from 25.100 to 25.100 ms</title></rect>
+<rect class="f2 call" x="754.3" y="288" width="1.4" height="26"><title>#122 present call (call to return)
+0.000 ms: from 25.100 to 25.100 ms</title></rect>
+<line class="p2" x1="754.3" y1="282" x2="754.3" y2="318"/>
+<polygon class="f2 call" points="748.8,317 759.8,317 754.3,325"><title>#122 present call (call to return)
+0.000 ms: from 25.100 to 25.100 ms</title></polygon>
+<text class="t2" x="752.4" y="282" text-anchor="middle">#122</text>
+<rect class="f2" x="754.3" y="336" width="58.6" height="26"><title>#122 GPU work
+3.000 ms: from 25.100 to 28.100 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="783.6" y="353" text-anchor="middle">#122</text>
+<polyline class="l2" points="754.3,314 754.3,336"/>
+<rect class="q2" x="812.9" y="371" width="19.6" height="9"><title>#122 waiting to be shown
+1.007 ms: from 28.100 to 29.107 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l2" points="812.9,362 812.9,371"/>
+<polyline class="l2" points="754.3,325 754.3,375.5 812.9,375.5"/>
+<rect class="f2" x="832.5" y="413" width="81.3" height="34"><title>#122 on screen
+4.167 ms: from 29.107 to 33.273 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="873.2" y="427" text-anchor="middle">#122</text>
+<text class="err" x="873.2" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l2" points="832.5,380 832.5,413"/>
+<rect class="e2" x="507.2" y="455" width="81.3" height="18"><title>#122 by its animation time: when the animation expected it on screen
+4.167 ms: from 12.440 to 16.607 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t2" x="547.9" y="468" text-anchor="middle">#122</text>
+<rect class="e3" x="833.7" y="190" width="81.3" height="12"><title>#123 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 29.167 to 33.333 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="833.7" y="208" width="81.3" height="16"/>
+<rect class="f3" x="833.7" y="211" width="2" height="10"><title>#123: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 29.167 to 29.267 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="833.7" y="245" width="81.3" height="1"><title>#123: 0 late frames in the pacer's frame window of 123 frames
+at 29.167 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="755.5" y="295" width="78.2" height="12"><title>#123 wait for its frame start
+4.007 ms: from 25.160 to 29.167 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 29.167 ms and woke exactly at that.</title></rect>
+<rect class="s3" x="755.5" y="284" width="80.2" height="3"><title>#123 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 25.160 to 29.267 ms</title></rect>
+<rect class="f3" x="833.7" y="288" width="2" height="26"><title>#123 draw: frame start to work done
+0.100 ms: from 29.167 to 29.267 ms
+Animation time 512.500 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="835.7" y="288" width="1.4" height="26"><title>#123 submit of its GPU work (call to return)
+0.000 ms: from 29.267 to 29.267 ms</title></rect>
+<rect class="f3 call" x="835.7" y="288" width="1.4" height="26"><title>#123 present call (call to return)
+0.000 ms: from 29.267 to 29.267 ms</title></rect>
+<line class="p3" x1="835.7" y1="282" x2="835.7" y2="318"/>
+<polygon class="f3 call" points="830.2,317 841.2,317 835.7,325"><title>#123 present call (call to return)
+0.000 ms: from 29.267 to 29.267 ms</title></polygon>
+<text class="t3" x="833.7" y="282" text-anchor="middle">#123</text>
+<rect class="f3" x="835.7" y="336" width="58.6" height="26"><title>#123 GPU work
+3.000 ms: from 29.267 to 32.267 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="864.9" y="353" text-anchor="middle">#123</text>
+<polyline class="l3" points="835.7,314 835.7,336"/>
+<rect class="q3" x="894.2" y="371" width="19.6" height="9"><title>#123 waiting to be shown
+1.007 ms: from 32.267 to 33.273 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l3" points="894.2,362 894.2,371"/>
+<polyline class="l3" points="835.7,325 835.7,375.5 894.2,375.5"/>
+<rect class="f3" x="913.9" y="413" width="81.3" height="34"><title>#123 on screen
+4.167 ms: from 33.273 to 37.440 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="954.5" y="427" text-anchor="middle">#123</text>
+<text class="err" x="954.5" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l3" points="913.9,380 913.9,413"/>
+<rect class="e3" x="588.6" y="455" width="81.3" height="18"><title>#123 by its animation time: when the animation expected it on screen
+4.167 ms: from 16.607 to 20.773 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t3" x="629.2" y="468" text-anchor="middle">#123</text>
+<rect class="e4" x="915" y="190" width="81.3" height="12"><title>#124 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 33.333 to 37.500 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="915" y="208" width="81.3" height="16"/>
+<rect class="f4" x="915" y="211" width="2" height="10"><title>#124: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 33.333 to 33.433 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="915" y="245" width="81.3" height="1"><title>#124: 0 late frames in the pacer's frame window of 124 frames
+at 33.333 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="836.8" y="295" width="78.2" height="12"><title>#124 wait for its frame start
+4.007 ms: from 29.327 to 33.333 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 33.333 ms and woke exactly at that.</title></rect>
+<rect class="s4" x="836.8" y="284" width="80.2" height="3"><title>#124 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 29.327 to 33.433 ms</title></rect>
+<rect class="f4" x="915" y="288" width="2" height="26"><title>#124 draw: frame start to work done
+0.100 ms: from 33.333 to 33.433 ms
+Animation time 516.667 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="917" y="288" width="1.4" height="26"><title>#124 submit of its GPU work (call to return)
+0.000 ms: from 33.433 to 33.433 ms</title></rect>
+<rect class="f4 call" x="917" y="288" width="1.4" height="26"><title>#124 present call (call to return)
+0.000 ms: from 33.433 to 33.433 ms</title></rect>
+<line class="p4" x1="917" y1="282" x2="917" y2="318"/>
+<polygon class="f4 call" points="911.5,317 922.5,317 917,325"><title>#124 present call (call to return)
+0.000 ms: from 33.433 to 33.433 ms</title></polygon>
+<text class="t4" x="915" y="282" text-anchor="middle">#124</text>
+<rect class="f4" x="917" y="336" width="58.6" height="26"><title>#124 GPU work
+3.000 ms: from 33.433 to 36.433 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="946.3" y="353" text-anchor="middle">#124</text>
+<polyline class="l4" points="917,314 917,336"/>
+<rect class="q4" x="975.5" y="371" width="19.6" height="9"><title>#124 waiting to be shown
+1.007 ms: from 36.433 to 37.440 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l4" points="975.5,362 975.5,371"/>
+<polyline class="l4" points="917,325 917,375.5 975.5,375.5"/>
+<rect class="f4" x="995.2" y="413" width="81.3" height="34"><title>#124 on screen
+4.167 ms: from 37.440 to 41.607 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1035.8" y="427" text-anchor="middle">#124</text>
+<text class="err" x="1035.8" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l4" points="995.2,380 995.2,413"/>
+<rect class="e4" x="669.9" y="455" width="81.3" height="18"><title>#124 by its animation time: when the animation expected it on screen
+4.167 ms: from 20.773 to 24.940 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t4" x="710.5" y="468" text-anchor="middle">#124</text>
+<rect class="e5" x="996.3" y="190" width="81.3" height="12"><title>#125 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 37.500 to 41.667 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="996.3" y="208" width="81.3" height="16"/>
+<rect class="f5" x="996.3" y="211" width="2" height="10"><title>#125: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 37.500 to 37.600 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="996.3" y="245" width="81.3" height="1"><title>#125: 0 late frames in the pacer's frame window of 125 frames
+at 37.500 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="918.1" y="295" width="78.2" height="12"><title>#125 wait for its frame start
+4.007 ms: from 33.493 to 37.500 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 37.500 ms and woke exactly at that.</title></rect>
+<rect class="s5" x="918.1" y="284" width="80.2" height="3"><title>#125 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 33.493 to 37.600 ms</title></rect>
+<rect class="f5" x="996.3" y="288" width="2" height="26"><title>#125 draw: frame start to work done
+0.100 ms: from 37.500 to 37.600 ms
+Animation time 520.833 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="998.3" y="288" width="1.4" height="26"><title>#125 submit of its GPU work (call to return)
+0.000 ms: from 37.600 to 37.600 ms</title></rect>
+<rect class="f5 call" x="998.3" y="288" width="1.4" height="26"><title>#125 present call (call to return)
+0.000 ms: from 37.600 to 37.600 ms</title></rect>
+<line class="p5" x1="998.3" y1="282" x2="998.3" y2="318"/>
+<polygon class="f5 call" points="992.8,317 1003.8,317 998.3,325"><title>#125 present call (call to return)
+0.000 ms: from 37.600 to 37.600 ms</title></polygon>
+<text class="t5" x="996.3" y="282" text-anchor="middle">#125</text>
+<rect class="f5" x="998.3" y="336" width="58.6" height="26"><title>#125 GPU work
+3.000 ms: from 37.600 to 40.600 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1027.6" y="353" text-anchor="middle">#125</text>
+<polyline class="l5" points="998.3,314 998.3,336"/>
+<rect class="q5" x="1056.9" y="371" width="19.6" height="9"><title>#125 waiting to be shown
+1.007 ms: from 40.600 to 41.607 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l5" points="1056.9,362 1056.9,371"/>
+<polyline class="l5" points="998.3,325 998.3,375.5 1056.9,375.5"/>
+<rect class="f5" x="1076.5" y="413" width="81.3" height="34"><title>#125 on screen
+4.167 ms: from 41.607 to 45.773 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1117.2" y="427" text-anchor="middle">#125</text>
+<text class="err" x="1117.2" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l5" points="1076.5,380 1076.5,413"/>
+<rect class="e5" x="751.2" y="455" width="81.3" height="18"><title>#125 by its animation time: when the animation expected it on screen
+4.167 ms: from 24.940 to 29.107 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t5" x="791.9" y="468" text-anchor="middle">#125</text>
+<rect class="e0" x="1077.7" y="190" width="81.3" height="12"><title>#126 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 41.667 to 45.833 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="1077.7" y="208" width="81.3" height="16"/>
+<rect class="f0" x="1077.7" y="211" width="2" height="10"><title>#126: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 41.667 to 41.767 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="1077.7" y="245" width="81.3" height="1"><title>#126: 0 late frames in the pacer's frame window of 126 frames
+at 41.667 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="999.5" y="295" width="78.2" height="12"><title>#126 wait for its frame start
+4.007 ms: from 37.660 to 41.667 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 41.667 ms and woke exactly at that.</title></rect>
+<rect class="s0" x="999.5" y="284" width="80.2" height="3"><title>#126 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 37.660 to 41.767 ms</title></rect>
+<rect class="f0" x="1077.7" y="288" width="2" height="26"><title>#126 draw: frame start to work done
+0.100 ms: from 41.667 to 41.767 ms
+Animation time 525.000 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="1079.6" y="288" width="1.4" height="26"><title>#126 submit of its GPU work (call to return)
+0.000 ms: from 41.767 to 41.767 ms</title></rect>
+<rect class="f0 call" x="1079.6" y="288" width="1.4" height="26"><title>#126 present call (call to return)
+0.000 ms: from 41.767 to 41.767 ms</title></rect>
+<line class="p0" x1="1079.6" y1="282" x2="1079.6" y2="318"/>
+<polygon class="f0 call" points="1074.1,317 1085.1,317 1079.6,325"><title>#126 present call (call to return)
+0.000 ms: from 41.767 to 41.767 ms</title></polygon>
+<text class="t0" x="1077.7" y="282" text-anchor="middle">#126</text>
+<rect class="f0" x="1079.6" y="336" width="58.6" height="26"><title>#126 GPU work
+3.000 ms: from 41.767 to 44.767 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1108.9" y="353" text-anchor="middle">#126</text>
+<polyline class="l0" points="1079.6,314 1079.6,336"/>
+<rect class="q0" x="1138.2" y="371" width="19.6" height="9"><title>#126 waiting to be shown
+1.007 ms: from 44.767 to 45.773 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l0" points="1138.2,362 1138.2,371"/>
+<polyline class="l0" points="1079.6,325 1079.6,375.5 1138.2,375.5"/>
+<rect class="f0" x="1157.8" y="413" width="81.3" height="34"><title>#126 on screen
+4.167 ms: from 45.773 to 49.940 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1198.5" y="427" text-anchor="middle">#126</text>
+<text class="err" x="1198.5" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l0" points="1157.8,380 1157.8,413"/>
+<rect class="e0" x="832.5" y="455" width="81.3" height="18"><title>#126 by its animation time: when the animation expected it on screen
+4.167 ms: from 29.107 to 33.273 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t0" x="873.2" y="468" text-anchor="middle">#126</text>
+<rect class="e1" x="1159" y="190" width="81.3" height="12"><title>#127 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 45.833 to 50.000 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="1159" y="208" width="81.3" height="16"/>
+<rect class="f1" x="1159" y="211" width="2" height="10"><title>#127: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 45.833 to 45.933 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="1159" y="245" width="81.3" height="1"><title>#127: 0 late frames in the pacer's frame window of 127 frames
+at 45.833 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="1080.8" y="295" width="78.2" height="12"><title>#127 wait for its frame start
+4.007 ms: from 41.827 to 45.833 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 45.833 ms and woke exactly at that.</title></rect>
+<rect class="s1" x="1080.8" y="284" width="80.2" height="3"><title>#127 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 41.827 to 45.933 ms</title></rect>
+<rect class="f1" x="1159" y="288" width="2" height="26"><title>#127 draw: frame start to work done
+0.100 ms: from 45.833 to 45.933 ms
+Animation time 529.167 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="1160.9" y="288" width="1.4" height="26"><title>#127 submit of its GPU work (call to return)
+0.000 ms: from 45.933 to 45.933 ms</title></rect>
+<rect class="f1 call" x="1160.9" y="288" width="1.4" height="26"><title>#127 present call (call to return)
+0.000 ms: from 45.933 to 45.933 ms</title></rect>
+<line class="p1" x1="1160.9" y1="282" x2="1160.9" y2="318"/>
+<polygon class="f1 call" points="1155.4,317 1166.4,317 1160.9,325"><title>#127 present call (call to return)
+0.000 ms: from 45.933 to 45.933 ms</title></polygon>
+<text class="t1" x="1159" y="282" text-anchor="middle">#127</text>
+<rect class="f1" x="1160.9" y="336" width="58.6" height="26"><title>#127 GPU work
+3.000 ms: from 45.933 to 48.933 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1190.2" y="353" text-anchor="middle">#127</text>
+<polyline class="l1" points="1160.9,314 1160.9,336"/>
+<rect class="q1" x="1219.5" y="371" width="19.6" height="9"><title>#127 waiting to be shown
+1.007 ms: from 48.933 to 49.940 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l1" points="1219.5,362 1219.5,371"/>
+<polyline class="l1" points="1160.9,325 1160.9,375.5 1219.5,375.5"/>
+<rect class="f1" x="1239.1" y="413" width="81.3" height="34"><title>#127 on screen
+4.167 ms: from 49.940 to 54.107 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1279.8" y="427" text-anchor="middle">#127</text>
+<text class="err" x="1279.8" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l1" points="1239.1,380 1239.1,413"/>
+<rect class="e1" x="913.9" y="455" width="81.3" height="18"><title>#127 by its animation time: when the animation expected it on screen
+4.167 ms: from 33.273 to 37.440 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t1" x="954.5" y="468" text-anchor="middle">#127</text>
+<rect class="e2" x="1240.3" y="190" width="81.3" height="12"><title>#128 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 50.000 to 54.167 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="1240.3" y="208" width="81.3" height="16"/>
+<rect class="f2" x="1240.3" y="211" width="2" height="10"><title>#128: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 50.000 to 50.100 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="1240.3" y="245" width="81.3" height="1"><title>#128: 0 late frames in the pacer's frame window of 128 frames
+at 50.000 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="1162.1" y="295" width="78.2" height="12"><title>#128 wait for its frame start
+4.007 ms: from 45.993 to 50.000 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 50.000 ms and woke exactly at that.</title></rect>
+<rect class="s2" x="1162.1" y="284" width="80.2" height="3"><title>#128 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 45.993 to 50.100 ms</title></rect>
+<rect class="f2" x="1240.3" y="288" width="2" height="26"><title>#128 draw: frame start to work done
+0.100 ms: from 50.000 to 50.100 ms
+Animation time 533.333 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="1242.3" y="288" width="1.4" height="26"><title>#128 submit of its GPU work (call to return)
+0.000 ms: from 50.100 to 50.100 ms</title></rect>
+<rect class="f2 call" x="1242.3" y="288" width="1.4" height="26"><title>#128 present call (call to return)
+0.000 ms: from 50.100 to 50.100 ms</title></rect>
+<line class="p2" x1="1242.3" y1="282" x2="1242.3" y2="318"/>
+<polygon class="f2 call" points="1236.8,317 1247.8,317 1242.3,325"><title>#128 present call (call to return)
+0.000 ms: from 50.100 to 50.100 ms</title></polygon>
+<text class="t2" x="1240.3" y="282" text-anchor="middle">#128</text>
+<rect class="f2" x="1242.3" y="336" width="58.6" height="26"><title>#128 GPU work
+3.000 ms: from 50.100 to 53.100 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1271.5" y="353" text-anchor="middle">#128</text>
+<polyline class="l2" points="1242.3,314 1242.3,336"/>
+<rect class="q2" x="1300.8" y="371" width="19.6" height="9"><title>#128 waiting to be shown
+1.007 ms: from 53.100 to 54.107 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l2" points="1300.8,362 1300.8,371"/>
+<polyline class="l2" points="1242.3,325 1242.3,375.5 1300.8,375.5"/>
+<rect class="f2" x="1320.5" y="413" width="81.3" height="34"><title>#128 on screen
+4.167 ms: from 54.107 to 58.273 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1361.1" y="427" text-anchor="middle">#128</text>
+<text class="err" x="1361.1" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l2" points="1320.5,380 1320.5,413"/>
+<rect class="e2" x="995.2" y="455" width="81.3" height="18"><title>#128 by its animation time: when the animation expected it on screen
+4.167 ms: from 37.440 to 41.607 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t2" x="1035.8" y="468" text-anchor="middle">#128</text>
+<rect class="e3" x="1321.6" y="190" width="81.3" height="12"><title>#129 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 54.167 to 58.333 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="1321.6" y="208" width="81.3" height="16"/>
+<rect class="f3" x="1321.6" y="211" width="2" height="10"><title>#129: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 54.167 to 54.267 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="1321.6" y="245" width="81.3" height="1"><title>#129: 0 late frames in the pacer's frame window of 129 frames
+at 54.167 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="1243.4" y="295" width="78.2" height="12"><title>#129 wait for its frame start
+4.007 ms: from 50.160 to 54.167 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 54.167 ms and woke exactly at that.</title></rect>
+<rect class="s3" x="1243.4" y="284" width="80.2" height="3"><title>#129 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 50.160 to 54.267 ms</title></rect>
+<rect class="f3" x="1321.6" y="288" width="2" height="26"><title>#129 draw: frame start to work done
+0.100 ms: from 54.167 to 54.267 ms
+Animation time 537.500 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="1323.6" y="288" width="1.4" height="26"><title>#129 submit of its GPU work (call to return)
+0.000 ms: from 54.267 to 54.267 ms</title></rect>
+<rect class="f3 call" x="1323.6" y="288" width="1.4" height="26"><title>#129 present call (call to return)
+0.000 ms: from 54.267 to 54.267 ms</title></rect>
+<line class="p3" x1="1323.6" y1="282" x2="1323.6" y2="318"/>
+<polygon class="f3 call" points="1318.1,317 1329.1,317 1323.6,325"><title>#129 present call (call to return)
+0.000 ms: from 54.267 to 54.267 ms</title></polygon>
+<text class="t3" x="1321.6" y="282" text-anchor="middle">#129</text>
+<rect class="f3" x="1323.6" y="336" width="58.6" height="26"><title>#129 GPU work
+3.000 ms: from 54.267 to 57.267 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1352.9" y="353" text-anchor="middle">#129</text>
+<polyline class="l3" points="1323.6,314 1323.6,336"/>
+<rect class="q3" x="1382.1" y="371" width="19.6" height="9"><title>#129 waiting to be shown
+1.007 ms: from 57.267 to 58.273 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l3" points="1382.1,362 1382.1,371"/>
+<polyline class="l3" points="1323.6,325 1323.6,375.5 1382.1,375.5"/>
+<rect class="f3" x="1401.8" y="413" width="81.3" height="34"><title>#129 on screen
+4.167 ms: from 58.273 to 62.440 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1442.5" y="427" text-anchor="middle">#129</text>
+<text class="err" x="1442.5" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l3" points="1401.8,380 1401.8,413"/>
+<rect class="e3" x="1076.5" y="455" width="81.3" height="18"><title>#129 by its animation time: when the animation expected it on screen
+4.167 ms: from 41.607 to 45.773 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t3" x="1117.2" y="468" text-anchor="middle">#129</text>
+<rect class="e4" x="1403" y="190" width="81.3" height="12"><title>#130 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 58.333 to 62.500 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="1403" y="208" width="81.3" height="16"/>
+<rect class="f4" x="1403" y="211" width="2" height="10"><title>#130: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 58.333 to 58.433 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="1403" y="245" width="81.3" height="1"><title>#130: 0 late frames in the pacer's frame window of 130 frames
+at 58.333 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<rect class="wait-vsync" x="1324.8" y="295" width="78.2" height="12"><title>#130 wait for its frame start
+4.007 ms: from 54.327 to 58.333 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 58.333 ms and woke exactly at that.</title></rect>
+<rect class="s4" x="1324.8" y="284" width="80.2" height="3"><title>#130 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 54.327 to 58.433 ms</title></rect>
+<rect class="f4" x="1403" y="288" width="2" height="26"><title>#130 draw: frame start to work done
+0.100 ms: from 58.333 to 58.433 ms
+Animation time 541.667 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="1404.9" y="288" width="1.4" height="26"><title>#130 submit of its GPU work (call to return)
+0.000 ms: from 58.433 to 58.433 ms</title></rect>
+<rect class="f4 call" x="1404.9" y="288" width="1.4" height="26"><title>#130 present call (call to return)
+0.000 ms: from 58.433 to 58.433 ms</title></rect>
+<line class="p4" x1="1404.9" y1="282" x2="1404.9" y2="318"/>
+<polygon class="f4 call" points="1399.4,317 1410.4,317 1404.9,325"><title>#130 present call (call to return)
+0.000 ms: from 58.433 to 58.433 ms</title></polygon>
+<text class="t4" x="1403" y="282" text-anchor="middle">#130</text>
+<rect class="f4" x="1404.9" y="336" width="58.6" height="26"><title>#130 GPU work
+3.000 ms: from 58.433 to 61.433 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1434.2" y="353" text-anchor="middle">#130</text>
+<polyline class="l4" points="1404.9,314 1404.9,336"/>
+<rect class="q4" x="1463.5" y="371" width="19.6" height="9"><title>#130 waiting to be shown
+1.007 ms: from 61.433 to 62.440 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l4" points="1463.5,362 1463.5,371"/>
+<polyline class="l4" points="1404.9,325 1404.9,375.5 1463.5,375.5"/>
+<rect class="f4" x="1483.1" y="413" width="81.3" height="34"><title>#130 on screen
+4.167 ms: from 62.440 to 66.607 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1523.8" y="427" text-anchor="middle">#130</text>
+<text class="err" x="1523.8" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l4" points="1483.1,380 1483.1,413"/>
+<rect class="e4" x="1157.8" y="455" width="81.3" height="18"><title>#130 by its animation time: when the animation expected it on screen
+4.167 ms: from 45.773 to 49.940 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t4" x="1198.5" y="468" text-anchor="middle">#130</text>
+<rect class="e5" x="1484.3" y="190" width="81.3" height="12"><title>#131 as the pacer expected it: from its frame start to its display time
+4.167 ms: from 62.500 to 66.667 ms
+The frame started exactly at the start the pacer gave it.</title></rect>
+<rect class="slot" x="1484.3" y="208" width="81.3" height="16"/>
+<rect class="f5" x="1484.3" y="211" width="2" height="10"><title>#131: the work the pacer was given, 2 % of its frame time
+0.100 ms: from 62.500 to 62.600 ms
+CPU 0.100 ms + GPU 0.000 ms (the newest GPU time the application had: an earlier frame's).
+Frame time 4.167 ms (the outline).</title></rect>
+<rect class="late-low" x="1484.3" y="245" width="81.3" height="1"><title>#131: 0 late frames in the pacer's frame window of 131 frames
+at 62.500 ms
+The rule slows down at 49 (its default settings, at this swap interval).</title></rect>
+<text class="limit-text" x="1571.6" y="242">0 of 49</text>
+<rect class="wait-vsync" x="1406.1" y="295" width="78.2" height="12"><title>#131 wait for its frame start
+4.007 ms: from 58.493 to 62.500 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 62.500 ms and woke exactly at that.</title></rect>
+<rect class="s5" x="1406.1" y="284" width="80.2" height="3"><title>#131 on the CPU thread, from the first thing done for it to the last
+4.107 ms: from 58.493 to 62.600 ms</title></rect>
+<rect class="f5" x="1484.3" y="288" width="2" height="26"><title>#131 draw: frame start to work done
+0.100 ms: from 62.500 to 62.600 ms
+Animation time 545.833 ms, a step of 4.167 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="1486.2" y="288" width="1.4" height="26"><title>#131 submit of its GPU work (call to return)
+0.000 ms: from 62.600 to 62.600 ms</title></rect>
+<rect class="f5 call" x="1486.2" y="288" width="1.4" height="26"><title>#131 present call (call to return)
+0.000 ms: from 62.600 to 62.600 ms</title></rect>
+<line class="p5" x1="1486.2" y1="282" x2="1486.2" y2="318"/>
+<polygon class="f5 call" points="1480.7,317 1491.7,317 1486.2,325"><title>#131 present call (call to return)
+0.000 ms: from 62.600 to 62.600 ms</title></polygon>
+<text class="t5" x="1484.3" y="282" text-anchor="middle">#131</text>
+<rect class="f5" x="1486.2" y="336" width="58.6" height="26"><title>#131 GPU work
+3.000 ms: from 62.600 to 65.600 ms
+Begin and end as the application measured them on its CPU clock.</title></rect>
+<text class="on" x="1515.5" y="353" text-anchor="middle">#131</text>
+<polyline class="l5" points="1486.2,314 1486.2,336"/>
+<rect class="q5" x="1544.8" y="371" width="19.6" height="9"><title>#131 waiting to be shown
+1.007 ms: from 65.600 to 66.607 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<polyline class="l5" points="1544.8,362 1544.8,371"/>
+<polyline class="l5" points="1486.2,325 1486.2,375.5 1544.8,375.5"/>
+<rect class="f5" x="1564.4" y="413" width="81.3" height="34"><title>#131 on screen
+4.167 ms: from 66.607 to 70.773 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 4.107 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="on" x="1605.1" y="427" text-anchor="middle">#131</text>
+<text class="err" x="1605.1" y="441" text-anchor="middle">0.00 ms</text>
+<polyline class="l5" points="1564.4,380 1564.4,413"/>
+<rect class="e5" x="1239.1" y="455" width="81.3" height="18"><title>#131 by its animation time: when the animation expected it on screen
+4.167 ms: from 49.940 to 54.107 ms
+Shown 16.667 ms after this time.
+The animation clock is tied to the display at #119's display time.</title></rect>
+<text class="t5" x="1279.8" y="468" text-anchor="middle">#131</text>
+<text class="axis" x="28" y="531">In this stretch, at the median: the draw takes 0.10 ms on the CPU, the GPU works 3.00 ms on a frame, and a frame is shown 4.11 ms after its start. 1 on screen longer than asked, 1 of 12 animation errors of 1 ms or more, 0 reported without a display time.</text>
+<text class="sub" x="28" y="553">The refresh grid is the display times the driver reported. Display times are what the graphics driver reported, not a measurement by the tools.</text>
+<text class="sub" x="28" y="573">A stage the log has no times for is not drawn. In a viewer that shows an SVG's tooltips, a shape under the pointer gives its times and details.</text>
+<text class="sub" x="28" y="593">The thin lines follow a frame: from the CPU thread (its submit, where the log has one) to its GPU work, from its present call down to its row of the wait to be shown, from the end of its GPU work to the start of that wait, and from there to the screen.</text>
+<text class="sub" x="28" y="613">A frame reported without a display time may or may not have been shown: the time it would have been on screen is drawn as not known, and only a capture settles it.</text>
+<text class="sub" x="28" y="633">The animation error of a shown frame is its animation time step minus its display time step from the frame before, by the reported display times; it is not known after a frame without one.</text>
+<text class="sub" x="28" y="653">The pacer's lanes: the work it was given for a frame (CPU plus the newest GPU time the application had) as a length in the frame time it had, and the late frames in its frame window as a share of the count the rule slows down at (its default settings).</text>
+<text class="sub" x="28" y="673">The lane by animation time has each frame from its animation time to the next frame's: when the animation expected it on screen. The animation clock is tied to the display at #119's display time.</text>
+<text class="sub" x="28" y="693">In that lane a frame's animation error is how far its box moved against its place on the display, compared with the frame before.</text>
+</svg>

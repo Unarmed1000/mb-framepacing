@@ -49,7 +49,7 @@ namespace MB::FramePacing::Pacer::Simulation
   //! In all of them the present takes a time where the settings say so (PresentsAtTime, PresentsAfterDuration): the pacer is then
   //! the one of the tier with a timed present, and the loop gives the display the time of the plan.
   //!
-  //! The frames as a frame log with the column names of the first integration's logs (the ones tools/frame_stages_chart.py draws),
+  //! The frames as a frame log with the column names of the first integration's logs (the ones the tools' frame-stages command draws),
   //! a row per frame, "\n" line ends. A moment a frame did not have is an empty cell. The display times are the model's own.
   std::string ToFrameLog(const std::vector<LoopFrame>& frames, const LoopSettings& settings);
 }

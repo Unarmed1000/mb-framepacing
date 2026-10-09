@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""The repository's dark chart card as SVG, for the scripts that draw one (pacer_capture_report.py, frame_stages_chart.py): the
+"""The repository's dark chart card as SVG, for the scripts that draw one (pacer_capture_report.py): the
 look of measure/libs/MB.FramePacing.Charts/source/SvgMarkup.cs, its text and its colours. A script adds the classes only it
 uses (Svg's extra_style), so one script's chart does not change when another gets a new colour.
 """

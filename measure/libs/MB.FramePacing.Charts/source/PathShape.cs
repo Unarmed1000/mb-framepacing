@@ -9,5 +9,9 @@
 
 namespace MB.FramePacing.Charts
 {
-  public sealed record PathShape(string Class, string Data) : CardShape;
+  public sealed record PathShape(string Class, string Data) : CardShape
+  {
+    /// <summary>What a viewer shows while the pointer is on the shape (the SVG's title of the element); empty for none.</summary>
+    public string Tip { get; init; } = string.Empty;
+  }
 }

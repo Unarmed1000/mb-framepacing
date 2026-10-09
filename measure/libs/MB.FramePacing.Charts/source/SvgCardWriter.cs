@@ -4,7 +4,8 @@
 //* Writes a card drawing as SVG: the element with its size, title and style sheet (SvgMarkup's, verbatim), an optional page colour behind
 //* the card, the card, then every shape in order, one element per line. A file shows exactly its range: the scrolling layers' shapes are
 //* written where they are. A page that scrolls the card itself (the playback page) asks for the layers as they are: each a group with the
-//* class "scroll-layer", clipped to its area, which the page moves sideways.
+//* class "scroll-layer", clipped to its area, which the page moves sideways. A drawing's own style rules follow the cards' and its
+//* definitions (fill patterns) the style sheet; a shape's tip is its title element, which a viewer shows while the pointer is on it.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -39,7 +40,14 @@ namespace MB.FramePacing.Charts
         $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\" aria-label=\"{Escape(drawing.Title)}\">"
       );
       Line(parts, $"<title>{Escape(drawing.Title)}</title>");
-      Line(parts, $"<style>{DiagramStyle}{ChartStyle}{ReportStyle}</style>");
+      Line(parts, $"<style>{DiagramStyle}{ChartStyle}{ReportStyle}{drawing.Style}</style>");
+      if (drawing.Definitions.Count > 0)
+      {
+        Line(parts, "<defs>");
+        foreach (string definition in drawing.Definitions)
+          Line(parts, definition);
+        Line(parts, "</defs>");
+      }
       if (background != null)
         Line(parts, $"<rect width=\"100%\" height=\"100%\" fill=\"{Escape(background)}\"/>");
       Line(parts, $"<rect class=\"card\" x=\"0.5\" y=\"0.5\" width=\"{N(drawing.Width - 1, 0)}\" height=\"{N(drawing.Height - 1, 0)}\" rx=\"14\"/>");
@@ -61,14 +69,26 @@ namespace MB.FramePacing.Charts
     {
       switch (shape)
       {
+        case RectShape r when r.Tip.Length > 0:
+          Line(
+            parts,
+            $"<rect class=\"{r.Class}\" x=\"{r.X}\" y=\"{r.Y}\" width=\"{r.Width}\" height=\"{r.Height}\"{(r.Rx.Length > 0 ? $" rx=\"{r.Rx}\"" : string.Empty)}><title>{Escape(r.Tip)}</title></rect>"
+          );
+          break;
         case RectShape r:
           Line(
             parts,
             $"<rect class=\"{r.Class}\" x=\"{r.X}\" y=\"{r.Y}\" width=\"{r.Width}\" height=\"{r.Height}\"{(r.Rx.Length > 0 ? $" rx=\"{r.Rx}\"" : string.Empty)}/>"
           );
           break;
+        case LineShape l when l.Tip.Length > 0:
+          Line(parts, $"<line class=\"{l.Class}\" x1=\"{l.X1}\" y1=\"{l.Y1}\" x2=\"{l.X2}\" y2=\"{l.Y2}\"><title>{Escape(l.Tip)}</title></line>");
+          break;
         case LineShape l:
           Line(parts, $"<line class=\"{l.Class}\" x1=\"{l.X1}\" y1=\"{l.Y1}\" x2=\"{l.X2}\" y2=\"{l.Y2}\"/>");
+          break;
+        case PathShape p when p.Tip.Length > 0:
+          Line(parts, $"<path class=\"{p.Class}\" d=\"{p.Data}\"><title>{Escape(p.Tip)}</title></path>");
           break;
         case PathShape p:
           Line(parts, $"<path class=\"{p.Class}\" d=\"{p.Data}\"/>");

@@ -1,0 +1,1374 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1692" height="1472" viewBox="0 0 1692 1472" role="img" aria-label="Frame stages: made-up">
+<title>Frame stages: made-up</title>
+<style>
+  text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+         font-size: 13px; fill: #e6edf3; font-variant-numeric: tabular-nums; }
+  .card { fill: #1f242b; stroke: #8b949e; stroke-opacity: 0.25; stroke-width: 1; }
+  .title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { fill: #8b949e; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; fill: #8b949e; }
+  .axis { font-size: 12px; fill: #c9d1d9; }
+  .value { font-size: 11px; fill: #c9d1d9; }
+  .grid { stroke: #ffffff; stroke-opacity: 0.1; stroke-width: 1; }
+  .zero-line { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; }
+  .band { fill: #ffffff; fill-opacity: 0.06; }
+  .green { fill: #2ea043; }
+  .green-faint { fill: #2ea043; fill-opacity: 0.45; }
+  .blue { fill: #58a6ff; }
+  .blue-faint { fill: #58a6ff; fill-opacity: 0.45; }
+  .red { fill: #e5534b; }
+  .amber { fill: #d29922; }
+  .line { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+  .line-blue { stroke: #58a6ff; }
+  .line-green { stroke: #2ea043; }
+  .line-amber { stroke: #d29922; }
+  .line-pink { stroke: #db61a2; }
+  .threshold { stroke: #e5534b; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  .threshold-text { fill: #ff7b72; font-size: 12px; }
+  .mark { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1; stroke-dasharray: 2 4; }
+
+  text { pointer-events: none; }
+  .row-line { stroke: #ffffff; stroke-opacity: 0.06; stroke-width: 1; }
+  .vsync { stroke: #ffffff; stroke-opacity: 0.3; stroke-width: 1; stroke-dasharray: 3 4; }
+  .vsync-n { font-size: 11px; fill: #6e7681; letter-spacing: 0.04em; }
+  .frame-label { font-size: 12px; font-weight: 600; fill: #c9d1d9; }
+  .lane-label { font-size: 10px; fill: #6e7681; }
+  .update { fill: #58a6ff; fill-opacity: 0.5; }
+  .draw { fill: #58a6ff; }
+  .acquire { fill: #a371f7; }
+  .present { fill: #d29922; }
+  .gpu { fill: #2ea043; }
+  .gpu-bound { fill: #2ea043; fill-opacity: 0.3; stroke: #2ea043; stroke-width: 1; stroke-dasharray: 3 3; }
+  .wait { fill: url(#hatch); }
+  .wait-vsync { fill: url(#bars); }
+  .wait-slot { fill: url(#dots); }
+  .dot { fill: #8b949e; }
+  .timed-call { fill: #db61a2; stroke: #f0f6fc; stroke-width: 1.2; }
+  .timed-arrow { fill: #db61a2; stroke: #0d1117; stroke-width: 0.8; }
+  .unlogged { fill: #8b949e; fill-opacity: 0.1; stroke: #8b949e; stroke-width: 1; stroke-dasharray: 3 3; }
+  .queue { fill: url(#cross); }
+  .hatch-line { stroke: #8b949e; stroke-width: 1.4; }
+  .screen-a { fill: #6e7681; }
+  .screen-b { fill: #adbac7; }
+  .screen-long { fill: #e5534b; }
+  .marker-tick { stroke: #ffffff; stroke-opacity: 0.75; stroke-width: 1; }
+  .present-arrow { fill: #d29922; stroke: #0d1117; stroke-width: 0.8; }
+  .present-line { stroke: #d29922; stroke-width: 1.4; fill: none; pointer-events: none; }
+  .join-line { stroke: #8b949e; stroke-width: 1; fill: none; pointer-events: none; }
+  .expected { fill: #f0f6fc; fill-opacity: 0.9; }
+  .timed { fill: #db61a2; }
+  .numbers { font-size: 11px; fill: #c9d1d9; }
+  .not-shown { font-size: 11px; font-weight: 600; fill: #d29922; }
+  .no-time { fill: #d29922; fill-opacity: 0.25; stroke: #d29922; stroke-width: 1.4; }
+  .unknown { fill: #8b949e; fill-opacity: 0.1; stroke: #8b949e; stroke-width: 1; stroke-dasharray: 2 3; }
+  .unknown-text { font-size: 12px; font-weight: 600; fill: #8b949e; }
+  .err { font-size: 10px; font-weight: 600; fill: #0d1117; }
+  .err-big { font-size: 10px; font-weight: 700; fill: #ff7b72; }
+  .err-back { fill: #0d1117; fill-opacity: 0.85; pointer-events: none; }
+  .lane { fill: #ffffff; fill-opacity: 0.035; }
+  .lane-name { font-size: 12px; fill: #c9d1d9; }
+  .soft { fill-opacity: 0.5; }
+  .call { stroke: #f0f6fc; stroke-width: 1.2; }
+  .submit { fill: #0d1117; fill-opacity: 0.6; }
+  .long { stroke: #e5534b; stroke-width: 2; }
+  .on { font-size: 11px; font-weight: 600; fill: #0d1117; }
+  .id-in { font-size: 10px; font-weight: 600; fill: #0d1117; }
+  .id-by { font-size: 10px; font-weight: 600; fill: #8b949e; }
+  .slot { fill: none; stroke: #8b949e; stroke-opacity: 0.55; stroke-width: 1; }
+  .over { fill: #e5534b; }
+  .late-low { fill: #8b949e; }
+  .late-high { fill: #d29922; }
+  .late-full { fill: #e5534b; }
+  .limit-text { font-size: 11px; fill: #ff7b72; }
+  .change { stroke: #f0f6fc; stroke-width: 1.5; }
+  .change-text { font-size: 11px; font-weight: 600; fill: #f0f6fc; }
+</style>
+<defs>
+<pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="5"/></pattern>
+<pattern id="cross" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="5"/><line class="hatch-line" x1="0" y1="0" x2="5" y2="0"/></pattern>
+<pattern id="bars" width="4" height="4" patternUnits="userSpaceOnUse"><line class="hatch-line" x1="1" y1="0" x2="1" y2="4"/></pattern>
+<pattern id="dots" width="4" height="4" patternUnits="userSpaceOnUse"><circle class="dot" cx="2" cy="2" r="1"/></pattern>
+</defs>
+<rect class="card" x="0.5" y="0.5" width="1691" height="1471" rx="10"/>
+<text class="title" x="28" y="40">Frame stages: made-up</text>
+<text class="sub" x="28" y="62">Frames 118 to 139 on a display at 60.00 Hz (16.67 ms a refresh), swap interval 1 and 2. A row per frame; times on the application's CPU clock.</text>
+<rect class="update" x="28" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="46" y="92">update</text>
+<rect class="wait" x="111.2" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="129.2" y="92">sleep, or a wait the log does not name</text>
+<rect class="wait-vsync" x="424.8" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="442.8" y="92">vertical blank wait</text>
+<rect class="wait-slot" x="601.6" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="619.6" y="92">frame slot wait</text>
+<rect class="unlogged" x="749.6" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="767.6" y="92">held, no times logged</text>
+<rect class="acquire" x="940.8" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="958.8" y="92">acquire</text>
+<rect class="draw" x="1031.2" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="1049.2" y="92">draw (to work done)</text>
+<rect class="submit" x="1208" y="82" width="12" height="12" rx="2"/>
+<text class="axis" x="1226" y="92">submit</text>
+<rect class="present" x="28" y="103" width="12" height="12" rx="2"/>
+<text class="axis" x="46" y="113">present call (with an arrow)</text>
+<rect class="gpu" x="269.6" y="103" width="12" height="12" rx="2"/>
+<text class="axis" x="287.6" y="113">GPU work</text>
+<rect class="queue" x="367.2" y="103" width="12" height="12" rx="2"/>
+<text class="axis" x="385.2" y="113">waiting to be shown</text>
+<rect class="screen-b" x="544" y="103" width="12" height="12" rx="2"/>
+<text class="axis" x="562" y="113">on screen</text>
+<rect class="screen-long" x="648.8" y="103" width="12" height="12" rx="2"/>
+<text class="axis" x="666.8" y="113">on screen longer than asked</text>
+<rect class="unknown" x="883.2" y="103" width="12" height="12" rx="2"/>
+<text class="axis" x="901.2" y="113">not known</text>
+<polygon class="expected" points="28,125 38,125 33,133"/>
+<text class="axis" x="46" y="134">where the pacer said to start the frame (CPU) and to show it (display)</text>
+<polygon class="timed-arrow" points="520,125 530,125 525,133"/>
+<text class="axis" x="538" y="134">a timed present, and (display lane) the time it asked for</text>
+<line class="marker-tick" x1="938" y1="123" x2="938" y2="135"/>
+<text class="axis" x="946" y="134">marker recorded (CPU)</text>
+<line class="vsync" x1="136.1" y1="164" x2="136.1" y2="1316"/>
+<text class="vsync-n" x="136.1" y="158" text-anchor="middle">0</text>
+<line class="vsync" x1="166.6" y1="164" x2="166.6" y2="1316"/>
+<text class="vsync-n" x="166.6" y="158" text-anchor="middle">1</text>
+<line class="vsync" x1="197.2" y1="164" x2="197.2" y2="1316"/>
+<text class="vsync-n" x="197.2" y="158" text-anchor="middle">2</text>
+<line class="vsync" x1="227.8" y1="164" x2="227.8" y2="1316"/>
+<text class="vsync-n" x="227.8" y="158" text-anchor="middle">3</text>
+<line class="vsync" x1="258.3" y1="164" x2="258.3" y2="1316"/>
+<text class="vsync-n" x="258.3" y="158" text-anchor="middle">4</text>
+<line class="vsync" x1="288.9" y1="164" x2="288.9" y2="1316"/>
+<text class="vsync-n" x="288.9" y="158" text-anchor="middle">5</text>
+<line class="vsync" x1="319.4" y1="164" x2="319.4" y2="1316"/>
+<text class="vsync-n" x="319.4" y="158" text-anchor="middle">6</text>
+<line class="vsync" x1="350" y1="164" x2="350" y2="1316"/>
+<text class="vsync-n" x="350" y="158" text-anchor="middle">7</text>
+<line class="vsync" x1="380.6" y1="164" x2="380.6" y2="1316"/>
+<text class="vsync-n" x="380.6" y="158" text-anchor="middle">8</text>
+<line class="vsync" x1="411.1" y1="164" x2="411.1" y2="1316"/>
+<text class="vsync-n" x="411.1" y="158" text-anchor="middle">9</text>
+<line class="vsync" x1="441.7" y1="164" x2="441.7" y2="1316"/>
+<text class="vsync-n" x="441.7" y="158" text-anchor="middle">10</text>
+<line class="vsync" x1="472.2" y1="164" x2="472.2" y2="1316"/>
+<text class="vsync-n" x="472.2" y="158" text-anchor="middle">11</text>
+<line class="vsync" x1="502.8" y1="164" x2="502.8" y2="1316"/>
+<text class="vsync-n" x="502.8" y="158" text-anchor="middle">12</text>
+<line class="vsync" x1="533.4" y1="164" x2="533.4" y2="1316"/>
+<text class="vsync-n" x="533.4" y="158" text-anchor="middle">13</text>
+<line class="vsync" x1="563.9" y1="164" x2="563.9" y2="1316"/>
+<text class="vsync-n" x="563.9" y="158" text-anchor="middle">14</text>
+<line class="vsync" x1="594.5" y1="164" x2="594.5" y2="1316"/>
+<text class="vsync-n" x="594.5" y="158" text-anchor="middle">15</text>
+<line class="vsync" x1="625.1" y1="164" x2="625.1" y2="1316"/>
+<text class="vsync-n" x="625.1" y="158" text-anchor="middle">16</text>
+<line class="vsync" x1="655.6" y1="164" x2="655.6" y2="1316"/>
+<text class="vsync-n" x="655.6" y="158" text-anchor="middle">17</text>
+<line class="vsync" x1="686.2" y1="164" x2="686.2" y2="1316"/>
+<text class="vsync-n" x="686.2" y="158" text-anchor="middle">18</text>
+<line class="vsync" x1="716.7" y1="164" x2="716.7" y2="1316"/>
+<text class="vsync-n" x="716.7" y="158" text-anchor="middle">19</text>
+<line class="vsync" x1="747.3" y1="164" x2="747.3" y2="1316"/>
+<text class="vsync-n" x="747.3" y="158" text-anchor="middle">20</text>
+<line class="vsync" x1="777.9" y1="164" x2="777.9" y2="1316"/>
+<text class="vsync-n" x="777.9" y="158" text-anchor="middle">21</text>
+<line class="vsync" x1="808.4" y1="164" x2="808.4" y2="1316"/>
+<text class="vsync-n" x="808.4" y="158" text-anchor="middle">22</text>
+<line class="vsync" x1="839" y1="164" x2="839" y2="1316"/>
+<text class="vsync-n" x="839" y="158" text-anchor="middle">23</text>
+<line class="vsync" x1="869.6" y1="164" x2="869.6" y2="1316"/>
+<text class="vsync-n" x="869.6" y="158" text-anchor="middle">24</text>
+<line class="vsync" x1="900.1" y1="164" x2="900.1" y2="1316"/>
+<text class="vsync-n" x="900.1" y="158" text-anchor="middle">25</text>
+<line class="vsync" x1="930.7" y1="164" x2="930.7" y2="1316"/>
+<text class="vsync-n" x="930.7" y="158" text-anchor="middle">26</text>
+<line class="vsync" x1="961.2" y1="164" x2="961.2" y2="1316"/>
+<text class="vsync-n" x="961.2" y="158" text-anchor="middle">27</text>
+<line class="vsync" x1="991.8" y1="164" x2="991.8" y2="1316"/>
+<text class="vsync-n" x="991.8" y="158" text-anchor="middle">28</text>
+<line class="vsync" x1="1022.4" y1="164" x2="1022.4" y2="1316"/>
+<text class="vsync-n" x="1022.4" y="158" text-anchor="middle">29</text>
+<line class="vsync" x1="1052.9" y1="164" x2="1052.9" y2="1316"/>
+<text class="vsync-n" x="1052.9" y="158" text-anchor="middle">30</text>
+<line class="vsync" x1="1083.5" y1="164" x2="1083.5" y2="1316"/>
+<text class="vsync-n" x="1083.5" y="158" text-anchor="middle">31</text>
+<line class="vsync" x1="1114" y1="164" x2="1114" y2="1316"/>
+<text class="vsync-n" x="1114" y="158" text-anchor="middle">32</text>
+<line class="vsync" x1="1144.6" y1="164" x2="1144.6" y2="1316"/>
+<text class="vsync-n" x="1144.6" y="158" text-anchor="middle">33</text>
+<line class="vsync" x1="1175.2" y1="164" x2="1175.2" y2="1316"/>
+<text class="vsync-n" x="1175.2" y="158" text-anchor="middle">34</text>
+<line class="vsync" x1="1205.7" y1="164" x2="1205.7" y2="1316"/>
+<text class="vsync-n" x="1205.7" y="158" text-anchor="middle">35</text>
+<line class="vsync" x1="1236.3" y1="164" x2="1236.3" y2="1316"/>
+<text class="vsync-n" x="1236.3" y="158" text-anchor="middle">36</text>
+<line class="vsync" x1="1266.9" y1="164" x2="1266.9" y2="1316"/>
+<text class="vsync-n" x="1266.9" y="158" text-anchor="middle">37</text>
+<line class="vsync" x1="1297.4" y1="164" x2="1297.4" y2="1316"/>
+<text class="vsync-n" x="1297.4" y="158" text-anchor="middle">38</text>
+<line class="vsync" x1="1328" y1="164" x2="1328" y2="1316"/>
+<text class="vsync-n" x="1328" y="158" text-anchor="middle">39</text>
+<line class="vsync" x1="1358.5" y1="164" x2="1358.5" y2="1316"/>
+<text class="vsync-n" x="1358.5" y="158" text-anchor="middle">40</text>
+<line class="vsync" x1="1389.1" y1="164" x2="1389.1" y2="1316"/>
+<text class="vsync-n" x="1389.1" y="158" text-anchor="middle">41</text>
+<text class="vsync-n" x="108" y="158" text-anchor="end">refresh</text>
+<line class="zero-line" x1="137.2" y1="1316" x2="137.2" y2="1321"/>
+<text class="axis" x="137.2" y="1336" text-anchor="middle">0</text>
+<line class="zero-line" x1="228.9" y1="1316" x2="228.9" y2="1321"/>
+<text class="axis" x="228.9" y="1336" text-anchor="middle">50</text>
+<line class="zero-line" x1="320.6" y1="1316" x2="320.6" y2="1321"/>
+<text class="axis" x="320.6" y="1336" text-anchor="middle">100</text>
+<line class="zero-line" x1="412.3" y1="1316" x2="412.3" y2="1321"/>
+<text class="axis" x="412.3" y="1336" text-anchor="middle">150</text>
+<line class="zero-line" x1="504" y1="1316" x2="504" y2="1321"/>
+<text class="axis" x="504" y="1336" text-anchor="middle">200</text>
+<line class="zero-line" x1="595.7" y1="1316" x2="595.7" y2="1321"/>
+<text class="axis" x="595.7" y="1336" text-anchor="middle">250</text>
+<line class="zero-line" x1="687.3" y1="1316" x2="687.3" y2="1321"/>
+<text class="axis" x="687.3" y="1336" text-anchor="middle">300</text>
+<line class="zero-line" x1="779" y1="1316" x2="779" y2="1321"/>
+<text class="axis" x="779" y="1336" text-anchor="middle">350</text>
+<line class="zero-line" x1="870.7" y1="1316" x2="870.7" y2="1321"/>
+<text class="axis" x="870.7" y="1336" text-anchor="middle">400</text>
+<line class="zero-line" x1="962.4" y1="1316" x2="962.4" y2="1321"/>
+<text class="axis" x="962.4" y="1336" text-anchor="middle">450</text>
+<line class="zero-line" x1="1054.1" y1="1316" x2="1054.1" y2="1321"/>
+<text class="axis" x="1054.1" y="1336" text-anchor="middle">500</text>
+<line class="zero-line" x1="1145.8" y1="1316" x2="1145.8" y2="1321"/>
+<text class="axis" x="1145.8" y="1336" text-anchor="middle">550</text>
+<line class="zero-line" x1="1237.5" y1="1316" x2="1237.5" y2="1321"/>
+<text class="axis" x="1237.5" y="1336" text-anchor="middle">600</text>
+<line class="zero-line" x1="1329.1" y1="1316" x2="1329.1" y2="1321"/>
+<text class="axis" x="1329.1" y="1336" text-anchor="middle">650</text>
+<text class="axis" x="108" y="1336" text-anchor="end">ms</text>
+<line class="row-line" x1="116" y1="224" x2="1406" y2="224"/>
+<text class="frame-label" x="28" y="202">#118</text>
+<text class="lane-label" x="108" y="190" text-anchor="end">CPU</text>
+<text class="lane-label" x="108" y="203" text-anchor="end">GPU</text>
+<text class="lane-label" x="108" y="218" text-anchor="end">display</text>
+<rect class="update" x="131.7" y="181" width="1.5" height="9"><title>#118 update
+0.800 ms: from -3.000 to -2.200 ms</title></rect>
+<rect class="wait" x="133.9" y="181" width="3.3" height="9"><title>#118 wait for its frame start
+1.800 ms: from -1.800 to 0.000 ms
+A sleep on a timer.
+It aimed at -0.015 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="133.3" y="181" width="1.4" height="9"><title>#118 acquire (call to return)
+0.170 ms: from -2.150 to -1.980 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="137.2" y="181" width="10.4" height="9"><title>#118 draw: frame start to work done
+5.668 ms: from 0.000 to 5.668 ms
+Marker recorded at 2.834 ms.
+Animation time 300.001 ms, a step of 16.667 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="146.9" y="181" width="1.4" height="9"><title>#118 submit of its GPU work (call to return)
+0.150 ms: from 5.268 to 5.418 ms</title></rect>
+<rect class="present" x="147.7" y="181" width="1.4" height="9"><title>#118 present call (call to return)
+0.160 ms: from 5.698 to 5.858 ms
+Present id 5118.</title></rect>
+<line class="present-line" x1="147.7" y1="176" x2="147.7" y2="192"/>
+<polygon class="present-arrow" points="143.2,191 152.2,191 147.7,197"><title>#118 present call (call to return)
+0.160 ms: from 5.698 to 5.858 ms
+Present id 5118.</title></polygon>
+<polyline class="join-line" points="146.9,190 147.3,194"/>
+<line class="marker-tick" x1="142.4" y1="181" x2="142.4" y2="190"><title>#118 marker recorded
+at 2.834 ms</title></line>
+<rect class="gpu" x="147.3" y="194" width="14.7" height="12"><title>#118 GPU work
+8.002 ms: from 5.468 to 13.470 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.932 ms.</title></rect>
+<text class="id-by" x="164.9" y="203.5">#118</text>
+<rect class="queue" x="161.9" y="196" width="8.4" height="8"><title>#118 waiting to be shown
+4.562 ms: from 13.470 to 18.032 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="196">CPU 5.67, GPU 8.00</text>
+<rect class="screen-a" x="170.3" y="209" width="30.6" height="12"><title>#118 on screen
+16.667 ms: from 18.032 to 34.699 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 18.032 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-by" x="203.9" y="218.5">#118</text>
+<text class="numbers" x="1420" y="210">shown after 18.03 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="165.3,201 175.3,201 170.3,209"><title>#118: the pacer's intended display time
+at 18.032 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="276" x2="1406" y2="276"/>
+<text class="frame-label" x="28" y="254">#119</text>
+<rect class="update" x="162.3" y="233" width="1.5" height="9"><title>#119 update
+0.800 ms: from 13.681 to 14.481 ms</title></rect>
+<rect class="wait-vsync" x="164.5" y="233" width="3.3" height="9"><title>#119 wait for its frame start
+1.800 ms: from 14.881 to 16.681 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 16.666 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="163.9" y="233" width="1.4" height="9"><title>#119 acquire (call to return)
+0.170 ms: from 14.531 to 14.701 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="167.8" y="233" width="11.7" height="9"><title>#119 draw: frame start to work done
+6.365 ms: from 16.681 to 23.046 ms
+Marker recorded at 19.863 ms.
+Animation time 316.667 ms, a step of 16.667 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="178.8" y="233" width="1.4" height="9"><title>#119 submit of its GPU work (call to return)
+0.150 ms: from 22.646 to 22.796 ms</title></rect>
+<rect class="present" x="179.5" y="233" width="1.4" height="9"><title>#119 present call (call to return)
+0.160 ms: from 23.076 to 23.236 ms
+Present id 5119.</title></rect>
+<line class="present-line" x1="179.5" y1="228" x2="179.5" y2="244"/>
+<polygon class="present-arrow" points="175,243 184,243 179.5,249"><title>#119 present call (call to return)
+0.160 ms: from 23.076 to 23.236 ms
+Present id 5119.</title></polygon>
+<polyline class="join-line" points="178.8,242 179.1,246"/>
+<line class="marker-tick" x1="173.7" y1="233" x2="173.7" y2="242"><title>#119 marker recorded
+at 19.863 ms</title></line>
+<polygon class="expected" points="162.7,225 172.7,225 167.7,233"><title>#119: the frame start the pacer gave
+at 16.632 ms
+The frame started 0.049 ms after it.</title></polygon>
+<rect class="gpu" x="179.1" y="246" width="16.6" height="12"><title>#119 GPU work
+9.047 ms: from 22.846 to 31.893 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 8.977 ms.</title></rect>
+<text class="id-by" x="198.7" y="255.5">#119</text>
+<rect class="queue" x="195.7" y="248" width="5.1" height="8"><title>#119 waiting to be shown
+2.806 ms: from 31.893 to 34.699 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="248">CPU 6.36, GPU 9.05</text>
+<rect class="screen-b" x="200.9" y="261" width="30.6" height="12"><title>#119 on screen
+16.667 ms: from 34.699 to 51.365 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 18.017 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-by" x="234.4" y="270.5">#119</text>
+<text class="numbers" x="1420" y="262">shown after 18.02 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="195.9,253 205.9,253 200.9,261"><title>#119: the pacer's intended display time
+at 34.699 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="328" x2="1406" y2="328"/>
+<text class="frame-label" x="28" y="306">#120</text>
+<rect class="update" x="192.8" y="285" width="1.5" height="9"><title>#120 update
+0.800 ms: from 30.318 to 31.118 ms</title></rect>
+<rect class="wait" x="195" y="285" width="1.7" height="9"><title>#120 wait for its frame start
+0.900 ms: from 31.518 to 32.418 ms
+A sleep on a timer.
+It aimed at 33.303 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="197.4" y="285" width="1.4" height="9"><title>#120 acquire (call to return)
+0.220 ms: from 32.838 to 33.058 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="198.3" y="285" width="9.1" height="9"><title>#120 draw: frame start to work done
+4.937 ms: from 33.318 to 38.255 ms
+Marker recorded at 35.787 ms.
+Animation time 333.334 ms, a step of 16.667 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="206.6" y="285" width="1.4" height="9"><title>#120 submit of its GPU work (call to return)
+0.150 ms: from 37.855 to 38.005 ms</title></rect>
+<rect class="wait" x="207.4" y="285" width="1.7" height="9"><title>#120 hold before its present
+0.920 ms: from 38.255 to 39.175 ms
+A sleep on a timer.
+It aimed at 39.155 ms and woke 0.020 ms after that.</title></rect>
+<rect class="present" x="209.1" y="285" width="1.4" height="9"><title>#120 present call (call to return)
+0.150 ms: from 39.205 to 39.355 ms
+Present id 5120.
+A timed present: 16.667 ms after the display time of the frame before.</title></rect>
+<line class="present-line" x1="209.1" y1="280" x2="209.1" y2="296"/>
+<polygon class="timed-arrow" points="204.6,295 213.6,295 209.1,301"><title>#120 present call (call to return)
+0.150 ms: from 39.205 to 39.355 ms
+Present id 5120.
+A timed present: 16.667 ms after the display time of the frame before.</title></polygon>
+<polyline class="join-line" points="206.6,294 207,298"/>
+<line class="marker-tick" x1="202.9" y1="285" x2="202.9" y2="294"><title>#120 marker recorded
+at 35.787 ms</title></line>
+<polygon class="expected" points="193.3,277 203.3,277 198.3,285"><title>#120: the frame start the pacer gave
+at 33.299 ms
+The frame started 0.019 ms after it.</title></polygon>
+<rect class="gpu" x="207" y="298" width="12.7" height="12"><title>#120 GPU work
+6.906 ms: from 38.055 to 44.961 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 6.836 ms.</title></rect>
+<text class="id-by" x="222.7" y="307.5">#120</text>
+<rect class="queue" x="219.7" y="300" width="11.7" height="8"><title>#120 waiting to be shown
+6.404 ms: from 44.961 to 51.365 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="300">CPU 4.94, GPU 6.91</text>
+<rect class="screen-a" x="231.4" y="313" width="30.6" height="12"><title>#120 on screen
+16.667 ms: from 51.365 to 68.032 ms
+1.00 refreshes, asked for a swap interval of 1.
+Shown 18.047 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-by" x="265" y="322.5">#120</text>
+<text class="numbers" x="1420" y="314">shown after 18.05 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="226.4,305 236.4,305 231.4,313"><title>#120: the pacer's intended display time
+at 51.365 ms
+Shown exactly at it.</title></polygon>
+<polygon class="timed" points="226.4,305 236.4,305 231.4,313"><title>#120: the time its timed present asked for
+at 51.365 ms
+16.667 ms after #119's display time.</title></polygon>
+<line class="row-line" x1="116" y1="380" x2="1406" y2="380"/>
+<text class="frame-label" x="28" y="358">#121</text>
+<rect class="update" x="223.4" y="337" width="1.5" height="9"><title>#121 update
+0.800 ms: from 46.966 to 47.766 ms</title></rect>
+<rect class="wait-vsync" x="225.6" y="337" width="3.3" height="9"><title>#121 wait for its frame start
+1.800 ms: from 48.166 to 49.966 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 49.951 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="224.9" y="337" width="1.4" height="9"><title>#121 acquire (call to return)
+0.170 ms: from 47.816 to 47.986 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="228.9" y="337" width="7.4" height="9"><title>#121 draw: frame start to work done
+4.045 ms: from 49.966 to 54.011 ms
+Marker recorded at 51.989 ms.
+Animation time 350.001 ms, a step of 16.667 ms.
+Swap interval 1.</title></rect>
+<rect class="submit" x="235.5" y="337" width="1.4" height="9"><title>#121 submit of its GPU work (call to return)
+0.150 ms: from 53.611 to 53.761 ms</title></rect>
+<rect class="present" x="236.3" y="337" width="1.4" height="9"><title>#121 present call (call to return)
+0.160 ms: from 54.041 to 54.201 ms
+Present id 5121.</title></rect>
+<line class="present-line" x1="236.3" y1="332" x2="236.3" y2="348"/>
+<polygon class="present-arrow" points="231.8,347 240.8,347 236.3,353"><title>#121 present call (call to return)
+0.160 ms: from 54.041 to 54.201 ms
+Present id 5121.</title></polygon>
+<polyline class="join-line" points="235.5,346 235.9,350"/>
+<line class="marker-tick" x1="232.6" y1="337" x2="232.6" y2="346"><title>#121 marker recorded
+at 51.989 ms</title></line>
+<polygon class="expected" points="223.9,329 233.9,329 228.9,337"><title>#121: the frame start the pacer gave
+at 49.965 ms
+The frame started 0.001 ms after it.</title></polygon>
+<rect class="gpu" x="235.9" y="350" width="10.2" height="12"><title>#121 GPU work
+5.567 ms: from 53.811 to 59.379 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 5.497 ms.</title></rect>
+<text class="id-by" x="249.1" y="359.5">#121</text>
+<rect class="queue" x="246.1" y="352" width="15.9" height="8"><title>#121 waiting to be shown
+8.653 ms: from 59.379 to 68.032 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="352">CPU 4.04, GPU 5.57</text>
+<rect class="screen-long" x="262" y="365" width="91.7" height="12"><title>#121 on screen
+50.000 ms: from 68.032 to 118.032 ms
+3.00 refreshes, asked for a swap interval of 1.
+Shown 18.066 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="307.8" y="374.5" text-anchor="middle">#121</text>
+<text class="numbers" x="1420" y="366">shown after 18.07 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="257,357 267,357 262,365"><title>#121: the pacer's intended display time
+at 68.032 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="432" x2="1406" y2="432"/>
+<text class="frame-label" x="28" y="410">#122</text>
+<rect class="update" x="284.6" y="389" width="1.5" height="9"><title>#122 update
+0.800 ms: from 80.340 to 81.140 ms</title></rect>
+<rect class="wait" x="286.8" y="389" width="3.3" height="9"><title>#122 wait for its frame start
+1.800 ms: from 81.540 to 83.340 ms
+A sleep on a timer.
+It aimed at 83.325 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="286.1" y="389" width="1.4" height="9"><title>#122 acquire (call to return)
+0.170 ms: from 81.190 to 81.360 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="290.1" y="389" width="11" height="9"><title>#122 draw: frame start to work done
+5.982 ms: from 83.340 to 89.323 ms
+Marker recorded at 86.331 ms.
+Animation time 366.667 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="300.3" y="389" width="1.4" height="9"><title>#122 submit of its GPU work (call to return)
+0.150 ms: from 88.922 to 89.073 ms</title></rect>
+<rect class="present" x="301.1" y="389" width="1.4" height="9"><title>#122 present call (call to return)
+0.160 ms: from 89.353 to 89.513 ms
+Present id 5122.</title></rect>
+<line class="present-line" x1="301.1" y1="384" x2="301.1" y2="400"/>
+<polygon class="present-arrow" points="296.6,399 305.6,399 301.1,405"><title>#122 present call (call to return)
+0.160 ms: from 89.353 to 89.513 ms
+Present id 5122.</title></polygon>
+<polyline class="join-line" points="300.3,398 300.7,402"/>
+<line class="marker-tick" x1="295.5" y1="389" x2="295.5" y2="398"><title>#122 marker recorded
+at 86.331 ms</title></line>
+<polygon class="expected" points="254.4,381 264.4,381 259.4,389"><title>#122: the frame start the pacer gave
+at 66.632 ms
+The frame started 16.708 ms after it.</title></polygon>
+<rect class="gpu" x="300.7" y="402" width="15.5" height="12"><title>#122 GPU work
+8.474 ms: from 89.123 to 97.596 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 8.404 ms.</title></rect>
+<text class="id-by" x="319.2" y="411.5">#122</text>
+<rect class="queue" x="316.2" y="404" width="37.5" height="8"><title>#122 waiting to be shown
+20.436 ms: from 97.596 to 118.032 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="404">CPU 5.98, GPU 8.47</text>
+<rect class="screen-a" x="353.7" y="417" width="61.1" height="12"><title>#122 on screen
+33.333 ms: from 118.032 to 151.366 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.692 ms after its frame start.
+Animation error -33.333 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="384.2" y="426.5" text-anchor="middle">#122</text>
+<text class="numbers" x="1420" y="418">shown after 34.69 ms, animation error -33.33 ms</text>
+<polygon class="expected" points="348.7,409 358.7,409 353.7,417"><title>#122: the pacer's intended display time
+at 118.032 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="484" x2="1406" y2="484"/>
+<text class="frame-label" x="28" y="462">#123</text>
+<rect class="update" x="345.6" y="441" width="1.5" height="9"><title>#123 update
+0.800 ms: from 113.657 to 114.457 ms</title></rect>
+<rect class="wait-vsync" x="347.8" y="441" width="1.7" height="9"><title>#123 wait for its frame start
+0.900 ms: from 114.857 to 115.757 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 116.642 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="350.3" y="441" width="1.4" height="9"><title>#123 acquire (call to return)
+0.220 ms: from 116.177 to 116.397 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="351.1" y="441" width="9.5" height="9"><title>#123 draw: frame start to work done
+5.172 ms: from 116.657 to 121.828 ms
+Marker recorded at 119.243 ms.
+Animation time 400.001 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="359.9" y="441" width="1.4" height="9"><title>#123 submit of its GPU work (call to return)
+0.150 ms: from 121.428 to 121.578 ms</title></rect>
+<rect class="present" x="360.7" y="441" width="1.4" height="9"><title>#123 present call (call to return)
+0.160 ms: from 121.858 to 122.018 ms
+Present id 5123.</title></rect>
+<line class="present-line" x1="360.7" y1="436" x2="360.7" y2="452"/>
+<polygon class="present-arrow" points="356.2,451 365.2,451 360.7,457"><title>#123 present call (call to return)
+0.160 ms: from 121.858 to 122.018 ms
+Present id 5123.</title></polygon>
+<polyline class="join-line" points="359.9,450 360.3,454"/>
+<line class="marker-tick" x1="355.9" y1="441" x2="355.9" y2="450"><title>#123 marker recorded
+at 119.243 ms</title></line>
+<polygon class="expected" points="346.1,433 356.1,433 351.1,441"><title>#123: the frame start the pacer gave
+at 116.632 ms
+The frame started 0.024 ms after it.</title></polygon>
+<rect class="gpu" x="360.3" y="454" width="13.3" height="12"><title>#123 GPU work
+7.258 ms: from 121.628 to 128.886 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.188 ms.</title></rect>
+<text class="id-by" x="376.6" y="463.5">#123</text>
+<rect class="queue" x="373.6" y="456" width="41.2" height="8"><title>#123 waiting to be shown
+22.480 ms: from 128.886 to 151.366 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="456">CPU 5.17, GPU 7.26</text>
+<rect class="screen-b" x="414.8" y="469" width="61.1" height="12"><title>#123 on screen
+33.333 ms: from 151.366 to 184.699 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.709 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="445.4" y="478.5" text-anchor="middle">#123</text>
+<text class="numbers" x="1420" y="470">shown after 34.71 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="409.8,461 419.8,461 414.8,469"><title>#123: the pacer's intended display time
+at 151.366 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="536" x2="1406" y2="536"/>
+<text class="frame-label" x="28" y="514">#124</text>
+<rect class="update" x="406.7" y="493" width="1.5" height="9"><title>#124 update
+0.800 ms: from 146.974 to 147.774 ms</title></rect>
+<rect class="wait" x="408.9" y="493" width="3.3" height="9"><title>#124 wait for its frame start
+1.800 ms: from 148.174 to 149.974 ms
+A sleep on a timer.
+It aimed at 149.959 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="408.3" y="493" width="1.4" height="9"><title>#124 acquire (call to return)
+0.170 ms: from 147.824 to 147.994 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="412.2" y="493" width="8.1" height="9"><title>#124 draw: frame start to work done
+4.426 ms: from 149.974 to 154.400 ms
+Marker recorded at 152.187 ms.
+Animation time 433.334 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="419.6" y="493" width="1.4" height="9"><title>#124 submit of its GPU work (call to return)
+0.150 ms: from 154.000 to 154.150 ms</title></rect>
+<rect class="present" x="420.4" y="493" width="1.4" height="9"><title>#124 present call (call to return)
+0.160 ms: from 154.430 to 154.590 ms
+Present id 5124.
+A timed present: 33.333 ms after the display time of the frame before.</title></rect>
+<line class="present-line" x1="420.4" y1="488" x2="420.4" y2="504"/>
+<polygon class="timed-arrow" points="415.9,503 424.9,503 420.4,509"><title>#124 present call (call to return)
+0.160 ms: from 154.430 to 154.590 ms
+Present id 5124.
+A timed present: 33.333 ms after the display time of the frame before.</title></polygon>
+<polyline class="join-line" points="419.6,502 420,506"/>
+<line class="marker-tick" x1="416.3" y1="493" x2="416.3" y2="502"><title>#124 marker recorded
+at 152.187 ms</title></line>
+<polygon class="expected" points="407.2,485 417.2,485 412.2,493"><title>#124: the frame start the pacer gave
+at 149.966 ms
+The frame started 0.009 ms after it.</title></polygon>
+<rect class="gpu" x="420" y="506" width="11.3" height="12"><title>#124 GPU work
+6.139 ms: from 154.200 to 160.339 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 6.069 ms.</title></rect>
+<text class="id-by" x="434.2" y="515.5">#124</text>
+<rect class="queue" x="431.2" y="508" width="44.7" height="8"><title>#124 waiting to be shown
+24.360 ms: from 160.339 to 184.699 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="508">CPU 4.43, GPU 6.14</text>
+<rect class="screen-a" x="475.9" y="521" width="61.1" height="12"><title>#124 on screen
+33.333 ms: from 184.699 to 218.032 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.725 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="506.5" y="530.5" text-anchor="middle">#124</text>
+<text class="numbers" x="1420" y="522">shown after 34.72 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="470.9,513 480.9,513 475.9,521"><title>#124: the pacer's intended display time
+at 184.699 ms
+Shown exactly at it.</title></polygon>
+<polygon class="timed" points="470.9,513 480.9,513 475.9,521"><title>#124: the time its timed present asked for
+at 184.699 ms
+33.333 ms after #123's display time.</title></polygon>
+<line class="row-line" x1="116" y1="588" x2="1406" y2="588"/>
+<text class="frame-label" x="28" y="566">#125</text>
+<rect class="update" x="467.9" y="545" width="1.5" height="9"><title>#125 update
+0.800 ms: from 180.309 to 181.109 ms</title></rect>
+<rect class="wait-vsync" x="470.1" y="545" width="3.3" height="9"><title>#125 wait for its frame start
+1.800 ms: from 181.509 to 183.309 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 183.294 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="469.4" y="545" width="1.4" height="9"><title>#125 acquire (call to return)
+0.170 ms: from 181.159 to 181.329 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="473.4" y="545" width="8.2" height="9"><title>#125 draw: frame start to work done
+4.484 ms: from 183.309 to 187.793 ms
+Marker recorded at 185.551 ms.
+Animation time 466.668 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="480.9" y="545" width="1.4" height="9"><title>#125 submit of its GPU work (call to return)
+0.150 ms: from 187.393 to 187.543 ms</title></rect>
+<rect class="wait-vsync" x="481.6" y="545" width="1.7" height="9"><title>#125 hold before its present
+0.920 ms: from 187.793 to 188.713 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 188.693 ms and woke 0.020 ms after that.</title></rect>
+<rect class="present" x="483.3" y="545" width="1.4" height="9"><title>#125 present call (call to return)
+0.150 ms: from 188.743 to 188.893 ms
+Present id 5125.</title></rect>
+<line class="present-line" x1="483.3" y1="540" x2="483.3" y2="556"/>
+<polygon class="present-arrow" points="478.8,555 487.8,555 483.3,561"><title>#125 present call (call to return)
+0.150 ms: from 188.743 to 188.893 ms
+Present id 5125.</title></polygon>
+<polyline class="join-line" points="480.9,554 481.2,558"/>
+<line class="marker-tick" x1="477.5" y1="545" x2="477.5" y2="554"><title>#125 marker recorded
+at 185.551 ms</title></line>
+<polygon class="expected" points="468.3,537 478.3,537 473.3,545"><title>#125: the frame start the pacer gave
+at 183.299 ms
+The frame started 0.010 ms after it.</title></polygon>
+<rect class="gpu" x="481.2" y="558" width="11.4" height="12"><title>#125 GPU work
+6.226 ms: from 187.593 to 193.820 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 6.156 ms.</title></rect>
+<text class="id-by" x="495.6" y="567.5">#125</text>
+<rect class="queue" x="492.6" y="560" width="44.4" height="8"><title>#125 waiting to be shown
+24.213 ms: from 193.820 to 218.032 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="560">CPU 4.48, GPU 6.23</text>
+<rect class="screen-b" x="537" y="573" width="61.1" height="12"><title>#125 on screen
+33.333 ms: from 218.032 to 251.366 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.723 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+Then a stretch the log has no display time for.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="567.6" y="582.5" text-anchor="middle">#125</text>
+<rect class="unknown" x="598.2" y="573.5" width="61.1" height="11"><title>Not known: #125 still, or #126
+33.333 ms: from 251.366 to 284.699 ms
+#126: No display time was asked for with this present.
+What the display showed here takes a capture to know.</title></rect>
+<text class="numbers" x="1420" y="574">shown after 34.72 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="532,565 542,565 537,573"><title>#125: the pacer's intended display time
+at 218.032 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="640" x2="1406" y2="640"/>
+<text class="frame-label" x="28" y="618">#126</text>
+<rect class="update" x="529" y="597" width="1.5" height="9"><title>#126 update
+0.800 ms: from 213.642 to 214.442 ms</title></rect>
+<rect class="wait" x="531.2" y="597" width="1.7" height="9"><title>#126 wait for its frame start
+0.900 ms: from 214.842 to 215.742 ms
+A sleep on a timer.
+It aimed at 216.627 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="533.6" y="597" width="1.4" height="9"><title>#126 acquire (call to return)
+0.220 ms: from 216.162 to 216.382 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="534.5" y="597" width="8.2" height="9"><title>#126 draw: frame start to work done
+4.454 ms: from 216.642 to 221.095 ms
+Marker recorded at 218.869 ms.
+Animation time 500.001 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="541.9" y="597" width="1.4" height="9"><title>#126 submit of its GPU work (call to return)
+0.150 ms: from 220.695 to 220.845 ms</title></rect>
+<rect class="present" x="542.7" y="597" width="1.4" height="9"><title>#126 present call (call to return)
+0.160 ms: from 221.125 to 221.285 ms
+Present id 5126.</title></rect>
+<line class="present-line" x1="542.7" y1="592" x2="542.7" y2="608"/>
+<polygon class="present-arrow" points="538.2,607 547.2,607 542.7,613"><title>#126 present call (call to return)
+0.160 ms: from 221.125 to 221.285 ms
+Present id 5126.</title></polygon>
+<polyline class="join-line" points="541.9,606 542.3,610"/>
+<line class="marker-tick" x1="538.6" y1="597" x2="538.6" y2="606"><title>#126 marker recorded
+at 218.869 ms</title></line>
+<polygon class="expected" points="529.5,589 539.5,589 534.5,597"><title>#126: the frame start the pacer gave
+at 216.632 ms
+The frame started 0.009 ms after it.</title></polygon>
+<rect class="gpu" x="542.3" y="610" width="11.3" height="12"><title>#126 GPU work
+6.180 ms: from 220.895 to 227.076 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 6.110 ms.</title></rect>
+<text class="id-by" x="556.6" y="619.5">#126</text>
+<text class="numbers" x="1420" y="612">CPU 4.45, GPU 6.18</text>
+<polygon class="expected" points="593.2,617 603.2,617 598.2,625"><title>#126: the pacer's intended display time
+at 251.366 ms</title></polygon>
+<line class="row-line" x1="116" y1="692" x2="1406" y2="692"/>
+<text class="frame-label" x="28" y="670">#127</text>
+<rect class="update" x="590.2" y="649" width="1.5" height="9"><title>#127 update
+0.800 ms: from 247.011 to 247.811 ms</title></rect>
+<rect class="wait-vsync" x="592.4" y="649" width="3.3" height="9"><title>#127 wait for its frame start
+1.800 ms: from 248.211 to 250.011 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 249.996 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="591.7" y="649" width="1.4" height="9"><title>#127 acquire (call to return)
+0.170 ms: from 247.861 to 248.031 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="595.7" y="649" width="11.3" height="9"><title>#127 draw: frame start to work done
+6.187 ms: from 250.011 to 256.198 ms
+Marker recorded at 253.105 ms.
+Animation time 533.334 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="606.3" y="649" width="1.4" height="9"><title>#127 submit of its GPU work (call to return)
+0.150 ms: from 255.798 to 255.948 ms</title></rect>
+<rect class="present" x="607.1" y="649" width="1.4" height="9"><title>#127 present call (call to return)
+0.160 ms: from 256.228 to 256.388 ms
+Present id 5127.</title></rect>
+<line class="present-line" x1="607.1" y1="644" x2="607.1" y2="660"/>
+<polygon class="present-arrow" points="602.6,659 611.6,659 607.1,665"><title>#127 present call (call to return)
+0.160 ms: from 256.228 to 256.388 ms
+Present id 5127.</title></polygon>
+<polyline class="join-line" points="606.3,658 606.7,662"/>
+<line class="marker-tick" x1="601.4" y1="649" x2="601.4" y2="658"><title>#127 marker recorded
+at 253.105 ms</title></line>
+<polygon class="expected" points="590.6,641 600.6,641 595.6,649"><title>#127: the frame start the pacer gave
+at 249.966 ms
+The frame started 0.045 ms after it.</title></polygon>
+<rect class="gpu" x="606.7" y="662" width="16.1" height="12"><title>#127 GPU work
+8.780 ms: from 255.998 to 264.779 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 8.710 ms.</title></rect>
+<text class="id-by" x="625.8" y="671.5">#127</text>
+<rect class="queue" x="622.8" y="664" width="36.5" height="8"><title>#127 waiting to be shown
+19.920 ms: from 264.779 to 284.699 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="664">CPU 6.19, GPU 8.78</text>
+<rect class="screen-b" x="659.3" y="677" width="61.1" height="12"><title>#127 on screen
+33.333 ms: from 284.699 to 318.033 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.688 ms after its frame start.
+Animation error not known: the frame before has no display time.
+Then a stretch the log has no display time for.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="689.8" y="686.5" text-anchor="middle">#127</text>
+<rect class="unknown" x="720.4" y="677.5" width="61.1" height="11"><title>Not known: #127 still, or #128
+33.333 ms: from 318.033 to 351.366 ms
+#128: The log has no result for this present.
+What the display showed here takes a capture to know.</title></rect>
+<text class="numbers" x="1420" y="678">shown after 34.69 ms</text>
+<polygon class="expected" points="654.3,669 664.3,669 659.3,677"><title>#127: the pacer's intended display time
+at 284.699 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="744" x2="1406" y2="744"/>
+<text class="frame-label" x="28" y="722">#128</text>
+<rect class="update" x="651.3" y="701" width="1.5" height="9"><title>#128 update
+0.800 ms: from 280.329 to 281.129 ms</title></rect>
+<rect class="wait" x="653.5" y="701" width="3.3" height="9"><title>#128 wait for its frame start
+1.800 ms: from 281.529 to 283.329 ms
+A sleep on a timer.
+It aimed at 283.314 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="652.8" y="701" width="1.4" height="9"><title>#128 acquire (call to return)
+0.170 ms: from 281.179 to 281.349 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="656.8" y="701" width="9.9" height="9"><title>#128 draw: frame start to work done
+5.412 ms: from 283.329 to 288.741 ms
+Marker recorded at 286.035 ms.
+Animation time 566.668 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="666" y="701" width="1.4" height="9"><title>#128 submit of its GPU work (call to return)
+0.150 ms: from 288.341 to 288.491 ms</title></rect>
+<rect class="present" x="666.8" y="701" width="1.4" height="9"><title>#128 present call (call to return)
+0.160 ms: from 288.771 to 288.931 ms
+Present id 5128.
+A timed present: 33.333 ms after the display time of the frame before.</title></rect>
+<line class="present-line" x1="666.8" y1="696" x2="666.8" y2="712"/>
+<polygon class="timed-arrow" points="662.3,711 671.3,711 666.8,717"><title>#128 present call (call to return)
+0.160 ms: from 288.771 to 288.931 ms
+Present id 5128.
+A timed present: 33.333 ms after the display time of the frame before.</title></polygon>
+<polyline class="join-line" points="666,710 666.3,714"/>
+<line class="marker-tick" x1="661.7" y1="701" x2="661.7" y2="710"><title>#128 marker recorded
+at 286.035 ms</title></line>
+<polygon class="expected" points="651.7,693 661.7,693 656.7,701"><title>#128: the frame start the pacer gave
+at 283.299 ms
+The frame started 0.029 ms after it.</title></polygon>
+<rect class="gpu" x="666.3" y="714" width="14" height="12"><title>#128 GPU work
+7.619 ms: from 288.541 to 296.160 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.549 ms.</title></rect>
+<text class="id-by" x="683.3" y="723.5">#128</text>
+<text class="numbers" x="1420" y="716">CPU 5.41, GPU 7.62</text>
+<text class="not-shown" x="1420" y="730">no display time reported</text>
+<polygon class="expected" points="715.4,721 725.4,721 720.4,729"><title>#128: the pacer's intended display time
+at 318.033 ms</title></polygon>
+<polygon class="timed" points="715.4,721 725.4,721 720.4,729"><title>#128: the time its timed present asked for
+at 318.033 ms
+33.333 ms after #127's display time.</title></polygon>
+<line class="row-line" x1="116" y1="796" x2="1406" y2="796"/>
+<text class="frame-label" x="28" y="774">#129</text>
+<rect class="update" x="712.4" y="753" width="1.5" height="9"><title>#129 update
+0.800 ms: from 313.671 to 314.471 ms</title></rect>
+<rect class="wait-vsync" x="714.6" y="753" width="1.7" height="9"><title>#129 wait for its frame start
+0.900 ms: from 314.871 to 315.771 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 316.656 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="717" y="753" width="1.4" height="9"><title>#129 acquire (call to return)
+0.220 ms: from 316.191 to 316.411 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="717.9" y="753" width="10.7" height="9"><title>#129 draw: frame start to work done
+5.845 ms: from 316.671 to 322.516 ms
+Marker recorded at 319.594 ms.
+Animation time 600.001 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="727.9" y="753" width="1.4" height="9"><title>#129 submit of its GPU work (call to return)
+0.150 ms: from 322.116 to 322.266 ms</title></rect>
+<rect class="present" x="728.7" y="753" width="1.4" height="9"><title>#129 present call (call to return)
+0.160 ms: from 322.546 to 322.706 ms
+Present id 5129.</title></rect>
+<line class="present-line" x1="728.7" y1="748" x2="728.7" y2="764"/>
+<polygon class="present-arrow" points="724.2,763 733.2,763 728.7,769"><title>#129 present call (call to return)
+0.160 ms: from 322.546 to 322.706 ms
+Present id 5129.</title></polygon>
+<polyline class="join-line" points="727.9,762 728.3,766"/>
+<line class="marker-tick" x1="723.3" y1="753" x2="723.3" y2="762"><title>#129 marker recorded
+at 319.594 ms</title></line>
+<polygon class="expected" points="712.8,745 722.8,745 717.8,753"><title>#129: the frame start the pacer gave
+at 316.633 ms
+The frame started 0.038 ms after it.</title></polygon>
+<rect class="gpu" x="728.3" y="766" width="15.2" height="12"><title>#129 GPU work
+8.268 ms: from 322.316 to 330.584 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 8.197 ms.</title></rect>
+<text class="id-by" x="746.4" y="775.5">#129</text>
+<rect class="queue" x="743.4" y="768" width="38.1" height="8"><title>#129 waiting to be shown
+20.782 ms: from 330.584 to 351.366 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="768">CPU 5.84, GPU 8.27</text>
+<rect class="screen-b" x="781.5" y="781" width="61.1" height="12"><title>#129 on screen
+33.333 ms: from 351.366 to 384.699 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.695 ms after its frame start.
+Animation error not known: the frame before has no display time.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="812.1" y="790.5" text-anchor="middle">#129</text>
+<text class="numbers" x="1420" y="782">shown after 34.70 ms</text>
+<polygon class="expected" points="776.5,773 786.5,773 781.5,781"><title>#129: the pacer's intended display time
+at 351.366 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="848" x2="1406" y2="848"/>
+<text class="frame-label" x="28" y="826">#130</text>
+<rect class="update" x="773.5" y="805" width="1.5" height="9"><title>#130 update
+0.800 ms: from 346.966 to 347.766 ms</title></rect>
+<rect class="wait" x="775.7" y="805" width="3.3" height="9"><title>#130 wait for its frame start
+1.800 ms: from 348.166 to 349.966 ms
+A sleep on a timer.
+It aimed at 349.951 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="775" y="805" width="1.4" height="9"><title>#130 acquire (call to return)
+0.170 ms: from 347.816 to 347.986 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="779" y="805" width="7.3" height="9"><title>#130 draw: frame start to work done
+4.000 ms: from 349.966 to 353.966 ms
+Marker recorded at 351.966 ms.
+Animation time 633.335 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="785.6" y="805" width="1.4" height="9"><title>#130 submit of its GPU work (call to return)
+0.150 ms: from 353.566 to 353.716 ms</title></rect>
+<rect class="wait" x="786.3" y="805" width="1.7" height="9"><title>#130 hold before its present
+0.920 ms: from 353.966 to 354.886 ms
+A sleep on a timer.
+It aimed at 354.866 ms and woke 0.020 ms after that.</title></rect>
+<rect class="present" x="788" y="805" width="1.4" height="9"><title>#130 present call (call to return)
+0.150 ms: from 354.916 to 355.066 ms
+Present id 5130.</title></rect>
+<line class="present-line" x1="788" y1="800" x2="788" y2="816"/>
+<polygon class="present-arrow" points="783.5,815 792.5,815 788,821"><title>#130 present call (call to return)
+0.150 ms: from 354.916 to 355.066 ms
+Present id 5130.</title></polygon>
+<polyline class="join-line" points="785.6,814 785.9,818"/>
+<line class="marker-tick" x1="782.6" y1="805" x2="782.6" y2="814"><title>#130 marker recorded
+at 351.966 ms</title></line>
+<polygon class="expected" points="774,797 784,797 779,805"><title>#130: the frame start the pacer gave
+at 349.966 ms
+The frame started exactly at it.</title></polygon>
+<rect class="gpu" x="785.9" y="818" width="10.1" height="12"><title>#130 GPU work
+5.500 ms: from 353.766 to 359.266 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 5.430 ms.</title></rect>
+<text class="id-by" x="799" y="827.5">#130</text>
+<rect class="queue" x="796" y="820" width="46.6" height="8"><title>#130 waiting to be shown
+25.433 ms: from 359.266 to 384.699 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="820">CPU 4.00, GPU 5.50</text>
+<rect class="screen-long" x="842.7" y="833" width="91.7" height="12"><title>#130 on screen
+50.000 ms: from 384.699 to 434.700 ms
+3.00 refreshes, asked for a swap interval of 2.
+Shown 34.733 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="888.5" y="842.5" text-anchor="middle">#130</text>
+<text class="numbers" x="1420" y="834">shown after 34.73 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="837.7,825 847.7,825 842.7,833"><title>#130: the pacer's intended display time
+at 384.699 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="900" x2="1406" y2="900"/>
+<text class="frame-label" x="28" y="878">#131</text>
+<rect class="update" x="834.6" y="857" width="1.5" height="9"><title>#131 update
+0.800 ms: from 380.321 to 381.121 ms</title></rect>
+<rect class="wait-vsync" x="836.8" y="857" width="3.3" height="9"><title>#131 wait for its frame start
+1.800 ms: from 381.521 to 383.321 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 383.306 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="836.2" y="857" width="1.4" height="9"><title>#131 acquire (call to return)
+0.170 ms: from 381.171 to 381.341 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="840.1" y="857" width="31.3" height="9"><title>#131 draw: frame start to work done
+17.052 ms: from 383.321 to 400.373 ms
+Marker recorded at 391.847 ms.
+Animation time 666.668 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="870.7" y="857" width="1.4" height="9"><title>#131 submit of its GPU work (call to return)
+0.150 ms: from 399.973 to 400.123 ms</title></rect>
+<rect class="present" x="871.5" y="857" width="1.4" height="9"><title>#131 present call (call to return)
+0.160 ms: from 400.403 to 400.563 ms
+Present id 5131.</title></rect>
+<line class="present-line" x1="871.5" y1="852" x2="871.5" y2="868"/>
+<polygon class="present-arrow" points="867,867 876,867 871.5,873"><title>#131 present call (call to return)
+0.160 ms: from 400.403 to 400.563 ms
+Present id 5131.</title></polygon>
+<polyline class="join-line" points="870.7,866 871,870"/>
+<line class="marker-tick" x1="855.8" y1="857" x2="855.8" y2="866"><title>#131 marker recorded
+at 391.847 ms</title></line>
+<polygon class="expected" points="835.1,849 845.1,849 840.1,857"><title>#131: the frame start the pacer gave
+at 383.299 ms
+The frame started 0.022 ms after it.</title></polygon>
+<rect class="gpu" x="871" y="870" width="13" height="12"><title>#131 GPU work
+7.078 ms: from 400.173 to 407.251 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.008 ms.</title></rect>
+<text class="id-by" x="887" y="879.5">#131</text>
+<rect class="queue" x="884" y="872" width="50.3" height="8"><title>#131 waiting to be shown
+27.449 ms: from 407.251 to 434.700 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="872">CPU 17.05, GPU 7.08</text>
+<rect class="screen-b" x="934.3" y="885" width="61.1" height="12"><title>#131 on screen
+33.333 ms: from 434.700 to 468.033 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 51.378 ms after its frame start.
+Animation error -16.667 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="964.9" y="894.5" text-anchor="middle">#131</text>
+<text class="numbers" x="1420" y="886">shown after 51.38 ms, animation error -16.67 ms</text>
+<polygon class="expected" points="898.8,877 908.8,877 903.8,885"><title>#131: the pacer's intended display time
+at 418.033 ms
+Shown 16.667 ms after it.</title></polygon>
+<line class="row-line" x1="116" y1="952" x2="1406" y2="952"/>
+<text class="frame-label" x="28" y="930">#132</text>
+<rect class="update" x="926.3" y="909" width="1.5" height="9"><title>#132 update
+0.800 ms: from 430.309 to 431.109 ms</title></rect>
+<rect class="wait" x="928.5" y="909" width="1.7" height="9"><title>#132 wait for its frame start
+0.900 ms: from 431.509 to 432.409 ms
+A sleep on a timer.
+It aimed at 433.294 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="930.9" y="909" width="1.4" height="9"><title>#132 acquire (call to return)
+0.220 ms: from 432.829 to 433.049 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="931.8" y="909" width="8.1" height="9"><title>#132 draw: frame start to work done
+4.440 ms: from 433.309 to 437.749 ms
+Marker recorded at 435.529 ms.
+Animation time 700.001 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="939.2" y="909" width="1.4" height="9"><title>#132 submit of its GPU work (call to return)
+0.150 ms: from 437.349 to 437.499 ms</title></rect>
+<rect class="present" x="940" y="909" width="1.4" height="9"><title>#132 present call (call to return)
+0.160 ms: from 437.779 to 437.939 ms
+Present id 5132.
+A timed present: 33.333 ms after the display time of the frame before.</title></rect>
+<line class="present-line" x1="940" y1="904" x2="940" y2="920"/>
+<polygon class="timed-arrow" points="935.5,919 944.5,919 940,925"><title>#132 present call (call to return)
+0.160 ms: from 437.779 to 437.939 ms
+Present id 5132.
+A timed present: 33.333 ms after the display time of the frame before.</title></polygon>
+<polyline class="join-line" points="939.2,918 939.6,922"/>
+<line class="marker-tick" x1="935.9" y1="909" x2="935.9" y2="918"><title>#132 marker recorded
+at 435.529 ms</title></line>
+<polygon class="expected" points="896.2,901 906.2,901 901.2,909"><title>#132: the frame start the pacer gave
+at 416.633 ms
+The frame started 16.676 ms after it.</title></polygon>
+<rect class="gpu" x="939.6" y="922" width="11.3" height="12"><title>#132 GPU work
+6.161 ms: from 437.549 to 443.710 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 6.091 ms.</title></rect>
+<text class="id-by" x="953.9" y="931.5">#132</text>
+<rect class="queue" x="950.9" y="924" width="44.6" height="8"><title>#132 waiting to be shown
+24.323 ms: from 443.710 to 468.033 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="924">CPU 4.44, GPU 6.16</text>
+<rect class="screen-a" x="995.5" y="937" width="61.1" height="12"><title>#132 on screen
+33.333 ms: from 468.033 to 501.366 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.724 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="1026" y="946.5" text-anchor="middle">#132</text>
+<text class="numbers" x="1420" y="938">shown after 34.72 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="990.5,929 1000.5,929 995.5,937"><title>#132: the pacer's intended display time
+at 468.033 ms
+Shown exactly at it.</title></polygon>
+<polygon class="timed" points="990.5,929 1000.5,929 995.5,937"><title>#132: the time its timed present asked for
+at 468.033 ms
+33.333 ms after #131's display time.</title></polygon>
+<line class="row-line" x1="116" y1="1004" x2="1406" y2="1004"/>
+<text class="frame-label" x="28" y="982">#133</text>
+<rect class="update" x="987.5" y="961" width="1.5" height="9"><title>#133 update
+0.800 ms: from 463.668 to 464.468 ms</title></rect>
+<rect class="wait-vsync" x="989.7" y="961" width="3.3" height="9"><title>#133 wait for its frame start
+1.800 ms: from 464.868 to 466.668 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 466.653 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="989" y="961" width="1.4" height="9"><title>#133 acquire (call to return)
+0.170 ms: from 464.518 to 464.688 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="993" y="961" width="10.4" height="9"><title>#133 draw: frame start to work done
+5.670 ms: from 466.668 to 472.337 ms
+Marker recorded at 469.502 ms.
+Animation time 733.335 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1002.6" y="961" width="1.4" height="9"><title>#133 submit of its GPU work (call to return)
+0.150 ms: from 471.937 to 472.087 ms</title></rect>
+<rect class="present" x="1003.4" y="961" width="1.4" height="9"><title>#133 present call (call to return)
+0.160 ms: from 472.367 to 472.527 ms
+Present id 5133.</title></rect>
+<line class="present-line" x1="1003.4" y1="956" x2="1003.4" y2="972"/>
+<polygon class="present-arrow" points="998.9,971 1007.9,971 1003.4,977"><title>#133 present call (call to return)
+0.160 ms: from 472.367 to 472.527 ms
+Present id 5133.</title></polygon>
+<polyline class="join-line" points="1002.6,970 1003,974"/>
+<line class="marker-tick" x1="998.2" y1="961" x2="998.2" y2="970"><title>#133 marker recorded
+at 469.502 ms</title></line>
+<polygon class="expected" points="987.9,953 997.9,953 992.9,961"><title>#133: the frame start the pacer gave
+at 466.633 ms
+The frame started 0.035 ms after it.</title></polygon>
+<rect class="gpu" x="1003" y="974" width="14.7" height="12"><title>#133 GPU work
+8.005 ms: from 472.137 to 480.142 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.935 ms.</title></rect>
+<text class="id-by" x="1020.7" y="983.5">#133</text>
+<rect class="queue" x="1017.7" y="976" width="38.9" height="8"><title>#133 waiting to be shown
+21.224 ms: from 480.142 to 501.366 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="976">CPU 5.67, GPU 8.00</text>
+<rect class="screen-b" x="1056.6" y="989" width="61.1" height="12"><title>#133 on screen
+33.333 ms: from 501.366 to 534.700 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.699 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="1087.2" y="998.5" text-anchor="middle">#133</text>
+<text class="numbers" x="1420" y="990">shown after 34.70 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="1051.6,981 1061.6,981 1056.6,989"><title>#133: the pacer's intended display time
+at 501.366 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="1056" x2="1406" y2="1056"/>
+<text class="frame-label" x="28" y="1034">#134</text>
+<rect class="update" x="1048.6" y="1013" width="1.5" height="9"><title>#134 update
+0.800 ms: from 497.013 to 497.813 ms</title></rect>
+<rect class="wait" x="1050.8" y="1013" width="3.3" height="9"><title>#134 wait for its frame start
+1.800 ms: from 498.213 to 500.013 ms
+A sleep on a timer.
+It aimed at 499.998 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="1050.2" y="1013" width="1.4" height="9"><title>#134 acquire (call to return)
+0.170 ms: from 497.863 to 498.033 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="1054.1" y="1013" width="11.5" height="9"><title>#134 draw: frame start to work done
+6.254 ms: from 500.013 to 506.267 ms
+Marker recorded at 503.140 ms.
+Animation time 766.668 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1064.8" y="1013" width="1.4" height="9"><title>#134 submit of its GPU work (call to return)
+0.150 ms: from 505.867 to 506.017 ms</title></rect>
+<rect class="present" x="1065.6" y="1013" width="1.4" height="9"><title>#134 present call (call to return)
+0.160 ms: from 506.297 to 506.457 ms
+Present id 5134.</title></rect>
+<line class="present-line" x1="1065.6" y1="1008" x2="1065.6" y2="1024"/>
+<polygon class="present-arrow" points="1061.1,1023 1070.1,1023 1065.6,1029"><title>#134 present call (call to return)
+0.160 ms: from 506.297 to 506.457 ms
+Present id 5134.</title></polygon>
+<polyline class="join-line" points="1064.8,1022 1065.2,1026"/>
+<line class="marker-tick" x1="1059.8" y1="1013" x2="1059.8" y2="1022"><title>#134 marker recorded
+at 503.140 ms</title></line>
+<polygon class="expected" points="1049,1005 1059,1005 1054,1013"><title>#134: the frame start the pacer gave
+at 499.966 ms
+The frame started 0.047 ms after it.</title></polygon>
+<rect class="gpu" x="1065.2" y="1026" width="16.3" height="12"><title>#134 GPU work
+8.880 ms: from 506.067 to 514.947 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 8.810 ms.</title></rect>
+<text class="id-by" x="1084.5" y="1035.5">#134</text>
+<rect class="queue" x="1081.5" y="1028" width="36.2" height="8"><title>#134 waiting to be shown
+19.753 ms: from 514.947 to 534.700 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="1028">CPU 6.25, GPU 8.88</text>
+<rect class="screen-a" x="1117.7" y="1041" width="61.1" height="12"><title>#134 on screen
+33.333 ms: from 534.700 to 568.033 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.687 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="1148.3" y="1050.5" text-anchor="middle">#134</text>
+<text class="numbers" x="1420" y="1042">shown after 34.69 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="1112.7,1033 1122.7,1033 1117.7,1041"><title>#134: the pacer's intended display time
+at 534.700 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="1108" x2="1406" y2="1108"/>
+<text class="frame-label" x="28" y="1086">#135</text>
+<rect class="update" x="1109.7" y="1065" width="1.5" height="9"><title>#135 update
+0.800 ms: from 530.309 to 531.110 ms</title></rect>
+<rect class="wait-vsync" x="1111.9" y="1065" width="1.7" height="9"><title>#135 wait for its frame start
+0.900 ms: from 531.510 to 532.409 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 533.294 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="1114.3" y="1065" width="1.4" height="9"><title>#135 acquire (call to return)
+0.220 ms: from 532.830 to 533.049 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="1115.2" y="1065" width="8.2" height="9"><title>#135 draw: frame start to work done
+4.473 ms: from 533.309 to 537.783 ms
+Marker recorded at 535.546 ms.
+Animation time 800.002 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1122.6" y="1065" width="1.4" height="9"><title>#135 submit of its GPU work (call to return)
+0.150 ms: from 537.383 to 537.533 ms</title></rect>
+<rect class="wait-vsync" x="1123.4" y="1065" width="1.7" height="9"><title>#135 hold before its present
+0.920 ms: from 537.783 to 538.703 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 538.683 ms and woke 0.020 ms after that.</title></rect>
+<rect class="present" x="1125.1" y="1065" width="1.4" height="9"><title>#135 present call (call to return)
+0.150 ms: from 538.733 to 538.883 ms
+Present id 5135.</title></rect>
+<line class="present-line" x1="1125.1" y1="1060" x2="1125.1" y2="1076"/>
+<polygon class="present-arrow" points="1120.6,1075 1129.6,1075 1125.1,1081"><title>#135 present call (call to return)
+0.150 ms: from 538.733 to 538.883 ms
+Present id 5135.</title></polygon>
+<polyline class="join-line" points="1122.6,1074 1123,1078"/>
+<line class="marker-tick" x1="1119.3" y1="1065" x2="1119.3" y2="1074"><title>#135 marker recorded
+at 535.546 ms</title></line>
+<polygon class="expected" points="1110.1,1057 1120.1,1057 1115.1,1065"><title>#135: the frame start the pacer gave
+at 533.300 ms
+The frame started 0.010 ms after it.</title></polygon>
+<rect class="gpu" x="1123" y="1078" width="11.4" height="12"><title>#135 GPU work
+6.210 ms: from 537.583 to 543.793 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 6.140 ms.</title></rect>
+<text class="id-by" x="1137.4" y="1087.5">#135</text>
+<rect class="queue" x="1134.4" y="1080" width="44.4" height="8"><title>#135 waiting to be shown
+24.240 ms: from 543.793 to 568.033 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="1080">CPU 4.47, GPU 6.21</text>
+<rect class="screen-b" x="1178.8" y="1093" width="61.1" height="12"><title>#135 on screen
+33.333 ms: from 568.033 to 601.366 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.724 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="1209.4" y="1102.5" text-anchor="middle">#135</text>
+<text class="numbers" x="1420" y="1094">shown after 34.72 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="1173.8,1085 1183.8,1085 1178.8,1093"><title>#135: the pacer's intended display time
+at 568.033 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="1160" x2="1406" y2="1160"/>
+<text class="frame-label" x="28" y="1138">#136</text>
+<rect class="update" x="1170.8" y="1117" width="1.5" height="9"><title>#136 update
+0.800 ms: from 563.662 to 564.462 ms</title></rect>
+<rect class="wait" x="1173" y="1117" width="3.3" height="9"><title>#136 wait for its frame start
+1.800 ms: from 564.862 to 566.662 ms
+A sleep on a timer.
+It aimed at 566.647 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="1172.4" y="1117" width="1.4" height="9"><title>#136 acquire (call to return)
+0.170 ms: from 564.512 to 564.682 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="1176.3" y="1117" width="9.9" height="9"><title>#136 draw: frame start to work done
+5.388 ms: from 566.662 to 572.050 ms
+Marker recorded at 569.356 ms.
+Animation time 833.335 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1185.5" y="1117" width="1.4" height="9"><title>#136 submit of its GPU work (call to return)
+0.150 ms: from 571.650 to 571.800 ms</title></rect>
+<rect class="present" x="1186.3" y="1117" width="1.4" height="9"><title>#136 present call (call to return)
+0.160 ms: from 572.080 to 572.240 ms
+Present id 5136.
+A timed present: 33.333 ms after the display time of the frame before.</title></rect>
+<line class="present-line" x1="1186.3" y1="1112" x2="1186.3" y2="1128"/>
+<polygon class="timed-arrow" points="1181.8,1127 1190.8,1127 1186.3,1133"><title>#136 present call (call to return)
+0.160 ms: from 572.080 to 572.240 ms
+Present id 5136.
+A timed present: 33.333 ms after the display time of the frame before.</title></polygon>
+<polyline class="join-line" points="1185.5,1126 1185.8,1130"/>
+<line class="marker-tick" x1="1181.3" y1="1117" x2="1181.3" y2="1126"><title>#136 marker recorded
+at 569.356 ms</title></line>
+<polygon class="expected" points="1171.3,1109 1181.3,1109 1176.3,1117"><title>#136: the frame start the pacer gave
+at 566.633 ms
+The frame started 0.029 ms after it.</title></polygon>
+<rect class="gpu" x="1185.8" y="1130" width="13.9" height="12"><title>#136 GPU work
+7.583 ms: from 571.850 to 579.433 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.513 ms.</title></rect>
+<text class="id-by" x="1202.7" y="1139.5">#136</text>
+<rect class="queue" x="1199.7" y="1132" width="40.2" height="8"><title>#136 waiting to be shown
+21.933 ms: from 579.433 to 601.366 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="1132">CPU 5.39, GPU 7.58</text>
+<rect class="screen-a" x="1240" y="1145" width="61.1" height="12"><title>#136 on screen
+33.333 ms: from 601.366 to 634.700 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.705 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="1270.5" y="1154.5" text-anchor="middle">#136</text>
+<text class="numbers" x="1420" y="1146">shown after 34.70 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="1235,1137 1245,1137 1240,1145"><title>#136: the pacer's intended display time
+at 601.366 ms
+Shown exactly at it.</title></polygon>
+<polygon class="timed" points="1235,1137 1245,1137 1240,1145"><title>#136: the time its timed present asked for
+at 601.366 ms
+33.333 ms after #135's display time.</title></polygon>
+<line class="row-line" x1="116" y1="1212" x2="1406" y2="1212"/>
+<text class="frame-label" x="28" y="1190">#137</text>
+<rect class="update" x="1231.9" y="1169" width="1.5" height="9"><title>#137 update
+0.800 ms: from 596.993 to 597.793 ms</title></rect>
+<rect class="wait-vsync" x="1234.1" y="1169" width="3.3" height="9"><title>#137 wait for its frame start
+1.800 ms: from 598.193 to 599.993 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 599.978 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="1233.5" y="1169" width="1.4" height="9"><title>#137 acquire (call to return)
+0.170 ms: from 597.843 to 598.013 ms
+Swap chain image 2.</title></rect>
+<rect class="draw" x="1237.4" y="1169" width="9.7" height="9"><title>#137 draw: frame start to work done
+5.264 ms: from 599.993 to 605.257 ms
+Marker recorded at 602.625 ms.
+Animation time 866.668 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1246.4" y="1169" width="1.4" height="9"><title>#137 submit of its GPU work (call to return)
+0.150 ms: from 604.857 to 605.007 ms</title></rect>
+<rect class="present" x="1247.1" y="1169" width="1.4" height="9"><title>#137 present call (call to return)
+0.160 ms: from 605.287 to 605.447 ms
+Present id 5137.</title></rect>
+<line class="present-line" x1="1247.1" y1="1164" x2="1247.1" y2="1180"/>
+<polygon class="present-arrow" points="1242.6,1179 1251.6,1179 1247.1,1185"><title>#137 present call (call to return)
+0.160 ms: from 605.287 to 605.447 ms
+Present id 5137.</title></polygon>
+<polyline class="join-line" points="1246.4,1178 1246.7,1182"/>
+<line class="marker-tick" x1="1242.3" y1="1169" x2="1242.3" y2="1178"><title>#137 marker recorded
+at 602.625 ms</title></line>
+<polygon class="expected" points="1232.4,1161 1242.4,1161 1237.4,1169"><title>#137: the frame start the pacer gave
+at 599.966 ms
+The frame started 0.026 ms after it.</title></polygon>
+<rect class="gpu" x="1246.7" y="1182" width="13.6" height="12"><title>#137 GPU work
+7.396 ms: from 605.057 to 612.453 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.326 ms.</title></rect>
+<text class="id-by" x="1263.3" y="1191.5">#137</text>
+<rect class="queue" x="1260.3" y="1184" width="40.8" height="8"><title>#137 waiting to be shown
+22.247 ms: from 612.453 to 634.700 ms
+From the end of its GPU work (or its present's return, if that is later) to its display time.</title></rect>
+<text class="numbers" x="1420" y="1184">CPU 5.26, GPU 7.40</text>
+<rect class="screen-b" x="1301.1" y="1197" width="61.1" height="12"><title>#137 on screen
+33.333 ms: from 634.700 to 668.033 ms
+2.00 refreshes, asked for a swap interval of 2.
+Shown 34.707 ms after its frame start.
+Animation error 0.000 ms: its animation time step minus its display time step, from the frame before.
+The display time is what the graphics driver reported, not a capture.</title></rect>
+<text class="id-in" x="1331.6" y="1206.5" text-anchor="middle">#137</text>
+<text class="numbers" x="1420" y="1198">shown after 34.71 ms, animation error 0.00 ms</text>
+<polygon class="expected" points="1296.1,1189 1306.1,1189 1301.1,1197"><title>#137: the pacer's intended display time
+at 634.700 ms
+Shown exactly at it.</title></polygon>
+<line class="row-line" x1="116" y1="1264" x2="1406" y2="1264"/>
+<text class="frame-label" x="28" y="1242">#138</text>
+<rect class="update" x="1293.1" y="1221" width="1.5" height="9"><title>#138 update
+0.800 ms: from 630.331 to 631.131 ms</title></rect>
+<rect class="wait" x="1295.3" y="1221" width="1.7" height="9"><title>#138 wait for its frame start
+0.900 ms: from 631.531 to 632.431 ms
+A sleep on a timer.
+It aimed at 633.316 ms and woke 0.885 ms before that.</title></rect>
+<rect class="acquire" x="1297.7" y="1221" width="1.4" height="9"><title>#138 acquire (call to return)
+0.220 ms: from 632.851 to 633.071 ms
+Swap chain image 0.</title></rect>
+<rect class="draw" x="1298.6" y="1221" width="10" height="9"><title>#138 draw: frame start to work done
+5.474 ms: from 633.331 to 638.804 ms
+Marker recorded at 636.067 ms.
+Animation time 900.002 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1307.9" y="1221" width="1.4" height="9"><title>#138 submit of its GPU work (call to return)
+0.150 ms: from 638.404 to 638.554 ms</title></rect>
+<rect class="present" x="1308.7" y="1221" width="1.4" height="9"><title>#138 present call (call to return)
+0.160 ms: from 638.834 to 638.994 ms
+Present id 5138.</title></rect>
+<line class="present-line" x1="1308.7" y1="1216" x2="1308.7" y2="1232"/>
+<polygon class="present-arrow" points="1304.2,1231 1313.2,1231 1308.7,1237"><title>#138 present call (call to return)
+0.160 ms: from 638.834 to 638.994 ms
+Present id 5138.</title></polygon>
+<polyline class="join-line" points="1307.9,1230 1308.2,1234"/>
+<line class="marker-tick" x1="1303.6" y1="1221" x2="1303.6" y2="1230"><title>#138 marker recorded
+at 636.067 ms</title></line>
+<polygon class="expected" points="1293.5,1213 1303.5,1213 1298.5,1221"><title>#138: the frame start the pacer gave
+at 633.300 ms
+The frame started 0.031 ms after it.</title></polygon>
+<rect class="gpu" x="1308.2" y="1234" width="14.1" height="12"><title>#138 GPU work
+7.710 ms: from 638.604 to 646.315 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 7.640 ms.</title></rect>
+<text class="id-by" x="1325.4" y="1243.5">#138</text>
+<text class="numbers" x="1420" y="1236">CPU 5.47, GPU 7.71</text>
+<text class="not-shown" x="1420" y="1250">not reported yet</text>
+<polygon class="expected" points="1357.2,1241 1367.2,1241 1362.2,1249"><title>#138: the pacer's intended display time
+at 668.033 ms</title></polygon>
+<line class="row-line" x1="116" y1="1316" x2="1406" y2="1316"/>
+<text class="frame-label" x="28" y="1294">#139</text>
+<rect class="update" x="1354.2" y="1273" width="1.5" height="9"><title>#139 update
+0.800 ms: from 663.670 to 664.470 ms</title></rect>
+<rect class="wait-vsync" x="1356.4" y="1273" width="3.3" height="9"><title>#139 wait for its frame start
+1.800 ms: from 664.870 to 666.670 ms
+A wait for the vertical blank, as the window system reports it.
+It aimed at 666.655 ms and woke 0.015 ms after that.</title></rect>
+<rect class="acquire" x="1355.8" y="1273" width="1.4" height="9"><title>#139 acquire (call to return)
+0.170 ms: from 664.520 to 664.690 ms
+Swap chain image 1.</title></rect>
+<rect class="draw" x="1359.7" y="1273" width="10.6" height="9"><title>#139 draw: frame start to work done
+5.757 ms: from 666.670 to 672.427 ms
+Marker recorded at 669.549 ms.
+Animation time 933.335 ms, a step of 33.333 ms.
+Swap interval 2.</title></rect>
+<rect class="submit" x="1369.5" y="1273" width="1.4" height="9"><title>#139 submit of its GPU work (call to return)
+0.150 ms: from 672.027 to 672.177 ms</title></rect>
+<rect class="present" x="1370.3" y="1273" width="1.4" height="9"><title>#139 present call (call to return)
+0.160 ms: from 672.457 to 672.617 ms
+Present id 5139.</title></rect>
+<line class="present-line" x1="1370.3" y1="1268" x2="1370.3" y2="1284"/>
+<polygon class="present-arrow" points="1365.8,1283 1374.8,1283 1370.3,1289"><title>#139 present call (call to return)
+0.160 ms: from 672.457 to 672.617 ms
+Present id 5139.</title></polygon>
+<polyline class="join-line" points="1369.5,1282 1369.9,1286"/>
+<line class="marker-tick" x1="1365" y1="1273" x2="1365" y2="1282"><title>#139 marker recorded
+at 669.549 ms</title></line>
+<polygon class="expected" points="1354.6,1265 1364.6,1265 1359.6,1273"><title>#139: the frame start the pacer gave
+at 666.633 ms
+The frame started 0.037 ms after it.</title></polygon>
+<rect class="gpu" x="1369.9" y="1286" width="14.9" height="12"><title>#139 GPU work
+8.136 ms: from 672.227 to 680.363 ms
+Begin and end as the application measured them on its CPU clock.
+GPU time of the frame as measured: 8.066 ms.</title></rect>
+<text class="id-by" x="1387.8" y="1295.5">#139</text>
+<text class="numbers" x="1420" y="1288">CPU 5.76, GPU 8.14</text>
+<text class="not-shown" x="1420" y="1302">not reported yet</text>
+<text class="sub" x="28" y="1366">The refresh grid is the vertical blank times the application read on its CPU clock. Display times are what the graphics driver reported, not a measurement by the tools.</text>
+<text class="sub" x="28" y="1386">A stage the log has no times for is not drawn. In a viewer that shows an SVG's tooltips, a shape under the pointer gives its times and details.</text>
+<text class="sub" x="28" y="1406">A dashed GPU box is the GPU time the application had at that frame (an earlier frame's), placed at the present.</text>
+<text class="sub" x="28" y="1426">A frame reported without a display time may or may not have been shown: the time it would have been on screen is drawn as not known, and only a capture settles it.</text>
+<text class="sub" x="28" y="1446">The animation error of a shown frame is its animation time step minus its display time step from the frame before, by the reported display times; it is not known after a frame without one.</text>
+</svg>

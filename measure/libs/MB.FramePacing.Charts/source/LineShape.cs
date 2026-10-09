@@ -9,5 +9,9 @@
 
 namespace MB.FramePacing.Charts
 {
-  public sealed record LineShape(string Class, SvgNumber X1, SvgNumber Y1, SvgNumber X2, SvgNumber Y2) : CardShape;
+  public sealed record LineShape(string Class, SvgNumber X1, SvgNumber Y1, SvgNumber X2, SvgNumber Y2) : CardShape
+  {
+    /// <summary>What a viewer shows while the pointer is on the shape (the SVG's title of the element); empty for none.</summary>
+    public string Tip { get; init; } = string.Empty;
+  }
 }

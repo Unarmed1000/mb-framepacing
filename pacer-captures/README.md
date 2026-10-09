@@ -65,3 +65,20 @@ Its numbers come from its logs, not from a summary someone wrote: `python tools/
 run and the charts into a folder named as the zip, `--update-doc` fills the tables of the session's document (the zip's name with
 `.md`), and `--check` fails when any of them is not what the zip gives. The charts and tables it makes are for the runs of the
 session it was written for; a session with other runs needs its own selections there.
+
+## The stages of a run's frames
+
+The tools draw the stages of each frame of a run from its frame log (experimental, as the pacer is): the CPU's part, the GPU's work,
+the wait to be shown and the time on screen, as a row per frame or a lane per resource, and the whole run as a trace file for a trace
+viewer. A shape's tooltip has its times and details.
+
+```
+mb-framepacing --experimental frame-stages <zip> --list                                  # the runs of a session
+mb-framepacing --experimental frame-stages <zip> --run <folder>/<name> -o stages.svg     # twelve frames from frame 120
+mb-framepacing --experimental frame-stages <log.csv> --from 300 --frames 16 -o stages.svg
+mb-framepacing --experimental frame-stages <log.csv> --view lanes -o lanes.svg --png     # a lane per resource, and a PNG
+mb-framepacing --experimental frame-stages <zip> --run <folder>/<name> --trace run.json  # the whole run for a trace viewer
+```
+
+What a log does not have is not drawn, and what it does not know is drawn as not known: a frame reported without a display time may
+or may not have been shown. Display times in a log are what the graphics driver reported, not a measurement by the tools.
