@@ -19,6 +19,7 @@ target_sources(mb_framepacing_pacer
     source/mb/framepacing/pacer/rule/FrameWorkRule.cpp
     source/mb/framepacing/pacer/rule/SwapIntervalRule.cpp
     source/mb/framepacing/pacer/tier/ClockGridLoopPacer.cpp
+    source/mb/framepacing/pacer/tier/FreeRunLoop.cpp
     source/mb/framepacing/pacer/timeline/VBlankTimeline.cpp
     source/mb/framepacing/pacer/tier/TierPacer.cpp
     source/mb/framepacing/pacer/tier/VBlankLoopPacer.cpp
@@ -62,6 +63,7 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/rule/SwapIntervalRule.hpp
       include/mb/framepacing/pacer/rule/FrameWindowState.hpp
       include/mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp
+      include/mb/framepacing/pacer/tier/FreeRunLoop.hpp
       include/mb/framepacing/pacer/tier/PacerHandover.hpp
       include/mb/framepacing/pacer/tier/TierPacer.hpp
       include/mb/framepacing/pacer/tier/VBlankLoopPacer.hpp
@@ -99,7 +101,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
                                             tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp tests/FrameWorkRuleTests.cpp
                                             tests/TimerPeriodOnlyPacerTests.cpp tests/TimerWaitForPresentPacerTests.cpp
                                             tests/VBlankPeriodOnlyPacerTests.cpp tests/FrameRateStepTests.cpp
-                                            tests/VBlankWaitForPresentPacerTests.cpp tests/TierMonitorRateTests.cpp tests/WorkloadLoopTests.cpp tests/DisplayHeldLoopTests.cpp tests/GpuWaitLoopTests.cpp tests/GpuWaitRuleTests.cpp tests/ActiveSetChangeLoopTests.cpp tests/DisplayErrorCounterTests.cpp tests/TimedPresentLoopTests.cpp tests/DisplayPlacementUtilTests.cpp tests/TierPacerTests.cpp tests/VBlankTimelineTests.cpp tests/PresentWaitRuleTests.cpp)
+                                            tests/VBlankWaitForPresentPacerTests.cpp tests/NotPacingTests.cpp tests/TierMonitorRateTests.cpp tests/WorkloadLoopTests.cpp tests/DisplayHeldLoopTests.cpp tests/GpuWaitLoopTests.cpp tests/GpuWaitRuleTests.cpp tests/ActiveSetChangeLoopTests.cpp tests/DisplayErrorCounterTests.cpp tests/TimedPresentLoopTests.cpp tests/DisplayPlacementUtilTests.cpp tests/TierPacerTests.cpp tests/VBlankTimelineTests.cpp tests/PresentWaitRuleTests.cpp)
   target_link_libraries(mb_framepacing_pacer_tests PRIVATE mb_framepacing_pacer_simulation mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_pacer_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/pacer) is found above this folder; a copy outside the repository skips those tests

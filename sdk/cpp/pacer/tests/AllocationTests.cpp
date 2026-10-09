@@ -87,6 +87,49 @@ TEST(Allocations, TheLowestPairsPacerPacesFramesWithoutAllocating)
   EXPECT_GT(checked, 2'000);
 }
 
+TEST(Allocations, SwitchingPacingOffAndOnNeverAllocates)
+{
+  const PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
+  PC::TierPacer pacer(settings, PC::PacerCapabilities(PC::PacerCapability::VBlankTimes | PC::PacerCapability::WaitForPresent));
+
+  int64_t checked = 0;
+  {
+    const FT::AllocationCounter counter;
+    int64_t now = 10 * FP::NanosecondTimeSpan::NanosecondsPerSecond;
+    PC::PresentReport report;
+    for (int32_t frame = 0; frame < 1'200; ++frame)
+    {
+      // Not pacing for a stretch of every 200 frames, and another part placing the frames in every other stretch
+      if ((frame % 200) == 60 || (frame % 200) == 140)
+      {
+        pacer.SetPacing((frame % 200) == 140);
+      }
+      if ((frame % 400) == 100 || (frame % 400) == 300)
+      {
+        pacer.SetActiveCapabilities(
+          PC::PacerCapabilities((frame % 400) == 100 ? PC::PacerCapability::WaitForPresent : PC::PacerCapability::VBlankTimes));
+      }
+      const PC::FrameStartPlan plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
+      now = plan.WaitsForStartTime() ? plan.StartTime.Nanoseconds() : now;
+      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(now));
+      now += 2'000'000;
+      const PC::PresentPlan present = pacer.EndFrame(FP::NanosecondTickCount(now));
+      now = present.WaitsForPresentTime() ? present.PresentTime.Nanoseconds() : now;
+      report.FrameId = present.FrameId;
+      report.CallTime = FP::NanosecondTickCount(now);
+      report.ReturnTime = FP::NanosecondTickCount(now + 60'000);
+      pacer.AddPresent(report);
+      pacer.AddGpuWork(PC::GpuWorkReport::Times(present.FrameId, FP::NanosecondTickCount(now), FP::NanosecondTickCount(now + 1'000'000)));
+      now += 60'000;
+      checked += static_cast<int64_t>(schedule.FrameId);
+    }
+    pacer.ForgetPresents();
+    pacer.Reset();
+    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
+  }
+  EXPECT_GT(checked, 1'200);
+}
+
 TEST(Allocations, ThePacerOfATimerWithAWaitForAPresentPacesFramesWithoutAllocating)
 {
   PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));

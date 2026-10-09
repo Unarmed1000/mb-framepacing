@@ -8,6 +8,7 @@
 #include <vector>
 #include "DisplayModelSettings.hpp"
 #include "LoopActiveSetChange.hpp"
+#include "LoopPacingChange.hpp"
 #include "LoopWorkChange.hpp"
 #include "NanosecondRange.hpp"
 
@@ -79,6 +80,8 @@ namespace MB::FramePacing::Pacer::Simulation
     uint32_t MaxPresentSwapInterval{0};
     //! For the tier pacers (SimulateTierLoop): changes of the active set in the run, by frame, ascending
     std::vector<LoopActiveSetChange> ActiveSetChanges;
+    //! For the tier pacers (SimulateTierLoop): the application stops pacing and starts again, by frame, ascending
+    std::vector<LoopPacingChange> PacingChanges;
     //! For the tier pacers (SimulateTierLoop): changes of the frames' work in the run, by time, ascending
     std::vector<LoopWorkChange> WorkChanges;
     //! false: paced at a fixed swap interval of 1, the rule off

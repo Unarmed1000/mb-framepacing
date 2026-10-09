@@ -13,6 +13,10 @@ namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What the pacer plans for a frame (TierPacer::BeginFrame): the swap interval to
   //! hold it for, the time to render it for, and the marker's pacing fields.
+  //!
+  //! While the application is not pacing (TierPacer::SetPacing) nothing is aimed for: the swap interval is 1, the animation
+  //! step is the time since the frame before started, and IntendedDisplayTime, NextFrameStartTime and TargetFrameTime are
+  //! not known (zero, as the marker has them).
   struct FrameSchedule
   {
     //! The frame's id: the pacer's own count of the frames it began, from 1. The application gives it back with the frame's reports

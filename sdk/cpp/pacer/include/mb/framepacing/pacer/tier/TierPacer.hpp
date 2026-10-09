@@ -25,6 +25,7 @@
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
+#include <mb/framepacing/pacer/tier/FreeRunLoop.hpp>
 #include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
 #include <cstdint>
 
@@ -64,8 +65,13 @@ namespace MB::FramePacing::Pacer
   //! waited for go on. Where the frames are placed starts anew with the first frame after the change, which begins when the
   //! frame before it said the next one would.
   //!
+  //! An application that stops pacing for a while (a menu, a benchmark, a display whose refresh rate is variable) says so
+  //! (SetPacing) and goes on with every call: a frame is then given nothing to wait for and nothing for its present, its
+  //! animation step is the time since the frame before it started, and what it reports is taken, so that pacing starts
+  //! again with the vertical blanks, the presents and the GPU's work known (FreeRunLoop).
+  //!
   //! Values in, values out: no platform API, no clock read, no wait. Made once (it allocates the rule's frame windows); pacing
-  //! frames and changing the active set never allocate.
+  //! frames, changing the active set and switching pacing off and on never allocate.
   class TierPacer
   {
     PacerCapabilities m_capabilities;
@@ -76,6 +82,12 @@ namespace MB::FramePacing::Pacer
     ClockGridLoopPacer m_grid;
     VBlankLoopPacer m_vblank;
     bool m_onVBlanks;
+    // The frames while the application is not pacing: neither of the two places them, and the one that would keeps the
+    // swap interval rule
+    FreeRunLoop m_free;
+    bool m_isPacing{true};
+    bool m_pendingPacing{true};
+    bool m_hasPendingPacing{false};
     // What the display reports say of the frames: statistics, whichever part paces
     DisplayErrorCounter m_display;
 
@@ -103,6 +115,22 @@ namespace MB::FramePacing::Pacer
       return m_hasPendingActive ? m_pendingActive : m_active;
     }
 
+    //! Whether the frames are paced: they are unless this was switched off. Off, every call is made as before: a frame's
+    //! plans are empty (no wait, no start time, no time to wait until before the present and none for it, a swap interval
+    //! of one), its schedule has no intended display time and no target frame time, and its animation step is the time
+    //! since the frame before it started (one refresh across a pause). The reports are taken as before, but for the waits:
+    //! no plan asked for one, and a wait of the application's own (AddSystemWait) holds nothing the pacer placed. The swap
+    //! interval rule gets no frame. On again, the first frame is placed anew as after a
+    //! change of the active set, the frame ids and the animation time go on, and the pause after start-up is made once
+    //! more where it is made at all. Takes effect when the open frame has ended.
+    void SetPacing(bool isPacing) noexcept;
+
+    //! True when the frames are paced, or will be when the open frame has ended.
+    [[nodiscard]] bool IsPacing() const noexcept
+    {
+      return m_hasPendingPacing ? m_pendingPacing : m_isPacing;
+    }
+
     //! The rating of what the application can do: the capability tier.
     [[nodiscard]] PacerRating Rating() const noexcept;
 
@@ -111,7 +139,8 @@ namespace MB::FramePacing::Pacer
 
     //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing (no
     //! vertical blank reading so far, waits for a present that stopped because none is shown), and where no pacer is built
-    //! for the active tier (PacerTierUtil::PacedAs).
+    //! for the active tier (PacerTierUtil::PacedAs). While the application is not pacing (IsPacing) it is the tier that
+    //! would pace.
     [[nodiscard]] PacerTier WorkingTier() const noexcept;
 
     //! A vertical blank of the display the window is on. Taken with PacerCapability::VBlankTimes active.
@@ -261,13 +290,13 @@ namespace MB::FramePacing::Pacer
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
     [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
-      return m_onVBlanks ? m_vblank.GpuTime() : m_grid.GpuTime();
+      return !m_isPacing ? m_free.GpuTime() : (m_onVBlanks ? m_vblank.GpuTime() : m_grid.GpuTime());
     }
 
     //! How long the last present held the frame loop.
     [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
-      return m_onVBlanks ? m_vblank.LastPresentBlocked() : m_grid.LastPresentBlocked();
+      return !m_isPacing ? m_free.LastPresentBlocked() : (m_onVBlanks ? m_vblank.LastPresentBlocked() : m_grid.LastPresentBlocked());
     }
 
     //! What the rule's frame window holds.
@@ -297,7 +326,9 @@ namespace MB::FramePacing::Pacer
   private:
     [[nodiscard]] bool IsFrameOpen() const noexcept;
     void Apply(const PacerCapabilities& active) noexcept;
+    void ApplyPacing(bool isPacing) noexcept;
     void ApplyPending() noexcept;
+    [[nodiscard]] const SwapIntervalRule& Rule() const noexcept;
   };
 }
 

@@ -63,6 +63,16 @@ namespace MB::FramePacing::Pacer
     }
   }
 
+  void TierPacer::SetPacing(const bool isPacing) noexcept
+  {
+    m_pendingPacing = isPacing;
+    m_hasPendingPacing = true;
+    if (!IsFrameOpen())
+    {
+      ApplyPending();
+    }
+  }
+
   PacerRating TierPacer::Rating() const noexcept
   {
     return PacerTierUtil::Rate(m_capabilities);
@@ -84,7 +94,16 @@ namespace MB::FramePacing::Pacer
 
   bool TierPacer::IsFrameOpen() const noexcept
   {
+    if (!m_isPacing)
+    {
+      return m_free.IsFrameOpen();
+    }
     return m_onVBlanks ? m_vblank.IsFrameOpen() : m_grid.IsFrameOpen();
+  }
+
+  const SwapIntervalRule& TierPacer::Rule() const noexcept
+  {
+    return m_onVBlanks ? m_vblank.Rule() : m_grid.Rule();
   }
 
   void TierPacer::Apply(const PacerCapabilities& active) noexcept
@@ -98,14 +117,16 @@ namespace MB::FramePacing::Pacer
     {
       // Another part places the frames from the next one on. The vertical blanks are read anew when they are taken up, and
       // forgotten when they are given up: a reading from before says nothing of now
+      // (while the application is not pacing, the frames are the free run's: the part only takes the rule now, and the
+      // frames when pacing starts again)
       if (onVBlanks)
       {
         m_vblank.ForgetVBlanks();
-        m_vblank.TakeOver(m_grid.GiveOver(), m_grid.Rule());
+        m_vblank.TakeOver(m_isPacing ? m_grid.GiveOver() : m_free.GiveOver(), m_grid.Rule());
       }
       else
       {
-        m_grid.TakeOver(m_vblank.GiveOver(), m_vblank.Rule());
+        m_grid.TakeOver(m_isPacing ? m_vblank.GiveOver() : m_free.GiveOver(), m_vblank.Rule());
         m_vblank.ForgetVBlanks();
       }
       m_onVBlanks = onVBlanks;
@@ -119,12 +140,41 @@ namespace MB::FramePacing::Pacer
     m_active = active;
   }
 
+  void TierPacer::ApplyPacing(const bool isPacing) noexcept
+  {
+    if (isPacing == m_isPacing)
+    {
+      return;
+    }
+    if (!isPacing)
+    {
+      // The frames go on unplaced, with what the part that paced them hands over
+      m_free.TakeOver(m_onVBlanks ? m_vblank.GiveOver() : m_grid.GiveOver());
+    }
+    else if (m_onVBlanks)
+    {
+      // The part that would pace has the rule already, and places the frames from its first one on. The vertical blanks
+      // were read all along
+      m_vblank.TakeOver(m_free.GiveOver(), m_vblank.Rule());
+    }
+    else
+    {
+      m_grid.TakeOver(m_free.GiveOver(), m_grid.Rule());
+    }
+    m_isPacing = isPacing;
+  }
+
   void TierPacer::ApplyPending() noexcept
   {
     if (m_hasPendingActive)
     {
       m_hasPendingActive = false;
       Apply(m_pendingActive);
+    }
+    if (m_hasPendingPacing)
+    {
+      m_hasPendingPacing = false;
+      ApplyPacing(m_pendingPacing);
     }
   }
 
@@ -138,13 +188,18 @@ namespace MB::FramePacing::Pacer
 
   FrameStartPlan TierPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
+    if (!m_isPacing)
+    {
+      // Not pacing: nothing to wait for
+      return {};
+    }
     return m_onVBlanks ? m_vblank.PlanFrame(now) : m_grid.PlanFrame(now);
   }
 
   void TierPacer::AddPresentWait(const PresentWaitReport& report) noexcept
   {
-    // A wait the plan did not ask for is not taken: the wait is not active
-    if (!m_active.Has(PacerCapability::WaitForPresent))
+    // A wait the plan did not ask for is not taken: the wait is not active, or the application is not pacing
+    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForPresent))
     {
       return;
     }
@@ -161,7 +216,7 @@ namespace MB::FramePacing::Pacer
   void TierPacer::AddGpuWait(const GpuWaitReport& report) noexcept
   {
     // A wait the plan did not ask for is not taken
-    if (!m_active.Has(PacerCapability::WaitForGpuWork) || m_active.Has(PacerCapability::WaitForPresent))
+    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForGpuWork) || m_active.Has(PacerCapability::WaitForPresent))
     {
       return;
     }
@@ -179,7 +234,17 @@ namespace MB::FramePacing::Pacer
   {
     // A change that waited for a frame that was never ended
     ApplyPending();
-    const FrameSchedule schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
+    FrameSchedule schedule;
+    if (!m_isPacing)
+    {
+      // What an application wants does not depend on whether it paces: the marker's preferred frame time is given
+      schedule = m_free.BeginFrame(cpuStartTime, Refresh(), Settings().FrameWindowLength());
+      schedule.PreferredFrameTime = NanosecondTimeDuration(Refresh().TimeFor(Rule().PreferredSwapInterval()));
+    }
+    else
+    {
+      schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
+    }
     // Kept for the display report that comes for it later
     m_display.AddFrame(schedule.FrameId, schedule.AnimationStep, cpuStartTime);
     return schedule;
@@ -187,9 +252,17 @@ namespace MB::FramePacing::Pacer
 
   PresentPlan TierPacer::EndFrame(const NanosecondTickCount workDoneTime) noexcept
   {
-    PresentPlan plan = m_onVBlanks ? m_vblank.EndFrame(workDoneTime) : m_grid.EndFrame(workDoneTime);
-    // The present's own swap interval, where it takes one: given next to what the loop does, as a minimum duration is
-    plan.SwapInterval = DisplayPlacementUtil::PresentSwapIntervalFor(m_active, SwapInterval());
+    PresentPlan plan;
+    if (!m_isPacing)
+    {
+      plan = m_free.EndFrame(workDoneTime);
+    }
+    else
+    {
+      plan = m_onVBlanks ? m_vblank.EndFrame(workDoneTime) : m_grid.EndFrame(workDoneTime);
+      // The present's own swap interval, where it takes one: given next to what the loop does, as a minimum duration is
+      plan.SwapInterval = DisplayPlacementUtil::PresentSwapIntervalFor(m_active, SwapInterval());
+    }
     // The frame has ended: a change of the active set takes effect now, for the frame after it
     ApplyPending();
     return plan;
@@ -197,12 +270,20 @@ namespace MB::FramePacing::Pacer
 
   NanosecondTimeDuration TierPacer::CpuBusyAt(const NanosecondTickCount now) const noexcept
   {
+    if (!m_isPacing)
+    {
+      return m_free.CpuBusyAt(now);
+    }
     return m_onVBlanks ? m_vblank.CpuBusyAt(now) : m_grid.CpuBusyAt(now);
   }
 
   void TierPacer::AddPresent(const PresentReport& report) noexcept
   {
-    if (m_onVBlanks)
+    if (!m_isPacing)
+    {
+      m_free.AddPresent(report);
+    }
+    else if (m_onVBlanks)
     {
       m_vblank.AddPresent(report);
     }
@@ -214,7 +295,11 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::AddGpuWork(const GpuWorkReport& report) noexcept
   {
-    if (m_onVBlanks)
+    if (!m_isPacing)
+    {
+      m_free.AddGpuWork(report, Settings().FrameMargin());
+    }
+    else if (m_onVBlanks)
     {
       m_vblank.AddGpuWork(report);
     }
@@ -226,6 +311,11 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::AddSystemWait(const SystemWaitReport& report) noexcept
   {
+    if (!m_isPacing)
+    {
+      // A loop that is not paced is held by nothing of the pacer's: there is nothing to tell the wait apart from
+      return;
+    }
     if (m_onVBlanks)
     {
       m_vblank.AddSystemWait(report);
@@ -246,7 +336,11 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::ForgetPresents() noexcept
   {
-    if (m_onVBlanks)
+    if (!m_isPacing)
+    {
+      m_free.ForgetPresents();
+    }
+    else if (m_onVBlanks)
     {
       m_vblank.ForgetPresents();
     }
@@ -281,6 +375,7 @@ namespace MB::FramePacing::Pacer
   {
     m_grid.Reset();
     m_vblank.Reset();
+    m_free.Reset();
     m_display.Restart();
   }
 }

@@ -184,6 +184,7 @@ namespace MB::FramePacing::Pacer::Simulation
     std::size_t nextGpuReport = 0;
     std::size_t nextDisplayReport = 0;
     std::size_t nextChange = 0;
+    std::size_t nextPacingChange = 0;
     // The work of a frame: the settings', until a change of it is due
     NanosecondRange cpuWork = settings.CpuWork;
     NanosecondRange gpuWork = settings.GpuWork;
@@ -211,6 +212,11 @@ namespace MB::FramePacing::Pacer::Simulation
         // Made with all the application has first: the timed presents and the display reports stay as the settings have them
         pacer.SetCapabilities(CapabilitiesOf(settings, PacerCapability::VBlankTimes | PacerCapability::WaitForPresent));
         pacer.SetActiveCapabilities(CapabilitiesOf(settings, settings.ActiveSetChanges[nextChange].Named));
+      }
+      // The application stops pacing or starts again: between two frames too
+      for (; nextPacingChange < settings.PacingChanges.size() && settings.PacingChanges[nextPacingChange].Frame <= index; ++nextPacingChange)
+      {
+        pacer.SetPacing(settings.PacingChanges[nextPacingChange].IsPacing);
       }
       const bool hasVBlankTimes = pacer.ActiveCapabilities().Has(PacerCapability::VBlankTimes);
       const bool hasWaitForPresent = pacer.ActiveCapabilities().Has(PacerCapability::WaitForPresent);

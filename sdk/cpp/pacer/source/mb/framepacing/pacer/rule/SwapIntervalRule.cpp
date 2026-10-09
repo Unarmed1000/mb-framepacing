@@ -165,6 +165,11 @@ namespace MB::FramePacing::Pacer
 
   void SwapIntervalRule::TakeOver(const SwapIntervalRule& other) noexcept
   {
+    if (&other == this)
+    {
+      // A part that goes on with its own rule: it has it
+      return;
+    }
     m_swapInterval = std::clamp(other.m_swapInterval, m_preferredSwapInterval, PacerSettings::MaxSwapInterval);
     if (m_entries.size() != other.m_entries.size())
     {

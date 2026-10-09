@@ -32,6 +32,14 @@ namespace MB::FramePacing::Pacer::PacerTierText
   //! The longest a short description is, in characters: one line of a narrow panel.
   inline constexpr uint32_t ShortDescriptionMaxLength = 44;
 
+  //! What is shown in place of the tier that is pacing while the application is not pacing (TierPacer::IsPacing is false):
+  //! a name for a label, a sentence, and one short line.
+  inline constexpr std::string_view NotPacingName = "Not pacing";
+  inline constexpr std::string_view NotPacingDescription =
+    "The application is not pacing its frames. The pacer gives them nothing to wait for and takes what is reported, so that "
+    "pacing starts again with a history.";
+  inline constexpr std::string_view NotPacingShortDescription = "Frames are not paced; reports are taken";
+
   //! A tier as it is shown: its major tier, a point and its sub tier.
   [[nodiscard]] constexpr std::string_view NumberOf(const PacerTier tier) noexcept
   {

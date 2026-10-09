@@ -140,13 +140,21 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
       rSettings.ActiveSetChanges = {{70, Without(both, named)}, {140, named}};
     }
 
+    void PacingChanges(LoopSettings& rSettings, const int64_t /*period*/, const PacerCapability /*named*/)
+    {
+      // The application stops pacing and starts again, on a display whose side holds a loop that nothing paces
+      rSettings.GpuWork = {300'000, 300'000};
+      rSettings.Display.Images = 3;
+      rSettings.PacingChanges = {{70, false}, {130, true}};
+    }
+
     void SixtyHertz(LoopSettings& rSettings, const int64_t /*period*/, const PacerCapability /*named*/)
     {
       rSettings.RateNumerator = 60;
       rSettings.GpuWork = {3'300'000, 3'300'000};
     }
 
-    constexpr std::array<Case, 16> Cases = {{{"light", Light},
+    constexpr std::array<Case, 17> Cases = {{{"light", Light},
                                              {"gpu-90-unreported", Gpu90Unreported},
                                              {"gpu-90", Gpu90},
                                              {"gpu-130", Gpu130},
@@ -161,6 +169,7 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
                                              {"gpu-wait", GpuWait},
                                              {"display-reports", DisplayReports},
                                              {"active-set-changes", ActiveSetChanges},
+                                             {"pacing-changes", PacingChanges},
                                              {"60-hz", SixtyHertz}}};
 
     void Append(std::string& rText, const int64_t value, const char after)

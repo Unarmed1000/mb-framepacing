@@ -30,7 +30,7 @@ every measurement so far with its conditions, the decisions and what is still mi
 
 | Checked                                                                                                                                                                                             | Not checked                                                                                                           |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| A simulated frame loop on a display model that queues presents, against golden results (`sdk/test-data/pacer`): the four ways of pacing below, both aims, sixteen cases                             | Any real swap chain recorded by a capture card and analysed with the tools                                            |
+| A simulated frame loop on a display model that queues presents, against golden results (`sdk/test-data/pacer`): the four ways of pacing below, both aims, seventeen cases                           | Any real swap chain recorded by a capture card and analysed with the tools                                            |
 | The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                                                                                           | Any platform but Windows, any graphics API but Vulkan, any GPU vendor but one                                         |
 | The refresh rates monitors have, 50 to 540 Hz: frames on time, two and three refreshes per frame, a display a thousandth off its rate (simulated)                                                   | A real display's clock against a real CPU clock for longer than minutes                                               |
 | Every line and branch of the module by its tests; no allocation per frame; two compilers, and a build with the address and undefined behaviour sanitizers                                           | The compilers of Linux and macOS                                                                                      |
@@ -39,6 +39,7 @@ every measurement so far with its conditions, the decisions and what is still mi
 | A minimum duration on the present, on that system: 150 runs at one, two and four refreshes per frame, each against the same run without it                                                          | A time on the present before which a frame is not shown (tiers 2.1 to 2.4): on no system, as the one at hand has none |
 | Display reports: the pacer's counts and its time from start to display against the first integration's own, equal in 12 runs of 12 on that system                                                   | A swap interval on the present; a display that skips an overdue frame                                                 |
 | The wait for the GPU's work, on that system: 96 runs with GPU work of 68 % and 129 % of a refresh, against the application's own wait for a frame slot                                              | A GPU's limit on any other machine or scene                                                                           |
+| An application that stops pacing and starts again: every call while it is off, and the frames on their refreshes again afterwards (simulated)                                                       | Pacing switched off and on, on any system                                                                             |
 |                                                                                                                                                                                                     | Vsync off; a variable refresh rate ([below](#a-variable-refresh-rate))                                                |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
@@ -282,6 +283,29 @@ late and the animation time does not step over the hold.
 swap interval with the rule's frame window, the GPU's work and the presents that can be waited for go on. Where the frames are
 placed starts anew with the first frame after the change, which begins when the frame before it said the next one would.
 
+### Not pacing
+
+An application that stops pacing for a while (a menu that draws on demand, a benchmark that runs as fast as it can, a display
+whose refresh rate is variable) says so with `SetPacing(false)` and **goes on with every call**. `IsPacing()` says which it
+is. As a change of the active set, the switch takes effect when the frame that is open has ended.
+
+| Call                                                        | While not pacing                                                                                                                                                                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PlanFrame`                                                 | No wait and no start time: the frame starts when the loop is there                                                                                                                       |
+| `BeginFrame`                                                | The frame ids go on. The animation step is the time since the frame before it started (one refresh across a pause). No intended display time, no target frame time; a swap interval of 1 |
+| `EndFrame`                                                  | No time to wait until, no time or duration for the present, a swap interval of 1. `CpuBusy` as always                                                                                    |
+| `AddVBlank`, `AddPresent`, `AddGpuWork`, `AddDisplayReport` | Taken: the vertical blanks, the presents that can be waited for, the GPU's time and the display's statistics stay current                                                                |
+| `AddPresentWait`, `AddGpuWait`, `AddSystemWait`             | Not taken: no plan asked for a wait, and nothing of the pacer's holds the loop                                                                                                           |
+
+The swap interval rule gets no frame meanwhile and keeps its swap interval. `WorkingTier()` goes on naming the tier that would
+pace; `PacerTierText` has the words to show in its place (`NotPacingName` and the two descriptions). The marker of such a
+frame carries what the schedule has: the animation time, the preferred frame time, and zero (not known) for the intended
+display time and the target frame time.
+
+`SetPacing(true)` is a handover as a change of the active set is: the first frame is placed anew, the frame ids, the animation
+time and the swap interval go on, and the pause after start-up is made once more where it is made at all. That first frame
+is placed as the first frame of a run is, so it may be shown a refresh later than it was made for.
+
 `SetRefreshPeriod` with another period and `SetSettings` with other settings start the frames again; both keep the animation
 time, and the same period or settings change nothing. `Settings()` always has the refresh period the pacer is on. `Reset()`
 starts again as made.
@@ -381,7 +405,7 @@ For an overlay or a log; none of it has to be read to pace.
 
 | Accessor                                                                | What                                                                                                                                          |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Rating()`, `ActiveRating()`, `WorkingTier()`                           | The tiers, as [above](#capabilities-and-tiers)                                                                                                |
+| `Rating()`, `ActiveRating()`, `WorkingTier()`, `IsPacing()`             | The tiers, as [above](#capabilities-and-tiers), and whether the frames are paced at all ([not pacing](#not-pacing))                           |
 | `SwapInterval()`, `FrameWindow()`                                       | The swap interval now, and what the rule's frame window holds: its frames, the late ones, and `StartsAhead`                                   |
 | `RefreshesBehindClock()`                                                | The refreshes the animation time is behind the clock: what was lost and not caught up with                                                    |
 | `PresentWaitTimeouts()`, `PresentWaitsStopped()`                        | The waits for a present that ended without the present shown, and whether the waits are stopped now                                           |
@@ -416,8 +440,9 @@ These are the platform's word, not a measurement of the display: the tools read 
 
 The pacer needs a fixed refresh rate. A display with a variable one (G-SYNC, FreeSync, HDMI VRR) refreshes when a frame
 arrives, so there are no whole refreshes to count in, and its vertical blanks follow the frames. **The pacer does not pace
-such a display**, and it is not told of one: an application that finds its display's refresh rate to be variable does not use
-the pacer for it.
+such a display**, and it is not told of one: an application that finds its display's refresh rate to be variable switches
+pacing off ([not pacing](#not-pacing)) and goes on with its calls, so that the frames have their ids and their animation time
+and pacing can start again when the refresh rate is fixed.
 
 **How an application can tell.** There is no way that works everywhere. Only the first of these has been seen here; the others
 are as their documentation has them:
@@ -535,10 +560,10 @@ regenerates them with `pacer-sim --golden` (built with the tests when the pacer 
 - `100-stages` and `60-relapse`: seeded staged loads. The fix is never late more often than the full-window rule and never slows down
   later; on `100-stages` and `60-relapse` it is late less often.
 - `tier-loops.csv` and `tier-loop-<run>.csv`: the pacer in a simulated frame loop on a display model that queues what a present
-  gives it. 128 runs: the four ways of pacing of major tier 3, both aims and sixteen cases (light work, GPU work of 90 and
+  gives it. 136 runs: the four ways of pacing of major tier 3, both aims and seventeen cases (light work, GPU work of 90 and
   130 % of a refresh, a frame that runs long, a slow display, two frames in flight, vertical blanks at which no frame is taken,
   a time on the present, a minimum duration, a swap interval on the present, the wait for the GPU's work, display reports,
-  changes of the active set, 60 Hz). A line per run with the length and the CRC-32 of its frames as text, and the eight runs
+  changes of the active set, an application that stops pacing and starts again, 60 Hz). A line per run with the length and the CRC-32 of its frames as text, and the eight runs
   with GPU work nobody reports written whole.
 
 The simulation and `pacer-sim` are test code, built with the tests only and never part of the library. The display model's

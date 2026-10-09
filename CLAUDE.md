@@ -268,7 +268,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Built from parts** (the user: no restart, four whole pacers taken apart under their tests): `TierPacer` (`pacer/tier/`) holds
     two ways of placing frames, `ClockGridLoopPacer` (a grid on the clock) and `VBlankLoopPacer` (the display's vertical blanks),
     and hands a run over between them (`PacerHandover`) when the active set changes; the parts are `hold/PresentWaitRule`,
-    `hold/GpuWaitRule`, `timeline/VBlankTimeline`, `placement/DisplayPlacementUtil`, `display/DisplayErrorCounter`,
+    `hold/GpuWaitRule`, `timeline/VBlankTimeline`, `placement/DisplayPlacementUtil`, `display/DisplayErrorCounter`, `tier/FreeRunLoop`,
     `rule/SwapIntervalRule` and `rule/FrameWorkRule`. The four single-tier classes (`TimerPeriodOnlyPacer`, …) are test code
     (`pacer/tests/simulation`): `TierPacer` with its capabilities fixed, kept for their tests.
   - **A frame's calls:** `AddVBlank`, `PlanFrame` (a wait for a present or for the GPU's work, then a start time; planned again
@@ -276,6 +276,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     until, `NotBeforeTime`, `MinimumDuration`, `SwapInterval`, `CpuBusy`), `AddPresent`; and where the application has them
     `AddGpuWork`, `AddSystemWait`, `AddDisplayReport`. `EndFrame` comes before the present and before any wait, which would count
     as work. A wait may take a few swap intervals and 50 ms at the least (`MinWaitTimeout`, the user's choice).
+  - **Not pacing** (the user, 2026-10-09: an application that stops pacing goes on reporting): `TierPacer::SetPacing(false)`
+    makes every plan empty and takes the reports (`tier/FreeRunLoop`, a third part beside the two that place frames); the
+    animation step is then the time since the frame before started, and the swap interval rule gets no frame. On again it is a
+    handover. It is the state a variable refresh rate needs; nothing of variable refresh is built.
+  - **The wait for a present counts the frames in flight** (the user, 2026-10-09): `PacerSettings::PresentWaitDepth`, at least
+    one more than `MaxFramesInFlight`. An application sets neither it nor `WaitingPresents`.
   - **No catching up** (the user): after a refresh that was lost the animation step stays the swap interval, and the animation
     time is that refresh behind the clock (`RefreshesBehindClock`); a constant offset does not show, correcting it does. A loss
     that repeats is followed. A start the display's side held is not stepped over (decision 17).

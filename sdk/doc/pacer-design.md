@@ -2011,7 +2011,9 @@ checked. Four things are settled now, because they cost little now and a second 
   refresh rate stay as they are.
 - **The application says so.** Whether variable refresh is active for its window, and the range, is information it gives with
   its capabilities. Until those pacers exist, the front does not pace such a display with a pacer for a fixed one: the tier it
-  is working at says that it is not pacing.
+  is working at says that it is not pacing. Built on 2026-10-09 is the state itself (decision 7): an application that
+  finds its display's refresh rate to be variable switches pacing off and goes on reporting. That it is variable is
+  still not something it can tell the pacer.
 - **Times in the plan are times.** A present's time, the intended display time, the animation step and the target frame time
   are moments and durations. The swap interval is a count beside them for the mechanisms that take one, and nothing a caller
   reads assumes that a display time is a whole number of refreshes after another.
@@ -2119,9 +2121,10 @@ measured only where a section above says so.
    says. That a present's time was not kept is not seen (major tier 2 with a wait could). An application can not say
    that its display's refresh rate is variable ("Variable refresh"). With both timed presents active the absolute time
    alone is given, which after a lost refresh brings a frame back at two refreshes per frame without a wait.
-3. **Decisions that are open** ("Decisions needed"): 3, 7, the setting of 9, and what is open of 10.
+3. **Decisions that are open** ("Decisions needed"): 3, the setting of 9, what is open of 10, and of 7 the first
+   wait after pacing starts again.
 4. **Checked as today's pacer is**, as far as one machine can (2026-10-09): the tier loops have golden data in the
-   repository (128 runs of the simulated loop, `tier-loops.csv`, the same bytes from two compilers); the monitor rates
+   repository (136 runs of the simulated loop, `tier-loops.csv`, the same bytes from two compilers); the monitor rates
    from 50 to 540 Hz run the tier pacer too; every line and branch of the module is run by a test (llvm-cov, without
    asserts); and the tests pass in a build with the address and undefined behaviour sanitizers (Clang on Windows).
    Still missing: the compilers of the other platforms.
@@ -2188,7 +2191,26 @@ refresh.
    loop while its queue is full, the aim of smoothness lets the system pace the loop. It is how smoothness behaves in that
    pacer and makes no tier, as it promises less than a wait for a present (how many frames wait is the swap chain's
    number): settled with the one list of tiers (decision 2).
-7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Not decided.
+7. **The pacer switched off**: does the application go on reporting, so the pacer starts with a history? Decided on
+   2026-10-09 and built: yes. An application that stops pacing says so (`TierPacer::SetPacing`) and goes on with every
+   call. A frame is then given nothing to carry out (no wait, no start time, nothing for its present), its animation
+   step is the time since the frame before it started, as an application without a pacer steps (one refresh across a
+   pause), and its marker has no intended display time and no target frame time. The vertical blank readings, the
+   presents, the GPU's work and the display reports are taken as before; the waits no plan asked for are not, and the
+   swap interval rule gets no frame, as a frame that is not placed can not be late. Pacing that starts again is a
+   handover as a change of the active set is: the first frame is placed anew, the frame ids, the animation time and
+   the swap interval go on, and the pause after start-up is to be made once more when frames were made unpaced. It is
+   a third part beside the two that place frames (`FreeRunLoop`), and the state a display with a variable refresh
+   rate needs ("Variable refresh"); nothing of variable refresh is built with it.
+   The simulation only (a display whose side holds a loop nothing paces, with one frame waiting; paced, not paced for
+   200 frames, paced again; the four ways of pacing that have a pacer in major tier 3, both aims): every frame is on
+   screen for one refresh again once the first paced frames are through. Two things it shows. **The first paced frame
+   is placed as the first frame of a run is**: it begins where the loop happens to be in a refresh, and where that is
+   too late for the vertical blank after it, it is shown a refresh later and counted as one late frame. And **with a
+   wait for a present and the aim of low latency one frame waits afterwards where none did before**: the wait keeps
+   the frames that wait to the one that may and takes none away, so the frame that piled up while nothing was paced
+   stays. Without the wait the pause after start-up takes it away. Not decided: whether the first wait after pacing
+   starts again should be for the last present.
 8. **The aim where two goals pull apart**: it is the application's choice between the two aims. Not latency optimized: no
    missed refreshes first, then the frame rate asked for, and latency is what that costs. Latency optimized: the fewest
    frames waiting first.

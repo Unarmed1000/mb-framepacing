@@ -209,7 +209,7 @@ TEST(Golden, EveryRunOfTheTierPacersLoopGivesTheBytesOfItsGoldenFile)
   }
   const std::vector<Sim::TierLoopGoldenRun> runs = Sim::TierLoopGolden::Runs();
   // Four ways of pacing, two aims, sixteen cases
-  ASSERT_EQ(runs.size(), 128u);
+  ASSERT_EQ(runs.size(), 136u);
   uint32_t whole = 0;
   for (const Sim::TierLoopGoldenRun& run : runs)
   {
@@ -237,6 +237,6 @@ TEST(Golden, EveryRunOfTheTierPacersLoopGivesTheBytesOfItsGoldenFile)
     EXPECT_EQ(line, expectedLine);
     ++count;
   }
-  EXPECT_EQ(count, 129u);
+  EXPECT_EQ(count, 137u);
   EXPECT_TRUE(digests == expected);
 }
