@@ -108,9 +108,9 @@ jobs:
         run: python3 tools/check_license_headers.py
       - name: uv (Python from .python-version, the dev tools from uv.lock)
         uses: astral-sh/setup-uv@v10.2.0
-      - name: Python dev tools (pyproject.toml, uv.lock)
+      - name: Python dev tools (pyproject.toml, uv.lock; the group trace is what tools/trace_augment.py needs)
         run: |
-          uv sync --locked
+          uv sync --locked --group trace
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Python scripts (ruff, basedpyright)
         run: |
@@ -119,6 +119,10 @@ jobs:
           basedpyright
       - name: Python library (against the golden marker set and the golden data)
         run: python3 -m unittest discover -s sdk/python -t sdk/python
+      - name: Repository scripts (tools/tests; the trace tests read their traces back with Perfetto's trace processor)
+        env:
+          MB_REQUIRE_TRACE_PROCESSOR: "1"
+        run: python -m unittest discover -s tools/tests -t tools
       - name: Reference shaders (glslang; drawing them needs a GPU, see tools/check_shaders.py --render)
         run: |
           sudo apt-get update && sudo apt-get install -y glslang-tools

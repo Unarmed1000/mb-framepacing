@@ -190,6 +190,30 @@ this would take it back to what the analysis produces and what a report holds.
 It touches the analysis, the charts and everything that reads a frame, so it is a redesign, not a pass. What was measured and done
 without it: the output files, the analysis and the report cards of an hour take seconds and allocate little beyond what they keep.
 
+## A capture and a Perfetto trace
+
+[`tools/trace_augment.py`](../measure/doc/perfetto.md) (experimental) joins a capture's analysis with a
+[Perfetto](https://perfetto.dev) trace recorded on the device during the same run: the capture's measurements as tracks in the
+trace, and a CSV of what the trace says of each presented frame. It is checked against traces its own tests make; **no recorded
+trace has been through it**.
+
+**Out of experimental:** a recorded trace and a capture of the same run, on each kind of system a trace comes from, to prove
+the two parts that rest on our reading of the trace: which of the system's frames is which frame of the capture, and where a
+display's vertical blanks are.
+
+**Possible upgrades:**
+
+- **Frames matched by an id, not by time:** the application writes the marker's frame index into the trace at each frame's
+  start (a trace counter or a slice named for it), and the tool matches by that. It would also place a capture whose markers
+  carry no times, and it needs no assumption about which clock the application's is. It is the application's to write: the
+  SDK calls no platform API.
+- **The trace under the video:** the trace's tracks for a run in [the playback page](../measure/doc/usage.md#the-playback-page),
+  on the playhead that the report and the recording already share.
+- **In the tools themselves:** the same join in `mb-framepacing` and its report cards, in place of a script. Perfetto's reader
+  is a native program, so it would be found and run as ffmpeg is, never bundled.
+- **More of the trace per frame:** the CPUs' and the GPU's frequency while a frame was made, the GPU's render stages, the
+  compositor's own work on the frame.
+
 ## Later
 
 - **Synced playback in the GUI:** click a spike in the Timeline to see the captured frame it came from, inside the GUI. Today

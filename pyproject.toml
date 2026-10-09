@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # The repository's Python development tools, managed with uv (https://docs.astral.sh/uv/): `uv sync` creates .venv with them on the
 # Python of .python-version (the minimum the libraries support), and uv.lock pins every package they bring along. The scripts
-# themselves only need the standard library; the SDK's Python library has its own pyproject.toml (sdk/python).
+# themselves only need the standard library, but for the one the group `trace` is for; the SDK's Python library has its own
+# pyproject.toml (sdk/python).
 #   uv sync                                    create or update .venv (CI: uv sync --locked)
 #   uv run ruff check . && uv run ruff format --check . && uv run basedpyright
 #   uv run tools/check_cpp.py                  C++ formatting and clang-tidy (python tools/check_cpp.py, see CLAUDE.md)
@@ -24,6 +25,13 @@ dev = [
     "clang-tidy==22.1.8",
     "conan==2.33.0",
     "ruff==0.16.9",
+]
+# What tools/trace_augment.py needs and nothing else does (experimental, measure/doc/perfetto.md): Perfetto's own Python package,
+# which reads a trace through Perfetto's trace processor (a native program it downloads on first use) and writes one with
+# protobuf. Not part of `uv sync`: `uv run --group trace tools/trace_augment.py ...`, and CI syncs with it to check and test the script
+trace = [
+    "perfetto==0.58.2",
+    "protobuf>=6.31.1",
 ]
 
 [tool.uv]

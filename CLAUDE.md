@@ -150,9 +150,31 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
   - The `linux-sanitize` preset (Clang, AddressSanitizer + UndefinedBehaviorSanitizer, compile database) is what CI runs the tests
     and clang-tidy with.
   - `cmake/Version.hpp.in` is guarded with `// clang-format off`, because formatting breaks its `@VAR@` placeholders.
-- **Python scripts** (`measure/build_standalone.py`, `tools/`, `sdk/unity/build_upm.py`): standard library only. They must pass
-  `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`, `pyrightconfig.json`, recommended mode). CI runs
-  all three.
+- **Python scripts** (`measure/build_standalone.py`, `tools/`, `sdk/unity/build_upm.py`): standard library only, but for the
+  Perfetto script (below). They must pass `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`,
+  `pyrightconfig.json`, recommended mode). CI runs all three. Their tests are in `tools/tests` (`python -m unittest discover -s
+tools/tests -t tools`; CI's `lint`).
+- **A capture and a Perfetto trace: EXPERIMENTAL** (`tools/trace_augment.py`, `measure/doc/perfetto.md`; the user, 2026-10-09: load a
+  trace with a capture for extra information, and add the capture's measurements to the trace, with Perfetto's Python package).
+  - It adds a run's measurements to a trace as tracks (`-o`), writes a CSV of what the trace says of each presented frame
+    (`--frames`), or writes the capture alone as a trace. `--inspect` lists what a trace has.
+  - **Checked against traces its own tests make only. No recorded trace has been through it:** every place that describes it says
+    so, until one has. A trace names a device and its programs: **never store a recorded trace in the repository** or quote from
+    one without the user's word.
+  - The parts: `trace_alignment.py` (the clocks, integer arithmetic), `trace_events.py` (a capture's frames as tracks) and
+    `trace_frames.py` (the per-frame join) need nothing but the standard library and are tested alone; `trace_tracks.py` (writes)
+    and `trace_source.py` (reads) are the only files that import Perfetto's package (`# pyright: basic`, as `shader_render.py`).
+  - The package is the dependency group `trace` of `pyproject.toml` (`uv run --group trace ...`; pinned in `uv.lock`). It reads
+    through Perfetto's trace processor, a native program it downloads on first use into the user's home folder: the tests that
+    need it are skipped when it can not be had, and CI sets `MB_REQUIRE_TRACE_PROCESSOR` so that there they fail instead.
+  - **The tracks go before the trace's own packets, on the trace's own clock with no clock named** (`trace_tracks.py`): a reader
+    takes a long recording piece by piece and drops what comes after with an earlier time (`sorter_push_event_out_of_order`; a
+    third of the events of a test trace with two such marks, when they were appended). Keep the test of it
+    (`test_a_trace_written_in_pieces`). The frame timeline's messages are not in the Python package's protos: the tests write
+    them field by field (`tools/tests/synthetic_trace.py`).
+  - The clocks are tied by the frames only (`measure/doc/perfetto.md` "The clocks"): a delay the whole run shares can not be told
+    from the clocks' difference. Never describe a track's position as measured beyond that.
+  - It is out of `usage.md`, as every experimental feature is out of the workflow documents.
 - **uv manages the Python dev tools:** the root `pyproject.toml` (not a package) pins them in its `dev` group, `uv.lock` pins
   everything they bring, and `.python-version` is the minimum Python (3.12). `uv sync` creates `.venv` on it; `uv run <tool or
 script>` runs inside it, and CI runs `uv sync --locked`. `tools/check_cpp.py` and `tools/check_conan.py` use the tools next to the
@@ -354,7 +376,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   little or no compression. Its OBS settings are proposed, not yet verified with a recording: say so until they are. The README
   opens with the sister repository's page (the slides), then how it works and this workflow.
 - **The root README never mentions an experimental feature** (the user's rule) except in its one "Experimental features" section,
-  which names each (live capture, camera capture, the pacer) with a link to its guide: no experimental commands, options, GUI
+  which names each (live capture, camera capture, the pacer, a capture and a Perfetto trace) with a link to its guide: no experimental commands, options, GUI
   switches or diagram paths anywhere else in it. The other documents say "experimental" wherever the feature appears.
 - **Live capture is EXPERIMENTAL** (`measure/doc/live-capture.md`, agreed with the user): recording a capture card or a network stream
   with the tools themselves. It is out of the workflow documents (README, usage.md, the install guides); live-capture.md has it,

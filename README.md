@@ -437,6 +437,8 @@ Some features are experimental, hidden unless you ask for them, and described in
 - [Live capture](measure/doc/live-capture.md): recording a capture card or a network stream with mb-framepacing itself.
 - [Camera capture](measure/doc/camera.md): a high speed camera filming the screen.
 - [The frame pacer](sdk/doc/pacer.md): a C++ module that paces a frame loop and fills the marker's pacing fields.
+- [A capture and a Perfetto trace](measure/doc/perfetto.md): the capture's measurements as tracks in a Perfetto trace of the same
+  run, and what the trace says of each frame.
 
 ## Configuration
 
