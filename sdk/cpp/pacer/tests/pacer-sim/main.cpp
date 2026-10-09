@@ -8,8 +8,8 @@
 //   pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]   one scenario to stdout (rate: Hz, numerator / denominator)
 //
 // And the tier pacer in a frame loop on a display that queues its presents (FrameLoopSimulation.hpp), as a frame log to stdout
-// with the column names of the first integration's logs. The word after --loop is kept from an earlier loop and changes
-// nothing. Without --wait-for-present, --vblank-pacer or --vblank-wait-pacer the pacer has a timer and the refresh period only:
+// with the column names of the first integration's logs, which tools/frame_stages_chart.py draws. The word after --loop is kept from an earlier loop
+// and changes nothing. Without --wait-for-present, --vblank-pacer or --vblank-wait-pacer the pacer has a timer and the refresh period only:
 //
 //   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-nanoseconds <n>]// [--timer-late-nanoseconds
 //   <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]

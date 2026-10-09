@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // EXPERIMENTAL. The tier pacer at the refresh rates monitors have, 50 to 540 Hz, in the simulation's loop (SimulateTierLoop): the
-// four ways of pacing that have a pacer without a time on the present, both aims. What MonitorRateTests.cpp checks of today's
-// pacer, as far as it carries over. The simulation only.
+// four ways of pacing that have a pacer without a time on the present, both aims. What the pacer this one replaced was checked
+// for at those rates, as far as it carries over. The simulation only.
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
