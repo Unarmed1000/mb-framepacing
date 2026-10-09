@@ -11,12 +11,12 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What the pacer plans for a frame (FramePacer::BeginFrame): the swap interval to
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What the pacer plans for a frame (TierPacer::BeginFrame): the swap interval to
   //! hold it for, the time to render it for, and the marker's pacing fields.
   struct FrameSchedule
   {
-    //! The frame's id: the pacer's own count of the frames it began, from 1. The application gives it back with the frame's present
-    //! feedback (PresentFeedback), where its platform has any.
+    //! The frame's id: the pacer's own count of the frames it began, from 1. The application gives it back with the frame's reports
+    //! (its present, its waits, the GPU's work, its display time).
     uint64_t FrameId{0};
     //! Refreshes from the previous frame's display to this one's: DXGI's SyncInterval, eglSwapInterval, QualitySettings.vSyncCount.
     uint32_t SwapInterval{1};

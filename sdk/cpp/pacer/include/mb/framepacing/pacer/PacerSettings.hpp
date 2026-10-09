@@ -12,7 +12,7 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). How a FramePacer paces. The display's refresh period is required; every other value
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). How a TierPacer paces. The display's refresh period is required; every other value
   //! has a default, the rule's being those of the adaptive swap interval rule the mb-framepacing-explained repository describes and
   //! simulates: they are settings, not properties of frame pacing in general. Always valid: every setter asserts that its value is within
   //! its range; without asserts it clamps a value outside into it.
@@ -28,7 +28,6 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_frameMargin{NanosecondTimeSpan::NanosecondsPerMillisecond};
     bool m_frameMarginSet{false};
     NanosecondTimeSpan m_slowestFrameTime{50 * NanosecondTimeSpan::NanosecondsPerMillisecond};
-    bool m_usePresentFeedback{false};
     PacerAim m_aim{PacerAim::Smoothness};
     uint32_t m_waitingPresents{0};
     uint32_t m_presentWaitSwapIntervals{4};
@@ -177,22 +176,7 @@ namespace MB::FramePacing::Pacer
 
     void SetSlowestFrameTime(NanosecondTimeSpan frameTime) noexcept;
 
-    //! Take the display times the application reports (FramePacer::AddPresentFeedback): for a platform with present feedback, on a
-    //! display with a fixed refresh rate. The pacer paces the same with it (by the frame starts and the frames' work); the display
-    //! times are counted (FramePacer::FeedbackState) and the intended display time is counted from them, unknown while there is
-    //! none. false, the default: feedback is not looked at.
-    [[nodiscard]] bool UsePresentFeedback() const noexcept
-    {
-      return m_usePresentFeedback;
-    }
-
-    void SetUsePresentFeedback(const bool usePresentFeedback) noexcept
-    {
-      m_usePresentFeedback = usePresentFeedback;
-    }
-
-    //! What the tier pacers optimize for (PacerAim): PacerAim::Smoothness, the default, or PacerAim::LowLatency. FramePacer has
-    //! no aims and does not read it.
+    //! What the pacer optimizes for (PacerAim): PacerAim::Smoothness, the default, or PacerAim::LowLatency.
     [[nodiscard]] PacerAim Aim() const noexcept
     {
       return m_aim;

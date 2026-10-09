@@ -3,7 +3,6 @@
 #include "FrameLoopSimulation.hpp"
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
@@ -33,14 +32,6 @@ namespace MB::FramePacing::Pacer::Simulation
 {
   namespace
   {
-    //! The vertical blank nearest to a time, counted from one the loop knows
-    int64_t NearestBlank(const int64_t blankNanoseconds, const int64_t periodNanoseconds, const int64_t nanoseconds) noexcept
-    {
-      const int64_t fromBlank = nanoseconds - blankNanoseconds;
-      const int64_t refreshes = (fromBlank >= 0 ? (fromBlank + (periodNanoseconds / 2)) : (fromBlank - (periodNanoseconds / 2))) / periodNanoseconds;
-      return blankNanoseconds + (refreshes * periodNanoseconds);
-    }
-
     //! A wait on a timer: it wakes a little after its time, and a time that has passed is no wait
     int64_t WaitUntil(const int64_t now, const int64_t target, SplitMix64& random, const NanosecondRange late) noexcept
     {
@@ -52,12 +43,6 @@ namespace MB::FramePacing::Pacer::Simulation
     {
       const bool isLong = std::find(settings.LongFrames.begin(), settings.LongFrames.end(), index) != settings.LongFrames.end();
       return random.Draw(range.MinNanoseconds, range.MaxNanoseconds) + (isLong ? settings.LongFrameCpuNanoseconds : 0);
-    }
-
-    //! A frame's work on the CPU, of a loop whose work does not change in a run
-    int64_t CpuWork(const LoopSettings& settings, const int32_t index, SplitMix64& random)
-    {
-      return CpuWork(settings, settings.CpuWork, index, random);
     }
 
     //! What a tier pacer's loop can do: what its pacer is named for, and the timed presents the settings give it
@@ -163,138 +148,6 @@ namespace MB::FramePacing::Pacer::Simulation
         out << Ticks(nanoseconds);
       }
     }
-  }
-
-  std::vector<LoopFrame> SimulateLoop(const LoopSettings& settings)
-  {
-    const RefreshPeriod period = RefreshPeriod::FromRate(settings.RateNumerator, settings.RateDenominator);
-    const int64_t periodNanoseconds = period.ToNanosecondTimeSpan().Nanoseconds();
-    PacerSettings pacerSettings(period);
-    pacerSettings.SetAutoSwapInterval(settings.AutoSwapInterval);
-    FramePacer pacer(pacerSettings);
-    DisplayModel display(period, settings.Display);
-    SplitMix64 random(settings.Seed);
-
-    std::vector<LoopFrame> frames;
-    frames.reserve(static_cast<std::size_t>(std::max(settings.Frames, 0)));
-    int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
-    // The loop's own state: the time the next frame may start, and the times the last present and frame start were held to
-    int64_t nextFrameStartNanoseconds = 0;
-    int64_t presentDueNanoseconds = 0;
-    int64_t frameStartDueNanoseconds = 0;
-    int64_t previousPresentNanoseconds = 0;
-    int64_t previousGpuEndNanoseconds = 0;
-    int64_t previousGpuWorkNanoseconds = 0;
-    for (int32_t index = 0; index < settings.Frames; ++index)
-    {
-      LoopFrame frame;
-      // The first place to wait: before the frame takes anything
-      if (nextFrameStartNanoseconds != 0)
-      {
-        frame.WaitBeginNanoseconds = now;
-        frame.WaitTargetNanoseconds = nextFrameStartNanoseconds;
-        now = WaitUntil(now, nextFrameStartNanoseconds, random, settings.TimerLate);
-        nextFrameStartNanoseconds = 0;
-      }
-      if (settings.WaitsForPreviousGpuWork)
-      {
-        now = std::max(now, previousGpuEndNanoseconds);
-      }
-      now = display.AcquireNanoseconds(now);
-
-      frame.StartNanoseconds = now;
-      frame.PendingAtStart = display.Pending(now);
-      const int64_t blankNanoseconds = display.BlankNanoseconds(display.BlankAtOrBefore(now));
-      const FrameSchedule schedule = pacer.BeginFrame(NanosecondTickCount(now));
-      const FrameWindowState window = pacer.FrameWindow();
-      frame.FrameId = schedule.FrameId;
-      frame.SwapInterval = schedule.SwapInterval;
-      frame.AnimationNanoseconds = schedule.AnimationTime.Nanoseconds();
-      frame.AnimationStepNanoseconds = schedule.AnimationStep.Nanoseconds();
-      frame.IntendedDisplayNanoseconds = schedule.IntendedDisplayTime.Nanoseconds();
-      frame.NextFrameStartNanoseconds = schedule.NextFrameStartTime.Nanoseconds();
-      frame.TargetFrameTimeNanoseconds = schedule.TargetFrameTime.Nanoseconds();
-      frame.WindowFrames = window.Frames;
-      frame.WindowLateFrames = window.LateFrames;
-
-      // The work: the CPU's, then the GPU's once it is free. The pacer is given the GPU's time of the frame before, as the
-      // sample only has a frame's GPU time later
-      frame.WorkCpuNanoseconds = CpuWork(settings, index, random);
-      frame.WorkGpuNanoseconds = previousGpuWorkNanoseconds;
-      now += frame.WorkCpuNanoseconds;
-      frame.WorkEndNanoseconds = now;
-      static_cast<void>(pacer.EndFrame(NanosecondTickCount(now), NanosecondTimeSpan(frame.WorkCpuNanoseconds + frame.WorkGpuNanoseconds)));
-      previousGpuWorkNanoseconds = random.Draw(settings.GpuWork.MinNanoseconds, settings.GpuWork.MaxNanoseconds);
-      frame.GpuBeginNanoseconds = std::max(now, previousGpuEndNanoseconds);
-      frame.GpuEndNanoseconds = frame.GpuBeginNanoseconds + previousGpuWorkNanoseconds;
-      previousGpuEndNanoseconds = frame.GpuEndNanoseconds;
-
-      // The second place to wait: before the present. The sample's calculations, which the present itself does not do
-      const int64_t lastPresentDueNanoseconds = presentDueNanoseconds;
-      const int64_t lastFrameStartDueNanoseconds = frameStartDueNanoseconds;
-      presentDueNanoseconds = 0;
-      frameStartDueNanoseconds = 0;
-      const int64_t frameTimeNanoseconds = frame.NextFrameStartNanoseconds - frame.StartNanoseconds;
-      const int64_t phaseNanoseconds = (periodNanoseconds * settings.VBlankPhasePercent) / 100;
-      if (schedule.SwapInterval <= 1)
-      {
-        // The present holds the frame for its one refresh; the loop waits for the pacer's time, counted from the time it held the
-        // frame before to
-        if (settings.Profile == LoopProfile::RenderLate)
-        {
-          const bool isOnCount =
-            lastFrameStartDueNanoseconds != 0 && (frame.StartNanoseconds - lastFrameStartDueNanoseconds) <= (frameTimeNanoseconds / 2);
-          int64_t dueNanoseconds = (isOnCount ? lastFrameStartDueNanoseconds : frame.StartNanoseconds) + frameTimeNanoseconds;
-          if (settings.HasVBlankTimes)
-          {
-            dueNanoseconds = NearestBlank(blankNanoseconds, periodNanoseconds, dueNanoseconds);
-          }
-          nextFrameStartNanoseconds = dueNanoseconds;
-          frameStartDueNanoseconds = dueNanoseconds;
-        }
-        else
-        {
-          const bool isOnCount =
-            lastPresentDueNanoseconds != 0 && (previousPresentNanoseconds - lastPresentDueNanoseconds) <= (frameTimeNanoseconds / 2);
-          int64_t dueNanoseconds = (isOnCount ? lastPresentDueNanoseconds : frame.StartNanoseconds) + frameTimeNanoseconds;
-          if (settings.HasVBlankTimes)
-          {
-            dueNanoseconds = NearestBlank(blankNanoseconds, periodNanoseconds, dueNanoseconds - phaseNanoseconds) + phaseNanoseconds;
-          }
-          frame.PresentWaitBeginNanoseconds = now;
-          frame.PresentWaitTargetNanoseconds = dueNanoseconds;
-          now = WaitUntil(now, dueNanoseconds, random, settings.TimerLate);
-          presentDueNanoseconds = dueNanoseconds;
-        }
-      }
-      else if (settings.HasVBlankTimes)
-      {
-        // A longer swap interval than the present holds: presented in the refresh before the vertical blank the frame is aimed
-        // at, and the next frame starts at that blank
-        const int64_t targetNanoseconds =
-          NearestBlank(blankNanoseconds, periodNanoseconds, frame.StartNanoseconds + (periodNanoseconds * schedule.SwapInterval));
-        frame.PresentWaitBeginNanoseconds = now;
-        frame.PresentWaitTargetNanoseconds = (targetNanoseconds - periodNanoseconds) + phaseNanoseconds;
-        now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
-        nextFrameStartNanoseconds = targetNanoseconds;
-      }
-      else
-      {
-        // The same with a timer only: as late as the present still reaches the refresh, which is a guess
-        const int64_t marginNanoseconds = std::min(NanosecondTimeSpan::NanosecondsPerMillisecond, periodNanoseconds / 8);
-        frame.PresentWaitBeginNanoseconds = now;
-        frame.PresentWaitTargetNanoseconds = (frame.NextFrameStartNanoseconds - periodNanoseconds) + marginNanoseconds;
-        now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
-        nextFrameStartNanoseconds = frame.NextFrameStartNanoseconds;
-      }
-
-      frame.PresentNanoseconds = now;
-      previousPresentNanoseconds = now;
-      frame.ShownNanoseconds = display.Present(now, frame.GpuEndNanoseconds);
-      frames.push_back(frame);
-      now += settings.LoopNanoseconds;
-    }
-    return frames;
   }
 
   std::vector<LoopFrame> SimulateTierLoop(const LoopSettings& settings, const PacerCapability named)
@@ -536,10 +389,10 @@ namespace MB::FramePacing::Pacer::Simulation
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
       const LoopFrame& frame = frames[index];
-      out << index << ',' << frame.FrameId << ",1," << frame.SwapInterval << ',' << (settings.HasVBlankTimes ? 1 : 0) << ','
-          << Ticks(periodNanoseconds) << ',' << Ticks(frame.TargetFrameTimeNanoseconds) << ',' << Ticks(frame.AnimationNanoseconds) << ','
-          << Ticks(frame.AnimationStepNanoseconds) << ',' << Ticks(frame.WorkCpuNanoseconds) << ',' << Ticks(frame.WorkGpuNanoseconds) << ','
-          << frame.WindowFrames << ',' << frame.WindowLateFrames << ',' << frame.PendingAtStart;
+      out << index << ',' << frame.FrameId << ",1," << frame.SwapInterval << ',' << "1," << Ticks(periodNanoseconds) << ','
+          << Ticks(frame.TargetFrameTimeNanoseconds) << ',' << Ticks(frame.AnimationNanoseconds) << ',' << Ticks(frame.AnimationStepNanoseconds)
+          << ',' << Ticks(frame.WorkCpuNanoseconds) << ',' << Ticks(frame.WorkGpuNanoseconds) << ',' << frame.WindowFrames << ','
+          << frame.WindowLateFrames << ',' << frame.PendingAtStart;
       Moment(out, frame.WaitBeginNanoseconds);
       Moment(out, frame.WaitTargetNanoseconds);
       Moment(out, frame.StartNanoseconds);

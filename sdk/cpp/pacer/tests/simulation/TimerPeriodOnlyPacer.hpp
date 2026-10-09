@@ -1,5 +1,5 @@
-#ifndef MB_FRAMEPACING_PACER_TIER_TIMERPERIODONLYPACER_HPP
-#define MB_FRAMEPACING_PACER_TIER_TIMERPERIODONLYPACER_HPP
+#ifndef MB_FRAMEPACING_PACER_SIMULATION_TIMERPERIODONLYPACER_HPP
+#define MB_FRAMEPACING_PACER_SIMULATION_TIMERPERIODONLYPACER_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -22,8 +22,8 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built one tier's pacer at a time; FramePacer is
-  //! the pacer the library has until they replace it). The pacer of the lowest tier, PacerTier::TimerPeriodOnly, the
+  //! Test code (the pacer module, sdk/doc/pacer-design.md): TierPacer with its capabilities fixed, as the tier's pacer was
+  //! first built and as its tests still use it. The pacer of the lowest tier, PacerTier::TimerPeriodOnly, the
   //! baseline: a whole pacer by itself, for an application with a steady clock, the refresh period of the display its
   //! window is on, a wait until a time, and a present that shows every frame in order for at least a refresh. Every application has
   //! that, so every capability set reaches this pacer.

@@ -19,7 +19,6 @@
 #include <vector>
 #include "FrameLoopSimulation.hpp"
 #include "LoopFrame.hpp"
-#include "LoopProfile.hpp"
 #include "LoopSettings.hpp"
 
 namespace PC = MB::FramePacing::Pacer;
@@ -28,10 +27,9 @@ namespace Sim = MB::FramePacing::Pacer::Simulation;
 namespace
 {
   //! 240 Hz, GPU work of 90 % of a refresh, a fixed swap interval of 1: the case of the logs
-  Sim::LoopSettings Loop(const Sim::LoopProfile profile)
+  Sim::LoopSettings Loop()
   {
     Sim::LoopSettings settings;
-    settings.Profile = profile;
     settings.AutoSwapInterval = false;
     return settings;
   }
@@ -48,212 +46,9 @@ namespace
   }
 }
 
-TEST(FrameLoop, EveryFrameIsShownAfterItsWorkAndInTheOrderOfThePresents)
-{
-  for (const Sim::LoopProfile profile : {Sim::LoopProfile::RenderLate, Sim::LoopProfile::RenderEarly})
-  {
-    Sim::LoopSettings settings = Loop(profile);
-    settings.Frames = 300;
-    settings.Display.HeldBlanks = {100, 200};
-    const std::vector<Sim::LoopFrame> frames = Sim::SimulateLoop(settings);
-
-    ASSERT_EQ(frames.size(), 300u);
-    for (std::size_t index = 0; index < frames.size(); ++index)
-    {
-      EXPECT_EQ(frames[index].FrameId, index + 1);
-      EXPECT_GE(frames[index].PresentNanoseconds, frames[index].WorkEndNanoseconds) << index;
-      EXPECT_GE(frames[index].ShownNanoseconds, frames[index].PresentNanoseconds) << index;
-      EXPECT_GE(frames[index].ShownNanoseconds, frames[index].GpuEndNanoseconds) << index;
-      if (index > 0)
-      {
-        EXPECT_GT(frames[index].ShownNanoseconds, frames[index - 1].ShownNanoseconds) << index;
-        EXPECT_GT(frames[index].StartNanoseconds, frames[index - 1].StartNanoseconds) << index;
-        // The GPU works on one frame at a time
-        EXPECT_GE(frames[index].GpuBeginNanoseconds, frames[index - 1].GpuEndNanoseconds) << index;
-      }
-    }
-  }
-}
-
-TEST(FrameLoop, ALoopInStepWithTheDisplayKeepsItsLatency)
-{
-  const Sim::LoopSettings late = Loop(Sim::LoopProfile::RenderLate);
-  const int64_t period = PeriodNanoseconds(late);
-  for (const Sim::LoopFrame& frame : Sim::SimulateLoop(late))
-  {
-    // Started at a vertical blank, shown at the next
-    EXPECT_EQ(HalfRefreshesToDisplay(frame, period), 2) << frame.FrameId;
-    EXPECT_EQ(frame.PendingAtStart, 0) << frame.FrameId;
-  }
-
-  const std::vector<Sim::LoopFrame> early = Sim::SimulateLoop(Loop(Sim::LoopProfile::RenderEarly));
-  for (std::size_t index = 10; index < early.size(); ++index)
-  {
-    // Started right after the present before it, in the middle of a refresh, so the frame before is still on its way
-    EXPECT_EQ(HalfRefreshesToDisplay(early[index], period), 3) << index;
-    EXPECT_EQ(early[index].PendingAtStart, 1) << index;
-  }
-}
-
-TEST(FrameLoop, TodayAVerticalBlankWithoutAFrameTakenCostsARefreshOfLatencyThatNeverComesBack)
-{
-  for (const Sim::LoopProfile profile : {Sim::LoopProfile::RenderLate, Sim::LoopProfile::RenderEarly})
-  {
-    Sim::LoopSettings settings = Loop(profile);
-    settings.Frames = 800;
-    settings.Display.HeldBlanks = {150, 300, 450};
-    const int64_t period = PeriodNanoseconds(settings);
-    const std::vector<Sim::LoopFrame> frames = Sim::SimulateLoop(settings);
-    const int64_t base = HalfRefreshesToDisplay(frames[100], period);
-    const int32_t basePending = frames[100].PendingAtStart;
-
-    // One refresh more after each held blank
-    EXPECT_EQ(HalfRefreshesToDisplay(frames[250], period), base + 2);
-    EXPECT_EQ(HalfRefreshesToDisplay(frames[400], period), base + 4);
-    EXPECT_EQ(frames[250].PendingAtStart, basePending + 1);
-    EXPECT_EQ(frames[400].PendingAtStart, basePending + 2);
-    // And three refreshes more for every frame of the rest of the run: the loop goes on at one frame per refresh
-    for (std::size_t index = 460; index < frames.size(); ++index)
-    {
-      EXPECT_EQ(HalfRefreshesToDisplay(frames[index], period), base + 6) << index;
-      EXPECT_EQ(frames[index].PendingAtStart, basePending + 3) << index;
-      // A refresh, to the nanosecond the period is rounded to
-      EXPECT_NEAR(static_cast<double>(frames[index].StartNanoseconds - frames[index - 1].StartNanoseconds), static_cast<double>(period), 1.0)
-        << index;
-    }
-  }
-}
-
-TEST(FrameLoop, TodayThePacerSeesNothingOfIt)
-{
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
-  settings.AutoSwapInterval = true;
-  settings.Frames = 800;
-  settings.Display.HeldBlanks = {150, 300, 450};
-  const std::vector<Sim::LoopFrame> held = Sim::SimulateLoop(settings);
-  settings.Display.HeldBlanks = {};
-  const std::vector<Sim::LoopFrame> inStep = Sim::SimulateLoop(settings);
-
-  // The pacer is given frame starts and work: they are the same in both runs, so its answers are
-  ASSERT_EQ(held.size(), inStep.size());
-  for (std::size_t index = 0; index < held.size(); ++index)
-  {
-    EXPECT_EQ(held[index].StartNanoseconds, inStep[index].StartNanoseconds) << index;
-    EXPECT_EQ(held[index].SwapInterval, inStep[index].SwapInterval) << index;
-    EXPECT_EQ(held[index].AnimationNanoseconds, inStep[index].AnimationNanoseconds) << index;
-    EXPECT_EQ(held[index].IntendedDisplayNanoseconds, inStep[index].IntendedDisplayNanoseconds) << index;
-    EXPECT_EQ(held[index].WindowLateFrames, 0u) << index;
-  }
-  // While the display shows the last frames three refreshes later
-  EXPECT_EQ(held.back().ShownNanoseconds - inStep.back().ShownNanoseconds,
-            PC::RefreshPeriod::FromRate(settings.RateNumerator).TimeFor(3).Nanoseconds());
-}
-
-TEST(FrameLoop, WithImagesThatBoundTheWaitingFramesTheLatencyStopsAtTheBound)
-{
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
-  settings.Frames = 800;
-  settings.Display.Images = 3;
-  settings.Display.HeldBlanks = {150, 300, 450};
-  const int64_t period = PeriodNanoseconds(settings);
-  const std::vector<Sim::LoopFrame> frames = Sim::SimulateLoop(settings);
-
-  EXPECT_EQ(HalfRefreshesToDisplay(frames[100], period), 2);
-  EXPECT_EQ(HalfRefreshesToDisplay(frames[250], period), 4);
-  // The acquire holds the loop for a refresh at the second and the third held blank: one frame waits, never two
-  for (std::size_t index = 310; index < frames.size(); ++index)
-  {
-    EXPECT_LE(frames[index].PendingAtStart, 1) << index;
-  }
-  EXPECT_EQ(HalfRefreshesToDisplay(frames.back(), period), 4);
-}
-
-TEST(FrameLoop, ALoopWithATimerOnlyBehavesTheSame)
-{
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
-  settings.Frames = 600;
-  settings.HasVBlankTimes = false;
-  settings.TimerLate = {0, 300'000};
-  settings.Display.HeldBlanks = {150, 300};
-  const int64_t period = PeriodNanoseconds(settings);
-  const std::vector<Sim::LoopFrame> frames = Sim::SimulateLoop(settings);
-
-  const int64_t base = HalfRefreshesToDisplay(frames[100], period);
-  for (std::size_t index = 320; index < frames.size(); ++index)
-  {
-    EXPECT_EQ(HalfRefreshesToDisplay(frames[index], period), base + 4) << index;
-  }
-}
-
-TEST(FrameLoop, ARunIsTheSameEveryTimeAndItsFrameLogHasARowPerFrame)
-{
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderEarly);
-  settings.Frames = 50;
-  settings.TimerLate = {0, 200'000};
-  const std::string first = Sim::ToFrameLog(Sim::SimulateLoop(settings), settings);
-  const std::string second = Sim::ToFrameLog(Sim::SimulateLoop(settings), settings);
-
-  EXPECT_EQ(first, second);
-  EXPECT_TRUE(first.starts_with("frameIndex,pacerFrameId,pacerOn,swapInterval,holdMethod,displayRefreshPeriodTicks,"));
-  EXPECT_EQ(std::count(first.begin(), first.end(), '\n'), 51);
-  // The first frame waits for nothing before its start: its two cells are empty
-  const std::size_t row = first.find('\n') + 1;
-  EXPECT_TRUE(first.substr(row).starts_with("0,1,1,1,1,41667,41667,"));
-  EXPECT_NE(first.substr(row, first.find('\n', row) - row).find(",,,"), std::string::npos);
-}
-
-// The pacer of the lowest tier (TimerPeriodOnlyPacer) in place of today's pacer and the loop's own calculations: the
-// application only carries out what it is given.
-
-TEST(FrameLoop, TheLowestPairsPacerPacesAsTodaysLoopOnATimerWhileNothingGoesWrong)
-{
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
-  settings.HasVBlankTimes = false;
-  settings.Frames = 600;
-  // Without its pause after start-up, which today's loop on this display has no need of either
-  settings.StartupPauseRefreshes = 0;
-  const std::vector<Sim::LoopFrame> today = Sim::SimulateLoop(settings);
-  const std::vector<Sim::LoopFrame> paced = Sim::SimulateTimerPeriodOnlyLoop(settings);
-
-  ASSERT_EQ(today.size(), paced.size());
-  for (std::size_t index = 0; index < today.size(); ++index)
-  {
-    // The frame starts drift apart by a third of a nanosecond a frame: today's loop adds the period's rounded nanoseconds up, the grid
-    // counts in the period itself
-    EXPECT_NEAR(static_cast<double>(paced[index].StartNanoseconds), static_cast<double>(today[index].StartNanoseconds),
-                1.0 + (static_cast<double>(index) / 3.0))
-      << index;
-    EXPECT_EQ(paced[index].ShownNanoseconds, today[index].ShownNanoseconds) << index;
-    EXPECT_EQ(paced[index].PendingAtStart, 0) << index;
-    EXPECT_EQ(paced[index].SwapInterval, 1u) << index;
-  }
-}
-
-TEST(FrameLoop, TodayAFrameThatRanLongLeavesAFrameWaitingForGoodOnATimer)
-{
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
-  settings.HasVBlankTimes = false;
-  settings.Frames = 400;
-  // Frame 100 works 1.6 refreshes longer on the CPU
-  settings.LongFrames = {100};
-  settings.LongFrameCpuNanoseconds = (PeriodNanoseconds(settings) * 16) / 10;
-  const int64_t period = PeriodNanoseconds(settings);
-  const std::vector<Sim::LoopFrame> frames = Sim::SimulateLoop(settings);
-
-  EXPECT_EQ(frames[99].PendingAtStart, 0);
-  EXPECT_EQ(HalfRefreshesToDisplay(frames[99], period), 2);
-  // The loop starts its count again from the late start, half a refresh off where it was: from then on every frame starts
-  // while the frame before it still waits, and is shown half a refresh later after its start
-  for (std::size_t index = 102; index < frames.size(); ++index)
-  {
-    EXPECT_EQ(frames[index].PendingAtStart, 1) << index;
-    EXPECT_EQ(HalfRefreshesToDisplay(frames[index], period), 3) << index;
-  }
-}
-
 TEST(FrameLoop, WithTheGridOnTheClockAFrameThatRanLongCostsWholeRefreshesAndNothingAfterIt)
 {
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 400;
   settings.LongFrames = {100};
   settings.LongFrameCpuNanoseconds = (PeriodNanoseconds(settings) * 16) / 10;
@@ -283,7 +78,7 @@ TEST(FrameLoop, TheLowestPairsPacerDoesNotSeeARefreshTheDisplayLostByItself)
 {
   // What this tier can not do, pinned: the frames are ready in time, the display takes none at three vertical blanks, and each
   // costs a refresh of latency for the rest of the run, as with today's pacer
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 800;
   settings.Display.HeldBlanks = {150, 300, 450};
   const int64_t period = PeriodNanoseconds(settings);
@@ -342,7 +137,7 @@ namespace
 
 TEST(FrameLoop, WithAWaitForTheLastPresentNoFrameWaitsAndALostRefreshCostsOneFrameStart)
 {
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 800;
   settings.WaitingPresents = 1;
   // Light work: a fifth of a refresh on the GPU
@@ -370,7 +165,7 @@ TEST(FrameLoop, WithAWaitForTheLastPresentNoFrameWaitsAndALostRefreshCostsOneFra
 
 TEST(FrameLoop, WithOnePresentAllowedToWaitOneWaitsAndNoMore)
 {
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 800;
   settings.WaitingPresents = 2;
   settings.GpuWork = {PeriodNanoseconds(settings) / 5, PeriodNanoseconds(settings) / 5};
@@ -395,7 +190,7 @@ TEST(FrameLoop, WorkThatDoesNotFitBesideTheWaitHalvesTheFrameRateWithNoPresentWa
 {
   // GPU work of 90 % of a refresh. The first integration measured this tier on a real swap chain: a frame every 1.94 refreshes
   // when waiting for the last present, every 0.96 when waiting for the one before it
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 800;
   const int64_t period = PeriodNanoseconds(settings);
 
@@ -419,7 +214,7 @@ TEST(FrameLoop, WorkThatDoesNotFitBesideTheWaitHalvesTheFrameRateWithNoPresentWa
 TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
 {
   // A display that shows nothing for a long stretch (a window that is hidden): every blank from 100 to 400 takes no frame
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 200;
   settings.WaitingPresents = 1;
   settings.GpuWork = {PeriodNanoseconds(settings) / 5, PeriodNanoseconds(settings) / 5};
@@ -464,7 +259,7 @@ TEST(FrameLoop, AWaitForAPresentThatRunsOutDoesNotStopTheLoop)
 TEST(FrameLoop, TheLowestPairsPauseAfterStartUpLetsTheDisplayTakeTheFramesThatPiledUp)
 {
   // Light work, and a display that takes no frame at two of its first vertical blanks: two frames wait from then on
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 800;
   settings.GpuWork = {PeriodNanoseconds(settings) / 5, PeriodNanoseconds(settings) / 5};
   settings.Display.HeldBlanks = {5, 6};
@@ -601,7 +396,7 @@ TEST(FrameLoop, WhenEveryFrameLosesARefreshTheAnimationKeepsUpWithTheClock)
 {
   // GPU work of 90 % of a refresh, a wait for the last present, the rule off: a frame about every two refreshes at a swap
   // interval of one. The first integration measured the animation at half speed in this case
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 800;
   settings.WaitingPresents = 1;
   const std::vector<Sim::LoopFrame> frames = Sim::SimulateTimerWaitForPresentLoop(settings);
@@ -622,7 +417,7 @@ TEST(FrameLoop, WhereverTheGridSitsAgainstTheDisplayAFrameThatRanLongLeavesNoFra
   {
     for (const int64_t longPercent : {110, 135, 160, 190, 240, 265})
     {
-      Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+      Sim::LoopSettings settings = Loop();
       settings.Frames = 300;
       settings.StartupPauseRefreshes = 0;
       const int64_t period = PeriodNanoseconds(settings);
@@ -664,7 +459,7 @@ namespace
   //! vertical blank, and one frame that runs long
   Sim::LoopSettings LoopWithALongFrame(const int64_t tenth, const int64_t longPercent, const PC::PacerAim aim)
   {
-    Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+    Sim::LoopSettings settings = Loop();
     settings.Frames = 600;
     settings.Aim = aim;
     settings.StartupPauseRefreshes = 0;
@@ -679,7 +474,7 @@ namespace
 
 TEST(FrameLoop, WithTheAimOfSmoothnessAFrameWaitsAndEveryFrameIsShownForOneRefresh)
 {
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 600;
   settings.Aim = PC::PacerAim::Smoothness;
   const int64_t period = PeriodNanoseconds(settings);
@@ -741,7 +536,7 @@ TEST(FrameLoop, WithTheAimOfSmoothnessAndAWaitForAPresentTheReserveIsExactlyWhat
 {
   // The wait is what this pacer has over the one without: after a long frame, and after vertical blanks at which the display
   // took no frame, the frames that wait are the one that may, not more
-  Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+  Sim::LoopSettings settings = Loop();
   settings.Frames = 900;
   settings.Aim = PC::PacerAim::Smoothness;
   const int64_t period = PeriodNanoseconds(settings);
@@ -783,7 +578,7 @@ namespace
   //! Light work at 240 Hz, a display that takes a frame so many tenths of a refresh before its vertical blank
   Sim::LoopSettings LightLoop(const int64_t tenth, const PC::PacerAim aim, const uint32_t waitingPresents = 2)
   {
-    Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+    Sim::LoopSettings settings = Loop();
     settings.Frames = 600;
     settings.Aim = aim;
     settings.WaitingPresents = waitingPresents;
@@ -916,7 +711,7 @@ TEST(FrameLoop, WithVerticalBlankTimesAndGpuWorkReportsAHeavyGpuLoadIsHeldAndOne
   {
     // GPU work of 90 % of a refresh at a fixed swap interval of one: a frame is started, or presented, that much sooner, and
     // every frame is on screen for one refresh
-    Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+    Sim::LoopSettings settings = Loop();
     settings.Frames = 800;
     settings.Aim = aim;
     settings.ReportsGpuWork = true;
@@ -952,7 +747,7 @@ TEST(FrameLoop, WhereTheSystemHoldsTheLoopASwapChainThatIsFullPacesItAndItDoesNo
   {
     for (const int64_t ppm : {int64_t{-2'000}, int64_t{0}, int64_t{2'000}})
     {
-      Sim::LoopSettings settings = Loop(Sim::LoopProfile::RenderLate);
+      Sim::LoopSettings settings = Loop();
       settings.Frames = 2'400;
       settings.Aim = PC::PacerAim::Smoothness;
       settings.GpuWork = {PeriodNanoseconds(settings) / 5, PeriodNanoseconds(settings) / 5};

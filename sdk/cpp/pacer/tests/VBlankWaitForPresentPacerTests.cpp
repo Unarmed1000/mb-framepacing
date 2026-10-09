@@ -19,12 +19,12 @@
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
-#include <mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "VBlankWaitForPresentPacer.hpp"
 
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;

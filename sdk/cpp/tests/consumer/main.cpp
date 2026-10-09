@@ -22,10 +22,14 @@
 #include <mb/framepacing/marker/payload/MarkerFlags.hpp>
 #include <mb/framepacing/marker/payload/Payload.hpp>
 #ifdef MB_CONSUMER_PACER
-#include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
+#include <mb/framepacing/pacer/capability/PacerTier.hpp>
+#include <mb/framepacing/pacer/capability/PacerTierText.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
+#include <mb/framepacing/pacer/frame/PresentPlan.hpp>
+#include <mb/framepacing/pacer/tier/TierPacer.hpp>
 #endif
 #include <array>
 #include <cstdint>
@@ -45,10 +49,12 @@ namespace
     namespace PC = MB::FramePacing::Pacer;
     PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));
     settings.SetPreferredFrameRate(30);
-    PC::FramePacer pacer(settings);
+    // An application with the baseline only: a clock, the refresh period, a wait until a time and a present
+    PC::TierPacer pacer(settings, PC::PacerCapabilities());
     const FP::NanosecondTickCount cpuStartTime = FP::NanosecondTickCount::FromSeconds(10);
     const PC::FrameSchedule schedule = pacer.BeginFrame(cpuStartTime);
-    const FP::NanosecondTimeDuration cpuBusy = pacer.EndFrame(cpuStartTime + FP::NanosecondTimeSpan::FromMilliseconds(4));
+    const PC::PresentPlan plan = pacer.EndFrame(cpuStartTime + FP::NanosecondTimeSpan::FromMilliseconds(4));
+    const FP::NanosecondTimeDuration cpuBusy = plan.CpuBusy;
     // The pacer and the marker both count in nanoseconds: the schedule's values go into the payload as they are
     const FM::Payload payload{FM::MarkerKind::Frame,
                               1u,
@@ -62,10 +68,12 @@ namespace
                               cpuBusy};
     FM::ModuleMatrix matrix;
     const bool encoded = FM::GenerateModules(payload, matrix);
-    std::printf("the pacer (experimental): swap interval %u, a %lld ns frame, %lld ns busy\n", static_cast<unsigned>(schedule.SwapInterval),
-                static_cast<long long>(payload.TargetFrameTime().Nanoseconds()), static_cast<long long>(payload.CpuBusy().Nanoseconds()));
-    return encoded && schedule.SwapInterval == 2u && payload.TargetFrameTime().Nanoseconds() == 33'333'333 &&
-           payload.CpuBusy().Nanoseconds() == 4'000'000;
+    const PC::PacerTier tier = pacer.Rating().Tier;
+    std::printf("the pacer (experimental): tier %s, swap interval %u, a %lld ns frame, %lld ns busy\n", PC::PacerTierText::NumberOf(tier).data(),
+                static_cast<unsigned>(schedule.SwapInterval), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()),
+                static_cast<long long>(payload.CpuBusy().Nanoseconds()));
+    return encoded && tier == PC::PacerTier::TimerPeriodOnly && schedule.SwapInterval == 2u &&
+           payload.TargetFrameTime().Nanoseconds() == 33'333'333 && payload.CpuBusy().Nanoseconds() == 4'000'000;
   }
 }
 #endif

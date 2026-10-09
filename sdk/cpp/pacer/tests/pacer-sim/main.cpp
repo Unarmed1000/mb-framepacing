@@ -7,16 +7,16 @@
 //   pacer-sim --golden <dir>                                     every golden scenario with its rules into <dir> (sdk/test-data/pacer)
 //   pacer-sim <frames.csv> <rate> [denominator] [--rule FullWindow|LateCount]   one scenario to stdout (rate: Hz, numerator / denominator)
 //
-// And a frame loop on a display that queues its presents (FrameLoopSimulation.hpp), as a frame log to stdout that
-// tools/frame_stages_chart.py draws:
+// And the tier pacer in a frame loop on a display that queues its presents (FrameLoopSimulation.hpp), as a frame log to stdout
+// with the column names of the first integration's logs. The word after --loop is kept from an earlier loop and changes
+// nothing. Without --wait-for-present, --vblank-pacer or --vblank-wait-pacer the pacer has a timer and the refresh period only:
 //
-//   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-nanoseconds <n>] [--timer-only]
-//             [--timer-late-nanoseconds <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
+//   pacer-sim --loop late|early [--rate <Hz>] [--frames <n>] [--gpu-percent <of a refresh>] [--cpu-nanoseconds <n>]// [--timer-late-nanoseconds
+//   <max>] [--fixed] [--seed <n>] [--latch-lead-percent <of a refresh>] [--pipeline <refreshes>]
 //             [--images <n>] [--hold <blank>,<blank>,...] [--long-frame <frame>,<more CPU nanoseconds>] [--tier-pacer]
 //             [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>] [--startup-pause <refreshes>]
 //
-//   --tier-pacer  the application carries out what the pacer of the lowest tier gives it, in place of today's pacer and
-//                 the first integration's own calculations
+//   --tier-pacer  a timer and the refresh period only, also with --wait-for-present given (which is then the reserve's number)
 //   --wait-for-present  the same with the pacer of a timer and a wait for a present
 //   --gpu-reports       the loop gives a tier pacer each frame's GPU work, begin and end
 //   --frames-in-flight  1: a frame starts when the GPU is done with the one before it; 2: the CPU works on a frame while the GPU
@@ -86,7 +86,6 @@ namespace
       return Usage();
     }
     Sim::LoopSettings settings;
-    settings.Profile = args[1] == "late" ? Sim::LoopProfile::RenderLate : Sim::LoopProfile::RenderEarly;
     int64_t gpuPercent = 90;
     int64_t latchLeadPercent = 0;
     bool tierPacer = false;
@@ -96,11 +95,6 @@ namespace
     for (std::size_t index = 2; index < args.size(); ++index)
     {
       const std::string_view name = args[index];
-      if (name == "--timer-only")
-      {
-        settings.HasVBlankTimes = false;
-        continue;
-      }
       if (name == "--fixed")
       {
         settings.AutoSwapInterval = false;
@@ -263,7 +257,8 @@ namespace
       std::cout << Sim::ToFrameLog(Sim::SimulateTimerWaitForPresentLoop(settings), settings);
       return 0;
     }
-    std::cout << Sim::ToFrameLog(tierPacer ? Sim::SimulateTimerPeriodOnlyLoop(settings) : Sim::SimulateLoop(settings), settings);
+    // Neither: a timer and the refresh period only, the baseline
+    std::cout << Sim::ToFrameLog(Sim::SimulateTimerPeriodOnlyLoop(settings), settings);
     return 0;
   }
 

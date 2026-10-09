@@ -19,9 +19,9 @@
 #include <mb/framepacing/pacer/frame/SystemWaitKind.hpp>
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
-#include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
+#include "TimerPeriodOnlyPacer.hpp"
 
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;

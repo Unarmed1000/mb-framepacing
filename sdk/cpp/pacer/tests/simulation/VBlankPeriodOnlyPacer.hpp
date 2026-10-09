@@ -1,5 +1,5 @@
-#ifndef MB_FRAMEPACING_PACER_TIER_VBLANKPERIODONLYPACER_HPP
-#define MB_FRAMEPACING_PACER_TIER_VBLANKPERIODONLYPACER_HPP
+#ifndef MB_FRAMEPACING_PACER_SIMULATION_VBLANKPERIODONLYPACER_HPP
+#define MB_FRAMEPACING_PACER_SIMULATION_VBLANKPERIODONLYPACER_HPP
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -23,8 +23,8 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built one tier's pacer at a time; FramePacer is
-  //! the pacer the library has until they replace it). The pacer of PacerTier::VBlankPeriodOnly: a whole pacer by
+  //! Test code (the pacer module, sdk/doc/pacer-design.md): TierPacer with its capabilities fixed, as the tier's pacer was
+  //! first built and as its tests still use it. The pacer of PacerTier::VBlankPeriodOnly: a whole pacer by
   //! itself, for an application that has the baseline (a steady clock, the refresh period of the display its window is on, a wait
   //! until a time, a present that shows every frame in order for at least a refresh) and is told when that display's vertical
   //! blanks are (PacerCapability::VBlankTimes).

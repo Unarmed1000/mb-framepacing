@@ -6,34 +6,31 @@
 // feedback too; only SetSettings with settings that need a larger frame window may allocate.
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
-#include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
-#include <mb/framepacing/pacer/clock/PacerRefreshClock.hpp>
 #include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/GpuWorkReport.hpp>
-#include <mb/framepacing/pacer/frame/PresentFeedback.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
-#include <mb/framepacing/pacer/tier/TimerPeriodOnlyPacer.hpp>
-#include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
-#include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
-#include <mb/framepacing/pacer/tier/VBlankWaitForPresentPacer.hpp>
 #include <mb/framepacing/testing/AllocationCounter.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
 #include <new>
+#include "TimerPeriodOnlyPacer.hpp"
+#include "TimerWaitForPresentPacer.hpp"
+#include "VBlankPeriodOnlyPacer.hpp"
+#include "VBlankWaitForPresentPacer.hpp"
 
 namespace FP = MB::FramePacing;
 namespace FT = MB::FramePacing::Testing;
@@ -46,103 +43,6 @@ TEST(Allocations, CountingWorks)
   void* const memory = ::operator new(sizeof(int));
   ::operator delete(memory);
   EXPECT_EQ(FT::AllocationCounter::Count(), 1u);
-}
-
-TEST(Allocations, PacingFramesDoesNotAllocate)
-{
-  // Made before counting: the pacer and the rule allocate their window here, once
-  const PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));
-  PC::FramePacer pacer(settings);
-  PC::FramePacer fullWindowPacer(
-    [&settings]
-    {
-      PC::PacerSettings copy = settings;
-      copy.SetSlowDown(PC::SlowDownRule::FullWindow);
-      return copy;
-    }());
-  PC::FramePacer feedbackPacer(
-    [&settings]
-    {
-      PC::PacerSettings copy = settings;
-      copy.SetUsePresentFeedback(true);
-      return copy;
-    }());
-  PC::PacerRefreshClock clock(settings.Refresh(), settings.FrameWindowLength());
-
-  int64_t written = 0;
-  {
-    const FT::AllocationCounter counter;
-    int64_t now = FP::NanosecondTimeSpan::NanosecondsPerSecond;
-    for (int64_t frame = 0; frame < 10'000; ++frame)
-    {
-      // Calm frames, then a busy stretch (every third frame over a refresh), the rule slowing down and speeding up again
-      const bool busy = (frame / 600) % 2 == 1;
-      const int64_t work = busy && frame % 3 == 0 ? 22'000'000 : 9'000'000;
-      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(now));
-      written += pacer.EndFrame(FP::NanosecondTickCount(now + work), FP::NanosecondTimeSpan(work)).Nanoseconds();
-      const PC::FrameSchedule other = fullWindowPacer.BeginFrame(FP::NanosecondTickCount(now));
-      written += fullWindowPacer.EndFrame(FP::NanosecondTickCount(now + work)).Nanoseconds();
-      written +=
-        clock.Advance(FP::NanosecondTickCount(now), schedule.SwapInterval).Step.Nanoseconds() + (clock.DisplayTimeAfter(1).Nanoseconds() % 3);
-      written += static_cast<int64_t>(pacer.FrameWindow().Frames) + (other.IntendedDisplayTime.Nanoseconds() % 7);
-      // Present feedback three frames after each frame: on time, late, off the grid, not shown, and none at all
-      const PC::FrameSchedule measured = feedbackPacer.BeginFrame(FP::NanosecondTickCount(now));
-      written += feedbackPacer.EndFrame(FP::NanosecondTickCount(now + work)).Nanoseconds() + (measured.IntendedDisplayTime.Nanoseconds() % 5);
-      if (measured.FrameId > 3u && frame % 7 != 0)
-      {
-        const FP::NanosecondTickCount shown(now + (frame % 11 == 0 ? 25'000'000 : 0) + (frame % 13 == 0 ? 7'000'000 : 0));
-        feedbackPacer.AddPresentFeedback(frame % 17 == 0 ? PC::PresentFeedback::NotShown(measured.FrameId - 3u)
-                                                         : PC::PresentFeedback::Shown(measured.FrameId - 3u, shown));
-      }
-      written += static_cast<int64_t>(feedbackPacer.FeedbackState().Used);
-      if (frame % 2'500 == 1'250)
-      {
-        clock.Restart();
-        pacer.Reset();
-      }
-      if (frame == 5'000)
-      {
-        pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(60'000, 1'001));
-        clock.SetRefreshPeriod(PC::RefreshPeriod::FromRate(60'000, 1'001));
-      }
-      // The same settings every frame, and now and then other ones that need no more room than the window has: a target frame rate
-      // and back
-      PC::PacerSettings current = pacer.Settings();
-      if (frame % 1'000 == 500)
-      {
-        current.SetPreferredFrameRate(30);
-      }
-      else if (frame % 1'000 == 750)
-      {
-        current.SetPreferredFrameTime({});
-      }
-      pacer.SetSettings(current);
-      now = std::max(schedule.IntendedDisplayTime.Nanoseconds(), now + work);
-    }
-    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
-  }
-  EXPECT_GT(written, 0) << "the calls must actually have produced output";
-}
-
-TEST(Allocations, SettingsThatNeedMoreRoomAllocateOnce)
-{
-  const PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));
-  PC::FramePacer pacer(settings);
-  PC::PacerSettings longer = settings;
-  longer.SetFrameWindowLength(FP::NanosecondTimeSpan(10 * FP::NanosecondTimeSpan::NanosecondsPerSecond));
-  {
-    const FT::AllocationCounter counter;
-    pacer.SetSettings(longer);
-    EXPECT_GE(FT::AllocationCounter::Count(), 1u);
-  }
-  {
-    // The room stays: the shorter window again, and the longer one again, allocate nothing
-    const FT::AllocationCounter counter;
-    pacer.SetSettings(settings);
-    pacer.SetSettings(longer);
-    pacer.SetSettings(longer);
-    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
-  }
 }
 
 TEST(Allocations, TheLowestPairsPacerPacesFramesWithoutAllocating)

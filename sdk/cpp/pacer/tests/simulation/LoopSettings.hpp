@@ -8,13 +8,12 @@
 #include <vector>
 #include "DisplayModelSettings.hpp"
 #include "LoopActiveSetChange.hpp"
-#include "LoopProfile.hpp"
 #include "LoopWorkChange.hpp"
 #include "NanosecondRange.hpp"
 
 namespace MB::FramePacing::Pacer::Simulation
 {
-  //! A frame loop to simulate (SimulateLoop): the application's side, and the display it presents to.
+  //! A frame loop to simulate (SimulateTierLoop): the application's side, and the display it presents to.
   struct LoopSettings
   {
     //! The refresh rate in Hz, RateNumerator / RateDenominator
@@ -23,11 +22,6 @@ namespace MB::FramePacing::Pacer::Simulation
     int32_t Frames{600};
     //! The seed the frames' times are drawn with (SplitMix64)
     uint64_t Seed{1};
-    LoopProfile Profile{LoopProfile::RenderLate};
-    //! true: the loop knows when the display refreshes and puts its times on the vertical blanks; false: it has a timer only
-    bool HasVBlankTimes{true};
-    //! Where in a refresh the loop presents when it has the vertical blank times, in percent of the refresh
-    int32_t VBlankPhasePercent{65};
     //! A frame's work on the CPU, from its start to its submit
     NanosecondRange CpuWork{100'000, 100'000};
     //! The frames (by their number from 0) whose CPU work is LongFrameCpuNanoseconds longer: frames that run long

@@ -18,9 +18,9 @@
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
-#include <mb/framepacing/pacer/tier/TimerWaitForPresentPacer.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
+#include "TimerWaitForPresentPacer.hpp"
 
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;

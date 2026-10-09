@@ -30,8 +30,8 @@
 
 namespace MB::FramePacing::Pacer
 {
-  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built; FramePacer is the pacer the library has
-  //! until this replaces it). The one pacer an application talks to: it is told what the application can do (its capabilities)
+  //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md; sdk/doc/pacer-design.md has how it came to be). The one pacer an
+  //! application talks to: it is told what the application can do (its capabilities)
   //! and which of that is active now, and paces every frame the way the active set's tier says. The application controls it by
   //! the active set and by nothing else: leaving a capability out is how a mechanism is switched off.
   //!

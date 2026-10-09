@@ -18,10 +18,10 @@
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
-#include <mb/framepacing/pacer/tier/VBlankPeriodOnlyPacer.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
 #include <cstdlib>
+#include "VBlankPeriodOnlyPacer.hpp"
 
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;
