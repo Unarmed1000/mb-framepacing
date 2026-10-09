@@ -390,6 +390,17 @@ TEST(FrameLoop, SideBySideAWaitForAPresentNeedsOnePresentMoreAllowedToWaitThanIn
     ASSERT_LE(frames[index].PendingAtStart, 2) << index;
   }
   EXPECT_NEAR(static_cast<double>(RefreshesPerFrameTimes100(frames, period)), 100.0, 1.0);
+
+  // And that is what the pacer does by itself for an application that sets nothing (decision 1): told of two frames in
+  // flight, its wait is for the present one further back, and the run is frame for frame the one with three set
+  settings.WaitingPresents = 0;
+  const std::vector<Sim::LoopFrame> picked = Sim::SimulateTimerWaitForPresentLoop(settings);
+  ASSERT_EQ(picked.size(), frames.size());
+  for (std::size_t index = 0; index < picked.size(); ++index)
+  {
+    ASSERT_EQ(picked[index].StartNanoseconds, frames[index].StartNanoseconds) << index;
+    ASSERT_EQ(picked[index].SwapInterval, 1u) << index;
+  }
 }
 
 TEST(FrameLoop, WhenEveryFrameLosesARefreshTheAnimationKeepsUpWithTheClock)

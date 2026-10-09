@@ -17,11 +17,11 @@ namespace MB::FramePacing::Pacer
   //! that has the wait. It says which present the frame start plan asks for and how long the wait may take, and it knows
   //! what a wait that ran out means. Values in, values out: no clock is read and nothing is allocated.
   //!
-  //! The wait is for the present so many frames back that the presents that may wait (PacerSettings::WaitingPresents) are in
-  //! between. A wait that ends without its present shown is counted (Timeouts), and the frame it held is not to be judged by
-  //! the pacer: the pacer asked for the wait. After WaitsRunOutToStop of them in a row the display is not taking the window's
-  //! frames (a window that is covered or minimised): the waits stop (Stopped), and once in FramesBetweenAsks frames the plan
-  //! asks, with no time to wait, whether an older present was shown. AsksShownToWait answers in a row that say shown end it.
+  //! The wait is for the present so many frames back that the presents that may wait (PacerSettings::WaitingPresents) and
+  //! the frames that are still in flight are in between (PacerSettings::PresentWaitDepth). A wait that ends without its present shown is counted
+  //! (Timeouts), and the frame it held is not to be judged by the pacer: the pacer asked for the wait. After WaitsRunOutToStop of them in a row the
+  //! display is not taking the window's frames (a window that is covered or minimised): the waits stop (Stopped), and once in FramesBetweenAsks
+  //! frames the plan asks, with no time to wait, whether an older present was shown. AsksShownToWait answers in a row that say shown end it.
   class PresentWaitRule
   {
     // The presents: the last one the system took, and the first that can still be waited for (0: none yet)

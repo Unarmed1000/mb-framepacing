@@ -104,6 +104,16 @@ namespace MB::FramePacing::Pacer
     m_waitingPresents = std::min(presents, MaxWaitingPresents);
   }
 
+  uint32_t PacerSettings::PresentWaitDepth() const noexcept
+  {
+    if (!PicksWaitingPresents())
+    {
+      return m_waitingPresents;
+    }
+    // A frame in flight is still on the GPU: its present is not one that can have been shown
+    return std::min(std::max(PickedWaitingPresents, m_maxFramesInFlight + 1u), MaxWaitingPresents);
+  }
+
   void PacerSettings::SetSwapChainImages(const uint32_t images) noexcept
   {
     assert(images <= MaxSwapChainImages);

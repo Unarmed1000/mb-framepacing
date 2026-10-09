@@ -12,10 +12,11 @@ namespace MB::FramePacing::Pacer
   FrameStartPlan PresentWaitRule::Plan(const PacerSettings& settings, const RefreshPeriod period, const uint32_t swapInterval) const noexcept
   {
     FrameStartPlan plan;
-    // The present to wait for: the one WaitingPresents back from the frame that is about to be made. While the waits run out
-    // nothing is waited for: the plan asks after a present that many frames older, which has had the time a wait would give
+    // The present to wait for: the one PresentWaitDepth back from the frame that is about to be made (the presents that may
+    // wait, and never one of a frame that is still in flight). While the waits run out nothing is waited for: the plan asks
+    // after a present that many frames older, which has had the time a wait would give
     const bool stopped = Stopped();
-    const uint64_t back = (uint64_t{settings.WaitingPresents()} - 1u) + (stopped ? settings.PresentWaitSwapIntervals() : 0u);
+    const uint64_t back = (uint64_t{settings.PresentWaitDepth()} - 1u) + (stopped ? settings.PresentWaitSwapIntervals() : 0u);
     // Asking is not free everywhere: while stopped it is done once in a number of frames
     const bool asks = !stopped || m_framesSinceAsk >= FramesBetweenAsks;
     if (asks && !m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId &&

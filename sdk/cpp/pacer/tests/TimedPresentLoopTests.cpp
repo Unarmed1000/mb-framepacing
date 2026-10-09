@@ -247,10 +247,13 @@ TEST(TimedPresentLoop, WithATimeOnThePresentTheDisplayShowsWhatThePacerWorkedOut
 {
   // Two frames in flight, work of 72 % of a refresh on the CPU and on the GPU, reported: a frame is ready 1.44 refreshes after its
   // start, and it starts when the wait for a present returns, up to 0.58 of a refresh after the display took that frame. The
-  // pacer counts a frame as ready for a vertical blank when it is ready the frame margin before it (an eighth of a refresh here)
+  // pacer counts a frame as ready for a vertical blank when it is ready the frame margin before it (an eighth of a refresh here).
+  // The wait is set to the present two back, which is what makes a frame start that late: the pacer by itself waits for the
+  // one three back with two frames in flight (decision 1), and the last part of this test is that run
   Sim::LoopSettings settings = LightLoop(PC::PacerAim::Smoothness, Timed::No);
   settings.Frames = 3'000;
   settings.MaxFramesInFlight = 2;
+  settings.WaitingPresents = 2;
   settings.WaitsForPreviousGpuWork = false;
   settings.ReportsGpuWork = true;
   const int64_t period = PeriodNanoseconds(settings);
@@ -281,6 +284,18 @@ TEST(TimedPresentLoop, WithATimeOnThePresentTheDisplayShowsWhatThePacerWorkedOut
   const int32_t untimed = slowed(Sim::SimulateVBlankWaitForPresentLoop(settings));
   EXPECT_GT(untimed, 1'000);
   EXPECT_NEAR(timed, untimed, 100);
+
+  // With the wait the pacer picks for two frames in flight a frame starts as soon as the one before it did, is ready well
+  // before the margin, and no frame is slowed down on either display, with a time on the present or without
+  settings.WaitingPresents = 0;
+  for (const int64_t latchLead : {int64_t{0}, (period * 13) / 100})
+  {
+    settings.Display.LatchLeadNanoseconds = latchLead;
+    settings.PresentsAtTime = false;
+    EXPECT_EQ(slowed(Sim::SimulateVBlankWaitForPresentLoop(settings)), 0) << latchLead;
+    settings.PresentsAtTime = true;
+    EXPECT_EQ(slowed(Sim::SimulateVBlankWaitForPresentLoop(settings)), 0) << latchLead;
+  }
 }
 
 TEST(TimedPresentLoop, TheAnimationErrorCountedFromDisplayReportsIsWhatTheDisplayShowed)

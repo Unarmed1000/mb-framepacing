@@ -164,7 +164,7 @@ namespace MB::FramePacing::Pacer
     void AddVBlank(const VBlankReading& reading) noexcept;
 
     //! Before a frame takes anything, at now on the application's steady clock: the present to wait for until it was shown (the
-    //! one PacerSettings::WaitingPresents back, where the system took it and it can still be waited for) and the longest the wait
+    //! one PacerSettings::PresentWaitDepth back, where the system took it and it can still be waited for) and the longest the wait
     //! may take (PacerSettings::PresentWaitSwapIntervals of the swap interval the frame is paced at), and after it, with the aim
     //! of low latency, the time to wait until. It changes nothing, so a frame may be planned again, and after AddPresentWait
     //! it is planned again: no second present is asked for, and the time is the one that holds then.

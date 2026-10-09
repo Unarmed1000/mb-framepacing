@@ -206,6 +206,13 @@ namespace MB::FramePacing::Pacer
     //! latency, and no slack.
     void SetWaitingPresents(uint32_t presents) noexcept;
 
+    //! How far back the present is that a wait for a present asks for, the frame that is about to be made counted: a frame
+    //! starts when the present that many back was shown. While the pacer picks it is WaitingPresents and never less than
+    //! one more than the frames in flight (MaxFramesInFlight): a frame that is still on the GPU has no present to be shown
+    //! yet, so with two in flight a wait for the present two back is a wait for a frame that can not be on screen. A number
+    //! that was set (SetWaitingPresents) is taken as set.
+    [[nodiscard]] uint32_t PresentWaitDepth() const noexcept;
+
     //! The images the application's swap chain has (0 to MaxSwapChainImages). 0, the default: not known. One of them is on
     //! screen and one is drawn into, so the frames that can wait to be shown are that many less two: a tier pacer keeps no
     //! larger reserve (ReserveFrames).

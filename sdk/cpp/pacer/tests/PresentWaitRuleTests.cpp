@@ -65,6 +65,26 @@ namespace
   }
 }
 
+TEST(PresentWaitRule, WithTwoFramesInFlightThePlanAsksForThePresentOneFurtherBack)
+{
+  // What the pacer picks, as for an application that sets nothing
+  PC::PacerSettings picked(g_hz100);
+  picked.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
+  PC::PacerSettings twoInFlight = picked;
+  twoInFlight.SetMaxFramesInFlight(2);
+
+  PC::PresentWaitRule rule;
+  Present(rule, 1);
+  Present(rule, 2);
+  // One frame in flight: before frame 3 the present of frame 1 is waited for. With two in flight frame 2 is still on the
+  // GPU and frame 1 may be waiting to be shown, so no present is far enough back yet
+  EXPECT_EQ(AskedFor(rule, picked), 1u);
+  EXPECT_EQ(AskedFor(rule, twoInFlight), 0u);
+  Present(rule, 3);
+  EXPECT_EQ(AskedFor(rule, picked), 2u);
+  EXPECT_EQ(AskedFor(rule, twoInFlight), 1u);
+}
+
 TEST(PresentWaitRule, ThePlanAsksForThePresentSoManyBackThatThePresentsThatMayWaitAreInBetween)
 {
   const PC::PacerSettings two = Settings(2);

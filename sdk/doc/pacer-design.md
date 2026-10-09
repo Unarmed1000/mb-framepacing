@@ -1449,7 +1449,9 @@ frame of a run on its refresh, and the duration keeps the ones after it there.
   a timed present (87 of 2,900 frames off their refresh, no frame slowed down) and were late with the time (the rule
   slowed down nearly half of the frames, and a frame was on screen a refresh later after its start). On a display that
   takes a frame 13 % of a refresh before its vertical blank, just over that margin (an eighth), the two slowed down
-  alike.
+  alike. These are runs with the wait for the present two back, which is what made a frame start so late. Since
+  decision 1 the pacer's own wait with two frames in flight is for the present three back, and in that run no frame
+  is slowed down on either display, with a time on the present or without.
 - **Switched on and off while the frames go on**: the timed present is a part of the active set like any other, and a
   change of it is no handover: the frame ids, the animation steps and the intended display times go on, and it is the
   next present that gets the time or does not any more.
@@ -2117,7 +2119,7 @@ measured only where a section above says so.
    says. That a present's time was not kept is not seen (major tier 2 with a wait could). An application can not say
    that its display's refresh rate is variable ("Variable refresh"). With both timed presents active the absolute time
    alone is given, which after a lost refresh brings a frame back at two refreshes per frame without a wait.
-3. **Decisions that are open** ("Decisions needed"): 1, 3, 4, 7, the setting of 9, and what is open of 10.
+3. **Decisions that are open** ("Decisions needed"): 3, 7, the setting of 9, and what is open of 10.
 4. **Checked as today's pacer is**, as far as one machine can (2026-10-09): the tier loops have golden data in the
    repository (128 runs of the simulated loop, `tier-loops.csv`, the same bytes from two compilers); the monitor rates
    from 50 to 540 Hz run the tier pacer too; every line and branch of the module is run by a test (llvm-cov, without
@@ -2140,12 +2142,18 @@ refresh.
 ## Decisions needed
 
 1. **k**, the presents that may be waiting: 1 is the lowest latency and leaves no slack (at work of 90 % of a refresh it
-   halved the frame rate in the first measurement), 2 leaves a frame of slack for one refresh more. Proposed: a setting,
-   default 2, as that kept the frame rate in every case measured; picking it from the work is the option below. Open
-   since: on the simulation a loop with two frames in flight and heavy work needs 3 (above). It did not show on the first
-   integration's system in the second measurements, where a frame reached the screen sooner than in the simulation's
-   display. Should the pacer take at least one more than the frames in flight the application names, or is that the
-   application's to set?
+   halved the frame rate in the first measurement), 2 leaves a frame of slack for one refresh more. The pacer picks 2,
+   as that kept the frame rate in every case measured, and an application sets nothing. Decided on 2026-10-09 and
+   built: **the wait for a present asks for the present at least one further back than the frames in flight the
+   application names** (`PacerSettings::PresentWaitDepth`): a frame that is still on the GPU has no present that can
+   have been shown, so with two in flight the wait is for the present three back. The reserve of the aim of smoothness
+   stays what it was: a frame in flight is not a frame made ahead. What it rests on is the simulation only (a loop
+   with two frames in flight and work of 72 % of a refresh on the CPU and on the GPU, 150 frames counted, the four
+   ways of pacing that have the wait): the frames off their swap interval went from 4, 3, 28 and 5 to none in all
+   four, and from a frame's start to its display it took 0.8 and 1.6 ms more with low latency and 3.2 and 3.9 ms more
+   with smoothness, at a refresh of 4.17 ms. With GPU work of 130 % of a refresh, at two refreshes per frame, the runs
+   are the same but for a frame or two. It did not show on the first integration's system in the second measurements,
+   where a frame reached the screen sooner than in the simulation's display, and no system has run it since.
 2. **The tiers**: decided on 2026-10-08: one list, each tier a combination of a timed present, a wait for a present and
    vertical blank times; display times a mark beside the tier (`+`), a wait for the GPU's work and a swap interval on
    the present mechanisms beside it; the pacers put together from parts ("Tiers", "How a pacer is put together").
@@ -2164,7 +2172,10 @@ refresh.
    waiting frame away if there is one and repeats a frame if there is none. At 0.01 frames a second under 240 that is one
    every 100 s: three waiting frames are gone after five minutes, and a frame is repeated every 100 s from then on.
 4. **Start-up and switching the pacer on**: is anything wanted beyond the queue rule (which holds the loop until the first
-   presents are shown, where it can wait or see)? Not decided.
+   presents are shown, where it can wait or see)? Decided on 2026-10-09: nothing more, with the one pause after
+   start-up of decision 11. What it rests on is the capture session of that day, on one system: from a frame's start
+   to its display it took 19 to 39 ms at the longest, in a run's first frames, and a wait for a present ran out once
+   at the start of a run in four runs of 78 and in none after its first 60 frames.
 5. **The two aims**: decided, and wrongly proposed here before as an option that no tier pacer carries. Every tier's pacer
    has a latency optimized and a not latency optimized form ("The rules that move into the pacer"). Still open is only the
    further step of the pacer choosing k and the frames in flight from the measured work by itself.

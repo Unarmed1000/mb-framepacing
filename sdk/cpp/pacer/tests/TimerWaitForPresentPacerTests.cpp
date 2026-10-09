@@ -817,3 +817,32 @@ TEST(PacerSettings, ThePacerPicksThePresentsThatMayWaitUnlessTheyAreSetForMeasur
   EXPECT_TRUE(settings.PicksWaitingPresents());
   EXPECT_EQ(settings, picked);
 }
+
+TEST(PacerSettings, TheWaitForAPresentAsksForOneFurtherBackThanTheFramesInFlight)
+{
+  PC::PacerSettings settings(g_hz100);
+  // One frame in flight: the present two back, the frame about to be made counted, so one present may wait
+  EXPECT_EQ(settings.MaxFramesInFlight(), 1u);
+  EXPECT_EQ(settings.PresentWaitDepth(), 2u);
+
+  // Two in flight: the frame before is still on the GPU, so the wait is for the present three back. The presents that may
+  // wait and the reserve of the aim of smoothness stay what they were: a frame in flight is not a frame made ahead
+  settings.SetMaxFramesInFlight(2);
+  EXPECT_EQ(settings.PresentWaitDepth(), 3u);
+  EXPECT_EQ(settings.WaitingPresents(), 2u);
+  EXPECT_EQ(settings.ReserveFrames(), 1u);
+  settings.SetMaxFramesInFlight(3);
+  EXPECT_EQ(settings.PresentWaitDepth(), 4u);
+  // And never further back than the most that may wait
+  settings.SetMaxFramesInFlight(PC::PacerSettings::MaxMaxFramesInFlight);
+  EXPECT_EQ(settings.PresentWaitDepth(), PC::PacerSettings::MaxWaitingPresents);
+
+  // A number set for a measurement is taken as set, whatever is in flight
+  settings.SetMaxFramesInFlight(2);
+  settings.SetWaitingPresents(2);
+  EXPECT_EQ(settings.PresentWaitDepth(), 2u);
+  settings.SetWaitingPresents(1);
+  EXPECT_EQ(settings.PresentWaitDepth(), 1u);
+  settings.SetWaitingPresents(0);
+  EXPECT_EQ(settings.PresentWaitDepth(), 3u);
+}

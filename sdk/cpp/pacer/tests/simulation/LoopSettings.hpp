@@ -35,9 +35,9 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t LoopNanoseconds{60'000};
     //! true: one frame in flight, so a frame's start waits for the GPU's work on the frame before it
     bool WaitsForPreviousGpuWork{true};
-    //! For a loop that waits for a present: the presents that may be waiting while a frame is made, and how long after the
-    //! display took a frame a wait for it returns
-    uint32_t WaitingPresents{2};
+    //! For a loop that waits for a present: the presents that may be waiting while a frame is made (0: the pacer picks, as
+    //! it does for an application, which sets none), and how long after the display took a frame a wait for it returns
+    uint32_t WaitingPresents{0};
     NanosecondRange PresentWaitReturn{60'000, 2'400'000};
     //! For the tier pacers: what they optimize for (PacerSettings::Aim). Low latency unless a run asks for the other
     PacerAim Aim{PacerAim::LowLatency};

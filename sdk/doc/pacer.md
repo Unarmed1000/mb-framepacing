@@ -248,7 +248,9 @@ display: 60 frames a second with smoothness, 30 with low latency). That is what 
 the aim by itself.
 
 With `WaitForPresent`, `WaitingPresents` is how many presents may be waiting while a frame is made: two unless set, so one
-frame may wait. With smoothness the reserve is that number less one.
+frame may wait. With smoothness the reserve is that number less one. The wait is for the present that many back, and one
+further back for every frame more that the application lets be in flight (`MaxFramesInFlight`): a frame that is still on
+the GPU has no present that can have been shown. An application sets none of this.
 
 ## Where the frames are placed
 
