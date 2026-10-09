@@ -7,8 +7,9 @@ It has modules:
   A capture of the display output, analysed with the mb-framepacing tools, then shows the **animation error**: how far what the
   application animated is from what was actually shown on screen.
 - **data**: reads what the mb-framepacing tools capture and analyse.
-- **pacer** (C++, **experimental**, off by default): paces a frame loop with only a steady clock and vsync. It holds a target frame
-  rate, adapts the swap interval to how the frames do, and hands the application its animation time and the values the marker carries.
+- **pacer** (C++, **experimental**, off by default): paces a frame loop from what the application says its platform can do, with
+  only a steady clock and the display's refresh period at the least. It holds a target frame rate, adapts the swap interval to how
+  the frames do, and hands the application its waits, its animation time and the values the marker carries.
 - **core**: what the modules share: `Point` and `Rectangle` in every language, the time types in nanoseconds (`NanosecondTimeSpan`,
   `NanosecondTickCount`, `NanosecondTimeDuration`: what the marker and the data modules use) in every language, time types in ticks
   of 100 ns (`TickCount64`, `TickCount32`, `TimeSpan32`) in C++ and C# for applications that count in them, and in C++ the library

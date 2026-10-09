@@ -212,41 +212,47 @@ counted in ticks too.
 ## The pacer (experimental)
 
 > **Experimental.** The pacer is checked against its own simulation and, on one machine, against the display times a graphics
-> driver reports: no capture of it on a real swap chain has been analysed with the tools yet. It is off by default (`-DMB_FRAMEPACING_BUILD_PACER=ON` builds it, Conan's `with_pacer=True`), and its API may change in any
-> release.
+> driver reports: no capture of it has been analysed with the tools yet. It is off by default (`-DMB_FRAMEPACING_BUILD_PACER=ON`
+> builds it, Conan's `with_pacer=True`), and its API may change in any release.
 
 ```cpp
-#include <mb/framepacing/pacer/FramePacer.hpp>
 #include <mb/framepacing/pacer/PacerSettings.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
+#include <mb/framepacing/pacer/tier/TierPacer.hpp>
 namespace FP = MB::FramePacing;
 namespace PC = MB::FramePacing::Pacer;
 
 PC::PacerSettings settings(PC::RefreshPeriod::FromRate(60));   // required: the display's refresh period
 settings.SetPreferredFrameRate(30);                            // optional: a target frame rate
-PC::FramePacer pacer(settings);                                // allocates its frame window, once
+PC::TierPacer pacer(settings, PC::PacerCapabilities());        // what the platform can do: here the baseline, nothing
 
-// Every frame: the time it starts on your steady clock (an FP::NanosecondTickCount) in, the plan out
-const PC::FrameSchedule schedule = pacer.BeginFrame(now);      // SwapInterval, AnimationTime, IntendedDisplayTime, ...
-const FP::NanosecondTimeDuration cpuBusy = pacer.EndFrame(presentTime);  // as you draw the marker, just before Present
+// Every frame: times on your steady clock (FP::NanosecondTickCount) in, plans out
+const PC::FrameStartPlan start = pacer.PlanFrame(now);         // a wait to make, then the time to start at
+const PC::FrameSchedule schedule = pacer.BeginFrame(startTime); // SwapInterval, AnimationTime, IntendedDisplayTime, ...
+const PC::PresentPlan present = pacer.EndFrame(workDoneTime);  // the time to present at, the values for the present, CpuBusy
+pacer.AddPresent({present.FrameId, callTime, returnTime});     // what happened
 ```
 
-The pacer needs a steady clock and a `Present` that waits for vsync, nothing else: a baseline for any platform. Where the platform
-reports when frames were shown, the application can pass that on (present feedback, optional, statistics only). It is values in, values
-out: it calls no platform API and never reads a clock, and `BeginFrame` and `EndFrame` never allocate.
+The pacer holds every pacing rule and every time calculation; the application says what its platform can do (its capabilities),
+carries out the waits and the present it is given, and reports what happened. It needs a steady clock and the display's refresh
+period, and paces better with a wait until a present was shown, the display's vertical blank times, or a time on the present. It
+is values in, values out: it calls no platform API, never waits and never reads a clock, and pacing a frame never allocates.
 [The frame pacer](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/pacer.md) (a release archive's `doc/pacer.md`) has
-the frame loop, how to apply the schedule, the target frame rate, the rule, every setting, and what newer platforms offer that it does
-not use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/framepacing/pacer/…>`):
+the capabilities and the tiers, the frame loop, the two aims, the target frame rate, the rule, every setting, and what it does not
+use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/framepacing/pacer/…>`):
 
-| Type                                                         | What it is                                                                                                                                     |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FramePacer`                                                 | Paces every frame (`BeginFrame`, `EndFrame`, `AddPresentFeedback`, `SetRefreshPeriod`, `SetSettings`, `Reset`, `FrameWindow`, `FeedbackState`) |
-| `PacerSettings`, `SlowDownRule`                              | The refresh period (required), the target frame rate and the rule's settings; always valid                                                     |
-| `RefreshPeriod`, `RefreshTime`                               | The refresh period, exact (`FromRate`, `FromNanoseconds`, `FromTimeSpan`; always valid, no default), and a time counted in whole refreshes     |
-| `FrameSchedule`                                              | What a frame gets: its id, its swap interval, its animation time and the marker's pacing values                                                |
-| `PresentFeedback`, `PresentResult`, `PresentFeedbackState`   | Optional: what the platform measured for an earlier frame (its display time, or that it was not shown), and the statistics of it               |
-| `SwapIntervalRule`, `SwapIntervalChange`, `FrameWindowState` | The adaptive swap interval rule on its own, for a frame loop of your own                                                                       |
-| `PacerRefreshClock`, `AnimationTime`, `FrameMeasurement`     | The part that measures the frame starts and counts refreshes, for an application that decides its swap interval itself                         |
-| `FramesInFlight`                                             | The part that counts what the display did from the frames' display times (present feedback), for the same application                          |
+| Type                                                                                                                                                                                                   | What it is                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TierPacer` (`tier/`)                                                                                                                                                                                  | The pacer: `PlanFrame`, `BeginFrame`, `EndFrame`, `AddPresent`, the reports (`AddPresentWait`, `AddGpuWait`, `AddGpuWork`, `AddSystemWait`, `AddVBlank`, `AddDisplayReport`), `SetActiveCapabilities`, `SetRefreshPeriod`, `SetSettings`, `Reset` |
+| `PacerCapability`, `PacerCapabilities`, `PacerTier`, `PacerMajorTier`, `PacerRating`, `PacerTierUtil`, `PacerTierText` (`capability/`)                                                                 | What an application can do, the tier a set reaches (`Rate`), and the tiers and capabilities in words for an overlay                                                                                                                               |
+| `PacerSettings`, `PacerAim`, `SlowDownRule`                                                                                                                                                            | The refresh period (required), the aim, the target frame rate and the other settings; always valid                                                                                                                                                |
+| `RefreshPeriod`, `RefreshTime`                                                                                                                                                                         | The refresh period, exact (`FromRate`, `FromNanosecondTimeSpan`; always valid, no default), and a time counted in whole refreshes                                                                                                                 |
+| `FrameStartPlan`, `FrameSchedule`, `PresentPlan` (`frame/`)                                                                                                                                            | What a frame gets: the wait and the time before it starts, its id, swap interval, animation time and the marker's pacing values, and how to present it                                                                                            |
+| `PresentReport`, `PresentWaitReport`, `GpuWaitReport`, `GpuWorkReport`, `SystemWaitReport`, `VBlankReading` (`frame/`), `DisplayReport` (`display/`)                                                   | What the application reports                                                                                                                                                                                                                      |
+| `DisplayErrorState`, `DisplayErrorCounter` (`display/`)                                                                                                                                                | Statistics of what the platform says the display did: the animation error, and the time from a frame's start to its display                                                                                                                       |
+| `FrameRateStep`, `FrameRateStepUtil`                                                                                                                                                                   | The frame rates a display can show, for a menu                                                                                                                                                                                                    |
+| `SwapIntervalRule`, `SwapIntervalChange`, `FrameWindowState`, `FrameWorkRule` (`rule/`)                                                                                                                | The adaptive swap interval rule on its own, and how a frame's work is judged                                                                                                                                                                      |
+| `ClockGridLoopPacer`, `VBlankLoopPacer`, `PacerHandover` (`tier/`), `PresentWaitRule`, `GpuWaitRule` (`hold/`), `VBlankTimeline` (`timeline/`), `DisplayPlacementUtil`, `PresentTiming` (`placement/`) | The parts `TierPacer` is put together from                                                                                                                                                                                                        |
 
 ## The core
 

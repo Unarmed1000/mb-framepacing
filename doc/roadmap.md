@@ -32,36 +32,32 @@ The work:
 
 ## The frame pacer
 
-The SDK's [frame pacer](../sdk/doc/pacer.md) is a first version and experimental: a baseline that needs only a steady clock and a
-`Present` that waits for vsync, so it works on any platform, and it is off by default. It is checked against its own simulation
-and, on one machine, against the display times a graphics driver reports (a first integration, the author's unofficial
-gtec-demo-framework: see the guide's Status), not yet measured with the tools. From that integration's present logs it can take present feedback where the application gives it
-(optional, off by default; fixed refresh rates only): statistics of what the display did, and the marker's intended display time
-as a refresh of the display. It paces the same with it.
+The SDK's [frame pacer](../sdk/doc/pacer.md) is experimental and off by default. It paces from what an application says its
+platform can do: with a steady clock and the display's refresh period at the least, and better with a wait until a present was
+shown, the display's vertical blank times or a time on the present. It is checked against its own simulation and, on one machine,
+against the display times a graphics driver reports (a first integration, the author's unofficial gtec-demo-framework: see the
+guide's Status), not yet measured with the tools. [Its design document](../sdk/doc/pacer-design.md) has every measurement so far
+and a list of what is still missing.
 
-**Out of experimental:** measure it on real swap chains, with the marker and the tools, on each platform and for each way of applying
-a schedule (the platform's swap interval, presenting a frame again, sleeping until the frame is due). Until then it stays off by
-default and its API may change.
+**Out of experimental:** measure it on real swap chains, with the marker and the tools, on each platform and for each way of
+pacing it has (its tiers). Until then it stays off by default and its API may change.
 
 **Possible upgrades.** Each is for platforms that offer it, never a requirement of the baseline; the guide's
 [Not used yet](../sdk/doc/pacer.md#not-used-yet) says where each exists:
 
-- **Vsync times the platform reports:** the intended display time without the jitter of the frame starts.
+- **A pacer for a display's side that skips a frame that is overdue:** the tier is rated, and a set that reaches it is paced as
+  if every frame were shown.
+- **Pacing by display times:** frames that wait seen and taken away where there is no wait for a present. Display times are
+  statistics only today. An earlier pacer measured its frames by them; in the first integration's sample it made no difference
+  at work of 20 % and 130 % of a refresh and was no better at 90 %.
 - **Predicted display times:** the animation time the platform itself aims for.
-- **Scheduled presents and per-frame targets:** back at full rate a frame sooner after one slow frame, and no sleep that guesses.
-- **Pacing by the display times of present feedback:** late frames as the display had them where the frame starts are uneven (a
-  busy machine at a high refresh rate). A first version did this; in the first integration's sample it made no difference at work
-  of 20 % and 130 % of a refresh and was no better at 90 %, so feedback is statistics only until a run shows the gain.
+- **An aim the pacer picks:** low latency where it costs no frame rate, without the application choosing.
 - **The refresh period measured from the frames:** a change of rate followed without being told, 59.94 Hz taken for 60.
 - **Slewing against drift:** animation that stays in step with audio or a server over hours.
-- **Variable refresh and vsync off:** pacing where there is no grid of refreshes to round to. Today a fixed frame rate held by
-  a timer sleep keeps its frame starts with G-SYNC on (the first integration's capture session), a wait on the vertical blank
-  holds nothing, and present feedback refuses nearly every display time. What the pacer can not do there is use the display: with
-  work of 130 % of a refresh it goes to half rate, where such a display could show every frame for as long as it took. The way
-  thought of is a mode of the same pacer (the same calls and schedule, the same sleep to `NextFrameStartTime`) with a clock and a
-  rule of its own: a frame time chosen from the display's range and held, not a multiple of the refresh, changed rarely and in
-  steps. A slot it has to be: the pacer still predicts when a frame is shown before the frame's work is known, since the frame is
-  rendered for that time. Open: the swap chain did not say that variable refresh was on, so the application would have to tell the pacer (the guide's
+- **Variable refresh and vsync off:** pacing where there is no grid of refreshes to round to. The pacer does not pace such a
+  display today. The way thought of is more tier pacers behind the same calls, with a clock and a rule of their own: a frame
+  time chosen from the display's range and held, not a multiple of the refresh, changed rarely and in steps. Open: a swap chain
+  did not say that variable refresh was on, so the application would have to tell the pacer (the guide's
   [A variable refresh rate](../sdk/doc/pacer.md#a-variable-refresh-rate) lists where it can ask, and how to measure it); and a
   capture card does not see variable refresh, so the tools could not check it.
 - **A C# port** (`MB.FramePacing.Pacer`): the same pacer for .NET, giving the golden data's results byte for byte.

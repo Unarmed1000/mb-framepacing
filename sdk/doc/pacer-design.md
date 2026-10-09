@@ -1,8 +1,11 @@
 # The frame pacer: redesign proposal (experimental)
 
-> **A proposal, not a description.** Nothing in this document is built. The pacer the library has today is described in
-> [pacer.md](pacer.md). This document is here to be agreed on before any pacer code changes; once it is agreed and built, it
-> becomes that guide. The pacer stays experimental and off by default.
+> **The record of a redesign, not the guide.** This document began as a proposal for a pacer to replace the one the library
+> had (`FramePacer`, which it calls "today's pacer"), and was written on as that pacer was built: what was wrong, every
+> measurement with its conditions, each decision with what decided it, what was changed and why, and what is still missing. The
+> pacer it led to is the one the library has now, and [pacer.md](pacer.md) is the guide to using it. Where a part says
+> "proposed" or "not built", the date beside it says as of when; "What is still missing" has the state. The pacer stays
+> experimental and off by default.
 
 ## The rule it has to meet
 
@@ -1111,16 +1114,16 @@ Inside a major tier a sub tier is a rank, from two capabilities:
 - **Vertical blank times** (`VBlankTimes`): the pacer knows where the display's refreshes are. Without them it counts
   refresh periods on the clock.
 
-| Tier        | Needs, with its major tier's     | What holds the loop      | Refreshes from      | Status                                                               |
-| ----------- | -------------------------------- | ------------------------ | ------------------- | -------------------------------------------------------------------- |
-| 1.1 and 2.1 | `WaitForPresent` + `VBlankTimes` | The display took a frame | Vertical blanks     | As its major tier                                                    |
-| 1.2 and 2.2 | `WaitForPresent`                 | The display took a frame | A grid on the clock | As its major tier                                                    |
-| 1.3 and 2.3 | `VBlankTimes`                    | A timer                  | Vertical blanks     | As its major tier                                                    |
-| 1.4 and 2.4 | nothing more                     | A timer                  | A grid on the clock | As its major tier                                                    |
-| 3.1         | `VBlankTimes` + `WaitForPresent` | The display took a frame | Vertical blanks     | Built (`VBlankWaitForPresentPacer`); first runs on one system        |
-| 3.2         | `VBlankTimes`                    | A timer                  | Vertical blanks     | Built (`VBlankPeriodOnlyPacer`); first runs on one system            |
-| 3.3         | `WaitForPresent`                 | The display took a frame | A grid on the clock | Built (`TimerWaitForPresentPacer`); measured on one system           |
-| 3.4         | nothing (the baseline)           | A timer                  | A grid on the clock | Built (`TimerPeriodOnlyPacer`); measured on one system, one run each |
+| Tier        | Needs, with its major tier's     | What holds the loop      | Refreshes from      | Status                                                    |
+| ----------- | -------------------------------- | ------------------------ | ------------------- | --------------------------------------------------------- |
+| 1.1 and 2.1 | `WaitForPresent` + `VBlankTimes` | The display took a frame | Vertical blanks     | As its major tier                                         |
+| 1.2 and 2.2 | `WaitForPresent`                 | The display took a frame | A grid on the clock | As its major tier                                         |
+| 1.3 and 2.3 | `VBlankTimes`                    | A timer                  | Vertical blanks     | As its major tier                                         |
+| 1.4 and 2.4 | nothing more                     | A timer                  | A grid on the clock | As its major tier                                         |
+| 3.1         | `VBlankTimes` + `WaitForPresent` | The display took a frame | Vertical blanks     | Built (`TierPacer`); first runs on one system             |
+| 3.2         | `VBlankTimes`                    | A timer                  | Vertical blanks     | Built (`TierPacer`); first runs on one system             |
+| 3.3         | `WaitForPresent`                 | The display took a frame | A grid on the clock | Built (`TierPacer`); measured on one system               |
+| 3.4         | nothing (the baseline)           | A timer                  | A grid on the clock | Built (`TierPacer`); measured on one system, one run each |
 
 - **The rule of the order:** who places the frame first, which is the major tier. Inside it, where the display's side
   places the frame, what holds the loop comes before where the refreshes are. Where the loop places it, the vertical
@@ -1380,7 +1383,8 @@ have a pacer are put together from the parts:
   and vertical blanks, by up to three and a half refreshes at four refreshes per frame, as the two start a frame at
   different places before its refresh; no frame was on screen longer or shorter for it.
 - **Each tier is still a pacer from the outside**: its own tests, and its own statement of what it promises and what it
-  can not do. The four class names of tiers 3.1 to 3.4 stay, each the one pacer with its capabilities fixed.
+  can not do. The four class names of tiers 3.1 to 3.4 stay, each the one pacer with its capabilities fixed: since
+  2026-10-09 as test code, with the tests written for them, and no longer in the library, whose pacer is `TierPacer`.
 - **Each part has both aims** where the aim bears on it: how many presents may wait and which frame's GPU work is waited
   for, a frame made ahead or a start that is held, a present at once with its time or a start held so that the frame is
   ready just in time.
@@ -1954,10 +1958,10 @@ decided when it is designed, with both aims.
 
 ## How it is checked
 
-- **Replay** (`pacer-replay`, test code): a stored frame log is given to the pacer in the order its application had the
-  values, and what the pacer makes of it (where it thinks the refreshes are, how many presents it thinks are waiting, the
-  misses it saw) is held against what the log shows the display did. A log shows what a pacer would have seen, never what
-  another answer would have caused.
+- **Replay** (`pacer-replay`, test code; **gone on 2026-10-09** with the pacer it replayed to): a stored frame log was
+  given to the pacer in the order its application had the values, and what the pacer made of it was held against what the
+  log shows the display did. A log shows what a pacer would have seen, never what another answer would have caused. The
+  logs it read were of the first integration's earlier sample; a replay of that sample's traces of today is not built.
 - **Simulation** (`pacer-sim --loop`, test code): a frame loop on a display model with a present that never waits, frames
   queued behind it, an optional bound, and vertical blanks at which no frame is taken. It gets a wait for a present, display
   times that come late and a timer that wakes late, and each tier is run on it: the queue that today stays for the rest of the
@@ -2033,10 +2037,13 @@ measured only where a section above says so.
    from 50 to 540 Hz run the tier pacer too; every line and branch of the module is run by a test (llvm-cov, without
    asserts); and the tests pass in a build with the address and undefined behaviour sanitizers (Clang on Windows).
    Still missing: the compilers of the other platforms.
-5. **Today's pacer replaced**: `FramePacer` and what only it uses, the four classes of one tier each, the consumer and
-   package checks, the simulation's golden files, the frame log's pacer chunks.
-6. **The documents**: the guide written anew from this proposal, with how an application makes each wait and each report
-   on its graphics API.
+5. **Today's pacer replaced**: done on 2026-10-09. `FramePacer` and what only it used are gone, the four classes of one
+   tier each are test code, the consumer and package checks pace with `TierPacer`, and the simulation of the sister
+   repository's frame model is paced by it too, with the same swap intervals and refreshes frame by frame. Gone with it
+   and not built anew: the replay of a stored frame log ("How it is checked"), as the logs it read were of the first
+   integration's earlier sample. Still missing: the frame log's pacer chunks.
+6. **The documents**: the guide is written anew for this pacer. Still missing in it: how an application makes each
+   wait and each report on its graphics API.
 7. **Measured**: no run of a tier pacer has been captured and analysed with the tools; the sub tiers of major tier 3
    are not measured against each other; major tier 2 has run on no system, as the one at hand has no present with an
    absolute time.
@@ -2143,4 +2150,6 @@ refresh.
 - The first integration's sample loses its hold methods, profiles and due times, and keeps the waits, the present and the
   measurements.
 - The frame log's pacer chunks follow the new calls, and get the capability sets and the ratings.
-- Today's guide, its Status table and "Not used yet" are rewritten from this document when the code is.
+- Today's guide, its Status table and "Not used yet" are rewritten from this document when the code is: done on
+  2026-10-09 ([The frame pacer](pacer.md)), with the pacer this proposal began from retired. Where this document says
+  "today's pacer" it is that one, `FramePacer`, which the library no longer has.

@@ -10,11 +10,11 @@ The repository has two parts, and the license follows them (see Conventions):
     `MB.FramePacing.Marker`, Python `mb_framepacing.marker`, the Unity package);
   - **data**: reads the tools' capture data and analysis output (C++ `MB::FramePacing::Data`, C# `MB.FramePacing.Data`, Python
     `mb_framepacing.data`);
-  - **pacer** (C++ `MB::FramePacing::Pacer` only; **experimental**, off by default): paces a frame loop with nothing but a steady clock
-    and vsync: frame starts measured on the CPU's clock and counted in whole refreshes on the display's (`PacerRefreshClock`), a
-    target frame rate, and the adaptive swap interval rule (the full-window rule of mb-framepacing-explained's simulation, and its fix
-    as the default); optionally it counts what the display did from the display times the platform reports (present feedback,
-    statistics only);
+  - **pacer** (C++ `MB::FramePacing::Pacer` only; **experimental**, off by default): paces a frame loop from what the application
+    says its platform can do (its capabilities), with a steady clock and the display's refresh period at the least: it gives every
+    frame its waits, its start time, its swap interval, its animation time, how to present it and the marker's pacing values, holds
+    a target frame rate, and adapts the swap interval (the full-window rule of mb-framepacing-explained's simulation, and its fix
+    as the default); it counts what the display did from the display times the platform reports (statistics only);
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
     language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `NanosecondTimeSpan`, `NanosecondTickCount` and `NanosecondTimeDuration` (a signed interval, a point on a clock and a length of time that is never negative, in nanoseconds: **what the marker, the data modules and the tools hold every time in**; exact from ticks, and to ticks truncated for an interval and the tick it is in for a point; `FromSeconds(double)` truncates to the nanosecond and `NanosecondTickCount::FromCounter` rounds down to it; in C# and Python too, where they are the only time types Python has), the tick types `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32` and `TimeDuration` (ticks of 100 ns, for applications and .NET's own APIs: nothing in the marker, the data modules or the tools holds a measured time in them), and the optional `core/time/ChronoConversion.hpp` (the tick and the nanosecond types); `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
@@ -41,7 +41,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, time types, `Point`, `Rectangle` + tests                     |
 | `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker` with its own QR encoder, `reference/` (qrcodegen), `marker-render`, tests  |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
-| `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulation and `pacer-sim` (`tests/`, test code)  |
+| `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulations and `pacer-sim` (`tests/`, test code) |
 | `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote) |
 | `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Point`, `Rectangle`, the time types; .NET Standard 2.1, C# 9) + NUnit tests     |
 | `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                 |
@@ -52,7 +52,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, the data formats, the pacer guide, encoding performance |
 | `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                       |
 | `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
-| `sdk/test-data/pacer/`                            | The pacer's golden data: scenario frames, every scenario's result (`pacer-sim --golden`), real frame logs         |
+| `sdk/test-data/pacer/`                            | The pacer's golden data (`pacer-sim --golden`): scenario frames and results, the tier loops' digests and frames   |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
@@ -101,8 +101,8 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     compiles: a module that build leaves out is skipped, and the script says so. To apply formatting: `clang-format -i` on the files the script lists.
   - **The C++ library is one project of modules** (Boost/Poco style): a folder per module (`sdk/cpp/<module>/{include,source,tests}`),
     each a static library `mb_framepacing_<module>` (alias and export `mb_framepacing::<module>`), headers `<mb/framepacing/<module>/<Type>.hpp>`,
-    grouped in subfolders where a module has many (`core/time/`, `marker/geometry/`, `marker/payload/`, `data/analysis/`, `data/capture/`, `pacer/clock/`,
-    `pacer/frame/`, `pacer/rule/`)
+    grouped in subfolders where a module has many (`core/time/`, `marker/geometry/`, `marker/payload/`, `data/analysis/`, `data/capture/`,
+    `pacer/capability/`, `pacer/display/`, `pacer/frame/`, `pacer/hold/`, `pacer/placement/`, `pacer/rule/`, `pacer/tier/`, `pacer/timeline/`)
     (no umbrella headers: callers include each type's header; functions live in a header of their own, e.g. `marker/FrameMarker.hpp`, as
     C#'s static classes), sources mirroring them (`source/mb/framepacing/<module>/<Name>.cpp`, one per header; private helpers in
     `source/.../detail/`, in a namespace named for what they are, such as `Marker::WireFormat` and `Data::CaptureDataFormat`, and named in
@@ -233,138 +233,104 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `NanosecondTimeSpan.TotalMilliseconds`, one division of the nanosecond count (for a value of whole ticks, the same double as ticks / 10000.0).
     The charts read the typed values; what they keep as nanosecond counts is integer arithmetic (whole refreshes, strip cells) and the prepared
     sequences (`FrameSequence`, `WaveletMatrix`), which rank plain integers. The GUI's `Stopwatch` timestamps stay raw.
-- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`): EXPERIMENTAL.** A first version designed from scratch as the baseline that
-  works on any platform: it needs a steady clock (passed in), a `Present` that waits for vsync and the display's refresh period, nothing
-  else. It is checked against its own simulation and, on one machine, against the display times a graphics driver reports (the
-  first integration: the user's unofficial gtec-demo-framework, three FramePacing samples, linked from the guide's Status and from
-  `integrating.md`; its capture sessions are in `pacer-captures/`), but no capture of it has been analysed with the tools. Off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's
-  `with_pacer`); build it with `-DMB_FRAMEPACING_BUILD_PACER=ON`.
+- **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`): EXPERIMENTAL.** The pacer of the redesign of 2026-10 (`TierPacer`), which
+  replaced the first one (`FramePacer`, retired on 2026-10-09 with its refresh clock and its present feedback). It is checked
+  against its own simulation and, on one machine, against the display times a graphics driver reports (the first integration: the
+  user's unofficial gtec-demo-framework, three FramePacing samples, linked from the guide's Status and from `integrating.md`), but
+  no capture of it has been analysed with the tools. Off by default (`MB_FRAMEPACING_BUILD_PACER`, Conan's `with_pacer`); build it
+  with `-DMB_FRAMEPACING_BUILD_PACER=ON`.
+  - **Two documents.** `sdk/doc/pacer.md` is the guide: how to use it, with a Status table (checked / not checked). **`sdk/doc/pacer-design.md`
+    is the record of the redesign**: what was wrong, every measurement with its conditions, each decision with what decided it, and
+    "What is still missing". A measurement goes into the record as numbers with their conditions; nothing from single runs goes
+    into the guide as advice. Keep the guide's Status table and the record's "What is still missing" current with every pacer change.
   - **Off for users, on where we check:** the `windows` and `linux-sanitize` presets, CI's and the release workflow's C++ build and
     tests (Windows, Ubuntu, macOS) build it. `check_consumers.py` runs twice more with it (`subdirectory-pacer`, `package-pacer`) and
-    `check_conan.py` once more (the consumer and
-    the Conan test package pace one frame and fill a `Payload` from the schedule), and the consumer check fails when a default
-    install holds anything of the pacer.
-  - **Every place users meet it says "experimental":** the guide's notice and its Status table (checked / not checked), the READMEs,
-    `integrating.md`, the CMake and Conan option descriptions, the release notes, and the first line of every public type's comment.
-    Keep it that way until it has been measured on real swap chains, and keep the Status table current with every pacer change.
-  - **Values in, values out:** `BeginFrame(cpuStartTime)` → `FrameSchedule` (swap interval, animation time and step, the marker's
-    pacing values), `EndFrame(presentTime, work)` → CPU busy. No platform API, no callbacks, no clock reads; made once (the rule's
-    frame window), no allocation per frame after that (only `SetSettings` with a larger frame window allocates).
-  - **The design (two clocks):** the time between two frame starts on the CPU's clock, rounded to whole refreshes and at least the
-    previous frame's swap interval, is how long that frame stayed (more = late). The display's clock counts those refreshes exactly
-    (`RefreshTime`, the fraction carried); the animation time is the previous frame's display plus this frame's swap interval, the
-    intended display time the frame's start plus that step. A gap longer than the frame window (or two frames), or a frame before
-    the previous one, starts again. The pacer keeps **no grid of refreshes of its own**: one that runs on the CPU's clock slides
-    against the display and double-steps (why the earlier design went).
-  - **The application holds the next frame's start to `FrameSchedule::NextFrameStartTime` at every swap interval, one included**
-    (the guide's frame loop has the wait): the pacer never waits, and a present does not always (the first integration's Vulkan
-    FIFO swap chain never did, and its sample left the wait out at a swap interval of one, so its loop ran ahead of the display
-    through every capture of 2026-10-04 and before). The pacer shows what it can not prevent (agreed with the user):
-    `FrameWindowState::StartsAhead`, how far ahead of those times the frames of the frame window began, added up, late frames left
-    out (`SwapIntervalRule::AddFrame(..., nextStartAhead)`, of no weight in the rule). Close to zero = in step; a refresh or more
-    = the loop runs ahead; below zero = it falls behind (wake-up delays add up). **A sum, not a count**: a count of the frames
-    that began early (`EarlyStarts`, shipped in 76218fc for a few hours) read about half for healthy and faulty loops alike, as
-    frame starts jitter by microseconds around the pacer's times. On the 507 stored runs the sum put 446 within 0.1 refresh a
-    second of zero and exactly the 13 faulty ones more than one ahead: try a diagnostic on the stored runs before shipping it.
-  - **A frame whose work is over its frame time** (`EndFrame`'s work against the swap interval's time; agreed with the user) is late
-    whatever the frame starts say, and for such frames only the time between the starts counts as real time, the rounding's
-    remainder carried to the next one (`PacerRefreshClock::Measure(frameStartTime, work)`). Why: a swap chain with a buffer to
-    spare takes the present at once, so frames with work of 130 % of a refresh start 1.37 refreshes apart, which rounds to one:
-    the pacer never slowed down and the animation ran at 73 % of real time (the first integration's work matrix, 120 and 240 Hz).
-    The simulation never showed it, as its frames always start on a refresh; there such frames are late already, so the golden
-    data did not change. A frame without `EndFrame` is never judged by its work (its work is the time to the next start).
-    `sdk/test-data/pacer/120-vulkan-work-130-log.csv` is the real log the tests pin.
-  - **Nothing a platform may not have:** vsync times, predicted display times, scheduled presents, a
-    measured refresh period, VRR are the guide's "Not used yet" and `doc/roadmap.md`. Agree with the user before adding one.
-  - **Present feedback is the one optional input, and statistics only** (the user, 2026-10-04: "stats only, to simplify";
-    `PacerSettings::UsePresentFeedback`, off by default, and without it the pacer and its golden data are unchanged): the
-    application gives each frame's measured display time back by its `FrameSchedule::FrameId`
-    (`AddPresentFeedback(PresentFeedback)`, a few frames later). **The pacer paces exactly as without it** (frame starts and work):
-    feedback gives `FeedbackState()` (`Used`, `Refused`, `NotShown`, `Missing`, `LateRefreshes`: what the display did, to hold
-    against the pacer's own late count) and the intended display time (`FramesInFlight`, `pacer/frame/`: a ring of 64 frames, no
-    allocation). Never let it change a swap interval or an animation time again without the user's word.
-    - Why statistics only: a first version measured the frames by their display times. The first integration's capture (120 and
-      240 Hz, work of 20, 90 and 130 %, idle and under CPU load) showed no difference at 20 and 130 %, a reaction 2 to 4 frames
-      later, and at 90 % (the rule's threshold) a count about 40 % above the display's events, as a frame never shown and the late
-      frame after it counted as two. The one case for it stays the busy-machine log below; pacing by display times is the guide's
-      "Not used yet" and a roadmap option.
-    - On a machine busy with other work the frames start up to 3 ms off the display's refreshes (the first integration's Vulkan
-      logs at 240 Hz), which the refresh clock's rounding reads as late frames. On an idle machine they start within 0.2 ms of a
-      refresh at every rate from 23.98 to 240 Hz: it is the machine's load, not the swap chain's queue (first believed, and
-      wrong). Ask what else ran on the machine before reading a present log.
-    - `LateRefreshes` = the display fell behind: more whole refreshes between two display times than the swap intervals between
-      them **and the lead** (a frame shown sooner than its swap interval puts the count ahead; a frame held as much longer after
-      it lost no refresh: a loop paced by sleeping makes such pairs). `Missing`: a frame that feedback for a newer frame passed,
-      or that left the ring without any. Refused: before the frame's present, not a whole number of refreshes (within an eighth)
-      after the display time used before it, a frame not kept. Two refused in a row that agree start the count again. With
-      feedback off the pacer keeps no frame (only the id counts on).
-    - `IntendedDisplayTime` is then the newest display time plus the swap intervals since (0 = unknown while there is none);
-      `NextFrameStartTime` (the frame's start plus its swap interval, the old value) is what a loop that sleeps holds to.
-    - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works): with G-SYNC on the display
-      times are on no grid and are refused. Those logs come from a G-SYNC display: ask for its state before reading a new one.
-    - **Whole capture sessions** of the first integration are one zip each, kept as assets of the GitHub release `pacer-captures`
-      (the user's choice: never in git, so no clone carries them; `gh release upload pacer-captures <zip>`), with a row in
-      `pacer-captures/README.md`. Git ignores a zip in `pacer-captures/`: download one there to work with it. Before packing, check the
-      files for hardware models (the user's graphics card must never be named: vendor and driver version only), user names and
-      local directories. **A session's numbers come from its logs through `tools/pacer_capture_report.py`** (standard library;
-      reads the zip in place): `<session>/runs.csv` (a row per run, whole ticks and counts), the charts (`<session>/*.svg`, in the
-      look of `SvgMarkup`) and the tables of `<session>.md` between `pacer-capture:<name>` comments (`--update-doc`; written as
-      Prettier formats them); `--check` fails when a file is not what the zip gives. Each session has its own charts and
-      tables there (`SESSIONS`, by the zip's name; an unknown zip gets `runs.csv` and the table of its folders). The guide quotes such a session ("that session") with a link by GitHub URL and **never embeds a chart**:
-      the SDK archive ships `doc/pacer.md` without images. Driver display times are not a measurement by the tools: say so.
-    - **What the two sessions of 2026-10-04 taught** (Vulkan FIFO, Windows, one driver; the results documents have the numbers):
-      the present and the acquire never waited there, so an application must hold the frame start to `NextFrameStartTime` at
-      every swap interval, one included (the first integration's sample did not at one, so every capture of it at a swap
-      interval of one up to those sessions is of a loop that ran ahead; a present takes about three refreshes to reach
-      the display there from the first frame on, and 3.1 ms in one held run after three lost presents. That
-      is not understood and the sample's swap chain code is being checked for a fault. **The user: wait for more data before
-      drawing conclusions.** Three explanations of it were written into the guide and withdrawn within a day (a queue the
-      application fills, a drain as the remedy, the hold emptying it): a finding from one run, or one that the other session has
-      not confirmed with a second capture, goes into a results document as a number and not into the guide as advice); the timer sleep mostly holds a frame and now and then lands on the wrong side of a refresh for a stretch; a
-      swap chain's reported refresh is the fastest display's of the desktop, so a second display at another rate changes
-      results (the first session's 60 and 50 Hz runs had one on: **ask what displays were on, and at what rates, before reading
-      a capture**); most findings are one run each and two runs of the same settings differ by several frames.
-    - `sdk/test-data/pacer/240-vulkan-present-log.csv` is a real present log (pacer off, G-SYNC off, a busy machine; not written by `pacer-sim`):
-      the tests pace it without and with feedback and pin the counts (214 frames late by their starts both ways, 2 refreshes
-      lost by the display times).
+    `check_conan.py` once more (the consumer and the Conan test package pace one frame with `TierPacer` and fill a `Payload` from the
+    schedule), and the consumer check fails when a default install holds anything of the pacer.
+  - **Every place users meet it says "experimental":** the guide's notice and its Status table, the READMEs, `integrating.md`, the
+    CMake and Conan option descriptions, the release notes, and the first line of every public type's comment. Keep it that way
+    until it has been measured on real swap chains.
+  - **The rule it is built to (the user's): the pacer holds every pacing rule and every time calculation; the application supplies
+    information and carries out the waits and the present.** Logic about pacing that an application has to write itself is a fault
+    of the pacer. Values in, values out: no platform API, no callbacks, no clock reads, no waits inside the library; made once (the
+    rule's frame windows), no allocation per frame after that (only `SetSettings` with a larger frame window allocates).
+  - **Capabilities and tiers** (`pacer/capability/`): an application says what it has and what of it is active (`PacerCapabilities`;
+    the active set is how it controls the pacer). A tier is the capabilities a set needs (`PacerTierUtil::Rate`, usable without a
+    pacer). **Three major tiers of four sub tiers, written "3.1"** (the user, 2026-10-09): major = who places a frame on its refresh
+    (1: the display's side, which also skips an overdue frame, `PresentAtTime` + `PresentSkipsOverdue`, **rated only, no pacer**; 2:
+    the display's side, `PresentAtTime`, built against the simulation only; 3: the frame loop). The sub tier is a rank inside it
+    from `WaitForPresent` and `VBlankTimes` (the wait first where the display places the frame, the vertical blank times first
+    where the loop does). No capability that changes how good the pacing is may hide inside a place. **Only a time before which a
+    frame is not shown makes a tier** (decision 16): `PresentAfterDuration` and `PresentSwapInterval` are rated beside it
+    (`DisplaySideHolds`) and given on every present where active. `PacerTierText` has the words and `NumberOf(tier)`; an
+    application shows no texts of its own. **Every tier has both aims** (`PacerAim::Smoothness`, the default, and `LowLatency`): an
+    aim is never built in as a tier's only behaviour, and the pacer does not pick it (the user: not now).
+  - **Built from parts** (the user: no restart, four whole pacers taken apart under their tests): `TierPacer` (`pacer/tier/`) holds
+    two ways of placing frames, `ClockGridLoopPacer` (a grid on the clock) and `VBlankLoopPacer` (the display's vertical blanks),
+    and hands a run over between them (`PacerHandover`) when the active set changes; the parts are `hold/PresentWaitRule`,
+    `hold/GpuWaitRule`, `timeline/VBlankTimeline`, `placement/DisplayPlacementUtil`, `display/DisplayErrorCounter`,
+    `rule/SwapIntervalRule` and `rule/FrameWorkRule`. The four single-tier classes (`TimerPeriodOnlyPacer`, …) are test code
+    (`pacer/tests/simulation`): `TierPacer` with its capabilities fixed, kept for their tests.
+  - **A frame's calls:** `AddVBlank`, `PlanFrame` (a wait for a present or for the GPU's work, then a start time; planned again
+    after each wait), `AddPresentWait` / `AddGpuWait`, `BeginFrame` → `FrameSchedule`, `EndFrame` → `PresentPlan` (a time to wait
+    until, `NotBeforeTime`, `MinimumDuration`, `SwapInterval`, `CpuBusy`), `AddPresent`; and where the application has them
+    `AddGpuWork`, `AddSystemWait`, `AddDisplayReport`. `EndFrame` comes before the present and before any wait, which would count
+    as work. A wait may take a few swap intervals and 50 ms at the least (`MinWaitTimeout`, the user's choice).
+  - **No catching up** (the user): after a refresh that was lost the animation step stays the swap interval, and the animation
+    time is that refresh behind the clock (`RefreshesBehindClock`); a constant offset does not show, correcting it does. A loss
+    that repeats is followed. A start the display's side held is not stepped over (decision 17).
+  - **Nothing a pacer uses about a display unless it is certain to be the window's display** (the user: 100 % certain; a
+    consistency check is no substitute). The refresh period is the application's to give: a swap chain's reported refresh was the
+    fastest display's of the desktop.
+  - **Display times are statistics only** (the user, 2026-10-04: "stats only, to simplify"): `AddDisplayReport` →
+    `DisplayErrors()` (the animation error by the tools' rules, and the time from a frame's start to its display). Never let them
+    change a swap interval or an animation time without the user's word; pacing by them is the guide's "Not used yet".
+  - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works, as more tier pacers behind the
+    same calls). The test display is a G-SYNC one: ask for its state, and what displays were on at what rates, before reading a
+    capture, and what else ran on the machine.
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
     `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.
-    **The frame rates a display can show** (the user, 2026-10-07: for a menu, "nothing lower than 20"): `FrameRateStep` (swap
-    interval, frame time, `RateMillihertz`) and `FrameRateStepUtil` (`StepCount`, `StepAt`, `StepFor`/`StepForRate`,
-    `IsStep`/`IsStepRate`; functions of the refresh period alone), a frame every 1, 2, 3, … refreshes down to 20 frames a
-    second, judged with the same slack (`PacerSettings::FrameRateSlackAt`) through the settings' own rounding, so the two
-    never disagree. The steps are what to offer: the settings still take a slower rate.
+    **The frame rates a display can show** (the user, 2026-10-07: for a menu, "nothing lower than 20"): `FrameRateStep` and
+    `FrameRateStepUtil` (`StepCount`, `StepAt`, `StepFor`/`StepForRate`, `IsStep`/`IsStepRate`; functions of the refresh period
+    alone), judged with the same slack through the settings' own rounding, so the two never disagree.
   - **Typed, in nanoseconds** (the user, 2026-10-07; the marker's payload takes the same types, so a schedule's values go into
     one as they are): points in time `NanosecondTickCount`, spans `NanosecondTimeSpan`, lengths that can not be negative
-    `NanosecondTimeDuration` (a schedule's frame times, the CPU busy time). The pacer caps nothing: what a marker's four bytes
-    do not hold is capped by the payload. `RefreshPeriod`'s 2⁻³²
-    nanoseconds are private (`FromRate`, `FromNanosecondTimeSpan`, `TimeFor`, `NearestRefreshes`, `FloorRefreshes`, `RefreshesToFit`).
-    The pacer's own golden files are in nanoseconds (`workNs`, …); the first integration's frame logs (the simulation's
-    `ToFrameLog`, `ReadFrameLog`, the two real logs in `sdk/test-data/pacer`) stay in ticks and are converted where they are read or written. **Always valid:** `RefreshPeriod` (100 µs
-    to 1 s, no default: the application gives its display's period) and `PacerSettings` (constructed from the period; setters
-    assert, then clamp). `SetRefreshPeriod` with another period restarts the pacer, and so does `SetSettings` with other settings
-    (the same ones change nothing; it allocates only when the frame window needs more room); both keep the animation time, and
-    `Settings()` always has the refresh period the pacer is on.
-  - **Names:** the rule's stretch of frames is the **frame window** (`FrameWindowLength`, `FrameWindowState`), never "window" alone (in
-    graphics that is the window system's). `PacerRefreshClock` (`pacer/clock/`) counts the display's
-    refreshes: never call it an animation clock, which in this repository is the application's game time (`sdk/doc/marker-fields.md`).
-  - **Monitor refresh rates** (`pacer/tests/MonitorRateTests.cpp`): 23 rates from 50 to 540 Hz (59.94 and 119.88 as rationals) run a
-    vsync loop with frames on time, a display 0.1 % off its rate, target frame rates, a load that comes and goes and a GPU-bound
-    loop (the GPU's time must be in `EndFrame`'s `work`, or the rule goes up and down; `EndFrame` comes before the present and
-    before any wait, which would count as work). The default
-    `FrameMargin` is the smaller of 1 ms and an eighth of the refresh period (`PacerSettings::FrameMarginAt`, agreed with the user):
-    with 1 ms alone twice the margin is a whole refresh at 500 Hz (and with work of a tenth of a refresh there is no room to speed
-    up again above 450 Hz), and a margin that was set stays as set. 60 and 100 Hz, and so the
-    golden data, keep 1 ms.
-  - Integer arithmetic only: the golden data must come out byte for byte. 100 % test coverage as the core and the marker
-    (llvm-cov, `NDEBUG`). There is no C# port (the roadmap lists one as a possible upgrade).
-  - The simulation of a frame loop (`pacer/tests/simulation`) and `pacer-sim` (`pacer/tests/pacer-sim`) are test code, built with the
-    tests only: never part of the library.
-  - Golden data: `python tools/update_pacer_test_data.py` writes the scenarios' frames from the test clips and runs `pacer-sim --golden`;
-    the tests compare every scenario's result byte for byte, and cross-check the clips (`60-busy`: the full-window rule reproduces the
-    sister repo's swap intervals and refreshes; `60-busy-full-rate`: at a fixed swap interval every frame is on the clip's refresh).
-    Run it after a change to the rule or the planning and review the difference.
+    `NanosecondTimeDuration`. The pacer caps nothing: what a marker's four bytes do not hold is capped by the payload.
+    `RefreshPeriod`'s 2⁻³² nanoseconds are private. **Always valid:** `RefreshPeriod` (100 µs to 1 s, no default) and
+    `PacerSettings` (constructed from the period; setters assert, then clamp). `SetRefreshPeriod` with another period and
+    `SetSettings` with other settings start the frames again and keep the animation time; the same ones change nothing.
+  - **Names:** the rule's stretch of frames is the **frame window** (`FrameWindowLength`, `FrameWindowState`), never "window" alone
+    (in graphics that is the window system's). The pacer's animation time is the display's, in refreshes: the application's game
+    time is its own (`sdk/doc/marker-fields.md`). The default `FrameMargin` is the smaller of 1 ms and an eighth of the refresh
+    period (`PacerSettings::FrameMarginAt`, agreed with the user); a margin that was set stays as set.
+  - **How it is checked.** Integer arithmetic only: the golden data must come out byte for byte, and does from MSVC and Clang.
+    100 % test coverage as the core and the marker (llvm-cov on a Clang build, `NDEBUG`); a header that is on the disk and not in
+    its library's `FILE_SET HEADERS` stops the configure. There is no C# port (the roadmap lists one as a possible upgrade).
+    - Test code, built with the tests only and never part of the library: `pacer/tests/simulation` (the sister repository's frame
+      model, `PacerSimulation`; a frame loop on a display model that queues presents, `SimulateTierLoop` with `LoopSettings`; the
+      golden runs, `TierLoopGolden`) and `pacer-sim` (`--golden`, `--loop`).
+    - Golden data: `python tools/update_pacer_test_data.py` writes the scenarios' frames from the test clips and runs
+      `pacer-sim --golden`: the scenarios' results (`60-busy`: the full-window rule reproduces the sister repo's swap intervals and
+      refreshes; `60-busy-full-rate`: at a fixed swap interval every frame is on the clip's refresh), and the tier loops
+      (`tier-loops.csv`: a line per run with the length and CRC-32 of its frames as text; `tier-loop-<run>.csv`: eight runs whole).
+      Run it after a change to a rule or to how a frame is paced and review the difference.
+    - `TierMonitorRateTests.cpp`: 23 rates from 50 to 540 Hz; `WorkloadLoopTests.cpp`: the loads of another pacer's own tests.
+  - **Capture sessions** of the first integration: a session is one zip, kept as an asset of the GitHub release `pacer-captures`
+    (the user's choice: never in git, so no clone carries them; `gh release upload pacer-captures <zip>`), with a row in
+    `pacer-captures/README.md`. Git ignores a zip in `pacer-captures/`: download one there to work with it. Before packing, check the
+    files for hardware models (the user's graphics card must never be named: vendor and driver version only), user names and
+    local directories. **A session's numbers come from its logs through `tools/pacer_capture_report.py`** (standard library;
+    reads the zip in place): `<session>/runs.csv`, the charts and the tables of `<session>.md` between `pacer-capture:<name>`
+    comments (`--update-doc`); `--check` fails when a file is not what the zip gives. The two sessions of 2026-10-04 are of the
+    first pacer and of a sample that did not hold its frame start at a swap interval of one: the guide links them for what they
+    say of variable refresh only. Driver display times are not a measurement by the tools: say so. The guide **never embeds a
+    chart**: the SDK archive ships `doc/pacer.md` without images.
+  - **Wait for more data before drawing conclusions** (the user): three explanations of one finding were written into the guide
+    and withdrawn within a day. A finding from one run, or one that another session has not confirmed, goes into the record as a
+    number and not into the guide as advice. Try a diagnostic on stored runs before shipping it.
+  - **Android's frame pacing library** may be read (the user, 2026-10-09) and its behaviour described; its code name does not go
+    into code, comments, documents or commit messages (cite it by its developer page), and none of its code is copied.
 - **Capture data (the default):** a capture decodes every frame's markers live and stores only them, with the timestamps, in
   `captures.mbcd` (`sdk/doc/capture-data-format.md`); the frames themselves (`frames.mbfc`) only with `--keep-frames` / the GUI's "Store
   video frames".

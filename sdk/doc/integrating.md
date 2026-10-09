@@ -221,8 +221,8 @@ the game wants to run at, its target frame time, and the time it intends the fra
 does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
 presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. The SDK's own
-[frame pacer](pacer.md) (`mb_framepacing::pacer`), which paces every frame with only a steady clock and vsync and hands you these values
-and an animation time in whole refreshes, is experimental and off by default.
+[frame pacer](pacer.md) (`mb_framepacing::pacer`), which paces every frame from what your platform can do (a steady clock and the
+refresh period at the least) and hands you these values and an animation time in whole refreshes, is experimental and off by default.
 
 **CPU start time and CPU busy (optional).** Add when the CPU started working on the frame (on the same clock) and how long it has
 worked on it when you draw the marker (you draw it last, just before Present). The capture sees only the display side; these show the
