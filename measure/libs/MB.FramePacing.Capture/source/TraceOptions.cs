@@ -1,14 +1,15 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The Perfetto trace a capture is joined with, and how: the trace's file, which of its processes is the application, and how the
-//* application's clock sits on the system's. A capture keeps it in capture.json ("trace"), so a later analysis joins the same trace again.
+//* EXPERIMENTAL (measure/doc/perfetto.md). The Perfetto trace a capture is joined with, and how: the trace's file, which of its processes
+//* is the application, and how the application's clock sits on the system's. A capture keeps it in capture.json ("trace"), so a later
+//* analysis joins the same trace again. MB.FramePacing.Trace does the join.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
-namespace MB.FramePacing.Trace
+namespace MB.FramePacing.Capture
 {
   /// <summary>Experimental. A Perfetto trace of a capture's run, and the options of the join.</summary>
   public sealed record TraceOptions
@@ -31,7 +32,9 @@ namespace MB.FramePacing.Trace
     /// <summary>Which of the trace's vertical blank sources to use, or "none". Null: the kernel's vertical blank events, when it has them.</summary>
     public string? VBlanks { get; init; }
 
-    /// <summary>The system clock the application's steady clock is, by its name (TraceAppClockUtil.Names). Null: monotonic.</summary>
+    /// <summary>
+    /// The system clock the application's steady clock is: "monotonic", "boottime", "monotonic-raw" or "realtime". Null: monotonic.
+    /// </summary>
     public string? AppClock { get; init; }
 
     /// <summary>What to add to a marker's time to get that clock's, for an application whose clock counts from an epoch of its own.</summary>
@@ -39,15 +42,5 @@ namespace MB.FramePacing.Trace
 
     /// <summary>The capture's clock minus the application's, when it is known: nothing is worked out from the frames then.</summary>
     public long? CaptureOffsetNs { get; init; }
-
-    /// <summary>The application clock. A name that is none of the clocks' is a <see cref="TraceException"/>.</summary>
-    public TraceAppClock Clock()
-    {
-      if (AppClock == null)
-        return TraceAppClock.Monotonic;
-      return TraceAppClockUtil.TryParse(AppClock, out var clock)
-        ? clock
-        : throw new TraceException($"'{AppClock}' is not an application clock: one of {string.Join(", ", TraceAppClockUtil.Names)}.");
-    }
   }
 }

@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using MB.FramePacing.Capture;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Trace.UnitTest

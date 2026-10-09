@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.Trace
 {
@@ -51,6 +52,16 @@ namespace MB.FramePacing.Trace
       }
       clock = TraceAppClock.Monotonic;
       return false;
+    }
+
+    /// <summary>The application clock of a join's options. A name that is none of the clocks' is a <see cref="TraceException"/>.</summary>
+    public static TraceAppClock Of(TraceOptions options)
+    {
+      if (options.AppClock == null)
+        return TraceAppClock.Monotonic;
+      return TryParse(options.AppClock, out var clock)
+        ? clock
+        : throw new TraceException($"'{options.AppClock}' is not an application clock: one of {string.Join(", ", Names)}.");
     }
 
     /// <summary>The name of the clock with Perfetto's <paramref name="clockId"/>; null for a clock that is not one of these.</summary>

@@ -6,6 +6,8 @@
 //*   captures.csv                - one row per capture index
 //*   run-<id>[-<n>]-frames.csv   - one row per presented application frame
 //*   summary.json                - everything else (layout, counts, statistics, histograms, warnings)
+//* EXPERIMENTAL: with a Perfetto trace of the run (measure/doc/perfetto.md), also what the trace says of each presented frame:
+//*   run-<id>[-<n>]-trace.csv    - one row per presented application frame (the tools' own file, not part of the analysis output format)
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -22,6 +24,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Data;
+using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.Analysis
 {
@@ -83,12 +86,86 @@ namespace MB.FramePacing.Analysis
       if (session is { FramesDroppedBySource: > 0 })
         warnings.Add($"The capture device/ffmpeg reported {session.FramesDroppedBySource} dropped frames.");
 
+      var traceJoins = JoinTrace(session, capture, timeline, options, warnings, cancellationToken);
+
       var outputDirectory = options.OutputDirectory ?? Path.Combine(captureDirectory, AnalysisDirectoryName);
       Directory.CreateDirectory(outputDirectory);
-      var report = new AnalysisReport(captureDirectory, outputDirectory, session, capture, timeline, warnings);
+      var report = new AnalysisReport(captureDirectory, outputDirectory, session, capture, timeline, warnings) { TraceJoins = traceJoins };
       WriteReports(report, options);
       return report;
     }
+
+    /// <summary>
+    /// EXPERIMENTAL: the Perfetto trace an analysis of <paramref name="captureDirectory"/> with <paramref name="options"/> joins the capture
+    /// with: the options', else the one capture.json names; null when there is none or the options say to join none.
+    /// </summary>
+    public static TraceOptions? TraceOf(string captureDirectory, AnalysisOptions options) =>
+      TraceOf(CaptureSessionInfo.TryLoad(captureDirectory), options);
+
+    private static TraceOptions? TraceOf(CaptureSessionInfo? session, AnalysisOptions options) =>
+      options.NoTrace ? null : options.Trace ?? session?.Trace;
+
+    /// <summary>
+    /// EXPERIMENTAL (measure/doc/perfetto.md): each run joined with the capture's Perfetto trace. The trace is read once. What does not fit
+    /// is a warning and the run has no join, but for a trace the options themselves name: that one not being readable stops the analysis.
+    /// </summary>
+    private static IReadOnlyList<TraceRunJoin?> JoinTrace(
+      CaptureSessionInfo? session,
+      DecodedCapture capture,
+      TimelineResult timeline,
+      AnalysisOptions options,
+      List<string> warnings,
+      CancellationToken cancellationToken
+    )
+    {
+      if (TraceOf(session, options) is not { } trace)
+        return Array.Empty<TraceRunJoin?>();
+      bool asked = options.Trace != null;
+      string traceName = Path.GetFileName(trace.Path);
+      if (options.TraceProcessorPath is not { } processor)
+      {
+        warnings.Add(
+          $"The Perfetto trace '{traceName}' was not joined: Perfetto's trace processor was not found (experimental; see measure/doc/perfetto.md)."
+        );
+        return Array.Empty<TraceRunJoin?>();
+      }
+
+      TraceData data;
+      try
+      {
+        data = TraceLoader.Load(processor, trace, cancellationToken);
+      }
+      catch (TraceException ex) when (!asked)
+      {
+        warnings.Add($"The Perfetto trace '{traceName}' was not joined: {ex.Message}");
+        return Array.Empty<TraceRunJoin?>();
+      }
+
+      var captures = capture.Rows.Select(r => r.ToCsvRow()).ToList();
+      var joins = new List<TraceRunJoin?>(timeline.Runs.Count);
+      foreach (var run in timeline.Runs)
+      {
+        long periodNs = (run.Pacing?.RefreshPeriod ?? timeline.CapturePeriod).Nanoseconds;
+        var traceRun = TraceRun.Create(run.RunId, run.SequenceId, run.Name, run.Frames.Select(f => f.ToRow()).ToList(), captures, periodNs);
+        try
+        {
+          joins.Add(TraceJoiner.Join(traceRun, data, trace));
+        }
+        catch (TraceException ex)
+        {
+          warnings.Add($"Run {run.RunId}: the Perfetto trace '{traceName}' was not joined: {ex.Message}");
+          joins.Add(null);
+        }
+      }
+      if (joins.Any(join => join != null))
+        warnings.Add(TraceNotice);
+      return joins;
+    }
+
+    /// <summary>What an analysis that joined a Perfetto trace says of it: the feature is experimental, and what its times rest on.</summary>
+    public const string TraceNotice =
+      "A Perfetto trace was joined (experimental): its times and the capture's are tied by the frames only, so a delay the whole run shares "
+      + "is not in what the trace says of a frame.";
 
     /// <summary>
     /// The capture data of <paramref name="captureDirectory"/>: captures.mbcd, or its frames.mbfc decoded (and the result saved as captures.mbcd,
@@ -205,13 +282,21 @@ namespace MB.FramePacing.Analysis
       WriteCaptures(Path.Combine(report.OutputDirectory, CapturesFileName), report.Capture.Rows);
       var ordinals = new Dictionary<uint, int>();
       var runFiles = new List<string>();
-      foreach (var run in report.Timeline.Runs)
+      for (int index = 0; index < report.Timeline.Runs.Count; ++index)
       {
+        var run = report.Timeline.Runs[index];
         int ordinal = ordinals.TryGetValue(run.RunId, out int seen) ? seen : 0;
         ordinals[run.RunId] = ordinal + 1;
         var name = RunFramesFileName(run, ordinal);
         runFiles.Add(name);
         WriteFrames(Path.Combine(report.OutputDirectory, name), run.Frames, camera);
+
+        // What the trace says of the run's frames; a run that was not joined has no such file, also not an earlier analysis's
+        string tracePath = Path.Combine(report.OutputDirectory, TraceFramesCsv.FileName(RunFilePrefix(run, ordinal)));
+        if (report.TraceJoinOf(index) is { } join)
+          TraceFramesCsv.Write(tracePath, join.Rows);
+        else if (File.Exists(tracePath))
+          File.Delete(tracePath);
       }
       WriteSummary(Path.Combine(report.OutputDirectory, SummaryFileName), report, options, runFiles);
     }

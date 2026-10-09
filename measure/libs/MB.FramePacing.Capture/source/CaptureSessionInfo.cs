@@ -85,6 +85,11 @@ namespace MB.FramePacing.Capture
     /// </summary>
     public CameraRig? Camera { get; init; }
 
+    /// <summary>
+    /// EXPERIMENTAL: the Perfetto trace of the run that the analysis joins the capture with (measure/doc/perfetto.md), and how. Null = none.
+    /// </summary>
+    public TraceOptions? Trace { get; init; }
+
     private static readonly JsonSerializerOptions g_jsonOptions = new JsonSerializerOptions
     {
       WriteIndented = true,

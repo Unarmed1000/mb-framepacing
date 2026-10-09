@@ -42,7 +42,7 @@ namespace MB.FramePacing.Trace
         new("frames", Text(join.Run.Frames.Count)),
         new("placed by", TraceAnchorText.Of(join.Alignment.Anchor)),
         new("capture clock minus application clock (ns)", Text(join.Alignment.CaptureMinusAppNs)),
-        new("application clock", TraceAppClockUtil.NameOf(join.Options.Clock())),
+        new("application clock", TraceAppClockUtil.NameOf(TraceAppClockUtil.Of(join.Options))),
         new("application clock offset (ns)", Text(join.Alignment.AppClockOffsetNs)),
         new("vertical blanks", join.VBlankNote),
       };

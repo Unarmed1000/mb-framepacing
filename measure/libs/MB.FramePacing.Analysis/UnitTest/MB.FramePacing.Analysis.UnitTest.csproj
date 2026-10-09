@@ -3,6 +3,12 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('UnitTest.props', '$(MSBuildProjectDirectory)'))" />
 
   <ItemGroup>
+    <!-- The stored traces and the golden capture they fit, shared with the trace library's tests -->
+    <Compile Include="..\..\MB.FramePacing.Trace\UnitTest\source\TempFolder.cs" Link="source\TempFolder.cs" />
+    <Compile Include="..\..\MB.FramePacing.Trace\UnitTest\source\TraceTestData.cs" Link="source\TraceTestData.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MB.FramePacing.Analysis.csproj" />
   </ItemGroup>
 </Project>

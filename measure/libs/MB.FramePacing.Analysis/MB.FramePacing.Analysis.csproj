@@ -6,5 +6,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MB.FramePacing.Capture\MB.FramePacing.Capture.csproj" />
+    <ProjectReference Include="..\MB.FramePacing.Trace\MB.FramePacing.Trace.csproj" />
   </ItemGroup>
 </Project>

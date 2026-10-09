@@ -11,6 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MB.FramePacing.Capture;
 using MB.FramePacing.Data;
 using NUnit.Framework;
 using static MB.FramePacing.Trace.UnitTest.TraceTestData;

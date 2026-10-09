@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.Trace
 {
@@ -41,7 +42,7 @@ namespace MB.FramePacing.Trace
         options.Layer,
         options.Thread,
         options.VBlanks,
-        options.Clock()
+        TraceAppClockUtil.Of(options)
       );
       lock (g_lock)
       {
@@ -59,7 +60,7 @@ namespace MB.FramePacing.Trace
     /// <summary>What <paramref name="options"/> need of the trace <paramref name="trace"/> answers for.</summary>
     public static TraceData Read(ITraceQueries trace, TraceOptions options)
     {
-      var clock = options.Clock();
+      var clock = TraceAppClockUtil.Of(options);
       var notes = new List<string>();
       var range = TraceReader.TraceRange(trace);
       var snapshots = TraceReader.ClockSnapshots(trace, TraceAppClockUtil.ClockId(clock));

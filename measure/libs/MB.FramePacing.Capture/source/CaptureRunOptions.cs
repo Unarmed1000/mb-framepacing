@@ -62,6 +62,9 @@ namespace MB.FramePacing.Capture
     /// <summary>The imported file or folder (<see cref="Ffmpeg.MediaSource.InputPath"/>), stored in capture.json; null for devices and streams.</summary>
     public string? InputPath { get; init; }
 
+    /// <summary>EXPERIMENTAL: a Perfetto trace of the run, stored in capture.json for the analysis to join the capture with (null = none).</summary>
+    public TraceOptions? Trace { get; init; }
+
     public string ToolVersion { get; init; } = string.Empty;
     public string? FfmpegVersion { get; init; }
     public string? FfmpegCommandLine { get; init; }

@@ -199,6 +199,7 @@ namespace MB.FramePacing.Capture
         Name = options.Name,
         ExpectedRefreshHz = options.ExpectedRefreshHz,
         Camera = options.Camera,
+        Trace = options.Trace,
       };
       session.Save(options.OutputDirectory);
       progress?.Invoke(

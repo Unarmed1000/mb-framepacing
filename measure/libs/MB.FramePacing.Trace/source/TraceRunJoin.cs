@@ -8,6 +8,7 @@
 //****************************************************************************************************************************************************
 
 using System.Collections.Generic;
+using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.Trace
 {

@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.Trace
 {
