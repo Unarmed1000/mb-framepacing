@@ -40,6 +40,12 @@ namespace MB.FramePacing.Capture
     /// <summary>The playback page and a recording browsers cannot play: make a playable copy or not. Null = ask.</summary>
     public PlaybackTranscodeChoice? PlaybackTranscode { get; init; }
 
+    /// <summary>
+    /// EXPERIMENTAL (a capture and a Perfetto trace): full path of Perfetto's trace_processor_shell. Null = use MB_TRACE_PROCESSOR, PATH or
+    /// the copy Perfetto's Python package downloaded.
+    /// </summary>
+    public string? TraceProcessorPath { get; init; }
+
     /// <summary>The file this configuration was loaded from, null if none exists yet.</summary>
     [JsonIgnore]
     public string? SourcePath { get; init; }
