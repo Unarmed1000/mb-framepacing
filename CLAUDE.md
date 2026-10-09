@@ -54,9 +54,10 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
 | `sdk/test-data/pacer/`                            | The pacer's golden data (`pacer-sim --golden`): scenario frames and results, the tier loops' digests and frames   |
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks        |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Trace/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks  |
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
 | `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                   |
+| `measure/test-data/trace/`, `frame-logs/`         | Made-up traces and frame logs with what the scripts gave for them: what the experimental C# ports are held to     |
 | `doc/`                                            | Project docs: releasing, roadmap                                                                                  |
 | `pacer-captures/`                                 | Capture sessions of the pacer: results documents, charts, `runs.csv`; the zips are assets of a GitHub release     |
 | `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                              |
@@ -151,30 +152,76 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modu
     and clang-tidy with.
   - `cmake/Version.hpp.in` is guarded with `// clang-format off`, because formatting breaks its `@VAR@` placeholders.
 - **Python scripts** (`measure/build_standalone.py`, `tools/`, `sdk/unity/build_upm.py`): standard library only, but for the
-  Perfetto script (below). They must pass `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`,
+  Perfetto scripts (below). They must pass `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`,
   `pyrightconfig.json`, recommended mode). CI runs all three. Their tests are in `tools/tests` (`python -m unittest discover -s
 tools/tests -t tools`; CI's `lint`).
-- **A capture and a Perfetto trace: EXPERIMENTAL** (`tools/trace_augment.py`, `measure/doc/perfetto.md`; the user, 2026-10-09: load a
-  trace with a capture for extra information, and add the capture's measurements to the trace, with Perfetto's Python package).
-  - It adds a run's measurements to a trace as tracks (`-o`), writes a CSV of what the trace says of each presented frame
-    (`--frames`), or writes the capture alone as a trace. `--inspect` lists what a trace has.
+- **A capture and a Perfetto trace: EXPERIMENTAL** (`measure/doc/perfetto.md`; the user, 2026-10-09: load a trace with a capture
+  for extra information, add the capture's measurements to the trace, select the trace in the GUI and the console app "so we can
+  use it for what we present", and save the augmented trace "as part of the report").
   - **Checked against traces its own tests make only. No recorded trace has been through it:** every place that describes it says
     so, until one has. A trace names a device and its programs: **never store a recorded trace in the repository** or quote from
-    one without the user's word.
-  - The parts: `trace_alignment.py` (the clocks, integer arithmetic), `trace_events.py` (a capture's frames as tracks) and
+    one without the user's word. **Nothing of a trace that names a program or a device goes onto a card** (the hover and the
+    description have values and the system's own verdict words; the layer name is in the CSV only).
+  - **Two implementations, held to the same bytes:** the script (`tools/trace_augment.py`, Perfetto's Python package) and the
+    tools (`measure/libs/MB.FramePacing.Trace`, a port part for part). `measure/test-data/trace` is what the script makes from the
+    golden capture and a made-up trace (`tools/update_trace_test_data.py`; a test of the scripts fails when the folder is stale),
+    and the C# tests compare with it: the written traces by length and SHA-256, the per-frame CSV byte for byte. Change the two
+    together, then regenerate the folder.
+  - **The tools:** `--trace` on `import` (stored in capture.json's `trace`, `TraceJoinOptions`) and `analyze` (for that analysis;
+    `--no-trace`), the trace's own options (`--trace-process`, …), `trace-info`, `config --set-trace-processor`; the GUI's
+    Perfetto trace card (Capture), row (Analyze) and trace processor (Settings), all behind the experimental switch. `capture`
+    takes no trace: while a live capture runs its trace is still being recorded.
+    - `CaptureAnalyzer` joins each run (`TraceLoader` reads the trace once and keeps it for the next analysis of the same file;
+      `TraceJoiner`) and writes `run-<id>-trace.csv`, the tools' own file and **not part of the analysis output format**; an
+      analysis that joins none removes it. What does not fit is a warning, but for a trace the analysis itself was given.
+    - `--charts` and Save charts also write `run-<id>-augmented.pftrace` (`AugmentedTraceFiles`) and read it back: a trace is
+      copied whole, so not by every analysis (the user's choice: with the charts).
+    - Presented (the user's choice: hover and description first, no panel): `ChartRun.Trace` (a row per frame, live and from the
+      CSV: the card from the files stays the live one), `CardHover`'s `trace, …` lines, two description lines on the report card.
+      A run without a trace gives byte for byte the card and hover it gave before.
+  - **Do they line up** (the user, 2026-10-09: "are we able to validate that the QR codes and perfetto information line up?"):
+    every join works out three numbers that do not depend on each other (`TraceLineUpCheck` → `TraceLineUp`, printed by `analyze`
+    and written as `run-<id>-trace-check.txt`): the thread awake for the markers' CPU busy time (and matched a frame off), the
+    measured display time minus the system's present time being one value, and, where the application named its frames in the
+    trace (`FrameSection`: a trace section `mbfp frame <run id> <frame index>` from the marker's CPU start to the end of its CPU
+    busy time; asked of the first integration with the user's word), the marker's times against the section's. **Numbers only,
+    no pass or fail** until recorded traces have shown what is usual, and none of them shows a delay the whole run shares. The
+    sections are a check next to the match by time, never in place of it (the per-frame CSV stays the script's).
+  - **Perfetto's trace processor is the user's own**, found as ffmpeg is (`TraceProcessorLocator`: `--trace-processor`,
+    `MB_TRACE_PROCESSOR`, `traceProcessorPath`, PATH, the folder Perfetto's Python package downloads into) and never bundled or
+    downloaded by the tools. `TraceProcessor` starts it on the loopback address with the trace on its command line and asks SQL
+    over its HTTP interface. No protobuf library: `ProtoWriter` / `ProtoReader` write and read the few messages field by field.
+    The tests that need it (category `trace-processor`) are skipped when there is none, and CI sets `MB_REQUIRE_TRACE_PROCESSOR`
+    so that there they fail instead (`tools/get_trace_processor.py` fetches the package's pinned copy for the .NET jobs).
+  - **The trace's times are plain whole nanoseconds (`long`, `…Ns`)** in the Trace library, not the capture's typed times: a
+    trace's clock is added and compared as a number, as the script does, never as a wrapping counter.
+  - The script's parts: `trace_alignment.py` (the clocks, integer arithmetic), `trace_events.py` (a capture's frames as tracks) and
     `trace_frames.py` (the per-frame join) need nothing but the standard library and are tested alone; `trace_tracks.py` (writes)
     and `trace_source.py` (reads) are the only files that import Perfetto's package (`# pyright: basic`, as `shader_render.py`).
-  - The package is the dependency group `trace` of `pyproject.toml` (`uv run --group trace ...`; pinned in `uv.lock`). It reads
-    through Perfetto's trace processor, a native program it downloads on first use into the user's home folder: the tests that
-    need it are skipped when it can not be had, and CI sets `MB_REQUIRE_TRACE_PROCESSOR` so that there they fail instead.
-  - **The tracks go before the trace's own packets, on the trace's own clock with no clock named** (`trace_tracks.py`): a reader
-    takes a long recording piece by piece and drops what comes after with an earlier time (`sorter_push_event_out_of_order`; a
-    third of the events of a test trace with two such marks, when they were appended). Keep the test of it
-    (`test_a_trace_written_in_pieces`). The frame timeline's messages are not in the Python package's protos: the tests write
-    them field by field (`tools/tests/synthetic_trace.py`).
+    The package is the dependency group `trace` of `pyproject.toml` (`uv run --group trace ...`; pinned in `uv.lock`); it
+    downloads the trace processor on first use into the user's home folder.
+  - **The tracks go before the trace's own packets, on the trace's own clock with no clock named** (`trace_tracks.py`,
+    `TraceTrackWriter`): a reader takes a long recording piece by piece and drops what comes after with an earlier time
+    (`sorter_push_event_out_of_order`; a third of the events of a test trace with two such marks, when they were appended). Keep
+    the tests of it (`test_a_trace_written_in_pieces`, `TheAugmentedTrace_IsTheScripts_AndReadsBackWhole`). The frame timeline's
+    messages are not in the Python package's protos: the tests write them field by field (`tools/tests/synthetic_trace.py`).
   - The clocks are tied by the frames only (`measure/doc/perfetto.md` "The clocks"): a delay the whole run shares can not be told
-    from the clocks' difference. Never describe a track's position as measured beyond that.
-  - It is out of `usage.md`, as every experimental feature is out of the workflow documents.
+    from the clocks' difference. Never describe a track's position, or what the trace says of a frame, as measured beyond that.
+  - It is out of `usage.md`, as every experimental feature is out of the workflow documents. DocImages has two pictures of it
+    (`gui-trace-capture.png`, `gui-trace-analysis.png`) and checks the whole way through the GUI when a trace processor is found.
+- **The frame stages charts: EXPERIMENTAL** (`frame-stages`, `measure/libs/MB.FramePacing.Charts/source/Stages`; the user,
+  2026-10-09: the script that drew them converted to C#). From a frame log of the pacer's first integration (its sample's own
+  CSV, alone or in a capture session's zip; `pacer-sim --loop` writes the same columns): a row per frame or a lane per resource,
+  and the whole run as a Chrome trace event file. The log's times stay whole ticks of 100 ns, as recorded: it is the sample's
+  file, not ours.
+  - A port of `tools/frame_stages_chart.py`, which is gone. `measure/test-data/frame-logs/expected` holds what the script gave
+    for the test logs (made up or simulated: **no log of a capture session is stored**), and `FrameStagesTests` holds the port
+    to it: the trace file byte for byte, the charts shape for shape. On the two sessions of 2026-10-04 (601 runs) the two gave
+    the same trace files and the same shapes.
+  - A shape may have a tip (the SVG's title) and a drawing its own style rules and fill patterns (`CardDrawing.Style`,
+    `Definitions`), for this card; the GUI does not draw it.
+  - Display times in a log are the graphics driver's report, not a measurement by the tools: the chart says so, and a frame
+    reported without a display time is never called not shown.
 - **uv manages the Python dev tools:** the root `pyproject.toml` (not a package) pins them in its `dev` group, `uv.lock` pins
   everything they bring, and `.python-version` is the minimum Python (3.12). `uv sync` creates `.venv` on it; `uv run <tool or
 script>` runs inside it, and CI runs `uv sync --locked`. `tools/check_cpp.py` and `tools/check_conan.py` use the tools next to the
@@ -385,8 +432,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     (`CaptureViewModel.ListSources`, `IsExperimental`). The default source is a video file, and the start button says
     **Analyze recording** for a video file or an image folder, **Start capture** for a live source (`StartText`).
   - **CLI:** `--experimental` (`CommonOptions.Experimental`, recursive) shows and allows the experimental parts: `capture`, `locate`,
-    `devices` and `camera-rig` (`CommonOptions.ExperimentalCommand`), `--camera`, `--recorded-fps` and `selftest`'s `--camera`,
-    `--refresh`, `--tear-every` (`ExperimentalOption`), and a stream URL for `import`. Without it they are left out of `--help`
+    `devices`, `camera-rig`, `trace-info` and `frame-stages` (`CommonOptions.ExperimentalCommand`), `--camera`, `--recorded-fps`,
+    `--trace` with its options, and `selftest`'s `--camera`, `--refresh`, `--tear-every` (`ExperimentalOption`), and a stream URL
+    for `import`. Without it they are left out of `--help`
     (read from the arguments before the commands are made: `ExperimentalRequested`) and refused with a one-line hint. Live capture
     prints `CommonOptions.LiveCaptureNotice` first. Every documented command for them carries `--experimental`.
   - **No synthetic test game in the GUI** (agreed with the user): no source, no `--demo`. `selftest` keeps it (the CLI's check

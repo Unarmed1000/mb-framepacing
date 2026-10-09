@@ -192,10 +192,11 @@ without it: the output files, the analysis and the report cards of an hour take 
 
 ## A capture and a Perfetto trace
 
-[`tools/trace_augment.py`](../measure/doc/perfetto.md) (experimental) joins a capture's analysis with a
-[Perfetto](https://perfetto.dev) trace recorded on the device during the same run: the capture's measurements as tracks in the
-trace, and a CSV of what the trace says of each presented frame. It is checked against traces its own tests make; **no recorded
-trace has been through it**.
+The tools join a capture with a [Perfetto](https://perfetto.dev) trace recorded on the device during the same run
+([experimental](../measure/doc/perfetto.md)): the analysis says what the trace says of each presented frame (a CSV, the report
+card's description, the GUI's text under the pointer), and the charts come with the trace that has the capture's measurements
+added as tracks. `tools/trace_augment.py` does the same from a checkout. It is checked against traces its own tests make; **no
+recorded trace has been through it**.
 
 **Out of experimental:** a recorded trace and a capture of the same run, on each kind of system a trace comes from, to prove
 the two parts that rest on our reading of the trace: which of the system's frames is which frame of the capture, and where a
@@ -209,8 +210,14 @@ display's vertical blanks are.
   SDK calls no platform API.
 - **The trace under the video:** the trace's tracks for a run in [the playback page](../measure/doc/usage.md#the-playback-page),
   on the playhead that the report and the recording already share.
-- **In the tools themselves:** the same join in `mb-framepacing` and its report cards, in place of a script. Perfetto's reader
-  is a native program, so it would be found and run as ffmpeg is, never bundled.
+- **The trace's values drawn:** a panel of the report card with the measured display time against the system's own present
+  time and the frames the system calls janky, and in the frametime panel the part of a frame's CPU busy time its thread waited
+  for a CPU. Today the values are in the text under the pointer and in the CSV only. Best drawn after a recorded trace has shown
+  what they look like.
+- **The trace's values in the playback page:** the same per-frame values in the page's readout under the video.
+- **Every option in the GUI:** the layer, the thread, the application's clock and the vertical blank source are the command
+  line's; the GUI takes the trace and the application.
+- **One augmented trace for a capture:** a capture with several runs gets a copy of the whole trace per run.
 - **More of the trace per frame:** the CPUs' and the GPU's frequency while a frame was made, the GPU's render stages, the
   compositor's own work on the frame.
 

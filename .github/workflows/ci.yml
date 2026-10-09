@@ -70,10 +70,20 @@ jobs:
           # Windows runners have 'python', Linux and macOS 'python3'
           "$(command -v python3 || command -v python)" sdk/cpp/tests/consumer/check_consumers.py
 
+      # Experimental: a capture joined with a Perfetto trace. The tools start the user's own trace processor and never download one;
+      # here Perfetto's Python package fetches the copy it is pinned to, and the tests that read a trace must find it
+      - name: uv (for Perfetto's Python package)
+        uses: astral-sh/setup-uv@v10.2.0
+      - name: Perfetto's trace processor (for the trace tests)
+        shell: bash
+        run: echo "MB_TRACE_PROCESSOR=$(uv run --locked --group trace tools/get_trace_processor.py)" >> "$GITHUB_ENV"
+
       # A test that runs 5 minutes is hung: the runner ends it and names it. The step's own limit catches a hang after the tests, and
       # unlike the job's limit it ends the step with its log
       - name: .NET build and tests
         timeout-minutes: 20
+        env:
+          MB_REQUIRE_TRACE_PROCESSOR: "1"
         run: dotnet test mb-framepacing.slnx -c Release --blame-hang-timeout 5m
 
       - name: Self-contained tools
