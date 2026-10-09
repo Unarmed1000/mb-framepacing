@@ -9,7 +9,12 @@
 # The pacer's golden data is compared byte for byte, with the LF line ends pacer-sim writes, on every OS
 sdk/test-data/pacer/*.csv text eol=lf
 
+# The trace test data is compared byte for byte too, with the LF line ends the script writes, on every OS
+measure/test-data/trace/*.csv  text eol=lf
+measure/test-data/trace/*.json text eol=lf
+
 # Binary files: never convert line endings or show text diffs
+*.pftrace binary
 *.png  binary
 *.pgm  binary
 *.mbfc binary

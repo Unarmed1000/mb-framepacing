@@ -1,0 +1,25 @@
+{
+  "capture": "sdk/test-data/data/60-busy-full-rate",
+  "process": "com.example.game",
+  "layer": "com.example.game/Main#0",
+  "periodNs": 16666667,
+  "appClock": "monotonic",
+  "appClockOffsetNs": 100000000000,
+  "captureMinusAppNs": 50000000,
+  "vblankShiftNs": 3000000,
+  "vblanks": "vblank-0",
+  "snapshotTraceNs": 103983333333,
+  "snapshotClockNs": 98983333333,
+  "captureAlone": {
+    "length": 261162,
+    "sha256": "69748e5a31d03ffb69d4a4ebd6aa8f17295f5e0ceade5863654b42f36dd096c2"
+  },
+  "augmented": {
+    "length": 364398,
+    "sha256": "5ff9a4d8b0dde52dfd30b9d05154234f764af46a8c093a34aa5f85e24be406ab"
+  },
+  "augmentedPieces": {
+    "length": 364526,
+    "sha256": "2a30e9ef1bad5b6a419cd7d27256cf6419b4cee5e218e754dd808e9ab891f6f4"
+  }
+}
