@@ -20,7 +20,7 @@ namespace MB.FramePacing.Trace
   /// <param name="Notes">What was found on the way, a line each.</param>
   public sealed record TraceRunJoin(
     TraceRun Run,
-    TraceOptions Options,
+    TraceJoinOptions Options,
     TraceData Data,
     TraceAlignment Alignment,
     VBlankFit? Fit,

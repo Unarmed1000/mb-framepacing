@@ -12,7 +12,7 @@
 namespace MB.FramePacing.Capture
 {
   /// <summary>Experimental. A Perfetto trace of a capture's run, and the options of the join.</summary>
-  public sealed record TraceOptions
+  public sealed record TraceJoinOptions
   {
     /// <summary>The trace's file: a Perfetto protobuf trace (a whole-file gzip is taken too).</summary>
     public string Path { get; init; } = string.Empty;

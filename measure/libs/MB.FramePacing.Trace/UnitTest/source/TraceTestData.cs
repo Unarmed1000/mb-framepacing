@@ -80,10 +80,10 @@ namespace MB.FramePacing.Trace.UnitTest
     }
 
     /// <summary>The options the stored traces were joined with.</summary>
-    public static TraceOptions Options(string trace, bool withProcess)
+    public static TraceJoinOptions Options(string trace, bool withProcess)
     {
       var digest = Digest();
-      return new TraceOptions
+      return new TraceJoinOptions
       {
         Path = File(trace),
         Process = withProcess ? digest.GetProperty("process").GetString() : null,

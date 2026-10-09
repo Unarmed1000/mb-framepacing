@@ -63,7 +63,7 @@ namespace MB.FramePacing.Capture
     public string? InputPath { get; init; }
 
     /// <summary>EXPERIMENTAL: a Perfetto trace of the run, stored in capture.json for the analysis to join the capture with (null = none).</summary>
-    public TraceOptions? Trace { get; init; }
+    public TraceJoinOptions? Trace { get; init; }
 
     public string ToolVersion { get; init; } = string.Empty;
     public string? FfmpegVersion { get; init; }

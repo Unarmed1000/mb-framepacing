@@ -99,10 +99,10 @@ namespace MB.FramePacing.Analysis
     /// EXPERIMENTAL: the Perfetto trace an analysis of <paramref name="captureDirectory"/> with <paramref name="options"/> joins the capture
     /// with: the options', else the one capture.json names; null when there is none or the options say to join none.
     /// </summary>
-    public static TraceOptions? TraceOf(string captureDirectory, AnalysisOptions options) =>
+    public static TraceJoinOptions? TraceOf(string captureDirectory, AnalysisOptions options) =>
       TraceOf(CaptureSessionInfo.TryLoad(captureDirectory), options);
 
-    private static TraceOptions? TraceOf(CaptureSessionInfo? session, AnalysisOptions options) =>
+    private static TraceJoinOptions? TraceOf(CaptureSessionInfo? session, AnalysisOptions options) =>
       options.NoTrace ? null : options.Trace ?? session?.Trace;
 
     /// <summary>

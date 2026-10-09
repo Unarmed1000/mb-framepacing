@@ -23,7 +23,7 @@ namespace MB.FramePacing.Trace
     /// The join of <paramref name="run"/> with <paramref name="data"/>. A run with no times in its markers, or whose CPU start times are
     /// not inside the trace, is a <see cref="TraceException"/>.
     /// </summary>
-    public static TraceRunJoin Join(TraceRun run, TraceData data, TraceOptions options)
+    public static TraceRunJoin Join(TraceRun run, TraceData data, TraceJoinOptions options)
     {
       if (run.Frames.Count == 0)
         throw new TraceException("The run has no frame to place.");

@@ -216,9 +216,9 @@ namespace MB.FramePacing.Trace.UnitTest
       Assert.That(TraceAppClockUtil.TryParse(null, out _), Is.False);
       Assert.That(TraceAppClockUtil.NameOfId(6), Is.EqualTo("boottime"));
       Assert.That(TraceAppClockUtil.NameOfId(64), Is.Null);
-      Assert.That(TraceAppClockUtil.Of(new TraceOptions()), Is.EqualTo(TraceAppClock.Monotonic));
-      Assert.That(TraceAppClockUtil.Of(new TraceOptions { AppClock = "realtime" }), Is.EqualTo(TraceAppClock.Realtime));
-      Assert.Throws<TraceException>(() => TraceAppClockUtil.Of(new TraceOptions { AppClock = "wall" }));
+      Assert.That(TraceAppClockUtil.Of(new TraceJoinOptions()), Is.EqualTo(TraceAppClock.Monotonic));
+      Assert.That(TraceAppClockUtil.Of(new TraceJoinOptions { AppClock = "realtime" }), Is.EqualTo(TraceAppClock.Realtime));
+      Assert.Throws<TraceException>(() => TraceAppClockUtil.Of(new TraceJoinOptions { AppClock = "wall" }));
       foreach (var anchor in Enum.GetValues<TraceAnchor>())
         Assert.That(TraceAnchorText.Of(anchor), Is.Not.Empty);
     }

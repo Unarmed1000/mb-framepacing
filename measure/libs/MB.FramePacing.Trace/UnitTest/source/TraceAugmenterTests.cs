@@ -131,7 +131,7 @@ namespace MB.FramePacing.Trace.UnitTest
       var digest = TraceTestData.Digest();
       var run = TraceTestData.GoldenRun();
       long shift = digest.GetProperty("vblankShiftNs").GetInt64();
-      var options = new TraceOptions { Path = tracePath, AppClockOffsetNs = digest.GetProperty("appClockOffsetNs").GetInt64() };
+      var options = new TraceJoinOptions { Path = tracePath, AppClockOffsetNs = digest.GetProperty("appClockOffsetNs").GetInt64() };
       var alignment = TraceAlignmentUtil.Align(run.Frames, options.AppClockOffsetNs!.Value) with { VBlankShiftNs = shift };
       var snapshots = new[] { new ClockSnapshot(digest.GetProperty("snapshotTraceNs").GetInt64(), digest.GetProperty("snapshotClockNs").GetInt64()) };
       string note = $"{digest.GetProperty("vblanks").GetString()}, display times moved by {-shift} ns";

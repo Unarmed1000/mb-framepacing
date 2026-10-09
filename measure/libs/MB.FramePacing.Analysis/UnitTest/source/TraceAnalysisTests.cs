@@ -46,7 +46,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     private static string Text(string folder, string name) => File.ReadAllText(Path.Combine(folder, name)).ReplaceLineEndings("\n");
 
-    private static TraceOptions Stored() => TraceTestData.Options(TraceTestData.SyntheticTrace, withProcess: true);
+    private static TraceJoinOptions Stored() => TraceTestData.Options(TraceTestData.SyntheticTrace, withProcess: true);
 
     [Test]
     public void WithoutATrace_TheOutputIsTheGoldenData_AndNothingOfATrace()

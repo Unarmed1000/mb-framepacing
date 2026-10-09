@@ -120,7 +120,7 @@ namespace MB.FramePacing.Trace.UnitTest
     {
       var run = TraceTestData.GoldenRun();
       // The markers' clock taken as the system's own, which it is not: the CPU start times are not in the trace
-      var plain = new TraceOptions { Path = TraceTestData.File(TraceTestData.SyntheticTrace) };
+      var plain = new TraceJoinOptions { Path = TraceTestData.File(TraceTestData.SyntheticTrace) };
       var data = TraceLoader.Load(m_processor, plain);
       Assert.That(Assert.Throws<TraceException>(() => TraceJoiner.Join(run, data, plain))!.Message, Does.Contain("application clock"));
 

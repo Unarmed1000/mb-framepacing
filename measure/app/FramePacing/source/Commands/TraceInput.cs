@@ -173,7 +173,7 @@ namespace MB.FramePacing.App.Commands
     /// The trace the options name; null without --trace. A file that is not there is a <see cref="FileNotFoundException"/>. Prints the
     /// experimental notice.
     /// </summary>
-    public TraceOptions? Options(ParseResult parseResult)
+    public TraceJoinOptions? Options(ParseResult parseResult)
     {
       if (parseResult.GetValue(Trace) is not { } trace)
         return null;
@@ -181,7 +181,7 @@ namespace MB.FramePacing.App.Commands
       if (!File.Exists(path))
         throw new FileNotFoundException($"The Perfetto trace does not exist: '{path}'");
       PrintNotice();
-      return new TraceOptions
+      return new TraceJoinOptions
       {
         Path = path,
         Process = parseResult.GetValue(Process),

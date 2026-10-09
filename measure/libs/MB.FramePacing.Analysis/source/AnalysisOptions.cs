@@ -31,7 +31,7 @@ namespace MB.FramePacing.Analysis
     /// EXPERIMENTAL: the Perfetto trace of the run to join the capture with, instead of the one in capture.json (null = capture.json's).
     /// A trace given here that can not be read stops the analysis; the capture's own is a warning then.
     /// </summary>
-    public TraceOptions? Trace { get; init; }
+    public TraceJoinOptions? Trace { get; init; }
 
     /// <summary>EXPERIMENTAL: join no trace, also when capture.json names one.</summary>
     public bool NoTrace { get; init; }

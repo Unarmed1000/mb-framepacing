@@ -55,7 +55,7 @@ namespace MB.FramePacing.Trace
     }
 
     /// <summary>The application clock of a join's options. A name that is none of the clocks' is a <see cref="TraceException"/>.</summary>
-    public static TraceAppClock Of(TraceOptions options)
+    public static TraceAppClock Of(TraceJoinOptions options)
     {
       if (options.AppClock == null)
         return TraceAppClock.Monotonic;

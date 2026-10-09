@@ -27,7 +27,7 @@ namespace MB.FramePacing.Trace
     /// What <paramref name="options"/> need of their trace, read with the trace processor at <paramref name="processorPath"/>. The same
     /// file with the same options is read once: asked for again, what was read is given back.
     /// </summary>
-    public static TraceData Load(string processorPath, TraceOptions options, CancellationToken cancellationToken = default)
+    public static TraceData Load(string processorPath, TraceJoinOptions options, CancellationToken cancellationToken = default)
     {
       string path = Path.GetFullPath(options.Path);
       var file = new FileInfo(path);
@@ -58,7 +58,7 @@ namespace MB.FramePacing.Trace
     }
 
     /// <summary>What <paramref name="options"/> need of the trace <paramref name="trace"/> answers for.</summary>
-    public static TraceData Read(ITraceQueries trace, TraceOptions options)
+    public static TraceData Read(ITraceQueries trace, TraceJoinOptions options)
     {
       var clock = TraceAppClockUtil.Of(options);
       var notes = new List<string>();

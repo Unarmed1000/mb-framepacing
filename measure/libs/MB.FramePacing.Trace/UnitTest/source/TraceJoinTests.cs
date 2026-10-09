@@ -135,7 +135,7 @@ namespace MB.FramePacing.Trace.UnitTest
     public void ARunThatCanNotBePlaced_IsRefusedWithWhatToDo()
     {
       var data = EmptyTrace(0, 1_000_000);
-      var options = new TraceOptions { Path = "run.pftrace" };
+      var options = new TraceJoinOptions { Path = "run.pftrace" };
 
       var none = new TraceRun("run", "1/", Frames(Frame(1, 100), Frame(2, 200)), Array.Empty<CaptureCsvRow>(), 100);
       Assert.That(Assert.Throws<TraceException>(() => TraceJoiner.Join(none, data, options))!.Message, Does.Contain("capture offset"));
@@ -167,7 +167,7 @@ namespace MB.FramePacing.Trace.UnitTest
       var source = new VBlankSource(false, "vblank-0", 3);
       var data = EmptyTrace(0, 1_000_000) with { VBlanksFrom = source, VBlanks = new long[] { 5, 105, 205 } };
 
-      var join = TraceJoiner.Join(run, data, new TraceOptions { Path = "run.pftrace" });
+      var join = TraceJoiner.Join(run, data, new TraceJoinOptions { Path = "run.pftrace" });
 
       Assert.That(join.Fit, Is.Null);
       Assert.That(join.VBlankNote, Is.EqualTo("none used"));
