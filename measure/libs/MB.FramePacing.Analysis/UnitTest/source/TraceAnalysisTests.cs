@@ -89,6 +89,10 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(File.ReadAllText(Path.Combine(report.OutputDirectory, TraceFile)), Is.EqualTo(File.ReadAllText(TraceTestData.File("frames.csv"))));
       var join = report.TraceJoinOf(0)!;
       Assert.That(join.Rows.Count, Is.EqualTo(report.Timeline.Runs[0].Frames.Count));
+      // How well the two line up is written next to it, as the numbers the join gives
+      string check = File.ReadAllText(Path.Combine(report.OutputDirectory, "run-1-trace-check.txt"));
+      Assert.That(check, Is.EqualTo(string.Join('\n', join.LineUp!.Lines()) + "\n"));
+      Assert.That(check, Does.Contain("379 of 387 frames with a CPU start time have theirs"));
       Assert.That(join.Run.Name, Is.EqualTo("busy-full-rate"));
       Assert.That(report.Warnings, Does.Contain(CaptureAnalyzer.TraceNotice));
       // The rest of the output is what it is without a trace
@@ -101,6 +105,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var again = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions());
       Assert.That(again.OutputDirectory, Is.EqualTo(report.OutputDirectory));
       Assert.That(File.Exists(Path.Combine(again.OutputDirectory, TraceFile)), Is.False);
+      Assert.That(File.Exists(Path.Combine(again.OutputDirectory, "run-1-trace-check.txt")), Is.False);
     }
 
     [Test]

@@ -33,5 +33,9 @@ namespace MB.FramePacing.Trace
     IReadOnlyDictionary<long, long> DisplayPresents,
     IReadOnlyList<ThreadState> ThreadStates,
     IReadOnlyList<string> Notes
-  );
+  )
+  {
+    /// <summary>The frames the application itself named in the trace, ascending by their start; empty when it named none.</summary>
+    public IReadOnlyList<FrameSection> FrameSections { get; init; } = System.Array.Empty<FrameSection>();
+  }
 }

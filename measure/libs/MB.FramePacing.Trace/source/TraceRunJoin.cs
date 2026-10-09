@@ -27,5 +27,9 @@ namespace MB.FramePacing.Trace
     string VBlankNote,
     IReadOnlyList<TraceFrame> Rows,
     IReadOnlyList<string> Notes
-  );
+  )
+  {
+    /// <summary>How well the run's markers and the trace line up, as numbers; null for a join that was not checked.</summary>
+    public TraceLineUp? LineUp { get; init; }
+  }
 }

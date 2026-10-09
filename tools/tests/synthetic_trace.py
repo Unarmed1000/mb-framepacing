@@ -13,6 +13,9 @@ that has a CPU start time the trace has:
 - the frame in the system's frame timeline: the application's frame from a little before its CPU start to a little after
   its CPU work ended, and the display frame it went into, which the system says was presented at the frame's intended display
   time (a late frame is 'Late Present' with the application to blame);
+- the application's own trace section around the frame's CPU work, named 'mbfp frame <run id> <frame index>': what an
+  application writes so that a frame of the trace is known by its marker's frame index. One frame in fifty has none, and every
+  ninth begins SECTION_LATE_NS after the marker's CPU start time;
 - and for the whole run the kernel's vertical blank events, VBLANK_BEFORE_INTENDED_NS before each refresh the pacer aimed at.
 
 The frame timeline's messages are not among the ones Perfetto's Python package has (they are Android's, an extension of the
@@ -31,6 +34,9 @@ VBLANK_BEFORE_INTENDED_NS = 3_000_000
 PREEMPTED_NS = 200_000
 SURFACE_BEFORE_CPU_NS = 100_000
 SURFACE_AFTER_CPU_NS = 500_000
+SECTION_LATE_NS = 1_500
+# The golden capture's run
+RUN_ID = 1
 
 APP_PID = 4242
 APP_NAME = "com.example.game"
@@ -75,6 +81,21 @@ def presented_ns(intended_display_ns: int, cpu_start_ns: int, cpu_busy_ns: int) 
 
 def is_preempted(frame_index: int) -> bool:
     return (frame_index % 10) == 0
+
+
+def has_section(frame_index: int) -> bool:
+    """The made-up application names its frames in the trace, all but one in fifty."""
+    return (frame_index % 50) != 7
+
+
+def section_late_ns(frame_index: int) -> int:
+    """How long after a frame's CPU start time its section begins: nothing, and 1500 ns for every ninth frame."""
+    return SECTION_LATE_NS if (frame_index % 9) == 0 else 0
+
+
+def section_name(frame_index: int) -> str:
+    """A frame's trace section: 'mbfp frame <run id> <frame index>'."""
+    return f"mbfp frame {RUN_ID} {frame_index}"
 
 
 def _switch(bundle, time_ns: int, previous: int, previous_state: int, following: int) -> None:
@@ -161,12 +182,16 @@ def build(with_service_events: bool = False) -> bytes:
         thread.tgid = pid
         thread.name = "main"
 
-    # The scheduler's and the display controller's events, in time order on one CPU
-    events: list[tuple[int, int, tuple[int, int, int] | None]] = []
+    # The scheduler's and the display controller's events, in time order on one CPU; and the application's own trace section
+    # around each frame's CPU work, named for the frame (a text: "B|<pid>|<name>" begins one, "E|<pid>" ends it)
+    events: list[tuple[int, int, tuple[int, int, int] | str | None]] = []
     for frame in worked:
         begin = trace_ns(frame.cpu_start_ns or 0)
         finish = begin + (frame.cpu_busy_ns or 0)
         events.append((begin, 1, (0, TASK_RUNNING, APP_PID)))
+        if has_section(frame.frame_index):
+            events.append((begin + section_late_ns(frame.frame_index), 2, f"B|{APP_PID}|{section_name(frame.frame_index)}\n"))
+            events.append((finish, 0, f"E|{APP_PID}\n"))
         if is_preempted(frame.frame_index) and (frame.cpu_busy_ns or 0) > (4 * PREEMPTED_NS):
             middle = begin + ((frame.cpu_busy_ns or 0) // 2)
             events.append((middle, 1, (APP_PID, TASK_RUNNING, OTHER_PID)))
@@ -185,7 +210,12 @@ def build(with_service_events: bool = False) -> bytes:
     bundle.cpu = 0
     sequence_number = 0
     for time_ns, _, switch in events:
-        if switch is None:
+        if isinstance(switch, str):
+            event = bundle.event.add()
+            event.timestamp = time_ns
+            event.pid = APP_PID
+            event.print.buf = switch
+        elif switch is None:
             sequence_number += 1
             event = bundle.event.add()
             event.timestamp = time_ns

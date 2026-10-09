@@ -80,7 +80,10 @@ namespace MB.FramePacing.Trace
         data.DisplayPresents,
         data.ThreadStates
       );
-      return new TraceRunJoin(run, options, data, alignment, fit, vblankNote, rows, notes);
+      return new TraceRunJoin(run, options, data, alignment, fit, vblankNote, rows, notes)
+      {
+        LineUp = TraceLineUpCheck.Check(run.RunId, run.Frames, rows, data, run.PeriodNs),
+      };
     }
 
     private static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);

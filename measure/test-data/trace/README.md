@@ -6,7 +6,7 @@ a device and its programs and is never stored in this repository.
 
 | File                       | What                                                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `synthetic.pftrace`        | The made-up trace: clock snapshots, a process, its scheduling, vertical blank events, a frame timeline       |
+| `synthetic.pftrace`        | The made-up trace: clock snapshots, a process, its scheduling and its own frame sections, vertical blank events, a frame timeline |
 | `synthetic-pieces.pftrace` | The same with the marks a recording has that was written to its file in pieces                               |
 | `frames.csv`               | What `tools/trace_augment.py --frames` says the trace says of each frame of the golden capture               |
 | `digest.json`              | The length and SHA-256 of the traces the script writes for them, and the numbers the tracks were placed by   |

@@ -8,6 +8,7 @@
 //*   summary.json                - everything else (layout, counts, statistics, histograms, warnings)
 //* EXPERIMENTAL: with a Perfetto trace of the run (measure/doc/perfetto.md), also what the trace says of each presented frame:
 //*   run-<id>[-<n>]-trace.csv    - one row per presented application frame (the tools' own file, not part of the analysis output format)
+//*   run-<id>[-<n>]-trace-check.txt - how well the markers and the trace line up, as numbers
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -307,10 +308,22 @@ namespace MB.FramePacing.Analysis
 
         // What the trace says of the run's frames; a run that was not joined has no such file, also not an earlier analysis's
         string tracePath = Path.Combine(report.OutputDirectory, TraceFramesCsv.FileName(RunFilePrefix(run, ordinal)));
+        string checkPath = Path.Combine(report.OutputDirectory, RunFilePrefix(run, ordinal) + TraceLineUp.FileSuffix);
         if (report.TraceJoinOf(index) is { } join)
+        {
           TraceFramesCsv.Write(tracePath, join.Rows);
-        else if (File.Exists(tracePath))
-          File.Delete(tracePath);
+          // How well the markers and the trace line up, as the numbers the join gives: a text of its own, for a reader
+          if (join.LineUp is { } lineUp)
+            File.WriteAllText(checkPath, string.Join('\n', lineUp.Lines()) + "\n", new UTF8Encoding(false));
+        }
+        else
+        {
+          foreach (string stale in new[] { tracePath, checkPath })
+          {
+            if (File.Exists(stale))
+              File.Delete(stale);
+          }
+        }
       }
       WriteSummary(Path.Combine(report.OutputDirectory, SummaryFileName), report, options, runFiles);
     }

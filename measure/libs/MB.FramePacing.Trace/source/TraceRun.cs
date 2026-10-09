@@ -19,6 +19,9 @@ namespace MB.FramePacing.Trace
   /// <param name="PeriodNs">The display's refresh period, in whole nanoseconds.</param>
   public sealed record TraceRun(string Name, string Key, IReadOnlyList<FrameRow> Frames, IReadOnlyList<CaptureCsvRow> Captures, long PeriodNs)
   {
+    /// <summary>The run's id, as its markers carry it: what the application's own frame sections in a trace are known by.</summary>
+    public uint RunId { get; init; }
+
     /// <summary>The run by its id, with the name it was given or else its sequence id as the summary writes it.</summary>
     public static TraceRun Create(
       uint runId,
@@ -34,7 +37,7 @@ namespace MB.FramePacing.Trace
         !string.IsNullOrEmpty(name) ? name
         : !string.IsNullOrEmpty(sequenceId) ? sequenceId
         : $"run {id}";
-      return new TraceRun(shown, $"{id}/{sequenceId ?? string.Empty}", frames, captures, periodNs);
+      return new TraceRun(shown, $"{id}/{sequenceId ?? string.Empty}", frames, captures, periodNs) { RunId = runId };
     }
 
     /// <summary>

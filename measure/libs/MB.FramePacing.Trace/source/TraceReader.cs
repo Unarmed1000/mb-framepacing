@@ -208,6 +208,26 @@ namespace MB.FramePacing.Trace
     }
 
     /// <summary>
+    /// The frames the application itself named in the trace (<see cref="FrameSection"/>), of the processes that fit the pattern,
+    /// ascending by their start. A section that had not ended when the trace did, or whose name is not a frame's, is left out.
+    /// </summary>
+    public static IReadOnlyList<FrameSection> FrameSections(ITraceQueries trace, string processGlob)
+    {
+      var rows = trace.Query(
+        "SELECT s.ts AS ts, s.dur AS dur, s.name AS name FROM slice s JOIN thread_track tt ON s.track_id = tt.id "
+          + "JOIN thread t USING (utid) JOIN process p USING (upid) "
+          + $"WHERE s.name GLOB {Quoted(FrameSection.NamePrefix + "*")} AND p.name GLOB {Quoted(processGlob)} AND s.dur >= 0 ORDER BY s.ts"
+      );
+      var sections = new List<FrameSection>(rows.RowCount);
+      for (int row = 0; row < rows.RowCount; ++row)
+      {
+        if (FrameSection.TryParseName(rows.Text(row, 2), out uint runId, out ulong frameIndex))
+          sections.Add(new FrameSection(runId, frameIndex, rows.Whole(row, 0), rows.Whole(row, 0) + rows.Whole(row, 1)));
+      }
+      return sections;
+    }
+
+    /// <summary>
     /// What a trace has under the root track of that name, per track name: its slices (a moment is a slice without length there), and its
     /// counter values.
     /// </summary>

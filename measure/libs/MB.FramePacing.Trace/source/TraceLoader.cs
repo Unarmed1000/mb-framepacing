@@ -86,7 +86,10 @@ namespace MB.FramePacing.Trace
         if (wanted != null)
           states = TraceReader.ThreadStates(trace, wanted.Utid);
       }
-      return new TraceData(range.FirstNs, range.LastNs, snapshots, errors, picked, vblanks, surfaceFrames, presents, states, notes);
+      return new TraceData(range.FirstNs, range.LastNs, snapshots, errors, picked, vblanks, surfaceFrames, presents, states, notes)
+      {
+        FrameSections = options.Process != null ? TraceReader.FrameSections(trace, options.Process) : Array.Empty<FrameSection>(),
+      };
     }
 
     /// <summary>
