@@ -85,6 +85,8 @@ namespace MB.FramePacing.App.Commands
         ffmpegOption,
       };
       playback.AddTo(command);
+      var trace = new TraceInput();
+      trace.AddTo(command, remembered: false);
 
       command.SetAction(
         async (parseResult, cancellationToken) =>
@@ -94,6 +96,11 @@ namespace MB.FramePacing.App.Commands
             var config = CommonOptions.LoadConfig(parseResult);
             var ffmpeg = FfmpegLocator.Find(parseResult.GetValue(ffmpegOption), config);
             var input = parseResult.GetValue(inputArgument)!;
+            // The playback page needs the analysis: --playback analyses too
+            bool analyze = parseResult.GetValue(analyzeOption) || parseResult.GetValue(playback.Playback);
+            // A trace that is not there, or no trace processor to read it with, is said before the import and not after it
+            var traceOptions = trace.Options(parseResult);
+            string? traceProcessor = traceOptions != null && analyze ? TraceInput.FindProcessor(parseResult, trace.Processor) : null;
             // Not a file or a folder: a stream URL, which is live capture
             if (!File.Exists(input) && !Directory.Exists(input) && input.Contains("://", StringComparison.Ordinal))
             {
@@ -141,6 +148,7 @@ namespace MB.FramePacing.App.Commands
               TargetFps = parseResult.GetValue(targetOption),
               Name = parseResult.GetValue(nameOption),
               ExpectedRefreshHz = parseResult.GetValue(displayOption),
+              Trace = traceOptions,
               ToolVersion = Program.VersionString,
               FfmpegVersion = FfmpegDevices.GetVersion(ffmpeg),
               FfmpegCommandLine = string.Join(" ", FfmpegCommandBuilder.BuildCapture(options)),
@@ -154,11 +162,16 @@ namespace MB.FramePacing.App.Commands
             var result = await Task.Run(() => CaptureCommand.RunWithStatus(source, runOptions, cancellationToken), CancellationToken.None);
             CaptureCommand.PrintResult(result.Session);
 
-            // The playback page needs the analysis: --playback analyses too
-            if (parseResult.GetValue(analyzeOption) || parseResult.GetValue(playback.Playback))
+            if (analyze)
               return AnalyzeCommand.Run(
                 result.Directory,
-                new AnalysisOptions { ToolVersion = Program.VersionString },
+                // The trace as this command line names it, so that one that can not be read stops the command
+                new AnalysisOptions
+                {
+                  ToolVersion = Program.VersionString,
+                  Trace = traceOptions,
+                  TraceProcessorPath = traceProcessor,
+                },
                 charts: parseResult.GetValue(chartsOption),
                 playback: parseResult.GetValue(playback.Playback)
                   ? report => PlaybackOutput.Write(parseResult, playback, report, ffmpeg, cancellationToken)

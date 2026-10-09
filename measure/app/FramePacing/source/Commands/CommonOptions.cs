@@ -26,15 +26,15 @@ namespace MB.FramePacing.App.Commands
     public static FramePacingConfig LoadConfig(ParseResult parseResult) => FramePacingConfig.Load(parseResult.GetValue(Config));
 
     /// <summary>
-    /// Global (recursive) option: show and allow the experimental parts, live capture (capture, locate, devices, a stream URL for import)
-    /// and camera capture (camera-rig, --camera, --recorded-fps, selftest --camera). Without it they are left out of --help and refused,
-    /// as the GUI hides them unless its experimental features are on.
+    /// Global (recursive) option: show and allow the experimental parts, live capture (capture, locate, devices, a stream URL for import),
+    /// camera capture (camera-rig, --camera, --recorded-fps, selftest --camera) and a capture joined with a Perfetto trace (trace-info,
+    /// --trace). Without it they are left out of --help and refused, as the GUI hides them unless its experimental features are on.
     /// </summary>
     public static readonly Option<bool> Experimental = new Option<bool>("--experimental")
     {
       Description =
-        "Show and allow the experimental parts: live capture (capture, locate, devices, a stream URL for import) and camera capture "
-        + "(camera-rig, --camera, --recorded-fps, selftest --camera).",
+        "Show and allow the experimental parts: live capture (capture, locate, devices, a stream URL for import), camera capture "
+        + "(camera-rig, --camera, --recorded-fps, selftest --camera) and a capture joined with a Perfetto trace (trace-info, --trace).",
       Recursive = true,
     };
 

@@ -80,8 +80,11 @@ namespace MB.FramePacing.App.Commands
         ffmpegOption,
       };
       playback.AddTo(command);
+      var trace = new TraceInput();
+      trace.AddTo(command, remembered: true);
       command.SetAction(parseResult =>
       {
+        string directory = Path.GetFullPath(parseResult.GetValue(directoryArgument)!);
         var options = new AnalysisOptions
         {
           TimeSource = parseResult.GetValue(timeOption),
@@ -101,8 +104,17 @@ namespace MB.FramePacing.App.Commands
           OutputDirectory = parseResult.GetValue(outputOption) is { } output ? Path.GetFullPath(output) : null,
           ToolVersion = Program.VersionString,
         };
+        try
+        {
+          options = trace.Apply(parseResult, directory, options);
+        }
+        catch (Exception ex)
+        {
+          Program.ReportError(ex);
+          return Program.ResultError;
+        }
         return Run(
-          Path.GetFullPath(parseResult.GetValue(directoryArgument)!),
+          directory,
           options,
           charts: parseResult.GetValue(chartsOption),
           playback: parseResult.GetValue(playback.Playback)
@@ -137,6 +149,9 @@ namespace MB.FramePacing.App.Commands
           AnsiConsole.MarkupLineInterpolated(
             $"[grey]{chartFiles.Count} chart(s) written next to them (run-*-report.svg, run-*-error-histogram.svg, ...)[/]"
           );
+        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts
+        if (charts)
+          TraceInput.WriteAugmented(report!, options.TraceProcessorPath);
         playback?.Invoke(report!);
         return Program.ResultSuccess;
       }

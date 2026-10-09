@@ -276,6 +276,20 @@ namespace MB.FramePacing.Analysis
 
     public static string RunFramesFileName(RunAnalysis run, int ordinal) => AnalysisFiles.FramesFileName(run.RunId, ordinal);
 
+    /// <summary>The start of every report file of each of <paramref name="runs"/>, in their order (<see cref="RunFilePrefix"/>).</summary>
+    public static IReadOnlyList<string> RunFilePrefixes(IReadOnlyList<RunAnalysis> runs)
+    {
+      var ordinals = new Dictionary<uint, int>();
+      var prefixes = new List<string>(runs.Count);
+      foreach (var run in runs)
+      {
+        int ordinal = ordinals.GetValueOrDefault(run.RunId);
+        ordinals[run.RunId] = ordinal + 1;
+        prefixes.Add(RunFilePrefix(run, ordinal));
+      }
+      return prefixes;
+    }
+
     private static void WriteReports(AnalysisReport report, AnalysisOptions options)
     {
       bool camera = report.Session?.Camera != null;

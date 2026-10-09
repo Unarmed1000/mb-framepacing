@@ -12,6 +12,7 @@ using System.CommandLine;
 using System.IO;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
+using MB.FramePacing.Trace;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -28,6 +29,13 @@ namespace MB.FramePacing.App.Commands
         Description = "Store what a playback report does with a recording browsers cannot play: ask, yes (make a playable copy) or no (no video).",
         HelpName = "ask|yes|no",
       };
+      var traceProcessorOption = CommonOptions.ExperimentalOption(
+        new Option<string?>("--set-trace-processor")
+        {
+          Description = "(experimental) Store the path of Perfetto's trace_processor_shell, which reads a Perfetto trace (--trace).",
+        },
+        TraceInput.What
+      );
       var command = new Command(
         "config",
         "Show or change the configuration file (ffmpeg installation, capture folder, the playback page's answers). Without options it shows the active settings."
@@ -37,6 +45,7 @@ namespace MB.FramePacing.App.Commands
         ffmpegOption,
         captureOption,
         playbackTranscodeOption,
+        traceProcessorOption,
       };
       command.SetAction(parseResult =>
       {
@@ -49,7 +58,8 @@ namespace MB.FramePacing.App.Commands
           var setFfmpeg = parseResult.GetValue(ffmpegOption);
           var setCapture = parseResult.GetValue(captureOption);
           var setPlaybackTranscode = parseResult.GetValue(playbackTranscodeOption);
-          if (setFfmpeg != null || setCapture != null || setPlaybackTranscode != null)
+          var setTraceProcessor = parseResult.GetValue(traceProcessorOption);
+          if (setFfmpeg != null || setCapture != null || setPlaybackTranscode != null || setTraceProcessor != null)
           {
             var config = FramePacingConfig.Load(File.Exists(FramePacingConfig.ResolvePath(explicitPath)) ? explicitPath : null);
             if (setFfmpeg != null)
@@ -64,6 +74,13 @@ namespace MB.FramePacing.App.Commands
             // "ask" is the default: stored as no value
             if (setPlaybackTranscode != null)
               config = config with { PlaybackTranscode = setPlaybackTranscode == PlaybackTranscodeChoice.Ask ? null : setPlaybackTranscode };
+            if (setTraceProcessor != null)
+            {
+              var full = Path.GetFullPath(setTraceProcessor);
+              if (!File.Exists(full))
+                throw new FileNotFoundException($"'{full}' does not exist");
+              config = config with { TraceProcessorPath = full };
+            }
             var written = config.Save(explicitPath);
             AnsiConsole.MarkupLineInterpolated($"[green]Saved[/] {written}");
           }
@@ -89,6 +106,21 @@ namespace MB.FramePacing.App.Commands
       table.AddRow("ffmpegPath", Markup.Escape(config.FfmpegPath ?? "(not set)"));
       table.AddRow("captureDirectory", Markup.Escape(config.CaptureDirectory ?? "(not set: Documents/mb-framepacing)"));
       table.AddRow("playbackTranscode", (config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask).ToString().ToLowerInvariant());
+      // Experimental: the trace processor a Perfetto trace is read with, shown with the experimental parts only
+      if (CommonOptions.ExperimentalRequested)
+      {
+        table.AddRow("traceProcessorPath (experimental)", Markup.Escape(config.TraceProcessorPath ?? "(not set)"));
+        string traceProcessor;
+        try
+        {
+          traceProcessor = Markup.Escape(TraceProcessorLocator.Find(null, config));
+        }
+        catch (FileNotFoundException)
+        {
+          traceProcessor = "[red]not found[/] - download: " + Markup.Escape(TraceProcessorLocator.DownloadPage);
+        }
+        table.AddRow("trace processor in use (experimental)", traceProcessor);
+      }
       string ffmpeg;
       try
       {

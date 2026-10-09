@@ -46,6 +46,7 @@ namespace MB.FramePacing.App
         CommonOptions.ExperimentalCommand(CaptureCommand.Create(), "Live capture ('capture')"),
         CommonOptions.ExperimentalCommand(LocateCommand.Create(), "Live capture ('locate')"),
         CommonOptions.ExperimentalCommand(CameraRigCommand.Create(), "Camera capture ('camera-rig')"),
+        CommonOptions.ExperimentalCommand(TraceInfoCommand.Create(), "A capture joined with a Perfetto trace ('trace-info')"),
         ImportCommand.Create(),
         AnalyzeCommand.Create(),
         RenderCommand.Create(),

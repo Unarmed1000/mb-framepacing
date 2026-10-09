@@ -105,6 +105,30 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     [Test]
     [Category("trace-processor")]
+    public void TheAugmentedTrace_IsTheScripts_AndIsWrittenOnlyForARunThatWasJoined()
+    {
+      string processor = TraceTestData.FindProcessorOrIgnore();
+      var plain = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions());
+      Assert.That(AugmentedTraceFiles.Write(plain, processor), Is.Empty);
+
+      var report = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { Trace = Stored(), TraceProcessorPath = processor });
+      var files = AugmentedTraceFiles.Write(report, processor);
+
+      Assert.That(files.Count, Is.EqualTo(1));
+      Assert.That(files[0].Path, Is.EqualTo(Path.Combine(report.OutputDirectory, "run-1-augmented.pftrace")));
+      Assert.That(TraceTestData.DigestOf(files[0].Path), Is.EqualTo(TraceTestData.Expected("augmented")));
+      Assert.That(files[0].Checked, Is.True);
+      Assert.That(files[0].Problems, Is.Empty);
+      Assert.That(files[0].Events, Is.GreaterThan(2000));
+      // Without a trace processor it is written and not read back
+      var unchecked1 = AugmentedTraceFiles.Write(report, null);
+      Assert.That(unchecked1[0].Checked, Is.False);
+      Assert.That(TraceTestData.DigestOf(unchecked1[0].Path), Is.EqualTo(TraceTestData.Expected("augmented")));
+      Assert.That(CaptureAnalyzer.RunFilePrefixes(report.Timeline.Runs), Is.EqualTo(new[] { "run-1" }));
+    }
+
+    [Test]
+    [Category("trace-processor")]
     public void TheTraceACaptureRemembers_IsJoinedAgain_UnlessToldNotTo()
     {
       string processor = TraceTestData.FindProcessorOrIgnore();
