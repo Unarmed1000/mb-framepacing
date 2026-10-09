@@ -204,7 +204,8 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
   const PacerCapability vblank = PacerCapability::VBlankTimes;
   // Every set reaches the baseline: a timer and the refresh period only
   EXPECT_TRUE(Reaches(PacerCapabilities(), PacerTier::TimerPeriodOnly));
-  EXPECT_TRUE(Reaches(PacerCapabilities(PacerCapability::AllCapabilities, 8), PacerTier::TimerPeriodOnly));
+  // (every capability a set can have at once: of the two pairs that exclude themselves, neither)
+  EXPECT_TRUE(Reaches(PacerCapabilities(PC::Without(PacerCapability::AllCapabilities, PresentPair | AcquirePair), 8), PacerTier::TimerPeriodOnly));
   // A wait for a present, and nothing else, reaches the tier of the timer with a wait
   EXPECT_TRUE(Reaches(PacerCapabilities(wait), PacerTier::TimerWaitForPresent));
   EXPECT_FALSE(Reaches(PacerCapabilities(), PacerTier::TimerWaitForPresent));

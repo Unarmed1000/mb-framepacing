@@ -166,7 +166,9 @@ namespace MB::FramePacing::Pacer
 
   NanosecondTickCount ClockGridLoopPacer::TimeOfSlot(const int64_t slot) const noexcept
   {
-    return m_origin + m_rule.Refresh().TimeFor(slot);
+    // The grid has no step before its first. A frame that would be due before it (one the reserve has made ahead of the
+    // first steps, at a run's start) is due at the first step: when the grid begins
+    return m_origin + m_rule.Refresh().TimeFor(std::max(slot, int64_t{0}));
   }
 
   void ClockGridLoopPacer::ArmStartupPause() noexcept

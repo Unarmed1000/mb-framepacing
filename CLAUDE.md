@@ -316,6 +316,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       (`tier-loops.csv`: a line per run with the length and CRC-32 of its frames as text; `tier-loop-<run>.csv`: eight runs whole).
       Run it after a change to a rule or to how a frame is paced and review the difference.
     - `TierMonitorRateTests.cpp`: 23 rates from 50 to 540 Hz; `WorkloadLoopTests.cpp`: the loads of another pacer's own tests.
+    - **Run the pacer's tests in a build with asserts before a push** (`cmake --build sdk/cpp/build/windows --config Debug`, then
+      the test executable in `pacer/Debug`): the `windows` preset's Release and a coverage build have `NDEBUG`, and CI's
+      `cpp-analysis` is the only job with asserts. Never with `--gtest_catch_exceptions=0`, which lets an assert open a dialog
+      on the desktop.
   - **Capture sessions** of the first integration: a session is one zip, kept as an asset of the GitHub release `pacer-captures`
     (the user's choice: never in git, so no clone carries them; `gh release upload pacer-captures <zip>`), with a row in
     `pacer-captures/README.md`. Git ignores a zip in `pacer-captures/`: download one there to work with it. Before packing, check the
