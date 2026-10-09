@@ -73,6 +73,41 @@
           </StackPanel>
         </Border>
 
+        <!-- EXPERIMENTAL: a Perfetto trace of the run, joined with the capture (only with the experimental features on) -->
+        <Border Classes="card" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
+          <Expander HorizontalAlignment="Stretch">
+            <Expander.Header>
+              <TextBlock Classes="cardTitle" Text="Perfetto trace (experimental)" />
+            </Expander.Header>
+            <StackPanel Spacing="8" DataContext="{Binding Trace}">
+              <TextBlock Classes="warning" Text="{x:Static vm:TraceViewModel.ExperimentalText}" TextWrapping="Wrap" />
+              <TextBlock
+                Classes="caption"
+                TextWrapping="Wrap"
+                Text="A Perfetto trace recorded on the device during the run. The analysis says what the trace says of each frame, and Save charts also writes the trace with the capture's measurements added as tracks. It needs markers with the CPU start time."
+              />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBox Text="{Binding TracePath}" PlaceholderText="optional: the run's trace (.pftrace, .perfetto-trace)" />
+                <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
+              </Grid>
+              <TextBlock Classes="caption" Text="Application (its process name in the trace; * and ? as in a file name)" TextWrapping="Wrap" />
+              <AutoCompleteBox
+                Text="{Binding Process}"
+                ItemsSource="{Binding Processes}"
+                FilterMode="Contains"
+                MinimumPrefixLength="0"
+                PlaceholderText="optional: needed for the system's own account and the CPU's time"
+              />
+              <TextBlock
+                Classes="caption"
+                Text="{Binding StatusText}"
+                TextWrapping="Wrap"
+                IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+              />
+            </StackPanel>
+          </Expander>
+        </Border>
+
         <!-- VERY EXPERIMENTAL: filming the screen with a calibrated high speed camera (only with the experimental features on) -->
         <Border Classes="card" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
           <Expander IsExpanded="{Binding Camera.UseCamera, Mode=OneTime}" HorizontalAlignment="Stretch">

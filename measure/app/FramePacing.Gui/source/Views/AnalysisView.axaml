@@ -12,57 +12,87 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
     <!-- Which capture -->
     <Border Classes="card" Padding="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
-        <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
-        <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
-        <ComboBox
-          Grid.Column="2"
-          ItemsSource="{Binding TimeSources}"
-          SelectedItem="{Binding SelectedTimeSource}"
-          ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available."
-        />
-        <TextBox
-          Grid.Column="3"
-          Width="120"
-          Text="{Binding TargetFpsText}"
-          PlaceholderText="Target fps"
-          ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Empty = the target stored with the capture, else the pacing in the markers, else one refresh per frame."
-        />
-        <TextBox
-          Grid.Column="4"
-          Width="120"
-          Text="{Binding DisplayHzText}"
-          PlaceholderText="Display Hz"
-          ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Empty = the rate stored with the capture, or no comparison."
-        />
-        <CheckBox
-          Grid.Column="5"
-          Content="Guess static"
-          IsChecked="{Binding AssumeStatic}"
-          VerticalAlignment="Center"
-          ToolTip.Tip="Assume a rest is static when a dropped frame took its static flag (used at the next Analyze). Such frames are flagged StaticAssumed; off, the rest is judged like any other step."
-        />
-        <Button Grid.Column="6" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
-        <Button Grid.Column="7" Content="Open reports" Command="{Binding OpenReportsCommand}" />
-        <Button
-          Grid.Column="8"
-          Content="Save charts"
-          Command="{Binding SaveChartsCommand}"
-          IsEnabled="{Binding HasRun}"
-          ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
-        />
-        <!-- A wrapper carries the tooltip: a disabled button shows none -->
-        <Border Grid.Column="9" Background="Transparent" ToolTip.Tip="{Binding PlaybackToolTip}">
-          <Button Content="Save playback page" Command="{Binding SavePlaybackCommand}" />
-        </Border>
-        <CheckBox
-          Grid.Column="10"
-          Content="Clamp static"
-          IsChecked="{Binding ClampStatic}"
-          VerticalAlignment="Center"
-          ToolTip.Tip="Scale the Timeline's display time step and frametime panels to the frames that animate: static holds, frametimes, CPU busy and aims beyond it (an idle wait) stop at the edge with their value. Save view and Save charts follow it."
-        />
-      </Grid>
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
+          <TextBox Text="{Binding CaptureDirectory}" PlaceholderText="Capture folder (contains captures.mbcd or frames.mbfc)" />
+          <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseCommand}" />
+          <ComboBox
+            Grid.Column="2"
+            ItemsSource="{Binding TimeSources}"
+            SelectedItem="{Binding SelectedTimeSource}"
+            ToolTip.Tip="Which clock to use for the capture times. Auto uses the capture card's timestamps when available."
+          />
+          <TextBox
+            Grid.Column="3"
+            Width="120"
+            Text="{Binding TargetFpsText}"
+            PlaceholderText="Target fps"
+            ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: frames shown a refresh later are late. Empty = the target stored with the capture, else the pacing in the markers, else one refresh per frame."
+          />
+          <TextBox
+            Grid.Column="4"
+            Width="120"
+            Text="{Binding DisplayHzText}"
+            PlaceholderText="Display Hz"
+            ToolTip.Tip="The display's refresh rate you expect. A camera capture compares it with the refresh rate calculated from the frames, a capture card with its capture rate. Empty = the rate stored with the capture, or no comparison."
+          />
+          <CheckBox
+            Grid.Column="5"
+            Content="Guess static"
+            IsChecked="{Binding AssumeStatic}"
+            VerticalAlignment="Center"
+            ToolTip.Tip="Assume a rest is static when a dropped frame took its static flag (used at the next Analyze). Such frames are flagged StaticAssumed; off, the rest is judged like any other step."
+          />
+          <Button Grid.Column="6" Classes="accent" Content="Analyze" MinWidth="100" Command="{Binding AnalyzeCommand}" />
+          <Button Grid.Column="7" Content="Open reports" Command="{Binding OpenReportsCommand}" />
+          <Button
+            Grid.Column="8"
+            Content="Save charts"
+            Command="{Binding SaveChartsCommand}"
+            IsEnabled="{Binding HasRun}"
+            ToolTip.Tip="Write the charts of every run as SVG cards next to the reports (the same files as 'analyze --charts')."
+          />
+          <!-- A wrapper carries the tooltip: a disabled button shows none -->
+          <Border Grid.Column="9" Background="Transparent" ToolTip.Tip="{Binding PlaybackToolTip}">
+            <Button Content="Save playback page" Command="{Binding SavePlaybackCommand}" />
+          </Border>
+          <CheckBox
+            Grid.Column="10"
+            Content="Clamp static"
+            IsChecked="{Binding ClampStatic}"
+            VerticalAlignment="Center"
+            ToolTip.Tip="Scale the Timeline's display time step and frametime panels to the frames that animate: static holds, frametimes, CPU busy and aims beyond it (an idle wait) stop at the edge with their value. Save view and Save charts follow it."
+          />
+        </Grid>
+        <!-- EXPERIMENTAL: a Perfetto trace of the run, joined at the next Analyze (only with the experimental features on) -->
+        <Panel IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
+          <Grid
+            ColumnDefinitions="Auto,*,Auto,Auto,300"
+            ColumnSpacing="8"
+            DataContext="{Binding Trace}"
+            ToolTip.Tip="{x:Static vm:TraceViewModel.ExperimentalText}"
+          >
+            <TextBlock Classes="subtle" Text="Perfetto trace (experimental)" VerticalAlignment="Center" />
+            <TextBox
+              Grid.Column="1"
+              Text="{Binding TracePath}"
+              PlaceholderText="optional: a trace recorded on the device during the run, joined at the next Analyze"
+              ToolTip.Tip="{Binding StatusText}"
+            />
+            <Button Grid.Column="2" Content="Browse..." Command="{Binding BrowseCommand}" />
+            <TextBlock Grid.Column="3" Classes="subtle" Text="Application" VerticalAlignment="Center" />
+            <AutoCompleteBox
+              Grid.Column="4"
+              Text="{Binding Process}"
+              ItemsSource="{Binding Processes}"
+              FilterMode="Contains"
+              MinimumPrefixLength="0"
+              PlaceholderText="its process name in the trace"
+              ToolTip.Tip="The application's process name in the trace (* and ? as in a file name): the system's own account of the frames and the CPU's time need it."
+            />
+          </Grid>
+        </Panel>
+      </StackPanel>
     </Border>
 
     <!-- Status, warnings -->

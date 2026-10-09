@@ -41,6 +41,7 @@ namespace MB.FramePacing.DocImages
     private const string ExampleCaptureRoot = @"D:\captures";
     private const string ExampleFfmpeg = @"C:\ffmpeg\bin\ffmpeg.exe";
     private const string ExampleRecording = @"D:\recordings\capture-card-240hz.mkv";
+    private const string ExampleTrace = @"D:\recordings\run.pftrace";
 
     /// <summary>The test clip the GUI screenshots import and analyse: a game that adapts its rate to a busy stretch.</summary>
     private const string ScreenshotClip = "60-busy-adaptive";
@@ -130,6 +131,7 @@ namespace MB.FramePacing.DocImages
       capture.FfmpegSummary = "ffmpeg 9.0.2";
       await Task.Delay(300);
       Save(window, Path.Combine(output, "gui-capture.png"));
+      await RenderTraceCardAsync(window, viewModel, output);
 
       // Import the test clip itself: the import finishes by itself, and the analysis page opens and analyses it
       capture.MediaPath = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "videos", ScreenshotClip, "video.mp4");
@@ -162,8 +164,128 @@ namespace MB.FramePacing.DocImages
       setup.Close();
 
       await RenderCameraAsync(window, viewModel, output);
+      await CheckTraceAsync(window, viewModel, output);
       window.Close();
       return true;
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL, the Capture page's Perfetto trace card (gui-trace-capture.png): shown only with the experimental features, which are
+    /// switched on for the picture and off again, so that the pictures after it show the default. Example values, nothing of this machine.
+    /// </summary>
+    private static async Task RenderTraceCardAsync(MainWindow window, MainWindowViewModel viewModel, string output)
+    {
+      var capture = viewModel.Capture;
+      viewModel.Settings.ExperimentalFeatures = true;
+      capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.VideoFile);
+      capture.Trace.TracePath = ExampleTrace;
+      await capture.Trace.Listed;
+      capture.Trace.Process = "com.example.game";
+      capture.Trace.StatusText = "212 processes, 3 with frames in the system's frame timeline (listed first).";
+      var expander = TraceExpander(window);
+      expander.IsExpanded = true;
+      await Task.Delay(300);
+      Save(window, Path.Combine(output, "gui-trace-capture.png"));
+      expander.IsExpanded = false;
+      capture.Trace.Show(null);
+      viewModel.Settings.ExperimentalFeatures = false;
+      capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.VideoFile);
+      await Task.Delay(100);
+    }
+
+    private static Expander TraceExpander(Window window) =>
+      window
+        .GetVisualDescendants()
+        .OfType<Expander>()
+        .First(e => e.Header is TextBlock { Text: { } header } && header.StartsWith("Perfetto trace", StringComparison.Ordinal));
+
+    /// <summary>
+    /// EXPERIMENTAL, a capture joined with a Perfetto trace (gui-trace-analysis.png): with the experimental features on, a test clip is imported with
+    /// the trace the tests made to fit it (measure/test-data/trace), picked on the Capture page with its application from the trace's
+    /// processes. The capture remembers the trace, the Analyze page shows it and joins it (with the offset of the made-up device's clock,
+    /// which is an option of the command line's, written into capture.json as an import there writes it), and Save charts writes the
+    /// augmented trace. Skipped without a trace processor; throws when a step does not happen.
+    /// </summary>
+    private static async Task CheckTraceAsync(MainWindow window, MainWindowViewModel viewModel, string output)
+    {
+      if (TraceViewModel.FindProcessor(out string problem) == null)
+      {
+        Console.WriteLine("  Perfetto trace: skipped (" + problem + ")");
+        return;
+      }
+      var capture = viewModel.Capture;
+      var analysis = viewModel.Analysis;
+      string trace = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "trace", "synthetic.pftrace");
+      const string Application = "com.example.game";
+      if (!analysis.ExperimentalFeatures)
+        throw new InvalidOperationException("The Analyze page did not hear that the experimental features are on");
+
+      viewModel.SelectedTab = MainWindowViewModel.CaptureTab;
+      capture.Camera.UseCamera = false;
+      capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.VideoFile);
+      capture.MediaPath = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "videos", "60-busy-full-rate", "video.mp4");
+      capture.OutputRoot = MB.FramePacing.Gui.Program.OutputRoot!;
+      capture.Trace.TracePath = trace;
+      await capture.Trace.Listed;
+      if (capture.Trace.Processes.FirstOrDefault() != Application)
+        throw new InvalidOperationException(
+          $"The trace's processes do not start with the application: '{string.Join(", ", capture.Trace.Processes)}' ({capture.Trace.StatusText})"
+        );
+      capture.Trace.Process = Application;
+      capture.StartCommand.Execute(null);
+      await WaitUntil(
+        () => !capture.IsCapturing && capture.LastCaptureDirectory.Contains("import-", StringComparison.Ordinal),
+        TimeSpan.FromSeconds(60)
+      );
+      await WaitUntil(
+        () => analysis.HasRun && !analysis.IsBusy && analysis.CaptureDirectory == capture.LastCaptureDirectory,
+        TimeSpan.FromSeconds(60)
+      );
+      string directory = capture.LastCaptureDirectory;
+
+      // The capture remembers the trace, and the Analyze page shows it
+      var session = CaptureSessionInfo.TryLoad(directory) ?? throw new InvalidOperationException("The import wrote no capture.json");
+      if (session.Trace is not { } remembered || remembered.Path != trace || remembered.Process != Application)
+        throw new InvalidOperationException("The capture does not remember the trace it was imported with");
+      if (analysis.Trace.TracePath != trace || analysis.Trace.Process != Application)
+        throw new InvalidOperationException($"The Analyze page does not show the capture's trace: '{analysis.Trace.TracePath}'");
+      // The made-up device's clock counts from an epoch of its own: without its offset the run is not inside the trace, which is a warning
+      if (analysis.SelectedRun?.Chart.Trace != null || !analysis.Warnings.Any(w => w.Contains("was not joined", StringComparison.Ordinal)))
+        throw new InvalidOperationException("A run that is not inside its trace was not a warning: " + string.Join(" | ", analysis.Warnings));
+
+      (session with { Trace = remembered with { AppClockOffsetNs = 100_000_000_000 } }).Save(directory);
+      await analysis.AnalyzeCommand.ExecuteAsync(null);
+      if (analysis.SelectedRun?.Chart.Trace is not { Count: > 380 } rows || rows.Count(row => row.SurfaceFrameToken != null) < 380)
+        throw new InvalidOperationException($"The Analyze page did not join the trace: {analysis.ErrorText} {string.Join(" | ", analysis.Warnings)}");
+
+      // The Analyze page with the trace's row and a run that was joined, with example values for what is this machine's
+      viewModel.SelectedTab = MainWindowViewModel.AnalysisTab;
+      analysis.CaptureDirectory = Path.Combine(ExampleCaptureRoot, "import-20260923-120000");
+      analysis.Trace.Process = Application;
+      analysis.Trace.TracePath = ExampleTrace;
+      await analysis.Trace.Listed;
+      await Task.Delay(300);
+      Save(window, Path.Combine(output, "gui-trace-analysis.png"));
+      analysis.CaptureDirectory = directory;
+      await analysis.Trace.Listed;
+
+      await analysis.SaveChartsCommand.ExecuteAsync(null);
+      string augmented = Path.Combine(directory, "analysis", "run-1-augmented.pftrace");
+      if (
+        !File.Exists(augmented)
+        || analysis.ErrorText.Length > 0
+        || !analysis.SummaryText.Contains("1 augmented trace(s)", StringComparison.Ordinal)
+      )
+        throw new InvalidOperationException($"Save charts wrote no augmented trace that reads back: '{analysis.SummaryText}' '{analysis.ErrorText}'");
+
+      // Switched off, the trace is not shown and not joined; the capture still remembers it
+      viewModel.Settings.ExperimentalFeatures = false;
+      if (analysis.Trace.TracePath.Length > 0 || capture.Trace.TracePath.Length > 0)
+        throw new InvalidOperationException("The trace is still shown with the experimental features off");
+      await analysis.AnalyzeCommand.ExecuteAsync(null);
+      if (analysis.SelectedRun?.Chart.Trace != null || analysis.Warnings.Any(w => w.Contains("Perfetto", StringComparison.Ordinal)))
+        throw new InvalidOperationException("A trace was joined with the experimental features off");
+      Console.WriteLine($"  Perfetto trace: picked, remembered, joined ({rows.Count} frames), {Path.GetFileName(augmented)} written and read back");
     }
 
     /// <summary>

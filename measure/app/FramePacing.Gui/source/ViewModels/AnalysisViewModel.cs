@@ -28,6 +28,7 @@ using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
 using MB.FramePacing.Charts;
 using MB.FramePacing.Charts.Playback;
+using MB.FramePacing.Trace;
 using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels
@@ -79,6 +80,8 @@ namespace MB.FramePacing.Gui.ViewModels
     {
       m_dialogs = dialogs;
       m_settings = settings;
+      Trace = new TraceViewModel(dialogs);
+      ExperimentalFeatures = settings.ExperimentalFeatures;
       CaptureDirectory = settings.LastCaptureDirectory ?? string.Empty;
       if (Enum.TryParse(settings.TimeSource, out TimeSource timeSource))
         SelectedTimeSource = timeSource;
@@ -86,6 +89,54 @@ namespace MB.FramePacing.Gui.ViewModels
       DisplayHzText = settings.AnalysisDisplayHz ?? string.Empty;
       ClampStatic = settings.ClampStatic;
       AssumeStatic = settings.AssumeStatic;
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL: the Perfetto trace the next Analyze joins the capture with: the capture's own when a capture is opened, or another.
+    /// Only with the experimental features: off, no trace is joined.
+    /// </summary>
+    public TraceViewModel Trace { get; }
+
+    /// <summary>Show the experimental features (the Settings page's switch): here, the Perfetto trace of the run.</summary>
+    [ObservableProperty]
+    public partial bool ExperimentalFeatures { get; set; }
+
+    partial void OnExperimentalFeaturesChanged(bool value) => Trace.Show(value ? RememberedTrace(CaptureDirectory) : null);
+
+    /// <summary>A capture was chosen: its own trace is the one shown.</summary>
+    partial void OnCaptureDirectoryChanged(string value)
+    {
+      if (ExperimentalFeatures)
+        Trace.Show(RememberedTrace(value));
+    }
+
+    /// <summary>The trace the capture in <paramref name="directory"/> names (capture.json); null when it names none or can not be read.</summary>
+    private static TraceJoinOptions? RememberedTrace(string? directory)
+    {
+      if (string.IsNullOrWhiteSpace(directory))
+        return null;
+      try
+      {
+        return CaptureSessionInfo.TryLoad(directory.Trim())?.Trace;
+      }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException)
+      {
+        return null;
+      }
+    }
+
+    /// <summary>
+    /// <paramref name="options"/> with the trace the page has for the capture in <paramref name="directory"/>. The capture's own trace is
+    /// left to the analysis (which warns when it is gone); another one is given to it (and stops it when it can not be read); none, or the
+    /// experimental features off, joins none. Without a trace processor the analysis warns.
+    /// </summary>
+    private AnalysisOptions WithTrace(AnalysisOptions options, string directory)
+    {
+      var remembered = RememberedTrace(directory);
+      var chosen = ExperimentalFeatures ? Trace.Options(remembered) : null;
+      if (chosen == null)
+        return options with { NoTrace = true };
+      return options with { Trace = chosen == remembered ? null : chosen, TraceProcessorPath = TraceViewModel.FindProcessor(out _) };
     }
 
     /// <summary>
@@ -698,8 +749,22 @@ namespace MB.FramePacing.Gui.ViewModels
         var files = await Task.Run(() => ChartFiles.Write(report, options));
         ErrorText = string.Empty;
         SummaryText = $"{files.Count} chart(s) written to {report.OutputDirectory}";
+        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts
+        if (report.TraceJoins.Any(join => join != null))
+        {
+          SummaryText += "; writing the augmented trace...";
+          string? processor = TraceViewModel.FindProcessor(out _);
+          var traces = await Task.Run(() => AugmentedTraceFiles.Write(report, processor));
+          SummaryText =
+            $"{files.Count} chart(s) and {traces.Count} augmented trace(s) written to {report.OutputDirectory} "
+            + $"({string.Join(", ", traces.Select(trace => Path.GetFileName(trace.Path)))}: the trace with the capture's measurements as "
+            + "tracks; it names the device and its programs, as the trace does)";
+          var problems = traces.SelectMany(trace => trace.Problems).ToList();
+          if (problems.Count > 0)
+            ErrorText = "The augmented trace does not read back as written: " + string.Join("; ", problems);
+        }
       }
-      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or TraceException)
       {
         ErrorText = "Could not write the charts: " + ex.Message;
       }
@@ -734,6 +799,7 @@ namespace MB.FramePacing.Gui.ViewModels
           },
           ToolVersion = MainWindowViewModel.Version,
         };
+        options = WithTrace(options, directory);
         var progress = new Progress<double>(value => ProgressPercent = value * 100);
         var report = await Task.Run(() =>
         {

@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Capture;
+using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.Gui.ViewModels
 {
@@ -44,6 +45,36 @@ namespace MB.FramePacing.Gui.ViewModels
     }
 
     public string ExperimentalText => CameraRigViewModel.ExperimentalText;
+
+    /// <summary>EXPERIMENTAL: Perfetto's trace processor, which reads a Perfetto trace: the one in use, or that none was found.</summary>
+    [ObservableProperty]
+    public partial string TraceProcessorText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string TraceProcessorStatusText { get; set; } = string.Empty;
+
+    /// <summary>Pick the user's trace_processor_shell and store it in the configuration. Automation and --output-root runs never store it.</summary>
+    [RelayCommand]
+    private async Task BrowseTraceProcessorAsync()
+    {
+      var path = await m_dialogs.PickFileAsync("Select Perfetto's trace_processor_shell");
+      if (path == null)
+        return;
+      try
+      {
+        if (!Program.Automation && Program.OutputRoot == null)
+          (MainWindowViewModel.SafeLoadConfig() with { TraceProcessorPath = path }).Save();
+        TraceProcessorStatusText = string.Empty;
+      }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+      {
+        TraceProcessorStatusText = "Could not save the configuration file: " + ex.Message;
+      }
+      Refresh();
+    }
+
+    [RelayCommand]
+    private void DownloadTraceProcessor() => m_dialogs.OpenUrl(TraceProcessorLocator.DownloadPage);
 
     public string FfmpegSummary => m_capture.FfmpegSummary;
 
@@ -107,6 +138,9 @@ namespace MB.FramePacing.Gui.ViewModels
       var config = MainWindowViewModel.SafeLoadConfig();
       FfmpegPathText = config.FfmpegPath ?? "not set: found on the PATH or in the usual install folders";
       CaptureDirectoryText = config.CaptureDirectory ?? MainWindowViewModel.DefaultCaptureDirectory;
+      TraceProcessorText =
+        TraceViewModel.FindProcessor(out _)
+        ?? "not found: download a release for this system (its zip holds trace_processor_shell), then pick the program here";
       m_refreshing = true;
       PlaybackTranscodeIndex = (int)(config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask);
       m_refreshing = false;
