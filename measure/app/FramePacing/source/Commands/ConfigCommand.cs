@@ -12,7 +12,7 @@ using System.CommandLine;
 using System.IO;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands

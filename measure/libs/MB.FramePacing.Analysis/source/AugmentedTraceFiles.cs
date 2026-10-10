@@ -16,7 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Analysis
 {

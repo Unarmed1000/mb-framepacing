@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""Check the C++ library (sdk/cpp: the core, marker, data and pacer modules) with clang-format and clang-tidy (config: sdk/cpp/.clang-format and
-.clang-tidy). The consumer project (sdk/cpp/tests/consumer), the size probes (sdk/cpp/tests/size) and the Conan recipe's test package
+"""Check the C++ library (sdk/cpp: the core, marker, data, pacer and trace modules) with clang-format and clang-tidy (config:
+sdk/cpp/.clang-format and .clang-tidy). The consumer project (sdk/cpp/tests/consumer), the size probes (sdk/cpp/tests/size) and the Conan recipe's test package
 (sdk/cpp/conan) are only formatted.
 
 Only our sources are checked, never third_party/ or fetched dependencies. clang-tidy needs a configured build of the library (GoogleTest
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import cast
 
 LIBRARY = "sdk/cpp"
-MODULES = ("core", "marker", "data", "pacer")
+MODULES = ("core", "marker", "data", "pacer", "trace")
 # The modules' shared test support (sdk/cpp/testing): checked with them, never part of the library
 TEST_SUPPORT = "testing"
 # Per module, relative to its folder: what to format, and what clang-tidy checks (it follows the headers they include)
@@ -101,13 +101,14 @@ def tidy_command(root: Path, build: Path, sources: list[str]) -> list[str]:
         f'-DMB_FRAMEPACING_EXPECTED_VERSION="{version}"',
         f'-DMB_FRAMEPACING_DATA_SOURCE_DIR="{(cpp / "data").as_posix()}"',
         f'-DMB_FRAMEPACING_PACER_SOURCE_DIR="{(cpp / "pacer").as_posix()}"',
+        f'-DMB_FRAMEPACING_TRACE_SOURCE_DIR="{(cpp / "trace").as_posix()}"',
     ]
     return [*command, *sources, "--", *flags]
 
 
 def built_sources(cpp: Path, build: Path, sources: list[str]) -> list[str]:
     """The sources the build compiles, when it wrote a compile database: clang-tidy can only check those (a module that is switched
-    off, like the pacer, has no include paths there). Without a database every source is checked, with tidy_command's flags."""
+    off, like the pacer or the trace module, has no include paths there). Without a database every source is checked, with tidy_command's flags."""
     database = build / "compile_commands.json"
     if not database.is_file():
         return sources

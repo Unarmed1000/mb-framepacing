@@ -3,12 +3,13 @@
 The C++20 library of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) SDK: one CMake project of modules, each its
 own static library target, like Boost's and Poco's.
 
-| Module   | Target                   | Headers                     | What it does                                                                                                           |
-| -------- | ------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `core`   | `mb_framepacing::core`   | `<mb/framepacing/core/…>`   | What every module shares: the library version, the time types, `Point`, `Rectangle`                                    |
-| `marker` | `mb_framepacing::marker` | `<mb/framepacing/marker/…>` | Draws the frame marker into every frame of an application; no dependencies, no allocations                             |
-| `data`   | `mb_framepacing::data`   | `<mb/framepacing/data/…>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json                            |
-| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/pacer/…>`  | **Experimental**, off by default (`MB_FRAMEPACING_BUILD_PACER`): paces a frame loop with a steady clock and vsync only |
+| Module   | Target                   | Headers                     | What it does                                                                                                                                       |
+| -------- | ------------------------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`   | `mb_framepacing::core`   | `<mb/framepacing/core/…>`   | What every module shares: the library version, the time types, `Point`, `Rectangle`                                                                |
+| `marker` | `mb_framepacing::marker` | `<mb/framepacing/marker/…>` | Draws the frame marker into every frame of an application; no dependencies, no allocations                                                         |
+| `data`   | `mb_framepacing::data`   | `<mb/framepacing/data/…>`   | Reads the tools' capture data and analysis output; uses the marker module and nlohmann/json                                                        |
+| `pacer`  | `mb_framepacing::pacer`  | `<mb/framepacing/pacer/…>`  | **Experimental**, off by default (`MB_FRAMEPACING_BUILD_PACER`): paces a frame loop with a steady clock and vsync only                             |
+| `trace`  | `mb_framepacing::trace`  | `<mb/framepacing/trace/…>`  | **Experimental**, off by default (`MB_FRAMEPACING_BUILD_TRACE`): what an application logs to its own trace for every frame; uses the marker module |
 
 No header includes a whole module: include the header of each type you use (one type per header) and the header of the functions
 (`marker/FrameMarker.hpp`, `data/analysis/FramesCsv.hpp`, ...).
@@ -59,6 +60,7 @@ Or git (`GIT_TAG sdk-v0.1.0`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of th
 | `MB_FRAMEPACING_BUILD_MARKER`       | on                                                                                                                        |
 | `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched                                                    |
 | `MB_FRAMEPACING_BUILD_PACER`        | off: the pacer is experimental; on builds `mb_framepacing::pacer`                                                         |
+| `MB_FRAMEPACING_BUILD_TRACE`        | off: the trace module is experimental; on builds `mb_framepacing::trace` (needs the marker module)                        |
 | `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                                                                         |
 | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                                                                  |
 | `MB_FRAMEPACING_INSTALL`            | on only when top-level: the install rules and the CMake package. Off, your own `cmake --install` installs your files only |
@@ -254,6 +256,43 @@ use yet. In `MB::FramePacing::Pacer`, each type in its own header (`<mb/framepac
 | `SwapIntervalRule`, `SwapIntervalChange`, `FrameWindowState`, `FrameWorkRule` (`rule/`)                                                                                                                | The adaptive swap interval rule on its own, and how a frame's work is judged                                                                                                                                                                      |
 | `ClockGridLoopPacer`, `VBlankLoopPacer`, `PacerHandover` (`tier/`), `PresentWaitRule`, `GpuWaitRule` (`hold/`), `VBlankTimeline` (`timeline/`), `DisplayPlacementUtil`, `PresentTiming` (`placement/`) | The parts `TierPacer` is put together from                                                                                                                                                                                                        |
 
+## The trace module (experimental)
+
+> **Experimental.** The frame record, this module and the tools that read the record are checked against traces their own tests
+> make: no recorded trace has been through them yet. The module is off by default (`-DMB_FRAMEPACING_BUILD_TRACE=ON` builds it,
+> Conan's `with_trace=True`), and its strings and its API may change in any release.
+
+```cpp
+#include <mb/framepacing/trace/FrameRecord.hpp>
+#include <mb/framepacing/trace/FrameRecordUtil.hpp>
+namespace FT = MB::FramePacing::Trace;
+
+// Every frame, after the frame's marker is made: payload is the payload the marker was drawn from
+FT::FrameRecord record;
+if (FT::FrameRecordUtil::TryCreate(payload, record))
+{
+  // With your own tracing: a slice named record.Name.CStr(), in the category FrameRecordText::Category, on the track named
+  // FrameRecordText::TrackName, from record.StartTime for record.Duration on the clock FrameRecordText::ClockId, with every
+  // entry of record.Annotations() as an annotation of that name and value
+}
+```
+
+An application that records a trace of a run logs one slice per frame to it, the **frame record**, so that the tools can tell which
+frame of the trace is which frame of a capture. The module defines every string of the record and works out, from a marker's
+payload, what to log; the application writes the slice itself, with whatever it traces with. The module links the marker module,
+reads no clock, calls no tracing API and never allocates. An application that records no trace does not need it.
+[The frame record](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/trace-frame-record.md) (a release archive's
+`doc/trace-frame-record.md`) is the specification: which frames get a slice, its name, start, length, clock, track and
+annotations. In `MB::FramePacing::Trace`, each type in its own header (`<mb/framepacing/trace/…>`):
+
+| Function or type             | What it is                                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `FrameRecordUtil::TryCreate` | The record of a marker's payload; false for a marker that gets none (a sync marker, a CPU start time of 0 or less)    |
+| `FrameRecord`                | What to log for one marker: the name, the start (`StartTime`), the length (`Duration`) and `Annotations()`            |
+| `FrameRecordName`            | A slice's name for a run id and frame index, held inline: `View()`, and `CStr()` for a function that takes a C string |
+| `FrameRecordAnnotation`      | One annotation: its name and its value, a whole number of nanoseconds                                                 |
+| `FrameRecordText`            | The strings (the category, the track's name, the start of a slice's name, the annotations' names) and the clock's id  |
+
 ## The core
 
 In `MB::FramePacing`, each in its own header (`<mb/framepacing/core/…>`, the time types in `core/time/`):
@@ -309,7 +348,8 @@ least 4 KiB), so a change in size comes with this table updated (`--update-doc` 
 cmake --preset windows && cmake --build --preset windows && ctest --preset windows   # or linux, linux-clang, linux-sanitize, macos
 ```
 
-The `windows` and `linux-sanitize` presets also build and test the experimental pacer (`MB_FRAMEPACING_BUILD_PACER`, off by default).
+The `windows` and `linux-sanitize` presets also build and test the experimental pacer and trace modules
+(`MB_FRAMEPACING_BUILD_PACER`, `MB_FRAMEPACING_BUILD_TRACE`, both off by default).
 
 Every module has its tests (`<module>/tests`); they fetch GoogleTest (an installed or Conan GTest wins). What they share, such as the
 allocation counter of the zero-allocation tests, is in `testing` (test code, never installed). `marker-render`

@@ -115,7 +115,7 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public void ARunOfASessionsZip_IsReadByItsName()
     {
-      using var temp = new MB.FramePacing.Trace.UnitTest.TempFolder();
+      using var temp = new MB.FramePacing.TraceJoin.UnitTest.TempFolder();
       string zip = temp.File("session.zip");
       using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
       {

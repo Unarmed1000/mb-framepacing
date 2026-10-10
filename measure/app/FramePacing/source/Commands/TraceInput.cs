@@ -1,8 +1,9 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (measure/doc/perfetto.md): a Perfetto trace of the run on the command line (import, capture and analyze --trace): the
-//* options, the trace they name, and the trace processor that reads it. The join itself is the analysis's, shared with the GUI.
+//* EXPERIMENTAL (measure/doc/perfetto.md): a Perfetto trace of the run on the command line (import and analyze --trace), and a trace
+//* the application wrote itself where the frame record is in a file of its own (--trace-app): the options, the traces they name, and
+//* the trace processor that reads them. The join itself is the analysis's, shared with the GUI.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -15,6 +16,7 @@ using System.Linq;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -34,9 +36,22 @@ namespace MB.FramePacing.App.Commands
         new Option<string?>("--trace")
         {
           Description =
-            "(experimental) A Perfetto trace recorded on the device during the run (.pftrace, .perfetto-trace): the analysis says what "
-            + "the trace says of each presented frame (run-<id>-trace.csv), and --charts also writes the trace with the capture's "
-            + "measurements added as tracks (run-<id>-augmented.pftrace). Needs markers with the CPU start time.",
+            "(experimental) A Perfetto trace of the run (.pftrace, .perfetto-trace): the analysis says what the trace says of each "
+            + "presented frame (run-<id>-trace.csv), and --charts also writes the trace with the capture's measurements added as tracks "
+            + "(run-<id>-augmented.pftrace). The trace needs the frame record the application logs (a slice per frame named "
+            + $"'{FrameRecordText.NamePrefix}<run id> <frame index>', sdk/doc/trace-frame-record.md): without it nothing is joined.",
+          HelpName = "file",
+        }
+      );
+
+    public Option<string?> AppTrace { get; } =
+      Experimental(
+        new Option<string?>("--trace-app")
+        {
+          Description =
+            "(experimental) A Perfetto trace the application wrote itself, for when its frame record is in a file of its own. With "
+            + "--trace the join is placed by it; alone nothing is joined, and what the tools decoded from the markers is held against "
+            + "it (run-<id>-trace-check.txt).",
           HelpName = "file",
         }
       );
@@ -46,8 +61,8 @@ namespace MB.FramePacing.App.Commands
         new Option<string?>("--trace-process")
         {
           Description =
-            "With --trace: the application's process name in the trace (* and ? as in a file name). The system's own account of the "
-            + "frames and the CPU's time need it ('trace-info' lists the processes).",
+            "With --trace: the application's process name in the trace (* and ? as in a file name), for a frame record that is on no "
+            + "process's track (default: the process the frame record is on; 'trace-info' lists the processes).",
           HelpName = "pattern",
         }
       );
@@ -81,36 +96,6 @@ namespace MB.FramePacing.App.Commands
         }
       );
 
-    public Option<string?> AppClock { get; } =
-      Experimental(
-        new Option<string?>("--trace-app-clock")
-        {
-          Description =
-            $"With --trace: the system clock the application's steady clock is: {string.Join(", ", TraceAppClockUtil.Names)} (default: "
-            + $"{TraceAppClockUtil.Names[0]}).",
-          HelpName = "clock",
-          Validators =
-          {
-            result =>
-            {
-              if (result.GetValueOrDefault<string?>() is { } name && !TraceAppClockUtil.TryParse(name, out _))
-                result.AddError($"--trace-app-clock is one of {string.Join(", ", TraceAppClockUtil.Names)}.");
-            },
-          },
-        }
-      );
-
-    public Option<long?> AppClockOffset { get; } =
-      Experimental(
-        new Option<long?>("--trace-app-clock-offset-ns")
-        {
-          Description =
-            "With --trace: what to add to a marker's time to get that clock's, in nanoseconds, for an application whose clock counts from "
-            + "an epoch of its own.",
-          HelpName = "ns",
-        }
-      );
-
     public Option<long?> CaptureOffset { get; } =
       Experimental(
         new Option<long?>("--trace-capture-offset-ns")
@@ -126,7 +111,7 @@ namespace MB.FramePacing.App.Commands
 
     /// <summary>analyze only: join no trace, also when the capture names one.</summary>
     public Option<bool> NoTrace { get; } =
-      Experimental(new Option<bool>("--no-trace") { Description = "(experimental) Join no Perfetto trace, also when capture.json names one." });
+      Experimental(new Option<bool>("--no-trace") { Description = "(experimental) Read no Perfetto trace, also when capture.json names one." });
 
     /// <summary>--trace-processor: the user's trace_processor_shell.</summary>
     public static Option<string?> ProcessorOption() =>
@@ -148,8 +133,9 @@ namespace MB.FramePacing.App.Commands
     /// <param name="remembered">The command analyses a capture that may name a trace itself (analyze): --no-trace is offered.</param>
     public void AddTo(Command command, bool remembered)
     {
-      var details = new Option[] { Process, Layer, Thread, VBlanks, AppClock, AppClockOffset, CaptureOffset };
+      var details = new Option[] { Process, Layer, Thread, VBlanks, CaptureOffset };
       command.Options.Add(Trace);
+      command.Options.Add(AppTrace);
       foreach (var option in details)
         command.Options.Add(option);
       command.Options.Add(Processor);
@@ -157,41 +143,54 @@ namespace MB.FramePacing.App.Commands
         command.Options.Add(NoTrace);
       command.Validators.Add(result =>
       {
-        if (result.GetResult(Trace) is not { Implicit: false })
+        bool trace = result.GetResult(Trace) is { Implicit: false };
+        bool appTrace = result.GetResult(AppTrace) is { Implicit: false };
+        if (!trace)
         {
           foreach (var option in details.Where(option => result.GetResult(option) is { Implicit: false }))
             result.AddError($"{option.Name} goes with --trace.");
         }
-        else if (remembered && result.GetValue(NoTrace))
+        if ((trace || appTrace) && remembered && result.GetValue(NoTrace))
         {
-          result.AddError("--no-trace does not go with --trace.");
+          result.AddError($"--no-trace does not go with {(trace ? "--trace" : "--trace-app")}.");
         }
       });
     }
 
     /// <summary>
-    /// The trace the options name; null without --trace. A file that is not there is a <see cref="FileNotFoundException"/>. Prints the
-    /// experimental notice.
+    /// The traces the options name; null without --trace and --trace-app. A file that is not there is a
+    /// <see cref="FileNotFoundException"/>. Prints the experimental notice.
     /// </summary>
-    public TraceJoinOptions? Options(ParseResult parseResult)
+    /// <param name="remembered">
+    /// The trace the capture itself names: --trace-app alone adds the application's trace to it; --trace replaces it whole.
+    /// </param>
+    public TraceJoinOptions? Options(ParseResult parseResult, TraceJoinOptions? remembered = null)
     {
-      if (parseResult.GetValue(Trace) is not { } trace)
+      string? trace = parseResult.GetValue(Trace);
+      string? appTrace = parseResult.GetValue(AppTrace);
+      if (trace == null && appTrace == null)
         return null;
-      string path = Path.GetFullPath(trace);
-      if (!File.Exists(path))
-        throw new FileNotFoundException($"The Perfetto trace does not exist: '{path}'");
+      string? path = trace != null ? ExistingFile(trace, "The Perfetto trace") : null;
+      string? appPath = appTrace != null ? ExistingFile(appTrace, "The application's trace") : null;
       PrintNotice();
+      if (path == null)
+        return (remembered ?? new TraceJoinOptions()) with { AppTracePath = appPath };
       return new TraceJoinOptions
       {
         Path = path,
+        AppTracePath = appPath,
         Process = parseResult.GetValue(Process),
         Layer = parseResult.GetValue(Layer),
         Thread = parseResult.GetValue(Thread),
         VBlanks = parseResult.GetValue(VBlanks),
-        AppClock = parseResult.GetValue(AppClock),
-        AppClockOffsetNs = parseResult.GetValue(AppClockOffset),
         CaptureOffsetNs = parseResult.GetValue(CaptureOffset),
       };
+    }
+
+    private static string ExistingFile(string given, string what)
+    {
+      string path = Path.GetFullPath(given);
+      return File.Exists(path) ? path : throw new FileNotFoundException($"{what} does not exist: '{path}'");
     }
 
     /// <summary>
@@ -201,7 +200,8 @@ namespace MB.FramePacing.App.Commands
     /// </summary>
     public AnalysisOptions Apply(ParseResult parseResult, string captureDirectory, AnalysisOptions options)
     {
-      options = options with { Trace = Options(parseResult), NoTrace = parseResult.GetValue(NoTrace) };
+      var remembered = CaptureSessionInfo.TryLoad(captureDirectory)?.Trace;
+      options = options with { Trace = Options(parseResult, remembered), NoTrace = parseResult.GetValue(NoTrace) };
       return WithProcessor(parseResult, captureDirectory, options);
     }
 

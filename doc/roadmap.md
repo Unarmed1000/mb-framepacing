@@ -195,8 +195,9 @@ without it: the output files, the analysis and the report cards of an hour take 
 The tools join a capture with a [Perfetto](https://perfetto.dev) trace recorded on the device during the same run
 ([experimental](../measure/doc/perfetto.md)): the analysis says what the trace says of each presented frame (a CSV, the report
 card's description, the GUI's text under the pointer), and the charts come with the trace that has the capture's measurements
-added as tracks. `tools/trace_augment.py` does the same from a checkout. It is checked against traces its own tests make; **no
-recorded trace has been through it**.
+added as tracks. `tools/trace_augment.py` does the same from a checkout. The join is by
+[the frame record](../sdk/doc/trace-frame-record.md), a slice the application logs for every frame, which the SDK's trace
+module defines (C++ and C#). It is checked against traces its own tests make; **no recorded trace has been through it**.
 
 **Out of experimental:** a recorded trace and a capture of the same run, on each kind of system a trace comes from, to prove
 the two parts that rest on our reading of the trace: which of the system's frames is which frame of the capture, and where a
@@ -204,10 +205,12 @@ display's vertical blanks are.
 
 **Possible upgrades:**
 
-- **Frames matched by an id, not by time:** the application writes the marker's frame index into the trace at each frame's
-  start (a trace counter or a slice named for it), and the tool matches by that. It would also place a capture whose markers
-  carry no times, and it needs no assumption about which clock the application's is. It is the application's to write: the
-  SDK calls no platform API.
+- **The system's frames matched by an id, not by time:** the frame record places the application's work in the trace, but
+  which of the system's frame timeline frames belongs to it is still worked out from times. Where a platform gives the
+  application the id the system knows a frame by, the record could carry it as an annotation, and the match would be exact.
+- **The frame record in more languages:** the trace module is C++ and C#; Python and the Unity package have none.
+- **A header that makes the tracing calls:** the trace module says what to log and the application logs it. For one tracing
+  library an optional header could make the calls too, so that the track and the clock can not be got wrong.
 - **The trace under the video:** the trace's tracks for a run in [the playback page](../measure/doc/usage.md#the-playback-page),
   on the playhead that the report and the recording already share.
 - **The trace's values drawn:** a panel of the report card with the measured display time against the system's own present

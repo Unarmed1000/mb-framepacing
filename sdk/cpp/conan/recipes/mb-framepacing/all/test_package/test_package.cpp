@@ -3,7 +3,9 @@
 //
 // The Conan package's test: encode the frame marker of one frame at 60 fps and draw it as a triangle list (marker), read a
 // summary's capture period (data), and print what came out with the library version (core). A package built with with_pacer
-// (MB_TEST_PACKAGE_PACER) also paces a frame with the experimental pacer module and fills the frame's marker from it.
+// (MB_TEST_PACKAGE_PACER) also paces a frame with the experimental pacer module and fills the frame's marker from it, and one built
+// with with_trace (MB_TEST_PACKAGE_TRACE) makes the record of a frame's marker with the experimental trace module and prints the
+// record's name.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
@@ -30,6 +32,11 @@
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
+#endif
+#ifdef MB_TEST_PACKAGE_TRACE
+#include <mb/framepacing/trace/FrameRecord.hpp>
+#include <mb/framepacing/trace/FrameRecordText.hpp>
+#include <mb/framepacing/trace/FrameRecordUtil.hpp>
 #endif
 #include <array>
 #include <cstdint>
@@ -78,6 +85,36 @@ namespace
 }
 #endif
 
+#ifdef MB_TEST_PACKAGE_TRACE
+namespace
+{
+  // The experimental trace module: the record of a frame, made from the payload its marker is drawn from. An application writes it
+  // to its own trace as a slice, with whatever it traces with; here it is printed
+  bool RecordOneFrame(const uint64_t frameIndex)
+  {
+    namespace TR = MB::FramePacing::Trace;
+    const FP::NanosecondTimeDuration frameTime = FP::NanosecondTimeDuration::FromNanoseconds(16'666'667);
+    // The frame's CPU work: 4 ms from its start, on the application's steady clock
+    const FM::Payload payload{FM::MarkerKind::Frame,
+                              1u,
+                              frameIndex,
+                              FM::MarkerFlags::NoFlags,
+                              FP::NanosecondTimeSpan::FromSeconds(1),
+                              frameTime,
+                              frameTime,
+                              {},
+                              FP::NanosecondTickCount::FromSeconds(10),
+                              FP::NanosecondTimeDuration::FromNanoseconds(4'000'000)};
+    TR::FrameRecord record;
+    const bool created = TR::FrameRecordUtil::TryCreate(payload, record);
+    std::printf("the trace module (experimental): a slice '%s' in the category %s, %lld ns long, with %zu annotations\n", record.Name.CStr(),
+                TR::FrameRecordText::Category.data(), static_cast<long long>(record.Duration.Nanoseconds()), record.Annotations().size());
+    return created && record.Name.View() == "mbfp frame 1 60" && record.StartTime == payload.CpuStartTime() &&
+           record.Duration.Nanoseconds() == 4'000'000 && record.Annotations().size() == 3u;
+  }
+}
+#endif
+
 int main()
 {
   // The application's own frame counter and animation time: frame 60 of an animation at 60 fps
@@ -100,5 +137,10 @@ int main()
 #else
   const bool paced = true;
 #endif
-  return count > 0 && capturePeriod == 16'666'667 && payload.TargetFrameTime().Nanoseconds() == 16'666'667 && paced ? 0 : 1;
+#ifdef MB_TEST_PACKAGE_TRACE
+  const bool recorded = RecordOneFrame(frameIndex);
+#else
+  const bool recorded = true;
+#endif
+  return count > 0 && capturePeriod == 16'666'667 && payload.TargetFrameTime().Nanoseconds() == 16'666'667 && paced && recorded ? 0 : 1;
 }

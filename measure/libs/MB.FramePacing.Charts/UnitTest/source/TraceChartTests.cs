@@ -14,8 +14,8 @@ using System.IO;
 using System.Linq;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Capture;
-using MB.FramePacing.Trace;
-using MB.FramePacing.Trace.UnitTest;
+using MB.FramePacing.TraceJoin;
+using MB.FramePacing.TraceJoin.UnitTest;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Charts.UnitTest

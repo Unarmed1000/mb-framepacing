@@ -8,8 +8,10 @@ subdirectory   add_subdirectory(<source tree>)
 package        cmake --install to a temporary prefix, then find_package(mb_framepacing <version> CONFIG REQUIRED COMPONENTS ...)
 archive        FetchContent of a release archive (a local path as URL, with its SHA256) (only with --archive)
 
-The pacer module is experimental and off by default: the runs above must not get it. Two more runs ask for it and pace a frame
-(MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer against an install built with -DMB_FRAMEPACING_BUILD_PACER=ON.
+The pacer and the trace module are experimental and off by default: the runs above must not get them. Two more runs ask for the pacer
+and pace a frame (MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer against an install built with
+-DMB_FRAMEPACING_BUILD_PACER=ON. Two more ask for the trace module and make a frame's record (MB_CONSUMER_TRACE): subdirectory-trace,
+and package-trace against an install built with -DMB_FRAMEPACING_BUILD_TRACE=ON.
 
 python sdk/cpp/tests/consumer/check_consumers.py [--source <mb_framepacing source tree>] [--archive <mb-framepacing-cpp-x.y.z.tar.gz>]
 """
@@ -24,6 +26,8 @@ from pathlib import Path
 
 CONSUMER_DIR = Path(__file__).resolve().parent
 DEFAULT_SOURCE = CONSUMER_DIR.parent.parent
+# The modules that are off unless an application asks for them
+EXPERIMENTAL_MODULES = ("pacer", "trace")
 
 
 class Arguments(argparse.Namespace):
@@ -86,11 +90,39 @@ def install_library(work: Path, source: Path, name: str, options: list[str]) -> 
     return prefix
 
 
-def check_has_no_pacer(prefix: Path) -> None:
-    """The pacer is experimental: an install with the default options has none of it."""
-    found = sorted(str(path.relative_to(prefix)) for path in prefix.rglob("*") if "pacer" in path.name.lower())
-    if found:
-        sys.exit(f"The default install holds the pacer module, which is off by default ({', '.join(found[:5])})")
+def module_files(prefix: Path, module: str) -> list[str]:
+    """What an install holds of a module: its headers (include/mb/framepacing/<module>/), its library (mb_framepacing_<module>) and
+    the CMake files that name its target (mb_framepacing::<module>). Found by those and not by the module's name alone, which is a
+    plain word that another module's files may have in their names."""
+    found: list[str] = []
+    for path in prefix.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(prefix).as_posix()
+        header = f"/mb/framepacing/{module}/" in f"/{relative}"
+        library = f"mb_framepacing_{module}" in path.name.lower()
+        target = path.suffix == ".cmake" and f"mb_framepacing::{module}" in path.read_text(encoding="utf-8")
+        if header or library or target:
+            found.append(relative)
+    return sorted(found)
+
+
+def check_has_no_experimental_module(prefix: Path) -> None:
+    """The pacer and the trace module are experimental: an install with the default options has nothing of either."""
+    for module in EXPERIMENTAL_MODULES:
+        found = module_files(prefix, module)
+        if module == "pacer":
+            # No other module has a file with the pacer's name in its own
+            found += sorted(path.relative_to(prefix).as_posix() for path in prefix.rglob("*") if "pacer" in path.name.lower())
+        if found:
+            sys.exit(f"The default install holds the {module} module, which is off by default ({', '.join(found[:5])})")
+
+
+def check_has_module(prefix: Path, module: str) -> None:
+    """An install that was asked for an experimental module holds it: what shows that the check of the default install looks for
+    the right files."""
+    if not module_files(prefix, module):
+        sys.exit(f"The install built with the {module} module holds none of its files")
 
 
 def main() -> int:
@@ -110,15 +142,24 @@ def main() -> int:
         check_installs_nothing(work, "subdirectory")
 
         prefix = install_library(work, source, "library", [])
-        check_has_no_pacer(prefix)
+        check_has_no_experimental_module(prefix)
         build_and_run(work, "package", {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor})
 
         # The experimental pacer, for an application that asks for it
         pacer = {"MB_CONSUMER_PACER": "ON"}
         build_and_run(work, "subdirectory-pacer", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix(), **pacer})
         prefix = install_library(work, source, "library-pacer", ["-DMB_FRAMEPACING_BUILD_PACER=ON"])
+        check_has_module(prefix, "pacer")
         package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
         build_and_run(work, "package-pacer", {**package, **pacer})
+
+        # The experimental trace module, the same way
+        trace = {"MB_CONSUMER_TRACE": "ON"}
+        build_and_run(work, "subdirectory-trace", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix(), **trace})
+        prefix = install_library(work, source, "library-trace", ["-DMB_FRAMEPACING_BUILD_TRACE=ON"])
+        check_has_module(prefix, "trace")
+        package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
+        build_and_run(work, "package-trace", {**package, **trace})
 
         if args.archive:
             archive = Path(args.archive).resolve()
@@ -138,7 +179,8 @@ def main() -> int:
         return 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    names = ["fetchcontent", "subdirectory", "package", "subdirectory-pacer", "package-pacer"] + (["archive"] if args.archive else [])
+    names = ["fetchcontent", "subdirectory", "package", "subdirectory-pacer", "package-pacer", "subdirectory-trace", "package-trace"]
+    names += ["archive"] if args.archive else []
     print("\nConsumer check: OK (" + ", ".join(names) + ")")
     return 0
 

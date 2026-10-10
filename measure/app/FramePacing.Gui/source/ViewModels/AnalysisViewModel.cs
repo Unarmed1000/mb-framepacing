@@ -28,7 +28,7 @@ using MB.FramePacing.Capture;
 using MB.FramePacing.Capture.Ffmpeg;
 using MB.FramePacing.Charts;
 using MB.FramePacing.Charts.Playback;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels

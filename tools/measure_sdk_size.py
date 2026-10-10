@@ -66,6 +66,7 @@ CSHARP_END = "<!-- /sdk-csharp-size-table -->"
 CSHARP_MODULES = (
     ("MB.FramePacing", "sdk/csharp/core/MB.FramePacing.csproj", "netstandard2.1"),
     ("MB.FramePacing.Marker", "sdk/csharp/marker/MB.FramePacing.Marker.csproj", "netstandard2.1"),
+    ("MB.FramePacing.Trace", "sdk/csharp/trace/MB.FramePacing.Trace.csproj", "netstandard2.1"),
     ("MB.FramePacing.Data", "sdk/csharp/data/MB.FramePacing.Data.csproj", "net10.0"),
 )
 # Assemblies are IL: the same on every platform, so their sizes only move with the code and the compiler

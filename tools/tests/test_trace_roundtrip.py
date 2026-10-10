@@ -71,7 +71,7 @@ class RoundTripTests(unittest.TestCase):
     def augmented(self, name: str = "augmented.pftrace") -> Path:
         output = self.work / name
         if not output.exists():
-            done = run_tool(CAPTURE, self.trace, "-o", output, "--app-clock-offset-ns", synthetic_trace.APP_CLOCK_OFFSET_NS)
+            done = run_tool(CAPTURE, self.trace, "-o", output)
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             self.assertIn("read back: every track has what was written", done.stdout)
         return output
@@ -89,6 +89,7 @@ class RoundTripTests(unittest.TestCase):
         self.assertIn(synthetic_trace.APP_NAME, done.stdout)
         self.assertIn(synthetic_trace.APP_LAYER, done.stdout)
         self.assertIn("monotonic", done.stdout)
+        self.assertIn("The application's frame record (slices named 'mbfp frame <run id> <frame index>'): 379", done.stdout)
         self.assertIn("Errors the trace processor counts: 0", done.stdout)
 
     def test_every_track_is_where_the_frames_say(self) -> None:
@@ -161,7 +162,7 @@ class RoundTripTests(unittest.TestCase):
         packed = self.work / "device.pftrace.gz"
         _ = packed.write_bytes(gzip.compress(self.trace.read_bytes()))
         output = self.work / "from-gzip.pftrace"
-        done = run_tool(CAPTURE, packed, "-o", output, "--app-clock-offset-ns", synthetic_trace.APP_CLOCK_OFFSET_NS)
+        done = run_tool(CAPTURE, packed, "-o", output)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(output.read_bytes(), again.read_bytes())
 
@@ -170,10 +171,10 @@ class RoundTripTests(unittest.TestCase):
         alignment = self.expected_alignment()
         boot = synthetic_trace.BOOT_MINUS_MONOTONIC_NS
         output = self.work / "frames.csv"
-        done = run_tool(
-            CAPTURE, self.trace, "--frames", output, "--process", synthetic_trace.APP_NAME, "--app-clock-offset-ns", synthetic_trace.APP_CLOCK_OFFSET_NS
-        )
+        # Nothing names the application or its clock: the frame record in the trace does
+        done = run_tool(CAPTURE, self.trace, "--frames", output)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn(f"frame record minus the markers' CPU start times: {synthetic_trace.APP_CLOCK_OFFSET_NS} ns, by 379 frames", done.stdout)
         self.assertIn(f"display times moved by {-synthetic_trace.VBLANK_BEFORE_INTENDED_NS} ns", done.stdout)
         self.assertIn("the furthest 0 ns from it", done.stdout)
         with output.open(encoding="utf-8", newline="") as file:
@@ -227,10 +228,15 @@ class RoundTripTests(unittest.TestCase):
             self.assertEqual(source.errors(), {})
 
     def test_what_does_not_fit_is_refused_with_what_to_do(self) -> None:
-        # The markers' clock taken as the system's own, which it is not: the CPU start times are not in the trace
-        done = run_tool(CAPTURE, self.trace, "-o", self.work / "refused.pftrace")
+        # A trace without the frame record of the run is not joined: here the capture alone as a trace, which has the capture's
+        # tracks and nothing an application logged
+        bare = self.work / "capture-alone.pftrace"
+        done = run_tool(CAPTURE, "-o", bare)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        done = run_tool(CAPTURE, bare, "-o", self.work / "refused.pftrace")
         self.assertEqual(done.returncode, 1)
-        self.assertIn("--app-clock-offset-ns", done.stderr)
+        self.assertIn("no frame record of this run (no slice named 'mbfp frame 1 <frame index>')", done.stderr)
+        self.assertIn("sdk/doc/trace-frame-record.md", done.stderr)
         self.assertFalse((self.work / "refused.pftrace").exists())
         done = run_tool(CAPTURE, self.trace)
         self.assertEqual(done.returncode, 1)
@@ -257,7 +263,7 @@ class RoundTripTests(unittest.TestCase):
         pieces = self.work / "pieces.pftrace"
         synthetic_trace.write(pieces, with_service_events=True)
         output = self.work / "pieces-augmented.pftrace"
-        done = run_tool(CAPTURE, pieces, "-o", output, "--app-clock-offset-ns", synthetic_trace.APP_CLOCK_OFFSET_NS)
+        done = run_tool(CAPTURE, pieces, "-o", output)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("read back: every track has what was written", done.stdout)
         with TraceSource(output) as source:

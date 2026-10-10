@@ -16,8 +16,8 @@
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Capture;
-using MB.FramePacing.Trace;
-using MB.FramePacing.Trace.UnitTest;
+using MB.FramePacing.TraceJoin;
+using MB.FramePacing.TraceJoin.UnitTest;
 using NUnit.Framework;
 
 namespace MB.FramePacing.Analysis.UnitTest
@@ -110,6 +110,66 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     [Test]
     [Category("trace-processor")]
+    public void ATraceOfTheApplicationsOwn_IsHeldAgainstTheMarkers_AloneOrWithATraceToJoin()
+    {
+      string processor = TraceTestData.FindProcessorOrIgnore();
+      string appTrace = TraceTestData.File(TraceTestData.AppTrace);
+      const string CheckFile = "run-1-trace-check.txt";
+
+      // Alone: nothing is joined, and the markers are held against the application's record
+      var alone = new TraceJoinOptions { AppTracePath = appTrace };
+      var report = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { Trace = alone, TraceProcessorPath = processor });
+
+      Assert.That(report.TraceJoins, Is.Empty);
+      Assert.That(File.Exists(Path.Combine(report.OutputDirectory, TraceFile)), Is.False);
+      Assert.That(report.Warnings, Has.None.Contains("Perfetto"));
+      var record = report.TraceRecordChecks.Single()!;
+      Assert.That((record.Slices, record.NamedFrames, record.StartDifferentFrames, record.BusyDifferentFrames), Is.EqualTo((379, 379, 0, 0)));
+      var lines = report.TraceCheckLines(0)!;
+      Assert.That(lines.Count, Is.EqualTo(2));
+      Assert.That(lines[1], Is.EqualTo(record.Line()).And.Contain("animationNs: 4 of 379 frames differ"));
+      Assert.That(File.ReadAllText(Path.Combine(report.OutputDirectory, CheckFile)), Is.EqualTo(string.Join('\n', lines) + "\n"));
+
+      // With a trace to join: the frame record of the application's own trace counts before the one the joined trace has (which is 1500 ns late for
+      // every ninth frame), and the frames only the joined trace names are held against its
+      var both = Stored() with
+      {
+        AppTracePath = appTrace,
+      };
+      var joined = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { Trace = both, TraceProcessorPath = processor });
+
+      var lineUp = joined.TraceJoinOf(0)!.LineUp!;
+      Assert.That(joined.TraceRecordChecks.Single(), Is.SameAs(lineUp.Record));
+      Assert.That((lineUp.Record.Slices, lineUp.Record.NamedFrames, lineUp.Record.WorkedFrames), Is.EqualTo((758, 387, 387)));
+      // Of the eight frames the application's trace has no slice of, the joined trace's is late for the one that is a ninth frame
+      Assert.That(lineUp.Record.StartDifferentFrames, Is.EqualTo(new[] { 421, 471, 521, 571, 621, 671, 721, 771 }.Count(i => (i % 9) == 0)));
+      Assert.That(joined.TraceCheckLines(0), Is.EqualTo(lineUp.Lines()));
+      Assert.That(File.ReadAllText(Path.Combine(joined.OutputDirectory, TraceFile)), Is.EqualTo(File.ReadAllText(TraceTestData.File("frames.csv"))));
+
+      // A capture remembers it, and without a trace processor it is a warning
+      (CaptureSessionInfo.TryLoad(m_capture)! with { Trace = alone }).Save(m_capture);
+      Assert.That(File.ReadAllText(Path.Combine(m_capture, CaptureSessionInfo.FileName)), Does.Contain("\"appTracePath\""));
+      var remembered = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { TraceProcessorPath = processor });
+      Assert.That(remembered.TraceRecordChecks.Single()!.Line(), Is.EqualTo(record.Line()));
+      var without = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions());
+      Assert.That(without.TraceRecordChecks, Is.Empty);
+      Assert.That(
+        without.Warnings.Single(w => w.Contains("Perfetto")),
+        Does.Contain("synthetic-app.pftrace").And.Contain("trace processor was not found")
+      );
+      Assert.That(File.Exists(Path.Combine(without.OutputDirectory, CheckFile)), Is.False);
+
+      // Its trace gone: a warning for a capture's own, and the analysis stops for one it was given
+      (CaptureSessionInfo.TryLoad(m_capture)! with { Trace = alone with { AppTracePath = m_temp.File("gone.pftrace") } }).Save(m_capture);
+      var gone = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { TraceProcessorPath = processor });
+      Assert.That(gone.TraceRecordChecks, Is.Empty);
+      Assert.That(gone.Warnings.Single(w => w.Contains("gone.pftrace")), Does.StartWith("The application's trace").And.Contain("does not exist"));
+      var asked = new AnalysisOptions { TraceProcessorPath = processor, Trace = alone with { AppTracePath = m_temp.File("gone.pftrace") } };
+      Assert.Throws<TraceException>(() => CaptureAnalyzer.Analyze(m_capture, asked));
+    }
+
+    [Test]
+    [Category("trace-processor")]
     public void TheAugmentedTrace_IsTheScripts_AndIsWrittenOnlyForARunThatWasJoined()
     {
       string processor = TraceTestData.FindProcessorOrIgnore();
@@ -139,10 +199,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       string processor = TraceTestData.FindProcessorOrIgnore();
       var session = CaptureSessionInfo.TryLoad(m_capture)!;
       (session with { Trace = Stored() }).Save(m_capture);
-      Assert.That(
-        File.ReadAllText(Path.Combine(m_capture, CaptureSessionInfo.FileName)),
-        Does.Contain("\"trace\": {").And.Contain("\"appClockOffsetNs\"")
-      );
+      Assert.That(File.ReadAllText(Path.Combine(m_capture, CaptureSessionInfo.FileName)), Does.Contain("\"trace\": {").And.Contain("\"process\""));
       Assert.That(CaptureAnalyzer.TraceOf(m_capture, new AnalysisOptions()), Is.EqualTo(Stored()));
 
       var report = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { TraceProcessorPath = processor });
@@ -180,13 +237,21 @@ namespace MB.FramePacing.Analysis.UnitTest
       var asked = new AnalysisOptions { TraceProcessorPath = processor, Trace = Stored() with { Path = m_temp.File("gone.pftrace") } };
       Assert.Throws<TraceException>(() => CaptureAnalyzer.Analyze(m_capture, asked));
 
-      // A run that is not inside the trace (the markers' clock taken as the system's, which it is not): a warning for the run
-      var off = new AnalysisOptions { TraceProcessorPath = processor, Trace = Stored() with { AppClockOffsetNs = null } };
+      // A trace without the frame record of the run (here the capture alone as a trace: nothing an application logged): a warning
+      // for the run, and nothing is joined
+      string bare = m_temp.File("bare.pftrace");
+      TraceAugmenter.WriteCaptureAlone(bare, TraceTestData.GoldenRun());
+      var off = new AnalysisOptions
+      {
+        TraceProcessorPath = processor,
+        Trace = new TraceJoinOptions { Path = bare },
+      };
       var report = CaptureAnalyzer.Analyze(m_capture, off);
       Assert.That(report.TraceJoins, Is.EqualTo(new TraceRunJoin?[] { null }));
+      Assert.That(report.TraceRecordChecks, Is.EqualTo(new FrameRecordCheck?[] { null }));
       Assert.That(
         report.Warnings.Single(w => w.Contains("Perfetto")),
-        Does.StartWith("Run 1: the Perfetto trace 'synthetic.pftrace' was not joined")
+        Does.StartWith("Run 1: the Perfetto trace 'bare.pftrace' was not joined: The trace has no frame record of this run")
       );
       Assert.That(report.Warnings, Has.None.EqualTo(CaptureAnalyzer.TraceNotice));
       Assert.That(File.Exists(Path.Combine(report.OutputDirectory, TraceFile)), Is.False);

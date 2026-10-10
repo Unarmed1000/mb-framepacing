@@ -48,18 +48,18 @@ jobs:
           esac
           ffmpeg -version | head -1
 
-      # The pacer is experimental and off by default; it is built and tested here all the same
-      - name: C++ library (core, marker, data and the experimental pacer)
+      # The pacer and the trace module are experimental and off by default; they are built and tested here all the same
+      - name: C++ library (core, marker, data and the experimental pacer and trace modules)
         shell: bash
         run: |
-          cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON
+          cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON -DMB_FRAMEPACING_BUILD_TRACE=ON
           cmake --build sdk/cpp/build/ci --config Release --parallel
           ctest --test-dir sdk/cpp/build/ci -C Release --output-on-failure
 
       - name: C++ library with the core and marker modules only (no nlohmann/json)
         shell: bash
         run: |
-          cmake -S sdk/cpp -B sdk/cpp/build/ci-no-data -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_DATA=OFF -DMB_FRAMEPACING_BUILD_PACER=OFF
+          cmake -S sdk/cpp -B sdk/cpp/build/ci-no-data -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_DATA=OFF -DMB_FRAMEPACING_BUILD_PACER=OFF -DMB_FRAMEPACING_BUILD_TRACE=OFF
           cmake --build sdk/cpp/build/ci-no-data --config Release --parallel
           ctest --test-dir sdk/cpp/build/ci-no-data -C Release --output-on-failure
           if [ -d sdk/cpp/build/ci-no-data/_deps/nlohmann_json-src ]; then echo "::error::nlohmann/json was fetched without the data module"; exit 1; fi

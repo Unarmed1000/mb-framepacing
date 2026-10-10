@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
 """EXPERIMENTAL (measure/doc/perfetto.md). Reads what trace_augment.py needs of a Perfetto trace, with Perfetto's own Python
-package: the trace's clocks, its processes, the display's vertical blanks, the system's frame timeline and a thread's
-scheduling states.
+package: the trace's clocks, the frame record the application logged, its processes, the display's vertical blanks, the
+system's frame timeline and a thread's scheduling states.
 
 The package reads a trace through Perfetto's trace processor, a native program it downloads on first use (a pinned version,
 checked by its SHA-256, kept under the user's home folder) and talks to on this machine only. trace_processor names one that is
@@ -16,7 +16,12 @@ from pathlib import Path
 from types import TracebackType
 
 from perfetto.trace_processor import TraceProcessor, TraceProcessorConfig
-from trace_alignment import ClockSnapshot  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
+from trace_alignment import (  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
+    RECORD_NAME_PREFIX,
+    ClockSnapshot,
+    FrameRecord,
+    parse_record_name,
+)
 from trace_events import TraceReadError  # pyright: ignore[reportImplicitRelativeImport]
 from trace_frames import SurfaceFrame, ThreadState  # pyright: ignore[reportImplicitRelativeImport]
 
@@ -98,6 +103,23 @@ class TraceSource:
         """What the trace processor counted as errors while it read the trace, by name."""
         rows = self._rows("SELECT name, SUM(value) AS total FROM stats WHERE severity = 'error' AND value > 0 GROUP BY name ORDER BY name")
         return {str(row.name): int(row.total) for row in rows}
+
+    def frame_records(self) -> list[FrameRecord]:
+        """The frame record: the slices named for a frame on any track, ascending by their start, with the process their
+        track belongs to. Their times are on the trace's own clock here. A slice that had not ended when the trace did, or
+        whose name is not a frame's, is left out."""
+        rows = self._rows(
+            "SELECT s.ts AS ts, s.name AS name, p.name AS process FROM slice s "
+            + "LEFT JOIN thread_track tt ON tt.id = s.track_id LEFT JOIN thread th ON th.utid = tt.utid "
+            + "LEFT JOIN process_track pt ON pt.id = s.track_id LEFT JOIN process p ON p.upid = COALESCE(pt.upid, th.upid) "
+            + f"WHERE s.name GLOB {quoted(RECORD_NAME_PREFIX + '*')} AND s.dur >= 0 ORDER BY s.ts"
+        )
+        records: list[FrameRecord] = []
+        for row in rows:
+            ids = parse_record_name(str(row.name))
+            if ids is not None:
+                records.append(FrameRecord(ids[0], ids[1], int(row.ts), str(row.process) if row.process is not None else None))
+        return records
 
     def processes(self, name_glob: str = "*") -> list[Process]:
         """The processes with a name that fits the pattern (* and ? as in a file name), by name."""

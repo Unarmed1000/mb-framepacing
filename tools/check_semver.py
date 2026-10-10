@@ -54,6 +54,7 @@ API_STREAMS = (
     ApiStream("MB.FramePacing", Path("sdk/csharp/core/MB.FramePacing.csproj"), "sdk/VERSION", "sdk-v"),
     ApiStream("MB.FramePacing.Marker", Path("sdk/csharp/marker/MB.FramePacing.Marker.csproj"), "sdk/VERSION", "sdk-v"),
     ApiStream("MB.FramePacing.Data", Path("sdk/csharp/data/MB.FramePacing.Data.csproj"), "sdk/VERSION", "sdk-v"),
+    ApiStream("MB.FramePacing.Trace", Path("sdk/csharp/trace/MB.FramePacing.Trace.csproj"), "sdk/VERSION", "sdk-v"),
 )
 
 # (major, minor, patch, 1 for a release or 0 for a pre-release, the pre-release label's rank, its number): sorts as semver does

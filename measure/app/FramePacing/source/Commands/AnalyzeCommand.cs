@@ -149,13 +149,15 @@ namespace MB.FramePacing.App.Commands
           AnsiConsole.MarkupLineInterpolated(
             $"[grey]{chartFiles.Count} chart(s) written next to them (run-*-report.svg, run-*-error-histogram.svg, ...)[/]"
           );
-        // Experimental: how well the markers and a joined Perfetto trace line up, as numbers
-        foreach (var join in report!.TraceJoins)
+        // Experimental: how well the markers and a joined Perfetto trace line up, and the markers against the application's own
+        // record, as numbers
+        for (int index = 0; index < report!.Timeline.Runs.Count; ++index)
         {
-          if (join?.LineUp is not { } lineUp)
+          if (report.TraceCheckLines(index) is not { } lines)
             continue;
-          AnsiConsole.MarkupLineInterpolated($"Run '{join.Run.Name}' and the trace:");
-          foreach (string line in lineUp.Lines())
+          var run = report.Timeline.Runs[index];
+          AnsiConsole.MarkupLineInterpolated($"Run {run.RunId} '{run.Name ?? run.SequenceId ?? string.Empty}' and the trace:");
+          foreach (string line in lines)
             AnsiConsole.MarkupLineInterpolated($"{line}");
         }
         // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts

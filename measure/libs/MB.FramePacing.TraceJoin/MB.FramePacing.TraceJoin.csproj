@@ -1,0 +1,11 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1 -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="MB.FramePacing.TraceJoin.UnitTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MB.FramePacing.Capture\MB.FramePacing.Capture.csproj" />
+    <ProjectReference Include="..\..\..\sdk\csharp\trace\MB.FramePacing.Trace.csproj" />
+  </ItemGroup>
+</Project>

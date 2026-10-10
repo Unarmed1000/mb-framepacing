@@ -21,7 +21,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MB.FramePacing.Analysis;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 using static MB.FramePacing.Charts.SvgMarkup;
 
 namespace MB.FramePacing.Charts

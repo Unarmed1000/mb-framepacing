@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MODULES = {
     "core": ("MB.FramePacing", ROOT / "sdk" / "csharp" / "core" / "UnitTest" / "MB.FramePacing.UnitTest.csproj"),
     "marker": ("MB.FramePacing.Marker", ROOT / "sdk" / "csharp" / "marker" / "UnitTest" / "MB.FramePacing.Marker.UnitTest.csproj"),
+    "trace": ("MB.FramePacing.Trace", ROOT / "sdk" / "csharp" / "trace" / "UnitTest" / "MB.FramePacing.Trace.UnitTest.csproj"),
 }
 
 

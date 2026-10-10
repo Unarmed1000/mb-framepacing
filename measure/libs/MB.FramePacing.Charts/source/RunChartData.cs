@@ -17,7 +17,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using MB.FramePacing.Analysis;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Charts
 {

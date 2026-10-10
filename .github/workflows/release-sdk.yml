@@ -71,11 +71,11 @@ jobs:
           dotnet-version: 10.0.x
       - name: CMake 4
         uses: lukka/get-cmake@v4.4.2
-      # The pacer is experimental and off by default; it is built and tested here all the same
-      - name: C++ library (core, marker, data and the experimental pacer)
+      # The pacer and the trace module are experimental and off by default; they are built and tested here all the same
+      - name: C++ library (core, marker, data and the experimental pacer and trace modules)
         shell: bash
         run: |
-          cmake -S sdk/cpp -B sdk/cpp/build/release -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON
+          cmake -S sdk/cpp -B sdk/cpp/build/release -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON -DMB_FRAMEPACING_BUILD_TRACE=ON
           cmake --build sdk/cpp/build/release --config Release --parallel
           ctest --test-dir sdk/cpp/build/release -C Release --output-on-failure
       - name: C# modules
@@ -140,7 +140,8 @@ jobs:
           ## C++ (CMake 4.0+, C++20)
 
           One library of modules: \`mb_framepacing::core\`, \`mb_framepacing::marker\` and \`mb_framepacing::data\`
-          (\`mb_framepacing::pacer\` is experimental and off by default: \`-DMB_FRAMEPACING_BUILD_PACER=ON\`).
+          (\`mb_framepacing::pacer\` and \`mb_framepacing::trace\` are experimental and off by default:
+          \`-DMB_FRAMEPACING_BUILD_PACER=ON\`, \`-DMB_FRAMEPACING_BUILD_TRACE=ON\`).
           Link the ones you use; \`-DMB_FRAMEPACING_BUILD_DATA=OFF\` leaves the data module (and nlohmann/json) out.
 
           \`\`\`cmake

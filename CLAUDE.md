@@ -15,6 +15,10 @@ The repository has two parts, and the license follows them (see Conventions):
     frame its waits, its start time, its swap interval, its animation time, how to present it and the marker's pacing values, holds
     a target frame rate, and adapts the swap interval (the full-window rule of mb-framepacing-explained's simulation, and its fix
     as the default); it counts what the display did from the display times the platform reports (statistics only);
+  - **trace** (C++ `MB::FramePacing::Trace` and C# `MB.FramePacing.Trace`; **experimental**, off by default in C++): the **frame
+    record**, the slice an application logs to its own Perfetto trace for every frame so that the tools can merge a trace of a
+    run with a capture of it (`sdk/doc/trace-frame-record.md` is the reference). It defines every string of the record and works
+    out what to log from a marker's payload; it writes no trace and calls no tracing API;
   - **core**: the types every module shares, `Point` and `Rectangle` (always valid: a negative size is 0; its edges must fit int32, which is asserted and never clamped) in every
     language (C++
     `MB::FramePacing` with the library version and the time types in `core/time/`: `NanosecondTimeSpan`, `NanosecondTickCount` and `NanosecondTimeDuration` (a signed interval, a point on a clock and a length of time that is never negative, in nanoseconds: **what the marker, the data modules and the tools hold every time in**; exact from ticks, and to ticks truncated for an interval and the tick it is in for a point; `FromSeconds(double)` truncates to the nanosecond and `NanosecondTickCount::FromCounter` rounds down to it; in C# and Python too, where they are the only time types Python has), the tick types `TimeSpan` (C#'s `System.TimeSpan`, out of range throws), `TickCount64`, `TickCount32` (wraps every 429.5 s, compares across the wrap), `TimeSpan32` and `TimeDuration` (ticks of 100 ns, for applications and .NET's own APIs: nothing in the marker, the data modules or the tools holds a measured time in them), and the optional `core/time/ChronoConversion.hpp` (the tick and the nanosecond types); `ByteSpanUtil` (`WriteLE`/`ReadLE<T>`: little-endian values, the
@@ -33,37 +37,39 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 
 ## Layout
 
-| Path                                              | Contents                                                                                                          |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)       |
-| `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                   |
-| `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`          |
-| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, time types, `Point`, `Rectangle` + tests                     |
-| `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker` with its own QR encoder, `reference/` (qrcodegen), `marker-render`, tests  |
-| `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests        |
-| `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulations and `pacer-sim` (`tests/`, test code) |
-| `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote) |
-| `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Point`, `Rectangle`, the time types; .NET Standard 2.1, C# 9) + NUnit tests     |
-| `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                 |
-| `sdk/csharp/data/`                                | C# data module `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output            |
-| `sdk/python/`                                     | Python package `mb_framepacing` (`marker`, `data`; standard library only, Python 3.12) + unittest tests           |
-| `sdk/unity/`                                      | Unity package `com.manabattery.framepacing` sources (helpers, samples), `build_upm.py`, `check_in_unity.py`       |
-| `sdk/shaders/`                                    | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan    |
-| `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, the data formats, the pacer guide, encoding performance |
-| `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                       |
-| `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                               |
-| `sdk/test-data/pacer/`                            | The pacer's golden data (`pacer-sim --golden`): scenario frames and results, the tier loops' digests and frames   |
-| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                              |
-| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/Trace/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks  |
-| `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)      |
-| `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                   |
-| `measure/test-data/trace/`, `frame-logs/`         | Made-up traces and frame logs with what the scripts gave for them: what the experimental C# ports are held to     |
-| `doc/`                                            | Project docs: releasing, roadmap                                                                                  |
-| `pacer-captures/`                                 | Capture sessions of the pacer: results documents, charts, `runs.csv`; the zips are assets of a GitHub release     |
-| `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                              |
-| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                                |
-| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                              |
-| `licenses/`                                       | Third-party licenses                                                                                              |
+| Path                                              | Contents                                                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)          |
+| `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                      |
+| `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`             |
+| `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, time types, `Point`, `Rectangle` + tests                        |
+| `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker` with its own QR encoder, `reference/` (qrcodegen), `marker-render`, tests     |
+| `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests           |
+| `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulations and `pacer-sim` (`tests/`, test code)    |
+| `sdk/cpp/trace/`, `sdk/csharp/trace/`             | Trace module `mb_framepacing::trace` / `MB.FramePacing.Trace` (experimental): the frame record + tests               |
+| `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote)    |
+| `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Point`, `Rectangle`, the time types; .NET Standard 2.1, C# 9) + NUnit tests        |
+| `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |
+| `sdk/csharp/data/`                                | C# data module `MB.FramePacing.Data` (.NET 10): reads and writes captures.mbcd and the analysis output               |
+| `sdk/python/`                                     | Python package `mb_framepacing` (`marker`, `data`; standard library only, Python 3.12) + unittest tests              |
+| `sdk/unity/`                                      | Unity package `com.manabattery.framepacing` sources (helpers, samples), `build_upm.py`, `check_in_unity.py`          |
+| `sdk/shaders/`                                    | Reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3/ES 3.0, OpenGL ES 2.0 and Vulkan       |
+| `sdk/doc/`                                        | Marker format and fields, integrating, Unity, vocabulary, the data formats, the pacer guide, encoding performance    |
+| `sdk/test-data/markers/`                          | Golden marker images and module digest from the C++ library                                                          |
+| `sdk/test-data/data/`                             | The data modules' golden data: a test clip imported and analysed, and `digest.json`                                  |
+| `sdk/test-data/pacer/`                            | The pacer's golden data (`pacer-sim --golden`): scenario frames and results, the tier loops' digests and frames      |
+| `sdk/test-data/trace/`                            | The trace module's golden data: payloads with the frame record each gives (`frame-records.csv`)                      |
+| `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                                 |
+| `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/TraceJoin/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks |
+| `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)         |
+| `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                      |
+| `measure/test-data/trace/`, `frame-logs/`         | Made-up traces and frame logs with what the scripts gave for them: what the experimental C# ports are held to        |
+| `doc/`                                            | Project docs: releasing, roadmap                                                                                     |
+| `pacer-captures/`                                 | Capture sessions of the pacer: results documents, charts, `runs.csv`; the zips are assets of a GitHub release        |
+| `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                                 |
+| root `Directory.*.props`, `UnitTest.props`        | Shared .NET build settings (C# projects only; see below), central package versions                                   |
+| `mb-framepacing.slnx`                             | IDE solution with every .NET project                                                                                 |
+| `licenses/`                                       | Third-party licenses                                                                                                 |
 
 ## Build and test
 
@@ -109,7 +115,8 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     `source/.../detail/`, in a namespace named for what they are, such as `Marker::WireFormat` and `Data::CaptureDataFormat`, and named in
     full at every use: no `using namespace`), namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
-COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` leave modules out (no data module: nlohmann/json is never fetched).
+COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` / `_TRACE` leave modules out (no data module: nlohmann/json is never fetched;
+    the pacer and the trace module are experimental and off unless asked for).
     `MB_FRAMEPACING_INSTALL` (on only when top-level) is around every install rule and the CMake package: an application that builds the
     library inside its own project installs its own files only (`tests/consumer/check_consumers.py` checks it).
     Each module's tests are their own executable. What they share is in `sdk/cpp/testing` (`mb_framepacing_test_support`, an OBJECT
@@ -163,14 +170,28 @@ tools/tests -t tools`; CI's `lint`).
     one without the user's word. **Nothing of a trace that names a program or a device goes onto a card** (the hover and the
     description have values and the system's own verdict words; the layer name is in the CSV only).
   - **Two implementations, held to the same bytes:** the script (`tools/trace_augment.py`, Perfetto's Python package) and the
-    tools (`measure/libs/MB.FramePacing.Trace`, a port part for part). `measure/test-data/trace` is what the script makes from the
+    tools (`measure/libs/MB.FramePacing.TraceJoin`, a port part for part). `measure/test-data/trace` is what the script makes from the
     golden capture and a made-up trace (`tools/update_trace_test_data.py`; a test of the scripts fails when the folder is stale),
     and the C# tests compare with it: the written traces by length and SHA-256, the per-frame CSV byte for byte. Change the two
     together, then regenerate the folder.
+  - **The join is by the frame record, and a trace without it is refused** (the user, 2026-10-10: the record is "what needs to
+    be logged to perfetto for this merge ... to work", "fully standarized preferably with the necessary strings defined by our sdk",
+    in a trace module of the SDK; a trace without the record: refuse). `TraceJoiner` places a run by `FrameRecordCheck.Of`: the
+    median of slice start minus the marker's CPU start time is what a marker's time needs added (`ClockOffsetNs`; 0 for an
+    application whose marker times are read from `CLOCK_MONOTONIC`). The application is the process the record's track belongs to
+    (`TraceLoader.ProcessOf`), unless named. There are **no application clock options any more** (`--trace-app-clock`,
+    `--trace-app-clock-offset-ns` and their fields are gone): never bring back a join that assumes which clock an application's is.
+    What stays by time: which of the system's frame timeline frames is which, and the capture's clock against the application's.
   - **The tools:** `--trace` on `import` (stored in capture.json's `trace`, `TraceJoinOptions`) and `analyze` (for that analysis;
     `--no-trace`), the trace's own options (`--trace-process`, …), `trace-info`, `config --set-trace-processor`; the GUI's
     Perfetto trace card (Capture), row (Analyze) and trace processor (Settings), all behind the experimental switch. `capture`
     takes no trace: while a live capture runs its trace is still being recorded.
+    - **`--trace-app <file>`** (`TraceJoinOptions.AppTracePath`; the console only, the GUI keeps what a capture names): a trace
+      the application wrote itself, for a frame record that is in a file of its own. With `--trace` the run is placed in the
+      joined trace by it (`TraceLoader.Load` reads both; the monotonic clock's snapshots tie the two files). Alone (`Path` empty)
+      nothing is joined and no trace notice is given: the analysis has a `FrameRecordCheck` per run
+      (`AnalysisReport.TraceRecordChecks`, `TraceCheckLines`) and writes the check file. An application's own trace given as
+      `--trace` is joined like any trace.
     - `CaptureAnalyzer` joins each run (`TraceLoader` reads the trace once and keeps it for the next analysis of the same file;
       `TraceJoiner`) and writes `run-<id>-trace.csv`, the tools' own file and **not part of the analysis output format**; an
       analysis that joins none removes it. What does not fit is a warning, but for a trace the analysis itself was given.
@@ -182,18 +203,38 @@ tools/tests -t tools`; CI's `lint`).
   - **Do they line up** (the user, 2026-10-09: "are we able to validate that the QR codes and perfetto information line up?"):
     every join works out three numbers that do not depend on each other (`TraceLineUpCheck` → `TraceLineUp`, printed by `analyze`
     and written as `run-<id>-trace-check.txt`): the thread awake for the markers' CPU busy time (and matched a frame off), the
-    measured display time minus the system's present time being one value, and, where the application named its frames in the
-    trace (`FrameSection`: a trace section `mbfp frame <run id> <frame index>` from the marker's CPU start to the end of its CPU
-    busy time; asked of the first integration with the user's word), the marker's times against the section's. **Numbers only,
-    no pass or fail** until recorded traces have shown what is usual, and none of them shows a delay the whole run shares. The
-    sections are a check next to the match by time, never in place of it (the per-frame CSV stays the script's).
+    measured display time minus the system's present time being one value, and the markers as decoded against the frame record
+    (`FrameRecordCheck`: slice start and length against the CPU start and busy times, each annotation against the marker's value).
+    **Numbers only, no pass or fail** until recorded traces have shown what is usual, and none of them shows a delay the whole
+    run shares.
+  - **The frame record is the SDK's** (`sdk/doc/trace-frame-record.md`, agreed with the first integration and then, on the
+    user's word, fixed in every string): a slice per frame whose main marker is drawn with a CPU start time greater than 0, named
+    `mbfp frame <run id> <frame index>`, from the marker's CPU start time for its CPU busy time as the payload carries them, on
+    `CLOCK_MONOTONIC`, in the category `mbfp`, on a track named `mbfp frames` under the application's process (or the thread's
+    own track for a writer that can only begin and end a section there); annotations in the order of the marker's fields,
+    `animationNs` always and `markerPreferredNs`, `markerTargetNs`, `intendedDisplayNs` unless 0.
+    - **The SDK says what to log and the application logs it** (the user: the app logs it "so it gets correctly sandwiched
+      with the perfetto trace of the app"; shown the sketch of the Perfetto calls: "this is fine"). No trace writer and no
+      tracing API in the SDK; an optional header that makes one library's calls is a roadmap option, not built.
+    - C++ `FrameRecordText` (the strings), `FrameRecordName` (inline, no allocation), `FrameRecord`, `FrameRecordAnnotation`,
+      `FrameRecordUtil::TryCreate(payload, record)`; C# the same names with `FrameRecord.TryCreate` and, for readers,
+      `FrameRecordName.TryParse`. Both are held to `sdk/test-data/trace/frame-records.csv`. Wired as the pacer is:
+      `MB_FRAMEPACING_BUILD_TRACE` (needs the marker module), Conan's `with_trace`, the `windows` and `linux-sanitize` presets,
+      CI and the release workflow, the consumer check (`subdirectory-trace`, `package-trace`; a default install holds none of
+      it). Not in Python (the script has the two strings it reads, held to the golden data by a test) and not in the Unity package.
+    - The tools read it with the SDK's strings (`MB.FramePacing.TraceJoin` references `MB.FramePacing.Trace`; the tools' library
+      was renamed to give the SDK the name): `FrameRecordSlice` is a record read from a trace, `TraceReader.FrameRecords` reads
+      it from any track with the process of the track.
+    - The made-up traces have both forms: `synthetic.pftrace` logs it as sections on the application's thread (every ninth
+      1500 ns late, one frame in fifty none), `synthetic-app.pftrace` (`synthetic_trace.build_app`) as the SDK defines it, with
+      annotations. The made-up application's clock is 100 s from the record's clock on purpose: nothing tells the join so.
   - **Perfetto's trace processor is the user's own**, found as ffmpeg is (`TraceProcessorLocator`: `--trace-processor`,
     `MB_TRACE_PROCESSOR`, `traceProcessorPath`, PATH, the folder Perfetto's Python package downloads into) and never bundled or
     downloaded by the tools. `TraceProcessor` starts it on the loopback address with the trace on its command line and asks SQL
     over its HTTP interface. No protobuf library: `ProtoWriter` / `ProtoReader` write and read the few messages field by field.
     The tests that need it (category `trace-processor`) are skipped when there is none, and CI sets `MB_REQUIRE_TRACE_PROCESSOR`
     so that there they fail instead (`tools/get_trace_processor.py` fetches the package's pinned copy for the .NET jobs).
-  - **The trace's times are plain whole nanoseconds (`long`, `…Ns`)** in the Trace library, not the capture's typed times: a
+  - **The trace's times are plain whole nanoseconds (`long`, `…Ns`)** in the TraceJoin library, not the capture's typed times: a
     trace's clock is added and compared as a number, as the script does, never as a wrapping counter.
   - The script's parts: `trace_alignment.py` (the clocks, integer arithmetic), `trace_events.py` (a capture's frames as tracks) and
     `trace_frames.py` (the per-frame join) need nothing but the standard library and are tested alone; `trace_tracks.py` (writes)

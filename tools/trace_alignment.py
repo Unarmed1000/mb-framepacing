@@ -7,9 +7,11 @@ Three clocks meet. The capture's (the capture card's, or the host's): a frame's 
 steady clock, which the markers carry the CPU start time and the pacer's intended display time on. And the trace's, which
 ties the system's clocks together with its own clock snapshots.
 
-- The application's clock to the trace's: the application's clock is one of the system's clocks (CLOCK_MONOTONIC unless said
-  otherwise), with an offset when it counts from an epoch of its own. Exact when that is true, and checked: the CPU start times
-  have to lie inside the trace.
+- The application's clock to the trace's: by the frame record the application logged into the trace
+  (sdk/doc/trace-frame-record.md): a slice per frame named for the frame's marker, from the marker's CPU start time, on the
+  system's CLOCK_MONOTONIC. Each frame's CPU work is where its slice is; the median of slice start minus CPU start time is
+  what a marker's time needs added (0 for an application that reads the marker's times from that clock, as the record
+  asks). A trace without the record of the run is not joined. Checked: the CPU start times have to lie inside the trace.
 - The capture's clock to the application's: the analysis's own alignment, read back from the frames it wrote
   (firstSeenNs - intendedDisplayNs - latenessNs is one number for a run). Without a schedule in the markers, the charts' rule:
   no frame is on screen before its CPU work ended. The differences between frames are exact either way; where the whole run
@@ -27,8 +29,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
 
-# Perfetto's ids of the system's clocks (its BuiltinClock), by the names --app-clock takes
-SYSTEM_CLOCK_IDS: dict[str, int] = {"monotonic": 3, "boottime": 6, "monotonic-raw": 5, "realtime": 1}
+# Perfetto's ids of the system's clocks (its BuiltinClock), with their names
+SYSTEM_CLOCK_NAMES: dict[int, str] = {1: "realtime", 3: "monotonic", 5: "monotonic-raw", 6: "boottime"}
+
+# The frame record (sdk/doc/trace-frame-record.md is the reference, and the SDK's trace module has these for C++ and C#): what
+# a slice's name begins with, and the clock the slices are on, CLOCK_MONOTONIC
+RECORD_NAME_PREFIX = "mbfp frame "
+RECORD_CLOCK_ID = 3
+MAX_RUN_ID = (1 << 32) - 1
+MAX_FRAME_INDEX = (1 << 64) - 1
 
 
 class AlignmentError(ValueError):
@@ -67,6 +76,18 @@ class ClockSnapshot:
 
     trace_ns: int
     clock_ns: int
+
+
+@dataclass(frozen=True)
+class FrameRecord:
+    """A frame record read from a trace: the slice an application logged for one frame, with its marker's run id and frame
+    index. start_ns is the slice's start, the marker's CPU start time, on the record's clock; process is the process the
+    slice's track belongs to, by the name the trace has for it."""
+
+    run_id: int
+    frame_index: int
+    start_ns: int
+    process: str | None = None
 
 
 @dataclass(frozen=True)
@@ -143,10 +164,77 @@ def to_trace_ns(clock_ns: int, snapshots: Sequence[ClockSnapshot]) -> int:
     return snapshot.trace_ns + (clock_ns - snapshot.clock_ns)
 
 
+def from_trace_ns(trace_ns: int, snapshots: Sequence[ClockSnapshot]) -> int:
+    """A time on the trace's clock, on a system clock: by the newest snapshot at or before it on the trace's clock (the first
+    one for a time before them all), the way back of to_trace_ns. Without any snapshot, the trace's clock is taken to be the
+    system clock."""
+    if not snapshots:
+        return trace_ns
+    before = [s for s in snapshots if s.trace_ns <= trace_ns]
+    snapshot = max(before, key=lambda s: s.trace_ns) if before else min(snapshots, key=lambda s: s.trace_ns)
+    return snapshot.clock_ns + (trace_ns - snapshot.trace_ns)
+
+
+def record_name(run_id: int, frame_index: int) -> str:
+    """The name of a frame's slice: 'mbfp frame <run id> <frame index>'."""
+    return f"{RECORD_NAME_PREFIX}{run_id} {frame_index}"
+
+
+def parse_record_name(name: str) -> tuple[int, int] | None:
+    """The run id and the frame index of a slice's name; None for a name that is not a frame's."""
+    if not name.startswith(RECORD_NAME_PREFIX):
+        return None
+    run, space, frame = name[len(RECORD_NAME_PREFIX) :].partition(" ")
+    if not space or not (run.isascii() and run.isdigit() and frame.isascii() and frame.isdigit()):
+        return None
+    run_id, frame_index = int(run), int(frame)
+    return (run_id, frame_index) if run_id <= MAX_RUN_ID and frame_index <= MAX_FRAME_INDEX else None
+
+
+def record_offset(frames: Sequence[TimedFrame], records: Sequence[FrameRecord], run_id: int) -> tuple[int, int]:
+    """What a marker's time needs added to be on the record's clock, and how many frames say so: the median of slice start
+    minus CPU start time over the run's frames that have both (the lower of the two in the middle; the first slice of a
+    frame index counts). A trace without the run's frame record is not joined: that is an AlignmentError that says what an
+    application logs."""
+    by_index: dict[int, FrameRecord] = {}
+    for record in records:
+        if record.run_id == run_id:
+            _ = by_index.setdefault(record.frame_index, record)
+    if not by_index:
+        raise AlignmentError(
+            f"The trace has no frame record of this run (no slice named '{RECORD_NAME_PREFIX}{run_id} <frame index>'): a trace is "
+            + "merged by the slice the application logs for each frame (sdk/doc/trace-frame-record.md)."
+        )
+    offsets = sorted(by_index[f.frame_index].start_ns - f.cpu_start_ns for f in frames if f.cpu_start_ns is not None and f.frame_index in by_index)
+    if not offsets:
+        raise AlignmentError(
+            "The trace's frame record of this run names none of the capture's frames that carry a CPU start time, so nothing places " + "the run in the trace."
+        )
+    return offsets[(len(offsets) - 1) // 2], len(offsets)
+
+
+def record_process(records: Sequence[FrameRecord]) -> str | None:
+    """The process most of the record's slices are on (the first of those with as many); None when no slice names one."""
+    counts: dict[str, int] = {}
+    most: str | None = None
+    for record in records:
+        if record.process is None:
+            continue
+        counts[record.process] = counts.get(record.process, 0) + 1
+        if most is None or counts[record.process] > counts[most]:
+            most = record.process
+    return most
+
+
+def literal_pattern(text: str) -> str:
+    """A pattern that fits exactly this text where a pattern is taken (* and ? as in a file name)."""
+    return text.replace("[", "[[]").replace("*", "[*]").replace("?", "[?]")
+
+
 def check_inside_trace(frames: Sequence[TimedFrame], alignment: Alignment, snapshots: Sequence[ClockSnapshot], trace_range: tuple[int, int]) -> None:
-    """Fails when the markers' CPU start times, taken as times on the system clock, are not inside the trace: the application's
-    clock is then not the clock that was named, or the trace is of another run. A trace may begin after the run did or end
-    before it: at least half of the frames have to be inside."""
+    """Fails when the markers' CPU start times, taken to the trace's clock, are not inside the trace: the trace is then of
+    another run, or its frame record came from a trace the two clocks do not tie to. A trace may begin after the run did or
+    end before it: at least half of the frames have to be inside."""
     starts = [to_trace_ns(alignment.marker_time(f.cpu_start_ns), snapshots) for f in frames if f.cpu_start_ns is not None]
     if not starts:
         return
@@ -156,8 +244,8 @@ def check_inside_trace(frames: Sequence[TimedFrame], alignment: Alignment, snaps
         raise AlignmentError(
             f"Only {inside} of {len(starts)} CPU start times of the markers lie inside the trace "
             + f"(the markers have {min(starts)} to {max(starts)} ns on the trace's clock, the trace runs from {first} to {last}). "
-            + "Either the trace is of another run, or the application's clock is not the one named: "
-            + "see --app-clock and --app-clock-offset-ns."
+            + "Either the trace is of another run, or its frame record is from a trace of the application's own whose clock "
+            + "the trace does not share."
         )
 
 

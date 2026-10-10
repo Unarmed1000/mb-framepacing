@@ -9,15 +9,22 @@ from trace_alignment import (
     AlignmentError,
     Anchor,
     ClockSnapshot,
+    FrameRecord,
     align,
     capture_minus_app,
     check_inside_trace,
     fit_vblanks,
+    from_trace_ns,
+    literal_pattern,
     nearest,
+    parse_record_name,
+    record_name,
+    record_offset,
+    record_process,
     to_trace_ns,
 )
 
-from .golden_capture import CAPTURE_MINUS_PACER_NS, PERIOD_NS, MadeFrame, frames
+from .golden_capture import CAPTURE_MINUS_PACER_NS, PERIOD_NS, ROOT, MadeFrame, frames
 
 
 class CaptureMinusAppTests(unittest.TestCase):
@@ -97,8 +104,84 @@ class InsideTraceTests(unittest.TestCase):
         with self.assertRaisesRegex(AlignmentError, "Only 4 of 10 CPU start times"):
             check_inside_trace(made, Alignment(Anchor.NOTHING, 0), [], (7_000, 20_000))
         # The same frames with the application's clock an hour off the system's
-        with self.assertRaisesRegex(AlignmentError, "--app-clock-offset-ns"):
+        with self.assertRaisesRegex(AlignmentError, "whose clock the trace does not share"):
             check_inside_trace(made, Alignment(Anchor.NOTHING, 0, app_clock_offset_ns=3_600_000_000_000), [], (0, 20_000))
+
+
+class FrameRecordTests(unittest.TestCase):
+    def test_the_names_are_the_sdks(self) -> None:
+        # The golden data the SDK's C++ and C# tests read: every record's name is written and read back the same here
+        golden = (ROOT / "sdk" / "test-data" / "trace" / "frame-records.csv").read_text(encoding="utf-8").splitlines()
+        header = golden[0].split(",")
+        named = 0
+        for line in golden[1:]:
+            row = dict(zip(header, line.split(","), strict=True))
+            if not row["name"]:
+                continue
+            named += 1
+            run_id, frame_index = int(row["runId"]), int(row["frameIndex"])
+            self.assertEqual(record_name(run_id, frame_index), row["name"])
+            self.assertEqual(parse_record_name(row["name"]), (run_id, frame_index))
+        self.assertGreaterEqual(named, 6)
+
+    def test_a_name_that_is_not_a_frames_is_refused(self) -> None:
+        for name in (
+            "mbfp frame 7",
+            "mbfp frame 7 ",
+            "mbfp frame  7",
+            "mbfp frame 7 -1",
+            "mbfp frame +7 1",
+            "mbfp frame a 1",
+            "mbfp frame 7 1 2",
+            "mbfp frame 4294967296 1",
+            "mbfp frame 1 18446744073709551616",
+            "frame 7 1",
+            "",
+        ):
+            self.assertIsNone(parse_record_name(name), name)
+
+    def test_the_median_of_slice_start_minus_cpu_start_places_the_run(self) -> None:
+        made = [MadeFrame(index, 0, cpu_start_ns=100 * index) for index in range(1, 5)] + [MadeFrame(9, 0)]
+        records = [
+            FrameRecord(5, 1, 1_100),
+            # Begun 3 ns late
+            FrameRecord(5, 2, 1_203),
+            FrameRecord(5, 3, 1_300),
+            # Another run's, a frame without a CPU start time, and a second one of a frame: the first counts
+            FrameRecord(6, 4, 9_999),
+            FrameRecord(5, 9, 9_999),
+            FrameRecord(5, 1, 7_777),
+        ]
+        self.assertEqual(record_offset(made, records, 5), (1_000, 3))
+        # Two frames: the lower of the two in the middle
+        self.assertEqual(record_offset(made, records[1:3], 5), (1_000, 2))
+
+    def test_a_trace_without_the_runs_record_is_refused(self) -> None:
+        made = [MadeFrame(1, 0, cpu_start_ns=100)]
+        with self.assertRaisesRegex(AlignmentError, "no slice named 'mbfp frame 5 <frame index>'"):
+            _ = record_offset(made, [], 5)
+        with self.assertRaisesRegex(AlignmentError, "no frame record of this run"):
+            _ = record_offset(made, [FrameRecord(6, 1, 100)], 5)
+        with self.assertRaisesRegex(AlignmentError, "names none of the capture's frames"):
+            _ = record_offset(made, [FrameRecord(5, 2, 100)], 5)
+
+    def test_the_application_is_the_process_most_of_the_record_is_on(self) -> None:
+        self.assertIsNone(record_process([]))
+        self.assertIsNone(record_process([FrameRecord(1, 1, 0)]))
+        self.assertEqual(record_process([FrameRecord(1, 1, 0), FrameRecord(1, 2, 0, "game")]), "game")
+        self.assertEqual(record_process([FrameRecord(1, 1, 0, "other"), FrameRecord(1, 2, 0, "game"), FrameRecord(1, 3, 0, "game")]), "game")
+        self.assertEqual(record_process([FrameRecord(1, 1, 0, "other"), FrameRecord(1, 2, 0, "game")]), "other")
+        self.assertEqual(literal_pattern("com.example.game"), "com.example.game")
+        self.assertEqual(literal_pattern("a*b?c[d]"), "a[*]b[?]c[[]d]")
+
+    def test_a_time_of_the_trace_is_taken_back_to_the_system_clock(self) -> None:
+        snapshots = [ClockSnapshot(trace_ns=5_000, clock_ns=4_000), ClockSnapshot(trace_ns=9_010, clock_ns=8_000)]
+        for trace_ns, clock_ns in ((5_000, 4_000), (8_999, 7_999), (9_010, 8_000), (9_510, 8_500), (4_000, 3_000)):
+            self.assertEqual(from_trace_ns(trace_ns, snapshots), clock_ns)
+            self.assertEqual(from_trace_ns(trace_ns, list(reversed(snapshots))), clock_ns)
+        for clock_ns in (3_000, 4_000, 7_999, 8_000, 8_500):
+            self.assertEqual(from_trace_ns(to_trace_ns(clock_ns, snapshots), snapshots), clock_ns)
+        self.assertEqual(from_trace_ns(123, []), 123)
 
 
 class VBlankFitTests(unittest.TestCase):

@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Data;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Charts
 {

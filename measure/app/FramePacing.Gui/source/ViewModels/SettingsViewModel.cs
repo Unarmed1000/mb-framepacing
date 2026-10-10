@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Capture;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Gui.ViewModels
 {

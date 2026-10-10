@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 4.0)
 #   marker  mb_framepacing::marker  the frame marker: encode it and draw it (links core)
 #   data    mb_framepacing::data    reads the tools' capture data and analysis output (links marker; nlohmann/json inside)
 #   pacer   mb_framepacing::pacer   paces frames with an adaptive swap interval, an animation time in whole refreshes (links core)
+#   trace   mb_framepacing::trace   the frame record: what an application logs to its own trace for every frame (links marker)
 # Every module has its folder (include/, source/, tests/); the headers install into one tree, <mb/framepacing/...>.
 
 # Inside the repository the version and LICENSE live in sdk/ (shared with the C#, Python and Unity libraries), the reference shaders in
@@ -44,6 +45,8 @@ option(MB_FRAMEPACING_BUILD_MARKER "Build the marker module (mb_framepacing::mar
 option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; needs the marker module, fetches nlohmann/json unless one is installed)" ON)
 # The pacer is experimental (sdk/doc/pacer.md: no capture of it has been analysed with the tools), so nobody gets it without asking for it
 option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer); EXPERIMENTAL, its API may change in any release" OFF)
+# The trace module is experimental too (sdk/doc/trace-frame-record.md: no recorded trace has been through the tools that read its record)
+option(MB_FRAMEPACING_BUILD_TRACE "Build the trace module (mb_framepacing::trace; needs the marker module); EXPERIMENTAL, its API may change in any release" OFF)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
 # An application that builds the library inside its own project installs its own files, not the library's
@@ -54,6 +57,9 @@ option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS
 
 if(MB_FRAMEPACING_BUILD_DATA AND NOT MB_FRAMEPACING_BUILD_MARKER)
   message(FATAL_ERROR "The data module needs the marker module: MB_FRAMEPACING_BUILD_DATA=ON needs MB_FRAMEPACING_BUILD_MARKER=ON")
+endif()
+if(MB_FRAMEPACING_BUILD_TRACE AND NOT MB_FRAMEPACING_BUILD_MARKER)
+  message(FATAL_ERROR "The trace module needs the marker module: MB_FRAMEPACING_BUILD_TRACE=ON needs MB_FRAMEPACING_BUILD_MARKER=ON")
 endif()
 
 include(GNUInstallDirs)
@@ -122,6 +128,10 @@ endif()
 if(MB_FRAMEPACING_BUILD_PACER)
   add_subdirectory(pacer)
   list(APPEND MB_FRAMEPACING_COMPONENTS pacer)
+endif()
+if(MB_FRAMEPACING_BUILD_TRACE)
+  add_subdirectory(trace)
+  list(APPEND MB_FRAMEPACING_COMPONENTS trace)
 endif()
 
 # Install + export so projects can use find_package(mb_framepacing CONFIG) as an alternative to add_subdirectory/FetchContent. The

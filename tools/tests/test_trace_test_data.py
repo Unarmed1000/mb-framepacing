@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
-"""measure/test-data/trace is what tools/trace_augment.py makes now: the tools' own join (measure/libs/MB.FramePacing.Trace) is
+"""measure/test-data/trace is what tools/trace_augment.py makes now: the tools' own join (measure/libs/MB.FramePacing.TraceJoin) is
 tested against that folder, so the two can not drift apart unseen.
 
 It needs the dependency group 'trace' and the trace processor, as test_trace_roundtrip does: skipped where either can not be

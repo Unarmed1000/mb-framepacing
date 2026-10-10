@@ -18,12 +18,20 @@ that has a CPU start time the trace has:
   ninth begins SECTION_LATE_NS after the marker's CPU start time;
 - and for the whole run the kernel's vertical blank events, VBLANK_BEFORE_INTENDED_NS before each refresh the pacer aimed at.
 
+build_app() is a second made-up trace, of the application's own: what an application that writes a Perfetto trace itself
+puts into it, and nothing of a system. It has the frame record as the SDK defines it (sdk/doc/trace-frame-record.md): a
+slice per frame named 'mbfp frame <run id> <frame index>', in the category 'mbfp' on a track named 'mbfp frames' under the
+application's process, from the marker's CPU start time for the marker's CPU busy time, stamped on CLOCK_MONOTONIC, with the
+marker's other times as annotations. Every value is the marker's own, but for what a test needs to see counted: one frame in fifty has no slice,
+only every other slice has the two frame times, a few have an animation time that is a nanosecond off, and one slice is
+another run's.
+
 The frame timeline's messages are not among the ones Perfetto's Python package has (they are Android's, an extension of the
 packet): they are written here field by field, by the numbers of Perfetto's frameworks_native_trace_packet.proto."""
 
 from pathlib import Path
 
-from perfetto.protos.perfetto.trace.perfetto_trace_pb2 import TracePacket
+from perfetto.protos.perfetto.trace.perfetto_trace_pb2 import TracePacket, TrackEvent
 from perfetto.trace_builder.proto_builder import TraceProtoBuilder
 
 from .golden_capture import frames
@@ -49,6 +57,14 @@ CLOCK_BOOTTIME = 6
 TASK_RUNNING = 0
 TASK_INTERRUPTIBLE = 1
 SEQUENCE = 7
+# The application's own trace: its sequence, its tracks, and what is off in it on purpose
+APP_SEQUENCE = 21
+APP_PROCESS_TRACK = 0x6D62_6670_0000_0001
+APP_RECORD_TRACK = 0x6D62_6670_0000_0002
+RECORD_CATEGORY = "mbfp"
+RECORD_TRACK_NAME = "mbfp frames"
+RECORD_ANIMATION_OFF_NS = 1
+OTHER_RUN_ID = 2
 
 # The frame timeline, as Perfetto's frameworks_native_trace_packet.proto numbers it: the packet's field, the kinds of event in
 # it, and the values of what the system says of a frame
@@ -96,6 +112,21 @@ def section_late_ns(frame_index: int) -> int:
 def section_name(frame_index: int) -> str:
     """A frame's trace section: 'mbfp frame <run id> <frame index>'."""
     return f"mbfp frame {RUN_ID} {frame_index}"
+
+
+def has_record(frame_index: int) -> bool:
+    """The made-up application's own trace has a slice for its frames, all but one in fifty."""
+    return (frame_index % 50) != 21
+
+
+def has_frame_times(frame_index: int) -> bool:
+    """Every other slice of it also has the marker's target and preferred frame time."""
+    return (frame_index % 2) == 0
+
+
+def record_animation_off_ns(frame_index: int) -> int:
+    """How far a slice's animation time is from the marker's: nothing, and a nanosecond for one frame in 97."""
+    return RECORD_ANIMATION_OFF_NS if (frame_index % 97) == 5 else 0
 
 
 def _switch(bundle, time_ns: int, previous: int, previous_state: int, following: int) -> None:
@@ -275,5 +306,79 @@ def build(with_service_events: bool = False) -> bytes:
     return b"".join(parts)
 
 
+def _record(builder: TraceProtoBuilder, run_id: int, frame_index: int, start_ns: int, busy_ns: int, values: dict[str, int]) -> None:
+    """One frame's slice in the application's own trace: its begin with the name and the annotations, and its end, both
+    stamped on CLOCK_MONOTONIC."""
+    packet = builder.add_packet()
+    packet.timestamp = start_ns
+    packet.timestamp_clock_id = CLOCK_MONOTONIC
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.track_event.type = TrackEvent.TYPE_SLICE_BEGIN
+    packet.track_event.track_uuid = APP_RECORD_TRACK
+    packet.track_event.categories.append(RECORD_CATEGORY)
+    packet.track_event.name = f"mbfp frame {run_id} {frame_index}"
+    for name, value in values.items():
+        annotation = packet.track_event.debug_annotations.add()
+        annotation.name = name
+        annotation.int_value = value
+    packet = builder.add_packet()
+    packet.timestamp = start_ns + busy_ns
+    packet.timestamp_clock_id = CLOCK_MONOTONIC
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.track_event.type = TrackEvent.TYPE_SLICE_END
+    packet.track_event.track_uuid = APP_RECORD_TRACK
+
+
+def build_app() -> bytes:
+    """The bytes of the application's own trace: a snapshot of its clocks, its tracks, and its record of its frames."""
+    builder = TraceProtoBuilder()
+    worked = [f for f in frames() if f.cpu_start_ns is not None and f.cpu_busy_ns is not None]
+    start = trace_ns(min(f.cpu_start_ns or 0 for f in worked)) - 1_000_000_000
+
+    packet = builder.add_packet()
+    packet.timestamp = start
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    for clock_id, value in ((CLOCK_BOOTTIME, start), (CLOCK_MONOTONIC, start - BOOT_MINUS_MONOTONIC_NS)):
+        clock = packet.clock_snapshot.clocks.add()
+        clock.clock_id = clock_id
+        clock.timestamp = value
+
+    packet = builder.add_packet()
+    packet.timestamp = start
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.track_descriptor.uuid = APP_PROCESS_TRACK
+    packet.track_descriptor.process.pid = APP_PID
+    packet.track_descriptor.process.process_name = APP_NAME
+    packet = builder.add_packet()
+    packet.timestamp = start
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.track_descriptor.uuid = APP_RECORD_TRACK
+    packet.track_descriptor.parent_uuid = APP_PROCESS_TRACK
+    packet.track_descriptor.name = RECORD_TRACK_NAME
+
+    # A marker's times are on the application's clock: the made-up device's CLOCK_MONOTONIC is APP_CLOCK_OFFSET_NS later
+    last_end = 0
+    for frame in worked:
+        begin = (frame.cpu_start_ns or 0) + APP_CLOCK_OFFSET_NS
+        last_end = max(last_end, begin + (frame.cpu_busy_ns or 0))
+        if not has_record(frame.frame_index):
+            continue
+        values = {
+            "intendedDisplayNs": frame.intended_display_ns or 0,
+            "animationNs": frame.animation_ns + record_animation_off_ns(frame.frame_index),
+        }
+        if has_frame_times(frame.frame_index):
+            values["markerTargetNs"] = frame.marker_target_ns or 0
+            values["markerPreferredNs"] = frame.marker_preferred_ns or 0
+        _record(builder, RUN_ID, frame.frame_index, begin, frame.cpu_busy_ns or 0, values)
+    # Another run's frame, with a frame index this run has too: it is not this run's
+    _record(builder, OTHER_RUN_ID, worked[0].frame_index, last_end + 1_000_000, 2_000_000, {})
+    return builder.serialize()
+
+
 def write(path: Path, with_service_events: bool = False) -> None:
     _ = path.write_bytes(build(with_service_events))
+
+
+def write_app(path: Path) -> None:
+    _ = path.write_bytes(build_app())

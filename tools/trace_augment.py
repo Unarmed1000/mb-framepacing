@@ -14,9 +14,10 @@ The capture's measurements into the trace, and what the trace says into the capt
 the device while the run was captured. Nothing is uploaded and neither input is changed. A trace names the device and its
 programs: an augmented trace holds everything the recorded one did.
 
-The capture's clock and the trace's are tied together by the frames only (tools/trace_alignment.py says how, and what that
-can and can not claim). The markers' CPU start times are taken to be on the system's CLOCK_MONOTONIC unless --app-clock says
-another clock, and the tool stops when they do not lie inside the trace.
+The trace has to have the frame record the application logs (sdk/doc/trace-frame-record.md: a slice per frame named
+'mbfp frame <run id> <frame index>'): the frames are placed by it, it says which process is the application, and without it
+nothing is joined. The capture's clock and the application's are tied together by the frames only (tools/trace_alignment.py
+says how, and what that can and can not claim).
 
 It needs Perfetto's Python package (the dependency group 'trace' of pyproject.toml), which reads a trace through Perfetto's
 trace processor: a native program the package downloads on first use, or the one --trace-processor names."""
@@ -40,7 +41,9 @@ from mb_framepacing.data import (  # noqa: E402
     read_summary,
 )
 from trace_alignment import (  # noqa: E402  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
-    SYSTEM_CLOCK_IDS,
+    RECORD_CLOCK_ID,
+    RECORD_NAME_PREFIX,
+    SYSTEM_CLOCK_NAMES,
     Alignment,
     AlignmentError,
     Anchor,
@@ -49,13 +52,16 @@ from trace_alignment import (  # noqa: E402  # pyright: ignore[reportImplicitRel
     capture_minus_app,
     check_inside_trace,
     fit_vblanks,
+    from_trace_ns,
+    literal_pattern,
+    record_offset,
+    record_process,
     to_trace_ns,
 )
 from trace_events import TraceFormatError, TraceReadError, Track, in_stretch, track_events  # noqa: E402  # pyright: ignore[reportImplicitRelativeImport]
 from trace_frames import join, summary_lines, to_csv  # noqa: E402  # pyright: ignore[reportImplicitRelativeImport]
 
 NS_PER_SECOND = 1_000_000_000
-APP_CLOCKS = tuple(SYSTEM_CLOCK_IDS)
 NEEDS_PACKAGE = "This needs Perfetto's Python package: uv run --group trace tools/trace_augment.py ..."
 
 
@@ -68,8 +74,6 @@ class Arguments(argparse.Namespace):
     run: int | None = None
     from_seconds: float | None = None
     to_seconds: float | None = None
-    app_clock: str = "monotonic"
-    app_clock_offset_ns: int = 0
     capture_offset_ns: int | None = None
     process: str | None = None
     layer: str = "*"
@@ -87,6 +91,7 @@ class UsageError(ValueError):
 class Run:
     """The run of a capture that is worked on: its frames (the stretch asked for), the capture's rows and its refresh period."""
 
+    run_id: int
     name: str
     key: str
     frames: list[FrameRow]
@@ -127,7 +132,7 @@ def read_run(capture: Path, run_id: int | None, from_seconds: float | None, to_s
     captures = read_captures(captures_file) if captures_file.exists() else []
     period = picked.pacing.refresh_period_ns if picked.pacing is not None else summary.capture_period_ns
     name = picked.name or picked.sequence_id or f"run {picked.run_id}"
-    return Run(name, f"{picked.run_id}/{picked.sequence_id or ''}", frames, captures, period)
+    return Run(picked.run_id, name, f"{picked.run_id}/{picked.sequence_id or ''}", frames, captures, period)
 
 
 def write_tracks(
@@ -185,13 +190,12 @@ def check_output(output: Path, run_name: str, written: dict[str, int], errors_be
 def inspect(arguments: Arguments, trace: Path) -> int:
     from trace_source import TraceSource  # noqa: PLC0415  # pyright: ignore[reportImplicitRelativeImport]
 
-    names = {number: name for name, number in SYSTEM_CLOCK_IDS.items()}
     with TraceSource(trace, arguments.trace_processor) as source:
         first, last = source.trace_range()
         print(f"{trace.name}: {first} to {last} ns on the trace's clock ({(last - first) / NS_PER_SECOND:.3f} s)")
-        print("Clocks the trace has snapshots of (--app-clock):")
+        print("Clocks the trace has snapshots of (the frame record is on the monotonic clock):")
         for clock_id, clock_name, snapshots in source.clocks():
-            print(f"  {clock_id:>3} {names.get(clock_id, clock_name or '')} ({snapshots} snapshots)")
+            print(f"  {clock_id:>3} {SYSTEM_CLOCK_NAMES.get(clock_id, clock_name or '')} ({snapshots} snapshots)")
         print("Vertical blanks (--vblanks):")
         for vblank_source in source.vblank_sources():
             print(f"  {vblank_source.name} ({vblank_source.kind}, {vblank_source.count})")
@@ -208,6 +212,7 @@ def inspect(arguments: Arguments, trace: Path) -> int:
             print("Threads of those (--thread):")
             for _, process_name, thread, is_main in source.threads(pattern)[:60]:
                 print(f"  {process_name}: '{thread}'{' (main)' if is_main else ''}")
+        print(f"The application's frame record (slices named '{RECORD_NAME_PREFIX}<run id> <frame index>'): {len(source.frame_records())}")
         errors = source.errors()
         print(f"Errors the trace processor counts: {sum(errors.values())}")
         for name, count in errors.items():
@@ -257,22 +262,30 @@ def with_trace(arguments: Arguments, run: Run, trace: Path) -> int:
 
     if arguments.output is None and arguments.frames is None:
         raise UsageError("Nothing to do: give -o for the trace with the capture's tracks, --frames for what the trace says of each frame, or both.")
-    alignment = align(run.frames, arguments.app_clock_offset_ns, arguments.capture_offset_ns)
-    if alignment.anchor is Anchor.NOTHING:
-        raise UsageError(
-            "The markers of this run carry no intended display time and no CPU start time, so nothing ties the capture's clock to "
-            + "the trace's: give the offset with --capture-offset-ns (the capture's clock minus the application's)."
-        )
     with TraceSource(trace, arguments.trace_processor) as source:
-        snapshots: list[ClockSnapshot] = source.clock_snapshots(SYSTEM_CLOCK_IDS[arguments.app_clock])
+        snapshots: list[ClockSnapshot] = source.clock_snapshots(RECORD_CLOCK_ID)
+        # The frame record says where the run's frames are on the trace's clock: without it nothing is joined
+        records = [dataclasses.replace(record, start_ns=from_trace_ns(record.start_ns, snapshots)) for record in source.frame_records()]
+        record_offset_ns, named = record_offset(run.frames, records, run.run_id)
+        alignment = align(run.frames, record_offset_ns, arguments.capture_offset_ns)
+        if alignment.anchor is Anchor.NOTHING:
+            raise UsageError(
+                "The markers of this run carry no intended display time and no CPU busy time, so nothing ties the capture's clock "
+                + "to the application's: give the offset with --capture-offset-ns (the capture's clock minus the application's)."
+            )
+        # The application: the process that was named, else the one its frame record is on
+        process = arguments.process
+        if process is None and (on := record_process(records)) is not None:
+            process = literal_pattern(on)
         trace_range = source.trace_range()
         check_inside_trace(run.frames, alignment, snapshots, trace_range)
         errors_before = source.errors()
 
         print(f"{run.name}: {len(run.frames)} frames, placed by {alignment.anchor.value}")
         print(f"  capture clock minus application clock: {alignment.capture_minus_app_ns} ns")
+        print(f"  frame record minus the markers' CPU start times: {record_offset_ns} ns, by {named} frames")
         if not snapshots:
-            print(f"  the trace has no snapshot of the {arguments.app_clock} clock: its own time is taken to be that clock")
+            print("  the trace has no snapshot of the monotonic clock: its own time is taken to be that clock")
 
         picked = pick_vblanks(arguments, source.vblank_sources())
         vblanks: list[int] = []
@@ -294,14 +307,14 @@ def with_trace(arguments: Arguments, run: Run, trace: Path) -> int:
 
         rows = None
         if arguments.frames is not None:
-            surface_frames = source.surface_frames(arguments.process, arguments.layer) if arguments.process is not None else []
+            surface_frames = source.surface_frames(process, arguments.layer) if process is not None else []
             presents = source.display_presents() if surface_frames else {}
             states = []
-            if arguments.process is not None:
-                threads = source.threads(arguments.process)
+            if process is not None:
+                threads = source.threads(process)
                 wanted = [t for t in threads if (t[2] == arguments.thread if arguments.thread is not None else t[3])]
                 if arguments.thread is not None and not wanted:
-                    raise UsageError(f"No thread named '{arguments.thread}' in the processes that fit '{arguments.process}'.")
+                    raise UsageError(f"No thread named '{arguments.thread}' in the processes that fit '{arguments.process or 'the application'}'.")
                 states = source.thread_states(wanted[0][0]) if wanted else []
             rows = join(run.frames, alignment, snapshots, run.period_ns, vblanks, surface_frames, presents, states)
 
@@ -310,8 +323,8 @@ def with_trace(arguments: Arguments, run: Run, trace: Path) -> int:
         print(f"{arguments.frames}:")
         for line in summary_lines(rows):
             print(f"  {line}")
-        if arguments.process is None:
-            print("  (--process names the application: the system's own account and the CPU's time need it)")
+        if process is None:
+            print("  (the frame record is on no process's track: --process names the application, for the system's account and the CPU's time)")
 
     if arguments.output is not None:
         attributes: dict[str, int | str] = {
@@ -319,7 +332,7 @@ def with_trace(arguments: Arguments, run: Run, trace: Path) -> int:
             "frames": len(run.frames),
             "placed by": alignment.anchor.value,
             "capture clock minus application clock (ns)": alignment.capture_minus_app_ns,
-            "application clock": arguments.app_clock,
+            "application clock": SYSTEM_CLOCK_NAMES[RECORD_CLOCK_ID],
             "application clock offset (ns)": alignment.app_clock_offset_ns,
             "vertical blanks": vblank_note,
         }
@@ -346,10 +359,8 @@ def main() -> int:
     _ = parser.add_argument("--run", type=int, metavar="ID", help="the run id, for a capture with more than one run")
     _ = parser.add_argument("--from", dest="from_seconds", type=float, metavar="SECONDS", help="from this long after the run's first frame")
     _ = parser.add_argument("--to", dest="to_seconds", type=float, metavar="SECONDS", help="up to this long after the run's first frame")
-    _ = parser.add_argument("--app-clock", choices=APP_CLOCKS, default="monotonic", help="the system clock the application's steady clock is (monotonic)")
-    _ = parser.add_argument("--app-clock-offset-ns", type=int, default=0, metavar="NS", help="what to add to a marker's time to get that clock's")
     _ = parser.add_argument("--capture-offset-ns", type=int, metavar="NS", help="the capture's clock minus the application's, when it is known")
-    _ = parser.add_argument("--process", metavar="GLOB", help="the application's process name in the trace (* and ? as in a file name)")
+    _ = parser.add_argument("--process", metavar="GLOB", help="the application's process name in the trace (the process the frame record is on)")
     _ = parser.add_argument("--layer", default="*", metavar="GLOB", help="the application's layer in the frame timeline (every layer)")
     _ = parser.add_argument("--thread", metavar="NAME", help="the thread whose CPU time is counted (the main thread)")
     _ = parser.add_argument("--vblanks", metavar="NAME", help="the trace's vertical blanks to use, or 'none' (the kernel's events, when it has them)")

@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MB.FramePacing.Capture;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 using NLog;
 
 namespace MB.FramePacing.Gui.ViewModels
@@ -75,15 +75,21 @@ namespace MB.FramePacing.Gui.ViewModels
     public TraceJoinOptions? Options(TraceJoinOptions? remembered = null)
     {
       string path = TracePath.Trim();
+      // A capture that names a trace of the application's own keeps it: the page has no field for it
       if (path.Length == 0)
-        return null;
+        return remembered is { Path.Length: 0, AppTracePath: not null } ? remembered : null;
       string? process = string.IsNullOrWhiteSpace(Process) ? null : Process.Trim();
       return remembered != null && string.Equals(remembered.Path, path, StringComparison.Ordinal)
         ? remembered with
         {
           Process = process,
         }
-        : new TraceJoinOptions { Path = path, Process = process };
+        : new TraceJoinOptions
+        {
+          Path = path,
+          Process = process,
+          AppTracePath = remembered?.AppTracePath,
+        };
     }
 
     /// <summary>Show <paramref name="options"/> (a capture's own trace); null clears the fields.</summary>

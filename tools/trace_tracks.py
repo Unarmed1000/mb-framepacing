@@ -177,8 +177,7 @@ class TrackWriter:
     def _event(self, sequence: int, track_id: int, time_ns: int, kind: TrackEvent.Type) -> TracePacket:
         if time_ns < 0:
             raise TraceFormatError(
-                f"A time before the clock's zero can not be written ({time_ns} ns): the application's clock counts from an epoch "
-                + "of its own, so say how far it is off the system clock with --app-clock-offset-ns."
+                f"A time before the clock's zero can not be written ({time_ns} ns): the run's frames are placed before the trace's " + "clock began."
             )
         # No clock is named: the time is the trace's own
         packet = self._packet()

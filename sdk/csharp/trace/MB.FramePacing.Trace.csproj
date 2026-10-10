@@ -1,0 +1,20 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The trace module of the C# SDK (EXPERIMENTAL, sdk/doc/trace-frame-record.md): the frame record an application logs to a trace, its
+       strings and what to log for a marker. It writes no trace and calls no tracing API. .NET Standard 2.1 and C# 9 without nullable
+       annotations, as the marker module it reads the payload of. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>MB.FramePacing.Trace</AssemblyName>
+    <RootNamespace>MB.FramePacing.Trace</RootNamespace>
+    <Product>MB Frame Pacing Trace</Product>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\core\MB.FramePacing.csproj" />
+    <ProjectReference Include="..\marker\MB.FramePacing.Marker.csproj" />
+  </ItemGroup>
+</Project>

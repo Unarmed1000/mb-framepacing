@@ -13,6 +13,7 @@ using System.CommandLine;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 using Spectre.Console;
 
 namespace MB.FramePacing.App.Commands
@@ -33,7 +34,8 @@ namespace MB.FramePacing.App.Commands
       var processorOption = TraceInput.ProcessorOption();
       var command = new Command(
         "trace-info",
-        "(experimental) List what a Perfetto trace has to go by: its clocks, vertical blank sources, processes, frame timeline layers and threads."
+        "(experimental) List what a Perfetto trace has to go by: its clocks, vertical blank sources, processes, frame timeline layers and "
+          + "threads, and whether it has the frame record the application logs (without which a trace is not joined)."
       )
       {
         traceArgument,
@@ -68,10 +70,10 @@ namespace MB.FramePacing.App.Commands
       double seconds = (info.LastNs - info.FirstNs) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
       AnsiConsole.MarkupLineInterpolated($"[bold]{name}[/]: {info.FirstNs} to {info.LastNs} ns on the trace's clock ({seconds:0.000} s)");
 
-      AnsiConsole.MarkupLine("Clocks the trace has snapshots of (--trace-app-clock):");
+      AnsiConsole.MarkupLine("Clocks the trace has snapshots of (the frame record is on the monotonic clock):");
       foreach (var clock in info.Clocks)
         AnsiConsole.MarkupLineInterpolated(
-          $"  {clock.ClockId, 3} {TraceAppClockUtil.NameOfId(clock.ClockId) ?? clock.Name ?? string.Empty} ({clock.Snapshots} snapshots)"
+          $"  {clock.ClockId, 3} {TraceClockText.NameOfId(clock.ClockId) ?? clock.Name ?? string.Empty} ({clock.Snapshots} snapshots)"
         );
 
       AnsiConsole.MarkupLine("Vertical blanks (--trace-vblanks):");
@@ -97,6 +99,10 @@ namespace MB.FramePacing.App.Commands
         foreach (var thread in info.Threads.Take(MaxListed))
           AnsiConsole.MarkupLineInterpolated($"  {thread.Process}: '{thread.Thread}'{(thread.IsMain ? " (main)" : string.Empty)}");
       }
+
+      AnsiConsole.MarkupLineInterpolated(
+        $"The application's frame record (slices named '{FrameRecordText.NamePrefix}<run id> <frame index>'): {info.FrameRecords}"
+      );
 
       AnsiConsole.MarkupLineInterpolated($"Errors the trace processor counts: {info.Errors.Values.Sum()}");
       foreach (var (error, count) in info.Errors)

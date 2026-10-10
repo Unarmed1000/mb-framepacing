@@ -19,7 +19,8 @@
       "architecture": "x64",
       "cacheVariables": {
         "MB_FRAMEPACING_BUILD_BENCHMARKS": "ON",
-        "MB_FRAMEPACING_BUILD_PACER": "ON"
+        "MB_FRAMEPACING_BUILD_PACER": "ON",
+        "MB_FRAMEPACING_BUILD_TRACE": "ON"
       },
       "condition": {
         "type": "equals",
@@ -51,6 +52,7 @@
         "MB_FRAMEPACING_BUILD_BENCHMARKS": "ON",
         "MB_FRAMEPACING_BUILD_FUZZERS": "ON",
         "MB_FRAMEPACING_BUILD_PACER": "ON",
+        "MB_FRAMEPACING_BUILD_TRACE": "ON",
         "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"

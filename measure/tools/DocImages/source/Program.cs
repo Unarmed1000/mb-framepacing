@@ -249,12 +249,7 @@ namespace MB.FramePacing.DocImages
         throw new InvalidOperationException("The capture does not remember the trace it was imported with");
       if (analysis.Trace.TracePath != trace || analysis.Trace.Process != Application)
         throw new InvalidOperationException($"The Analyze page does not show the capture's trace: '{analysis.Trace.TracePath}'");
-      // The made-up device's clock counts from an epoch of its own: without its offset the run is not inside the trace, which is a warning
-      if (analysis.SelectedRun?.Chart.Trace != null || !analysis.Warnings.Any(w => w.Contains("was not joined", StringComparison.Ordinal)))
-        throw new InvalidOperationException("A run that is not inside its trace was not a warning: " + string.Join(" | ", analysis.Warnings));
-
-      (session with { Trace = remembered with { AppClockOffsetNs = 100_000_000_000 } }).Save(directory);
-      await analysis.AnalyzeCommand.ExecuteAsync(null);
+      // The import joined the run: its frames are placed by the frame record the made-up application logged into the trace
       if (analysis.SelectedRun?.Chart.Trace is not { Count: > 380 } rows || rows.Count(row => row.SurfaceFrameToken != null) < 380)
         throw new InvalidOperationException($"The Analyze page did not join the trace: {analysis.ErrorText} {string.Join(" | ", analysis.Warnings)}");
 

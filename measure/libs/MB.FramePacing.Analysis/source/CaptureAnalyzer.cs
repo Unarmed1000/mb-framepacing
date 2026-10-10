@@ -25,7 +25,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using MB.FramePacing.Capture;
 using MB.FramePacing.Data;
-using MB.FramePacing.Trace;
+using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Analysis
 {
@@ -87,11 +87,15 @@ namespace MB.FramePacing.Analysis
       if (session is { FramesDroppedBySource: > 0 })
         warnings.Add($"The capture device/ffmpeg reported {session.FramesDroppedBySource} dropped frames.");
 
-      var traceJoins = JoinTrace(session, capture, timeline, options, warnings, cancellationToken);
+      var (traceJoins, recordChecks) = JoinTrace(session, capture, timeline, options, warnings, cancellationToken);
 
       var outputDirectory = options.OutputDirectory ?? Path.Combine(captureDirectory, AnalysisDirectoryName);
       Directory.CreateDirectory(outputDirectory);
-      var report = new AnalysisReport(captureDirectory, outputDirectory, session, capture, timeline, warnings) { TraceJoins = traceJoins };
+      var report = new AnalysisReport(captureDirectory, outputDirectory, session, capture, timeline, warnings)
+      {
+        TraceJoins = traceJoins,
+        TraceRecordChecks = recordChecks,
+      };
       WriteReports(report, options);
       return report;
     }
@@ -107,10 +111,12 @@ namespace MB.FramePacing.Analysis
       options.NoTrace ? null : options.Trace ?? session?.Trace;
 
     /// <summary>
-    /// EXPERIMENTAL (measure/doc/perfetto.md): each run joined with the capture's Perfetto trace. The trace is read once. What does not fit
-    /// is a warning and the run has no join, but for a trace the options themselves name: that one not being readable stops the analysis.
+    /// EXPERIMENTAL (measure/doc/perfetto.md): each run joined with the capture's Perfetto trace, by the frame record the application
+    /// logged (sdk/doc/trace-frame-record.md), and its markers held against that record. With only a trace of the application's own
+    /// nothing is joined, and the markers are held against its record. Each trace is read once. What does not fit is a warning and
+    /// the run has no join, but for a trace the options themselves name: that one not being readable stops the analysis.
     /// </summary>
-    private static IReadOnlyList<TraceRunJoin?> JoinTrace(
+    private static (IReadOnlyList<TraceRunJoin?> Joins, IReadOnlyList<FrameRecordCheck?> RecordChecks) JoinTrace(
       CaptureSessionInfo? session,
       DecodedCapture capture,
       TimelineResult timeline,
@@ -119,48 +125,67 @@ namespace MB.FramePacing.Analysis
       CancellationToken cancellationToken
     )
     {
+      var none = (Array.Empty<TraceRunJoin?>(), Array.Empty<FrameRecordCheck?>());
       if (TraceOf(session, options) is not { } trace)
-        return Array.Empty<TraceRunJoin?>();
+        return none;
       bool asked = options.Trace != null;
-      string traceName = Path.GetFileName(trace.Path);
+      bool hasTrace = trace.Path.Length > 0;
+      if (!hasTrace && string.IsNullOrEmpty(trace.AppTracePath))
+        return none;
+      string traceName = Path.GetFileName(hasTrace ? trace.Path : trace.AppTracePath!);
       if (options.TraceProcessorPath is not { } processor)
       {
         warnings.Add(
-          $"The Perfetto trace '{traceName}' was not joined: Perfetto's trace processor was not found (experimental; see measure/doc/perfetto.md)."
+          $"The Perfetto trace '{traceName}' was not read: Perfetto's trace processor was not found (experimental; see measure/doc/perfetto.md)."
         );
-        return Array.Empty<TraceRunJoin?>();
+        return none;
       }
 
-      TraceData data;
+      TraceData? data = null;
+      IReadOnlyList<FrameRecordSlice>? appRecords = null;
       try
       {
-        data = TraceLoader.Load(processor, trace, cancellationToken);
+        // A trace to join is read with the frame record of the application's own trace, where there is one; alone, that record is all
+        if (hasTrace)
+          data = TraceLoader.Load(processor, trace, cancellationToken);
+        else
+          appRecords = TraceLoader.LoadAppRecords(processor, trace, cancellationToken);
       }
       catch (TraceException ex) when (!asked)
       {
-        warnings.Add($"The Perfetto trace '{traceName}' was not joined: {ex.Message}");
-        return Array.Empty<TraceRunJoin?>();
+        warnings.Add(
+          hasTrace
+            ? $"The Perfetto trace '{traceName}' was not joined: {ex.Message}"
+            : $"The application's trace '{traceName}' was not read: {ex.Message}"
+        );
+        return none;
       }
 
       var captures = capture.Rows.Select(r => r.ToCsvRow()).ToList();
       var joins = new List<TraceRunJoin?>(timeline.Runs.Count);
+      var records = new List<FrameRecordCheck?>(timeline.Runs.Count);
       foreach (var run in timeline.Runs)
       {
-        long periodNs = (run.Pacing?.RefreshPeriod ?? timeline.CapturePeriod).Nanoseconds;
-        var traceRun = TraceRun.Create(run.RunId, run.SequenceId, run.Name, run.Frames.Select(f => f.ToRow()).ToList(), captures, periodNs);
-        try
+        var rows = run.Frames.Select(f => f.ToRow()).ToList();
+        TraceRunJoin? join = null;
+        if (data != null)
         {
-          joins.Add(TraceJoiner.Join(traceRun, data, trace));
+          long periodNs = (run.Pacing?.RefreshPeriod ?? timeline.CapturePeriod).Nanoseconds;
+          try
+          {
+            join = TraceJoiner.Join(TraceRun.Create(run.RunId, run.SequenceId, run.Name, rows, captures, periodNs), data, trace);
+          }
+          catch (TraceException ex)
+          {
+            warnings.Add($"Run {run.RunId}: the Perfetto trace '{traceName}' was not joined: {ex.Message}");
+          }
         }
-        catch (TraceException ex)
-        {
-          warnings.Add($"Run {run.RunId}: the Perfetto trace '{traceName}' was not joined: {ex.Message}");
-          joins.Add(null);
-        }
+        joins.Add(join);
+        records.Add(join?.LineUp?.Record ?? (appRecords != null ? FrameRecordCheck.Of(run.RunId, rows, appRecords) : null));
       }
       if (joins.Any(join => join != null))
         warnings.Add(TraceNotice);
-      return joins;
+      return (data != null ? joins : Array.Empty<TraceRunJoin?>(), records);
     }
 
     /// <summary>What an analysis that joined a Perfetto trace says of it: the feature is experimental, and what its times rest on.</summary>
@@ -310,20 +335,15 @@ namespace MB.FramePacing.Analysis
         string tracePath = Path.Combine(report.OutputDirectory, TraceFramesCsv.FileName(RunFilePrefix(run, ordinal)));
         string checkPath = Path.Combine(report.OutputDirectory, RunFilePrefix(run, ordinal) + TraceLineUp.FileSuffix);
         if (report.TraceJoinOf(index) is { } join)
-        {
           TraceFramesCsv.Write(tracePath, join.Rows);
-          // How well the markers and the trace line up, as the numbers the join gives: a text of its own, for a reader
-          if (join.LineUp is { } lineUp)
-            File.WriteAllText(checkPath, string.Join('\n', lineUp.Lines()) + "\n", new UTF8Encoding(false));
-        }
-        else
-        {
-          foreach (string stale in new[] { tracePath, checkPath })
-          {
-            if (File.Exists(stale))
-              File.Delete(stale);
-          }
-        }
+        else if (File.Exists(tracePath))
+          File.Delete(tracePath);
+        // How well the markers and the trace line up, and what the markers say against the application's frame record: the numbers
+        // as a text of its own, for a reader
+        if (report.TraceCheckLines(index) is { } lines)
+          File.WriteAllText(checkPath, string.Join('\n', lines) + "\n", new UTF8Encoding(false));
+        else if (File.Exists(checkPath))
+          File.Delete(checkPath);
       }
       WriteSummary(Path.Combine(report.OutputDirectory, SummaryFileName), report, options, runFiles);
     }
