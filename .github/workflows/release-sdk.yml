@@ -70,7 +70,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: CMake 4
-        uses: lukka/get-cmake@v4.4.2
+        uses: lukka/get-cmake@v4.4.4
       # The pacer and the trace module are experimental and off by default; they are built and tested here all the same
       - name: C++ library (core, marker, data and the experimental pacer and trace modules)
         shell: bash
@@ -102,7 +102,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4
-        uses: lukka/get-cmake@v4.4.2
+        uses: lukka/get-cmake@v4.4.4
       - name: Create and verify the archives
         run: python3 sdk/cpp/package_release.py --output dist --verify
       - uses: actions/upload-artifact@v7
@@ -221,7 +221,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4 (the test package builds with it)
-        uses: lukka/get-cmake@v4.4.2
+        uses: lukka/get-cmake@v4.4.4
       - name: uv (Python from .python-version, the dev tools from uv.lock)
         uses: astral-sh/setup-uv@v10.2.0
       - name: The released archive through the recipe (the version is added here only; commit it with tools/add_conan_version.py)
