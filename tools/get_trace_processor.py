@@ -10,8 +10,12 @@ checked against its SHA-256 and kept under the user's home folder.
 
 CI runs it before the .NET tests, whose trace tests read their traces with that program (MB_TRACE_PROCESSOR). The tools
 themselves never download it: they find the user's own (an option, MB_TRACE_PROCESSOR, the configuration file, PATH, and this
-folder of the Python package's)."""
+folder of the Python package's).
 
+The path is the last line of the standard output, and all this script writes there: what the package prints while it
+downloads goes to the standard error, and a download program it starts may still write lines before it."""
+
+import contextlib
 import sys
 
 
@@ -21,7 +25,9 @@ def main() -> int:
     except ImportError as error:
         print(f"{error}\nThis needs Perfetto's Python package: uv run --group trace tools/get_trace_processor.py", file=sys.stderr)
         return 1
-    print(PlatformDelegate().get_shell_path(bin_path=None))
+    with contextlib.redirect_stdout(sys.stderr):
+        path = PlatformDelegate().get_shell_path(bin_path=None)
+    print(path)
     return 0
 
 

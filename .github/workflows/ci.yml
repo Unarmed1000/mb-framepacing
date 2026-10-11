@@ -74,9 +74,13 @@ jobs:
       # here Perfetto's Python package fetches the copy it is pinned to, and the tests that read a trace must find it
       - name: uv (for Perfetto's Python package)
         uses: astral-sh/setup-uv@v10.2.0
+      # The path is the last line the script prints (the download before it may print too), without Windows' carriage return
       - name: Perfetto's trace processor (for the trace tests)
         shell: bash
-        run: echo "MB_TRACE_PROCESSOR=$(uv run --locked --group trace tools/get_trace_processor.py)" >> "$GITHUB_ENV"
+        run: |
+          trace_processor="$(uv run --locked --group trace tools/get_trace_processor.py | tail -n 1 | tr -d '\r')"
+          test -f "$trace_processor"
+          echo "MB_TRACE_PROCESSOR=$trace_processor" >> "$GITHUB_ENV"
 
       # A test that runs 5 minutes is hung: the runner ends it and names it. The step's own limit catches a hang after the tests, and
       # unlike the job's limit it ends the step with its log

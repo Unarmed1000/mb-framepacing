@@ -142,13 +142,17 @@ TEST(Golden, EveryPayloadGivesTheRecordOfItsRow)
     const std::vector<std::string> cells = Split(row, ',');
     ASSERT_EQ(cells.size(), ColumnCount);
     const std::optional<FM::MarkerKind> kind = KindOf(cells[0]);
-    ASSERT_TRUE(kind.has_value()) << "a kind that is not Frame, SequenceStart, SequenceEnd or Sync";
+    if (!kind.has_value())
+    {
+      ADD_FAILURE() << "a kind that is not Frame, SequenceStart, SequenceEnd or Sync";
+      return;
+    }
 
     // A record that held values, so that a row without a record also shows that the call empties it
     TR::FrameRecord record;
     record.StartTime = FP::NanosecondTickCount(1);
     record.AnnotationCount = 1;
-    const bool created = TR::FrameRecordUtil::TryCreate(PayloadOf(*kind, cells), record);
+    const bool created = TR::FrameRecordUtil::TryCreate(PayloadOf(kind.value(), cells), record);
 
     const std::string& expectedName = cells[9];
     if (expectedName.empty())
