@@ -26,9 +26,11 @@ namespace MB.FramePacing.Data
   /// <param name="PredictionErrorMs">With a schedule: animation time step minus intended step.</param>
   /// <param name="RefreshDeviation">The refresh rate relative to the expected one (0.01 = 1 % faster), null without one.</param>
   public sealed record SummaryPacing(
-    [property: JsonPropertyName("refreshPeriodNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired] NanosecondTimeSpan RefreshPeriod,
+    [property: JsonPropertyName("refreshPeriodNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired]
+      NanosecondTimeDuration RefreshPeriod,
     [property: JsonRequired] bool RefreshCalculated,
-    [property: JsonPropertyName("targetFrameNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired] NanosecondTimeSpan TargetFrameTime,
+    [property: JsonPropertyName("targetFrameNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired]
+      NanosecondTimeDuration TargetFrameTime,
     [property: JsonRequired] string Source,
     [property: JsonRequired] long LateFrames,
     [property: JsonRequired] double LateShare,

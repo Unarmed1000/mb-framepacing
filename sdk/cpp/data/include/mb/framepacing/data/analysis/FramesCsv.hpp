@@ -10,7 +10,8 @@
 namespace MB::FramePacing::Data
 {
   //! A run's frames CSV (its name is in summary.json: SummaryRun::FramesFile). Columns are found by name. Allocates; throws
-  //! DataFormatError for content it cannot read.
+  //! DataFormatError for content it cannot read: a negative number where a length of time belongs (targetNs, preferredNs,
+  //! frameTimeNs) is outside its range, as a number beyond its column's type is.
   std::vector<FrameRow> ReadFrames(const std::filesystem::path& path);
 }
 

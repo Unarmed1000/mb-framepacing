@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-#include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/data/DataFormatError.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/data/analysis/SummaryCamera.hpp>
@@ -160,10 +160,20 @@ namespace MB::FramePacing::Data
       }
     }
 
-    //! A time: a whole number of nanoseconds.
-    NanosecondTimeSpan RequiredNanoseconds(const Json& object, const char* name)
+    //! A length of time from its nanoseconds: a whole number that is never negative. Throws DataFormatError for a negative one, as for
+    //! any other number outside its range.
+    NanosecondTimeDuration ToDuration(const int64_t nanoseconds, const char* name)
     {
-      return NanosecondTimeSpan(Required<int64_t>(object, name));
+      if (nanoseconds < 0)
+      {
+        ThrowNot(name, "a whole number in its range");
+      }
+      return NanosecondTimeDuration::FromNanoseconds(nanoseconds);
+    }
+
+    NanosecondTimeDuration RequiredDuration(const Json& object, const char* name)
+    {
+      return ToDuration(Required<int64_t>(object, name), name);
     }
 
     std::vector<std::string> Texts(const Json& object, const char* name)
@@ -263,9 +273,9 @@ namespace MB::FramePacing::Data
       if (const Json* pacing = OptionalObject(value, "pacing"))
       {
         SummaryPacing p;
-        p.RefreshPeriod = RequiredNanoseconds(*pacing, "refreshPeriodNs");
+        p.RefreshPeriod = RequiredDuration(*pacing, "refreshPeriodNs");
         p.RefreshCalculated = Required<bool>(*pacing, "refreshCalculated");
-        p.TargetFrameTime = RequiredNanoseconds(*pacing, "targetFrameNs");
+        p.TargetFrameTime = RequiredDuration(*pacing, "targetFrameNs");
         p.Source = Required<std::string>(*pacing, "source");
         p.LateFrames = Required<int64_t>(*pacing, "lateFrames");
         p.LateShare = Required<double>(*pacing, "lateShare");
@@ -344,14 +354,14 @@ namespace MB::FramePacing::Data
     }
     summary.FrameSize = Optional<std::string>(root, "frameSize");
     summary.TimeSource = Optional<std::string>(root, "timeSource");
-    summary.CapturePeriod = RequiredNanoseconds(root, "capturePeriodNs");
+    summary.CapturePeriod = RequiredDuration(root, "capturePeriodNs");
     // 0 is a file without the field, as C# reads it
-    summary.MeasurementResolution = NanosecondTimeSpan(OrDefault<int64_t>(root, "measurementResolutionNs", 0));
-    if (summary.MeasurementResolution == NanosecondTimeSpan::Zero())
+    summary.MeasurementResolution = ToDuration(OrDefault<int64_t>(root, "measurementResolutionNs", 0), "measurementResolutionNs");
+    if (summary.MeasurementResolution == NanosecondTimeDuration::Zero())
     {
       summary.MeasurementResolution = summary.CapturePeriod;
     }
-    summary.ErrorThreshold = RequiredNanoseconds(root, "errorThresholdNs");
+    summary.ErrorThreshold = RequiredDuration(root, "errorThresholdNs");
     if (const Json* markers = OptionalList(root, "markers"))
     {
       for (const Json& marker : *markers)

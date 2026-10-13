@@ -62,6 +62,16 @@ namespace MB.FramePacing.Data.UnitTest
     private static string OneRun(params string[] members) =>
       "{ \"capturePeriodNs\": 16666700, \"errorThresholdNs\": 1000000, \"runs\": [ { " + string.Join(", ", members) + " } ] }";
 
+    /// <summary>The JSON text with another number as the value of its one field of that name.</summary>
+    private static string NumberOf(string json, string field, string number)
+    {
+      string name = "\"" + field + "\": ";
+      int start = json.IndexOf(name, StringComparison.Ordinal) + name.Length;
+      Assert.That(start, Is.GreaterThanOrEqualTo(name.Length), field);
+      int end = json.IndexOfAny(new[] { ',', '\r', '\n', ' ', '}' }, start);
+      return json[..start] + number + json[end..];
+    }
+
     private static string MinimalWith(string member) => MinimalSummary.Replace("{", "{ " + member + ",", StringComparison.Ordinal);
 
     private static string MinimalWithout(string name)
@@ -94,11 +104,17 @@ namespace MB.FramePacing.Data.UnitTest
       var summary = AnalysisSummary.Parse(MinimalSummary);
       Assert.That(
         (summary.CapturePeriod, summary.MeasurementResolution, summary.ErrorThreshold),
-        Is.EqualTo((new NanosecondTimeSpan(16_666_700), new NanosecondTimeSpan(16_666_700), new NanosecondTimeSpan(1_000_000)))
+        Is.EqualTo(
+          (
+            NanosecondTimeDuration.FromNanoseconds(16_666_700),
+            NanosecondTimeDuration.FromNanoseconds(16_666_700),
+            NanosecondTimeDuration.FromNanoseconds(1_000_000)
+          )
+        )
       );
       Assert.That(
         AnalysisSummary.Parse(MinimalWithout("measurementResolutionNs")).MeasurementResolution,
-        Is.EqualTo(new NanosecondTimeSpan(16_666_700)),
+        Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16_666_700)),
         "a file without it: the capture period"
       );
 
@@ -131,6 +147,36 @@ namespace MB.FramePacing.Data.UnitTest
         () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodNs", "capturePeriodMs", StringComparison.Ordinal)),
         Throws.InstanceOf<InvalidDataException>().With.Message.Contains("capturePeriodNs")
       );
+
+      // A length of time is never negative: a negative number is outside its field's range
+      foreach (string field in new[] { "capturePeriodNs", "measurementResolutionNs", "errorThresholdNs" })
+      {
+        Assert.That(
+          () => AnalysisSummary.Parse(NumberOf(MinimalSummary, field, "-1")),
+          Throws.InstanceOf<InvalidDataException>().With.Message.Contains("summary.json is not a summary"),
+          field + " below 0"
+        );
+        Assert.That(
+          () => AnalysisSummary.Parse(NumberOf(MinimalSummary, field, "-9223372036854775808")),
+          Throws.InstanceOf<InvalidDataException>(),
+          field + " the lowest 64 bits hold"
+        );
+        Assert.That(
+          () => AnalysisSummary.Parse(NumberOf(MinimalSummary, field, "9223372036854775808")),
+          Throws.InstanceOf<InvalidDataException>(),
+          field + " one more than a length of time holds"
+        );
+      }
+      var limits = AnalysisSummary.Parse(
+        NumberOf(NumberOf(MinimalSummary, "capturePeriodNs", "9223372036854775807"), "measurementResolutionNs", "0")
+      );
+      Assert.That(limits.CapturePeriod, Is.EqualTo(NanosecondTimeDuration.MaxValue), "the longest");
+      Assert.That(limits.MeasurementResolution, Is.EqualTo(NanosecondTimeDuration.MaxValue), "0 reads as the capture period");
+      Assert.That(
+        AnalysisSummary.Parse(NumberOf(MinimalSummary, "errorThresholdNs", "0")).ErrorThreshold,
+        Is.EqualTo(NanosecondTimeDuration.Zero),
+        "0 is in the range"
+      );
       Assert.That(
         () => AnalysisSummary.Parse(MinimalSummary.Replace("capturePeriodNs", "capturePeriodTicks", StringComparison.Ordinal)),
         Throws.InstanceOf<InvalidDataException>().With.Message.Contains("capturePeriodNs"),
@@ -150,7 +196,7 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(run.Pacing, Is.Not.Null);
       Assert.That(
         (run.Pacing!.RefreshPeriod, run.Pacing.TargetFrameTime),
-        Is.EqualTo((new NanosecondTimeSpan(16_666_700), new NanosecondTimeSpan(33_333_400)))
+        Is.EqualTo((NanosecondTimeDuration.FromNanoseconds(16_666_700), NanosecondTimeDuration.FromNanoseconds(33_333_400)))
       );
       Assert.That(
         (run.RunId, run.FramesFile, run.Counts.Captures, run.Statistics.FramesWithAnimationError),
@@ -166,6 +212,21 @@ namespace MB.FramePacing.Data.UnitTest
           AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, pacing.Replace("refreshPeriodNs", "refreshPeriodMs", StringComparison.Ordinal))),
         Throws.InstanceOf<InvalidDataException>()
       );
+
+      // Neither is ever negative
+      foreach (string field in new[] { "refreshPeriodNs", "targetFrameNs" })
+      {
+        Assert.That(
+          () => AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, NumberOf(pacing, field, "-1"))),
+          Throws.InstanceOf<InvalidDataException>().With.Message.Contains("summary.json is not a summary"),
+          field + " below 0"
+        );
+        Assert.That(
+          () => AnalysisSummary.Parse(OneRun(RunStart, Counts, Statistics, NumberOf(pacing, field, "0"))),
+          Throws.Nothing,
+          field + " of 0 is in the range"
+        );
+      }
     }
 
     [Test]
@@ -334,16 +395,16 @@ namespace MB.FramePacing.Data.UnitTest
         Flags: new[] { "Late" },
         IntendedDisplayTime: new NanosecondTickCount(long.MinValue),
         MarkerTargetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.MaxValue),
-        TargetFrameTime: new NanosecondTimeSpan(33_333_400),
+        TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(33_333_400),
         MarkerPreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(1),
-        PreferredFrameTime: new NanosecondTimeSpan(16_666_700),
+        PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(16_666_700),
         PacingError: new NanosecondTimeSpan(3),
         PredictionError: new NanosecondTimeSpan(-3),
         Lateness: new NanosecondTimeSpan(8_333_300),
         LastSeenTime: new NanosecondTickCount(1_234_567_890_123_456_789),
         CpuStartTime: new NanosecondTickCount(-1_234_567_890_123_456_789),
         CpuBusy: NanosecondTimeDuration.FromNanoseconds(12_006_000),
-        FrameTime: new NanosecondTimeSpan(16_666_800),
+        FrameTime: NanosecondTimeDuration.FromNanoseconds(16_666_800),
         CpuWait: new NanosecondTimeSpan(4_660_800),
         OlderFrames: new[]
         {
@@ -446,6 +507,77 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(Read("0")[0].CpuBusy, Is.EqualTo(NanosecondTimeDuration.Zero));
       Assert.That(() => Read("4294967296"), Throws.InstanceOf<InvalidDataException>());
       Assert.That(() => Read("-1"), Throws.InstanceOf<InvalidDataException>());
+    }
+
+    [TestCase("targetNs")]
+    [TestCase("preferredNs")]
+    [TestCase("frameTimeNs")]
+    public void FramesCsv_ALengthOfTimeIsNeverNegative(string column)
+    {
+      // Two lines whose cells are all 16666700 but the second line's cell of the column
+      string[] names = (FramesCsv.Header + FramesCsv.CameraColumns).Split(',');
+      string Line(string cell)
+      {
+        var cells = new List<string>();
+        foreach (string name in names)
+          cells.Add(name == column ? cell : (name is "flags" or "olderFrames" ? string.Empty : "16666700"));
+        return string.Join(',', cells);
+      }
+      FrameRow Read(string cell) =>
+        FramesCsv.Read(new StringReader(string.Join(',', names) + "\n" + Line("16666700") + "\n" + Line(cell) + "\n"), "run-1-frames.csv")[1];
+      NanosecondTimeDuration? Value(FrameRow row) =>
+        column switch
+        {
+          "targetNs" => row.TargetFrameTime,
+          "preferredNs" => row.PreferredFrameTime,
+          _ => row.FrameTime,
+        };
+
+      Assert.That(Value(Read("0")), Is.EqualTo(NanosecondTimeDuration.Zero));
+      Assert.That(Value(Read("-0")), Is.EqualTo(NanosecondTimeDuration.Zero), "-0 is 0, as in the C++ and Python readers");
+      Assert.That(Value(Read("9223372036854775807")), Is.EqualTo(NanosecondTimeDuration.MaxValue), "the longest");
+      foreach (string negative in new[] { "-1", "-16666700", "-9223372036854775808" })
+      {
+        Assert.That(
+          () => Read(negative),
+          Throws.InstanceOf<InvalidDataException>().With.Message.Contains("'run-1-frames.csv' line 3").And.Message.Contains("'" + negative + "'"),
+          "the error names the file, the line and the cell"
+        );
+      }
+      Assert.That(() => Read("9223372036854775808"), Throws.InstanceOf<InvalidDataException>(), "one more than a length of time holds");
+    }
+
+    [Test]
+    public void FramesCsv_WhatCanGoEitherWayKeepsItsSign()
+    {
+      var row = FramesCsv.Read(
+        new StringReader(
+          FrameColumns
+            + ",displayDeltaNs,animationDeltaNs,animationErrorNs,pacingErrorNs,predictionErrorNs,latenessNs,cpuWaitNs,scanoutDelayNs\n"
+            + "0,1,-1,0,0,-10,1,0,-2,,-11,-3,-4,-5,-6,-7,-8,-9\n"
+        )
+      )[0];
+      Assert.That((row.AnimationTime, row.Drift), Is.EqualTo((new NanosecondTimeSpan(-1), new NanosecondTimeSpan(-2))));
+      // The time on screen and the display time step are the difference of two sightings: a camera can time a frame after the next one's
+      // sighting, and the steps then still add up to the time that passed
+      Assert.That(row.OnScreen, Is.EqualTo(new NanosecondTimeSpan(-10)));
+      Assert.That(row.DisplayDelta, Is.EqualTo(new NanosecondTimeSpan(-11)));
+      // A camera's scanout delay too: the sync marker can be seen before the main marker decodes
+      Assert.That(
+        new[] { row.AnimationDelta, row.AnimationError, row.PacingError, row.PredictionError, row.Lateness, row.CpuWait, row.ScanoutDelay },
+        Is.EqualTo(
+          new NanosecondTimeSpan?[]
+          {
+            new NanosecondTimeSpan(-3),
+            new NanosecondTimeSpan(-4),
+            new NanosecondTimeSpan(-5),
+            new NanosecondTimeSpan(-6),
+            new NanosecondTimeSpan(-7),
+            new NanosecondTimeSpan(-8),
+            new NanosecondTimeSpan(-9),
+          }
+        )
+      );
     }
 
     [Test]

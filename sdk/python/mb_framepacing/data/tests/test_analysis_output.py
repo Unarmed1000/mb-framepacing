@@ -5,6 +5,7 @@
 
 import tempfile
 import unittest
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -133,6 +134,40 @@ class SummaryTests(unittest.TestCase):
         self.refused(replaced(MINIMAL_SUMMARY, '"errorThresholdNs": 1000000', '"errorThresholdNs": true'))
         with self.assertRaisesRegex(DataFormatError, "capturePeriodNs"):
             _ = parse_summary(replaced(MINIMAL_SUMMARY, "capturePeriodNs", "capturePeriodMs"))
+
+    def test_a_length_of_time_in_a_summary_is_never_negative(self) -> None:
+        # Every time a summary has is a length of time: a negative number is outside its range, and refused as any other such number is
+        limits = r"is not a whole number in its range \(0 to 9223372036854775807\)"
+        period = '"capturePeriodNs": 16666667'
+        resolution = '"measurementResolutionNs": 16666667'
+        threshold = '"errorThresholdNs": 1000000'
+        with self.assertRaisesRegex(DataFormatError, rf"^summary\.json\.capturePeriodNs {limits}$"):
+            _ = parse_summary(replaced(MINIMAL_SUMMARY, period, '"capturePeriodNs": -1'))
+        with self.assertRaisesRegex(DataFormatError, rf"^summary\.json\.measurementResolutionNs {limits}$"):
+            _ = parse_summary(replaced(MINIMAL_SUMMARY, resolution, '"measurementResolutionNs": -1'))
+        with self.assertRaisesRegex(DataFormatError, rf"^summary\.json\.errorThresholdNs {limits}$"):
+            _ = parse_summary(replaced(MINIMAL_SUMMARY, threshold, '"errorThresholdNs": -1'))
+        self.refused(replaced(MINIMAL_SUMMARY, period, '"capturePeriodNs": -9223372036854775808'), "the lowest number 64 bits hold")
+        self.refused(replaced(MINIMAL_SUMMARY, threshold, '"errorThresholdNs": -16666667'))
+        longest = parse_summary(replaced(MINIMAL_SUMMARY, period, '"capturePeriodNs": 9223372036854775807'))
+        self.assertEqual(longest.capture_period_ns, 9_223_372_036_854_775_807, "the longest")
+
+        # No time at all is a length of time
+        zero = parse_summary(replaced(replaced(MINIMAL_SUMMARY, period, '"capturePeriodNs": 0'), threshold, '"errorThresholdNs": 0'))
+        self.assertEqual((zero.capture_period_ns, zero.error_threshold_ns), (0, 0))
+        self.assertEqual(parse_summary(replaced(MINIMAL_SUMMARY, threshold, '"errorThresholdNs": -0')).error_threshold_ns, 0, "-0 is 0")
+
+        # A run's pacing has two more
+        def with_pacing(old: str, new: str) -> str:
+            return one_run(RUN_START, COUNTS, statistics(), replaced(PACING, old, new))
+
+        with self.assertRaisesRegex(DataFormatError, rf"^summary\.json\.runs\[\]\.pacing\.refreshPeriodNs {limits}$"):
+            _ = parse_summary(with_pacing('"refreshPeriodNs": 16666667', '"refreshPeriodNs": -16666667'))
+        with self.assertRaisesRegex(DataFormatError, rf"^summary\.json\.runs\[\]\.pacing\.targetFrameNs {limits}$"):
+            _ = parse_summary(with_pacing('"targetFrameNs": 33333334', '"targetFrameNs": -1'))
+        (run,) = parse_summary(with_pacing('"targetFrameNs": 33333334', '"targetFrameNs": 0')).runs
+        assert run.pacing is not None
+        self.assertEqual(run.pacing.target_frame_ns, 0)
 
     def test_a_summary_from_before_the_nanoseconds_is_refused(self) -> None:
         # The same format version, its times in ticks of 100 ns under names that end in Ticks: the required ...Ns fields are not there
@@ -394,6 +429,47 @@ class FramesCsvTests(unittest.TestCase):
         for cell in ("4294967296", "-1"):
             with self.assertRaises(DataFormatError):
                 _ = read(cell)
+
+    def test_a_length_of_time_is_never_negative(self) -> None:
+        # 64 bits signed in the file, as the tools hold them, and never negative: a negative number is outside its range
+        def read(column: str, value: str) -> FrameRow:
+            return frames(f"{FRAME_COLUMNS},{column}\n0,1,0,0,0,16666667,1,0,0,,{value}\n")[0]
+
+        lengths: dict[str, Callable[[FrameRow], int | None]] = {
+            "targetNs": lambda row: row.target_ns,
+            "preferredNs": lambda row: row.preferred_ns,
+            "frameTimeNs": lambda row: row.frame_time_ns,
+        }
+        for column, length in lengths.items():
+            with self.subTest(column):
+                self.assertEqual(length(read(column, "16666667")), 16_666_667)
+                self.assertEqual(length(read(column, "0")), 0, "no time at all is a length of time")
+                self.assertEqual(length(read(column, "-0")), 0, "-0 is 0")
+                self.assertEqual(length(read(column, "9223372036854775807")), 9_223_372_036_854_775_807, "the longest")
+                self.assertIsNone(length(read(column, "")), "an empty cell")
+                self.refused(f"{FRAME_COLUMNS},{column}\n0,1,0,0,0,16666667,1,0,0,,9223372036854775808\n", "beyond 64 bits")
+                self.refused(f"{FRAME_COLUMNS},{column}\n0,1,0,0,0,16666667,1,0,0,,-9223372036854775808\n", "the lowest number 64 bits hold")
+                # The file and the line, then what any number outside its range is refused with
+                with self.assertRaisesRegex(DataFormatError, r"^'run-1-frames\.csv' line 2: '-1' is outside its range \(0 to 9223372036854775807\)$"):
+                    _ = read(column, "-1")
+
+        # What can go either way reads below zero: a camera's scanout delay too (the sync marker can be seen before the main marker decodes),
+        # and the display time step and the time on screen, the difference of two sightings (a camera can time a frame after the next
+        # one's sighting, and the steps then still add up to the time that passed)
+        either_way: dict[str, Callable[[FrameRow], int | None]] = {
+            "displayDeltaNs": lambda row: row.display_delta_ns,
+            "animationDeltaNs": lambda row: row.animation_delta_ns,
+            "animationErrorNs": lambda row: row.animation_error_ns,
+            "pacingErrorNs": lambda row: row.pacing_error_ns,
+            "predictionErrorNs": lambda row: row.prediction_error_ns,
+            "latenessNs": lambda row: row.lateness_ns,
+            "cpuWaitNs": lambda row: row.cpu_wait_ns,
+            "scanoutDelayNs": lambda row: row.scanout_delay_ns,
+        }
+        for column, interval in either_way.items():
+            self.assertEqual(interval(read(column, "-9223372036854775808")), -9_223_372_036_854_775_808, column)
+        (row,) = frames(f"{FRAME_COLUMNS}\n0,1,-5,0,0,-16666667,1,0,-7,\n")
+        self.assertEqual((row.animation_ns, row.on_screen_ns, row.drift_ns), (-5, -16_666_667, -7))
 
     def test_other_content_that_is_not_a_frame_is_refused(self) -> None:
         self.refused("", "an empty file")

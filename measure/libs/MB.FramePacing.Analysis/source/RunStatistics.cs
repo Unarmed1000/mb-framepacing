@@ -52,7 +52,7 @@ namespace MB.FramePacing.Analysis
     /// frame rates; every frame the drift and time on screen. <paramref name="threshold"/> is the error threshold,
     /// <paramref name="capturePeriod"/> the capture period (no frame counts as off without one).
     /// </summary>
-    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, NanosecondTimeSpan threshold, NanosecondTimeSpan capturePeriod)
+    public static RunStatistics From(IReadOnlyList<PresentedFrame> frames, NanosecondTimeDuration threshold, NanosecondTimeDuration capturePeriod)
     {
       // One pass over the frames gathers each kind of value as nanoseconds (a run of an hour has a million frames), then each is sorted
       // once and gives its statistics; the display time steps' sorted values give the lows too
@@ -80,7 +80,7 @@ namespace MB.FramePacing.Analysis
           animationSteps.Add(frame.AnimationDelta!.Value);
           errors.Add(error);
           absoluteErrors.Add(absolute);
-          if (capturePeriod > NanosecondTimeSpan.Zero && absolute > threshold)
+          if (capturePeriod > NanosecondTimeDuration.Zero && absolute > threshold)
             ++visibleErrors;
           absoluteErrorNanoseconds += Math.Abs(error.Nanoseconds);
           errorDisplayNanoseconds += frame.DisplayDelta!.Value.Nanoseconds;

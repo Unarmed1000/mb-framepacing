@@ -40,9 +40,9 @@ namespace MB.FramePacing.Analysis
   /// <param name="Verdict">Which of the two dominates.</param>
   /// <param name="ExpectedRefreshHz">The display refresh rate the user expects, if given (compared with <see cref="RefreshHz"/>).</param>
   public sealed record RunPacing(
-    NanosecondTimeSpan RefreshPeriod,
+    NanosecondTimeDuration RefreshPeriod,
     bool RefreshCalculated,
-    NanosecondTimeSpan TargetFrameTime,
+    NanosecondTimeDuration TargetFrameTime,
     PacingSource Source,
     long LateFrames,
     double LateShare,
@@ -64,7 +64,7 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>The refresh rate the run was measured with (Hz).</summary>
     public double RefreshHz =>
-      RefreshPeriod > NanosecondTimeSpan.Zero ? NanosecondTimeSpan.NanosecondsPerSecond / (double)RefreshPeriod.Nanoseconds : 0;
+      RefreshPeriod > NanosecondTimeDuration.Zero ? NanosecondTimeSpan.NanosecondsPerSecond / (double)RefreshPeriod.Nanoseconds : 0;
 
     /// <summary><see cref="RefreshHz"/> relative to <see cref="ExpectedRefreshHz"/>: 0.01 = 1 % faster; null without an expected rate.</summary>
     public double? RefreshDeviation => ExpectedRefreshHz is > 0 && RefreshHz > 0 ? (RefreshHz / ExpectedRefreshHz.Value) - 1 : null;

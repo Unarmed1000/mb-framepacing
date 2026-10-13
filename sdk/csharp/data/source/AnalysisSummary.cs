@@ -41,9 +41,12 @@ namespace MB.FramePacing.Data
     JsonElement? Capture,
     string? FrameSize,
     string? TimeSource,
-    [property: JsonPropertyName("capturePeriodNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired] NanosecondTimeSpan CapturePeriod,
-    [property: JsonPropertyName("measurementResolutionNs"), JsonConverter(typeof(NanosecondsJsonConverter))] NanosecondTimeSpan MeasurementResolution,
-    [property: JsonPropertyName("errorThresholdNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired] NanosecondTimeSpan ErrorThreshold,
+    [property: JsonPropertyName("capturePeriodNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired]
+      NanosecondTimeDuration CapturePeriod,
+    [property: JsonPropertyName("measurementResolutionNs"), JsonConverter(typeof(NanosecondsJsonConverter))]
+      NanosecondTimeDuration MeasurementResolution,
+    [property: JsonPropertyName("errorThresholdNs"), JsonConverter(typeof(NanosecondsJsonConverter)), JsonRequired]
+      NanosecondTimeDuration ErrorThreshold,
     IReadOnlyList<SummaryMarker> Markers,
     IReadOnlyList<string> Warnings,
     IReadOnlyList<SummaryRun> Runs
@@ -99,7 +102,7 @@ namespace MB.FramePacing.Data
       return summary with
       {
         FormatVersion = version,
-        MeasurementResolution = summary.MeasurementResolution == NanosecondTimeSpan.Zero ? summary.CapturePeriod : summary.MeasurementResolution,
+        MeasurementResolution = summary.MeasurementResolution == NanosecondTimeDuration.Zero ? summary.CapturePeriod : summary.MeasurementResolution,
         Markers = summary.Markers ?? Array.Empty<SummaryMarker>(),
         Warnings = summary.Warnings ?? Array.Empty<string>(),
         Runs = summary.Runs ?? Array.Empty<SummaryRun>(),

@@ -64,18 +64,18 @@ namespace MB.FramePacing.Benchmarks
             first ? null : new NanosecondTimeSpan(error),
             NanosecondTimeSpan.Zero,
             late ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
-            TargetFrameTime: first ? null : new NanosecondTimeSpan(refresh),
+            TargetFrameTime: first ? null : NanosecondTimeDuration.FromNanoseconds(refresh),
             CpuStartTime: new NanosecondTickCount(time - halfRefresh),
             CpuBusy: NanosecondTimeDuration.FromNanoseconds(thirdRefresh),
-            FrameTime: first ? null : new NanosecondTimeSpan(display)
+            FrameTime: first ? null : NanosecondTimeDuration.FromNanoseconds(display)
           )
         );
       }
       int lateCount = frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
       var pacing = new RunPacing(
-        new NanosecondTimeSpan(refresh),
+        NanosecondTimeDuration.FromNanoseconds(refresh),
         false,
-        new NanosecondTimeSpan(refresh),
+        NanosecondTimeDuration.FromNanoseconds(refresh),
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(count - 1),
@@ -91,12 +91,21 @@ namespace MB.FramePacing.Benchmarks
         true,
         true,
         new RunCounts(count, count, 0, 0, 0, 0, 0, count, 0, 0, 0, 1),
-        RunStatistics.From(frames, NanosecondTimeSpan.FromMilliseconds(1), new NanosecondTimeSpan(refresh)),
+        RunStatistics.From(
+          frames,
+          new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1)),
+          NanosecondTimeDuration.FromNanoseconds(refresh)
+        ),
         frames,
         Array.Empty<string>(),
         Pacing: pacing
       );
-      return new ChartRun(analysis, new NanosecondTimeSpan(refresh), NanosecondTimeSpan.FromMilliseconds(1), false);
+      return new ChartRun(
+        analysis,
+        NanosecondTimeDuration.FromNanoseconds(refresh),
+        new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1)),
+        false
+      );
     }
   }
 }

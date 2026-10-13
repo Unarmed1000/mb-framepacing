@@ -3,7 +3,8 @@
 
 """summary.json (doc/analysis-output-format.md): the capture, the analysis settings and every run's counts, statistics, pacing and
 histograms. Its formatVersion covers the CSV files it names; a file without it is format 1, a newer one is refused. A time setting is a
-whole number of nanoseconds (the '...Ns' fields); the statistics and histograms are in milliseconds. The fields every summary has are
+whole number of nanoseconds (the '...Ns' fields) and, as each is a length of time, never negative: a negative number there is outside its
+range. The statistics and histograms are in milliseconds. The fields every summary has are
 required (doc/analysis-output-format.md marks them) and a value must be of its field's type and within its range: anything else raises
 DataFormatError. Optional fields a file lacks read as None (or an empty statistics), and fields this reader does not know are ignored."""
 
@@ -21,6 +22,8 @@ FORMAT_VERSION = 1
 INT32 = (-(2**31), 2**31 - 1)
 INT64 = (-(2**63), 2**63 - 1)
 UINT32 = (0, 2**32 - 1)
+DURATION = (0, INT64[1])
+"""A length of time in nanoseconds: 64 bits signed in the other languages' readers, and never negative."""
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 
@@ -194,7 +197,7 @@ class SummaryPacing:
     """The refresh, the target the frames are measured against (source: Schedule, TargetFrameTime, PreferredFrameTime, GivenTarget or
     NativeRefresh), late
     frames and the verdict (None, BadPacing, DeltaTimeJitter or Both). refresh_period_ns is the display's refresh period,
-    target_frame_ns the frame time the run is measured against, in whole refreshes."""
+    target_frame_ns the frame time the run is measured against, in whole refreshes: lengths of time, never negative."""
 
     refresh_period_ns: int
     refresh_calculated: bool
@@ -277,7 +280,7 @@ class AnalysisSummary:
     """summary.json. scanout is 'SingleScanout' (a capture card) or 'Camera'; time_source 'Device' or 'Host'; capture is the capture's
     capture.json as it was when analysed. capture_period_ns, measurement_resolution_ns (how precisely a display time is known: the
     capture period in a file without it) and error_threshold_ns (the |animation error| above which a frame counts as off) are whole
-    nanoseconds."""
+    nanoseconds: lengths of time, never negative."""
 
     format_version: int
     tool_version: str | None
@@ -329,10 +332,10 @@ def parse_summary(text: str) -> AnalysisSummary:
         capture=capture if isinstance(capture, dict) else None,
         frame_size=root.optional_text("frameSize"),
         time_source=root.optional_text("timeSource"),
-        capture_period_ns=root.integer("capturePeriodNs"),
+        capture_period_ns=root.integer("capturePeriodNs", DURATION),
         # 0 is a file without the field, as C# reads it
-        measurement_resolution_ns=root.optional_integer("measurementResolutionNs") or root.integer("capturePeriodNs"),
-        error_threshold_ns=root.integer("errorThresholdNs"),
+        measurement_resolution_ns=root.optional_integer("measurementResolutionNs", DURATION) or root.integer("capturePeriodNs", DURATION),
+        error_threshold_ns=root.integer("errorThresholdNs", DURATION),
         markers=tuple(_marker(item) for item in root.children("markers")),
         warnings=root.texts("warnings"),
         runs=tuple(_run(item) for item in root.children("runs")),
@@ -412,9 +415,9 @@ def _pacing(value: _Object) -> SummaryPacing:
         return _value_statistics(child) if child is not None else None
 
     return SummaryPacing(
-        refresh_period_ns=value.integer("refreshPeriodNs"),
+        refresh_period_ns=value.integer("refreshPeriodNs", DURATION),
         refresh_calculated=value.boolean("refreshCalculated"),
-        target_frame_ns=value.integer("targetFrameNs"),
+        target_frame_ns=value.integer("targetFrameNs", DURATION),
         source=value.text("source"),
         late_frames=value.integer("lateFrames"),
         late_share=value.number("lateShare"),

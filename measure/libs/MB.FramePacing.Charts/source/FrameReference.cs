@@ -18,18 +18,18 @@ namespace MB.FramePacing.Charts
   public static class FrameReference
   {
     /// <summary>The target frame time before <paramref name="frame"/>, as written: the marker's, else its preferred frame time.</summary>
-    public static NanosecondTimeSpan? Target(PresentedFrame frame) =>
+    public static NanosecondTimeDuration? Target(PresentedFrame frame) =>
       frame.MarkerTargetFrameTime == MarkerPayload.OnDemandFrameTime ? null
       : frame.MarkerTargetFrameTime == NanosecondTimeDuration.Zero ? Preferred(frame)
-      : frame.MarkerTargetFrameTime.Value;
+      : frame.MarkerTargetFrameTime;
 
     /// <summary>
     /// The preferred frame time of <paramref name="frame"/>, as written: the marker's, else what the analysis took (the target given
     /// to the tools, else one refresh).
     /// </summary>
-    public static NanosecondTimeSpan? Preferred(PresentedFrame frame) =>
+    public static NanosecondTimeDuration? Preferred(PresentedFrame frame) =>
       frame.MarkerPreferredFrameTime == MarkerPayload.OnDemandFrameTime ? null
       : frame.MarkerPreferredFrameTime == NanosecondTimeDuration.Zero ? frame.PreferredFrameTime
-      : frame.MarkerPreferredFrameTime.Value;
+      : frame.MarkerPreferredFrameTime;
   }
 }

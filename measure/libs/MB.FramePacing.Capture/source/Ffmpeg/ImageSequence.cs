@@ -74,7 +74,7 @@ namespace MB.FramePacing.Capture.Ffmpeg
           duration = intervals.Count > 0 ? intervals[^1] : NanosecondTimeSpan.NanosecondsPerSecond / 60;
         builder
           .Append("duration ")
-          .Append(new NanosecondTimeSpan(duration).TotalSeconds.ToString("0.#########", CultureInfo.InvariantCulture))
+          .Append(NanosecondTimeDuration.FromNanoseconds(duration).Value.TotalSeconds.ToString("0.#########", CultureInfo.InvariantCulture))
           .Append('\n');
       }
       // ffmpeg ignores the duration of the last entry unless the file is repeated

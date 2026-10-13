@@ -92,14 +92,14 @@ namespace MB.FramePacing.Capture
     {
       private readonly GrayImage m_frame;
       private readonly MarkerDecoder m_decoder = new MarkerDecoder(tryHarder: true);
-      private readonly NanosecondTimeSpan m_interval;
+      private readonly NanosecondTimeDuration m_interval;
       private readonly CancellationTokenSource m_stop;
       private NanosecondTickCount? m_lastDecodeTime;
 
       public Sink(int width, int height, TimeSpan interval, CancellationTokenSource stop)
       {
         m_frame = new GrayImage(width, height);
-        m_interval = NanosecondTimeSpan.FromTimeSpan(interval);
+        m_interval = new NanosecondTimeDuration(NanosecondTimeSpan.FromTimeSpan(interval));
         m_stop = stop;
       }
 

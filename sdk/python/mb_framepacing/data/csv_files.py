@@ -4,9 +4,10 @@
 """A run's frames CSV (run-<id>-frames.csv) and captures.csv (doc/analysis-output-format.md): a header line, then one line per presented
 frame or per capture, comma separated. Columns are found by their name, so columns an older file lacks read as None and columns a newer
 one adds are ignored. Every number is a whole one, written as its digits with a '-' in front when negative; a time is its whole
-nanoseconds (the '...Ns' columns), exactly as a marker carried it. An empty cell is None. Content that is anything else raises
-DataFormatError, with the file and the line. A file from before the nanoseconds named its times '...Ticks': a frames CSV from then lacks
-its required columns and is refused, and a captures.csv from then reads as captures without times."""
+nanoseconds (the '...Ns' columns), exactly as a marker carried it. A length of time is never negative: a negative number in its column
+is outside its range. An empty cell is None. Content that is anything else raises DataFormatError, with the file and the line. A file
+from before the nanoseconds named its times '...Ticks': a frames CSV from then lacks its required columns and is refused, and a
+captures.csv from then reads as captures without times."""
 
 import re
 from collections.abc import Callable
@@ -27,7 +28,13 @@ class FrameRow:
     frametime and CPU wait as PresentMon names them); marker_target_ns and marker_preferred_ns are ON_DEMAND_FRAME_NS on demand,
     target_ns and preferred_ns (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
     camera captures' only. older_frames are the captures that showed an older frame out of order while this frame was the newest:
-    (frame index, capture nanoseconds) in capture order."""
+    (frame index, capture nanoseconds) in capture order.
+
+    A length of time is never negative: target_ns, preferred_ns and frame_time_ns, and the marker's own marker_target_ns,
+    marker_preferred_ns and cpu_busy_ns. What can go either way can be: animation_ns, animation_delta_ns, animation_error_ns,
+    drift_ns, pacing_error_ns, prediction_error_ns, lateness_ns, cpu_wait_ns and scanout_delay_ns (the sync marker can be seen before
+    the main marker decodes), and on_screen_ns and display_delta_ns, which are the difference of two sightings: a camera can time a
+    frame after the next one's sighting, and the steps then still add up to the time that passed."""
 
     segment: int
     frame_index: int
@@ -87,6 +94,8 @@ _INT32 = (-(2**31), 2**31 - 1)
 _INT64 = (-(2**63), 2**63 - 1)
 _UINT32 = (0, 2**32 - 1)
 _UINT64 = (0, 2**64 - 1)
+_DURATION = (0, _INT64[1])
+"""A length of time: 64 bits signed in the file, and never negative."""
 _WHOLE_NUMBER = re.compile(r"-?[0-9]+", re.ASCII)
 _HEX_BYTES = re.compile(r"(?:[0-9A-Fa-f]{2})*", re.ASCII)
 
@@ -152,14 +161,18 @@ class _Table:
         return _whole(text, limits) if text else None
 
     def ns(self, row: list[str], name: str) -> int:
-        """A span's or a point in time's cell: its nanoseconds."""
+        """The cell of a point in time, or of an interval that can go either way: its nanoseconds."""
         return _whole(self.cell(row, name), _INT64)
 
     def optional_ns(self, row: list[str], name: str) -> int | None:
         return self.optional_whole(row, name, _INT64)
 
+    def optional_duration_ns(self, row: list[str], name: str) -> int | None:
+        """A length of time's cell: its nanoseconds, never negative. A negative number is outside its range."""
+        return self.optional_whole(row, name, _DURATION)
+
     def optional_ns32(self, row: list[str], name: str) -> int | None:
-        """A marker's 32-bit span (0 to ON_DEMAND_FRAME_NS), as the marker carried it."""
+        """One of a marker's 32-bit durations (0 to ON_DEMAND_FRAME_NS), as the marker carried it."""
         return self.optional_whole(row, name, _UINT32)
 
 
@@ -185,16 +198,16 @@ def _frame(table: _Table, row: list[str]) -> FrameRow:
         flags=tuple(_entries(table.cell(row, "flags"), "flags")),
         intended_display_ns=table.optional_ns(row, "intendedDisplayNs"),
         marker_target_ns=table.optional_ns32(row, "markerTargetNs"),
-        target_ns=table.optional_ns(row, "targetNs"),
+        target_ns=table.optional_duration_ns(row, "targetNs"),
         marker_preferred_ns=table.optional_ns32(row, "markerPreferredNs"),
-        preferred_ns=table.optional_ns(row, "preferredNs"),
+        preferred_ns=table.optional_duration_ns(row, "preferredNs"),
         pacing_error_ns=table.optional_ns(row, "pacingErrorNs"),
         prediction_error_ns=table.optional_ns(row, "predictionErrorNs"),
         lateness_ns=table.optional_ns(row, "latenessNs"),
         last_seen_ns=table.optional_ns(row, "lastSeenNs"),
         cpu_start_ns=table.optional_ns(row, "cpuStartNs"),
         cpu_busy_ns=table.optional_ns32(row, "cpuBusyNs"),
-        frame_time_ns=table.optional_ns(row, "frameTimeNs"),
+        frame_time_ns=table.optional_duration_ns(row, "frameTimeNs"),
         cpu_wait_ns=table.optional_ns(row, "cpuWaitNs"),
         older_frames=_older_frames(table.cell(row, "olderFrames")),
         main_marker_first_seen_ns=table.optional_ns(row, "mainMarkerFirstSeenNs"),

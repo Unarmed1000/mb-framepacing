@@ -20,7 +20,7 @@ foreach (var run in summary.Runs)
   Console.WriteLine($"Run {run.RunId}: {run.Statistics.AverageFps:0.0} fps, {run.Pacing?.LateFrames} late frames");
   foreach (var frame in FramesCsv.Read(Path.Combine(analysis, run.FramesFile)))
   {
-    // Every time is in nanoseconds (points in time NanosecondTickCounts, spans NanosecondTimeSpans); null where the file has an empty cell
+    // Every time is in nanoseconds (the animation error a NanosecondTimeSpan, which can be negative); null where the file has an empty cell
     if (frame.AnimationError is { } error)
       Console.WriteLine($"{frame.FrameIndex}: {error.TotalMilliseconds:0.000} ms");
   }
@@ -49,10 +49,15 @@ foreach (var record in reader.ReadAll())
 
 The times are typed, with the C++ data module's names, and every one is in nanoseconds (the core's types, `MB.FramePacing`): points
 in time are `NanosecondTickCount`s, on the capture's clock (a frame's `FirstSeenTime`, a record's `HostTime` and `DeviceTime`, null
-when the device gave none) or the frame pacer's (`IntendedDisplayTime`, `CpuStartTime`); spans are `NanosecondTimeSpan`s
-(`DisplayDelta`, `AnimationError`, ...); the marker's own durations (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`:
-32 bits in the marker and in the file) are `NanosecondTimeDuration`s, as the marker's `Payload` returns them, and a frame time of
-`Payload.OnDemandFrameTime` is a frame presented on demand. Milliseconds to show are a time's `TotalMilliseconds`.
+when the device gave none) or the frame pacer's (`IntendedDisplayTime`, `CpuStartTime`). A length of time is a
+`NanosecondTimeDuration`, which is never negative: a frame's `TargetFrameTime`, `PreferredFrameTime` and `FrameTime`, the summary's
+`CapturePeriod`, `MeasurementResolution` and `ErrorThreshold`, a run's pacing `RefreshPeriod` and `TargetFrameTime`, and the
+marker's own durations (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`: 32 bits in the marker and in the file), as
+the marker's `Payload` returns them; a frame time of `Payload.OnDemandFrameTime` is a frame presented on demand. What can go either
+way is a `NanosecondTimeSpan`: `AnimationTime`, `AnimationDelta`, `AnimationError`, `PacingError`, `PredictionError`, `Lateness`,
+`Drift`, `CpuWait`, a camera capture's `ScanoutDelay` (the sync marker can be seen before the main marker decodes), and
+`DisplayDelta` and `OnScreen` (the display time step and the time on screen: a camera can time a frame after the next one's
+sighting, and the steps then still add up to the time that passed). Milliseconds to show are a time's `TotalMilliseconds`.
 
 The files hold every time as whole nanoseconds (`…Ns` columns and fields), in the integer type it has, so a value is read exactly as
 it was written: nothing goes through a floating point number. A file from before the nanoseconds held ticks of 100 ns under
@@ -61,7 +66,8 @@ it was written: nothing goes through a floating point number. A file from before
 hundred times too small. Analyse such a capture again, or record it again when its markers counted in ticks too.
 
 Readers throw `InvalidDataException` for a file that is not in the format: a newer format version than they know (the message says
-to update), a required field or column missing, or a value that is not of its type or outside its range.
+to update), a required field or column missing, or a value that is not of its type or outside its range (a negative number where a
+length of time belongs among them).
 
 ## Tests
 

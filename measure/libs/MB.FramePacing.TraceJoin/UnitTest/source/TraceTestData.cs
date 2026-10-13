@@ -146,7 +146,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
         Flags: flags ?? Array.Empty<string>(),
         IntendedDisplayTime: Point(intendedDisplayNs),
         MarkerTargetFrameTime: Length(markerTargetNs),
-        TargetFrameTime: Span(targetNs),
+        TargetFrameTime: Length(targetNs),
         MarkerPreferredFrameTime: Length(markerPreferredNs),
         PreferredFrameTime: null,
         PacingError: null,

@@ -62,7 +62,7 @@ CI checks it):
 | `MB.FramePacing`        | netstandard2.1 | 20.0 KiB |
 | `MB.FramePacing.Marker` | netstandard2.1 | 28.0 KiB |
 | `MB.FramePacing.Trace`  | netstandard2.1 |  8.5 KiB |
-| `MB.FramePacing.Data`   | net10.0        | 96.5 KiB |
+| `MB.FramePacing.Data`   | net10.0        | 97.0 KiB |
 
 <!-- /sdk-csharp-size-table -->
 
@@ -131,8 +131,11 @@ marker module of the same language.
 
 - **Times are whole nanoseconds.** The files hold every time as a whole number of nanoseconds (`…Ns` columns and fields), and only
   `summary.json`'s statistics and histograms are milliseconds (`…Ms`). C++ and C# read them as the core's nanosecond types (a point
-  in time a `NanosecondTickCount`, a span a `NanosecondTimeSpan`, the marker's frame times and CPU busy a
-  `NanosecondTimeDuration`), Python as plain `int`s named `*_ns`. A capture or an analysis output made before the tools counted in
+  in time a `NanosecondTickCount`; a length of time, which is never negative, a `NanosecondTimeDuration`: a frame time, a period, a
+  threshold; what can go either way a `NanosecondTimeSpan`: the animation time and step, the errors, the lateness, the drift, CPU
+  wait, a camera capture's scanout delay, and the display time step and the time on screen, since a camera can time a frame after
+  the next one's sighting and the steps then still add up to the time that passed), Python as plain `int`s named `*_ns`. Every
+  reader refuses a negative number where a length of time belongs. A capture or an analysis output made before the tools counted in
   nanoseconds is not valid and is made again: the two formats say what is refused and what reads a hundred times too small.
 - **Format versions.** `captures.mbcd` has a format version in its header, and `summary.json` a `formatVersion` that covers the CSV
   files it names. A reader refuses a newer version than it knows. Within a version, fields and columns may be added; readers look CSV

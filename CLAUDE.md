@@ -303,12 +303,28 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     the smallest slots that fit). Readers refuse another record size.
   - **Typed times** (C++ and C#, the same names; the tools are typed throughout too, with these names: `PresentedFrame`, `CaptureRow`,
     `ChartRun`): every time is a whole number of nanoseconds. Points in time are `NanosecondTickCount` (named `…Time`:
-    `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown), spans `NanosecondTimeSpan` (named for what they are: `DisplayDelta`,
-    `Drift`, `TargetFrameTime`), and a length of time that is never negative is `NanosecondTimeDuration`: the marker's frame times and
-    CPU busy (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`). The tools' other lengths (display time step, time on
-    screen, frametime, CPU wait, periods) are signed spans. `System.TimeSpan` remains only for .NET waits, timeouts and progress,
-    converted with the types' own helpers (`ToTimeSpan()`, `FromTimeSpan(...)`: never `* 100` or `/ 100` at a call site). Python's
-    marker and data modules keep plain `int`s named `*_ns`.
+    `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown). **A length of time is `NanosecondTimeDuration`**, which is never
+    negative (the user's rule), named for what it is: in a frame's row `FrameTime`, `TargetFrameTime`, `PreferredFrameTime` and the
+    marker's own `MarkerTargetFrameTime`, `MarkerPreferredFrameTime` and `CpuBusy`; in the summary `CapturePeriod`,
+    `MeasurementResolution` and `ErrorThreshold`; in a run's pacing `RefreshPeriod` and `TargetFrameTime`. The signed
+    `NanosecondTimeSpan` is only for what can go either way by meaning: the animation time and step (`AnimationTime`,
+    `AnimationDelta`), the three errors (`AnimationError`, `PacingError`, `PredictionError`), `Lateness`, `Drift`, `CpuWait`,
+    a camera's per-frame `ScanoutDelay` (the user's decision: a measured difference of two sightings, not a length, as the sync
+    marker can be seen before the taller main marker decodes; the camera's delays, tear test and usual delay in `TimelineAnalyzer`
+    are signed and never clamped), and **the display time step and the time on screen** (`DisplayDelta`, `OnScreen`, columns
+    `displayDeltaNs` and `onScreenNs`; the user's decision): each is one frame's first sighting minus another's, and a camera can
+    time a frame after the next one's sighting, so the difference can be negative. Turned into zero, the display time steps would no
+    longer add up to the time that passed and the drift would carry a false offset: they are never clamped, a negative one is
+    written and read as it is, and what is computed from them (the animation error, the static guess's hold, the statistics, the
+    charts) is signed too. **Readers refuse a negative duration:** a negative number in a duration's column or field
+    (`frameTimeNs`, `targetNs`, `preferredNs` in a frames CSV; `capturePeriodNs`, `measurementResolutionNs`, `errorThresholdNs`,
+    `pacing.refreshPeriodNs`, `pacing.targetFrameNs` in `summary.json`) is outside its range and refused as any such number is, in
+    every language; the files keep their `i64`. **A length that can not be worked out is unknown, never 0:** a frametime is
+    the next frame's CPU start minus this one's, and where an application's CPU start times go backwards it is empty (the user,
+    2026-10-14, on landing this: a 0 would hide a broken clock behind a number that reads as a measurement). `System.TimeSpan` remains only for .NET
+    waits, timeouts and progress, converted with the types' own helpers (`ToTimeSpan()`, `FromTimeSpan(...)`: never `* 100` or
+    `/ 100` at a call site). Python's marker and data modules keep plain `int`s named `*_ns`, and the data module checks the same
+    range.
   - **The files hold times as whole nanoseconds** (`…Ns` columns and fields), in the integer type the value has: a marker's value is
     in the CSV exactly as the marker carried it (`animationNs` an `i64`, `markerTargetNs` a `u32`, 4294967295 = on demand), and
     `summary.json`'s settings too (`capturePeriodNs`, `errorThresholdNs`, `pacing.refreshPeriodNs`, `targetFrameNs`). The tools'
@@ -340,7 +356,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `CpuStartTime`, `MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`); what the analysis works out is nullable
     (`DisplayDelta`, `TargetFrameTime`, `Lateness`). `IntendedDisplayTime` and `CpuStartTime` are on the pacer's clock, `FirstSeenTime`
     on the capture's: `PacingAnalyzer.CaptureMinusPacer` is where the analysis subtracts them. Milliseconds are
-    `NanosecondTimeSpan.TotalMilliseconds`, one division of the nanosecond count (for a value of whole ticks, the same double as ticks / 10000.0).
+    `NanosecondTimeSpan.TotalMilliseconds` (a duration's through its `Value`), one division of the nanosecond count (for a value of whole ticks, the same double as ticks / 10000.0).
     The charts read the typed values; what they keep as nanosecond counts is integer arithmetic (whole refreshes, strip cells) and the prepared
     sequences (`FrameSequence`, `WaveletMatrix`), which rank plain integers. The GUI's `Stopwatch` timestamps stay raw.
 - **Pacer module (`sdk/cpp/pacer`, `sdk/doc/pacer.md`): EXPERIMENTAL.** The pacer of the redesign of 2026-10 (`TierPacer`), which

@@ -20,8 +20,8 @@ namespace MB.FramePacing.Gui.ViewModels
     public RunViewModel(ChartRun chart)
     {
       var run = chart.Run;
-      double capturePeriodMs = chart.CapturePeriod.TotalMilliseconds;
-      double errorThresholdMs = chart.ErrorThreshold.TotalMilliseconds;
+      double capturePeriodMs = chart.CapturePeriod.Value.TotalMilliseconds;
+      double errorThresholdMs = chart.ErrorThreshold.Value.TotalMilliseconds;
       Chart = chart;
       Run = run;
       CapturePeriodMs = capturePeriodMs;
@@ -42,7 +42,7 @@ namespace MB.FramePacing.Gui.ViewModels
       var s = run.Statistics;
       if (run.Pacing is { } pacing)
       {
-        string target = pacing.TargetFrameTime.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
+        string target = pacing.TargetFrameTime.Value.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
         string against = pacing.Source switch
         {
           PacingSource.Schedule => $"the pacer's schedule in the markers (typically {target} ms per frame)",

@@ -216,12 +216,12 @@ namespace MB.FramePacing.Charts
 
       // What each hold was aimed at: the target and preferred frame time of the frame that ends it. The display time step panel draws them
       // in whole refreshes, as the analysis compares; the frametime panel as written. Without pacing (no refresh rate) there are none
-      var refresh = run.Run.Pacing?.RefreshPeriod ?? NanosecondTimeSpan.Zero;
-      NanosecondTimeSpan? Rounded(NanosecondTimeSpan? frameTime) => frameTime is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
-      ReferenceStretch[] Stretches(Func<PresentedFrame, NanosecondTimeSpan?> target, Func<PresentedFrame, NanosecondTimeSpan?> preferred)
+      var refresh = run.Run.Pacing?.RefreshPeriod ?? NanosecondTimeDuration.Zero;
+      NanosecondTimeDuration? Rounded(NanosecondTimeDuration? frameTime) => frameTime is { } t ? FrameTimeRounding.WholeRefreshes(t, refresh) : null;
+      ReferenceStretch[] Stretches(Func<PresentedFrame, NanosecondTimeDuration?> target, Func<PresentedFrame, NanosecondTimeDuration?> preferred)
       {
         var stretches = new List<ReferenceStretch>();
-        for (int i = 0; refresh > NanosecondTimeSpan.Zero && i < count; ++i)
+        for (int i = 0; refresh > NanosecondTimeDuration.Zero && i < count; ++i)
         {
           if (!HasNext(i))
             continue;
@@ -239,14 +239,14 @@ namespace MB.FramePacing.Charts
       // The scales take the lines of the holds that animate: neither the frame holding nor the frame ending the hold, whose aim the line is,
       // is static (an idle screen's aim, 1 s at 1 fps, would squash them, as its hold would). Unless static values count too
       FrameSequence References(
-        Func<PresentedFrame, NanosecondTimeSpan?> target,
-        Func<PresentedFrame, NanosecondTimeSpan?> preferred,
+        Func<PresentedFrame, NanosecondTimeDuration?> target,
+        Func<PresentedFrame, NanosecondTimeDuration?> preferred,
         bool withStatic
       ) =>
         new FrameSequence(
           count,
           i =>
-            refresh > NanosecondTimeSpan.Zero
+            refresh > NanosecondTimeDuration.Zero
             && HasNext(i)
             && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
               ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch

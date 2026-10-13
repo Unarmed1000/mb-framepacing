@@ -137,7 +137,7 @@ namespace MB.FramePacing.Charts
     private static void AddCaptures(
       IReadOnlyList<CaptureCsvRow> rows,
       IReadOnlyList<PresentedFrame> frames,
-      NanosecondTimeSpan period,
+      NanosecondTimeDuration period,
       bool camera,
       Action<RunEventKind, RunEvent> add
     )
@@ -151,7 +151,7 @@ namespace MB.FramePacing.Charts
       for (int i = start; i < rows.Count; ++i)
       {
         var row = rows[i];
-        var time = row.CaptureTime ?? knownTime + new NanosecondTimeSpan((row.CaptureIndex - knownIndex) * period.Nanoseconds);
+        var time = row.CaptureTime ?? knownTime + NanosecondTimeDuration.FromNanoseconds((row.CaptureIndex - knownIndex) * period.Nanoseconds);
         if (time > lastSeen)
           break;
         if (row.CaptureTime is { } recorded)

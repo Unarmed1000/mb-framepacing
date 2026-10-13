@@ -52,7 +52,7 @@ namespace MB.FramePacing.Charts
           $"The section has {frames.Count} presented frames; the frame timeline draws at most {MaxFrames}: choose a shorter section (--from, --to)"
         );
 
-      var refresh = run.Pacing is { } pacing && pacing.RefreshPeriod > NanosecondTimeSpan.Zero ? pacing.RefreshPeriod : chart.CapturePeriod;
+      var refresh = run.Pacing is { } pacing && pacing.RefreshPeriod > NanosecondTimeDuration.Zero ? pacing.RefreshPeriod : chart.CapturePeriod;
       var (offset, alignedBySchedule) = PacerToCapture(run.Frames);
 
       // The refresh grid starts at the first frame's display time; each frame's first refresh on it
@@ -95,7 +95,7 @@ namespace MB.FramePacing.Charts
         startRefresh = Math.Min(startRefresh, (int)Math.Floor(boxes.Min(b => (b.Start - first).Nanoseconds) / (double)refresh.Nanoseconds));
       var origin = RefreshAt(startRefresh);
       var end = RefreshAt(endRefresh);
-      double refreshMs = refresh.TotalMilliseconds;
+      double refreshMs = refresh.Value.TotalMilliseconds;
       double scale = Math.Max(1.2, MinRefreshPixels / refreshMs);
       double width = Math.Max(MinWidth, Left + ((end - origin).TotalMilliseconds * scale) + Right);
       double XOf(NanosecondTickCount time) => Left + ((time - origin).TotalMilliseconds * scale);
@@ -277,7 +277,7 @@ namespace MB.FramePacing.Charts
       ("strip-static-a", "static: nothing animates"),
     };
 
-    private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, NanosecondTimeSpan threshold)
+    private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, NanosecondTimeDuration threshold)
     {
       parts.Add(new RectShape("box", N(20, 0), N(legendY - 12, 1), N(30, 0), N(16, 0), "4"));
       parts.Add(
@@ -316,7 +316,7 @@ namespace MB.FramePacing.Charts
         new TextShape(
           20,
           coloursY + 26,
-          $"Animation error = animation time step − display time step: + shown too soon, − shown too late; error threshold {Ms(threshold.TotalMilliseconds)} ms",
+          $"Animation error = animation time step − display time step: + shown too soon, − shown too late; error threshold {Ms(threshold.Value.TotalMilliseconds)} ms",
           "sub",
           "start"
         )

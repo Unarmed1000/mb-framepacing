@@ -37,7 +37,8 @@ namespace MB.FramePacing.Analysis.UnitTest
         StartMetadata? start = null,
         long targetFrameNanoseconds = 0,
         long preferredFrameNanoseconds = 0,
-        MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.NoFlags
+        MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.NoFlags,
+        long cpuStartNanoseconds = 0
       )
       {
         var payload = new MarkerPayload(
@@ -47,7 +48,8 @@ namespace MB.FramePacing.Analysis.UnitTest
           flags,
           new NanosecondTimeSpan(animationMs * Ms),
           PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(preferredFrameNanoseconds),
-          TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(targetFrameNanoseconds)
+          TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(targetFrameNanoseconds),
+          CpuStartTime: new NanosecondTickCount(cpuStartNanoseconds)
         );
         for (int i = 0; i < captures; ++i)
           Rows.Add(new CaptureRow(Next, new NanosecondTickCount(Next * Period), CaptureStatus.Decoded, payload, start));
@@ -105,6 +107,28 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(with.Frames.Count, Is.EqualTo(without.Frames.Count));
     }
 
+    /// <summary>
+    /// A frametime is the next frame's CPU start minus this one's. Where an application's CPU start times go backwards there is no
+    /// frametime: unknown, as where a CPU start time is missing, and never a 0 that would read as a measurement.
+    /// </summary>
+    [Test]
+    public void AFrametime_IsUnknownWhereTheCpuStartTimesGoBackwards()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4, cpuStartNanoseconds: 1_000 * Ms).Show(2, 16, 4, cpuStartNanoseconds: 1_016 * Ms);
+      rows.Show(3, 32, 4, cpuStartNanoseconds: 1_010 * Ms).Show(4, 48, 4, cpuStartNanoseconds: 1_026 * Ms);
+      rows.End(1);
+
+      var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
+
+      Assert.That(
+        frames.Select(f => f.FrameTime?.Nanoseconds),
+        Is.EqualTo(new long?[] { 16 * Ms, null, 16 * Ms, null }),
+        "frame 2's next CPU start is before its own; the last frame has no next one"
+      );
+      Assert.That(frames.Select(f => f.CpuWait), Is.All.Null, "no CPU busy time in these markers");
+    }
+
     [Test]
     public void PerfectPacing_HasNoAnimationError()
     {
@@ -142,6 +166,40 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(frames[3].AnimationError?.Nanoseconds, Is.EqualTo(-16 * Ms));
       Assert.That(frames[3].Drift.Nanoseconds, Is.EqualTo(-16 * Ms));
       Assert.That(frames[4].AnimationError?.Nanoseconds, Is.EqualTo(0));
+    }
+
+    /// <summary>
+    /// A frame timed before the frame it follows (here a capture whose timestamp goes back; a camera can time a frame after the next
+    /// one's sighting): the display time step is that negative difference, never zero, so the steps still add up to the time that passed.
+    /// </summary>
+    [Test]
+    public void AFrameTimedBeforeThePreviousOne_HasANegativeDisplayTimeStep_AndTheStepsStillAddUp()
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4).Show(4, 48, 4).Show(5, 64, 4);
+      rows.End(1);
+      // The first capture of frame index 3 is stamped 2 ms before the first capture of frame index 2
+      int second = rows.Rows.FindIndex(r => r.Payload.Kind == MarkerKind.Frame && r.Payload.FrameIndex == 2);
+      int third = rows.Rows.FindIndex(r => r.Payload.Kind == MarkerKind.Frame && r.Payload.FrameIndex == 3);
+      rows.Rows[third] = rows.Rows[third] with { CaptureTime = rows.Rows[second].CaptureTime - new NanosecondTimeSpan(2 * Ms) };
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+      var frames = run.Frames;
+
+      Assert.That(frames.Select(f => f.FrameIndex), Is.EqualTo(new ulong[] { 1, 2, 3, 4, 5 }));
+      Assert.That(frames[2].FirstSeenTime < frames[1].FirstSeenTime, "a capture card's frame keeps the time as stamped");
+      Assert.That(frames[2].DisplayDelta, Is.EqualTo(new NanosecondTimeSpan(-2 * Ms)), "first seen minus the previous frame's, as it is");
+      Assert.That(frames[1].OnScreen, Is.EqualTo(new NanosecondTimeSpan(-2 * Ms)), "the same difference, seen from the previous frame");
+      Assert.That(frames[3].DisplayDelta, Is.EqualTo(new NanosecondTimeSpan(34 * Ms)), "the step after it is longer by as much");
+      // The animation error is the animation time step minus the step as measured, and the drift adds the errors up
+      Assert.That(frames[2].AnimationError, Is.EqualTo(new NanosecondTimeSpan(18 * Ms)));
+      Assert.That(frames[3].AnimationError, Is.EqualTo(new NanosecondTimeSpan(-18 * Ms)));
+      Assert.That(frames[^1].Drift, Is.EqualTo(NanosecondTimeSpan.Zero), "no false offset is left in the drift");
+      // The display time steps add up to the time that passed
+      long steps = frames.Skip(1).Sum(f => f.DisplayDelta!.Value.Nanoseconds);
+      Assert.That(steps, Is.EqualTo((frames[^1].FirstSeenTime - frames[0].FirstSeenTime).Nanoseconds));
+      Assert.That(steps, Is.EqualTo(64 * Ms));
+      Assert.That(run.Statistics.DisplayDeltaMs.Min, Is.EqualTo(-2).Within(1e-9), "the statistics take the step as it is");
     }
 
     /// <summary>

@@ -58,16 +58,16 @@ namespace MB.FramePacing.Analysis
     NanosecondTickCount? MainMarkerFirstSeenTime = null,
     NanosecondTickCount IntendedDisplayTime = default,
     NanosecondTimeDuration MarkerTargetFrameTime = default,
-    NanosecondTimeSpan? TargetFrameTime = null,
+    NanosecondTimeDuration? TargetFrameTime = null,
     NanosecondTimeSpan? PacingError = null,
     NanosecondTimeSpan? PredictionError = null,
     NanosecondTimeSpan? Lateness = null,
     NanosecondTickCount CpuStartTime = default,
     NanosecondTimeDuration CpuBusy = default,
-    NanosecondTimeSpan? FrameTime = null,
+    NanosecondTimeDuration? FrameTime = null,
     NanosecondTimeSpan? CpuWait = null,
     NanosecondTimeDuration MarkerPreferredFrameTime = default,
-    NanosecondTimeSpan? PreferredFrameTime = null,
+    NanosecondTimeDuration? PreferredFrameTime = null,
     System.Collections.Generic.IReadOnlyList<OlderFrameCapture>? OlderFrames = null
   );
 }

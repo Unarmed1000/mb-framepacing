@@ -107,8 +107,10 @@ namespace MB.FramePacing.Capture
       var lastReport = default(NanosecondTickCount);
 
       // The limits are .NET time spans (a duration the user gave, a report every 200 ms): against the capture clock they are nanoseconds
-      NanosecondTimeSpan? durationLimit = options.Duration is { } runFor ? NanosecondTimeSpan.FromTimeSpan(runFor) : null;
-      var reportInterval = NanosecondTimeSpan.FromMilliseconds(200);
+      NanosecondTimeDuration? durationLimit = options.Duration is { } runFor
+        ? new NanosecondTimeDuration(NanosecondTimeSpan.FromTimeSpan(runFor))
+        : null;
+      var reportInterval = new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(200));
       while (sourceThread.IsAlive)
       {
         sourceThread.Join(20);

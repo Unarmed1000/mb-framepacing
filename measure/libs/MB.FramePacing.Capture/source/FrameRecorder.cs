@@ -297,7 +297,7 @@ namespace MB.FramePacing.Capture
     {
       try
       {
-        var wait = NanosecondTimeSpan.FromTimeSpan(m_options.DeviceTimeWait);
+        var wait = new NanosecondTimeDuration(NanosecondTimeSpan.FromTimeSpan(m_options.DeviceTimeWait));
         while (true)
         {
           // Read completion before the counters: once it is seen, the counters read afterwards are final
@@ -461,7 +461,7 @@ namespace MB.FramePacing.Capture
     }
 
     /// <summary>Fill in pending device timestamps. Returns how many records starting at <paramref name="first"/> are ready to write.</summary>
-    private int ResolveDeviceTimes(long first, int count, bool force, NanosecondTimeSpan wait)
+    private int ResolveDeviceTimes(long first, int count, bool force, NanosecondTimeDuration wait)
     {
       for (int i = 0; i < count; ++i)
       {

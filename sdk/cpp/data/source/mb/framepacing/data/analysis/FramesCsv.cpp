@@ -47,17 +47,17 @@ namespace MB::FramePacing::Data
       frame.Drift = Csv::ParseNanosecondTimeSpan(table.Cell(row, "driftNs"));
       ForEachEntry(table.Cell(row, "flags"), "flags", [&frame](const std::string_view flag) { frame.Flags.emplace_back(flag); });
       frame.IntendedDisplayTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "intendedDisplayNs"));
-      frame.MarkerTargetFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "markerTargetNs"));
-      frame.TargetFrameTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "targetNs"));
-      frame.MarkerPreferredFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "markerPreferredNs"));
-      frame.PreferredFrameTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "preferredNs"));
+      frame.MarkerTargetFrameTime = Csv::OptionalMarkerDuration(table.Cell(row, "markerTargetNs"));
+      frame.TargetFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "targetNs"));
+      frame.MarkerPreferredFrameTime = Csv::OptionalMarkerDuration(table.Cell(row, "markerPreferredNs"));
+      frame.PreferredFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "preferredNs"));
       frame.PacingError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "pacingErrorNs"));
       frame.PredictionError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "predictionErrorNs"));
       frame.Lateness = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "latenessNs"));
       frame.LastSeenTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "lastSeenNs"));
       frame.CpuStartTime = Csv::OptionalNanosecondTickCount(table.Cell(row, "cpuStartNs"));
-      frame.CpuBusy = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "cpuBusyNs"));
-      frame.FrameTime = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "frameTimeNs"));
+      frame.CpuBusy = Csv::OptionalMarkerDuration(table.Cell(row, "cpuBusyNs"));
+      frame.FrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "frameTimeNs"));
       frame.CpuWait = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "cpuWaitNs"));
       // olderFrames: frameIndex@captureNs entries separated by |
       ForEachEntry(table.Cell(row, "olderFrames"), "olderFrames",

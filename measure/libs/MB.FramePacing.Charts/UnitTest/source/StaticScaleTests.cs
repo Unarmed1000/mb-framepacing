@@ -108,7 +108,9 @@ namespace MB.FramePacing.Charts.UnitTest
     {
       var data = RunChartData.Of(Run());
       int lastAnimating = data.StaticStretches[0].Start - 1;
-      long idle = FrameTimeRounding.WholeRefreshes(new NanosecondTimeSpan(Idle), new NanosecondTimeSpan(Period)).Nanoseconds;
+      long idle = FrameTimeRounding
+        .WholeRefreshes(NanosecondTimeDuration.FromNanoseconds(Idle), NanosecondTimeDuration.FromNanoseconds(Period))
+        .Nanoseconds;
 
       Assert.That(data.AnimatingStepReferences.Frames[lastAnimating], Is.False, "its line comes from an idle frame");
       Assert.That(data.AllStepReferences.Frames[lastAnimating], Is.True);

@@ -84,9 +84,9 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(60)));
 
       var pacing = run.Pacing!;
-      Assert.That(pacing.RefreshPeriod, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
+      Assert.That(pacing.RefreshPeriod, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16 * Ms)));
       Assert.That(pacing.RefreshCalculated, Is.False, "a capture card's refresh is its capture period");
-      Assert.That(pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
+      Assert.That(pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16 * Ms)));
       Assert.That(pacing.Source, Is.EqualTo(PacingSource.NativeRefresh));
       Assert.That(pacing.LateFrames, Is.Zero);
       Assert.That(pacing.Verdict, Is.EqualTo(PacingVerdict.None));
@@ -148,7 +148,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(20, refreshes: 2)));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
-      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16 * Ms)));
       Assert.That(run.Pacing.LateFrames, Is.Zero);
       Assert.That(run.Frames.Skip(1).All(f => f.DisplayDelta > f.PreferredFrameTime), "longer than preferred: the late share's amber");
     }
@@ -162,7 +162,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(frames, preferredNanoseconds: 32 * Ms));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.PreferredFrameTime));
-      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(32)));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(32 * Ms)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
       Assert.That(run.Frames.Skip(1).All(f => f.PreferredFrameTime?.Nanoseconds == 32 * Ms));
@@ -176,7 +176,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[9] = (3, 32);
       var run = Analyze(Rows(frames), targetFps: 31.25);
 
-      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(32)));
+      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(32 * Ms)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[10]));
     }
@@ -263,7 +263,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(Steady(20, refreshes: 2)), targetFps: 62.5);
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.GivenTarget));
-      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
+      Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16 * Ms)));
       Assert.That(run.Pacing.LateFrames, Is.Zero);
       Assert.That(
         run.Frames.Skip(1).All(f => f.DisplayDelta?.Nanoseconds == 32 * Ms && f.TargetFrameTime?.Nanoseconds == 16 * Ms),
@@ -282,7 +282,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       frames[11] = (4, 14);
       var run = Analyze(Rows(frames, refresh: 7 * Ms), targetFps: 60);
 
-      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(21)));
+      Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(21 * Ms)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[12]));
     }
@@ -342,7 +342,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(wrong.Pacing!.MatchesExpectedRefresh, Is.False);
       Assert.That(
         wrong.Pacing.RefreshPeriod,
-        Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)),
+        Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16 * Ms)),
         "a capture card's refresh stays the capture period"
       );
       Assert.That(wrong.Warnings, Has.Some.Contains("capture runs at 62.5 fps, but a 120 Hz display was expected"));

@@ -167,7 +167,7 @@ for (const FD::SummaryRun& run : summary.Runs)
 {
   for (const FD::FrameRow& frame : FD::ReadFrames(*analysis / run.FramesFile))
   {
-    // Every time is in nanoseconds (points in time NanosecondTickCounts, spans NanosecondTimeSpans); an empty cell is an empty std::optional
+    // Every time is in nanoseconds (the animation error a NanosecondTimeSpan, which can be negative); an empty cell is an empty std::optional
     if (frame.AnimationError)
     {
       std::printf("%llu: %.4f ms\n", static_cast<unsigned long long>(frame.FrameIndex), frame.AnimationError->TotalMilliseconds());
@@ -188,10 +188,15 @@ for (const FD::CaptureDataRecord& record : reader.ReadAll())
 
 The times are typed, and every one is in nanoseconds: points in time are `NanosecondTickCount`s, on the capture's clock (a frame's
 `FirstSeenTime`, a record's `HostTime` and `DeviceTime`, empty when the device gave none) or the frame pacer's
-(`IntendedDisplayTime`, `CpuStartTime`); spans are `NanosecondTimeSpan`s (`DisplayDelta`, `AnimationError`, ...); the marker's own
-durations (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`: 32 bits in the marker and in the file) are
-`NanosecondTimeDuration`s, as the marker's `Payload` returns them, and a frame time of `Payload::OnDemandFrameTime` is a frame
-presented on demand.
+(`IntendedDisplayTime`, `CpuStartTime`). A length of time is a `NanosecondTimeDuration`, which is never negative: a frame's
+`TargetFrameTime`, `PreferredFrameTime` and `FrameTime`, the summary's `CapturePeriod`, `MeasurementResolution` and
+`ErrorThreshold`, a run's pacing `RefreshPeriod` and `TargetFrameTime`, and the marker's own durations (`MarkerTargetFrameTime`,
+`MarkerPreferredFrameTime`, `CpuBusy`: 32 bits in the marker and in the file), as the marker's `Payload` returns them; a frame time
+of `Payload::OnDemandFrameTime` is a frame presented on demand. What can go either way is a `NanosecondTimeSpan`: `AnimationTime`,
+`AnimationDelta`, `AnimationError`, `PacingError`, `PredictionError`, `Lateness`, `Drift`, `CpuWait`, a camera capture's
+`ScanoutDelay` (the sync marker can be seen before the main marker decodes), and `DisplayDelta` and `OnScreen` (the display time
+step and the time on screen: a camera can time a frame after the next one's sighting, and the steps then still add up to the time
+that passed). A negative number in a file where a length of time belongs is outside its range, and the file is refused.
 
 Reading allocates and throws: `FD::DataFormatError` for a file it cannot read (another kind of file, damaged content, or a newer format
 version, whose message says to update), `std::runtime_error` for a file it cannot open. In `MB::FramePacing::Data`, each type and
@@ -329,8 +334,8 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 | Toolchain               | Compiler                   | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.0 KiB |            221.7 KiB |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.5 KiB |            193.1 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.0 KiB |            221.8 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.5 KiB |            192.7 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.4 KiB |            215.7 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.2 KiB |            139.0 KiB |
 | Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      20.0 KiB |            189.6 KiB |

@@ -19,7 +19,7 @@ namespace MB.FramePacing.Charts
   /// <param name="CapturePeriod">The capture period (<see cref="TimelineResult.CapturePeriod"/>).</param>
   /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (<see cref="TimelineResult.ErrorThreshold"/>).</param>
   /// <param name="Camera">An EXPERIMENTAL camera capture: the refresh strip draws every frame until the next one.</param>
-  public sealed record ChartRun(RunAnalysis Run, NanosecondTimeSpan CapturePeriod, NanosecondTimeSpan ErrorThreshold, bool Camera)
+  public sealed record ChartRun(RunAnalysis Run, NanosecondTimeDuration CapturePeriod, NanosecondTimeDuration ErrorThreshold, bool Camera)
   {
     /// <summary>
     /// The capture's rows (captures.csv), for what the capture missed (RunEvents): every run of the capture shares them. Null when not known.

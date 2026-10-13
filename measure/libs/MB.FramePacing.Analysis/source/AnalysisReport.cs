@@ -52,9 +52,9 @@ namespace MB.FramePacing.Analysis
       return null;
     }
 
-    public double CapturePeriodMs => Timeline.CapturePeriod.TotalMilliseconds;
+    public double CapturePeriodMs => Timeline.CapturePeriod.Value.TotalMilliseconds;
 
     /// <summary>The |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>).</summary>
-    public double ErrorThresholdMs => Timeline.ErrorThreshold.TotalMilliseconds;
+    public double ErrorThresholdMs => Timeline.ErrorThreshold.Value.TotalMilliseconds;
   }
 }

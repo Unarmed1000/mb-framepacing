@@ -31,7 +31,7 @@ namespace MB.FramePacing.Charts
       var s = run.Statistics;
       var c = run.Counts;
       var pacing = run.Pacing;
-      double thresholdMs = chart.ErrorThreshold.TotalMilliseconds;
+      double thresholdMs = chart.ErrorThreshold.Value.TotalMilliseconds;
       int measured = s.AbsoluteAnimationErrorMs.Count;
       // The largest error either way: shown too soon (positive) or too late (negative)
       double worst = Math.Max(s.AnimationErrorMs.Max, -s.AnimationErrorMs.Min);
@@ -172,7 +172,7 @@ namespace MB.FramePacing.Charts
     {
       var chart = section.Run;
       var pacing = chart.Run.Pacing;
-      double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).TotalMilliseconds;
+      double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).Value.TotalMilliseconds;
       var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
       bool mismatch = pacing?.MatchesExpectedRefresh == false;
       string kind =

@@ -40,14 +40,14 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     public static RunPacing Analyze(
       List<PresentedFrame> frames,
-      NanosecondTimeSpan refresh,
+      NanosecondTimeDuration refresh,
       bool refreshCalculated,
       double? targetFps,
-      NanosecondTimeSpan errorThreshold
+      NanosecondTimeDuration errorThreshold
     )
     {
       // Half a refresh, cut to the nanosecond
-      var half = new NanosecondTimeSpan(refresh.Nanoseconds / 2);
+      var half = NanosecondTimeDuration.FromNanoseconds(refresh.Nanoseconds / 2);
       bool schedule = frames.Count(f => f.IntendedDisplayTime != default) >= Math.Max(2, frames.Count / 2);
       var source =
         schedule ? PacingSource.Schedule
@@ -93,10 +93,10 @@ namespace MB.FramePacing.Analysis
         var markerWants = frame.MarkerPreferredFrameTime;
         var onDemandTime = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
         bool onDemand = markerTarget == onDemandTime || (markerTarget == NanosecondTimeDuration.Zero && markerWants == onDemandTime);
-        NanosecondTimeSpan? target =
-          intendedStep is { } step ? WholeRefreshes(step, refresh)
+        NanosecondTimeDuration? target =
+          intendedStep is { } step ? WholeRefreshes(new NanosecondTimeDuration(step), refresh)
           : onDemand ? null
-          : new NanosecondTimeSpan(
+          : NanosecondTimeDuration.FromNanoseconds(
             (1 + dropped[i])
               * (
                 markerTarget != NanosecondTimeDuration.Zero ? WholeRefreshes(markerTarget, refresh)
@@ -106,7 +106,7 @@ namespace MB.FramePacing.Analysis
           );
         // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
         // to the tools, else one refresh
-        NanosecondTimeSpan? preferred =
+        NanosecondTimeDuration? preferred =
           markerWants == onDemandTime ? null
           : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
           : givenTarget;
@@ -136,7 +136,7 @@ namespace MB.FramePacing.Analysis
           ++counted;
           // Late: the frame before it was on screen half a refresh or more longer than this frame's animation time step. A static step has
           // no animation error: nothing animated, so nothing was shown late
-          isLate = frame.AnimationError is { } error && error <= -half;
+          isLate = frame.AnimationError is { } error && error <= -half.Value;
           if (isLate)
             ++late;
         }
@@ -166,7 +166,7 @@ namespace MB.FramePacing.Analysis
         refreshCalculated,
         // The median, as a target a frame had: the lower of the two middle ones for an even number of frames
         targets.Count > 0
-          ? new NanosecondTimeSpan(targets.Values[(targets.Count - 1) / 2])
+          ? NanosecondTimeDuration.FromNanoseconds(targets.Values[(targets.Count - 1) / 2])
           : givenTarget,
         source,
         late,
@@ -192,7 +192,7 @@ namespace MB.FramePacing.Analysis
     /// The earliest offset (capture time minus intended time, sorted) that at least <see cref="OnTimeShare"/> of the frames share within half a
     /// refresh: the run's on-time frames.
     /// </summary>
-    private static NanosecondTimeSpan OnTimeOffset(ReadOnlySpan<long> sortedNanoseconds, NanosecondTimeSpan half)
+    private static NanosecondTimeSpan OnTimeOffset(ReadOnlySpan<long> sortedNanoseconds, NanosecondTimeDuration half)
     {
       int needed = Math.Max(1, (int)Math.Ceiling(sortedNanoseconds.Length * OnTimeShare));
       int end = 0;
@@ -207,7 +207,7 @@ namespace MB.FramePacing.Analysis
       return new NanosecondTimeSpan(sortedNanoseconds[0]);
     }
 
-    private static NanosecondTimeSpan WholeRefreshes(NanosecondTimeSpan frameTime, NanosecondTimeSpan refresh) =>
+    private static NanosecondTimeDuration WholeRefreshes(NanosecondTimeDuration frameTime, NanosecondTimeDuration refresh) =>
       FrameTimeRounding.WholeRefreshes(frameTime, refresh);
 
     /// <summary>
@@ -221,7 +221,7 @@ namespace MB.FramePacing.Analysis
     /// </item>
     /// </list>
     /// </summary>
-    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, NanosecondTimeSpan half, NanosecondTimeSpan errorThreshold)
+    private static (long Uneven, long Even) Split(List<PresentedFrame> frames, NanosecondTimeDuration half, NanosecondTimeDuration errorThreshold)
     {
       bool OffTarget(PresentedFrame f) =>
         f.Flags.HasFlag(PresentedFrameFlags.Torn)

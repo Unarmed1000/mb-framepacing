@@ -42,8 +42,8 @@ namespace MB.FramePacing.Capture.Synthetic
     public long CaptureCount { get; }
 
     /// <summary>The display's refresh period, rounded to the nearest nanosecond.</summary>
-    public NanosecondTimeSpan RefreshInterval =>
-      new NanosecondTimeSpan((long)Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / Options.RefreshHz));
+    public NanosecondTimeDuration RefreshInterval =>
+      NanosecondTimeDuration.FromNanoseconds((long)Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / Options.RefreshHz));
 
     /// <summary>Where the synthetic pacer's steady clock starts.</summary>
     public static readonly NanosecondTickCount PacerEpoch = NanosecondTickCount.FromSeconds(1);
@@ -110,16 +110,16 @@ namespace MB.FramePacing.Capture.Synthetic
         // The CPU starts each frame one refresh before the vsync it is rendered for, but not before it has finished the previous frame (a
         // skipped frame can leave two frames planned for one vsync), and is busy for 60 % of a refresh (cut to the nanosecond); a stalled
         // frame is busy that many refreshes longer, so it is shown late and the next frame starts late
-        var intendedDisplayTime = PacerEpoch + new NanosecondTimeSpan(intendedSlot * refresh.Nanoseconds);
+        var intendedDisplayTime = PacerEpoch + NanosecondTimeDuration.FromNanoseconds(intendedSlot * refresh.Nanoseconds);
         var cpuStartTime = intendedDisplayTime - refresh;
         if (previousCpuEnd is { } busyUntil && busyUntil > cpuStartTime)
           cpuStartTime = busyUntil;
-        var cpuBusy = new NanosecondTimeSpan(refresh.Nanoseconds * 6 / 10);
+        var cpuBusy = NanosecondTimeDuration.FromNanoseconds(refresh.Nanoseconds * 6 / 10);
         if (k > 0 && o.StallEvery > 0 && k % o.StallEvery == 0)
         {
           slot += o.StallSlots;
           planned += o.StallSlots;
-          cpuBusy += new NanosecondTimeSpan(o.StallSlots * refresh.Nanoseconds);
+          cpuBusy += NanosecondTimeDuration.FromNanoseconds(o.StallSlots * refresh.Nanoseconds);
         }
         previousCpuEnd = cpuStartTime + cpuBusy;
         var displayTime = new NanosecondTickCount(slot * refresh.Nanoseconds);
@@ -128,7 +128,7 @@ namespace MB.FramePacing.Capture.Synthetic
 
         // Vsync off: the frame is presented part way through the scanout, so the scanout shows the old frame above and the new one below
         if (o.TearEvery > 0 && k > 0 && k % o.TearEvery == 0)
-          displayTime += new NanosecondTimeSpan((long)Math.Round(o.TearFraction * refresh.Nanoseconds));
+          displayTime += NanosecondTimeDuration.FromNanoseconds((long)Math.Round(o.TearFraction * refresh.Nanoseconds));
 
         // Skipped frames are rendered (frame index and animation advance) but never shown: the next frame takes this vsync.
         if (o.SkipEvery > 0 && k > 0 && k % o.SkipEvery == 0)
@@ -154,11 +154,11 @@ namespace MB.FramePacing.Capture.Synthetic
             frameIndex,
             MB.FramePacing.Marker.MarkerFlags.NoFlags,
             animationTime,
-            PreferredFrameTime: new NanosecondTimeDuration(refresh),
-            TargetFrameTime: new NanosecondTimeDuration(refresh),
+            PreferredFrameTime: refresh,
+            TargetFrameTime: refresh,
             IntendedDisplayTime: intendedDisplayTime,
             CpuStartTime: cpuStartTime,
-            CpuBusy: new NanosecondTimeDuration(cpuBusy)
+            CpuBusy: cpuBusy
           )
           : new MarkerPayload(kind, idle ? 0u : o.RunId, frameIndex, MB.FramePacing.Marker.MarkerFlags.NoFlags, animationTime);
         m_presented.Add(new SyntheticPresentedFrame(payload, displayTime));
@@ -166,7 +166,7 @@ namespace MB.FramePacing.Capture.Synthetic
     }
 
     /// <summary>A length in seconds, rounded to the nearest nanosecond.</summary>
-    private static NanosecondTimeSpan Seconds(double seconds) =>
-      new NanosecondTimeSpan((long)Math.Round(seconds * NanosecondTimeSpan.NanosecondsPerSecond));
+    private static NanosecondTimeDuration Seconds(double seconds) =>
+      NanosecondTimeDuration.FromNanoseconds((long)Math.Round(seconds * NanosecondTimeSpan.NanosecondsPerSecond));
   }
 }

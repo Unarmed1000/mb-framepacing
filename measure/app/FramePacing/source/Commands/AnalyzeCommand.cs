@@ -46,7 +46,7 @@ namespace MB.FramePacing.App.Commands
       var thresholdOption = new Option<double?>("--error-threshold-ms")
       {
         Description =
-          $"The |animation error| above which a frame counts as off, in ms (default {TimelineAnalyzer.DefaultErrorThreshold.TotalMilliseconds:0.###}).",
+          $"The |animation error| above which a frame counts as off, in ms (default {TimelineAnalyzer.DefaultErrorThreshold.Value.TotalMilliseconds:0.###}).",
         Validators =
         {
           result =>
@@ -95,9 +95,9 @@ namespace MB.FramePacing.App.Commands
             RunId = parseResult.GetValue(runOption),
             TargetFps = parseResult.GetValue(targetOption),
             ExpectedRefreshHz = parseResult.GetValue(displayOption),
-            // The threshold's milliseconds, rounded to the nearest nanosecond
+            // The threshold's milliseconds, rounded to the nearest nanosecond (the option refuses a value that is not above 0)
             ErrorThreshold = parseResult.GetValue(thresholdOption) is { } ms
-              ? new NanosecondTimeSpan((long)Math.Round(ms * NanosecondTimeSpan.NanosecondsPerMillisecond))
+              ? NanosecondTimeDuration.FromNanoseconds((long)Math.Round(ms * NanosecondTimeSpan.NanosecondsPerMillisecond))
               : TimelineAnalyzer.DefaultErrorThreshold,
             AssumeStatic = !parseResult.GetValue(noStaticGuessOption),
           },
@@ -245,7 +245,7 @@ namespace MB.FramePacing.App.Commands
         if (run.Pacing is { } pacing)
         {
           AnsiConsole.MarkupLineInterpolated(
-            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), shown half a refresh or more later than their animation time step. Target {pacing.TargetFrameTime.TotalMilliseconds:0.##} ms ({TargetReason(pacing)})."
+            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), shown half a refresh or more later than their animation time step. Target {pacing.TargetFrameTime.Value.TotalMilliseconds:0.##} ms ({TargetReason(pacing)})."
           );
           AnsiConsole.MarkupLineInterpolated($"{RefreshText(pacing)}");
           if (pacing.PacingErrorMs is { } pacingError && pacing.PredictionErrorMs is { } predictionError)

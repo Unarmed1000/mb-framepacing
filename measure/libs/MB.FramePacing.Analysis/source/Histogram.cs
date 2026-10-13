@@ -21,18 +21,20 @@ namespace MB.FramePacing.Analysis
     public const int DefaultMaxBins = 400;
 
     /// <summary>The width of the reported bins: 0.1 ms, fine enough to show a spread well below a refresh.</summary>
-    public static readonly NanosecondTimeSpan DefaultBinWidth = new NanosecondTimeSpan(NanosecondTimeSpan.NanosecondsPerMillisecond / 10);
+    public static readonly NanosecondTimeDuration DefaultBinWidth = NanosecondTimeDuration.FromNanoseconds(
+      NanosecondTimeSpan.NanosecondsPerMillisecond / 10
+    );
 
     public static readonly Histogram Empty = new Histogram(0, 0, Array.Empty<HistogramBin>());
 
-    /// <summary>Bin <paramref name="spans"/>; bin k covers [(k - 0.5) * width, (k + 0.5) * width). A width of zero or less is 1 ms.</summary>
-    public static Histogram From(IEnumerable<NanosecondTimeSpan> spans, NanosecondTimeSpan binWidth, int maxBins = DefaultMaxBins)
+    /// <summary>Bin <paramref name="spans"/>; bin k covers [(k - 0.5) * width, (k + 0.5) * width). A width of zero is 1 ms.</summary>
+    public static Histogram From(IEnumerable<NanosecondTimeSpan> spans, NanosecondTimeDuration binWidth, int maxBins = DefaultMaxBins)
     {
       ArgumentOutOfRangeException.ThrowIfLessThan(maxBins, 1);
       var values = spans.Select(s => s.Nanoseconds).ToArray();
       if (values.Length == 0)
         return Empty;
-      long width = binWidth > NanosecondTimeSpan.Zero ? binWidth.Nanoseconds : NanosecondTimeSpan.NanosecondsPerMillisecond;
+      long width = binWidth > NanosecondTimeDuration.Zero ? binWidth.Nanoseconds : NanosecondTimeSpan.NanosecondsPerMillisecond;
 
       long first = BinOf(values.Min(), width);
       long last = BinOf(values.Max(), width);

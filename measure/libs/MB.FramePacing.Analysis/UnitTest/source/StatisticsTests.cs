@@ -95,11 +95,11 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void RunStatistics_AreTheReferenceFormulas_ToTheBit()
     {
-      var threshold = NanosecondTimeSpan.FromMilliseconds(1);
+      var threshold = new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1));
       foreach (int count in new[] { 0, 1, 2, 99, 100, 999, 1000, 20_000 })
       {
         var frames = Frames(count, new Random(count + 1));
-        foreach (var period in new[] { new NanosecondTimeSpan(Refresh), NanosecondTimeSpan.Zero })
+        foreach (var period in new[] { NanosecondTimeDuration.FromNanoseconds(Refresh), NanosecondTimeDuration.Zero })
           Assert.That(RunStatistics.From(frames, threshold, period), Is.EqualTo(Reference(frames, threshold, period)), $"{count} frames");
       }
     }
@@ -137,7 +137,7 @@ namespace MB.FramePacing.Analysis.UnitTest
             new NanosecondTimeSpan(random.Next(-900_000, 900_000)),
             flags,
             CpuBusy: random.Next(4) == 0 ? default : NanosecondTimeDuration.FromNanoseconds(random.Next(1, 4_000_000)),
-            FrameTime: random.Next(6) == 0 ? null : new NanosecondTimeSpan(display + random.Next(-50_000, 50_000)),
+            FrameTime: random.Next(6) == 0 ? null : NanosecondTimeDuration.FromNanoseconds(display + random.Next(-50_000, 50_000)),
             CpuWait: random.Next(3) == 0 ? null : new NanosecondTimeSpan(random.Next(0, 3_000_000))
           )
         );
@@ -146,7 +146,11 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>The statistics as they were computed before: a list and a sorted array of milliseconds per statistic.</summary>
-    private static RunStatistics Reference(IReadOnlyList<PresentedFrame> frames, NanosecondTimeSpan threshold, NanosecondTimeSpan capturePeriod)
+    private static RunStatistics Reference(
+      IReadOnlyList<PresentedFrame> frames,
+      NanosecondTimeDuration threshold,
+      NanosecondTimeDuration capturePeriod
+    )
     {
       static Statistics Of(IEnumerable<NanosecondTimeSpan> spans) => Statistics.From(spans.Select(s => s.TotalMilliseconds));
       var withMetrics = frames.Where(f => f.AnimationError.HasValue).ToList();
@@ -170,14 +174,14 @@ namespace MB.FramePacing.Analysis.UnitTest
         Of(withMetrics.Select(f => f.AnimationError!.Value.Duration())),
         Of(frames.Select(f => f.Drift)),
         Of(frames.Select(f => f.OnScreen)),
-        withMetrics.LongCount(f => capturePeriod > NanosecondTimeSpan.Zero && f.AnimationError!.Value.Duration() > threshold),
+        withMetrics.LongCount(f => capturePeriod > NanosecondTimeDuration.Zero && f.AnimationError!.Value.Duration() > threshold),
         errorPerFrameMs,
         percentError,
         frameRateNanoseconds > 0 ? frameRate.Count * (double)NanosecondTimeSpan.NanosecondsPerSecond / frameRateNanoseconds : 0,
         LowFps(0.99, RunStatistics.MinFramesForOnePercentLow),
         LowFps(0.999, RunStatistics.MinFramesForPointOnePercentLow),
         Of(frames.Where(f => f.CpuBusy != NanosecondTimeDuration.Zero).Select(f => f.CpuBusy.Value)),
-        Of(frames.Where(f => f.FrameTime.HasValue).Select(f => f.FrameTime!.Value)),
+        Of(frames.Where(f => f.FrameTime.HasValue).Select(f => f.FrameTime!.Value.Value)),
         Of(frames.Where(f => f.CpuWait.HasValue).Select(f => f.CpuWait!.Value)),
         frames.LongCount(f => f.DisplayDelta.HasValue && (f.Flags & PresentedFrameFlags.StaticBefore) != 0),
         frames.LongCount(f =>

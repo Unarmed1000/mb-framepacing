@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
-// summary.json and the CSVs: the format version, columns by name, times as whole nanoseconds, and content that is refused (files from
-// before the nanoseconds, with their times in ticks of 100 ns under "...Ticks" names, among it).
+// summary.json and the CSVs: the format version, columns by name, times as whole nanoseconds, and content that is refused (a negative
+// length of time, and files from before the nanoseconds, with their times in ticks of 100 ns under "...Ticks" names, among it).
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -9,6 +9,7 @@
 #include <mb/framepacing/data/analysis/AnalysisFiles.hpp>
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
 #include <mb/framepacing/data/analysis/CapturesCsv.hpp>
+#include <mb/framepacing/data/analysis/FrameRow.hpp>
 #include <mb/framepacing/data/analysis/FramesCsv.hpp>
 #include <mb/framepacing/marker/payload/Payload.hpp>
 #include <gtest/gtest.h>
@@ -16,9 +17,11 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace FP = MB::FramePacing;
@@ -196,20 +199,20 @@ TEST(AnalysisOutput, FormatVersionZeroIsFormatOne)
 TEST(AnalysisOutput, ASummarysTimesAreWholeNanoseconds)
 {
   const auto summary = FD::ParseSummary(MinimalSummary);
-  EXPECT_EQ(summary.CapturePeriod, FP::NanosecondTimeSpan(16'666'667));
-  EXPECT_EQ(summary.MeasurementResolution, FP::NanosecondTimeSpan(16'666'667));
-  EXPECT_EQ(summary.ErrorThreshold, FP::NanosecondTimeSpan(1'000'000));
+  EXPECT_EQ(summary.CapturePeriod, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  EXPECT_EQ(summary.MeasurementResolution, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  EXPECT_EQ(summary.ErrorThreshold, FP::NanosecondTimeDuration::FromNanoseconds(1'000'000));
   EXPECT_EQ(FD::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000 })").MeasurementResolution,
-            FP::NanosecondTimeSpan(16'666'667))
+            FP::NanosecondTimeDuration::FromNanoseconds(16'666'667))
     << "a file without it: the capture period";
   constexpr std::string_view Resolution = R"("measurementResolutionNs": 16666667)";
   EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionNs": 0)")).MeasurementResolution,
-            FP::NanosecondTimeSpan(16'666'667))
+            FP::NanosecondTimeDuration::FromNanoseconds(16'666'667))
     << "0, as C# reads a file without it";
   EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionNs": 5)")).MeasurementResolution,
-            FP::NanosecondTimeSpan(5));
-  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, "16666667,", "9223372036854775807,")).CapturePeriod, FP::NanosecondTimeSpan::MaxValue())
-    << "the 64 bits a time has";
+            FP::NanosecondTimeDuration::FromNanoseconds(5));
+  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, "16666667,", "9223372036854775807,")).CapturePeriod, FP::NanosecondTimeDuration::MaxValue())
+    << "the 63 bits a length of time has";
 
   // Never a fraction, a text or another unit's field
   constexpr std::string_view Threshold = R"("errorThresholdNs": 1000000)";
@@ -227,6 +230,62 @@ TEST(AnalysisOutput, ASummarysTimesAreWholeNanoseconds)
   {
     EXPECT_NE(std::string(error.what()).find("capturePeriodNs"), std::string::npos) << error.what();
   }
+}
+
+TEST(AnalysisOutput, ALengthOfTimeInASummaryIsNeverNegative)
+{
+  // Every time a summary has is a length of time: a negative number is outside its range, and refused as any other such number is
+  const auto refusal = [](const std::string& json) -> std::string
+  {
+    try
+    {
+      (void)FD::ParseSummary(json);
+    }
+    catch (const FD::DataFormatError& error)
+    {
+      return error.what();
+    }
+    return "read";
+  };
+  constexpr std::string_view Period = R"("capturePeriodNs": 16666667)";
+  constexpr std::string_view Resolution = R"("measurementResolutionNs": 16666667)";
+  constexpr std::string_view Threshold = R"("errorThresholdNs": 1000000)";
+  EXPECT_EQ(refusal(Replaced(MinimalSummary, Period, R"("capturePeriodNs": -1)")),
+            "summary.json: 'capturePeriodNs' is not a whole number in its range");
+  EXPECT_EQ(refusal(Replaced(MinimalSummary, Resolution, R"("measurementResolutionNs": -1)")),
+            "summary.json: 'measurementResolutionNs' is not a whole number in its range")
+    << "not the capture period, as 0 is";
+  EXPECT_EQ(refusal(Replaced(MinimalSummary, Threshold, R"("errorThresholdNs": -1)")),
+            "summary.json: 'errorThresholdNs' is not a whole number in its range");
+  EXPECT_EQ(refusal(Replaced(MinimalSummary, Period, R"("capturePeriodNs": -9223372036854775808)")),
+            "summary.json: 'capturePeriodNs' is not a whole number in its range")
+    << "the lowest number its 64 bits hold";
+  EXPECT_EQ(refusal(Replaced(MinimalSummary, Threshold, R"("errorThresholdNs": -16666667)")),
+            "summary.json: 'errorThresholdNs' is not a whole number in its range");
+
+  // No time at all is a length of time
+  const auto zero = FD::ParseSummary(Replaced(Replaced(MinimalSummary, Period, R"("capturePeriodNs": 0)"), Threshold, R"("errorThresholdNs": 0)"));
+  EXPECT_EQ(zero.CapturePeriod, FP::NanosecondTimeDuration::Zero());
+  EXPECT_EQ(zero.ErrorThreshold, FP::NanosecondTimeDuration::Zero());
+  EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Threshold, R"("errorThresholdNs": -0)")).ErrorThreshold, FP::NanosecondTimeDuration::Zero())
+    << "-0 is 0";
+
+  // A run's pacing has two more
+  constexpr std::string_view Pacing = R"("pacing": { "refreshPeriodNs": 16666667, "refreshCalculated": false, "targetFrameNs": 33333334,
+    "source": "TargetFrameTime", "lateFrames": 1, "lateShare": 0.125, "worstLateShare": 0.5, "errorFramesWithUnevenDisplay": 1,
+    "errorFramesWithEvenDisplay": 1, "verdict": "Both" })";
+  const auto withPacing = [](const std::string& pacing) { return OneRun(RunStart, Counts, Statistics(), pacing); };
+  EXPECT_EQ(FD::ParseSummary(withPacing(std::string(Pacing))).Runs.size(), 1u) << "the pacing these cases change one value of";
+  EXPECT_EQ(refusal(withPacing(Replaced(Pacing, R"("refreshPeriodNs": 16666667)", R"("refreshPeriodNs": -16666667)"))),
+            "summary.json: 'refreshPeriodNs' is not a whole number in its range");
+  EXPECT_EQ(refusal(withPacing(Replaced(Pacing, R"("targetFrameNs": 33333334)", R"("targetFrameNs": -1)"))),
+            "summary.json: 'targetFrameNs' is not a whole number in its range");
+  const auto pacing = FD::ParseSummary(withPacing(Replaced(Pacing, R"("targetFrameNs": 33333334)", R"("targetFrameNs": 0)"))).Runs[0].Pacing;
+  if (!pacing.has_value())
+  {
+    FAIL() << "no pacing";
+  }
+  EXPECT_EQ(pacing->TargetFrameTime, FP::NanosecondTimeDuration::Zero());
 }
 
 TEST(AnalysisOutput, ASummaryFromBeforeTheNanosecondsIsRefused)
@@ -256,7 +315,7 @@ TEST(AnalysisOutput, ASummaryFromBeforeTheNanosecondsIsRefused)
   // The optional one is not read under its old name: the capture period, as in a file without it
   constexpr std::string_view Resolution = R"("measurementResolutionNs": 16666667)";
   EXPECT_EQ(FD::ParseSummary(Replaced(MinimalSummary, Resolution, R"("measurementResolutionTicks": 5)")).MeasurementResolution,
-            FP::NanosecondTimeSpan(16'666'667));
+            FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
 
   // A run's pacing from then
   constexpr std::string_view Pacing = R"("pacing": { "refreshPeriodNs": 16666667, "refreshCalculated": false, "targetFrameNs": 33333334,
@@ -292,8 +351,8 @@ TEST(AnalysisOutput, ARunIsReadWithItsCountsStatisticsAndPacing)
   {
     FAIL() << "no pacing";
   }
-  EXPECT_EQ(run.Pacing->RefreshPeriod, FP::NanosecondTimeSpan(16'666'667));
-  EXPECT_EQ(run.Pacing->TargetFrameTime, FP::NanosecondTimeSpan(33'333'334));
+  EXPECT_EQ(run.Pacing->RefreshPeriod, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  EXPECT_EQ(run.Pacing->TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'334));
   EXPECT_EQ(run.Pacing->Source, "TargetFrameTime");
   EXPECT_FALSE(run.Histograms.has_value());
 
@@ -424,7 +483,7 @@ TEST(AnalysisOutput, RequiredFieldsAreRequired)
 TEST(AnalysisOutput, AFileIsReadOrSaidToBeMissing)
 {
   const TemporaryFile file("summary.json", std::string(MinimalSummary));
-  EXPECT_EQ(FD::ReadSummary(file.Path()).CapturePeriod, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(FD::ReadSummary(file.Path()).CapturePeriod, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
   const auto missing = std::filesystem::temp_directory_path() / "mb_framepacing_data_test-no-such-folder" / "summary.json";
   EXPECT_THROW((void)FD::ReadFrames(missing), std::runtime_error);
   EXPECT_THROW((void)FD::ReadCaptures(missing), std::runtime_error);
@@ -520,16 +579,16 @@ TEST(AnalysisOutput, EveryTimeIsReadAsTheNanosecondsItIs)
   EXPECT_EQ(row.Drift, FP::NanosecondTimeSpan(-7));
   EXPECT_EQ(row.IntendedDisplayTime, FP::NanosecondTickCount(std::numeric_limits<int64_t>::min()));
   EXPECT_EQ(row.MarkerTargetFrameTime, FM::Payload::OnDemandFrameTime) << "on demand, as the marker library names it";
-  EXPECT_EQ(row.TargetFrameTime, FP::NanosecondTimeSpan(33'333'334));
+  EXPECT_EQ(row.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'334));
   EXPECT_EQ(row.MarkerPreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(1));
-  EXPECT_EQ(row.PreferredFrameTime, FP::NanosecondTimeSpan(16'666'667));
+  EXPECT_EQ(row.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
   EXPECT_EQ(row.PacingError, FP::NanosecondTimeSpan(3));
   EXPECT_EQ(row.PredictionError, FP::NanosecondTimeSpan(-3));
   EXPECT_EQ(row.Lateness, FP::NanosecondTimeSpan(8'333'333));
   EXPECT_EQ(row.LastSeenTime, FP::NanosecondTickCount(1'234'567'890'123'456'789));
   EXPECT_EQ(row.CpuStartTime, FP::NanosecondTickCount(-1'234'567'890'123'456'789));
   EXPECT_EQ(row.CpuBusy, FP::NanosecondTimeDuration::FromNanoseconds(12'006'000));
-  EXPECT_EQ(row.FrameTime, FP::NanosecondTimeSpan(16'666'800));
+  EXPECT_EQ(row.FrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'800));
   EXPECT_EQ(row.CpuWait, FP::NanosecondTimeSpan(4'660'800));
   ASSERT_EQ(row.OlderFrames.size(), 2u);
   EXPECT_EQ(row.OlderFrames[0].FrameIndex, 41u);
@@ -572,6 +631,62 @@ TEST(AnalysisOutput, TheMarkersDurationsMustFit32Bits)
     EXPECT_THROW((void)read(column, "-1"), FD::DataFormatError) << column << ": a duration is never negative";
     EXPECT_THROW((void)read(column, "1.5"), FD::DataFormatError) << column;
   }
+}
+
+TEST(AnalysisOutput, ALengthOfTimeInAFramesCsvIsNeverNegative)
+{
+  // 64 bits signed in the file, as the tools hold them, and never negative: a negative number is outside its range
+  const auto read = [](const std::string_view column, const std::string_view value)
+  { return ReadFrames(std::string(FrameColumns) + "," + std::string(column) + "\n0,1,0,0,0,16666667,1,0,0,," + std::string(value) + "\n").at(0); };
+  using Length = std::optional<FP::NanosecondTimeDuration> FD::FrameRow::*;
+  const std::vector<std::pair<std::string_view, Length>> lengths{
+    {"targetNs", &FD::FrameRow::TargetFrameTime},
+    {"preferredNs", &FD::FrameRow::PreferredFrameTime},
+    {"frameTimeNs", &FD::FrameRow::FrameTime},
+  };
+  for (const auto& [column, member] : lengths)
+  {
+    EXPECT_EQ(read(column, "16666667").*member, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667)) << column;
+    EXPECT_EQ(read(column, "0").*member, FP::NanosecondTimeDuration::Zero()) << column << ": no time at all is a length of time";
+    EXPECT_EQ(read(column, "-0").*member, FP::NanosecondTimeDuration::Zero()) << column << ": -0 is 0";
+    EXPECT_EQ(read(column, "9223372036854775807").*member, FP::NanosecondTimeDuration::MaxValue()) << column << ": the longest";
+    EXPECT_FALSE((read(column, "").*member).has_value()) << column << ": an empty cell";
+    EXPECT_THROW((void)read(column, "9223372036854775808"), FD::DataFormatError) << column << ": beyond 64 bits";
+    EXPECT_THROW((void)read(column, "-9223372036854775808"), FD::DataFormatError) << column << ": the lowest number its 64 bits hold";
+    try
+    {
+      (void)read(column, "-1");
+      FAIL() << column << ": a negative length of time was read";
+    }
+    catch (const FD::DataFormatError& error)
+    {
+      // The file and the line, then what any number outside its range is refused with
+      EXPECT_STREQ(error.what(), "'mb_framepacing_data_test-frames.csv' line 2: '-1' is not a whole number in its range") << column;
+    }
+  }
+
+  // What can go either way stays a signed span, and reads below zero: a camera's scanout delay among them (the sync marker can be seen
+  // before the main marker decodes), and the display time step and the time on screen, the difference of two sightings (a camera can
+  // time a frame after the next one's sighting, and the steps then still add up to the time that passed)
+  using Span = std::optional<FP::NanosecondTimeSpan> FD::FrameRow::*;
+  const std::vector<std::pair<std::string_view, Span>> spans{
+    {"displayDeltaNs", &FD::FrameRow::DisplayDelta},
+    {"animationDeltaNs", &FD::FrameRow::AnimationDelta},
+    {"animationErrorNs", &FD::FrameRow::AnimationError},
+    {"pacingErrorNs", &FD::FrameRow::PacingError},
+    {"predictionErrorNs", &FD::FrameRow::PredictionError},
+    {"latenessNs", &FD::FrameRow::Lateness},
+    {"cpuWaitNs", &FD::FrameRow::CpuWait},
+    {"scanoutDelayNs", &FD::FrameRow::ScanoutDelay},
+  };
+  for (const auto& [column, member] : spans)
+  {
+    EXPECT_EQ(read(column, "-9223372036854775808").*member, FP::NanosecondTimeSpan::MinValue()) << column;
+  }
+  const auto row = ReadFrames(std::string(FrameColumns) + "\n0,1,-5,0,0,-16666667,1,0,-7,\n").at(0);
+  EXPECT_EQ(row.AnimationTime, FP::NanosecondTimeSpan(-5));
+  EXPECT_EQ(row.OnScreen, FP::NanosecondTimeSpan(-16'666'667));
+  EXPECT_EQ(row.Drift, FP::NanosecondTimeSpan(-7));
 }
 
 TEST(AnalysisOutput, AFramesCsvFromBeforeTheNanosecondsIsRefused)

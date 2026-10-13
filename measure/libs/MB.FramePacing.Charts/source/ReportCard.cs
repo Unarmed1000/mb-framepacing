@@ -91,7 +91,7 @@ namespace MB.FramePacing.Charts
       var chart = section.Run;
       var run = chart.Run;
       var pacing = run.Pacing;
-      double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).TotalMilliseconds;
+      double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).Value.TotalMilliseconds;
       double from = section.FromSeconds;
       double to = section.ToSeconds;
       var (viewFrom, viewTo) = visible ?? (from, to);
@@ -112,9 +112,9 @@ namespace MB.FramePacing.Charts
             : $"A section of {Ms1(to - from)} s of the run's {Ms1(RunSection.Whole(chart).ToSeconds)} s"
         )
           + $", {frameCount.ToString("N0", CultureInfo.InvariantCulture)} presented frames on a {Hz(pacing)} display"
-          + (pacing != null ? $", measured against a {Ms1(pacing.TargetFrameTime.TotalMilliseconds)} ms target." : "."),
-        $"Resolution {Ms1(chart.CapturePeriod.TotalMilliseconds)} ms (one capture period); error threshold "
-          + $"{Ms(chart.ErrorThreshold.TotalMilliseconds)} ms.",
+          + (pacing != null ? $", measured against a {Ms1(pacing.TargetFrameTime.Value.TotalMilliseconds)} ms target." : "."),
+        $"Resolution {Ms1(chart.CapturePeriod.Value.TotalMilliseconds)} ms (one capture period); error threshold "
+          + $"{Ms(chart.ErrorThreshold.Value.TotalMilliseconds)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
@@ -568,7 +568,7 @@ namespace MB.FramePacing.Charts
 
       parts.Add(new TextShape(20, errorY - 16, "ANIMATION ERROR PER FRAME: + SHOWN TOO SOON, − SHOWN TOO LATE", "label", "start"));
       var panelKey = new List<(string[] Classes, string Text, bool Line)> { (new[] { "band" }, "within the error threshold", false) };
-      double threshold = section.Run.ErrorThreshold.TotalMilliseconds;
+      double threshold = section.Run.ErrorThreshold.Value.TotalMilliseconds;
       parts.Add(new RectShape("band", N(PlotX0, 1), N(YOf(threshold), 1), N(view.PlotX1 - PlotX0, 1), N(YOf(-threshold) - YOf(threshold), 1)));
       foreach (double position in ChartScale.ErrorTicks(limit).Where(t => t != 0))
       {
@@ -860,9 +860,9 @@ namespace MB.FramePacing.Charts
       var preferred = new StringBuilder();
       double? targetEnd = null;
       double? preferredEnd = null;
-      void Add(StringBuilder path, ref double? end, double x0, double x1, NanosecondTimeSpan frameTime)
+      void Add(StringBuilder path, ref double? end, double x0, double x1, NanosecondTimeDuration frameTime)
       {
-        double ms = frameTime.TotalMilliseconds;
+        double ms = frameTime.Value.TotalMilliseconds;
         double y = yOf(ms);
         // Joined to the stretch before when it ends where this one starts
         path.Append(end is { } before && Math.Abs(before - x0) < 1e-6 ? $"V{N(y, 1)}H{N(x1, 1)}" : $"M{N(x0, 1)} {N(y, 1)}H{N(x1, 1)}");
@@ -1051,7 +1051,7 @@ namespace MB.FramePacing.Charts
         {
           if (!data.Spans[i])
             continue;
-          double frameTime = frames[i].FrameTime?.TotalMilliseconds ?? 0;
+          double frameTime = frames[i].FrameTime?.Value.TotalMilliseconds ?? 0;
           double cpuBusyMs = frames[i].CpuBusy.Value.TotalMilliseconds;
           double x0 = view.XOfFrame(i);
           double x1 = X1(i);
@@ -1262,9 +1262,9 @@ namespace MB.FramePacing.Charts
       int legend = parts.Count;
       parts.Add(new TextShape(view.PlotX1, stripY - 16, string.Empty, "vsync-n", "end"));
       // The refresh's milliseconds rounded back to its nanoseconds
-      var refresh = new NanosecondTimeSpan((long)Math.Round(refreshMs * NanosecondTimeSpan.NanosecondsPerMillisecond));
+      var refresh = NanosecondTimeDuration.FromNanoseconds((long)Math.Round(refreshMs * NanosecondTimeSpan.NanosecondsPerMillisecond));
       int Cells(NanosecondTimeSpan span) =>
-        refresh > NanosecondTimeSpan.Zero ? (int)Math.Max(0, (span.Nanoseconds + (refresh.Nanoseconds / 2)) / refresh.Nanoseconds) : 1;
+        refresh > NanosecondTimeDuration.Zero ? (int)Math.Max(0, (span.Nanoseconds + (refresh.Nanoseconds / 2)) / refresh.Nanoseconds) : 1;
       bool anyUnknown = false;
       bool anyStatic = false;
       bool anyLate = false;
@@ -1298,7 +1298,7 @@ namespace MB.FramePacing.Charts
         int repeats = 0;
         if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment && view.Data.DroppedBeforeFrame[i + 1] is > 0 and var dropped)
         {
-          var target = frames[i + 1].TargetFrameTime is { } t && t > NanosecondTimeSpan.Zero ? t : refresh;
+          var target = frames[i + 1].TargetFrameTime is { } t && t > NanosecondTimeDuration.Zero ? t : refresh;
           repeats = (int)Math.Min(seen - 1, dropped * Math.Max(1, Cells(target)));
         }
         for (int c = 0; c < cells; ++c)
@@ -1308,7 +1308,7 @@ namespace MB.FramePacing.Charts
             break;
           // A refresh that showed an older frame out of order (also between two sightings of this frame); after the frame's last
           // sighting, else one the capture did not tell; the refreshes where dropped frames were due repeat this frame
-          var at = frame.FirstSeenTime + new NanosecondTimeSpan(c * refresh.Nanoseconds);
+          var at = frame.FirstSeenTime + NanosecondTimeDuration.FromNanoseconds(c * refresh.Nanoseconds);
           bool older = frame.OlderFrames is { } shown && shown.Any(o => (o.CaptureTime - at).Duration().Nanoseconds * 2 < refresh.Nanoseconds);
           string cell =
             older ? "strip-older"
@@ -1405,8 +1405,8 @@ namespace MB.FramePacing.Charts
       var events = view.Data.Events;
       var data = view.Data;
       // The period is at least one nanosecond, the smallest step of time
-      var period = new NanosecondTimeSpan(Math.Max(1, chart.CapturePeriod.Nanoseconds));
-      var smallestStep = new NanosecondTimeSpan(1);
+      var period = NanosecondTimeDuration.FromNanoseconds(Math.Max(1, chart.CapturePeriod.Nanoseconds));
+      var smallestStep = NanosecondTimeDuration.FromNanoseconds(1);
       var (from, to) = EventTimes(view.Section);
       parts.Add(new TextShape(20, eventsY - 16, "EVENTS: WHAT THE FRAMES DID, WHAT THE CAPTURE MISSED", "label", "start"));
       plots.Add(new CardPlot(ReportItem.Events, PlotX0, eventsY, view.PlotX1, eventsY + EventsH, view.ViewFrom, view.ViewTo, 0, 1));

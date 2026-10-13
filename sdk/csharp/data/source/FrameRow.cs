@@ -2,8 +2,12 @@
 //* File Description
 //* ----------------
 //* One line of a run's frames CSV (run-<id>-frames.csv, doc/analysis-output-format.md): one presented frame. Points in time are
-//* NanosecondTickCounts, on the capture's clock or the frame pacer's; spans are NanosecondTimeSpans; the marker's own durations (a u32 in
-//* the file) NanosecondTimeDurations; null is an empty cell. The display side comes from the capture, the pacing and CPU fields from the markers. The C++ data module's FrameRow.
+//* NanosecondTickCounts, on the capture's clock or the frame pacer's; a length of time (a frame time) is a NanosecondTimeDuration, never
+//* negative, the marker's own (a u32 in the file) too; what can go either way (the animation time, an error, the lateness, the drift,
+//* the CPU wait, a camera's scanout delay) is a NanosecondTimeSpan, and so are the display time step and the time on screen, which are
+//* the difference of two sightings: a camera can time a frame after the next one's sighting, and the steps then still add up to the time
+//* that passed. Null is an empty cell. The display side comes from the capture, the pacing and CPU fields from the markers. The C++ data
+//* module's FrameRow.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -58,16 +62,16 @@ namespace MB.FramePacing.Data
     IReadOnlyList<string> Flags,
     NanosecondTickCount? IntendedDisplayTime,
     NanosecondTimeDuration? MarkerTargetFrameTime,
-    NanosecondTimeSpan? TargetFrameTime,
+    NanosecondTimeDuration? TargetFrameTime,
     NanosecondTimeDuration? MarkerPreferredFrameTime,
-    NanosecondTimeSpan? PreferredFrameTime,
+    NanosecondTimeDuration? PreferredFrameTime,
     NanosecondTimeSpan? PacingError,
     NanosecondTimeSpan? PredictionError,
     NanosecondTimeSpan? Lateness,
     NanosecondTickCount? LastSeenTime,
     NanosecondTickCount? CpuStartTime,
     NanosecondTimeDuration? CpuBusy,
-    NanosecondTimeSpan? FrameTime,
+    NanosecondTimeDuration? FrameTime,
     NanosecondTimeSpan? CpuWait,
     IReadOnlyList<OlderFrame> OlderFrames,
     NanosecondTickCount? MainMarkerFirstSeenTime = null,

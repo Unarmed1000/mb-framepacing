@@ -13,8 +13,8 @@ namespace MB.FramePacing.Analysis
 {
   /// <param name="ErrorThreshold">The |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>).</param>
   public sealed record TimelineResult(
-    NanosecondTimeSpan CapturePeriod,
-    NanosecondTimeSpan ErrorThreshold,
+    NanosecondTimeDuration CapturePeriod,
+    NanosecondTimeDuration ErrorThreshold,
     IReadOnlyList<RunAnalysis> Runs,
     IReadOnlyList<string> Warnings
   );

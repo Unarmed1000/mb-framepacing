@@ -109,7 +109,7 @@ namespace MB.FramePacing.Analysis
     /// A presented frame read back. A row without a last-seen time (lastSeenNs): the last capture its time on screen allows, the time on
     /// screen less one capture period after it was first seen, and never before that.
     /// </summary>
-    public static PresentedFrame ToFrame(this FrameRow row, NanosecondTimeSpan capturePeriod) =>
+    public static PresentedFrame ToFrame(this FrameRow row, NanosecondTimeDuration capturePeriod) =>
       new PresentedFrame(
         row.Segment,
         row.FrameIndex,

@@ -2,9 +2,9 @@
 //* File Description
 //* ----------------
 //* One line of an analysis CSV, split on commas, read by column name so columns added later and columns an older file lacks both work.
-//* Every number is a whole one, written as its digits with a '-' in front when negative; times are nanoseconds. A cell that is anything
-//* else, or outside its type's range, is an InvalidDataException. The row is a view of the line's characters (no string per cell): it
-//* is good as long as the line is.
+//* Every number is a whole one, written as its digits with a '-' in front when negative; times are nanoseconds, and a length of time is
+//* never negative. A cell that is anything else, or outside its type's range, is an InvalidDataException. The row is a view of the
+//* line's characters (no string per cell): it is good as long as the line is.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -62,6 +62,12 @@ namespace MB.FramePacing.Data
     /// <summary>A span's cell; null when it is empty.</summary>
     public NanosecondTimeSpan? Span(int index) => Long(index) is { } nanoseconds ? new NanosecondTimeSpan(nanoseconds) : null;
 
+    /// <summary>
+    /// A length of time's cell: its nanoseconds, never negative (a negative number is refused, as one outside any other range is); null
+    /// when it is empty.
+    /// </summary>
+    public NanosecondTimeDuration? Duration(int index) => Cell(index) is { Length: > 0 } text ? ParseDuration(text) : null;
+
     /// <summary>A point in time's cell: the nanoseconds since its clock's zero.</summary>
     public NanosecondTickCount RequiredTime(int index) => new NanosecondTickCount(RequiredLong(index));
 
@@ -90,6 +96,23 @@ namespace MB.FramePacing.Data
       if (ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong value) && value <= max)
         return value;
       throw new InvalidDataException($"'{text}' is not a whole number from 0 to {max}");
+    }
+
+    /// <summary>
+    /// A length of time: a whole number of nanoseconds that is never negative. The cell is a signed 64-bit number in the file, read as one
+    /// ("-0" is 0, as in the other languages' readers); a negative number is refused.
+    /// </summary>
+    private static NanosecondTimeDuration ParseDuration(ReadOnlySpan<char> text)
+    {
+      // AllowLeadingSign takes a '+' too, which the other languages' readers do not
+      if (
+        text.Length > 0
+        && text[0] != '+'
+        && long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long nanoseconds)
+        && nanoseconds >= 0
+      )
+        return NanosecondTimeDuration.FromNanoseconds(nanoseconds);
+      throw new InvalidDataException($"'{text}' is not a whole number from 0 to {long.MaxValue}");
     }
 
     /// <summary>The header line's column names with their positions, and how many columns it has.</summary>

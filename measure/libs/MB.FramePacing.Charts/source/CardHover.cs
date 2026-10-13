@@ -68,7 +68,7 @@ namespace MB.FramePacing.Charts
       var data = m_section.Data;
       double column = Math.Floor(plot.PixelX(seconds));
       // An event covers its refresh: it reaches a nanosecond less than the period (which is at least one) after its time
-      var reach = new NanosecondTimeSpan(Math.Max(1, data.Run.CapturePeriod.Nanoseconds) - 1);
+      var reach = NanosecondTimeDuration.FromNanoseconds(Math.Max(1, data.Run.CapturePeriod.Nanoseconds) - 1);
       var from = data.TimeAt(plot.ValueX(column)) - reach;
       var to = data.TimeAt(plot.ValueX(column + 1));
       var lines = new List<string>();

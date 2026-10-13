@@ -25,7 +25,7 @@ namespace MB.FramePacing.Analysis
     public const double RefreshTolerance = 0.01;
 
     /// <summary>The default |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>): 1 ms.</summary>
-    public static readonly NanosecondTimeSpan DefaultErrorThreshold = NanosecondTimeSpan.FromMilliseconds(1);
+    public static readonly NanosecondTimeDuration DefaultErrorThreshold = new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1));
 
     public static TimelineResult Analyze(IReadOnlyList<CaptureRow> rows, TimelineOptions? options = null)
     {
@@ -36,9 +36,9 @@ namespace MB.FramePacing.Analysis
       // The report is the same for every source; a camera's coarser timing shows as noise in the errors, and the warning says how much
       if (options.Scanout == ScanoutModel.Camera && period > threshold)
         warnings.Add(
-          $"The camera times each frame to about one camera period ({period.TotalMilliseconds:0.##} ms), more than the "
-            + $"{threshold.TotalMilliseconds:0.###} ms error threshold: smaller animation errors are measurement noise. "
-            + $"--error-threshold-ms {period.TotalMilliseconds:0.##} counts only the errors the camera resolves."
+          $"The camera times each frame to about one camera period ({period.Value.TotalMilliseconds:0.##} ms), more than the "
+            + $"{threshold.Value.TotalMilliseconds:0.###} ms error threshold: smaller animation errors are measurement noise. "
+            + $"--error-threshold-ms {period.Value.TotalMilliseconds:0.##} counts only the errors the camera resolves."
         );
 
       var runRows = SplitIntoRuns(rows, warnings);
@@ -58,7 +58,7 @@ namespace MB.FramePacing.Analysis
     /// Median interval between consecutive recorded captures (the upper of the two middle ones for an even number: always an interval
     /// the capture has); zero when there is none.
     /// </summary>
-    public static NanosecondTimeSpan EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
+    public static NanosecondTimeDuration EstimateCapturePeriod(IReadOnlyList<CaptureRow> rows)
     {
       var deltas = new NanosecondList(rows.Count);
       // Only the index and the time of the capture before are needed: a row is too large to copy for each
@@ -80,9 +80,10 @@ namespace MB.FramePacing.Analysis
         previousTime = row.CaptureTime;
       }
       if (deltas.Count == 0)
-        return NanosecondTimeSpan.Zero;
+        return NanosecondTimeDuration.Zero;
       deltas.Sort();
-      return new NanosecondTimeSpan(deltas.Values[deltas.Count / 2]);
+      // Every interval is between a capture and a later one: never negative
+      return NanosecondTimeDuration.FromNanoseconds(deltas.Values[deltas.Count / 2]);
     }
 
     private sealed class RunRows
@@ -237,7 +238,7 @@ namespace MB.FramePacing.Analysis
       public List<OlderFrameCapture>? OlderFrames;
     }
 
-    private static RunAnalysis AnalyzeRun(RunRows run, NanosecondTimeSpan period, NanosecondTimeSpan threshold, TimelineOptions options)
+    private static RunAnalysis AnalyzeRun(RunRows run, NanosecondTimeDuration period, NanosecondTimeDuration threshold, TimelineOptions options)
     {
       var warnings = new List<string>(run.Warnings);
       long decoded = 0;
@@ -386,7 +387,7 @@ namespace MB.FramePacing.Analysis
         outOfOrder,
         frames.Count > 0 ? frames[^1].Segment + 1 : 0
       );
-      if (period <= NanosecondTimeSpan.Zero)
+      if (period <= NanosecondTimeDuration.Zero)
         warnings.Add("The capture period could not be determined");
       if (SlowCaptureWarning(frames, period) is { } slowCapture)
         warnings.Add(slowCapture);
@@ -416,7 +417,7 @@ namespace MB.FramePacing.Analysis
     private static CameraRunStatistics AnalyzeCamera(
       List<FrameBuilder> builders,
       Dictionary<ulong, NanosecondTickCount> firstSecondary,
-      NanosecondTimeSpan period,
+      NanosecondTimeDuration period,
       List<string> warnings
     )
     {
@@ -432,7 +433,7 @@ namespace MB.FramePacing.Analysis
 
       var typical = Median(delays);
       long tornFrames = 0;
-      if (delays.Count >= 3 && period > NanosecondTimeSpan.Zero && typical.Nanoseconds > 4 * period.Nanoseconds)
+      if (delays.Count >= 3 && period > NanosecondTimeDuration.Zero && typical.Nanoseconds > 4 * period.Nanoseconds)
       {
         // Three camera periods, or half the usual delay (cut to the nanosecond) when that is more
         var margin = new NanosecondTimeSpan(Math.Max(3 * period.Nanoseconds, typical.Nanoseconds / 2));
@@ -497,14 +498,14 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     private static RunPacing? AnalyzePacing(
       List<PresentedFrame> frames,
-      NanosecondTimeSpan period,
-      NanosecondTimeSpan threshold,
+      NanosecondTimeDuration period,
+      NanosecondTimeDuration threshold,
       bool camera,
       TimelineOptions options,
       List<string> warnings
     )
     {
-      if (period <= NanosecondTimeSpan.Zero)
+      if (period <= NanosecondTimeDuration.Zero)
         return null;
       double? expected = options.ExpectedRefreshHz is > 0 ? options.ExpectedRefreshHz : null;
       var refresh = period;
@@ -529,7 +530,7 @@ namespace MB.FramePacing.Analysis
         var firstSeen = CameraFirstSeenTimes(frames).ToList();
         double? onGrid = RefreshEstimator.GridPeriodNanoseconds(firstSeen, estimate, intervals, cameraPeriodNanoseconds, hint);
         estimate = RefreshEstimator.RefinePeriodNanoseconds(firstSeen, onGrid ?? estimate);
-        refresh = new NanosecondTimeSpan((long)Math.Round(estimate));
+        refresh = NanosecondTimeDuration.FromNanoseconds((long)Math.Round(estimate));
         double calculatedHz = NanosecondTimeSpan.NanosecondsPerSecond / estimate;
         if (onGrid == null && firstSeen.Count >= RefreshEstimator.MinGridTimes)
           warnings.Add(
@@ -614,7 +615,7 @@ namespace MB.FramePacing.Analysis
     /// skipped frames). When most presented frames come after frame indices that were never captured, the capture is slower than the
     /// display, or vsync is off: the results then describe what the capture saw, not what the display showed.
     /// </summary>
-    private static string? SlowCaptureWarning(List<PresentedFrame> frames, NanosecondTimeSpan period)
+    private static string? SlowCaptureWarning(List<PresentedFrame> frames, NanosecondTimeDuration period)
     {
       int followers = 0;
       int afterGap = 0;
@@ -634,7 +635,7 @@ namespace MB.FramePacing.Analysis
         return null;
 
       string rates =
-        seconds > 0 && period > NanosecondTimeSpan.Zero
+        seconds > 0 && period > NanosecondTimeDuration.Zero
           ? string.Create(
             CultureInfo.InvariantCulture,
             $" The frame index advances about {indices / seconds:0} times per second; the capture records {NanosecondTimeSpan.NanosecondsPerSecond / (double)period.Nanoseconds:0} frames per second."
@@ -655,11 +656,11 @@ namespace MB.FramePacing.Analysis
     ///    step). The frame time is B's target or preferred frame time, else the animation step into A. A stall with a running clock, or an
     ///    ordinary dropped frame, is neither.
     /// </summary>
-    private static void AssumeStatic(List<FrameBuilder> builders, NanosecondTimeSpan refresh, NanosecondTimeSpan threshold)
+    private static void AssumeStatic(List<FrameBuilder> builders, NanosecondTimeDuration refresh, NanosecondTimeDuration threshold)
     {
       var onDemandTime = MarkerPayload.OnDemandFrameTime;
       // Half a refresh, cut to the nanosecond
-      var halfRefresh = new NanosecondTimeSpan(refresh.Nanoseconds / 2);
+      var halfRefresh = NanosecondTimeDuration.FromNanoseconds(refresh.Nanoseconds / 2);
       var twoRefreshes = refresh + refresh;
       bool usesStaticFlags = builders.Any(b => b.StaticAfter || b.StaticBefore);
       // The frame indices each segment showed out of order: skipped, but not dropped
@@ -683,15 +684,15 @@ namespace MB.FramePacing.Analysis
             b.TargetFrameTime == onDemandTime || (b.TargetFrameTime == NanosecondTimeDuration.Zero && b.PreferredFrameTime == onDemandTime);
           // What each frame in between was due: B's target, else what the application prefers. Without either (on demand, or unknown), the
           // animation step into A: the last step of the motion before the hold. At least one refresh
-          NanosecondTimeSpan frameTime =
+          NanosecondTimeDuration frameTime =
             !onDemand && b.TargetFrameTime != NanosecondTimeDuration.Zero ? b.TargetFrameTime
             : !onDemand && b.PreferredFrameTime != NanosecondTimeDuration.Zero && b.PreferredFrameTime != onDemandTime ? b.PreferredFrameTime
-            : i >= 2 && builders[i - 2].Segment == a.Segment ? a.AnimationTime - builders[i - 2].AnimationTime
+            : i >= 2 && builders[i - 2].Segment == a.Segment ? new NanosecondTimeDuration(a.AnimationTime - builders[i - 2].AnimationTime)
             : refresh;
           if (frameTime < refresh)
             frameTime = refresh;
           long rendered = (long)b.SkippedBefore + 1;
-          var due = new NanosecondTimeSpan(frameTime.Nanoseconds * rendered);
+          var due = NanosecondTimeDuration.FromNanoseconds(frameTime.Nanoseconds * rendered);
           var hold = b.FirstSeenTime - a.FirstSeenTime;
           var animation = b.AnimationTime - a.AnimationTime;
           bool waited = onDemand || hold >= due + halfRefresh;
@@ -706,8 +707,8 @@ namespace MB.FramePacing.Analysis
 
     private static List<PresentedFrame> BuildFrames(
       List<FrameBuilder> builders,
-      NanosecondTimeSpan period,
-      NanosecondTimeSpan threshold,
+      NanosecondTimeDuration period,
+      NanosecondTimeDuration threshold,
       bool camera,
       bool assumeStatic
     )
@@ -750,13 +751,16 @@ namespace MB.FramePacing.Analysis
         NanosecondTimeSpan? error = displayDelta.HasValue && !staticStep && !uncertainStep ? animationDelta!.Value - displayDelta.Value : null;
         drift += error ?? NanosecondTimeSpan.Zero;
         var onScreen = hasNext ? builders[i + 1].FirstSeenTime - b.FirstSeenTime : b.LastSeenTime - b.FirstSeenTime + period;
-        // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured
-        NanosecondTimeSpan? frameTime =
+        // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured, and when that start
+        // is not before this one. A clock that went backwards says nothing of how long the frame took: unknown, and never a 0 that
+        // would look like a measurement
+        NanosecondTimeDuration? frameTime =
           i + 1 < builders.Count
           && builders[i + 1].FrameIndex == b.FrameIndex + 1
           && b.CpuStartTime != default
           && builders[i + 1].CpuStartTime != default
-            ? builders[i + 1].CpuStartTime - b.CpuStartTime
+          && builders[i + 1].CpuStartTime >= b.CpuStartTime
+            ? new NanosecondTimeDuration(builders[i + 1].CpuStartTime - b.CpuStartTime)
             : null;
         NanosecondTimeSpan? cpuWait = frameTime.HasValue && b.CpuBusy != NanosecondTimeDuration.Zero ? frameTime.Value - b.CpuBusy : null;
         var flags = PresentedFrameFlags.None;

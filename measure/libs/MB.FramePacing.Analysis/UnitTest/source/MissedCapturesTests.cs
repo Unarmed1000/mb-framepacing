@@ -44,7 +44,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     [TestCase(3.0, 2)]
     public void Before_CountsTheRefreshesAStepLeftOut(double periods, long missed) =>
       Assert.That(
-        MissedCaptures.Before(new NanosecondTimeSpan((long)Math.Round(periods * Period)), new NanosecondTimeSpan(Period)),
+        MissedCaptures.Before(new NanosecondTimeSpan((long)Math.Round(periods * Period)), NanosecondTimeDuration.FromNanoseconds(Period)),
         Is.EqualTo(missed)
       );
 

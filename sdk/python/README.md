@@ -187,9 +187,17 @@ with CaptureDataReader(capture_folder / "captures.mbcd") as reader:
 ```
 
 Every time is a whole number of nanoseconds in a field named `…_ns` (`FrameRow.first_seen_ns`, `CaptureDataRecord.host_ns`,
-`AnalysisSummary.capture_period_ns`), exactly the number the file holds. Files from before the tools counted in nanoseconds held
-ticks of 100 ns under names that end in `Ticks`: such a `summary.json` or frames CSV is refused (`DataFormatError`), and the two
-format documents above say what the other files read as. Analyse the capture again.
+`AnalysisSummary.capture_period_ns`), exactly the number the file holds. A length of time is never negative (a frame's `target_ns`,
+`preferred_ns` and `frame_time_ns`, the summary's `capture_period_ns`, `measurement_resolution_ns` and `error_threshold_ns`, a
+run's pacing `refresh_period_ns` and `target_frame_ns`): a negative number there in a file is refused (`DataFormatError`), as any
+number outside its range is. What can go either way can be negative: the animation time and step, the errors, the lateness, the
+drift, CPU wait, a camera capture's `scanout_delay_ns` (the sync marker can be seen before the main marker decodes), and
+`display_delta_ns` and `on_screen_ns` (the display time step and the time on screen: a camera can time a frame after the next one's
+sighting, and the steps then still add up to the time that passed).
+
+Files from before the tools counted in nanoseconds held ticks of 100 ns under names that end in `Ticks`: such a `summary.json` or
+frames CSV is refused (`DataFormatError`), and the two format documents above say what the other files read as. Analyse the capture
+again.
 
 ### API
 

@@ -318,7 +318,7 @@ namespace MB.FramePacing.Charts.UnitTest
             LastSeenTime = new NanosecondTickCount(time),
             DisplayDelta = i > 0 ? new NanosecondTimeSpan(display) : null,
             MarkerTargetFrameTime = NanosecondTimeDuration.FromNanoseconds(i < 1400 ? Refresh : 2 * Refresh),
-            PreferredFrameTime = new NanosecondTimeSpan(preferred(i)),
+            PreferredFrameTime = NanosecondTimeDuration.FromNanoseconds(preferred(i)),
             Flags = i == 1800 ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
           }
         );
@@ -366,15 +366,15 @@ namespace MB.FramePacing.Charts.UnitTest
             first ? null : new NanosecondTimeSpan(error),
             NanosecondTimeSpan.Zero,
             late ? PresentedFrameFlags.Late : PresentedFrameFlags.None,
-            TargetFrameTime: first ? null : new NanosecondTimeSpan(Refresh)
+            TargetFrameTime: first ? null : NanosecondTimeDuration.FromNanoseconds(Refresh)
           )
         );
       }
       int lateCount = frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
       var pacing = new RunPacing(
-        new NanosecondTimeSpan(Refresh),
+        NanosecondTimeDuration.FromNanoseconds(Refresh),
         false,
-        new NanosecondTimeSpan(Refresh),
+        NanosecondTimeDuration.FromNanoseconds(Refresh),
         PacingSource.NativeRefresh,
         lateCount,
         lateCount / (double)(Count - 1),
@@ -390,12 +390,21 @@ namespace MB.FramePacing.Charts.UnitTest
         true,
         true,
         new RunCounts(Count, Count, 0, 0, 0, 0, 0, Count, 0, 0, 0, 1),
-        RunStatistics.From(frames, NanosecondTimeSpan.FromMilliseconds(1), new NanosecondTimeSpan(Refresh)),
+        RunStatistics.From(
+          frames,
+          new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1)),
+          NanosecondTimeDuration.FromNanoseconds(Refresh)
+        ),
         frames,
         Array.Empty<string>(),
         Pacing: pacing
       );
-      return new ChartRun(analysis, new NanosecondTimeSpan(Refresh), NanosecondTimeSpan.FromMilliseconds(1), false);
+      return new ChartRun(
+        analysis,
+        NanosecondTimeDuration.FromNanoseconds(Refresh),
+        new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1)),
+        false
+      );
     }
 
     private static int Count(string text, string part) => Regex.Matches(text, Regex.Escape(part)).Count;
@@ -736,20 +745,20 @@ namespace MB.FramePacing.Charts.UnitTest
               5 => f with { OnScreen = new NanosecondTimeSpan(3 * Refresh) },
               10 => f with
               {
-                FirstSeenTime = f.FirstSeenTime + new NanosecondTimeSpan(2 * Refresh),
-                LastSeenTime = f.LastSeenTime + new NanosecondTimeSpan(2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + NanosecondTimeDuration.FromNanoseconds(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + NanosecondTimeDuration.FromNanoseconds(2 * Refresh),
                 SkippedBefore = 2,
               },
               12 => f with
               {
-                FirstSeenTime = f.FirstSeenTime + new NanosecondTimeSpan(2 * Refresh),
-                LastSeenTime = f.LastSeenTime + new NanosecondTimeSpan(2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + NanosecondTimeDuration.FromNanoseconds(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + NanosecondTimeDuration.FromNanoseconds(2 * Refresh),
                 Flags = PresentedFrameFlags.Torn,
               },
               > 5 => f with
               {
-                FirstSeenTime = f.FirstSeenTime + new NanosecondTimeSpan(2 * Refresh),
-                LastSeenTime = f.LastSeenTime + new NanosecondTimeSpan(2 * Refresh),
+                FirstSeenTime = f.FirstSeenTime + NanosecondTimeDuration.FromNanoseconds(2 * Refresh),
+                LastSeenTime = f.LastSeenTime + NanosecondTimeDuration.FromNanoseconds(2 * Refresh),
               },
               _ => f,
             }

@@ -21,15 +21,15 @@ namespace MB.FramePacing.Analysis
     /// <paramref name="frameTime"/> in whole refreshes of <paramref name="refresh"/>, rounded up, at least one (a 60 fps target on 144 Hz
     /// alternates 2 and 3 refreshes: 3 is the target).
     /// </summary>
-    public static NanosecondTimeSpan WholeRefreshes(NanosecondTimeSpan frameTime, NanosecondTimeSpan refresh) =>
-      new NanosecondTimeSpan(WholeRefreshes((double)frameTime.Nanoseconds, refresh.Nanoseconds));
+    public static NanosecondTimeDuration WholeRefreshes(NanosecondTimeDuration frameTime, NanosecondTimeDuration refresh) =>
+      NanosecondTimeDuration.FromNanoseconds(WholeRefreshes((double)frameTime.Nanoseconds, refresh.Nanoseconds));
 
     /// <summary>
     /// The frame time of <paramref name="framesPerSecond"/> in whole refreshes of <paramref name="refresh"/>, as
-    /// <see cref="WholeRefreshes(NanosecondTimeSpan, NanosecondTimeSpan)"/>.
+    /// <see cref="WholeRefreshes(NanosecondTimeDuration, NanosecondTimeDuration)"/>.
     /// </summary>
-    public static NanosecondTimeSpan WholeRefreshesAtRate(double framesPerSecond, NanosecondTimeSpan refresh) =>
-      new NanosecondTimeSpan(WholeRefreshes(NanosecondTimeSpan.NanosecondsPerSecond / framesPerSecond, refresh.Nanoseconds));
+    public static NanosecondTimeDuration WholeRefreshesAtRate(double framesPerSecond, NanosecondTimeDuration refresh) =>
+      NanosecondTimeDuration.FromNanoseconds(WholeRefreshes(NanosecondTimeSpan.NanosecondsPerSecond / framesPerSecond, refresh.Nanoseconds));
 
     // A rate's frame time is not a whole number of nanoseconds: the rounding takes it as it is. The refresh and the result are whole ones
     private static long WholeRefreshes(double frameTime, long refresh) => Math.Max(1, (long)Math.Ceiling((frameTime / refresh) - Slack)) * refresh;
