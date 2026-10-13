@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mb-framepacing"
 # The SDK's version, sdk/VERSION as PEP 440 spells it (0.2.0-beta.1 is 0.2.0b1; a test checks that mb_framepacing.__version__ matches it)
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "The mb-framepacing SDK: draw the frame marker into every frame (mb_framepacing.marker) and read the tools' capture data and analysis output (mb_framepacing.data)"
 readme = "README.md"
 requires-python = ">=3.12"
