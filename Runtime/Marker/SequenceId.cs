@@ -1,0 +1,176 @@
+//****************************************************************************************************************************************************
+//* File Description
+//* ----------------
+//* The start marker's sequence id: 16 opaque bytes that identify the capture sequence, any content as long as it is unique to it (a UUID's
+//* bytes, or a short text tag padded with zeros). A value type of two 64 bit halves, so it never allocates. Shown as text when it is
+//* printable ASCII, otherwise as a UUID's 8-4-4-4-12 hex form.
+//*
+//* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
+//* SPDX-License-Identifier: BSD-3-Clause
+//****************************************************************************************************************************************************
+
+using System;
+using System.Buffers.Binary;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace MB.FramePacing.Marker
+{
+  public readonly struct SequenceId : IEquatable<SequenceId>
+  {
+    public const int ByteCount = 16;
+
+    // Bytes 0..7 and 8..15, the first byte the most significant
+    private readonly ulong m_high;
+    private readonly ulong m_low;
+
+    public SequenceId(ulong high, ulong low)
+    {
+      m_high = high;
+      m_low = low;
+    }
+
+    /// <summary>Bytes 0 to 7, byte 0 the most significant.</summary>
+    public ulong High => m_high;
+
+    /// <summary>Bytes 8 to 15, byte 8 the most significant.</summary>
+    public ulong Low => m_low;
+
+    /// <summary>All zero: no sequence id.</summary>
+    public bool IsEmpty => m_high == 0 && m_low == 0;
+
+    /// <summary>The first 16 bytes of <paramref name="source"/>.</summary>
+    public static SequenceId FromBytes(ReadOnlySpan<byte> source)
+    {
+      if (source.Length < ByteCount)
+        throw new ArgumentException($"A sequence id needs {ByteCount} bytes");
+      return new SequenceId(BinaryPrimitives.ReadUInt64BigEndian(source), BinaryPrimitives.ReadUInt64BigEndian(source.Slice(8)));
+    }
+
+    /// <summary>Write the 16 bytes to the start of <paramref name="destination"/>. Returns false when they do not fit.</summary>
+    public bool TryCopyTo(Span<byte> destination)
+    {
+      if (destination.Length < ByteCount)
+        return false;
+      BinaryPrimitives.WriteUInt64BigEndian(destination, m_high);
+      BinaryPrimitives.WriteUInt64BigEndian(destination.Slice(8), m_low);
+      return true;
+    }
+
+    /// <summary>A UUID's bytes in the order its text shows them, so <see cref="ToString"/> gives the same text as the Guid. Does not allocate.</summary>
+    public static SequenceId FromGuid(Guid guid)
+    {
+      // The overlay reads the Guid's fields as its constructor takes them (int, short, short, 8 bytes), whatever the machine's byte order
+      var fields = new GuidFields { Guid = guid };
+      ulong high = ((ulong)(uint)fields.A << 32) | ((ulong)(ushort)fields.B << 16) | (ushort)fields.C;
+      ulong low =
+        ((ulong)fields.D << 56)
+        | ((ulong)fields.E << 48)
+        | ((ulong)fields.F << 40)
+        | ((ulong)fields.G << 32)
+        | ((ulong)fields.H << 24)
+        | ((ulong)fields.I << 16)
+        | ((ulong)fields.J << 8)
+        | fields.K;
+      return new SequenceId(high, low);
+    }
+
+    /// <summary>
+    /// A text tag of at most 16 printable ASCII characters, padded with zero bytes. Returns false for any other text. Does not allocate.
+    /// </summary>
+    public static bool TryFromText(string text, out SequenceId id)
+    {
+      id = default;
+      if (text == null || text.Length == 0 || text.Length > ByteCount)
+        return false;
+      ulong high = 0;
+      ulong low = 0;
+      for (int i = 0; i < ByteCount; ++i)
+      {
+        char c = i < text.Length ? text[i] : '\0';
+        if (i < text.Length && (c < 0x20 || c > 0x7E))
+          return false;
+        if (i < 8)
+          high = (high << 8) | c;
+        else
+          low = (low << 8) | c;
+      }
+      id = new SequenceId(high, low);
+      return true;
+    }
+
+    /// <summary>The text when the bytes are printable ASCII followed only by zero bytes, otherwise the 8-4-4-4-12 hex form.</summary>
+    public override string ToString()
+    {
+      Span<byte> bytes = stackalloc byte[ByteCount];
+      TryCopyTo(bytes);
+      int length = ByteCount;
+      while (length > 0 && bytes[length - 1] == 0)
+        --length;
+      bool text = length > 0;
+      for (int i = 0; i < length && text; ++i)
+        text = bytes[i] >= 0x20 && bytes[i] <= 0x7E;
+      if (text)
+        return Encoding.ASCII.GetString(bytes.Slice(0, length));
+      var hex = new StringBuilder(36);
+      for (int i = 0; i < ByteCount; ++i)
+      {
+        if (i == 4 || i == 6 || i == 8 || i == 10)
+          hex.Append('-');
+        hex.Append(bytes[i].ToString("x2"));
+      }
+      return hex.ToString();
+    }
+
+    public bool Equals(SequenceId other) => m_high == other.m_high && m_low == other.m_low;
+
+    public override bool Equals(object obj) => obj is SequenceId other && Equals(other);
+
+    public override int GetHashCode() => HashCode.Combine(m_high, m_low);
+
+    public static bool operator ==(SequenceId left, SequenceId right) => left.Equals(right);
+
+    public static bool operator !=(SequenceId left, SequenceId right) => !left.Equals(right);
+
+    /// <summary>A Guid's fields in the order of its constructor, laid over the Guid itself.</summary>
+    [StructLayout(LayoutKind.Explicit)]
+    private struct GuidFields
+    {
+      [FieldOffset(0)]
+      public Guid Guid;
+
+      [FieldOffset(0)]
+      public readonly int A;
+
+      [FieldOffset(4)]
+      public readonly short B;
+
+      [FieldOffset(6)]
+      public readonly short C;
+
+      [FieldOffset(8)]
+      public readonly byte D;
+
+      [FieldOffset(9)]
+      public readonly byte E;
+
+      [FieldOffset(10)]
+      public readonly byte F;
+
+      [FieldOffset(11)]
+      public readonly byte G;
+
+      [FieldOffset(12)]
+      public readonly byte H;
+
+      [FieldOffset(13)]
+      public readonly byte I;
+
+      [FieldOffset(14)]
+      public readonly byte J;
+
+      [FieldOffset(15)]
+      public readonly byte K;
+    }
+  }
+}
