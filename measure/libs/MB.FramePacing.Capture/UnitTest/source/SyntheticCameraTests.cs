@@ -18,6 +18,7 @@ using NUnit.Framework;
 namespace MB.FramePacing.Capture.UnitTest
 {
   [TestFixture]
+  [Category("slow")] // a simulated camera, frame by frame: CI runs it on one system
   public class SyntheticCameraTests
   {
     private static SyntheticCamera CreateCamera(SyntheticCameraOptions? cameraOptions = null, double fps = 1000, double refreshHz = 60) =>

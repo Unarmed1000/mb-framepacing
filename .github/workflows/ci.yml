@@ -64,11 +64,14 @@ jobs:
           ctest --test-dir sdk/cpp/build/ci-no-data -C Release --output-on-failure
           if [ -d sdk/cpp/build/ci-no-data/_deps/nlohmann_json-src ]; then echo "::error::nlohmann/json was fetched without the data module"; exit 1; fi
 
+      # Every documented way on Ubuntu; on Windows and macOS, where a build of the library takes longest, the installed package only
       - name: CMake consumers (FetchContent, add_subdirectory, find_package with components)
         shell: bash
         run: |
+          only=()
+          if [ "${{ runner.os }}" != "Linux" ]; then only=(--package-only); fi
           # Windows runners have 'python', Linux and macOS 'python3'
-          "$(command -v python3 || command -v python)" sdk/cpp/tests/consumer/check_consumers.py
+          "$(command -v python3 || command -v python)" sdk/cpp/tests/consumer/check_consumers.py "${only[@]}"
 
       # Experimental: a capture joined with a Perfetto trace. The tools start the user's own trace processor and never download one;
       # here Perfetto's Python package fetches the copy it is pinned to, and the tests that read a trace must find it
@@ -83,12 +86,17 @@ jobs:
           echo "MB_TRACE_PROCESSOR=$trace_processor" >> "$GITHUB_ENV"
 
       # A test that runs 5 minutes is hung: the runner ends it and names it. The step's own limit catches a hang after the tests, and
-      # unlike the job's limit it ends the step with its log
+      # unlike the job's limit it ends the step with its log. The slow tests (category "slow": every test clip imported through
+      # ffmpeg, the simulated cameras) run on Ubuntu only; Windows and macOS run everything else, the import tests among it
       - name: .NET build and tests
         timeout-minutes: 20
+        shell: bash
         env:
           MB_REQUIRE_TRACE_PROCESSOR: "1"
-        run: dotnet test mb-framepacing.slnx -c Release --blame-hang-timeout 5m
+        run: |
+          filter=()
+          if [ "${{ runner.os }}" != "Linux" ]; then filter=(--filter "TestCategory!=slow"); fi
+          dotnet test mb-framepacing.slnx -c Release --blame-hang-timeout 5m "${filter[@]}"
 
       - name: Self-contained tools
         if: startsWith(github.ref, 'refs/tags/tools-v')

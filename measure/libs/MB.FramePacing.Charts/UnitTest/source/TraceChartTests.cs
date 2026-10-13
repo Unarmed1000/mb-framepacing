@@ -21,6 +21,7 @@ using NUnit.Framework;
 namespace MB.FramePacing.Charts.UnitTest
 {
   [TestFixture]
+  [NonParallelizable] // shares Perfetto's trace processor and the loader's cache of traces
   public class TraceChartTests
   {
     private const string Joined = "A Perfetto trace of the run was joined (experimental): its times are tied to the capture's by the frames only.";

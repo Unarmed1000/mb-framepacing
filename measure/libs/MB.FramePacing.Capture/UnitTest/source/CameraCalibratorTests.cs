@@ -18,6 +18,7 @@ using NUnit.Framework;
 namespace MB.FramePacing.Capture.UnitTest
 {
   [TestFixture]
+  [Category("slow")] // a simulated camera, frame by frame: CI runs it on one system
   public class CameraCalibratorTests
   {
     private static readonly CameraCalibratorOptions g_options = new CameraCalibratorOptions { Seconds = 0.5 };

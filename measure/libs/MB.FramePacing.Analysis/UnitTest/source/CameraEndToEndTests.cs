@@ -22,6 +22,7 @@ using NUnit.Framework;
 namespace MB.FramePacing.Analysis.UnitTest
 {
   [TestFixture]
+  [Category("slow")] // a simulated camera, frame by frame: CI runs it on one system
   public class CameraEndToEndTests
   {
     private string m_directory = string.Empty;

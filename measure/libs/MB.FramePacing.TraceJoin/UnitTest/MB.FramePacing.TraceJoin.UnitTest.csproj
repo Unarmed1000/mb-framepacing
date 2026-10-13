@@ -2,6 +2,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="$([MSBuild]::GetPathOfFileAbove('UnitTest.props', '$(MSBuildProjectDirectory)'))" />
 
+  <!-- One test at a time: these tests share Perfetto's trace processor (a process of its own) and the loader's cache of traces -->
+  <PropertyGroup>
+    <ParallelTests>false</ParallelTests>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MB.FramePacing.TraceJoin.csproj" />
   </ItemGroup>

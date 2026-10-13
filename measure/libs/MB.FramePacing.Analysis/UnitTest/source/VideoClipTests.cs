@@ -22,6 +22,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 {
   [TestFixture]
   [Category("ffmpeg")]
+  [Category("slow")] // imports every test clip through ffmpeg: CI runs it on one system
   public class VideoClipTests
   {
     private string m_directory = string.Empty;
@@ -324,7 +325,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     {
       IReadOnlyList<PresentedFrame> Frames(string clip) =>
         CaptureAnalyzer
-          .Analyze(VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, clip)), new AnalysisOptions())
+          .Analyze(VideoClips.Imported(clip, m_ffmpeg, Path.Combine(m_directory, clip)), new AnalysisOptions())
           .Timeline.Runs.Single()
           .Frames;
       var inAdvance = Frames("60-on-demand-paused-clock");
@@ -339,6 +340,6 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary>How long after its intended display time the frame is first shown (the pacer's and the video's clocks differ by a constant).</summary>
     private static long Behind(ClipManifest manifest, int frame) => manifest.ShownNanoseconds(frame) - manifest.IntendedNanoseconds(frame);
 
-    private string Import(string clip) => VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, "capture"));
+    private string Import(string clip) => VideoClips.Imported(clip, m_ffmpeg, Path.Combine(m_directory, "capture"));
   }
 }

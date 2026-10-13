@@ -11,6 +11,22 @@
     <PackageReference Include="NUnit.Analyzers" />
     <PackageReference Include="NUnit3TestAdapter" />
   </ItemGroup>
+  <!--
+    Tests run at once: every test case of a project in parallel with the others, each on a fixture object of its own, so what a
+    test's SetUp keeps in its fields is that test's alone. A test that shares something with others (a file, a process, a static of
+    the code under test, an environment variable) is marked [NonParallelizable] with the reason: NUnit runs those after the
+    parallel ones, one at a time. A project that cannot do this sets ParallelTests to false.
+  -->
+  <ItemGroup Condition="'$(ParallelTests)' != 'false'">
+    <AssemblyAttribute Include="NUnit.Framework.ParallelizableAttribute">
+      <_Parameter1>NUnit.Framework.ParallelScope.All</_Parameter1>
+      <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="NUnit.Framework.FixtureLifeCycleAttribute">
+      <_Parameter1>NUnit.Framework.LifeCycle.InstancePerTestCase</_Parameter1>
+      <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
+    </AssemblyAttribute>
+  </ItemGroup>
   <ItemGroup>
     <Content Include="NLog.config" Condition="Exists('NLog.config')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

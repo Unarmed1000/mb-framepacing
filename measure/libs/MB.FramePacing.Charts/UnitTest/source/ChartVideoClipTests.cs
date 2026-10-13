@@ -24,6 +24,7 @@ namespace MB.FramePacing.Charts.UnitTest
 {
   [TestFixture]
   [Category("ffmpeg")]
+  [Category("slow")] // imports every test clip through ffmpeg: CI runs it on one system
   public class ChartVideoClipTests
   {
     private string m_directory = string.Empty;
@@ -731,7 +732,7 @@ namespace MB.FramePacing.Charts.UnitTest
     private (ClipManifest Manifest, AnalysisReport Report, ChartRun Chart) Analyze(string clip)
     {
       var manifest = VideoClips.Manifest(clip);
-      var report = CaptureAnalyzer.Analyze(VideoClips.Import(clip, m_ffmpeg, Path.Combine(m_directory, "capture")), new AnalysisOptions());
+      var report = CaptureAnalyzer.Analyze(VideoClips.Imported(clip, m_ffmpeg, Path.Combine(m_directory, "capture")), new AnalysisOptions());
       var run = report.Timeline.Runs.Single();
       Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), $"{clip}: the manifest's presented frames");
       return (manifest, report, ChartRun.From(report, run));

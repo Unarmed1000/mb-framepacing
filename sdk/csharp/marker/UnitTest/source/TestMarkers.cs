@@ -16,12 +16,18 @@ namespace MB.FramePacing.Marker.UnitTest
 {
   public static class TestMarkers
   {
-    private static readonly MarkerGenerator g_generator = new MarkerGenerator();
-    private static readonly byte[] g_bits = new byte[ModuleMatrix.MaxPackedModuleByteCount];
+    // A generator and its bytes per thread: tests run at once, and a generator is one caller's, as an application has one per frame loop
+    [ThreadStatic]
+    private static MarkerGenerator? g_generator;
 
-    /// <summary>The payload's module matrix, in bytes the helper owns (valid until the next call).</summary>
+    [ThreadStatic]
+    private static byte[]? g_bits;
+
+    /// <summary>The payload's module matrix, in bytes the helper owns (valid until the calling thread's next call).</summary>
     public static ModuleMatrix Encode(in Payload payload, in StartMetadata metadata = default)
     {
+      g_generator ??= new MarkerGenerator();
+      g_bits ??= new byte[ModuleMatrix.MaxPackedModuleByteCount];
       Assert.That(g_generator.TryGenerateModules(payload, metadata, g_bits, out var matrix), Is.True, "encoding failed");
       return matrix;
     }

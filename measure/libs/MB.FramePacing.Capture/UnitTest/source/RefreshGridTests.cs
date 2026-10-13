@@ -170,6 +170,7 @@ namespace MB.FramePacing.Capture.UnitTest
     /// with another rate expected, the refresh with the display's rate expected, and the line through the times stays on it.
     /// </summary>
     [Test]
+    [Category("slow")] // every monitor rate at every camera rate: CI runs it on one system
     public void MonitorRefreshRates_AtEveryCameraRate_SettleOnTheRefresh()
     {
       double[] refreshRates = { 50, 60, 75, 90, 100, 120, 144, 160, 165, 240, 360, 500 };

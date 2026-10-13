@@ -13,7 +13,12 @@ and pace a frame (MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer agai
 -DMB_FRAMEPACING_BUILD_PACER=ON. Two more ask for the trace module and make a frame's record (MB_CONSUMER_TRACE): subdirectory-trace,
 and package-trace against an install built with -DMB_FRAMEPACING_BUILD_TRACE=ON.
 
+--package-only runs the package way alone, with the default modules: the library built and installed once, the check that the
+install holds nothing of an experimental module, and a consumer that finds it. It is what a system runs when another one runs all
+of them (CI: everything on Ubuntu, this on Windows and macOS, where a build of the library takes longest).
+
 python sdk/cpp/tests/consumer/check_consumers.py [--source <mb_framepacing source tree>] [--archive <mb-framepacing-cpp-x.y.z.tar.gz>]
+                                                 [--package-only]
 """
 
 import argparse
@@ -35,12 +40,14 @@ class Arguments(argparse.Namespace):
 
     source: str = str(DEFAULT_SOURCE)
     archive: str | None = None
+    package_only: bool = False
 
 
 def parse_args() -> Arguments:
     parser = argparse.ArgumentParser(description="Build and run the mb_framepacing consumer project in every documented way.")
     _ = parser.add_argument("--source", default=str(DEFAULT_SOURCE), help="The mb_framepacing source tree (default: sdk/cpp).")
     _ = parser.add_argument("--archive", help="Also consume this release archive through FetchContent (URL + SHA256).")
+    _ = parser.add_argument("--package-only", action="store_true", help="Only the package way, with the default modules.")
     return parser.parse_args(namespace=Arguments())
 
 
@@ -132,6 +139,16 @@ def main() -> int:
     major_minor = ".".join(version.split(".")[:2])
     work = Path(tempfile.mkdtemp(prefix="mb-framepacing-consumer-"))
     try:
+        if args.package_only:
+            if args.archive:
+                sys.exit("--package-only does not take --archive")
+            prefix = install_library(work, source, "library", [])
+            check_has_no_experimental_module(prefix)
+            definitions = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
+            build_and_run(work, "package", definitions)
+            print("\nConsumer check: OK (package)")
+            return 0
+
         build_and_run(
             work,
             "fetchcontent",

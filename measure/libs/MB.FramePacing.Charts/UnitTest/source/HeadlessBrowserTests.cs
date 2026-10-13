@@ -18,6 +18,7 @@ using NUnit.Framework;
 namespace MB.FramePacing.Charts.UnitTest
 {
   [TestFixture]
+  [NonParallelizable] // starts browsers, which abort or hang now and then when several start at once
   public class HeadlessBrowserTests
   {
     private const string SandboxError = "FATAL:zygote_host_impl_linux.cc: No usable sandbox!";

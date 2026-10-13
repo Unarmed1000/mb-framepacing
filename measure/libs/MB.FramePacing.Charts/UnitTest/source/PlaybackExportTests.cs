@@ -55,17 +55,13 @@ namespace MB.FramePacing.Charts.UnitTest
     private readonly List<PlaybackQuestion> m_asked = new List<PlaybackQuestion>();
     private readonly List<string> m_transcoded = new List<string>();
 
-    [OneTimeSetUp]
-    public void ReadTheGoldenAnalysis()
-    {
-      // The data modules' golden data: a test clip imported and analysed (sdk/test-data/data)
-      string golden = Path.GetFullPath(Path.Combine(VideoClips.Directory(), "..", "..", "..", "sdk", "test-data", "data", "60-busy-full-rate"));
-      m_runs = AnalysisOutput.Read(golden);
-    }
-
     [SetUp]
     public void SetUp()
     {
+      // The data modules' golden data: a test clip imported and analysed (sdk/test-data/data). Read for each test: they run at once,
+      // each on a fixture object of its own
+      string golden = Path.GetFullPath(Path.Combine(VideoClips.Directory(), "..", "..", "..", "sdk", "test-data", "data", "60-busy-full-rate"));
+      m_runs = AnalysisOutput.Read(golden);
       m_directory = Path.Combine(Path.GetTempPath(), "mb-framepacing-tests", Guid.NewGuid().ToString("N"));
       Directory.CreateDirectory(Path.Combine(m_directory, "capture", "analysis"));
       m_source = Path.Combine(m_directory, "recordings", "my capture.mp4");

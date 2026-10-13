@@ -786,8 +786,33 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     pipeline.
 - **ffmpeg tests:** the end-to-end tests (`FfmpegImportTests`, category `ffmpeg`) are skipped when no ffmpeg is found; CI installs
   ffmpeg.
+- **The .NET tests run at once and are meant to be quick** (the user, 2026-10-13: "a simple project", a minute or two for the
+  tests at the very most): the root `UnitTest.props` gives every test project `Parallelizable(ParallelScope.All)` and
+  `FixtureLifeCycle(InstancePerTestCase)`, so every test case runs in parallel on a fixture object of its own (what `SetUp` keeps
+  in fields is that test's alone; a `OneTimeSetUp` would have to be static).
+  - **A test owns what it changes:** a temporary folder of its own (a new GUID), never a file, folder or static shared with
+    another test. Helpers that keep scratch state keep it per thread (`TestMarkers`: a `MarkerGenerator` and its bytes are
+    `[ThreadStatic]`).
+  - **What can not run at once is `[NonParallelizable]` with the reason in a comment** (NUnit runs those after the parallel
+    ones, one at a time): tests that set environment variables, start a browser (`HeadlessBrowserTests`, `Png_IsTwiceTheSize`)
+    or share Perfetto's trace processor and `TraceLoader`'s cache. A project that is all of that sets `ParallelTests` to `false`
+    (the TraceJoin tests).
+  - **A test clip is imported once for a test run** (`VideoClips.Imported(clip, ffmpeg, directory)`): the import (ffmpeg, a
+    marker decoded in every frame) is the cost, so the tests of a clip get a copy of one capture, each in its own folder, as
+    an analysis writes its output next to the capture. Only a test of the import itself calls `VideoClips.Import`.
+  - After adding a test that touches files, processes or statics, run the suite a few times in a row: a sharing fault shows
+    as a test that fails now and then.
+  - **The category `slow` is what CI runs on one system only** (Ubuntu; the user, 2026-10-14, to see whether that is enough
+    before capture data is stored for the tests): the tests that import every test clip through ffmpeg (`VideoClipTests`,
+    `ChartVideoClipTests`) and the simulated cameras (`CameraEndToEndTests`, `FfmpegCameraTests`, `CameraCalibratorTests`,
+    `SyntheticCameraTests`, the monitor rates of `RefreshGridTests`). Windows and macOS run `--filter "TestCategory!=slow"`,
+    which keeps the import tests (`FfmpegImportTests`, `PlaybackPageTests`). Locally, and in mb-quality, everything runs. A new
+    test that takes seconds gets the category with its reason; a new test of how the tools behave on a system does not.
 - **CI** (mb-quality is not available there; CI runs the same commands directly):
-  - `.github/workflows/ci.yml` builds and tests C++, the CMake consumer project and .NET on Windows, Ubuntu and macOS.
+  - `.github/workflows/ci.yml` builds and tests C++, the CMake consumer project and .NET on Windows, Ubuntu and macOS. Ubuntu
+    runs all of it; Windows and macOS, the slower runners, leave out the .NET tests of the category `slow` and run the consumer
+    project one way (`check_consumers.py --package-only`: the installed package with the default modules) instead of every
+    documented way.
   - Its other jobs: `lint` (Prettier, one type per file, license headers, ruff, basedpyright, the Python library's tests, the
     reference shaders, actionlint, the Unity package assembly), `dotnet-lint` (dotnet format as mb-quality applies it, CSharpier,
     vulnerable packages, C# coverage, C# assembly sizes), `cpp-analysis` (sanitizer tests, a minute of fuzzing, clang-format,

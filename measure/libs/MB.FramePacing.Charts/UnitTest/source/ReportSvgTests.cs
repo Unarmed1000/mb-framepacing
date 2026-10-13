@@ -168,6 +168,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// would be taken for the new one.
     /// </summary>
     [Test]
+    [NonParallelizable] // starts a browser, which aborts or hangs now and then when several start at once
     public void Png_IsTwiceTheSize()
     {
       if (HeadlessBrowser.Find() is not { } browser)

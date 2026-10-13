@@ -24,6 +24,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 {
   [TestFixture]
   [Category("ffmpeg")]
+  [Category("slow")] // a simulated camera, frame by frame: CI runs it on one system
   public class FfmpegCameraTests
   {
     private const double CameraFps = 1000;
